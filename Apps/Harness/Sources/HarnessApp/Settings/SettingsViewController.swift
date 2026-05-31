@@ -706,7 +706,7 @@ final class SettingsViewController: NSViewController, NSFontChanging {
 
         systemNotificationsToggle.state = SessionCoordinator.shared.settings.systemNotificationsEnabled ? .on : .off
         systemNotificationsToggle.target = self
-        systemNotificationsToggle.action = #selector(appearanceTextDidCommit)
+        systemNotificationsToggle.action = #selector(systemNotificationsToggled)
         notificationSoundToggle.state = SessionCoordinator.shared.settings.notificationSoundEnabled ? .on : .off
         notificationSoundToggle.target = self
         notificationSoundToggle.action = #selector(appearanceTextDidCommit)
@@ -830,6 +830,17 @@ final class SettingsViewController: NSViewController, NSFontChanging {
 
     @objc private func sendTestNotification() {
         DesktopNotifier.sendTest()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in self?.refreshNotificationStatus() }
+    }
+
+    /// Toggling banners on is only meaningful if macOS is also allowing them. So when the user
+    /// enables the setting, trigger the system permission prompt (or route to System Settings if
+    /// already denied) — otherwise the toggle would silently produce nothing on a fresh install.
+    @objc private func systemNotificationsToggled() {
+        flushAndApply()
+        if systemNotificationsToggle.state == .on {
+            DesktopNotifier.requestOrOpenSettings()
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in self?.refreshNotificationStatus() }
     }
 

@@ -8,9 +8,26 @@ struct SetupStepView: View {
     @State private var isInstalling = false
     @State private var installReport: BinaryInstaller.InstallReport?
     @State private var errorMessage: String?
+    @State private var notifState: NotificationPermission.State = .undetermined
 
     private var canInstall: Bool { cliStatus.isReady || daemonStatus.isReady }
     private var isSuccess: Bool { installReport != nil && errorMessage == nil }
+
+    private var notifValue: String {
+        switch notifState {
+        case .granted:      "on"
+        case .denied:       "off"
+        case .undetermined: "ask"
+        }
+    }
+
+    private var notifTone: StatusPill.Tone {
+        switch notifState {
+        case .granted:      .success
+        case .denied:       .danger
+        case .undetermined: .pending
+        }
+    }
 
     var body: some View {
         VStack(spacing: 24) {
@@ -27,6 +44,9 @@ struct SetupStepView: View {
                     .padding(.vertical, 13)
                 Rectangle().fill(.white.opacity(0.075)).frame(height: 1)
                 statusRow(title: "Daemon", detail: "HarnessDaemon", status: daemonStatus)
+                    .padding(.vertical, 13)
+                Rectangle().fill(.white.opacity(0.075)).frame(height: 1)
+                QuietRow(title: "Notifications", detail: "Alerts when an agent finishes or needs input", value: notifValue, tone: notifTone)
                     .padding(.vertical, 13)
             }
             .frame(maxWidth: 500)
@@ -62,12 +82,24 @@ struct SetupStepView: View {
             } else {
                 StatusPill(text: "ready", tone: .success)
             }
+
+            if notifState != .granted {
+                Button(notifState == .denied ? "Open notification settings" : "Enable notifications",
+                       action: requestNotifications)
+                    .buttonStyle(GlassSecondaryButtonStyle())
+            }
         }
         .animation(Motion.spring, value: isSuccess)
+        .animation(Motion.spring, value: notifState)
         .onAppear {
             if case .willInstall = cliStatus { cliStatus = BinaryInstaller.detectCLI() }
             if case .willInstall = daemonStatus { daemonStatus = BinaryInstaller.detectDaemon() }
+            NotificationPermission.current { notifState = $0 }
         }
+    }
+
+    private func requestNotifications() {
+        NotificationPermission.request { notifState = $0 }
     }
 
     private func statusRow(title: String, detail: String, status: BinaryInstaller.DetectionStatus) -> some View {
