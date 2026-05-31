@@ -18,12 +18,11 @@ Harness.dmg
 .icon-staging*/
 .env
 
-# Local-only agent notes and release handoff files
+# Local-only agent notes
 .claude/
 .cursor/
 claude.md
 agents.md
-HANDOFF.md
 
 # Release archives (DMG + appcast) — hosted on the site, not committed
 dist/
