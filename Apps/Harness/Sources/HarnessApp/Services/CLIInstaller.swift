@@ -37,8 +37,8 @@ enum CLIInstaller {
                 }
             }
             var completionMessage = ""
-            if let url = try? ShellCompletionInstaller.installFishCompletion() {
-                completionMessage = "\nFish completion installed at \(url.path)"
+            if let lines = try? ShellCompletionInstaller.installForLoginShell(), !lines.isEmpty {
+                completionMessage = "\n" + lines.joined(separator: "\n")
             }
             showAlert("""
             harness-cli installed to:

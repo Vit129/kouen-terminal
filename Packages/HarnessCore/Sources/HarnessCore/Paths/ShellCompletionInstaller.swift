@@ -1,78 +1,126 @@
 import Foundation
 
-/// Installs the fish completion script for `harness-cli` into
-/// `~/.config/fish/completions/`. The script is bundled in the source tree at
-/// `Scripts/completions/harness-cli.fish`; we ship it inline here so both
-/// `Harness.app`'s installer flow and `harness-cli install` can lay it down
-/// without depending on the source repository.
+/// Installs `harness-cli` shell completions so they work out of the box after `install`:
+/// - **fish**: written to `~/.config/fish/completions/harness-cli.fish`, which fish auto-loads
+///   (no rc edit needed).
+/// - **zsh/bash**: the script is written under the Harness home and a guarded, backed-up,
+///   idempotent `source` block is wired into the user's rc (`.zshrc`/`.bashrc`) — the same
+///   mechanism `ShellIntegration` uses for OSC 133.
+///
+/// Scripts come from `CompletionGenerator` (one canonical command catalog), so the installed
+/// files, `harness-cli completions <shell>`, and `Scripts/completions/harness-cli.fish` never drift.
 public enum ShellCompletionInstaller {
-    /// Embedded copy of the fish completion script. Keep in sync with
-    /// `Scripts/completions/harness-cli.fish`.
-    private static let fishCompletionSource: String = #"""
-    # Fish completion for harness-cli. Kept hand-curated so it stays terse and
-    # accurate; regenerate after adding a new subcommand or flag.
+    /// The fish completion script — generated from the command catalog.
+    public static var fishCompletionSource: String { CompletionGenerator.script(for: .fish) }
 
-    set -l __harness_cli_subcommands \
-        ping list-workspaces list-surfaces list-agents get-snapshot \
-        new-workspace new-session new-tab new-split \
-        select-workspace select-session select-tab \
-        close-tab close-session \
-        send send-keys capture-pane \
-        kill-pane swap-pane resize-pane zoom-pane copy-mode \
-        rename-tab rename-session rename-workspace \
-        detect-agent install-hooks attach notify \
-        daemon-stats list-clients detach-client \
-        bind-key unbind-key list-keys \
-        set-buffer list-buffers show-buffer delete-buffer paste-buffer \
-        select-layout next-layout previous-layout rotate-window \
-        break-pane join-pane respawn-pane select-pane \
-        set-option show-options bind-hook unbind-hook list-hooks display-message \
-        install
+    private static let markerBegin = "# >>> Harness CLI completions >>>"
+    private static let markerEnd = "# <<< Harness CLI completions <<<"
 
-    complete -c harness-cli -f -n "not __fish_seen_subcommand_from $__harness_cli_subcommands" \
-        -a "$__harness_cli_subcommands"
+    public struct InstallResult: Sendable, Equatable {
+        public let shell: ShellIntegration.Shell
+        /// Where the completion script was written.
+        public let scriptPath: URL
+        /// The rc the source block was wired into (nil for fish — its dir auto-loads).
+        public let rcPath: URL?
+        /// True when the rc already had the block (zsh/bash) and nothing was appended this run.
+        public let alreadyWired: Bool
+        /// Backup of the rc taken before the first edit, if any.
+        public let rcBackedUp: URL?
+    }
 
-    complete -c harness-cli -n "__fish_seen_subcommand_from new-tab new-session" -l workspace -d "Workspace name or UUID"
-    complete -c harness-cli -n "__fish_seen_subcommand_from new-tab new-session" -l cwd       -d "Working directory"
-    complete -c harness-cli -n "__fish_seen_subcommand_from new-split" -l tab        -d "Tab UUID"
-    complete -c harness-cli -n "__fish_seen_subcommand_from new-split" -l direction  -a "horizontal vertical"
-    complete -c harness-cli -n "__fish_seen_subcommand_from select-pane" -l pane     -d "Pane UUID"
-    complete -c harness-cli -n "__fish_seen_subcommand_from select-pane" -l dir      -a "L R U D"
-    complete -c harness-cli -n "__fish_seen_subcommand_from attach respawn-pane paste-buffer notify send send-keys capture-pane copy-mode detect-agent" -l surface -d "Surface UUID"
-    complete -c harness-cli -n "__fish_seen_subcommand_from attach" -l detach-keys   -d "Detach key sequence (e.g. C-a d)"
-    complete -c harness-cli -n "__fish_seen_subcommand_from respawn-pane" -l clear-history -d "Drop scrollback on respawn"
-    complete -c harness-cli -n "__fish_seen_subcommand_from select-layout" -l tab     -d "Tab UUID"
-    complete -c harness-cli -n "__fish_seen_subcommand_from select-layout" -l layout  -a "even-horizontal even-vertical main-horizontal main-vertical tiled"
-    complete -c harness-cli -n "__fish_seen_subcommand_from set-buffer" -l name      -d "Buffer name"
-    complete -c harness-cli -n "__fish_seen_subcommand_from set-buffer" -l data      -d "Inline data"
-    complete -c harness-cli -n "__fish_seen_subcommand_from set-buffer" -l stdin     -d "Read data from stdin"
-    complete -c harness-cli -n "__fish_seen_subcommand_from set-option" -s g -d "Global scope"
-    complete -c harness-cli -n "__fish_seen_subcommand_from set-option" -s s -d "Session scope"
-    complete -c harness-cli -n "__fish_seen_subcommand_from set-option" -s t -d "Tab scope"
-    complete -c harness-cli -n "__fish_seen_subcommand_from set-option" -s p -d "Pane scope"
-    complete -c harness-cli -n "__fish_seen_subcommand_from set-option" -s w -d "Workspace scope"
-    complete -c harness-cli -n "__fish_seen_subcommand_from bind-key unbind-key list-keys" -s T -d "Key table" -a "root prefix copy-mode command"
-    complete -c harness-cli -n "__fish_seen_subcommand_from bind-hook unbind-hook list-hooks" -l event \
-        -a "after-new-tab after-new-session after-kill-tab after-split-pane after-kill-pane after-resize-pane pane-exited client-attached client-detached agent-state-changed notification-posted"
-    complete -c harness-cli -n "__fish_seen_subcommand_from install-hooks" \
-        -a "codex claude-code cursor pi hermes openclaw aider gemini goose"
-    complete -c harness-cli -n "__fish_seen_subcommand_from list-agents" -l waiting -d "Only agents waiting on you"
-    complete -c harness-cli -n "__fish_seen_subcommand_from list-agents" -l json    -d "Machine-readable JSON output"
-    """#
+    /// Where a shell's completion script lives. fish uses its native auto-load dir; zsh/bash live
+    /// under the Harness home's `completions/` directory (sourced from the rc). `homeOverride` (the
+    /// user home) redirects both for tests, mirroring `ShellIntegration`.
+    public static func scriptURL(for shell: ShellIntegration.Shell, homeOverride: URL? = nil) -> URL {
+        switch shell {
+        case .fish:
+            if let home = homeOverride {
+                return home.appendingPathComponent(".config/fish/completions/harness-cli.fish")
+            }
+            return HarnessPaths.fishCompletionURL
+        case .zsh, .bash:
+            let appSupport = homeOverride.map {
+                $0.appendingPathComponent("Library/Application Support/Harness", isDirectory: true)
+            } ?? HarnessPaths.applicationSupport
+            return appSupport.appendingPathComponent("completions", isDirectory: true)
+                .appendingPathComponent("harness-cli.\(shell.rawValue)")
+        }
+    }
 
-    /// Write the fish completion script to its standard location. Returns
-    /// the installed URL or throws if write fails. Idempotent.
+    /// Install completion for one shell. fish drops into its auto-load dir; zsh/bash write the
+    /// script under the Harness home and wire a guarded `source` block into the rc (idempotent,
+    /// backed up). Returns what happened so the caller can report it.
+    @discardableResult
+    public static func install(for shell: ShellIntegration.Shell, homeOverride: URL? = nil) throws -> InstallResult {
+        let scriptURL = scriptURL(for: shell, homeOverride: homeOverride)
+        try FileManager.default.createDirectory(
+            at: scriptURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data(CompletionGenerator.script(for: shell).utf8).write(to: scriptURL, options: .atomic)
+
+        switch shell {
+        case .fish:
+            // fish auto-loads from the completions dir; no rc wiring required.
+            return InstallResult(shell: shell, scriptPath: scriptURL, rcPath: nil,
+                                 alreadyWired: false, rcBackedUp: nil)
+        case .zsh, .bash:
+            let rc = ShellIntegration.rcURL(for: shell, homeOverride: homeOverride)
+            let body = sourceBody(for: shell, scriptPath: scriptURL)
+            let wired = try ShellRCWiring.wire(into: rc, begin: markerBegin, end: markerEnd, body: body)
+            return InstallResult(shell: shell, scriptPath: scriptURL, rcPath: rc,
+                                 alreadyWired: wired.alreadyWired, rcBackedUp: wired.backedUp)
+        }
+    }
+
+    /// Install completions for the user's login shell (`shellPath` or `$SHELL`): always lay down
+    /// the fish drop-in (auto-loaded; inert without fish) and, for a zsh/bash login, wire the rc.
+    /// Returns human-readable summary lines for the installer to print/show.
+    public static func installForLoginShell(shellPath: String? = nil, homeOverride: URL? = nil) throws -> [String] {
+        var lines: [String] = []
+        let fish = try install(for: .fish, homeOverride: homeOverride)
+        lines.append("fish-completion: \(fish.scriptPath.path)")
+
+        switch ShellIntegration.Shell.detect(from: shellPath ?? ProcessInfo.processInfo.environment["SHELL"] ?? "") {
+        case .zsh:
+            lines.append(try wireSummary(for: .zsh, homeOverride: homeOverride))
+        case .bash:
+            lines.append(try wireSummary(for: .bash, homeOverride: homeOverride))
+        case .fish, nil:
+            break // fish handled above; an unknown shell can use `harness-cli completions <shell>`.
+        }
+        return lines
+    }
+
+    private static func wireSummary(for shell: ShellIntegration.Shell, homeOverride: URL?) throws -> String {
+        let result = try install(for: shell, homeOverride: homeOverride)
+        let rc = result.rcPath?.path ?? "your rc"
+        if result.alreadyWired {
+            return "\(shell.rawValue)-completion: already enabled in \(rc)"
+        }
+        let backup = result.rcBackedUp.map { " (backed up \($0.lastPathComponent))" } ?? ""
+        return "\(shell.rawValue)-completion: enabled in \(rc)\(backup) — restart your shell"
+    }
+
+    /// The rc line that loads our completion. bash sources it directly; zsh bootstraps `compinit`
+    /// first only if the completion system isn't already initialized (so it works even in a bare
+    /// zsh, without a redundant init for users who already run compinit).
+    private static func sourceBody(for shell: ShellIntegration.Shell, scriptPath: URL) -> String {
+        switch shell {
+        case .bash:
+            return "[ -f \"\(scriptPath.path)\" ] && source \"\(scriptPath.path)\""
+        case .zsh:
+            return """
+            if ! whence compdef >/dev/null 2>&1; then autoload -Uz compinit && compinit -u 2>/dev/null; fi
+            [ -f \"\(scriptPath.path)\" ] && source \"\(scriptPath.path)\"
+            """
+        case .fish:
+            return "" // fish never wires an rc line.
+        }
+    }
+
+    /// Write the fish completion script to its standard location. Returns the installed URL.
+    /// Idempotent. Kept for callers that only want fish (the GUI's legacy path delegates here).
     @discardableResult
     public static func installFishCompletion() throws -> URL {
-        try FileManager.default.createDirectory(
-            at: HarnessPaths.fishCompletionDirectory,
-            withIntermediateDirectories: true
-        )
-        try fishCompletionSource.write(
-            to: HarnessPaths.fishCompletionURL,
-            atomically: true,
-            encoding: .utf8
-        )
-        return HarnessPaths.fishCompletionURL
+        try install(for: .fish).scriptPath
     }
 }

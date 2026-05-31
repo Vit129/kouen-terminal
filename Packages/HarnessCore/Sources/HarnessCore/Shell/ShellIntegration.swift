@@ -82,26 +82,10 @@ public enum ShellIntegration {
         try Data(script(for: shell).utf8).write(to: scriptURL, options: .atomic)
 
         let rc = rcURL(for: shell, homeOverride: homeOverride)
-        try FileManager.default.createDirectory(at: rc.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let existing = (try? String(contentsOf: rc, encoding: .utf8)) ?? ""
         let sourceLine = sourceLine(for: shell, scriptPath: scriptURL)
-
-        if existing.contains(markerBegin) {
-            return InstallResult(scriptPath: scriptURL, rcPath: rc, sourceLine: sourceLine,
-                                 alreadyWired: true, rcBackedUp: nil)
-        }
-
-        var backedUp: URL?
-        if FileManager.default.fileExists(atPath: rc.path) {
-            let backup = rc.appendingPathExtension("harness-bak-\(UUID().uuidString.prefix(8))")
-            try FileManager.default.copyItem(at: rc, to: backup)
-            backedUp = backup
-        }
-        let block = "\n\(markerBegin)\n\(sourceLine)\n\(markerEnd)\n"
-        let updated = existing.isEmpty ? String(block.dropFirst()) : existing + block
-        try Data(updated.utf8).write(to: rc, options: .atomic)
+        let wired = try ShellRCWiring.wire(into: rc, begin: markerBegin, end: markerEnd, body: sourceLine)
         return InstallResult(scriptPath: scriptURL, rcPath: rc, sourceLine: sourceLine,
-                             alreadyWired: false, rcBackedUp: backedUp)
+                             alreadyWired: wired.alreadyWired, rcBackedUp: wired.backedUp)
     }
 
     /// The `source` line for a shell (fish has no `[ -f ]` test syntax).
