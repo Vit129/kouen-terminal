@@ -96,6 +96,12 @@ public final class TerminalEmulator: VTParserHandler {
     public func feed(_ bytes: [UInt8]) { parser.feed(bytes) }
     public func feed(_ text: String) { parser.feed(Array(text.utf8)) }
 
+    /// Reference seam: feed bytes one at a time through the per-byte scalar path, bypassing the
+    /// printable-ASCII run fast path that `feed` uses. Public so the (non-`@testable`) benchmark
+    /// target can A/B the run path against the scalar baseline; equivalence tests use it too. Not
+    /// part of the normal input API — production code should always use `feed`.
+    public func feedScalarwise(_ bytes: [UInt8]) { parser.feedScalarwise(bytes) }
+
     public func resize(cols: Int, rows: Int) {
         primary.resize(cols: cols, rows: rows)
         alternate.resize(cols: cols, rows: rows)
@@ -131,6 +137,20 @@ public final class TerminalEmulator: VTParserHandler {
         // so `lqqk`-style line drawing renders via the existing procedural box-drawing path.
         let active = glUsesG1 ? g1 : g0
         current.print(active == .decSpecialGraphics ? DECSpecialGraphics.map(scalar) : scalar)
+    }
+
+    /// Run-batched printable-ASCII path: route a contiguous ASCII run to the screen's batched
+    /// `printASCIIRun` (build the cell template once, fill a row in a tight loop). Only valid when
+    /// the active charset is ASCII — under DEC special graphics each byte needs the per-codepoint
+    /// translation `parserPrint` does, so we fall back to scalar replay there. Byte-for-byte
+    /// equivalent to repeated `parserPrint`, which is what `AsciiFastPathTests` proves.
+    func parserPrintRun(_ bytes: UnsafeBufferPointer<UInt8>) {
+        let active = glUsesG1 ? g1 : g0
+        if active == .decSpecialGraphics {
+            for b in bytes { current.print(DECSpecialGraphics.map(UInt32(b))) }
+        } else {
+            current.printASCIIRun(bytes)
+        }
     }
 
     func parserExecute(_ control: UInt8) {
