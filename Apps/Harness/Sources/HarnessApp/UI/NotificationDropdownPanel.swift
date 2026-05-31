@@ -155,7 +155,8 @@ private final class NotificationRowView: NSView {
         if let kind = entry.agentKind {
             dot.style = .agent(hex: coordinator.settings.agentColorHex(for: kind))
         } else {
-            dot.style = .waiting
+            // Theme accent rather than the hardcoded `.waiting` blue, so the dot fits the theme.
+            dot.style = .accent
         }
         dot.applyStyle()
         dot.translatesAutoresizingMaskIntoConstraints = false

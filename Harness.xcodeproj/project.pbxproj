@@ -105,7 +105,6 @@
 		CEB9B54163AB73D20D84FC59 /* RealPtyLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7143B9A4AFB1E19A4836A27B /* RealPtyLifecycleTests.swift */; };
 		D45EFB29397B90EF2E46C35D /* CLIInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A9C10A4B52FB83548EAC0F3 /* CLIInstaller.swift */; };
 		D5A35A080C113603A8D707A7 /* HarnessControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63791142526EFF43A6EA6B0D /* HarnessControls.swift */; };
-		D861050FDA0E17557C202B38 /* Sparkle in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 9212B022D953712A47E264CE /* Sparkle */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		DA2D4A06C95D60F7ECE577C1 /* Phase67UI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93B6EE4051D1702BE7F6D1AC /* Phase67UI.swift */; };
 		DBDA5C22F9B1EC5F6B0F170B /* HarnessTerminalEngine in Frameworks */ = {isa = PBXBuildFile; productRef = 71AA2E606C228A77FE9CB2A7 /* HarnessTerminalEngine */; };
 		DD59B3A79B69AF4E1B5E03D1 /* SGRMouseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7772697307FDEA3BF08C4EF /* SGRMouseTests.swift */; };
@@ -158,20 +157,6 @@
 			remoteInfo = "harness-cli";
 		};
 /* End PBXContainerItemProxy section */
-
-/* Begin PBXCopyFilesBuildPhase section */
-		D7A24824654FEF928DB8F7C8 /* Embed Frameworks */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "";
-			dstSubfolderSpec = 10;
-			files = (
-				D861050FDA0E17557C202B38 /* Sparkle in Embed Frameworks */,
-			);
-			name = "Embed Frameworks";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		02041E627641793E108CE8CF /* HarnessDaemonTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = HarnessDaemonTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -754,7 +739,6 @@
 				093CFC9C0B64433157F91DE8 /* Sources */,
 				8FEB3F608FCC41A1DC444FC3 /* Resources */,
 				CD0891400EC7CA3E7DCB88CF /* Frameworks */,
-				D7A24824654FEF928DB8F7C8 /* Embed Frameworks */,
 				331F9F0694CD9C8473F1B19B /* Copy Bundled Tools */,
 			);
 			buildRules = (

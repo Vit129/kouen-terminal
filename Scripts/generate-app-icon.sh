@@ -2,15 +2,15 @@
 set -euo pipefail
 # Regenerate Harness.icns from Apps/Harness/Resources/Assets.xcassets/AppIcon.appiconset
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-ICONSET="$ROOT/Apps/Harness/Resources/Assets.xcassets/AppIcon.appiconset"
 OUT="$ROOT/Apps/Harness/Resources/Harness.icns"
+# Master 1024×1024 source lives OUTSIDE the .appiconset so it isn't an unassigned
+# child of the icon set (the set's largest assigned slot is 512x512@2x = 1024px).
+SRC="$ROOT/Apps/Harness/Resources/AppIcon-1024.png"
 
-if [[ ! -f "$ICONSET/icon_1024x1024.png" ]]; then
-  echo "Missing $ICONSET/icon_1024x1024.png — add a 1024×1024 source PNG first." >&2
+if [[ ! -f "$SRC" ]]; then
+  echo "Missing $SRC — add a 1024×1024 master PNG first." >&2
   exit 1
 fi
-
-SRC="$ICONSET/icon_1024x1024.png"
 TMP_STAGE="$(mktemp -d "${TMPDIR:-/tmp}/harness-icon.XXXXXX")"
 STAGE="$TMP_STAGE/Harness.iconset"
 mkdir -p "$STAGE"

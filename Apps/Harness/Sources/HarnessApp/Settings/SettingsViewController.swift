@@ -329,12 +329,21 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         pageContainer.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(pageContainer)
 
+        // Flat footer pinned to the content column: a hairline top separator + the Done
+        // pill, instead of a floating button hovering over the canvas.
+        let footer = NSView()
+        footer.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(footer)
+
+        let footerDivider = HarnessDesign.divider()
+        footer.addSubview(footerDivider)
+
         let doneButton = HarnessPillButton(title: "Done", kind: .secondary)
         doneButton.target = self
         doneButton.action = #selector(closeWindow)
         doneButton.keyEquivalent = "\r"
         doneButton.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(doneButton)
+        footer.addSubview(doneButton)
 
         NSLayoutConstraint.activate([
             sidebar.topAnchor.constraint(equalTo: view.topAnchor),
@@ -345,10 +354,19 @@ final class SettingsViewController: NSViewController, NSFontChanging {
             pageContainer.topAnchor.constraint(equalTo: view.topAnchor),
             pageContainer.leadingAnchor.constraint(equalTo: sidebar.trailingAnchor),
             pageContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            pageContainer.bottomAnchor.constraint(equalTo: doneButton.topAnchor, constant: -10),
+            pageContainer.bottomAnchor.constraint(equalTo: footer.topAnchor),
 
-            doneButton.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -16),
-            doneButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -24),
+            footer.leadingAnchor.constraint(equalTo: sidebar.trailingAnchor),
+            footer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            footer.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            footer.heightAnchor.constraint(equalToConstant: 56),
+
+            footerDivider.topAnchor.constraint(equalTo: footer.topAnchor),
+            footerDivider.leadingAnchor.constraint(equalTo: footer.leadingAnchor, constant: 28),
+            footerDivider.trailingAnchor.constraint(equalTo: footer.trailingAnchor, constant: -28),
+
+            doneButton.centerYAnchor.constraint(equalTo: footer.centerYAnchor),
+            doneButton.trailingAnchor.constraint(equalTo: footer.trailingAnchor, constant: -28),
         ])
 
         pages[0] = buildAppearancePage()
@@ -384,7 +402,7 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         2: ["terminal", "font", "shell", "directory", "scrollback", "blink", "copy", "session"],
         3: ["keys", "prefix", "binding", "keybinding", "shortcut"],
         4: ["agents", "agent", "color", "codex", "claude", "cursor", "pi", "hermes", "openclaw", "hook", "notification", "detection"],
-        5: ["advanced", "options", "status", "mouse", "mode", "clipboard", "base-index", "renumber", "monitor", "rename", "repeat", "history", "pane", "border", "tmux"],
+        5: ["advanced", "options", "status", "mouse", "mode", "clipboard", "base-index", "renumber", "monitor", "rename", "repeat", "history", "pane", "border", "harness-cli", "set-option"],
     ]
 
     private func buildSidebar() -> NSView {
@@ -510,35 +528,24 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         themeActions.spacing = 16
         themeActions.alignment = .centerY
 
-        let themeGroup = formGrid(rows: [
-            ("Theme", themePopup),
-            ("", themeActions),
+        let themeGroup = settingsGroup("Theme", [
+            settingsRow("Theme", themePopup),
+            settingsRow("", themeActions),
         ])
-        let windowGroup = formGrid(rows: [
-            ("Opacity", opacityRow),
-            ("Blur", blurRow),
-            ("Padding", paddingRow),
-            ("", transparentTitlebarToggle),
-            ("", showStatusLineToggle),
-            ("", sidebarVisibleToggle),
+        let windowGroup = settingsGroup("Window", [
+            settingsRow("Opacity", opacityRow),
+            settingsRow("Blur", blurRow),
+            settingsRow("Padding", paddingRow),
+            settingsRow("", transparentTitlebarToggle),
+            settingsRow("", showStatusLineToggle),
+            settingsRow("", sidebarVisibleToggle),
         ])
-
-        // Experience mode: the headline knob. Plain feels like a fast native terminal;
-        // Tmux exposes the full multiplexer; Persistent/Agent sit between. The summary updates
-        // live so the choice is self-explanatory.
-        experienceSegment.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        let experienceGroup = NSStackView(views: [experienceSegment, experienceSummaryLabel])
-        experienceGroup.orientation = .vertical
-        experienceGroup.alignment = .leading
-        experienceGroup.spacing = 8
-        experienceSegment.widthAnchor.constraint(equalTo: experienceGroup.widthAnchor).isActive = true
 
         let stack = NSStackView(views: [
             header,
             livePreview,
-            sectionCard("Experience", experienceGroup),
-            sectionCard("Theme", themeGroup),
-            sectionCard("Window", windowGroup),
+            themeGroup,
+            windowGroup,
         ])
         stack.orientation = .vertical
         stack.alignment = .width
@@ -568,12 +575,12 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         colorsGroup.alignment = .width
         colorsGroup.spacing = 10
 
-        let renderingGroup = formGrid(rows: [
-            ("", vividColorsToggle),
-            ("", linearBlendingToggle),
-            ("", themeTerminalOutputToggle),
-            ("", ligaturesToggle),
-            ("", promptGutterToggle),
+        let renderingGroup = settingsGroup("Color rendering", [
+            settingsRow("", vividColorsToggle),
+            settingsRow("", linearBlendingToggle),
+            settingsRow("", themeTerminalOutputToggle),
+            settingsRow("", ligaturesToggle),
+            settingsRow("", promptGutterToggle),
         ])
 
         let chromeAccents = colorPairRow(
@@ -583,10 +590,10 @@ final class SettingsViewController: NSViewController, NSFontChanging {
 
         let stack = NSStackView(views: [
             header,
-            sectionCard("Terminal colors", colorsGroup),
-            sectionCard("Color rendering", renderingGroup),
-            sectionCard("ANSI palette", buildPaletteSection()),
-            sectionCard("Chrome", chromeAccents),
+            settingsGroup("Terminal colors", [colorsGroup]),
+            renderingGroup,
+            settingsGroup("ANSI palette", [buildPaletteSection()]),
+            settingsGroup("Chrome", [chromeAccents]),
         ])
         stack.orientation = .vertical
         stack.alignment = .width
@@ -634,27 +641,39 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         cwdField.widthAnchor.constraint(equalToConstant: 280).isActive = true
         scrollbackField.widthAnchor.constraint(equalToConstant: 100).isActive = true
 
-        let fontGroup = formGrid(rows: [
+        let fontGroup = settingsGroup("Font", settingsRows([
             ("Font", fontRow),
             ("Size", fontSizeField),
-        ])
-        let shellGroup = formGrid(rows: [
+        ]))
+        let shellGroup = settingsGroup("Shell", settingsRows([
             ("Shell", shellField),
             ("Default directory", cwdField),
+        ]))
+        let behaviorGroup = settingsGroup("Behavior", [
+            settingsRow("Cursor style", cursorStyleSegment),
+            settingsRow("Scrollback", scrollbackField),
+            settingsRow("", cursorBlinkToggle),
+            settingsRow("", copyOnSelectToggle),
+            settingsRow("", keepSessionsToggle),
         ])
-        let behaviorGroup = formGrid(rows: [
-            ("Cursor style", cursorStyleSegment),
-            ("Scrollback", scrollbackField),
-            ("", cursorBlinkToggle),
-            ("", copyOnSelectToggle),
-            ("", keepSessionsToggle),
-        ])
+
+        // Experience mode: how much of Harness is exposed (controls + default session
+        // persistence). It governs terminal behavior, so it lives here rather than under
+        // Appearance. The summary updates live so the choice is self-explanatory.
+        experienceSegment.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        let experienceContent = NSStackView(views: [experienceSegment, experienceSummaryLabel])
+        experienceContent.orientation = .vertical
+        experienceContent.alignment = .leading
+        experienceContent.spacing = 8
+        experienceSegment.widthAnchor.constraint(equalTo: experienceContent.widthAnchor).isActive = true
+        let experienceGroup = settingsGroup("Experience", [experienceContent])
 
         let stack = NSStackView(views: [
             header,
-            sectionCard("Font", fontGroup),
-            sectionCard("Shell", shellGroup),
-            sectionCard("Behavior", behaviorGroup),
+            experienceGroup,
+            fontGroup,
+            shellGroup,
+            behaviorGroup,
         ])
         stack.orientation = .vertical
         stack.alignment = .width
@@ -668,16 +687,11 @@ final class SettingsViewController: NSViewController, NSFontChanging {
     private func buildKeysPage() -> NSView {
         let header = pageHeader(title: "Keys", trailing: nil)
 
-        let prefixHint = NSTextField(labelWithString: "Click to record a new shortcut. Esc cancels.")
-        prefixHint.font = .systemFont(ofSize: 11.5)
-        prefixHint.textColor = .secondaryLabelColor
-
-        let prefixGroup = formGrid(rows: [
-            ("Prefix key", keyRecorder),
-            ("", prefixHint),
+        let prefixGroup = settingsGroup("Prefix", [
+            settingsRow("Prefix key", keyRecorder, hint: "Click to record a new shortcut. Esc cancels."),
         ])
 
-        let stack = NSStackView(views: [header, sectionCard("Prefix", prefixGroup)])
+        let stack = NSStackView(views: [header, prefixGroup])
         stack.orientation = .vertical
         stack.alignment = .width
         stack.spacing = 18
@@ -697,12 +711,8 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         notificationSoundToggle.target = self
         notificationSoundToggle.action = #selector(appearanceTextDidCommit)
 
-        let toggleGrid = formGrid(rows: [
-            ("", systemNotificationsToggle),
-            ("", notificationSoundToggle),
-        ])
         notificationStatusField.font = .systemFont(ofSize: 11)
-        notificationStatusField.textColor = .secondaryLabelColor
+        notificationStatusField.textColor = HarnessChrome.current.textTertiary
         notificationStatusField.lineBreakMode = .byWordWrapping
         notificationStatusField.maximumNumberOfLines = 2
         notificationTestButton.target = self
@@ -712,11 +722,16 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         let notifButtons = NSStackView(views: [notificationTestButton, notificationPermissionButton])
         notifButtons.orientation = .horizontal
         notifButtons.spacing = 10
-        let notificationsGroup = NSStackView(views: [toggleGrid, notificationStatusField, leadingRow(notifButtons)])
-        notificationsGroup.orientation = .vertical
-        notificationsGroup.alignment = .width
-        notificationsGroup.spacing = 12
+        let notifStatusBlock = NSStackView(views: [notificationStatusField, leadingRow(notifButtons)])
+        notifStatusBlock.orientation = .vertical
+        notifStatusBlock.alignment = .leading
+        notifStatusBlock.spacing = 10
         refreshNotificationStatus()
+        let notificationsGroup = settingsGroup("Notifications", [
+            settingsRow("", systemNotificationsToggle),
+            settingsRow("", notificationSoundToggle),
+            notifStatusBlock,
+        ])
 
         let detectionCaption = settingsCaption("Harness identifies agents by walking each pane's process tree and matching the executables shown below — it works for any shell, no setup. Install hooks so an agent can ping you the moment it stops or needs input (the config is merged into the agent's own file and backed up first). Customize matching in agents.json.")
         let editAgents = HarnessPillButton(title: "Edit agents.json…", kind: .secondary)
@@ -727,24 +742,15 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         detectionBox.alignment = .leading
         detectionBox.spacing = 12
 
-        let agentRows = NSStackView(views: Self.agentColorKinds.map(agentRow))
-        agentRows.orientation = .vertical
-        agentRows.alignment = .width
-        agentRows.spacing = 12
-
         let reset = HarnessPillButton(title: "Reset agent colors", kind: .secondary)
         reset.target = self
         reset.action = #selector(resetAgentColors)
-        let agentsBox = NSStackView(views: [agentRows, leadingRow(reset)])
-        agentsBox.orientation = .vertical
-        agentsBox.alignment = .width
-        agentsBox.spacing = 14
 
         let stack = NSStackView(views: [
             header,
-            sectionCard("Notifications", notificationsGroup),
-            sectionCard("Detection & hooks", detectionBox),
-            sectionCard("Agents", agentsBox),
+            notificationsGroup,
+            settingsGroup("Detection & hooks", [detectionBox]),
+            settingsGroup("Agents", Self.agentColorKinds.map(agentRow) + [leadingRow(reset)]),
         ])
         stack.orientation = .vertical
         stack.alignment = .width
@@ -884,7 +890,7 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         }
     }
 
-    // MARK: - Page: Advanced (tmux-style options)
+    // MARK: - Page: Advanced (harness-cli set-option surface)
 
     /// Daemon-owned `OptionStore` values, fetched on page build. Keyed by option name.
     private var advValues: [String: String] = [:]
@@ -895,66 +901,54 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         let header = pageHeader(title: "Advanced", trailing: nil)
         loadAdvancedValues()
 
-        let statusGroup = formGrid(rows: [
-            ("Status position", advSegment("status-position", ["bottom", "top"])),
-            ("Status left", advField("status-left", width: 260)),
-            ("Status right", advField("status-right", width: 260)),
-        ])
-        let statusBox = NSStackView(views: [
+        let statusGroup = settingsGroup("Status bar", [
             settingsCaption("Format the bottom status bar (FormatString tokens like #{cwd_basename}, #{git_branch}, #{time:%H:%M}). The on/off switch is in Appearance ▸ Window."),
-            statusGroup,
-        ])
-        statusBox.orientation = .vertical
-        statusBox.alignment = .width
-        statusBox.spacing = 10
-
-        let inputGroup = formGrid(rows: [
-            ("", advToggle("mouse", "Mouse reporting")),
-            ("Copy-mode keys", advSegment("mode-keys", ["vi", "emacs"])),
-            ("", advToggle("set-clipboard", "Programs may set the system clipboard (OSC 52)")),
+            settingsRow("Status position", advSegment("status-position", ["bottom", "top"])),
+            settingsRow("Status left", advField("status-left", width: 260)),
+            settingsRow("Status right", advField("status-right", width: 260)),
         ])
 
-        let indexGroup = formGrid(rows: [
-            ("Window base index", advSegment("base-index", ["0", "1"])),
-            ("Pane base index", advSegment("pane-base-index", ["0", "1"])),
-            ("", advToggle("renumber-windows", "Renumber windows after one closes")),
+        let inputGroup = settingsGroup("Input", [
+            settingsRow("", advToggle("mouse", "Mouse reporting")),
+            settingsRow("Copy-mode keys", advSegment("mode-keys", ["vi", "emacs"])),
+            settingsRow("", advToggle("set-clipboard", "Programs may set the system clipboard (OSC 52)")),
         ])
 
-        let titleGroup = formGrid(rows: [
-            ("", advToggle("allow-rename", "Allow programs to rename a tab (OSC title)")),
-            ("", advToggle("automatic-rename", "Automatic tab rename from the running command")),
-            ("", advToggle("monitor-activity", "Flag a background tab on new output")),
-            ("", advToggle("monitor-bell", "Flag a background tab on a terminal bell")),
-            ("Silence alert (s)", advField("monitor-silence", width: 80)),
+        let indexGroup = settingsGroup("Indexing", [
+            settingsRow("Window base index", advSegment("base-index", ["0", "1"])),
+            settingsRow("Pane base index", advSegment("pane-base-index", ["0", "1"])),
+            settingsRow("", advToggle("renumber-windows", "Renumber windows after one closes")),
         ])
 
-        let lifecycleGroup = formGrid(rows: [
-            ("", advToggle("remain-on-exit", "Keep a dead pane so it can be respawned")),
-            ("Prefix repeat (ms)", advField("repeat-time", width: 100)),
-            ("History limit", advField("history-limit", width: 120)),
-        ])
-        let lifecycleBox = NSStackView(views: [
-            lifecycleGroup,
-            settingsCaption("History limit is the multiplexer scrollback; the renderer's own scrollback is in Terminal ▸ Behavior."),
-        ])
-        lifecycleBox.orientation = .vertical
-        lifecycleBox.alignment = .width
-        lifecycleBox.spacing = 8
-
-        let borderGroup = formGrid(rows: [
-            ("Pane border labels", advSegment("pane-border-status", ["off", "top", "bottom"])),
-            ("Border format", advField("pane-border-format", width: 260)),
+        let titleGroup = settingsGroup("Titles & monitoring", [
+            settingsRow("", advToggle("allow-rename", "Allow programs to rename a tab (OSC title)")),
+            settingsRow("", advToggle("automatic-rename", "Automatic tab rename from the running command")),
+            settingsRow("", advToggle("monitor-activity", "Flag a background tab on new output")),
+            settingsRow("", advToggle("monitor-bell", "Flag a background tab on a terminal bell")),
+            settingsRow("Silence alert (s)", advField("monitor-silence", width: 80)),
         ])
 
+        let lifecycleGroup = settingsGroup("Lifecycle", [
+            settingsRow("", advToggle("remain-on-exit", "Keep a dead pane so it can be respawned")),
+            settingsRow("Prefix repeat (ms)", advField("repeat-time", width: 100)),
+            settingsRow("History limit", advField("history-limit", width: 120), hint: "Session scrollback; the renderer's own scrollback is in Terminal ▸ Behavior."),
+        ])
+
+        let borderGroup = settingsGroup("Pane borders", [
+            settingsRow("Pane border labels", advSegment("pane-border-status", ["off", "top", "bottom"])),
+            settingsRow("Border format", advField("pane-border-format", width: 260)),
+        ])
+
+        let intro = settingsCaption("Power-user options shared with the harness-cli set-option command surface. Changes apply globally and persist immediately.")
         let stack = NSStackView(views: [
             header,
-            settingsCaption("Power-user options shared with the harness-cli set-option / tmux command surface. Changes apply globally and persist immediately."),
-            sectionCard("Status bar", statusBox),
-            sectionCard("Input", inputGroup),
-            sectionCard("Indexing", indexGroup),
-            sectionCard("Titles & monitoring", titleGroup),
-            sectionCard("Lifecycle", lifecycleBox),
-            sectionCard("Pane borders", borderGroup),
+            intro,
+            statusGroup,
+            inputGroup,
+            indexGroup,
+            titleGroup,
+            lifecycleGroup,
+            borderGroup,
         ])
         stack.orientation = .vertical
         stack.alignment = .width
@@ -1048,9 +1042,11 @@ final class SettingsViewController: NSViewController, NSFontChanging {
 
     // MARK: - Layout helpers
 
+    /// A single quiet page title for breathing room under the transparent titlebar —
+    /// demoted from the old 22pt bold header (the sidebar already names the page).
     private func pageHeader(title: String, trailing: HarnessPillButton? = nil) -> NSView {
         let titleLabel = NSTextField(labelWithString: title)
-        titleLabel.font = .systemFont(ofSize: 22, weight: .bold)
+        titleLabel.font = .systemFont(ofSize: 18, weight: .semibold)
         titleLabel.textColor = HarnessChrome.current.textPrimary
         let stack = NSStackView()
         stack.orientation = .horizontal
@@ -1067,83 +1063,149 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         return stack
     }
 
-    /// macOS System-Settings-style grouped card: a rounded elevated surface holding
-    /// an optional uppercased title and the section's content, theme-aware.
-    private func sectionCard(_ title: String?, _ content: NSView) -> NSView {
-        let c = HarnessChrome.current
-        let card = NSView()
-        card.wantsLayer = true
-        card.layer?.backgroundColor = c.surfaceElevated.cgColor
-        card.layer?.cornerRadius = HarnessDesign.Radius.card
-        card.layer?.cornerCurve = .continuous
-        card.layer?.borderWidth = 1
-        card.layer?.borderColor = c.border.cgColor
-        card.translatesAutoresizingMaskIntoConstraints = false
+    // MARK: - Flat grouped primitives
+    //
+    // The window reads as one seamless surface (sidebar glass + theme canvas), so
+    // sections are flat rounded fills (a subtle `surfaceElevated` lift, no border) with
+    // hairline separators between rows — never heavy bordered cards. `settingsGroup`
+    // frames a list of rows; `settingsRow` is the canonical label + trailing-control row.
 
-        let stack = NSStackView()
-        stack.orientation = .vertical
-        // .width so width-dependent content (color pair rows, form grids) lays out to
-        // the full card width rather than collapsing to intrinsic size.
-        stack.alignment = .width
-        stack.spacing = 12
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        if let title {
+    /// One settings row: leading label (+ optional hint line) and a trailing control.
+    /// Pass an empty `label` for label-less content (toggles carry their own title, and
+    /// captions/custom blocks left-align) — the control then leads, filling the row.
+    private func settingsRow(_ label: String, _ control: NSView, hint: String? = nil) -> NSView {
+        let c = HarnessChrome.current
+        control.translatesAutoresizingMaskIntoConstraints = false
+        control.setContentHuggingPriority(.required, for: .horizontal)
+
+        let row = NSStackView()
+        row.orientation = .horizontal
+        row.alignment = .centerY
+        row.spacing = 14
+        row.translatesAutoresizingMaskIntoConstraints = false
+
+        func makeSpacer() -> NSView {
+            let spacer = NSView()
+            spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+            spacer.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+            return spacer
+        }
+
+        if label.isEmpty {
+            row.addArrangedSubview(control)
+            row.addArrangedSubview(makeSpacer())
+        } else {
+            let titleLabel = NSTextField(labelWithString: label)
+            titleLabel.font = .systemFont(ofSize: 13)
+            titleLabel.textColor = c.textSecondary
+            titleLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+            let labelCol: NSView
+            if let hint {
+                let hintLabel = NSTextField(wrappingLabelWithString: hint)
+                hintLabel.font = .systemFont(ofSize: 11)
+                hintLabel.textColor = c.textTertiary
+                hintLabel.preferredMaxLayoutWidth = 380
+                let col = NSStackView(views: [titleLabel, hintLabel])
+                col.orientation = .vertical
+                col.alignment = .leading
+                col.spacing = 2
+                labelCol = col
+            } else {
+                labelCol = titleLabel
+            }
+            row.addArrangedSubview(labelCol)
+            row.addArrangedSubview(makeSpacer())
+            row.addArrangedSubview(control)
+        }
+        row.heightAnchor.constraint(greaterThanOrEqualToConstant: 28).isActive = true
+        return row
+    }
+
+    /// Convenience: build a list of `settingsRow`s from `(label, control)` pairs.
+    private func settingsRows(_ items: [(String, NSView)]) -> [NSView] {
+        items.map { settingsRow($0.0, $0.1) }
+    }
+
+    /// Flat grouped section: an optional uppercased section label above a rounded
+    /// `surfaceElevated` fill (no border) holding the rows, hairline-separated.
+    private func settingsGroup(_ title: String?, _ rows: [NSView]) -> NSView {
+        let c = HarnessChrome.current
+        let outer = NSStackView()
+        outer.orientation = .vertical
+        outer.alignment = .leading
+        outer.spacing = 8
+        outer.translatesAutoresizingMaskIntoConstraints = false
+
+        if let title, !title.isEmpty {
             let label = NSTextField(labelWithString: title.uppercased())
             label.font = .systemFont(ofSize: 11, weight: .semibold)
             label.textColor = c.textTertiary
-            stack.addArrangedSubview(label)
+            outer.addArrangedSubview(label)
         }
-        content.translatesAutoresizingMaskIntoConstraints = false
-        stack.addArrangedSubview(content)
 
-        card.addSubview(stack)
+        let surface = NSView()
+        surface.wantsLayer = true
+        surface.layer?.backgroundColor = c.surfaceElevated.cgColor
+        surface.layer?.cornerRadius = HarnessDesign.Radius.card
+        surface.layer?.cornerCurve = .continuous
+        surface.translatesAutoresizingMaskIntoConstraints = false
+
+        let rowStack = NSStackView()
+        rowStack.orientation = .vertical
+        rowStack.alignment = .width
+        rowStack.spacing = 0
+        rowStack.translatesAutoresizingMaskIntoConstraints = false
+        for (index, content) in rows.enumerated() {
+            if index > 0 { rowStack.addArrangedSubview(groupDivider()) }
+            rowStack.addArrangedSubview(paddedRow(content))
+        }
+
+        surface.addSubview(rowStack)
+        outer.addArrangedSubview(surface)
         NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: card.topAnchor, constant: 16),
-            stack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 16),
-            stack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -16),
-            stack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -16),
+            rowStack.topAnchor.constraint(equalTo: surface.topAnchor),
+            rowStack.leadingAnchor.constraint(equalTo: surface.leadingAnchor),
+            rowStack.trailingAnchor.constraint(equalTo: surface.trailingAnchor),
+            rowStack.bottomAnchor.constraint(equalTo: surface.bottomAnchor),
+            surface.leadingAnchor.constraint(equalTo: outer.leadingAnchor),
+            surface.trailingAnchor.constraint(equalTo: outer.trailingAnchor),
         ])
-        return card
+        return outer
     }
 
-    private func sectionHeading(_ text: String) -> NSView {
-        let label = NSTextField(labelWithString: text.uppercased())
-        label.font = .systemFont(ofSize: 11, weight: .semibold)
-        label.textColor = .tertiaryLabelColor
-        label.alignment = .left
-        label.lineBreakMode = .byClipping
-        label.translatesAutoresizingMaskIntoConstraints = false
-        // Pin the label to the leading edge in its own container so the heading is
-        // always flush-left, with a little breathing room above to separate sections.
+    /// Uniform insets around one group row (content provides its own height).
+    private func paddedRow(_ content: NSView) -> NSView {
+        content.translatesAutoresizingMaskIntoConstraints = false
         let container = NSView()
         container.translatesAutoresizingMaskIntoConstraints = false
-        container.addSubview(label)
+        container.addSubview(content)
         NSLayoutConstraint.activate([
-            label.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            label.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor),
-            label.topAnchor.constraint(equalTo: container.topAnchor, constant: 6),
-            label.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            content.topAnchor.constraint(equalTo: container.topAnchor, constant: 9),
+            content.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -9),
+            content.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 16),
+            content.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -16),
         ])
         return container
     }
 
-    /// Right-aligned label column + control column, like macOS System Settings.
-    private func formGrid(rows: [(String, NSView)]) -> NSView {
-        let grid = NSGridView()
-        grid.translatesAutoresizingMaskIntoConstraints = false
-        grid.rowSpacing = 13
-        grid.columnSpacing = 16
-        for (title, control) in rows {
-            let label = NSTextField(labelWithString: title)
-            label.font = .systemFont(ofSize: 12)
-            label.textColor = .secondaryLabelColor
-            label.alignment = .right
-            grid.addRow(with: [label, control])
-        }
-        grid.column(at: 0).xPlacement = .trailing
-        grid.column(at: 0).width = 140
-        grid.column(at: 1).xPlacement = .leading
-        return grid
+    /// Hairline separator between group rows, inset on the leading edge to line up
+    /// with the row content.
+    private func groupDivider() -> NSView {
+        let wrap = NSView()
+        wrap.translatesAutoresizingMaskIntoConstraints = false
+        let line = NSView()
+        line.wantsLayer = true
+        line.layer?.backgroundColor = HarnessChrome.current.border.cgColor
+        line.translatesAutoresizingMaskIntoConstraints = false
+        wrap.addSubview(line)
+        NSLayoutConstraint.activate([
+            wrap.heightAnchor.constraint(equalToConstant: 1),
+            line.topAnchor.constraint(equalTo: wrap.topAnchor),
+            line.bottomAnchor.constraint(equalTo: wrap.bottomAnchor),
+            line.leadingAnchor.constraint(equalTo: wrap.leadingAnchor, constant: 16),
+            line.trailingAnchor.constraint(equalTo: wrap.trailingAnchor),
+        ])
+        return wrap
     }
 
     /// `[swatch] Name [hex] [↺]` — consistent width pattern so every row aligns.
@@ -1222,7 +1284,7 @@ final class SettingsViewController: NSViewController, NSFontChanging {
             documentView.trailingAnchor.constraint(equalTo: scroll.contentView.trailingAnchor),
             documentView.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor),
 
-            content.topAnchor.constraint(equalTo: documentView.topAnchor, constant: 26),
+            content.topAnchor.constraint(equalTo: documentView.topAnchor, constant: 36),
             content.leadingAnchor.constraint(equalTo: documentView.leadingAnchor, constant: 28),
             content.trailingAnchor.constraint(equalTo: documentView.trailingAnchor, constant: -28),
             content.bottomAnchor.constraint(equalTo: documentView.bottomAnchor, constant: -28),
@@ -1757,7 +1819,9 @@ final class SettingsSidebarButton: NSControl {
         iconView.translatesAutoresizingMaskIntoConstraints = false
 
         label.stringValue = title
-        label.font = .systemFont(ofSize: 12.5, weight: .medium)
+        // The one chrome label font the app's sidebar/tab strip use, so the Settings
+        // nav reads as the same surface.
+        label.font = HarnessDesign.Typography.sidebarLabel
         label.translatesAutoresizingMaskIntoConstraints = false
 
         addSubview(iconView)
@@ -1834,11 +1898,17 @@ enum SettingsWindowController {
         let controller = SettingsViewController()
         let win = NSWindow(contentViewController: controller)
         win.title = "Harness Settings"
-        win.styleMask = [.titled, .closable, .resizable]
+        // Full-size content + transparent, hidden-title titlebar so the glass sidebar and
+        // theme canvas run edge-to-edge under the titlebar — the same seamless chrome as
+        // the main window (MainWindowController uses the identical flags).
+        win.styleMask = [.titled, .closable, .resizable, .fullSizeContentView]
+        win.titlebarAppearsTransparent = true
+        win.titleVisibility = .hidden
+        win.isMovableByWindowBackground = false
         win.isRestorable = false
         win.isReleasedWhenClosed = false
-        win.minSize = NSSize(width: 820, height: 600)
-        win.setContentSize(NSSize(width: 880, height: 660))
+        win.minSize = NSSize(width: 860, height: 620)
+        win.setContentSize(NSSize(width: 920, height: 680))
         // `onClose` left nil → SettingsViewController.closeWindow() falls through to
         // `view.window?.close()`, so Done/Esc dismisses this popup.
         window = win

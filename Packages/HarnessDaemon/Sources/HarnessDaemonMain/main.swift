@@ -88,7 +88,7 @@ nonisolated(unsafe) private var signalSources: [DispatchSourceSignal] = []
 /// two daemons sharing a socket would corrupt the snapshot store.
 private func detectStaleInstance() {
     guard FileManager.default.fileExists(atPath: HarnessPaths.daemonPIDURL.path) else { return }
-    guard let raw = try? String(contentsOf: HarnessPaths.daemonPIDURL),
+    guard let raw = try? String(contentsOf: HarnessPaths.daemonPIDURL, encoding: .utf8),
           let priorPID = pid_t(raw.trimmingCharacters(in: .whitespacesAndNewlines))
     else {
         removePIDFile()

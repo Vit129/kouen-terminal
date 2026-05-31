@@ -6,15 +6,18 @@ import Foundation
 /// session persistence policy, and how prominent agent workflows are. Nothing about a mode
 /// forks the session path.
 ///
-/// - `plain`: a fast native terminal. No prefix key, no status line, no multiplexer
-///   terminology. Sessions are ephemeral by default (a clean quit closes them) so it feels
-///   like a normal terminal. Equivalent in spirit to Ghostty.
+/// - `plain`: a fast native terminal. No command prefix, no status line, no session
+///   controls. Sessions are ephemeral by default (a clean quit closes them) so it feels
+///   like a normal terminal.
 /// - `persistent`: like `plain` visually, but sessions survive a clean quit and can be
 ///   driven/attached from the CLI. Individual sessions can be promoted/demoted.
-/// - `tmux`: the full multiplexer surface — prefix key, status line, copy mode, buffers,
-///   tmux-style targets and commands, attach/detach.
+/// - `tmux`: the full Harness surface — command prefix, status line, copy mode, paste
+///   buffers, panes/splits, and the harness-cli command set, attach/detach.
 /// - `agent`: persistent project workspaces with agent detection, notifications, and
-///   jump-to-agent foregrounded. tmux controls are available but off by default.
+///   jump-to-agent foregrounded. The full controls are available but off by default.
+///
+/// (The `tmux` raw value is retained for on-disk migration compatibility only; no
+/// user-facing string names it — Harness uses its own vocabulary throughout.)
 public enum ExperienceMode: String, Codable, Sendable, CaseIterable {
     case plain
     case persistent
@@ -26,7 +29,7 @@ public enum ExperienceMode: String, Codable, Sendable, CaseIterable {
         switch self {
         case .plain: return "Plain Terminal"
         case .persistent: return "Persistent Terminal"
-        case .tmux: return "Multiplexer"
+        case .tmux: return "Full Terminal"
         case .agent: return "Agent Workspace"
         }
     }
@@ -35,11 +38,11 @@ public enum ExperienceMode: String, Codable, Sendable, CaseIterable {
     public var summary: String {
         switch self {
         case .plain:
-            return "A fast native terminal. No prefix key or status bar; sessions close when you quit."
+            return "A fast native terminal. No command prefix or status bar; sessions close when you quit."
         case .persistent:
             return "Like Plain, but sessions survive quitting and can be attached from the CLI."
         case .tmux:
-            return "The full multiplexer: prefix key, status line, copy mode, buffers, attach/detach."
+            return "The full Harness experience: command prefix, status line, copy mode, paste buffers, panes, and the harness-cli command set."
         case .agent:
             return "Persistent project workspaces with AI-agent detection, notifications, and jump-to-agent."
         }

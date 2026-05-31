@@ -15,6 +15,10 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ARCHIVES="${1:-$ROOT/dist}"
+# Where the archives are hosted. Enclosure URLs in the appcast are made absolute against
+# this so Sparkle downloads from the site no matter where appcast.xml itself is fetched
+# from. Override with DOWNLOAD_URL_PREFIX if you host downloads on a subpath/CDN.
+DOWNLOAD_URL_PREFIX="${DOWNLOAD_URL_PREFIX:-https://harnesscli.dev/}"
 
 # Locate generate_appcast: prefer PATH, else the resolved Sparkle SPM artifact, else Homebrew.
 GEN="$(command -v generate_appcast || true)"
@@ -38,7 +42,8 @@ fi
 
 echo "Using:    $GEN"
 echo "Scanning: $ARCHIVES"
-"$GEN" "$ARCHIVES"
+echo "URLs:     ${DOWNLOAD_URL_PREFIX}<archive>"
+"$GEN" --download-url-prefix "$DOWNLOAD_URL_PREFIX" "$ARCHIVES"
 echo ""
 echo "Wrote $ARCHIVES/appcast.xml"
 echo "Next: upload appcast.xml + the archive(s) to https://harnesscli.dev/"

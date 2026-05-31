@@ -119,7 +119,9 @@ final class NotificationBellButton: NSControl {
         // reads as one themed pack that follows the theme like the session cards.
         HarnessDesign.applyIconButtonChrome(to: layer, bounds: bounds, isHovered: isHovered)
         let hasUnread = waitingCount > 0
-        iconView.contentTintColor = hasUnread ? c.waiting : (isHovered ? c.textPrimary : c.textSecondary)
+        // Theme accent (the cursor/foreground-derived hue), never a hardcoded blue, so the
+        // bell follows the active theme like the rest of the chrome.
+        iconView.contentTintColor = hasUnread ? c.accent : (isHovered ? c.textPrimary : c.textSecondary)
         badgeBackground.layer?.backgroundColor = c.danger.cgColor
         // SF Symbol variant: filled when there's an unread notification, outline
         // when idle. Makes the visual state read in a glance.

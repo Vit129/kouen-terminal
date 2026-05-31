@@ -930,8 +930,16 @@ public final class SurfaceRegistry: @unchecked Sendable {
         cols: UInt16,
         scrollbackBytes: Int?
     ) -> String? {
-        if let existing = sessions[surfaceID] {
-            existing.resize(rows: rows, cols: cols)
+        if sessions[surfaceID] != nil {
+            // Existing surface: do NOT resize here. A surface's geometry is owned by the
+            // per-client resize votes (`resizeSurface`), which every client sends once its
+            // view (GUI) or TTY (CLI attach) lays out. `ensureSurface` carries only a
+            // placeholder 24×80 — resizing a live PTY to that on every reattach (e.g. an app
+            // relaunch that re-grabs daemon-kept surfaces) storms SIGWINCH: the shell redraws
+            // its prompt at 80 cols, that redraw overlaps the replayed scrollback (captured at
+            // the real width) and the real resize that immediately follows, leaving the garbled
+            // overlapping prompt seen on terminal restart. Returning early keeps the surface at
+            // its real size until the client's own resize vote arrives.
             return surfaceID
         }
         do {

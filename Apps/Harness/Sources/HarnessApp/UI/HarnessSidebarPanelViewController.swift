@@ -179,19 +179,27 @@ final class HarnessSidebarPanelViewController: NSViewController {
             }
         )
         dropdown.alphaValue = 0
-        dropdown.translatesAutoresizingMaskIntoConstraints = false
+        dropdown.translatesAutoresizingMaskIntoConstraints = true
         dropdown.layer?.zPosition = 100
-        view.addSubview(dropdown)
+
+        // Float the panel over the window's content view rather than inside the narrow
+        // sidebar: anchored to the sidebar it was clipped at the divider (cut off) and its
+        // body text was squeezed into ~190pt. Hosted on the content view it can use a
+        // comfortable fixed width and overhang the terminal, fully visible. Frame-positioned
+        // just below the bell; it dismisses on any outside click so it needn't track resizes.
+        let host = view.window?.contentView ?? view
+        let width: CGFloat = 300
+        let height = dropdown.preferredHeight
+        let bell = host.convert(notificationBell.bounds, from: notificationBell)
+        var originX = bell.minX
+        originX = min(originX, host.bounds.maxX - width - 8)
+        originX = max(8, originX)
+        // The content view is not flipped (y grows upward), so the panel sits below the bell
+        // when its top edge is the bell's bottom edge.
+        let originY = bell.minY - 6 - height
+        dropdown.frame = NSRect(x: originX, y: originY, width: width, height: height)
+        host.addSubview(dropdown)
         notificationsDropdown = dropdown
-        // Anchor leading + trailing to the sidebar's inset so the panel never
-        // overshoots the sidebar (previous fixed-300-width trailing-anchored
-        // panel had its left edge clip past the sidebar's leading bound).
-        NSLayoutConstraint.activate([
-            dropdown.topAnchor.constraint(equalTo: notificationBell.bottomAnchor, constant: 6),
-            dropdown.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8),
-            dropdown.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
-            dropdown.heightAnchor.constraint(equalToConstant: dropdown.preferredHeight),
-        ])
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.12
             ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
