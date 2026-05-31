@@ -139,6 +139,20 @@ public final class TerminalEmulator: VTParserHandler {
         current.print(active == .decSpecialGraphics ? DECSpecialGraphics.map(scalar) : scalar)
     }
 
+    /// Run-batched printable-ASCII path: route a contiguous ASCII run to the screen's batched
+    /// `printASCIIRun` (build the cell template once, fill a row in a tight loop). Only valid when
+    /// the active charset is ASCII — under DEC special graphics each byte needs the per-codepoint
+    /// translation `parserPrint` does, so we fall back to scalar replay there. Byte-for-byte
+    /// equivalent to repeated `parserPrint`, which is what `AsciiFastPathTests` proves.
+    func parserPrintRun(_ bytes: UnsafeBufferPointer<UInt8>) {
+        let active = glUsesG1 ? g1 : g0
+        if active == .decSpecialGraphics {
+            for b in bytes { current.print(DECSpecialGraphics.map(UInt32(b))) }
+        } else {
+            current.printASCIIRun(bytes)
+        }
+    }
+
     func parserExecute(_ control: UInt8) {
         switch control {
         case 0x07: onBell?()                 // BEL
