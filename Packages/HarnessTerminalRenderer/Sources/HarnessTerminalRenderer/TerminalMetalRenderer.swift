@@ -288,8 +288,11 @@ public final class TerminalMetalRenderer {
         else { return nil }
 
         var vp = viewport
-        // Background pass.
-        if let buffer = device.makeBuffer(bytes: backgrounds, length: backgrounds.count * MemoryLayout<BgInstance>.stride, options: .storageModeShared) {
+        // Background pass. `makeBuffer(length:)` is undefined for length 0, so skip an empty
+        // pass (the glyph/decoration passes already guard the same way) — production clamps the
+        // grid to ≥1×1, but a directly-constructed empty frame must not hit a zero-length buffer.
+        if !backgrounds.isEmpty,
+           let buffer = device.makeBuffer(bytes: backgrounds, length: backgrounds.count * MemoryLayout<BgInstance>.stride, options: .storageModeShared) {
             renderEncoder.setRenderPipelineState(bgPipeline)
             renderEncoder.setVertexBuffer(buffer, offset: 0, index: 0)
             renderEncoder.setVertexBytes(&vp, length: MemoryLayout<SIMD2<Float>>.stride, index: 1)

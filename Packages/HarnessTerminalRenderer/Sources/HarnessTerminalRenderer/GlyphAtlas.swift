@@ -83,11 +83,31 @@ final class GlyphAtlas {
         rasterizer.shape(text, bold: bold, italic: italic)
     }
 
-    /// Pack a rasterized glyph into the shelf and upload it. Returns nil when the glyph has
-    /// no ink or the atlas is full.
+    /// Pack a rasterized glyph into the shelf and upload it. Returns nil only when the glyph has
+    /// no ink, or (pathologically) is larger than the whole atlas. On exhaustion the atlas is
+    /// reset and the glyph re-packed, so a long CJK/emoji-heavy session never silently loses
+    /// glyphs to a full atlas (the old behaviour: every later glyph dropped to a blank cell,
+    /// cached `nil`, for the rest of the session).
     private func place(_ glyph: RasterizedGlyph) -> AtlasEntry? {
         guard glyph.width > 0, glyph.height > 0 else { return nil }
+        if let entry = pack(glyph) { return entry }
+        resetPacker()
+        return pack(glyph) // nil here only if a single glyph exceeds the atlas (not real fonts)
+    }
 
+    /// Drop every cached entry and rewind the shelf packer so the texture can be repacked from
+    /// scratch. Both caches index into `texture`, so they must be cleared together with the pen.
+    /// Cached glyphs re-rasterize on next access; at worst one frame shows stale UVs, then heals.
+    private func resetPacker() {
+        penX = 0
+        penY = 0
+        shelfHeight = 0
+        cache.removeAll(keepingCapacity: true)
+        shapedCache.removeAll(keepingCapacity: true)
+    }
+
+    /// Shelf-pack one inked glyph, uploading its coverage. Returns nil when the atlas is full.
+    private func pack(_ glyph: RasterizedGlyph) -> AtlasEntry? {
         // Advance to a new shelf if this glyph won't fit on the current row.
         if penX + glyph.width > size {
             penX = 0
