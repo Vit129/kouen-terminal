@@ -143,6 +143,10 @@ struct HarnessCLI {
             case "attach-window":
                 let code = try handleAttachWindow(args)
                 exit(code)
+            case "record":
+                exit(handleRecord(args, client: client))
+            case "replay":
+                exit(handleReplay(args))
             case "daemon-stats":
                 try printDaemonStats(args, client: client)
             case "list-clients":
@@ -641,6 +645,37 @@ struct HarnessCLI {
             configuration.detachSequence = parsed
         }
         return try AttachClient.run(surfaceID: surface, configuration: configuration)
+    }
+
+    /// `record --surface <id> --output <file> [--display]` — record a surface's
+    /// output to a JSON Lines file (see `RecordingEvent`); `--display` also mirrors
+    /// the output to this terminal. Stops on Ctrl-C or when the surface closes.
+    static func handleRecord(_ args: [String], client: DaemonClient) -> Int32 {
+        guard let surface = flagValue(args, flag: "--surface"),
+              let output = flagValue(args, flag: "--output") else {
+            fputs("Usage: harness-cli record --surface <uuid> --output <file> [--display]\n", stderr)
+            return 64
+        }
+        return RecordClient.run(
+            client: client, surfaceID: surface, outputPath: output,
+            display: args.contains("--display")
+        )
+    }
+
+    /// `replay <file> [--speed <n>] [--no-timing]` — play a recording back to this
+    /// terminal. `--speed` scales the recorded timing (2 = twice as fast),
+    /// `--no-timing` dumps everything instantly. Ctrl-C stops cleanly.
+    static func handleReplay(_ args: [String]) -> Int32 {
+        guard let file = positionalArgs(args, skippingValuesFor: ["--speed"]).first else {
+            fputs("Usage: harness-cli replay <file> [--speed <n>] [--no-timing]\n", stderr)
+            return 64
+        }
+        let speed = Double(flagValue(args, flag: "--speed") ?? "1") ?? .nan
+        guard speed > 0 else {
+            fputs("harness-cli replay: --speed must be a positive number\n", stderr)
+            return 64
+        }
+        return ReplayClient.run(path: file, speed: speed, honorTiming: !args.contains("--no-timing"))
     }
 
     /// Renders a whole tab (split layout) into the terminal via the compositor.
@@ -1241,6 +1276,8 @@ struct HarnessCLI {
           install-hooks <codex|claude-code|cursor|pi|hermes|openclaw|aider|gemini|goose>
           install-shell-integration [bash|zsh|fish|all]  (OSC 133 prompt marks + gutter)
           attach --surface <uuid> [--detach-keys "C-a d"]
+          record --surface <uuid> --output <file> [--display]
+          replay <file> [--speed <n>] [--no-timing]
           notify --surface <uuid> [--title t] [--body b] [--from-hook]
           daemon-stats [--json] [--pretty]
           list-clients [--json] [--pretty]
