@@ -170,6 +170,6 @@ Events: `after-new-tab`, `after-new-session`, `after-kill-tab`, `after-split-pan
 | Form | Effect |
 |---|---|
 | `a ; b ; c` | Sequence. Commits each in order; later steps see the post-state of earlier ones. |
-| `"literal text"` / `'literal text'` | Quoted arguments preserve whitespace and `;`. |
+| `"literal text"` / `'literal text'` | Quoted arguments preserve whitespace and `;`. An unterminated quote is a parse error (it is **not** silently swallowed to end of line). |
 
 See `docs/KEYBINDINGS.md` for the default key tables and `Packages/HarnessCore/Sources/HarnessCore/Format/FormatString.swift` for the full `FormatString` token list.
