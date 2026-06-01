@@ -149,7 +149,12 @@ final class SessionCoordinator: NSObject {
     /// Push the theme's focus-ring / waiting colors into a host (the terminal package
     /// can't reach the app palette, so the app owns these indicator colors).
     private func pushBorderColors(to host: TerminalHostView) {
-        host.applyBorderColors(active: HarnessChrome.current.focusRing, waiting: HarnessChrome.current.waiting)
+        let chrome = HarnessChrome.current
+        host.applyBorderColors(
+            active: chrome.focusRing,
+            waiting: chrome.waiting,
+            frame: chrome.textPrimary.withAlphaComponent(chrome.isDark ? 0.16 : 0.22)
+        )
     }
 
     private func syncWaitingRings() {

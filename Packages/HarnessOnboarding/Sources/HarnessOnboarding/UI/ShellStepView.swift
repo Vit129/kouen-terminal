@@ -9,10 +9,10 @@ struct ShellStepView: View {
     @State private var success = false
 
     struct ShellInfo: Identifiable {
-        let id = UUID()
+        let id: ShellProfileInstaller.Shell
+        let shell: ShellProfileInstaller.Shell
         let name: String
         let profileURL: URL
-        let line: String
         var alreadyHas: Bool
     }
 
@@ -84,51 +84,25 @@ struct ShellStepView: View {
     }
 
     private func detectShells() {
-        var result: [ShellInfo] = []
-        let home = FileManager.default.homeDirectoryForCurrentUser
-
-        let zsh = home.appendingPathComponent(".zshrc")
-        result.append(ShellInfo(name: "zsh", profileURL: zsh,
-                                line: "export PATH=\"\(HarnessCLIPaths.binDirectory.path):$PATH\"",
-                                alreadyHas: containsLine(zsh)))
-
-        let bash = home.appendingPathComponent(".bash_profile")
-        result.append(ShellInfo(name: "bash", profileURL: bash,
-                                line: "export PATH=\"\(HarnessCLIPaths.binDirectory.path):$PATH\"",
-                                alreadyHas: containsLine(bash)))
-
-        let fish = home.appendingPathComponent(".config/fish/config.fish")
-        result.append(ShellInfo(name: "fish", profileURL: fish,
-                                line: "set -gx PATH \(HarnessCLIPaths.binDirectory.path) $PATH",
-                                alreadyHas: containsLine(fish)))
-
-        shells = result
-    }
-
-    private func containsLine(_ url: URL) -> Bool {
-        guard let content = try? String(contentsOf: url, encoding: .utf8) else { return false }
-        return content.contains("Harness/bin")
+        shells = ShellProfileInstaller.profiles().map {
+            ShellInfo(
+                id: $0.shell,
+                shell: $0.shell,
+                name: $0.shell.rawValue,
+                profileURL: $0.profileURL,
+                alreadyHas: $0.alreadyHas
+            )
+        }
     }
 
     private func updateShell(_ shell: ShellInfo) {
         isWorking = true
         defer { isWorking = false }
 
-        let backup = shell.profileURL.appendingPathExtension("bak-\(Int(Date().timeIntervalSince1970))")
         do {
-            if FileManager.default.fileExists(atPath: shell.profileURL.path) {
-                try FileManager.default.copyItem(at: shell.profileURL, to: backup)
-            } else {
-                try FileManager.default.createDirectory(at: shell.profileURL.deletingLastPathComponent(),
-                                                        withIntermediateDirectories: true)
-                try "".write(to: shell.profileURL, atomically: true, encoding: .utf8)
-            }
-            var content = (try? String(contentsOf: shell.profileURL, encoding: .utf8)) ?? ""
-            if !content.hasSuffix("\n") && !content.isEmpty { content += "\n" }
-            content += "\n# Added by Harness CLI Onboarding\n\(shell.line)\n"
-            try content.write(to: shell.profileURL, atomically: true, encoding: .utf8)
-
-            messages.append("Updated \(shell.name), backup \(backup.lastPathComponent)")
+            let result = try ShellProfileInstaller.install(shell.shell)
+            let backup = result.backupURL.map { ", backup \($0.lastPathComponent)" } ?? ""
+            messages.append(result.alreadyConfigured ? "\(shell.name) already configured" : "Updated \(shell.name)\(backup)")
             detectShells()
         } catch {
             messages.append("Failed to update \(shell.name): \(error.localizedDescription)")
@@ -148,6 +122,7 @@ struct ShellStepView: View {
         let fishScript = """
         # Fish completion for harness-cli (embedded by the onboarding wizard)
         set -l __harness_cli_subcommands \\
+            doctor completions color-check theme-preview \\
             ping list-workspaces list-surfaces list-sessions list-windows list-panes list-agents has-session \\
             list-commands get-snapshot daemon-stats list-clients detach-client \\
             new-workspace new-session new-tab new-split \\

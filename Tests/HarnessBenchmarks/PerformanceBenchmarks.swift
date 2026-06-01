@@ -80,14 +80,20 @@ final class PerformanceBenchmarks: XCTestCase {
     }
 
     @discardableResult
-    private func encodeAndWait(renderer: TerminalMetalRenderer, frame: TerminalFrame, target: MTLTexture) -> TerminalRenderStats {
+    private func encodeAndWait(
+        renderer: TerminalMetalRenderer,
+        frame: TerminalFrame,
+        target: MTLTexture,
+        damage: TerminalDamage? = nil
+    ) -> TerminalRenderStats {
         guard let commandBuffer = renderer.encode(
             frame,
             target: target,
             clearColor: RenderColor(red: 0, green: 0, blue: 0, alpha: 1),
             origin: (0, 0),
             gamma: 1,
-            ligatures: false
+            ligatures: false,
+            damage: damage
         ) else {
             XCTFail("encode")
             return renderer.stats
@@ -481,10 +487,91 @@ final class PerformanceBenchmarks: XCTestCase {
                 ("decoInstances", "\(stats.decoInstances)"),
                 ("imageInstances", "\(stats.imageInstances)"),
                 ("atlasPages", "\(stats.atlasPages)"),
+                ("encodedRows", "\(stats.encodedRows)"),
+                ("reusedRows", "\(stats.reusedRows)"),
+                ("instanceUploadBytes", "\(stats.instanceUploadBytes)"),
             ]
         )
         measure {
             encodeAndWait(renderer: renderer, frame: frame, target: target)
+        }
+    }
+
+    func testRenderEncodeIncrementalDamage160x48() throws {
+        try skipUnlessEnabled()
+        let device = try makeMetalDevice()
+        let renderer = try XCTUnwrap(
+            TerminalMetalRenderer(device: device, fontFamily: "Menlo", fontSize: 14, scale: 2),
+            "TerminalMetalRenderer failed to build"
+        )
+        let frame = frame(cols: 160, rows: 48)
+        let size = renderer.surfacePixelSize(columns: 160, rows: 48)
+        let target = try XCTUnwrap(makeTarget(device, width: size.width, height: size.height), "no texture")
+        _ = encodeAndWait(
+            renderer: renderer,
+            frame: frame,
+            target: target,
+            damage: TerminalDamage(rows: IndexSet(integersIn: 0 ..< 48), full: true)
+        )
+
+        let dirtyOneRow = TerminalDamage(rows: IndexSet(integer: 12), full: false)
+        let stats = encodeAndWait(renderer: renderer, frame: frame, target: target, damage: dirtyOneRow)
+        printBenchmark(
+            "render_encode_incremental_damage_160x48",
+            nanos: stats.encodeNanos,
+            fields: [
+                ("cells", "\(stats.cells)"),
+                ("bgInstances", "\(stats.bgInstances)"),
+                ("glyphInstances", "\(stats.glyphInstances)"),
+                ("encodedRows", "\(stats.encodedRows)"),
+                ("reusedRows", "\(stats.reusedRows)"),
+                ("instanceUploadBytes", "\(stats.instanceUploadBytes)"),
+            ]
+        )
+        measure {
+            encodeAndWait(renderer: renderer, frame: frame, target: target, damage: dirtyOneRow)
+        }
+    }
+
+    func testRenderEncodeStableDamage160x48() throws {
+        try skipUnlessEnabled()
+        let device = try makeMetalDevice()
+        let renderer = try XCTUnwrap(
+            TerminalMetalRenderer(device: device, fontFamily: "Menlo", fontSize: 14, scale: 2),
+            "TerminalMetalRenderer failed to build"
+        )
+        let frame = frame(cols: 160, rows: 48)
+        let size = renderer.surfacePixelSize(columns: 160, rows: 48)
+        let target = try XCTUnwrap(makeTarget(device, width: size.width, height: size.height), "no texture")
+        _ = encodeAndWait(
+            renderer: renderer,
+            frame: frame,
+            target: target,
+            damage: TerminalDamage(rows: IndexSet(integersIn: 0 ..< 48), full: true)
+        )
+        _ = encodeAndWait(
+            renderer: renderer,
+            frame: frame,
+            target: target,
+            damage: TerminalDamage(rows: [], full: false)
+        )
+
+        let cleanDamage = TerminalDamage(rows: [], full: false)
+        let stats = encodeAndWait(renderer: renderer, frame: frame, target: target, damage: cleanDamage)
+        printBenchmark(
+            "render_encode_stable_damage_160x48",
+            nanos: stats.encodeNanos,
+            fields: [
+                ("cells", "\(stats.cells)"),
+                ("bgInstances", "\(stats.bgInstances)"),
+                ("glyphInstances", "\(stats.glyphInstances)"),
+                ("encodedRows", "\(stats.encodedRows)"),
+                ("reusedRows", "\(stats.reusedRows)"),
+                ("instanceUploadBytes", "\(stats.instanceUploadBytes)"),
+            ]
+        )
+        measure {
+            encodeAndWait(renderer: renderer, frame: frame, target: target, damage: cleanDamage)
         }
     }
 

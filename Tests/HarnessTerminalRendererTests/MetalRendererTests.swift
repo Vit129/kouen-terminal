@@ -170,6 +170,127 @@ final class MetalRendererTests: XCTestCase {
         XCTAssertNotEqual(nonEmptyStats.glyphInstances, blankStats.glyphInstances)
     }
 
+    func testRendererDamageReusesCleanRowsWithoutChangingReadback() throws {
+        let (device, renderer) = try makeRenderer()
+        let initial = frame("\u{1b}[?25lAAAA\r\nBBBB\r\nCCCC", cols: 4, rows: 3)
+        let changed = frame("\u{1b}[?25lAAAA\r\nBXBB\r\nCCCC", cols: 4, rows: 3)
+        let size = renderer.surfacePixelSize(columns: 4, rows: 3)
+        guard let incrementalTarget = makeTarget(device, width: size.width, height: size.height),
+              let fullTarget = makeTarget(device, width: size.width, height: size.height)
+        else { throw XCTSkip("no texture") }
+
+        renderer.render(
+            initial,
+            to: incrementalTarget,
+            clearColor: RenderColor(red: 0, green: 0, blue: 0, alpha: 1),
+            damage: TerminalDamage(rows: IndexSet(integersIn: 0 ..< 3), full: true)
+        )
+        XCTAssertEqual(renderer.stats.encodedRows, 3)
+        XCTAssertEqual(renderer.stats.reusedRows, 0)
+
+        renderer.render(
+            changed,
+            to: incrementalTarget,
+            clearColor: RenderColor(red: 0, green: 0, blue: 0, alpha: 1),
+            damage: TerminalDamage(rows: IndexSet(integer: 1), full: false)
+        )
+        let incrementalStats = renderer.stats
+        XCTAssertEqual(incrementalStats.encodedRows, 1)
+        XCTAssertEqual(incrementalStats.reusedRows, 2)
+        XCTAssertGreaterThan(incrementalStats.instanceUploadBytes, 0)
+
+        renderer.render(
+            changed,
+            to: incrementalTarget,
+            clearColor: RenderColor(red: 0, green: 0, blue: 0, alpha: 1),
+            damage: TerminalDamage(rows: [], full: false)
+        )
+        XCTAssertEqual(renderer.stats.encodedRows, 0)
+        XCTAssertEqual(renderer.stats.reusedRows, 3)
+        XCTAssertGreaterThan(renderer.stats.instanceUploadBytes, 0, "first stable frame primes immutable upload buffers")
+
+        renderer.render(
+            changed,
+            to: incrementalTarget,
+            clearColor: RenderColor(red: 0, green: 0, blue: 0, alpha: 1),
+            damage: TerminalDamage(rows: [], full: false)
+        )
+        XCTAssertEqual(renderer.stats.encodedRows, 0)
+        XCTAssertEqual(renderer.stats.reusedRows, 3)
+        XCTAssertEqual(renderer.stats.instanceUploadBytes, 0)
+
+        let reference = try makeRenderer(device: device)
+        reference.render(changed, to: fullTarget, clearColor: RenderColor(red: 0, green: 0, blue: 0, alpha: 1))
+        XCTAssertEqual(
+            readPixelBytes(incrementalTarget, width: size.width, height: size.height),
+            readPixelBytes(fullTarget, width: size.width, height: size.height)
+        )
+    }
+
+    func testRendererDamageRebuildsBlockCursorGlyphRowWhenBlinking() throws {
+        let (device, renderer) = try makeRenderer()
+        var visible = frame("A", cols: 1, rows: 1)
+        visible.cursor.visible = true
+        visible.cursor.style = .block
+        var hidden = visible
+        hidden.cursor.visible = false
+        let size = renderer.surfacePixelSize(columns: 1, rows: 1)
+        guard let target = makeTarget(device, width: size.width, height: size.height) else {
+            throw XCTSkip("no texture")
+        }
+
+        renderer.render(
+            visible,
+            to: target,
+            clearColor: RenderColor(red: 0, green: 0, blue: 0, alpha: 1),
+            damage: TerminalDamage(rows: IndexSet(integersIn: 0 ..< 1), full: true)
+        )
+        renderer.render(
+            hidden,
+            to: target,
+            clearColor: RenderColor(red: 0, green: 0, blue: 0, alpha: 1),
+            damage: TerminalDamage(rows: [], full: false)
+        )
+
+        XCTAssertEqual(renderer.stats.encodedRows, 1, "cursor blink invalidates the glyph row")
+        XCTAssertEqual(renderer.stats.reusedRows, 0)
+    }
+
+    func testRendererDamageDoesNotReuseStableBuffersForInvalidFrameShape() throws {
+        let (device, renderer) = try makeRenderer()
+        let red = RenderColor(red: 1, green: 0, blue: 0, alpha: 1)
+        let green = RenderColor(red: 0, green: 1, blue: 0, alpha: 1)
+        let valid = backgroundFrame(Array(repeating: red, count: 4))
+        let size = renderer.surfacePixelSize(columns: 4, rows: 1)
+        guard let target = makeTarget(device, width: size.width, height: size.height) else {
+            throw XCTSkip("no texture")
+        }
+
+        renderer.render(
+            valid,
+            to: target,
+            clearColor: green,
+            damage: TerminalDamage(rows: IndexSet(integer: 0), full: true)
+        )
+        renderer.render(valid, to: target, clearColor: green, damage: TerminalDamage(rows: [], full: false))
+        renderer.render(valid, to: target, clearColor: green, damage: TerminalDamage(rows: [], full: false))
+        XCTAssertEqual(renderer.stats.instanceUploadBytes, 0)
+
+        let invalid = TerminalFrame(columns: 4, rows: 1, cells: [], cursor: valid.cursor)
+        renderer.render(invalid, to: target, clearColor: green, damage: TerminalDamage(rows: [], full: false))
+        XCTAssertEqual(renderer.stats.bgInstances, 0)
+        XCTAssertEqual(renderer.stats.glyphInstances, 0)
+
+        let px = readPixels(target, width: size.width, height: size.height)
+        assertColor(
+            px(renderer.cellPixelWidth / 2, renderer.cellPixelHeight / 2),
+            r: 0,
+            g: 255,
+            b: 0,
+            label: "invalid frame clears instead of reusing stale stable buffers"
+        )
+    }
+
     func testGlyphAtlasStatsTrackMissThenHit() throws {
         let (device, _) = try makeRenderer()
         let atlas = try makeAtlas(device)
@@ -455,6 +576,22 @@ final class MetalRendererTests: XCTestCase {
         let px = readPixels(target, width: w, height: h)
         assertColor(px(renderer.cellPixelWidth / 2, renderer.cellPixelHeight / 2),
                     r: 255, g: 0, b: 0, label: "blank cell reveals red clear color")
+    }
+
+    func testTranslucentCanvasClearIsPremultipliedForLayerCompositing() throws {
+        let (device, renderer) = try makeRenderer()
+        let f = frame("\u{1b}[?25l", cols: 1, rows: 1)
+        let (w, h) = renderer.surfacePixelSize(columns: 1, rows: 1)
+        guard let target = makeTarget(device, width: w, height: h) else { throw XCTSkip("no texture") }
+
+        renderer.render(f, to: target, clearColor: RenderColor(red: 1, green: 0, blue: 0, alpha: 0.5))
+        let px = readPixels(target, width: w, height: h)
+        let center = px(renderer.cellPixelWidth / 2, renderer.cellPixelHeight / 2)
+
+        XCTAssertLessThanOrEqual(abs(Int(center.0) - 128), 1, "red channel is premultiplied by alpha")
+        XCTAssertEqual(center.1, 0)
+        XCTAssertEqual(center.2, 0)
+        XCTAssertLessThanOrEqual(abs(Int(center.3) - 128), 1, "alpha channel is preserved")
     }
 
     func testCursorFillDrawsOverSkippedDefaultCell() throws {

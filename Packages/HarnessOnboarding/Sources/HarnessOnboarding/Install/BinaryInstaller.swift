@@ -173,6 +173,12 @@ enum BinaryInstaller {
     }
 
     private static func copyReplacing(src: URL, dest: URL, executable: Bool) throws {
+        if src.standardizedFileURL.path == dest.standardizedFileURL.path {
+            if executable {
+                try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: dest.path)
+            }
+            return
+        }
         if FileManager.default.fileExists(atPath: dest.path) {
             try FileManager.default.removeItem(at: dest)
         }

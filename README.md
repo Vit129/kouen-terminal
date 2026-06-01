@@ -10,11 +10,11 @@ One self-contained app. The terminal engine, daemon, and CLI are all first-party
 
 ## Download
 
-**[Download Harness 1.0.0 for macOS →](https://github.com/robzilla1738/harness-cli/releases/download/v1.0.0/Harness.dmg)**
+**[Download Harness 1.0.1 for macOS →](https://github.com/robzilla1738/harness-cli/releases/download/v1.0.1/Harness.dmg)**
 
 Open the DMG, drag `Harness.app` to Applications, and launch it normally. The release is signed, notarized, and built for Apple silicon Macs running macOS 15 or later.
 
-SHA-256: `da07070a496cb2678b28b816dcd4868af12ac6576bc9cb92e68980e5827a40c5`
+SHA-256: `6db8549159c60438b528ed44e227c055fc39444a2aaab4c9040242d59373377f`
 
 Prefer to build it yourself? Jump to [Build from source](#build-from-source).
 
@@ -82,6 +82,11 @@ Install it onto your `PATH`:
 # Then add the printed path to your shell profile:
 export PATH="$HOME/Library/Application Support/Harness/bin:$PATH"
 ```
+
+The first-run setup in `Harness.app` performs the same local installation for new
+users: it copies `harness-cli` and `HarnessDaemon`, registers the LaunchAgent,
+adds PATH blocks for zsh/bash/fish with backups, installs fish completions, asks
+for notification permission, and offers detected agent hooks.
 
 ## Agent hooks
 
@@ -152,6 +157,7 @@ xcodebuild -project Harness.xcodeproj -scheme Harness -configuration Debug \
 
 - [Experience modes](docs/MODES.md) — Plain / Persistent / Full / Agent
 - [Sessions & panes guide](docs/MULTIPLEXER_GUIDE.md) — prefix, panes, sessions, copy mode, attach from anywhere
+- [tmux-style capabilities PDF](docs/HARNESS_TMUX_CAPABILITIES.pdf) — printable setup, shortcuts, commands, attach, copy mode, and troubleshooting
 - [Migration](docs/MIGRATION.md) — bringing your config and habits across
 - [Keybindings](docs/KEYBINDINGS.md) · [Commands](docs/COMMANDS.md) · [Shell integration](docs/shell-integration/README.md) · [Agent hooks](docs/agent-hooks/README.md)
 - [Third-party notices](docs/THIRD-PARTY-NOTICES.md)

@@ -327,7 +327,10 @@ public final class GlyphRasterizer {
 
         ctx.setAllowsAntialiasing(true)
         ctx.setShouldAntialias(true)
-        ctx.setShouldSmoothFonts(true)
+        // Harness owns text weight through the explicit glyph gamma setting. CoreGraphics font
+        // smoothing inflates grayscale coverage before Metal blends it, making regular text look
+        // artificially bold even when the user selected native rendering.
+        ctx.setShouldSmoothFonts(false)
         ctx.setFillColor(gray: 1, alpha: 1) // white ink on the zero-cleared (black) bitmap
         ctx.scaleBy(x: scale, y: scale)
 

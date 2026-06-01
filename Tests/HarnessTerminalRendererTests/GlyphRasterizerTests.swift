@@ -1,3 +1,4 @@
+import CoreGraphics
 import CoreText
 import XCTest
 @testable import HarnessTerminalRenderer
@@ -33,6 +34,24 @@ final class GlyphRasterizerTests: XCTestCase {
         XCTAssertTrue(glyph.coverage.contains { $0 > 0 }, "glyph should have non-zero coverage")
         // 'A' sits above the baseline.
         XCTAssertGreaterThan(glyph.bearingY, 0)
+    }
+
+    func testNativeRasterizationDoesNotApplyCoreGraphicsFontSmoothing() {
+        let scalar = UnicodeScalar("A").value
+        guard let glyph = rasterizer.rasterize(codepoint: scalar) else {
+            return XCTFail("expected a glyph for 'A'")
+        }
+
+        let actualCoverage = glyph.coverage.reduce(0) { $0 + Int($1) }
+        let nativeCoverage = referenceCoverageSum(codepoint: scalar, smoothFonts: false)
+        let smoothedCoverage = referenceCoverageSum(codepoint: scalar, smoothFonts: true)
+
+        XCTAssertEqual(actualCoverage, nativeCoverage)
+        XCTAssertGreaterThan(
+            smoothedCoverage,
+            nativeCoverage + nativeCoverage / 5,
+            "CoreGraphics font smoothing materially thickens grayscale coverage"
+        )
     }
 
     func testSpaceHasNoInk() {
@@ -152,5 +171,50 @@ final class GlyphRasterizerTests: XCTestCase {
                 fontSize: CTFontGetSize($0.font)
             )
         }
+    }
+
+    private func referenceCoverageSum(codepoint: UInt32, smoothFonts: Bool) -> Int {
+        let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
+        guard let scalar = Unicode.Scalar(codepoint) else { return 0 }
+        var utf16 = Array(String(scalar).utf16)
+        var glyphs = [CGGlyph](repeating: 0, count: utf16.count)
+        guard CTFontGetGlyphsForCharacters(font, &utf16, &glyphs, utf16.count),
+              let glyph = glyphs.first, glyph != 0
+        else { return 0 }
+
+        var g = glyph
+        var bounds = CGRect.zero
+        CTFontGetBoundingRectsForGlyphs(font, .horizontal, &g, &bounds, 1)
+
+        let scale: CGFloat = 2
+        let pad = 1
+        let leftPx = Int(floor(bounds.minX * scale))
+        let rightPx = Int(ceil(bounds.maxX * scale))
+        let topPx = Int(ceil(bounds.maxY * scale))
+        let botPx = Int(floor(bounds.minY * scale))
+        let width = (rightPx - leftPx) + 2 * pad
+        let height = (topPx - botPx) + 2 * pad
+        guard width > 0, height > 0 else { return 0 }
+
+        var coverage = [UInt8](repeating: 0, count: width * height)
+        guard let context = CGContext(
+            data: &coverage,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: width,
+            space: CGColorSpaceCreateDeviceGray(),
+            bitmapInfo: CGImageAlphaInfo.none.rawValue
+        ) else { return 0 }
+
+        context.setAllowsAntialiasing(true)
+        context.setShouldAntialias(true)
+        context.setShouldSmoothFonts(smoothFonts)
+        context.setFillColor(gray: 1, alpha: 1)
+        context.scaleBy(x: scale, y: scale)
+
+        var position = CGPoint(x: CGFloat(pad - leftPx) / scale, y: CGFloat(pad - botPx) / scale)
+        CTFontDrawGlyphs(font, &g, &position, 1, context)
+        return coverage.reduce(0) { $0 + Int($1) }
     }
 }

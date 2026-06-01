@@ -1160,17 +1160,16 @@ struct HarnessCLI {
         let dest = HarnessPaths.applicationSupport.appendingPathComponent("bin/harness-cli")
         try HarnessPaths.ensureDirectories()
         try FileManager.default.createDirectory(at: dest.deletingLastPathComponent(), withIntermediateDirectories: true)
-        if FileManager.default.fileExists(atPath: dest.path) {
-            try FileManager.default.removeItem(at: dest)
-        }
-        try FileManager.default.copyItem(at: source, to: dest)
-        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: dest.path)
+        try copyExecutable(source: source, destination: dest)
         print(dest.path)
         print("export PATH=\"\(dest.deletingLastPathComponent().path):$PATH\"")
         // Install the LaunchAgent so the daemon survives reboot.
         if let daemon = locateDaemonBinary() {
             do {
-                let report = try LaunchAgentInstaller.install(daemonPath: daemon)
+                let installedDaemon = HarnessPaths.applicationSupport.appendingPathComponent("bin/HarnessDaemon")
+                try copyExecutable(source: daemon, destination: installedDaemon)
+                print("daemon: \(installedDaemon.path)")
+                let report = try LaunchAgentInstaller.install(daemonPath: installedDaemon)
                 print("launch-agent: \(report.plistPath.path)")
             } catch {
                 fputs("warning: LaunchAgent install failed: \(error)\n", stderr)
@@ -1189,6 +1188,16 @@ struct HarnessCLI {
         }
         print("Tip: run 'harness-cli install-shell-integration' to enable OSC 133 prompt marks, "
             + "the success/failure gutter, and prompt jumping.")
+    }
+
+    static func copyExecutable(source: URL, destination: URL) throws {
+        if source.standardizedFileURL.path != destination.standardizedFileURL.path {
+            if FileManager.default.fileExists(atPath: destination.path) {
+                try FileManager.default.removeItem(at: destination)
+            }
+            try FileManager.default.copyItem(at: source, to: destination)
+        }
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: destination.path)
     }
 
     /// Locate the daemon executable next to the running CLI. The CLI is

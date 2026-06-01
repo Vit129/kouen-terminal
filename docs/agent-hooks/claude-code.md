@@ -24,7 +24,7 @@ This writes `~/.claude/settings.json` (backing up any existing file as
         "hooks": [
           {
             "type": "command",
-            "command": "harness-cli notify --surface \"$HARNESS_SURFACE\" --title \"Claude Code\" --from-hook"
+            "command": "PATH=\"$HOME/Library/Application Support/Harness/bin:$PATH\" harness-cli notify --surface \"$HARNESS_SURFACE\" --title \"Claude Code\" --from-hook"
           }
         ]
       }
@@ -35,7 +35,7 @@ This writes `~/.claude/settings.json` (backing up any existing file as
         "hooks": [
           {
             "type": "command",
-            "command": "harness-cli notify --surface \"$HARNESS_SURFACE\" --title \"Claude Code\" --body \"Done\""
+            "command": "PATH=\"$HOME/Library/Application Support/Harness/bin:$PATH\" harness-cli notify --surface \"$HARNESS_SURFACE\" --title \"Claude Code\" --body \"Done\""
           }
         ]
       }

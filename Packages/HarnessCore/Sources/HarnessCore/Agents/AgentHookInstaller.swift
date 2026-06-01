@@ -1,7 +1,9 @@
 import Foundation
 
 /// Writes per-agent hook config files so each known agent CLI calls back into Harness via
-/// `harness-cli notify --surface "$HARNESS_SURFACE"`. Shared by the CLI (`install-hooks`)
+/// `harness-cli notify --surface "$HARNESS_SURFACE"`. Hook commands prepend Harness's
+/// app-support bin directory to PATH, so they keep working even when the user's agent
+/// process did not load the shell profile that onboarding edits. Shared by the CLI (`install-hooks`)
 /// and the Settings "Install hooks" button — UI-agnostic (no `print`/`exit`), so the GUI
 /// can call it directly. Configs are **deep-merged** into the agent's existing file (via
 /// `JSONMerge`) and backed up first — never clobbered. Per-agent guides live in
@@ -224,16 +226,17 @@ public enum AgentHookInstaller {
 
     /// Substring present in every Harness hook command — the `isInstalled` marker.
     private static let hookMarker = "harness-cli notify"
+    private static let notifyPrefix = "PATH=\"$HOME/Library/Application Support/Harness/bin:$PATH\" harness-cli notify"
 
     private static func notifyCommand(title: String, body: String) -> String {
-        "harness-cli notify --surface \"$HARNESS_SURFACE\" --title \"\(title)\" --body \"\(body)\""
+        "\(notifyPrefix) --surface \"$HARNESS_SURFACE\" --title \"\(title)\" --body \"\(body)\""
     }
 
     /// A notify command whose body comes from the hook's stdin JSON `message` (`--from-hook`).
     /// Used for agents (Claude Code) that pass the notification text on stdin rather than as a
     /// shell argument — `--body "$HARNESS_NOTIFY_MESSAGE"` would expand to nothing.
     private static func notifyFromHookCommand(title: String) -> String {
-        "harness-cli notify --surface \"$HARNESS_SURFACE\" --title \"\(title)\" --from-hook"
+        "\(notifyPrefix) --surface \"$HARNESS_SURFACE\" --title \"\(title)\" --from-hook"
     }
 
     private static func hookPayload(for agent: AgentKind) -> [String: Any]? {
@@ -282,17 +285,17 @@ public enum AgentHookInstaller {
         case .cursor:
             return [
                 "version": 1,
-                "agent_notify": "harness-cli notify --surface \"$HARNESS_SURFACE\" --title \"Cursor\" --body \"$1\"",
-                "agent_done": "harness-cli notify --surface \"$HARNESS_SURFACE\" --title \"Cursor\" --body \"Done\"",
+                "agent_notify": "\(notifyPrefix) --surface \"$HARNESS_SURFACE\" --title \"Cursor\" --body \"$1\"",
+                "agent_done": "\(notifyPrefix) --surface \"$HARNESS_SURFACE\" --title \"Cursor\" --body \"Done\"",
             ]
         // Pi/Hermes/OpenClaw fire a single `notify` hook with no message argument, so pass a
         // `--title` to identify the agent on the banner (the body falls back to the default).
         case .pi:
-            return ["notify": "harness-cli notify --surface \"$HARNESS_SURFACE\" --title \"Pi\""]
+            return ["notify": "\(notifyPrefix) --surface \"$HARNESS_SURFACE\" --title \"Pi\""]
         case .hermes:
-            return ["notify": "harness-cli notify --surface \"$HARNESS_SURFACE\" --title \"Hermes\""]
+            return ["notify": "\(notifyPrefix) --surface \"$HARNESS_SURFACE\" --title \"Hermes\""]
         case .openClaw:
-            return ["notify": "harness-cli notify --surface \"$HARNESS_SURFACE\" --title \"OpenClaw\""]
+            return ["notify": "\(notifyPrefix) --surface \"$HARNESS_SURFACE\" --title \"OpenClaw\""]
         case .openCode, .aider, .gemini, .goose, .generic:
             return nil
         }

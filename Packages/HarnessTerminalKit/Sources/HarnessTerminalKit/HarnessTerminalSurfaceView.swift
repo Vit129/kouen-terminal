@@ -40,6 +40,7 @@ private struct SurfaceFrameBuildConfiguration: Sendable {
 private struct SurfaceFrameBuildResult: Sendable {
     var generation: UInt64
     var frame: TerminalFrame
+    var damage: TerminalDamage?
     var frameBuildNanos: UInt64
     var clearColor: RenderColor
 }
@@ -904,6 +905,7 @@ public final class HarnessTerminalSurfaceView: NSView {
             origin: (originOffsetX, originOffsetY),
             gamma: glyphGamma,
             ligatures: ligaturesEnabled,
+            damage: plain ? damage : nil,
             frameBuildNanos: frameBuildNanos
         )
         if didPresent { onRenderStats?(renderer.stats) }
@@ -939,6 +941,7 @@ public final class HarnessTerminalSurfaceView: NSView {
             let builder = config.makeBuilder()
             let frameBuildStart = DispatchTime.now().uptimeNanoseconds
             var frame: TerminalFrame
+            var renderDamage: TerminalDamage?
             if let cm = copyModeState {
                 let offset = cm.scrollbackOffset(historyCount: emulator.historyCount)
                 let grid = emulator.readGrid(scrollbackOffset: offset)
@@ -971,6 +974,7 @@ public final class HarnessTerminalSurfaceView: NSView {
                     frame = builder.build(grid, region: nil,
                                           imageProvider: { emulator.image(for: $0) },
                                           reusing: state.lastPlainFrame, damage: damage)
+                    renderDamage = damage
                 } else {
                     frame = builder.build(grid, selection: selection,
                                           imageProvider: { emulator.image(for: $0) })
@@ -993,6 +997,7 @@ public final class HarnessTerminalSurfaceView: NSView {
             let result = SurfaceFrameBuildResult(
                 generation: generation,
                 frame: frame,
+                damage: renderDamage,
                 frameBuildNanos: DispatchTime.now().uptimeNanoseconds &- frameBuildStart,
                 clearColor: builder.renderColor(bg, alpha: opacity)
             )
@@ -1010,6 +1015,7 @@ public final class HarnessTerminalSurfaceView: NSView {
                     origin: origin,
                     gamma: gamma,
                     ligatures: ligatures,
+                    damage: result.damage,
                     frameBuildNanos: result.frameBuildNanos
                 )
                 if didPresent { self.onRenderStats?(renderer.stats) }

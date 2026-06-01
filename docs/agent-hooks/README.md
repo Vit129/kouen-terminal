@@ -18,6 +18,10 @@ dot colors per agent), but those tools don't have built-in hook protocols —
 use the manual `harness-cli notify` snippet from your shell or a `precmd`
 hook to surface their state.
 
+Installed hook commands prepend Harness's app-support `bin` directory to
+`PATH`, so notifications still work when an agent subprocess does not load your
+interactive shell profile.
+
 ## CLI notification
 
 ```bash
@@ -45,7 +49,7 @@ Press `Cmd+Shift+U` in Harness, or run:
       "matcher": "",
       "hooks": [{
         "type": "command",
-        "command": "harness-cli notify --surface \"${HARNESS_SURFACE:-default}\" --body \"Agent finished — review output\""
+        "command": "PATH=\"$HOME/Library/Application Support/Harness/bin:$PATH\" harness-cli notify --surface \"${HARNESS_SURFACE:-default}\" --body \"Agent finished — review output\""
       }]
     }]
   }

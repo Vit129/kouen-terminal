@@ -109,7 +109,7 @@ final class GridCompositorTests: XCTestCase {
         // A pane with a reserved top label row draws its pane-border-format label there.
         let comp = GridCompositor(cols: 80, rows: 24)
         let grid = snapshot(80, 23, "x")
-        var rect = PaneRect(paneID: UUID(), surfaceID: UUID(), x: 0, y: 1, cols: 80, rows: 23, labelRow: 0)
+        let rect = PaneRect(paneID: UUID(), surfaceID: UUID(), x: 0, y: 1, cols: 80, rows: 23, labelRow: 0)
         let p = CompositorPane(rect: rect, grid: grid, isActive: true, borderLabel: " 0 myshell ")
         let out = comp.render(panes: [p])
         XCTAssertTrue(out.contains("myshell"), "border label text should render on the label row")

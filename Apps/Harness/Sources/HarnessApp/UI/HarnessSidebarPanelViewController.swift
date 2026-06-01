@@ -84,6 +84,11 @@ final class HarnessSidebarPanelViewController: NSViewController {
         )
     }
 
+    override func viewDidLayout() {
+        super.viewDidLayout()
+        syncSessionColumnWidth()
+    }
+
     func applyChromeColors() {
         HarnessDesign.applySidebarChrome(to: view)
         HarnessDesign.makeClear(chromeHeader)
@@ -409,9 +414,11 @@ final class HarnessSidebarPanelViewController: NSViewController {
     private func setupSessionList() {
         let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("session"))
         column.width = HarnessDesign.sidebarWidth
+        column.resizingMask = .autoresizingMask
         sessionTable.addTableColumn(column)
         sessionTable.headerView = nil
         sessionTable.backgroundColor = .clear
+        sessionTable.columnAutoresizingStyle = .uniformColumnAutoresizingStyle
         sessionTable.rowHeight = HarnessDesign.sessionRowHeight
         sessionTable.intercellSpacing = NSSize(width: 0, height: HarnessDesign.rowSpacing)
         sessionTable.selectionHighlightStyle = .none
@@ -441,6 +448,14 @@ final class HarnessSidebarPanelViewController: NSViewController {
             scroll.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             scroll.bottomAnchor.constraint(equalTo: footer.topAnchor),
         ])
+    }
+
+    private func syncSessionColumnWidth() {
+        guard let column = sessionTable.tableColumns.first else { return }
+        let width = sessionScroll?.contentView.bounds.width ?? view.bounds.width
+        let clamped = max(1, width)
+        guard abs(column.width - clamped) > 0.5 else { return }
+        column.width = clamped
     }
 
     /// One footer row: "⚙ Settings" (text + icon) on the left, a trimmed set of quick
@@ -1335,15 +1350,19 @@ final class SessionCardRowView: NSView {
         fill.translatesAutoresizingMaskIntoConstraints = false
 
         titleLabel.font = HarnessDesign.Typography.sidebarLabel
+        titleLabel.usesSingleLineMode = true
         titleLabel.lineBreakMode = .byTruncatingTail
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         // The agent chip now carries the full tool name; let the title truncate to
         // make room rather than squeezing the chip.
         titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        titleLabel.setContentCompressionResistancePriority(.required, for: .vertical)
 
         metaLabel.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
+        metaLabel.usesSingleLineMode = true
         metaLabel.lineBreakMode = .byTruncatingTail
         metaLabel.translatesAutoresizingMaskIntoConstraints = false
+        metaLabel.setContentCompressionResistancePriority(.required, for: .vertical)
 
         agentChip.translatesAutoresizingMaskIntoConstraints = false
         agentChip.isHidden = true
@@ -1360,7 +1379,7 @@ final class SessionCardRowView: NSView {
             fill.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -(HarnessDesign.horizontalInset - 4)),
 
             titleLabel.leadingAnchor.constraint(equalTo: fill.leadingAnchor, constant: 12),
-            titleLabel.topAnchor.constraint(equalTo: fill.topAnchor, constant: 10),
+            titleLabel.topAnchor.constraint(equalTo: fill.topAnchor, constant: 8),
             titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: agentChip.leadingAnchor, constant: -6),
 
             // No inline controls anymore — the agent chip sits flush to the card's
@@ -1371,11 +1390,11 @@ final class SessionCardRowView: NSView {
             agentChip.widthAnchor.constraint(lessThanOrEqualToConstant: 140),
 
             metaLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
-            metaLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 3),
+            metaLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 2),
             // Meta sits on its own line below the title/controls, so it gets the full
             // card width — the cwd path was being clipped early against the close button.
             metaLabel.trailingAnchor.constraint(equalTo: fill.trailingAnchor, constant: -10),
-            metaLabel.bottomAnchor.constraint(lessThanOrEqualTo: fill.bottomAnchor, constant: -10),
+            metaLabel.bottomAnchor.constraint(lessThanOrEqualTo: fill.bottomAnchor, constant: -6),
         ])
     }
 
@@ -1470,5 +1489,4 @@ final class SessionCardRowView: NSView {
         }
     }
 }
-
 

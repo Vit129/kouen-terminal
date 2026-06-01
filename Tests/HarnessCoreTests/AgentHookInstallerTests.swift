@@ -58,6 +58,7 @@ final class AgentHookInstallerTests: XCTestCase {
         let result = try AgentHookInstaller.install(agent: .claudeCode, homeOverride: home)
         let command = try claudeNotificationCommand(at: result.path)
         XCTAssertTrue(command.contains("--from-hook"), "Notification body must come from stdin")
+        XCTAssertTrue(command.hasPrefix("PATH=\"$HOME/Library/Application Support/Harness/bin:$PATH\" harness-cli notify"))
         XCTAssertFalse(command.contains("HARNESS_NOTIFY_MESSAGE"), "the dangling env var must be gone")
     }
 

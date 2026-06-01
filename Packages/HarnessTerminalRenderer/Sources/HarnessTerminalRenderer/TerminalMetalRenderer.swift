@@ -13,6 +13,9 @@ public struct TerminalRenderStats: Equatable, Sendable {
     public var decoInstances: Int
     public var imageInstances: Int
     public var atlasPages: Int
+    public var encodedRows: Int
+    public var reusedRows: Int
+    public var instanceUploadBytes: Int
     public var frameBuildNanos: UInt64
     public var encodeNanos: UInt64
 
@@ -25,6 +28,9 @@ public struct TerminalRenderStats: Equatable, Sendable {
         decoInstances: Int = 0,
         imageInstances: Int = 0,
         atlasPages: Int = 1,
+        encodedRows: Int = 0,
+        reusedRows: Int = 0,
+        instanceUploadBytes: Int = 0,
         frameBuildNanos: UInt64 = 0,
         encodeNanos: UInt64 = 0
     ) {
@@ -36,6 +42,9 @@ public struct TerminalRenderStats: Equatable, Sendable {
         self.decoInstances = decoInstances
         self.imageInstances = imageInstances
         self.atlasPages = atlasPages
+        self.encodedRows = encodedRows
+        self.reusedRows = reusedRows
+        self.instanceUploadBytes = instanceUploadBytes
         self.frameBuildNanos = frameBuildNanos
         self.encodeNanos = encodeNanos
     }
@@ -53,6 +62,71 @@ private struct PendingBgSpan {
     var endColumn: Int
     var color: RenderColor
     var instance: BgInstance
+}
+
+private struct EncodedRowInstances {
+    var backgrounds: [BgInstance] = []
+    var glyphs: [GlyphInstance] = []
+    var decorations: [DecoInstance] = []
+    var bgSpans = 0
+    var bgCells = 0
+}
+
+private struct EncodedFrameInstances {
+    var backgrounds: [BgInstance] = []
+    var glyphs: [GlyphInstance] = []
+    var decorations: [DecoInstance] = []
+    var bgSpans = 0
+    var bgCells = 0
+    var encodedRows = 0
+    var reusedRows = 0
+}
+
+private struct CursorCacheKey: Equatable {
+    var row: Int
+    var column: Int
+    var visible: Bool
+    var style: CursorStyle
+    var textColor: RenderColor
+
+    var invertsGlyph: Bool { visible && style == .block }
+}
+
+private struct RowInstanceCache {
+    var columns = 0
+    var rows = 0
+    var originX = 0
+    var originY = 0
+    var ligatures = false
+    var atlasResets = 0
+    var rowInstances: [EncodedRowInstances?] = []
+    var previousCursor: CursorCacheKey?
+}
+
+private struct PromptGutterUploadKey: Equatable {
+    var row: Int
+    var color: RenderColor
+}
+
+private struct InstanceUploadCacheKey: Equatable {
+    var columns: Int
+    var rows: Int
+    var originX: Int
+    var originY: Int
+    var ligatures: Bool
+    var cursor: CursorRender
+    var promptGutter: [PromptGutterUploadKey]
+}
+
+private struct UploadedInstanceBuffers {
+    var key: InstanceUploadCacheKey
+    var backgrounds: MTLBuffer?
+    var backgroundCount: Int
+    var glyphs: MTLBuffer?
+    var glyphCount: Int
+    var decorations: MTLBuffer?
+    var decorationCount: Int
+    var uploadBytes: Int
 }
 
 private struct GlyphInstance {
@@ -116,12 +190,31 @@ public final class TerminalMetalRenderer {
     /// The render-target pixel format both pipelines are built for.
     public static let pixelFormat: MTLPixelFormat = .rgba8Unorm
 
+    /// CAMetalLayer compositing expects premultiplied color when alpha is below 1.
+    /// Store translucent clears that way so the terminal canvas composites like the
+    /// AppKit chrome tint beside it; opaque clears remain byte-for-byte identical.
+    private static func premultipliedClearColor(_ color: RenderColor) -> MTLClearColor {
+        let alpha = Double(color.alpha)
+        return MTLClearColor(
+            red: Double(color.red) * alpha,
+            green: Double(color.green) * alpha,
+            blue: Double(color.blue) * alpha,
+            alpha: alpha
+        )
+    }
+
     /// Depth of the instance-buffer ring and the cap on frames the GPU may have in flight.
     private static let maxFramesInFlight = 3
     /// Reusable, growable instance buffers (one ring each) replacing per-frame `makeBuffer`.
     private let bgInstanceBuffer: DynamicInstanceBuffer
     private let glyphInstanceBuffer: DynamicInstanceBuffer
     private let decoInstanceBuffer: DynamicInstanceBuffer
+    /// CPU-side row cache for encoded Metal instances. The drawable is still fully redrawn
+    /// every frame; this cache only avoids regenerating clean rows from `RenderCell`s.
+    private var rowInstanceCache = RowInstanceCache()
+    /// Immutable instance buffers for an unchanged frame. When damage is empty and the overlay
+    /// key still matches, the renderer can bind these without another CPU memcpy.
+    private var uploadedInstanceCache: UploadedInstanceBuffers?
     /// Caps in-flight frames at `maxFramesInFlight` so we never reuse a ring slot the GPU is
     /// still reading. Signaled from each command buffer's completion handler.
     private let inFlightSemaphore = DispatchSemaphore(value: TerminalMetalRenderer.maxFramesInFlight)
@@ -233,11 +326,13 @@ public final class TerminalMetalRenderer {
         origin: (x: Int, y: Int) = (0, 0),
         gamma: Float = 1,
         ligatures: Bool = false,
+        damage: TerminalDamage? = nil,
         frameBuildNanos: UInt64 = 0
     ) -> Bool {
         guard let commandBuffer = encode(
             frame, target: target, clearColor: clearColor, origin: origin,
-            gamma: gamma, ligatures: ligatures, frameBuildNanos: frameBuildNanos
+            gamma: gamma, ligatures: ligatures, damage: damage,
+            frameBuildNanos: frameBuildNanos
         ) else { return false }
         commandBuffer.commit()
         commandBuffer.waitUntilCompleted()
@@ -246,7 +341,7 @@ public final class TerminalMetalRenderer {
 
     /// Render `frame` into a layer drawable and present it. Used by the live view.
     /// `origin` is the device-pixel offset of the grid's top-left (for window padding).
-    /// `gamma` > 1 applies gamma-correct (linear) text coverage; 1 = native blending.
+    /// `gamma` remaps glyph coverage only: 1 = native, < 1 = heavier/crisper, > 1 = softer.
     /// `ligatures` enables CoreText run shaping (programming-font ligatures).
     /// `clearColor` carries the same default-background contract as `render(_:to:clearColor:…)`.
     @discardableResult
@@ -257,11 +352,13 @@ public final class TerminalMetalRenderer {
         origin: (x: Int, y: Int) = (0, 0),
         gamma: Float = 1,
         ligatures: Bool = false,
+        damage: TerminalDamage? = nil,
         frameBuildNanos: UInt64 = 0
     ) -> Bool {
         guard let commandBuffer = encode(
             frame, target: drawable.texture, clearColor: clearColor, origin: origin,
-            gamma: gamma, ligatures: ligatures, frameBuildNanos: frameBuildNanos
+            gamma: gamma, ligatures: ligatures, damage: damage,
+            frameBuildNanos: frameBuildNanos
         ) else { return false }
         commandBuffer.present(drawable)
         commandBuffer.commit()
@@ -277,6 +374,7 @@ public final class TerminalMetalRenderer {
         origin: (x: Int, y: Int),
         gamma: Float,
         ligatures: Bool,
+        damage: TerminalDamage? = nil,
         frameBuildNanos: UInt64 = 0
     ) -> MTLCommandBuffer? {
         let encodeStart = DispatchTime.now().uptimeNanoseconds
@@ -298,95 +396,20 @@ public final class TerminalMetalRenderer {
         let strikeY = (Float(ascentPixels) * 0.65).rounded()
         let overlineY = thickness
 
-        // Cursor cell + whether the glyph there should flip to the cursor-text color.
-        let cursorCol = frame.cursor.column
-        let cursorRow = frame.cursor.row
-        let invertCursorGlyph = frame.cursor.visible && frame.cursor.style == .block
-
-        var backgrounds: [BgInstance] = []
-        backgrounds.reserveCapacity(frame.cells.count + 1)
-        var glyphs: [GlyphInstance] = []
-        var decorations: [DecoInstance] = []
-        var pendingBgSpan: PendingBgSpan?
-        var bgSpanCount = 0
-        var bgCellCount = 0
-
-        func flushPendingBgSpan() {
-            guard let span = pendingBgSpan else { return }
-            backgrounds.append(span.instance)
-            bgSpanCount += 1
-            pendingBgSpan = nil
-        }
-
-        func appendCellBackground(_ cell: RenderCell, originX: Float, originY: Float) {
-            bgCellCount += 1
-            if var span = pendingBgSpan,
-               span.row == cell.row,
-               span.endColumn + 1 == cell.column,
-               span.color == cell.background {
-                span.endColumn = cell.column
-                span.instance.size.x += cellW
-                pendingBgSpan = span
-                return
-            }
-
-            flushPendingBgSpan()
-            pendingBgSpan = PendingBgSpan(
-                row: cell.row,
-                endColumn: cell.column,
-                color: cell.background,
-                instance: BgInstance(
-                    origin: SIMD2(originX, originY),
-                    size: SIMD2(cellW, cellH),
-                    color: vector(cell.background)
-                )
-            )
-        }
-
-        for cell in frame.cells {
-            let originX = ox + Float(cell.column * cellPixelWidth)
-            let originY = oy + Float(cell.row * cellPixelHeight)
-            let blockRects = Self.blockElementRects(cell.codepoint)
-            // Block-element characters (█ ▀ ▄ ▌ quadrants …) are drawn as exact-fill rects in
-            // the foreground color rather than as font glyphs — font glyphs leave sub-pixel
-            // gaps that show as grid seams in block art (the Codex/Claude mascots). The fills
-            // share the background pass (opaque, painter-ordered after the cell bg).
-            if let rects = blockRects {
-                flushPendingBgSpan()
-                if cell.drawBackground {
-                    bgCellCount += 1
-                    backgrounds.append(BgInstance(
-                        origin: SIMD2(originX, originY),
-                        size: SIMD2(cellW, cellH),
-                        color: vector(cell.background)
-                    ))
-                    bgSpanCount += 1
-                }
-
-                let fill = vector(cell.foreground)
-                for r in rects {
-                    let x0 = originX + (r.0 * cellW).rounded()
-                    let y0 = originY + (r.1 * cellH).rounded()
-                    let x1 = originX + ((r.0 + r.2) * cellW).rounded()
-                    let y1 = originY + ((r.1 + r.3) * cellH).rounded()
-                    backgrounds.append(BgInstance(
-                        origin: SIMD2(x0, y0), size: SIMD2(x1 - x0, y1 - y0), color: fill
-                    ))
-                }
-            } else if cell.drawBackground {
-                // Default canvas cells already match the cleared target, so the FrameBuilder
-                // marks them `drawBackground == false` and we skip the redundant quad. Adjacent
-                // same-color explicit backgrounds are merged into one row span here.
-                appendCellBackground(cell, originX: originX, originY: originY)
-            }
-
-            // Line decorations sit on top of the glyph; emit for the full cell.
-            appendDecorations(cell, originX: originX, originY: originY,
-                              cellSize: SIMD2(cellW, cellH),
-                              thickness: thickness, underlineY: underlineY,
-                              strikeY: strikeY, overlineY: overlineY, into: &decorations)
-        }
-        flushPendingBgSpan()
+        let encoded = buildFrameInstances(
+            frame,
+            origin: origin,
+            cellSize: SIMD2(cellW, cellH),
+            ligatures: ligatures,
+            damage: damage,
+            thickness: thickness,
+            underlineY: underlineY,
+            strikeY: strikeY,
+            overlineY: overlineY
+        )
+        var backgrounds = encoded.backgrounds
+        let glyphs = encoded.glyphs
+        let decorations = encoded.decorations
 
         // OSC 133 prompt gutter: a thin vertical stripe in the left margin marking shell-prompt
         // rows (green/red/neutral, resolved in the FrameBuilder). Appended after the cell
@@ -403,17 +426,6 @@ public final class TerminalMetalRenderer {
                     color: vector(color)
                 ))
             }
-        }
-
-        // Glyphs: ligated CoreText run shaping when enabled, else the fast per-cell path.
-        // Both place each glyph on its source cell so the monospace grid stays aligned.
-        let cursorCell = invertCursorGlyph ? (row: cursorRow, column: cursorCol) : nil
-        if ligatures {
-            emitLigatedGlyphs(frame, ox: ox, oy: oy, cursorCell: cursorCell,
-                              cursorTextColor: frame.cursor.textColor, into: &glyphs)
-        } else {
-            emitPerCellGlyphs(frame, ox: ox, oy: oy, cursorCell: cursorCell,
-                              cursorTextColor: frame.cursor.textColor, into: &glyphs)
         }
 
         // Cursor: block fills the cell (glyphs still draw on top); bar is a thin left
@@ -445,19 +457,18 @@ public final class TerminalMetalRenderer {
             ))
         }
         frameStats.bgInstances = backgrounds.count
-        frameStats.bgSpans = bgSpanCount
-        frameStats.bgCells = bgCellCount
+        frameStats.bgSpans = encoded.bgSpans
+        frameStats.bgCells = encoded.bgCells
         frameStats.glyphInstances = glyphs.count
         frameStats.decoInstances = decorations.count
+        frameStats.encodedRows = encoded.encodedRows
+        frameStats.reusedRows = encoded.reusedRows
 
         let pass = MTLRenderPassDescriptor()
         pass.colorAttachments[0].texture = target
         pass.colorAttachments[0].loadAction = .clear
         pass.colorAttachments[0].storeAction = .store
-        pass.colorAttachments[0].clearColor = MTLClearColor(
-            red: Double(clearColor.red), green: Double(clearColor.green),
-            blue: Double(clearColor.blue), alpha: Double(clearColor.alpha)
-        )
+        pass.colorAttachments[0].clearColor = Self.premultipliedClearColor(clearColor)
 
         // Reserve an in-flight slot before touching the instance-buffer ring, then advance to
         // the next slot so this frame writes a buffer no longer read by the GPU. The semaphore
@@ -476,27 +487,36 @@ public final class TerminalMetalRenderer {
         commandBuffer.addCompletedHandler { [inFlightSemaphore] _ in inFlightSemaphore.signal() }
 
         var vp = viewport
-        // Background pass. Empty instance arrays bind nothing — `DynamicInstanceBuffer.upload`
-        // returns nil for an empty array (the glyph/decoration passes guard the same way), so a
-        // directly-constructed empty frame never hits a zero-length buffer.
-        if let buffer = bgInstanceBuffer.upload(backgrounds, slot: frameSlot) {
+        let instanceBuffers = bindableInstanceBuffers(
+            backgrounds: backgrounds,
+            glyphs: glyphs,
+            decorations: decorations,
+            frame: frame,
+            origin: origin,
+            ligatures: ligatures,
+            damage: damage,
+            encoded: encoded,
+            slot: frameSlot
+        )
+        frameStats.instanceUploadBytes = instanceBuffers.uploadBytes
+
+        // Background pass. Empty instance arrays bind nothing, so a directly-constructed empty
+        // frame never hits a zero-length buffer.
+        if let buffer = instanceBuffers.backgrounds {
             renderEncoder.setRenderPipelineState(bgPipeline)
             renderEncoder.setVertexBuffer(buffer, offset: 0, index: 0)
             renderEncoder.setVertexBytes(&vp, length: MemoryLayout<SIMD2<Float>>.stride, index: 1)
-            renderEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4, instanceCount: backgrounds.count)
+            renderEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4, instanceCount: instanceBuffers.backgroundCount)
         }
 
         // Images with z < 0 draw below text (Kitty negative z-index).
         frameStats.imageInstances += drawImages(
-            frame.images.filter { $0.z < 0 },
-            encoder: renderEncoder,
-            viewport: &vp,
-            ox: ox,
-            oy: oy
+            frame.images, zBand: .belowText, encoder: renderEncoder,
+            viewport: &vp, ox: ox, oy: oy
         )
 
         // Glyph pass (with the gamma-correct coverage uniform).
-        if let buffer = glyphInstanceBuffer.upload(glyphs, slot: frameSlot) {
+        if let buffer = instanceBuffers.glyphs {
             var glyphGamma = max(0.1, gamma)
             renderEncoder.setRenderPipelineState(glyphPipeline)
             renderEncoder.setVertexBuffer(buffer, offset: 0, index: 0)
@@ -504,24 +524,21 @@ public final class TerminalMetalRenderer {
             renderEncoder.setFragmentTexture(atlas.texture, index: 0)
             renderEncoder.setFragmentSamplerState(sampler, index: 0)
             renderEncoder.setFragmentBytes(&glyphGamma, length: MemoryLayout<Float>.stride, index: 0)
-            renderEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4, instanceCount: glyphs.count)
+            renderEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4, instanceCount: instanceBuffers.glyphCount)
         }
 
         // Decoration pass (underline family / strikethrough / overline) — over the glyphs.
-        if let buffer = decoInstanceBuffer.upload(decorations, slot: frameSlot) {
+        if let buffer = instanceBuffers.decorations {
             renderEncoder.setRenderPipelineState(decoPipeline)
             renderEncoder.setVertexBuffer(buffer, offset: 0, index: 0)
             renderEncoder.setVertexBytes(&vp, length: MemoryLayout<SIMD2<Float>>.stride, index: 1)
-            renderEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4, instanceCount: decorations.count)
+            renderEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4, instanceCount: instanceBuffers.decorationCount)
         }
 
         // Images with z >= 0 (the default) draw above text.
         frameStats.imageInstances += drawImages(
-            frame.images.filter { $0.z >= 0 },
-            encoder: renderEncoder,
-            viewport: &vp,
-            ox: ox,
-            oy: oy
+            frame.images, zBand: .aboveText, encoder: renderEncoder,
+            viewport: &vp, ox: ox, oy: oy
         )
 
         renderEncoder.endEncoding()
@@ -531,15 +548,442 @@ public final class TerminalMetalRenderer {
         return commandBuffer
     }
 
+    private func bindableInstanceBuffers(
+        backgrounds: [BgInstance],
+        glyphs: [GlyphInstance],
+        decorations: [DecoInstance],
+        frame: TerminalFrame,
+        origin: (x: Int, y: Int),
+        ligatures: Bool,
+        damage: TerminalDamage?,
+        encoded: EncodedFrameInstances,
+        slot: Int
+    ) -> UploadedInstanceBuffers {
+        let uploadBytes =
+            backgrounds.count * MemoryLayout<BgInstance>.stride
+            + glyphs.count * MemoryLayout<GlyphInstance>.stride
+            + decorations.count * MemoryLayout<DecoInstance>.stride
+        let key = instanceUploadCacheKey(frame: frame, origin: origin, ligatures: ligatures)
+        let frameShapeIsValid = frame.columns > 0
+            && frame.rows > 0
+            && frame.cells.count == frame.columns * frame.rows
+        let stableFrame = damage != nil
+            && damage?.full == false
+            && encoded.encodedRows == 0
+            && encoded.reusedRows == frame.rows
+            && frameShapeIsValid
+            && frame.images.isEmpty
+
+        if stableFrame, let cached = uploadedInstanceCache, cached.key == key {
+            return UploadedInstanceBuffers(
+                key: key,
+                backgrounds: cached.backgrounds,
+                backgroundCount: cached.backgroundCount,
+                glyphs: cached.glyphs,
+                glyphCount: cached.glyphCount,
+                decorations: cached.decorations,
+                decorationCount: cached.decorationCount,
+                uploadBytes: 0
+            )
+        }
+
+        if stableFrame, let cached = makeUploadedInstanceCache(
+            key: key, backgrounds: backgrounds, glyphs: glyphs, decorations: decorations
+        ) {
+            uploadedInstanceCache = cached
+            return cached
+        }
+
+        uploadedInstanceCache = nil
+        return UploadedInstanceBuffers(
+            key: key,
+            backgrounds: bgInstanceBuffer.upload(backgrounds, slot: slot),
+            backgroundCount: backgrounds.count,
+            glyphs: glyphInstanceBuffer.upload(glyphs, slot: slot),
+            glyphCount: glyphs.count,
+            decorations: decoInstanceBuffer.upload(decorations, slot: slot),
+            decorationCount: decorations.count,
+            uploadBytes: uploadBytes
+        )
+    }
+
+    private func makeUploadedInstanceCache(
+        key: InstanceUploadCacheKey,
+        backgrounds: [BgInstance],
+        glyphs: [GlyphInstance],
+        decorations: [DecoInstance]
+    ) -> UploadedInstanceBuffers? {
+        let bg = makeImmutableInstanceBuffer(backgrounds, label: "bg-instances.stable")
+        let glyph = makeImmutableInstanceBuffer(glyphs, label: "glyph-instances.stable")
+        let deco = makeImmutableInstanceBuffer(decorations, label: "deco-instances.stable")
+        if (!backgrounds.isEmpty && bg == nil)
+            || (!glyphs.isEmpty && glyph == nil)
+            || (!decorations.isEmpty && deco == nil) {
+            return nil
+        }
+
+        return UploadedInstanceBuffers(
+            key: key,
+            backgrounds: bg,
+            backgroundCount: backgrounds.count,
+            glyphs: glyph,
+            glyphCount: glyphs.count,
+            decorations: deco,
+            decorationCount: decorations.count,
+            uploadBytes: backgrounds.count * MemoryLayout<BgInstance>.stride
+                + glyphs.count * MemoryLayout<GlyphInstance>.stride
+                + decorations.count * MemoryLayout<DecoInstance>.stride
+        )
+    }
+
+    private func makeImmutableInstanceBuffer<T>(_ instances: [T], label: String) -> MTLBuffer? {
+        guard !instances.isEmpty else { return nil }
+        let bytes = instances.count * MemoryLayout<T>.stride
+        return instances.withUnsafeBytes { raw in
+            guard let baseAddress = raw.baseAddress,
+                  let buffer = device.makeBuffer(bytes: baseAddress, length: bytes, options: .storageModeShared)
+            else { return nil }
+            buffer.label = label
+            return buffer
+        }
+    }
+
+    private func instanceUploadCacheKey(
+        frame: TerminalFrame,
+        origin: (x: Int, y: Int),
+        ligatures: Bool
+    ) -> InstanceUploadCacheKey {
+        let gutter = frame.promptGutter
+            .map { PromptGutterUploadKey(row: $0.key, color: $0.value) }
+            .sorted { $0.row < $1.row }
+        return InstanceUploadCacheKey(
+            columns: frame.columns,
+            rows: frame.rows,
+            originX: origin.x,
+            originY: origin.y,
+            ligatures: ligatures,
+            cursor: frame.cursor,
+            promptGutter: gutter
+        )
+    }
+
+    private func buildFrameInstances(
+        _ frame: TerminalFrame,
+        origin: (x: Int, y: Int),
+        cellSize: SIMD2<Float>,
+        ligatures: Bool,
+        damage: TerminalDamage?,
+        thickness: Float,
+        underlineY: Float,
+        strikeY: Float,
+        overlineY: Float
+    ) -> EncodedFrameInstances {
+        guard frame.columns > 0,
+              frame.rows > 0,
+              frame.cells.count == frame.columns * frame.rows
+        else {
+            resetRowInstanceCache()
+            return EncodedFrameInstances()
+        }
+
+        guard let damage, frame.images.isEmpty else {
+            resetRowInstanceCache()
+            return buildFrameInstancesWithoutCache(
+                frame, origin: origin, cellSize: cellSize, ligatures: ligatures,
+                thickness: thickness, underlineY: underlineY, strikeY: strikeY,
+                overlineY: overlineY
+            )
+        }
+
+        let cursorKey = CursorCacheKey(
+            row: frame.cursor.row,
+            column: frame.cursor.column,
+            visible: frame.cursor.visible,
+            style: frame.cursor.style,
+            textColor: frame.cursor.textColor
+        )
+        let cacheMatches = rowInstanceCache.columns == frame.columns
+            && rowInstanceCache.rows == frame.rows
+            && rowInstanceCache.originX == origin.x
+            && rowInstanceCache.originY == origin.y
+            && rowInstanceCache.ligatures == ligatures
+            && rowInstanceCache.atlasResets == atlas.stats.resets
+            && rowInstanceCache.rowInstances.count == frame.rows
+
+        var dirtyRows = clampedRows(damage.rows, rowCount: frame.rows)
+        if damage.full || !cacheMatches {
+            rowInstanceCache = RowInstanceCache(
+                columns: frame.columns,
+                rows: frame.rows,
+                originX: origin.x,
+                originY: origin.y,
+                ligatures: ligatures,
+                atlasResets: atlas.stats.resets,
+                rowInstances: Array(repeating: nil, count: frame.rows),
+                previousCursor: nil
+            )
+            dirtyRows = IndexSet(integersIn: 0 ..< frame.rows)
+        }
+
+        if rowInstanceCache.previousCursor != cursorKey {
+            if let previous = rowInstanceCache.previousCursor, previous.invertsGlyph {
+                insert(row: previous.row, into: &dirtyRows, rowCount: frame.rows)
+            }
+            if cursorKey.invertsGlyph {
+                insert(row: cursorKey.row, into: &dirtyRows, rowCount: frame.rows)
+            }
+        }
+
+        let atlasResetsBefore = atlas.stats.resets
+        var encoded = EncodedFrameInstances()
+        encoded.backgrounds.reserveCapacity(frame.cells.count + 1)
+        encoded.glyphs.reserveCapacity(frame.cells.count)
+        encoded.decorations.reserveCapacity(frame.cells.count / 8)
+
+        for row in 0 ..< frame.rows {
+            let rowInstances: EncodedRowInstances
+            if dirtyRows.contains(row) || rowInstanceCache.rowInstances[row] == nil {
+                rowInstances = encodeRowInstances(
+                    row,
+                    frame: frame,
+                    origin: origin,
+                    cellSize: cellSize,
+                    ligatures: ligatures,
+                    cursorKey: cursorKey,
+                    thickness: thickness,
+                    underlineY: underlineY,
+                    strikeY: strikeY,
+                    overlineY: overlineY
+                )
+                rowInstanceCache.rowInstances[row] = rowInstances
+                encoded.encodedRows += 1
+            } else {
+                rowInstances = rowInstanceCache.rowInstances[row]!
+                encoded.reusedRows += 1
+            }
+            append(rowInstances, into: &encoded)
+        }
+        rowInstanceCache.previousCursor = cursorKey
+
+        if atlas.stats.resets != atlasResetsBefore {
+            let reusedRows = encoded.reusedRows
+            resetRowInstanceCache()
+            // If a reset happened after reusing rows, cached glyph UVs may reference the old
+            // atlas contents. Redo this frame from cells so the already-present stale-frame
+            // fallback never becomes a persistent cache bug.
+            if reusedRows > 0 {
+                return buildFrameInstancesWithoutCache(
+                    frame, origin: origin, cellSize: cellSize, ligatures: ligatures,
+                    thickness: thickness, underlineY: underlineY, strikeY: strikeY,
+                    overlineY: overlineY
+                )
+            }
+        }
+
+        return encoded
+    }
+
+    private func buildFrameInstancesWithoutCache(
+        _ frame: TerminalFrame,
+        origin: (x: Int, y: Int),
+        cellSize: SIMD2<Float>,
+        ligatures: Bool,
+        thickness: Float,
+        underlineY: Float,
+        strikeY: Float,
+        overlineY: Float
+    ) -> EncodedFrameInstances {
+        var encoded = EncodedFrameInstances()
+        encoded.backgrounds.reserveCapacity(frame.cells.count + 1)
+        encoded.glyphs.reserveCapacity(frame.cells.count)
+        encoded.decorations.reserveCapacity(frame.cells.count / 8)
+        for row in 0 ..< frame.rows {
+            let rowInstances = encodeRowInstances(
+                row,
+                frame: frame,
+                origin: origin,
+                cellSize: cellSize,
+                ligatures: ligatures,
+                cursorKey: CursorCacheKey(
+                    row: frame.cursor.row,
+                    column: frame.cursor.column,
+                    visible: frame.cursor.visible,
+                    style: frame.cursor.style,
+                    textColor: frame.cursor.textColor
+                ),
+                thickness: thickness,
+                underlineY: underlineY,
+                strikeY: strikeY,
+                overlineY: overlineY
+            )
+            encoded.encodedRows += 1
+            append(rowInstances, into: &encoded)
+        }
+        return encoded
+    }
+
+    private func encodeRowInstances(
+        _ row: Int,
+        frame: TerminalFrame,
+        origin: (x: Int, y: Int),
+        cellSize: SIMD2<Float>,
+        ligatures: Bool,
+        cursorKey: CursorCacheKey,
+        thickness: Float,
+        underlineY: Float,
+        strikeY: Float,
+        overlineY: Float
+    ) -> EncodedRowInstances {
+        let ox = Float(origin.x)
+        let oy = Float(origin.y)
+        let cellW = cellSize.x
+        let cellH = cellSize.y
+        var encoded = EncodedRowInstances()
+        encoded.backgrounds.reserveCapacity(frame.columns)
+        encoded.glyphs.reserveCapacity(frame.columns)
+        var pendingBgSpan: PendingBgSpan?
+
+        func flushPendingBgSpan() {
+            guard let span = pendingBgSpan else { return }
+            encoded.backgrounds.append(span.instance)
+            encoded.bgSpans += 1
+            pendingBgSpan = nil
+        }
+
+        func appendCellBackground(_ cell: RenderCell, originX: Float, originY: Float) {
+            encoded.bgCells += 1
+            if var span = pendingBgSpan,
+               span.row == cell.row,
+               span.endColumn + 1 == cell.column,
+               span.color == cell.background {
+                span.endColumn = cell.column
+                span.instance.size.x += cellW
+                pendingBgSpan = span
+                return
+            }
+
+            flushPendingBgSpan()
+            pendingBgSpan = PendingBgSpan(
+                row: cell.row,
+                endColumn: cell.column,
+                color: cell.background,
+                instance: BgInstance(
+                    origin: SIMD2(originX, originY),
+                    size: SIMD2(cellW, cellH),
+                    color: vector(cell.background)
+                )
+            )
+        }
+
+        let start = row * frame.columns
+        let end = start + frame.columns
+        for cell in frame.cells[start ..< end] {
+            let originX = ox + Float(cell.column * cellPixelWidth)
+            let originY = oy + Float(cell.row * cellPixelHeight)
+            let blockRects = Self.blockElementRects(cell.codepoint)
+            // Block elements remain procedural and painter-ordered after the cell background.
+            if let rects = blockRects {
+                flushPendingBgSpan()
+                if cell.drawBackground {
+                    encoded.bgCells += 1
+                    encoded.backgrounds.append(BgInstance(
+                        origin: SIMD2(originX, originY),
+                        size: SIMD2(cellW, cellH),
+                        color: vector(cell.background)
+                    ))
+                    encoded.bgSpans += 1
+                }
+
+                let fill = vector(cell.foreground)
+                for r in rects {
+                    let x0 = originX + (r.0 * cellW).rounded()
+                    let y0 = originY + (r.1 * cellH).rounded()
+                    let x1 = originX + ((r.0 + r.2) * cellW).rounded()
+                    let y1 = originY + ((r.1 + r.3) * cellH).rounded()
+                    encoded.backgrounds.append(BgInstance(
+                        origin: SIMD2(x0, y0), size: SIMD2(x1 - x0, y1 - y0), color: fill
+                    ))
+                }
+            } else if cell.drawBackground {
+                appendCellBackground(cell, originX: originX, originY: originY)
+            }
+
+            appendDecorations(cell, originX: originX, originY: originY,
+                              cellSize: cellSize,
+                              thickness: thickness, underlineY: underlineY,
+                              strikeY: strikeY, overlineY: overlineY,
+                              into: &encoded.decorations)
+        }
+        flushPendingBgSpan()
+
+        let cursorCell = cursorKey.invertsGlyph ? (row: cursorKey.row, column: cursorKey.column) : nil
+        if ligatures {
+            emitLigatedGlyphs(row: row, frame: frame, ox: ox, oy: oy, cursorCell: cursorCell,
+                              cursorTextColor: cursorKey.textColor, into: &encoded.glyphs)
+        } else {
+            emitPerCellGlyphs(row: row, frame: frame, ox: ox, oy: oy, cursorCell: cursorCell,
+                              cursorTextColor: cursorKey.textColor, into: &encoded.glyphs)
+        }
+
+        return encoded
+    }
+
+    private func append(_ row: EncodedRowInstances, into encoded: inout EncodedFrameInstances) {
+        encoded.backgrounds.append(contentsOf: row.backgrounds)
+        encoded.glyphs.append(contentsOf: row.glyphs)
+        encoded.decorations.append(contentsOf: row.decorations)
+        encoded.bgSpans += row.bgSpans
+        encoded.bgCells += row.bgCells
+    }
+
+    private func resetRowInstanceCache() {
+        rowInstanceCache = RowInstanceCache()
+        uploadedInstanceCache = nil
+    }
+
+    private func clampedRows(_ rows: IndexSet, rowCount: Int) -> IndexSet {
+        guard rowCount > 0 else { return [] }
+        var clamped = IndexSet()
+        for row in rows where row >= 0 && row < rowCount {
+            clamped.insert(row)
+        }
+        return clamped
+    }
+
+    private func insert(row: Int, into rows: inout IndexSet, rowCount: Int) {
+        guard row >= 0 && row < rowCount else { return }
+        rows.insert(row)
+    }
+
     /// Draw each inline image as a textured quad at its cell rect. One draw per image (each has
     /// its own texture); the GPU clips quads that extend past the viewport (images scrolling off).
-    private func drawImages(_ images: [FrameImage], encoder: MTLRenderCommandEncoder, viewport: inout SIMD2<Float>, ox: Float, oy: Float) -> Int {
+    private enum ImageZBand {
+        case belowText
+        case aboveText
+
+        func contains(_ image: FrameImage) -> Bool {
+            switch self {
+            case .belowText: return image.z < 0
+            case .aboveText: return image.z >= 0
+            }
+        }
+    }
+
+    private func drawImages(
+        _ images: [FrameImage],
+        zBand: ImageZBand,
+        encoder: MTLRenderCommandEncoder,
+        viewport: inout SIMD2<Float>,
+        ox: Float,
+        oy: Float
+    ) -> Int {
         guard !images.isEmpty else { return 0 }
         let cellW = Float(cellPixelWidth), cellH = Float(cellPixelHeight)
         var drawn = 0
         encoder.setRenderPipelineState(imagePipeline)
         encoder.setFragmentSamplerState(sampler, index: 0)
         for img in images {
+            guard zBand.contains(img) else { continue }
             guard let texture = imageCache.texture(
                 id: img.id, rgba: img.image.rgba, width: img.image.pixelWidth, height: img.image.pixelHeight)
             else { continue }
@@ -598,11 +1042,13 @@ public final class TerminalMetalRenderer {
     /// Fast path: one atlas glyph per cell (no shaping). Each glyph sits on its own cell;
     /// the cursor cell flips to the cursor-text color.
     private func emitPerCellGlyphs(
-        _ frame: TerminalFrame, ox: Float, oy: Float,
+        row: Int, frame: TerminalFrame, ox: Float, oy: Float,
         cursorCell: (row: Int, column: Int)?, cursorTextColor: RenderColor,
         into glyphs: inout [GlyphInstance]
     ) {
-        for cell in frame.cells {
+        let start = row * frame.columns
+        let end = start + frame.columns
+        for cell in frame.cells[start ..< end] {
             guard cell.hasGlyph, !Self.isBlockElement(cell.codepoint),
                   let entry = atlas.entry(for: GlyphKey(codepoint: cell.codepoint, bold: cell.bold, italic: cell.italic))
             else { continue }
@@ -621,66 +1067,64 @@ public final class TerminalMetalRenderer {
     /// every shaped glyph on its *source* cell so the monospace grid stays aligned (a
     /// ligature spanning N cells lands on its first cell). The cursor cell is shaped alone.
     private func emitLigatedGlyphs(
-        _ frame: TerminalFrame, ox: Float, oy: Float,
+        row: Int, frame: TerminalFrame, ox: Float, oy: Float,
         cursorCell: (row: Int, column: Int)?, cursorTextColor: RenderColor,
         into glyphs: inout [GlyphInstance]
     ) {
         let cols = frame.columns
-        for row in 0 ..< frame.rows {
-            var col = 0
-            while col < cols {
-                guard let cell = frame.cell(row: row, column: col), cell.hasGlyph,
-                      !Self.isBlockElement(cell.codepoint) else {
-                    col += 1
-                    continue
-                }
-                if let cur = cursorCell, cur.row == row, cur.column == col {
-                    emitSingleGlyph(cell, row: row, col: col, ox: ox, oy: oy,
-                                    color: vector(cursorTextColor), into: &glyphs)
-                    col += 1
-                    continue
-                }
-                // Box-drawing chars use a procedural cell-sized sprite — never shape them into
-                // a ligature run (that would render the font glyph and reintroduce seams).
-                if BoxDrawing.supported(cell.codepoint) {
-                    emitSingleGlyph(cell, row: row, col: col, ox: ox, oy: oy,
-                                    color: vector(cell.foreground), into: &glyphs)
-                    col += 1
-                    continue
-                }
-                // Accumulate a run of contiguous, same-style, same-color glyph cells.
-                var runText = ""
-                var utf16ToColumn: [Int] = []
-                let bold = cell.bold, italic = cell.italic, fg = cell.foreground
-                var c = col
-                while c < cols, let rc = frame.cell(row: row, column: c) {
-                    if rc.width == .spacerTail { c += 1; continue } // wide-char tail
-                    if !rc.hasGlyph { break }
-                    if Self.isBlockElement(rc.codepoint) { break } // drawn procedurally
-                    if BoxDrawing.supported(rc.codepoint) { break } // procedural box sprite
-                    if let cur = cursorCell, cur.row == row, cur.column == c { break }
-                    if rc.bold != bold || rc.italic != italic || rc.foreground != fg { break }
-                    let scalar = Unicode.Scalar(rc.codepoint) ?? " "
-                    let before = runText.utf16.count
-                    runText.unicodeScalars.append(scalar)
-                    for _ in before ..< runText.utf16.count { utf16ToColumn.append(c) }
-                    c += 1
-                }
-                if utf16ToColumn.isEmpty { col += 1; continue }
-                let color = vector(fg)
-                for shaped in atlas.shape(runText, bold: bold, italic: italic) {
-                    guard let entry = atlas.entry(forShaped: shaped.glyph, font: shaped.font) else { continue }
-                    let idx = min(max(0, shaped.utf16Index), utf16ToColumn.count - 1)
-                    let cellColumn = utf16ToColumn[idx]
-                    glyphs.append(glyphInstance(
-                        entry,
-                        originX: ox + Float(cellColumn * cellPixelWidth),
-                        originY: oy + Float(row * cellPixelHeight),
-                        color: color
-                    ))
-                }
-                col = c
+        var col = 0
+        while col < cols {
+            guard let cell = frame.cell(row: row, column: col), cell.hasGlyph,
+                  !Self.isBlockElement(cell.codepoint) else {
+                col += 1
+                continue
             }
+            if let cur = cursorCell, cur.row == row, cur.column == col {
+                emitSingleGlyph(cell, row: row, col: col, ox: ox, oy: oy,
+                                color: vector(cursorTextColor), into: &glyphs)
+                col += 1
+                continue
+            }
+            // Box-drawing chars use a procedural cell-sized sprite — never shape them into
+            // a ligature run (that would render the font glyph and reintroduce seams).
+            if BoxDrawing.supported(cell.codepoint) {
+                emitSingleGlyph(cell, row: row, col: col, ox: ox, oy: oy,
+                                color: vector(cell.foreground), into: &glyphs)
+                col += 1
+                continue
+            }
+            // Accumulate a run of contiguous, same-style, same-color glyph cells.
+            var runText = ""
+            var utf16ToColumn: [Int] = []
+            let bold = cell.bold, italic = cell.italic, fg = cell.foreground
+            var c = col
+            while c < cols, let rc = frame.cell(row: row, column: c) {
+                if rc.width == .spacerTail { c += 1; continue } // wide-char tail
+                if !rc.hasGlyph { break }
+                if Self.isBlockElement(rc.codepoint) { break } // drawn procedurally
+                if BoxDrawing.supported(rc.codepoint) { break } // procedural box sprite
+                if let cur = cursorCell, cur.row == row, cur.column == c { break }
+                if rc.bold != bold || rc.italic != italic || rc.foreground != fg { break }
+                let scalar = Unicode.Scalar(rc.codepoint) ?? " "
+                let before = runText.utf16.count
+                runText.unicodeScalars.append(scalar)
+                for _ in before ..< runText.utf16.count { utf16ToColumn.append(c) }
+                c += 1
+            }
+            if utf16ToColumn.isEmpty { col += 1; continue }
+            let color = vector(fg)
+            for shaped in atlas.shape(runText, bold: bold, italic: italic) {
+                guard let entry = atlas.entry(forShaped: shaped.glyph, font: shaped.font) else { continue }
+                let idx = min(max(0, shaped.utf16Index), utf16ToColumn.count - 1)
+                let cellColumn = utf16ToColumn[idx]
+                glyphs.append(glyphInstance(
+                    entry,
+                    originX: ox + Float(cellColumn * cellPixelWidth),
+                    originY: oy + Float(row * cellPixelHeight),
+                    color: color
+                ))
+            }
+            col = c
         }
     }
 

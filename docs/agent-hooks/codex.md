@@ -15,10 +15,10 @@ Code, deep-merged into any existing hooks):
 {
   "hooks": {
     "PermissionRequest": [
-      { "matcher": "*", "hooks": [{ "type": "command", "command": "harness-cli notify --surface \"$HARNESS_SURFACE\" --title \"Codex\" --body \"Awaiting input\"" }] }
+      { "matcher": "*", "hooks": [{ "type": "command", "command": "PATH=\"$HOME/Library/Application Support/Harness/bin:$PATH\" harness-cli notify --surface \"$HARNESS_SURFACE\" --title \"Codex\" --body \"Awaiting input\"" }] }
     ],
     "Stop": [
-      { "matcher": "*", "hooks": [{ "type": "command", "command": "harness-cli notify --surface \"$HARNESS_SURFACE\" --title \"Codex\" --body \"Done\"" }] }
+      { "matcher": "*", "hooks": [{ "type": "command", "command": "PATH=\"$HOME/Library/Application Support/Harness/bin:$PATH\" harness-cli notify --surface \"$HARNESS_SURFACE\" --title \"Codex\" --body \"Done\"" }] }
     ]
   }
 }

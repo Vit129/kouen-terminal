@@ -8,7 +8,7 @@ import UserNotifications
 /// helper only drives the system prompt, or routes to System Settings when already denied
 /// (macOS never re-prompts after a denial).
 enum NotificationPermission {
-    enum State: Equatable { case granted, denied, undetermined }
+    enum State: Equatable, Sendable { case granted, denied, undetermined }
 
     private static func map(_ status: UNAuthorizationStatus) -> State {
         switch status {
@@ -19,30 +19,34 @@ enum NotificationPermission {
     }
 
     /// Current permission, delivered on the main queue.
-    static func current(_ completion: @escaping (State) -> Void) {
+    static func current(_ completion: @escaping @MainActor @Sendable (State) -> Void) {
         UNUserNotificationCenter.current().getNotificationSettings { settings in
             let state = map(settings.authorizationStatus)
-            DispatchQueue.main.async { completion(state) }
+            deliver(state, to: completion)
         }
     }
 
     /// Prompt when undecided; open System Settings ▸ Notifications when already denied.
-    static func request(_ completion: @escaping (State) -> Void) {
+    static func request(_ completion: @escaping @MainActor @Sendable (State) -> Void) {
         UNUserNotificationCenter.current().getNotificationSettings { settings in
             switch settings.authorizationStatus {
             case .denied:
-                DispatchQueue.main.async {
+                Task { @MainActor in
                     openSystemSettings()
                     completion(.denied)
                 }
             case .authorized, .provisional, .ephemeral:
-                DispatchQueue.main.async { completion(.granted) }
+                deliver(.granted, to: completion)
             default:
                 UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
-                    DispatchQueue.main.async { completion(granted ? .granted : .denied) }
+                    deliver(granted ? .granted : .denied, to: completion)
                 }
             }
         }
+    }
+
+    private static func deliver(_ state: State, to completion: @escaping @MainActor @Sendable (State) -> Void) {
+        Task { @MainActor in completion(state) }
     }
 
     static func openSystemSettings() {

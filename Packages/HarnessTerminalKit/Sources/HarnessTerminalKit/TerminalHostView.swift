@@ -33,12 +33,21 @@ public final class TerminalHostView: NSView {
     /// so the app pushes them via `applyBorderColors`. Default until the first push.
     public var activeBorderColor: NSColor = .systemBlue
     public var waitingRingColor: NSColor = .systemBlue
+    private var terminalFrameBorderColor: NSColor = .separatorColor.withAlphaComponent(0.22)
+
+    static let terminalFrameCornerRadius: CGFloat = 10
+    static let terminalFrameInset: CGFloat = 1
+
+    static func terminalFrameLineWidth(backingScaleFactor scale: CGFloat?) -> CGFloat {
+        guard let scale, scale > 1 else { return 1 }
+        return 1 / scale
+    }
 
     public var showsWaitingRing: Bool {
         get { isWaiting }
         set {
             isWaiting = newValue
-            needsDisplay = true
+            borderOverlayView.needsDisplay = true
         }
     }
 
@@ -47,7 +56,7 @@ public final class TerminalHostView: NSView {
         set {
             let changed = newValue != isActiveBorder
             isActiveBorder = newValue
-            needsDisplay = true
+            borderOverlayView.needsDisplay = true
             // `window-style`/`pane-style` dims inactive panes — re-resolve the base color
             // when focus changes (only worth a re-apply when a style is actually set).
             if changed, !paneStyles.isEmpty { applyNativeAppearance() }
@@ -71,6 +80,7 @@ public final class TerminalHostView: NSView {
     /// `pane-border-format` label, overlaid on the top/bottom edge above the terminal. The GUI
     /// overlays it (the surface keeps full size) rather than reserving a row like the grid
     /// compositor — surface-appropriate, same shared format/options underneath.
+    private let borderOverlayView = TerminalFrameOverlayView()
     private let borderLabelField = NSTextField(labelWithString: "")
     private var borderLabelTop: NSLayoutConstraint?
     private var borderLabelBottom: NSLayoutConstraint?
@@ -110,7 +120,7 @@ public final class TerminalHostView: NSView {
         get { isMarked }
         set {
             isMarked = newValue
-            needsDisplay = true
+            borderOverlayView.needsDisplay = true
         }
     }
 
@@ -188,8 +198,18 @@ public final class TerminalHostView: NSView {
             native.bottomAnchor.constraint(equalTo: bottomAnchor),
         ])
 
-        // pane-border-format label overlay — added AFTER `native` so it sits above the Metal
-        // surface (a label drawn in `draw(_:)` would be hidden behind it).
+        borderOverlayView.translatesAutoresizingMaskIntoConstraints = false
+        borderOverlayView.host = self
+        addSubview(borderOverlayView)
+        NSLayoutConstraint.activate([
+            borderOverlayView.topAnchor.constraint(equalTo: topAnchor),
+            borderOverlayView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            borderOverlayView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            borderOverlayView.bottomAnchor.constraint(equalTo: bottomAnchor),
+        ])
+
+        // pane-border-format label overlay — added AFTER `native`/border so it sits above the
+        // Metal surface and frame.
         borderLabelField.translatesAutoresizingMaskIntoConstraints = false
         borderLabelField.font = .monospacedSystemFont(ofSize: 10, weight: .medium)
         borderLabelField.alignment = .center
@@ -313,27 +333,30 @@ public final class TerminalHostView: NSView {
         }
     }
 
-    public override func draw(_ dirtyRect: NSRect) {
-        super.draw(dirtyRect)
+    fileprivate func drawTerminalOverlay(in bounds: NSRect) {
+        drawTerminalFrame(in: bounds)
         // The waiting ring (urgent) takes precedence over the quieter active-pane
         // border so a pane that needs attention never reads as merely focused.
         if isWaiting {
             // Two-stroke ring: a soft outer halo + a crisp inner stroke. Reads as
             // "needs attention" without screaming.
-            strokeIndicator(color: waitingRingColor, lineWidth: 4, alpha: 0.18, inset: 1)
-            strokeIndicator(color: waitingRingColor, lineWidth: 1.5, alpha: 0.85, inset: 2)
+            strokeIndicator(in: bounds, color: waitingRingColor, lineWidth: 4, alpha: 0.18, inset: 1)
+            strokeIndicator(in: bounds, color: waitingRingColor, lineWidth: 1.5, alpha: 0.85, inset: 2)
         } else if isActiveBorder {
             // Minimal focused-pane hairline — only ever drawn when a tab is split
-            // (gated in SessionCoordinator.setActiveSurface), so a lone terminal has
-            // no border at all. Two strokes give it a subtle "edge light" on dark
-            // themes without becoming a hard outline.
-            strokeIndicator(color: activeBorderColor, lineWidth: 1, alpha: 0.42, inset: 1)
+            // (gated in SessionCoordinator.setActiveSurface). A lone terminal keeps only
+            // the neutral frame; split focus adds this subtle edge light.
+            strokeIndicator(in: bounds, color: activeBorderColor, lineWidth: 1, alpha: 0.42, inset: 1)
         }
         // The marked pane (join-pane source) gets a distinct dashed accent on top,
         // so it reads as "marked" independently of focus.
         if isMarked {
             let rect = bounds.insetBy(dx: 1.5, dy: 1.5)
-            let path = NSBezierPath(roundedRect: rect, xRadius: 6, yRadius: 6)
+            let path = NSBezierPath(
+                roundedRect: rect,
+                xRadius: Self.terminalFrameCornerRadius,
+                yRadius: Self.terminalFrameCornerRadius
+            )
             path.lineWidth = 1.5
             path.setLineDash([5, 3], count: 2, phase: 0)
             waitingRingColor.withAlphaComponent(0.9).setStroke()
@@ -341,20 +364,44 @@ public final class TerminalHostView: NSView {
         }
     }
 
-    private func strokeIndicator(color: NSColor, lineWidth: CGFloat, alpha: CGFloat, inset: CGFloat? = nil) {
+    private func drawTerminalFrame(in bounds: NSRect) {
+        guard bounds.width > 2, bounds.height > 2 else { return }
+        let rect = bounds.insetBy(dx: Self.terminalFrameInset, dy: Self.terminalFrameInset)
+        let path = NSBezierPath(
+            roundedRect: rect,
+            xRadius: Self.terminalFrameCornerRadius,
+            yRadius: Self.terminalFrameCornerRadius
+        )
+        terminalFrameBorderColor.setStroke()
+        path.lineWidth = Self.terminalFrameLineWidth(backingScaleFactor: window?.backingScaleFactor)
+        path.stroke()
+    }
+
+    private func strokeIndicator(
+        in bounds: NSRect,
+        color: NSColor,
+        lineWidth: CGFloat,
+        alpha: CGFloat,
+        inset: CGFloat? = nil
+    ) {
         let effectiveInset = inset ?? lineWidth
         let rect = bounds.insetBy(dx: effectiveInset, dy: effectiveInset)
-        let path = NSBezierPath(roundedRect: rect, xRadius: 6, yRadius: 6)
+        let path = NSBezierPath(
+            roundedRect: rect,
+            xRadius: Self.terminalFrameCornerRadius,
+            yRadius: Self.terminalFrameCornerRadius
+        )
         color.withAlphaComponent(alpha).setStroke()
         path.lineWidth = lineWidth
         path.stroke()
     }
 
     /// Push theme-derived indicator colors from the app's palette.
-    public func applyBorderColors(active: NSColor, waiting: NSColor) {
+    public func applyBorderColors(active: NSColor, waiting: NSColor, frame: NSColor? = nil) {
         activeBorderColor = active
         waitingRingColor = waiting
-        needsDisplay = true
+        if let frame { terminalFrameBorderColor = frame }
+        borderOverlayView.needsDisplay = true
     }
 
     public func focusTerminal() {
@@ -473,6 +520,22 @@ public final class TerminalHostView: NSView {
 
     deinit {
         outputSubscription?.cancel()
+    }
+}
+
+@MainActor
+private final class TerminalFrameOverlayView: NSView {
+    weak var host: TerminalHostView?
+
+    override var isOpaque: Bool { false }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        nil
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        host?.drawTerminalOverlay(in: bounds)
     }
 }
 

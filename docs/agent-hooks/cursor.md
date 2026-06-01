@@ -14,7 +14,7 @@ Writes `~/.cursor/agent-hooks.json` with:
 ```json
 {
   "version": 1,
-  "agent_notify": "harness-cli notify --surface \"$HARNESS_SURFACE\" --title \"Cursor\" --body \"$1\""
+  "agent_notify": "PATH=\"$HOME/Library/Application Support/Harness/bin:$PATH\" harness-cli notify --surface \"$HARNESS_SURFACE\" --title \"Cursor\" --body \"$1\""
 }
 ```
 
@@ -33,7 +33,7 @@ is `$HARNESS_SURFACE`.
 If you can't use the hook file, drop this in your shell config:
 
 ```bash
-cursor_notify() { harness-cli notify --surface "$HARNESS_SURFACE" --title "Cursor" --body "$1"; }
+cursor_notify() { PATH="$HOME/Library/Application Support/Harness/bin:$PATH" harness-cli notify --surface "$HARNESS_SURFACE" --title "Cursor" --body "$1"; }
 ```
 
 Then call `cursor_notify "Done"` from inside Cursor's terminal session at the

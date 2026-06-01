@@ -12,6 +12,10 @@ enum CLIInstaller {
         binDirectory.appendingPathComponent("harness-cli")
     }
 
+    static var installedDaemonPath: URL {
+        binDirectory.appendingPathComponent("HarnessDaemon")
+    }
+
     @discardableResult
     static func install() -> Bool {
         let source = cliSourceURL()
@@ -22,16 +26,13 @@ enum CLIInstaller {
         do {
             try HarnessPaths.ensureDirectories()
             try FileManager.default.createDirectory(at: binDirectory, withIntermediateDirectories: true)
-            if FileManager.default.fileExists(atPath: installedCLIPath.path) {
-                try FileManager.default.removeItem(at: installedCLIPath)
-            }
-            try FileManager.default.copyItem(at: source, to: installedCLIPath)
-            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: installedCLIPath.path)
+            try copyExecutable(source: source, destination: installedCLIPath)
             var launchAgentMessage = ""
             if let daemon = daemonSourceURL() {
                 do {
-                    _ = try LaunchAgentInstaller.install(daemonPath: daemon)
-                    launchAgentMessage = "\nLaunchAgent installed at \(HarnessPaths.launchAgentURL.path)"
+                    try copyExecutable(source: daemon, destination: installedDaemonPath)
+                    _ = try LaunchAgentInstaller.install(daemonPath: installedDaemonPath)
+                    launchAgentMessage = "\nHarnessDaemon installed to \(installedDaemonPath.path)\nLaunchAgent installed at \(HarnessPaths.launchAgentURL.path)"
                 } catch {
                     launchAgentMessage = "\nLaunchAgent install failed: \(error)"
                 }
@@ -52,6 +53,16 @@ enum CLIInstaller {
             showAlert("Install failed: \(error.localizedDescription)")
             return false
         }
+    }
+
+    private static func copyExecutable(source: URL, destination: URL) throws {
+        if source.standardizedFileURL.path != destination.standardizedFileURL.path {
+            if FileManager.default.fileExists(atPath: destination.path) {
+                try FileManager.default.removeItem(at: destination)
+            }
+            try FileManager.default.copyItem(at: source, to: destination)
+        }
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: destination.path)
     }
 
     static func daemonSourceURL() -> URL? {

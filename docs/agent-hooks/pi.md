@@ -8,7 +8,7 @@ Writes `~/.pi/hooks.json`:
 
 ```json
 {
-  "notify": "harness-cli notify --surface \"$HARNESS_SURFACE\" --title \"Pi\""
+  "notify": "PATH=\"$HOME/Library/Application Support/Harness/bin:$PATH\" harness-cli notify --surface \"$HARNESS_SURFACE\" --title \"Pi\""
 }
 ```
 
