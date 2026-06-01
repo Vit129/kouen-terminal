@@ -6,6 +6,8 @@ import HarnessCore
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var mainWindowController: MainWindowController?
     private var menuBarController: MenuBarController?
+    private var externalOpenReady = false
+    private var queuedExternalOpenURLs: [URL] = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         StartupMetrics.shared.mark(.launchStart)
@@ -38,6 +40,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Self.reconcileSessionPersistenceWithModeOnce()
             FirstRunExperience.offerCLIInstallIfNeeded()
             OnboardingController.presentIfNeeded()
+            self.externalOpenReady = true
+            self.drainQueuedExternalOpenURLs()
         }
     }
 
@@ -74,5 +78,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
         true
+    }
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        enqueueExternalOpen(urls)
+    }
+
+    func application(_ sender: NSApplication, openFiles filenames: [String]) {
+        enqueueExternalOpen(filenames.map { URL(fileURLWithPath: $0) })
+        sender.reply(toOpenOrPrint: .success)
+    }
+
+    private func enqueueExternalOpen(_ urls: [URL]) {
+        guard !urls.isEmpty else { return }
+        NSApp.activate(ignoringOtherApps: true)
+        if externalOpenReady {
+            DefaultTerminalOpener.open(urls)
+        } else {
+            queuedExternalOpenURLs.append(contentsOf: urls)
+        }
+    }
+
+    private func drainQueuedExternalOpenURLs() {
+        guard externalOpenReady, !queuedExternalOpenURLs.isEmpty else { return }
+        let urls = queuedExternalOpenURLs
+        queuedExternalOpenURLs.removeAll()
+        DefaultTerminalOpener.open(urls)
     }
 }

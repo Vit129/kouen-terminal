@@ -20,6 +20,39 @@
     <string>100</string>
     <key>CFBundleIconFile</key>
     <string>Harness</string>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>Terminal URLs</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>ssh</string>
+                <string>telnet</string>
+                <string>x-man-page</string>
+            </array>
+        </dict>
+    </array>
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>Terminal command file</string>
+            <key>CFBundleTypeRole</key>
+            <string>Shell</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>com.apple.terminal.shell-script</string>
+            </array>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>command</string>
+                <string>tool</string>
+            </array>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+        </dict>
+    </array>
     <key>LSMinimumSystemVersion</key>
     <string>15.0</string>
     <key>NSHighResolutionCapable</key>

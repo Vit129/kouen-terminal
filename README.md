@@ -53,6 +53,7 @@ New installs start in Plain. Moving over from another setup? See [docs/MIGRATION
 - Shell integration (OSC 133): prompt marks for jump-to-prompt and a command success / failure gutter — bash / zsh / fish snippets in [docs/shell-integration/](docs/shell-integration/README.md)
 - Inline images that stay put across reflow and scroll into history
 - Drag file-backed folders or images into a pane to insert shell-quoted paths
+- Set Harness as the default terminal for SSH/Telnet/man-page links and `.command` / `.tool` files from Settings > Terminal
 - Automatic, signed background updates (Sparkle + EdDSA)
 
 ## harness-cli

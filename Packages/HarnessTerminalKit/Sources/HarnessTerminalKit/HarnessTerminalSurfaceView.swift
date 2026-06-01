@@ -149,12 +149,7 @@ public final class HarnessTerminalSurfaceView: NSView {
     }
 
     static func shellQuotedPath(_ path: String) -> String {
-        guard !path.isEmpty else { return "''" }
-        let safe = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789/_:.,@%+=-")
-        if path.unicodeScalars.allSatisfy({ safe.contains($0) }) {
-            return path
-        }
-        return "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
+        ShellQuoting.quote(path)
     }
 
     static func droppedPathText(for urls: [URL]) -> String {

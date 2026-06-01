@@ -32,6 +32,16 @@ fingerprint changes. Re-import manually any time:
 
 Comment lines start with `#`; `#` is **not** stripped from values (so hex colors survive).
 
+### Make Harness the default terminal
+
+macOS does not expose one universal "default terminal" switch. Harness registers the
+Launch Services handlers terminal users expect: SSH links, Telnet links, man-page links,
+and `.command` / `.tool` files. Set them from **Settings → Terminal → Default terminal**.
+
+Opening one of those links or files creates a new Harness tab. SSH/Telnet/man-page URLs run
+the matching command, directories open as the tab's working directory, and command files run
+from their parent directory.
+
 ## From tmux
 
 Switch to **Full Terminal** mode (Settings → Terminal → Experience). Your muscle

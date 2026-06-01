@@ -369,6 +369,25 @@ final class SessionCoordinator: NSObject {
         }
     }
 
+    func openDefaultTerminalLaunch(_ launch: DefaultTerminalLaunchRequest) {
+        guard let workspaceID = snapshot.activeWorkspace?.id ?? snapshot.workspaces.first?.id else { return }
+        let cwd = launch.cwd ?? settings.defaultCWD
+        guard case let .tabID(tabID)? = requestDaemon(.newTab(workspaceID: workspaceID, cwd: cwd)) else {
+            syncFromDaemon()
+            return
+        }
+        if let title = launch.title, !title.isEmpty {
+            requestDaemon(.renameTab(tabID: tabID, name: title))
+        }
+        syncFromDaemon()
+        guard let surfaceID = firstSurfaceID(forTab: tabID) else { return }
+        setActiveSurface(surfaceID)
+        terminalHosts.host(for: surfaceID)?.focusTerminal()
+        if let command = launch.command, !command.isEmpty {
+            requestDaemon(.sendData(surfaceID: surfaceID.uuidString, data: Data((command + "\r").utf8)))
+        }
+    }
+
     func splitActivePane(direction: SplitDirection) {
         guard let workspace = snapshot.activeWorkspace,
               let tab = workspace.activeTab,
@@ -388,6 +407,17 @@ final class SessionCoordinator: NSObject {
         default:
             return nil
         }
+    }
+
+    private func firstSurfaceID(forTab tabID: TabID) -> SurfaceID? {
+        for workspace in snapshot.workspaces {
+            for session in workspace.sessions {
+                if let tab = session.tabs.first(where: { $0.id == tabID }) {
+                    return tab.rootPane.allSurfaceIDs().first
+                }
+            }
+        }
+        return nil
     }
 
     func selectWorkspace(_ id: WorkspaceID) {

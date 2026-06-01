@@ -34,6 +34,8 @@ final class SettingsViewController: NSViewController, NSFontChanging {
     private let cursorBlinkToggle = HarnessToggle(title: "Blinking cursor")
     private let copyOnSelectToggle = HarnessToggle(title: "Copy text to clipboard on selection")
     private let keepSessionsToggle = HarnessToggle(title: "Keep sessions running after the window closes")
+    private let defaultTerminalButton = HarnessPillButton(title: "Set Harness as default terminal", kind: .secondary)
+    private let defaultTerminalStatusField = NSTextField(wrappingLabelWithString: "")
     private let vividColorsToggle = HarnessToggle(title: "Vivid color rendering (Display P3 opt-in)")
     private let linearBlendingToggle = HarnessToggle(title: "Crisp text rendering")
     private let themeTerminalOutputToggle = HarnessToggle(title: "Apply theme colors to terminal output — off = canvas matches theme, output untouched")
@@ -269,6 +271,12 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         keepSessionsToggle.state = SessionCoordinator.shared.snapshot.keepSessionsOnQuit ? .on : .off
         keepSessionsToggle.target = self
         keepSessionsToggle.action = #selector(toggleKeepSessions)
+        defaultTerminalButton.target = self
+        defaultTerminalButton.action = #selector(setDefaultTerminalClicked)
+        defaultTerminalStatusField.font = .systemFont(ofSize: 11.5)
+        defaultTerminalStatusField.textColor = HarnessChrome.current.textTertiary
+        defaultTerminalStatusField.maximumNumberOfLines = 2
+        refreshDefaultTerminalStatus()
         vividColorsToggle.state = settings.colorRendering == .vivid ? .on : .off
         vividColorsToggle.target = self
         vividColorsToggle.action = #selector(appearanceTextDidCommit)
@@ -649,6 +657,11 @@ final class SettingsViewController: NSViewController, NSFontChanging {
             ("Shell", shellField),
             ("Default directory", cwdField),
         ]))
+        let defaultTerminalGroup = settingsGroup("Default terminal", [
+            settingsCaption("Use Harness for SSH/Telnet links, man-page links, and .command/.tool files."),
+            leadingRow(defaultTerminalButton),
+            defaultTerminalStatusField,
+        ])
         let behaviorGroup = settingsGroup("Behavior", [
             settingsRow("Cursor style", cursorStyleSegment),
             settingsRow("Scrollback", scrollbackField),
@@ -673,6 +686,7 @@ final class SettingsViewController: NSViewController, NSFontChanging {
             experienceGroup,
             fontGroup,
             shellGroup,
+            defaultTerminalGroup,
             behaviorGroup,
         ])
         stack.orientation = .vertical
@@ -1437,6 +1451,28 @@ final class SettingsViewController: NSViewController, NSFontChanging {
     @objc private func toggleKeepSessions() {
         let keep = keepSessionsToggle.state == .on
         SessionCoordinator.shared.requestDaemon(.setKeepSessionsOnQuit(keep))
+    }
+
+    @objc private func setDefaultTerminalClicked() {
+        defaultTerminalButton.isEnabled = false
+        defaultTerminalButton.setTitleText("Setting...")
+        Task { @MainActor in
+            do {
+                try await DefaultTerminalManager.setAsDefault()
+                Toast.show("Harness is now the default terminal", in: view)
+            } catch {
+                Toast.show("Couldn't set default terminal", in: view)
+                defaultTerminalStatusField.stringValue = error.localizedDescription
+            }
+            defaultTerminalButton.isEnabled = true
+            refreshDefaultTerminalStatus()
+        }
+    }
+
+    private func refreshDefaultTerminalStatus() {
+        let status = DefaultTerminalManager.status()
+        defaultTerminalStatusField.stringValue = status.summary
+        defaultTerminalButton.setTitleText(status.isDefault ? "Default terminal set" : "Set Harness as default terminal")
     }
 
     /// The selected experience mode, derived from the segment position.
