@@ -430,11 +430,11 @@ public final class TerminalMetalRenderer {
                 cursorOrigin = SIMD2(cellX, cellY)
                 cursorSize = SIMD2(cellW, cellH)
             case .bar:
-                let w = max(2, Float(cellPixelWidth) / 8)
+                let w = max(1, round(Float(cellPixelWidth) / 12))
                 cursorOrigin = SIMD2(cellX, cellY)
                 cursorSize = SIMD2(w, cellH)
             case .underline:
-                let h = max(2, Float(cellPixelHeight) / 10)
+                let h = max(1, round(Float(cellPixelHeight) / 16))
                 cursorOrigin = SIMD2(cellX, cellY + cellH - h)
                 cursorSize = SIMD2(cellW, h)
             }

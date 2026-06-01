@@ -164,6 +164,19 @@ public struct CursorRender: Equatable, Sendable {
     }
 }
 
+private func renderCursorStyle(userStyle: CursorStyle, programShape: TerminalCursorShape) -> CursorStyle {
+    switch programShape {
+    case .default:
+        return userStyle
+    case .block:
+        return .block
+    case .bar:
+        return .bar
+    case .underline:
+        return .underline
+    }
+}
+
 /// A linear (line-wrapping) text selection over the grid, normalized so `start` is at or
 /// before `end` in reading order. Bounds are inclusive cell coordinates.
 public struct TerminalSelection: Equatable, Sendable {
@@ -387,7 +400,7 @@ public struct FrameBuilder {
             cursor = CursorRender(
                 row: snapshot.cursor.row, column: snapshot.cursor.col, visible: snapshot.cursor.visible,
                 color: renderColor(cursorColor), textColor: renderColor(cursorTextColor),
-                style: cursorStyle
+                style: renderCursorStyle(userStyle: cursorStyle, programShape: snapshot.cursor.shape)
             )
         }
         // Resolve placements to drawable images (those whose pixels the provider can supply).

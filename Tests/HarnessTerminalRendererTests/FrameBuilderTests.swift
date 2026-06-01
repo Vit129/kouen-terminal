@@ -72,6 +72,23 @@ final class FrameBuilderTests: XCTestCase {
         XCTAssertEqual(f.cursor.color, RenderColor(theme.cursor ?? theme.foreground))
     }
 
+    func testProgramCursorShapeOverridesUserDefaultStyle() {
+        let term = HarnessGridTerminal(cols: 4, rows: 1)!
+        term.feed("\u{1b}[5 q") // blinking bar
+
+        let f = FrameBuilder(theme: theme, cursorStyle: .block).build(term.readGrid()!)
+
+        XCTAssertEqual(f.cursor.style, .bar)
+    }
+
+    func testDefaultCursorShapeHonorsUserStyle() {
+        let term = HarnessGridTerminal(cols: 4, rows: 1)!
+
+        let f = FrameBuilder(theme: theme, cursorStyle: .bar).build(term.readGrid()!)
+
+        XCTAssertEqual(f.cursor.style, .bar)
+    }
+
     func testRenderColorNormalizesChannels() {
         XCTAssertEqual(RenderColor(RGBColor(red: 255, green: 0, blue: 0)),
                        RenderColor(red: 1, green: 0, blue: 0, alpha: 1))

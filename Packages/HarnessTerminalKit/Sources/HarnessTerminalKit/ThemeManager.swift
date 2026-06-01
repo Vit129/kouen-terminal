@@ -3,7 +3,7 @@ import HarnessTheme
 
 @MainActor
 public enum ThemeManager {
-    public static let defaultThemeName = "Catppuccin Mocha"
+    public static let defaultThemeName = HarnessThemeCatalog.defaultThemeName
 
     /// Dropdown entry representing the user's standard terminal baseline.
     /// Terminal output no longer consumes named theme palettes; themes are for
@@ -11,17 +11,18 @@ public enum ThemeManager {
     public static let defaultDisplayName = "Default"
     public static let defaultBaselineBackgroundHex = "#000000"
     public static let defaultBaselineForegroundHex = "#ffffff"
-    /// The standard, vivid xterm ANSI-16 palette — the de-facto "true" colors programs
-    /// assume. Used for terminal *output* when theme→output recoloring is off (the
-    /// default), so ANSI-16 tools render like a normal terminal rather than washed/pastel.
+    /// Ghostty-compatible ANSI-16 defaults. Used for terminal *output* when theme→output
+    /// recoloring is off (the default), so ANSI tools start from the same muted baseline
+    /// instead of the hotter legacy xterm primaries.
     public static let defaultBaselinePaletteHex = [
-        "#000000", "#CD0000", "#00CD00", "#CDCD00",
-        "#0000EE", "#CD00CD", "#00CDCD", "#E5E5E5",
-        "#7F7F7F", "#FF0000", "#00FF00", "#FFFF00",
-        "#5C5CFF", "#FF00FF", "#00FFFF", "#FFFFFF",
+        "#1d1f21", "#cc6666", "#b5bd68", "#f0c674",
+        "#81a2be", "#b294bb", "#8abeb7", "#c5c8c6",
+        "#666666", "#d54e53", "#b9ca4a", "#e7c547",
+        "#7aa6da", "#c397d8", "#70c0b1", "#eaeaea",
     ]
 
     public static let featuredThemes = [
+        "Ghostty Default",
         "Catppuccin Mocha",
         "Dracula",
         "Tokyo Night",

@@ -114,6 +114,7 @@
 		C2BCF8DD2B632CA2C5A297A0 /* OptionValueTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98AADED807E2179E9DDE038D /* OptionValueTests.swift */; };
 		C6615DC046488D6863E8EBDE /* ReplayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEAC0FEC29983B2E235F4AD /* ReplayClient.swift */; };
 		C7402FE4B4BBB5EC6C3D7DD9 /* AttachInputBatcherTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBCDDE3A4C2D6F709BE82CA7 /* AttachInputBatcherTests.swift */; };
+		C7E8E4FF6E4C1B61A606F4D0 /* HarnessTerminalSurfaceDragDropTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB808C784D47F165C2E844FC /* HarnessTerminalSurfaceDragDropTests.swift */; };
 		C8D8E22B16FC1B7A15009E29 /* PrefixKeymap.swift in Sources */ = {isa = PBXBuildFile; fileRef = E87D766FA02E02860C0BAC11 /* PrefixKeymap.swift */; };
 		C99BA68EE068EB2E4DB931BB /* HarnessCopyMode in Frameworks */ = {isa = PBXBuildFile; productRef = D104338C78B1AD80EE41F4F3 /* HarnessCopyMode */; };
 		CD1734C04213D881E6A943EA /* MainWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D798A050D3824B4FEA80EA3A /* MainWindowController.swift */; };
@@ -139,6 +140,7 @@
 		F39A7823485432B3D8A18A7F /* KeyTableTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42A46C9D61AB68EF00510185 /* KeyTableTests.swift */; };
 		F51258DADC262CFAFCC9F7AB /* HarnessCLI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41B78BE3F3AF6A844038EF95 /* HarnessCLI.swift */; };
 		F63AA674E614B27B234B1ECC /* SessionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8A2D8F06287D6DB6C5606FE /* SessionCoordinator.swift */; };
+		F72A00AD90FDA5C086977EB8 /* ThemeManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F130CE1B8BF54583AE852CF6 /* ThemeManagerTests.swift */; };
 		F894F1E7B74B5EC290B91E5D /* SnapshotQueryFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2028CCA071529A0A1D32390 /* SnapshotQueryFormatterTests.swift */; };
 		FA8BDF893A6EB2781A21B2C8 /* HarnessCopyMode in Frameworks */ = {isa = PBXBuildFile; productRef = FE523A47A837BFE82BB0E2CD /* HarnessCopyMode */; };
 		FC63C7B7E12D915CCA7CBA1A /* WaitForRegistryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20DF4845E259A59459F605CA /* WaitForRegistryTests.swift */; };
@@ -270,6 +272,7 @@
 		C91C2E3C2A8847B6A0514123 /* StatusLineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusLineView.swift; sourceTree = "<group>"; };
 		C98251A71A00B4D1AAD8859A /* SessionEditorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionEditorTests.swift; sourceTree = "<group>"; };
 		CA12DE19711C76D4DAF36509 /* NotificationDropdownPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationDropdownPanel.swift; sourceTree = "<group>"; };
+		CB808C784D47F165C2E844FC /* HarnessTerminalSurfaceDragDropTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessTerminalSurfaceDragDropTests.swift; sourceTree = "<group>"; };
 		CBD4172A892BE31553B95C03 /* TerminalRecordingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalRecordingTests.swift; sourceTree = "<group>"; };
 		CCC26C5F0BC01F83A6FCD844 /* CopyModeReducerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CopyModeReducerTests.swift; sourceTree = "<group>"; };
 		CDDF46E038BBABC664D2CB1A /* MenuBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarController.swift; sourceTree = "<group>"; };
@@ -294,6 +297,7 @@
 		ED4D137AE38994FB0D00AB53 /* AgentInboxPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentInboxPanelView.swift; sourceTree = "<group>"; };
 		F020335A72A6E59565B2702A /* CommandParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandParserTests.swift; sourceTree = "<group>"; };
 		F07A9707ED8F9BC6D22C1973 /* TestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestSupport.swift; sourceTree = "<group>"; };
+		F130CE1B8BF54583AE852CF6 /* ThemeManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeManagerTests.swift; sourceTree = "<group>"; };
 		F3912417CC3E06CEA28B664B /* CommandPromptController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandPromptController.swift; sourceTree = "<group>"; };
 		F43DED9291885610DB352103 /* RealPty.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealPty.swift; sourceTree = "<group>"; };
 		F65E988F7DC60DB925F1D00E /* HarnessCoreTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = HarnessCoreTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -605,8 +609,10 @@
 			children = (
 				12D719192EF917E6990605D1 /* GridCompositorCopyModeTests.swift */,
 				B90CB5DF66664CE2A95C323F /* GridCompositorTests.swift */,
+				CB808C784D47F165C2E844FC /* HarnessTerminalSurfaceDragDropTests.swift */,
 				B070A4B36545FD70BA9E8459 /* HarnessTerminalSurfaceWorkerTests.swift */,
 				7BE2C23E1D42C14C6316C133 /* RenderSchedulerTests.swift */,
+				F130CE1B8BF54583AE852CF6 /* ThemeManagerTests.swift */,
 			);
 			path = HarnessTerminalKitTests;
 			sourceTree = "<group>";
@@ -1035,8 +1041,10 @@
 			files = (
 				54C8A46E825AC07DDBD53041 /* GridCompositorCopyModeTests.swift in Sources */,
 				2724F1AF55170C3B00C74E93 /* GridCompositorTests.swift in Sources */,
+				C7E8E4FF6E4C1B61A606F4D0 /* HarnessTerminalSurfaceDragDropTests.swift in Sources */,
 				7EF3C2AE44F80D750B89B192 /* HarnessTerminalSurfaceWorkerTests.swift in Sources */,
 				EFC29FC14231F73DE6E96270 /* RenderSchedulerTests.swift in Sources */,
+				F72A00AD90FDA5C086977EB8 /* ThemeManagerTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

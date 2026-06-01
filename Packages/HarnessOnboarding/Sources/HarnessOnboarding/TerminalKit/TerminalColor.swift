@@ -5,7 +5,7 @@ import Foundation
 //   • RGBColor       — Packages/HarnessTheme/.../Color/RGBColor.swift
 //   • ANSIPalette    — Packages/HarnessTerminalRenderer/.../ANSIPalette.swift
 //   • CellColorResolver — Packages/HarnessTerminalRenderer/.../CellColorResolver.swift
-//   • MochaTheme     — inlined Catppuccin Mocha (the monorepo default theme)
+//   • MochaTheme     — inlined Catppuccin Mocha for the onboarding preview
 
 /// A platform-independent 24-bit color with optional alpha.
 public struct RGBColor: Equatable, Sendable, Hashable {
@@ -115,7 +115,7 @@ public struct CellColorResolver: Sendable {
     }
 }
 
-/// Catppuccin Mocha — the monorepo's default theme. Background/foreground + the 16 base
+/// Catppuccin Mocha — the onboarding preview theme. Background/foreground + the 16 base
 /// ANSI colors that feed `ANSIPalette`. The one vivid focal point against the monochrome chrome.
 public enum MochaTheme {
     public static let background = RGBColor(hex: "#1e1e2e")!

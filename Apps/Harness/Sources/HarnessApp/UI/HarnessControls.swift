@@ -669,7 +669,7 @@ final class HarnessSegmented: NSControl {
 
 // MARK: - Select (searchable dropdown)
 
-/// Themed dropdown replacing `NSPopUpButton` for long lists (the 485-theme catalog). Shows
+/// Themed dropdown replacing `NSPopUpButton` for long lists (the 490-theme catalog). Shows
 /// the current value + chevron; click opens a searchable themed popover. Popup-compatible
 /// shims keep call sites a type-swap.
 @MainActor

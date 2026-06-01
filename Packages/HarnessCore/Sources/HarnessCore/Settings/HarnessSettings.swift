@@ -195,7 +195,7 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         importedConfigSignature: String? = nil,
         prefixKey: String = "ctrl-a",
         scrollbackLines: Int = 10_000,
-        cursorStyle: String = "block",
+        cursorStyle: String = "bar",
         cursorBlink: Bool = true,
         copyOnSelect: Bool = true,
         selectionBackgroundHex: String? = nil,
