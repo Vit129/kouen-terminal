@@ -81,6 +81,10 @@ public enum AttachClient {
 // MARK: - Live session
 
 private final class LiveSession: @unchecked Sendable {
+    /// Max time (ms) buffered stdin bytes wait before flushing — bounds typing
+    /// latency while letting paste bursts coalesce. `poll` granularity is 1 ms.
+    static let flushDelayMillis: Int32 = 2
+
     let client: DaemonClient
     let surfaceID: String
     let configuration: AttachClient.Configuration
@@ -117,64 +121,59 @@ private final class LiveSession: @unchecked Sendable {
         subscription = sub
 
         // stdin loop — `poll(2)` on (stdin, wakeRead) so a detach request from
-        // any thread interrupts the read promptly. Forwards everything except
-        // the detach sequence to the daemon.
-        let detachSeq = configuration.detachSequence
-        var matched = 0
+        // any thread interrupts the read promptly. Forwarded bytes are coalesced
+        // by `AttachInputBatcher` so a large paste burst becomes a few large
+        // `sendData` requests instead of one per read, without delaying typing
+        // or the detach sequence.
+        func send(_ data: Data?) {
+            guard let data, !data.isEmpty else { return }
+            _ = try? client.request(.sendData(surfaceID: surfaceID, data: data), timeout: 1)
+        }
+        var batcher = AttachInputBatcher(detachSequence: configuration.detachSequence)
         var buffer = [UInt8](repeating: 0, count: 4096)
         var fds: [pollfd] = [
             pollfd(fd: STDIN_FILENO, events: Int16(POLLIN), revents: 0),
             pollfd(fd: wakeRead, events: Int16(POLLIN), revents: 0),
         ]
-        loop: while !shouldExit() {
+        while true {
+            if shouldExit() { send(batcher.drain()); break }
+            // Block indefinitely while idle; once bytes are buffered, wait at
+            // most `flushDelayMillis` so a paste keeps coalescing but a lone
+            // keystroke is flushed almost immediately.
+            let timeout: Int32 = batcher.hasPending ? Self.flushDelayMillis : -1
             let ready = fds.withUnsafeMutableBufferPointer { ptr -> Int32 in
-                poll(ptr.baseAddress, nfds_t(ptr.count), -1)
+                poll(ptr.baseAddress, nfds_t(ptr.count), timeout)
             }
             if ready < 0 {
                 if errno == EINTR { continue }
+                send(batcher.drain())
                 break
+            }
+            if ready == 0 {
+                // Flush timeout elapsed with buffered bytes — send and resume
+                // blocking. (Only reachable while `hasPending`.)
+                send(batcher.drain())
+                continue
             }
             if (fds[1].revents & Int16(POLLIN)) != 0 {
                 var drain = [UInt8](repeating: 0, count: 32)
                 _ = read(wakeRead, &drain, drain.count)
-                // Either onEnd / SIGTERM set the flag — exit the loop.
+                // onEnd / SIGTERM set the flag — handled at the top of the loop.
                 continue
             }
             guard (fds[0].revents & Int16(POLLIN)) != 0 else { continue }
             let n = read(STDIN_FILENO, &buffer, buffer.count)
-            if n == 0 { break } // stdin closed
+            if n == 0 { send(batcher.drain()); break } // stdin closed
             if n < 0 {
                 if errno == EINTR { continue }
+                send(batcher.drain())
                 break
             }
-            var forward = Data()
-            forward.reserveCapacity(n)
-            var i = 0
-            while i < n {
-                let byte = buffer[i]
-                if !detachSeq.isEmpty, byte == detachSeq[matched] {
-                    matched += 1
-                    if matched == detachSeq.count {
-                        requestDetach()
-                        break loop
-                    }
-                } else {
-                    if matched > 0 {
-                        // Prefix broke — flush the partial so the shell sees
-                        // what the user actually typed.
-                        forward.append(contentsOf: detachSeq.prefix(matched))
-                        matched = 0
-                    }
-                    if !detachSeq.isEmpty, byte == detachSeq[0] {
-                        matched = 1
-                    } else {
-                        forward.append(byte)
-                    }
-                }
-                i += 1
-            }
-            if !forward.isEmpty {
-                _ = try? client.request(.sendData(surfaceID: surfaceID, data: forward), timeout: 1)
+            let outcome = batcher.ingest(buffer[0..<n])
+            send(outcome.flush)
+            if outcome.detach {
+                requestDetach()
+                break
             }
         }
 

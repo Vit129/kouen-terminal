@@ -75,6 +75,7 @@ private func installSignalHandlers(server: DaemonServer, shutdown: @escaping @Se
     install(SIGUSR1) {
         let telemetry = server.registry.surfaceTelemetry
         daemonLog("stats: surfaces=\(telemetry.surfaceCount) scrollback=\(telemetry.scrollbackBytes)B")
+        daemonLog(server.registry.metrics.summary())
     }
 }
 

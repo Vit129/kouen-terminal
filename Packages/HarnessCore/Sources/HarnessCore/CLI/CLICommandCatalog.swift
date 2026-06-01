@@ -77,6 +77,8 @@ public enum CLICommandCatalog {
         .init("copy-mode", "Enter/exit copy mode"),
         .init("attach", "Attach a single pane to this terminal"),
         .init("attach-window", "Attach a tab's full split layout"),
+        .init("record", "Record a surface's output to a JSON Lines file"),
+        .init("replay", "Replay a recorded session to this terminal"),
         .init("control-mode", "tmux control protocol over stdio", aliases: ["-CC"]),
         // Buffers
         .init("set-buffer", "Set a paste buffer"),

@@ -158,7 +158,13 @@ public final class HarnessTerminalSurfaceView: NSView {
         super.init(frame: .zero)
         configureLayer()
         configureEmulatorCallbacks()
-        buildRenderer()
+        // Defer the renderer build: at init the view has no window, so
+        // `window?.backingScaleFactor` would fall back to 2.0 and compile the Metal
+        // pipeline at the wrong scale — work immediately thrown away when the host
+        // calls `configureAppearance` and again at `viewDidMoveToWindow` (real scale).
+        // Every render/layout path guards `renderer == nil`, and the first real render
+        // only happens once the view is in a window, so building there is correct and
+        // avoids a discarded shader/pipeline compile per surface.
     }
 
     @available(*, unavailable)
@@ -407,6 +413,7 @@ public final class HarnessTerminalSurfaceView: NSView {
     public override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         if window != nil {
+            StartupMetrics.shared.mark(.firstSurfaceAttached) // idempotent: first surface in a window
             buildRenderer() // pick up the real backing scale
             startDisplayLink()
             updateGridSize()
@@ -588,6 +595,7 @@ public final class HarnessTerminalSurfaceView: NSView {
             gamma: glyphGamma,
             ligatures: ligaturesEnabled
         )
+        StartupMetrics.shared.mark(.firstDrawablePresented) // idempotent: only the first present counts
         // Retain only a plain frame for row reuse; a selection/scrollback/preedit frame would
         // poison the cache with overlay-baked cells, so drop it. (`plain` already excludes IME.)
         lastPlainFrame = plain ? frame : nil

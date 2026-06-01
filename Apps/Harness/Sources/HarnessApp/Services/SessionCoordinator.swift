@@ -51,7 +51,13 @@ final class SessionCoordinator: NSObject {
 
     private override init() {
         super.init()
-        syncFromDaemon()
+        // Deliberately do NOT hydrate from the daemon here. This singleton is first
+        // touched while building the window (before `showWindow`), and `syncFromDaemon`
+        // is a blocking daemon IPC — doing it here freezes first paint on a cold/slow
+        // daemon. We start from the default `snapshot` + already-loaded local `settings`
+        // (chrome resolves correctly from `settings.custom*Hex`), and the async
+        // `DaemonLauncher.ensureRunning` callback in AppDelegate performs the first
+        // hydration the moment the daemon answers — after the window is on screen.
         observeNotifications()
         startMetadataRefresh()
     }
@@ -87,6 +93,7 @@ final class SessionCoordinator: NSObject {
 
     func syncFromDaemon(metadataOnly: Bool = false) {
         guard let remote = try? daemon.fetchSnapshot() else { return }
+        StartupMetrics.shared.mark(.firstSnapshot) // idempotent: records the first hydration only
         let structureChanged = structureFingerprint(remote) != structureFingerprint(snapshot)
         snapshot = remote
         lastRevision = remote.revision

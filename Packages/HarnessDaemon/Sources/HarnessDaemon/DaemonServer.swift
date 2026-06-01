@@ -94,7 +94,10 @@ public final class DaemonServer: @unchecked Sendable {
             close(fd)
             throw DaemonError.bindFailed
         }
-        guard listen(fd, 8) == 0 else {
+        // `SOMAXCONN`, not a small fixed backlog: the daemon serves the GUI plus any number of
+        // `harness-cli` clients, and a burst of near-simultaneous connects (e.g. several attach
+        // clients reconnecting at once) must not overflow the accept queue and get refused.
+        guard listen(fd, SOMAXCONN) == 0 else {
             close(fd)
             throw DaemonError.listenFailed
         }
@@ -293,7 +296,7 @@ public final class DaemonServer: @unchecked Sendable {
                 totalScrollbackBytes: telemetry.scrollbackBytes,
                 clientCount: clients.count,
                 subscriberCount: totalSubs,
-                snapshotRevision: registry.snapshot.revision
+                snapshotRevision: registry.revision
             )
             return .daemonStats(stats)
         default:
@@ -312,6 +315,9 @@ public final class DaemonServer: @unchecked Sendable {
         } else {
             writeBuffers[fd] = data
         }
+        // Read-only instrumentation of the peak backlog (the cap/flush/drop logic below is
+        // unchanged); captured here so a client that's about to be dropped still registers its high.
+        registry.metrics.observeBacklog(bytes: writeBuffers[fd]?.count ?? 0)
         // A client that won't drain must not pin unbounded memory — drop it past the backlog cap.
         if (writeBuffers[fd]?.count ?? 0) > maxWriteBacklog {
             writeBuffers[fd] = nil
@@ -374,7 +380,9 @@ public final class DaemonServer: @unchecked Sendable {
         guard let token = registry.subscribe(surfaceID: surfaceID, handler: { [weak self] data, sequence in
             guard let server = self else { return }
             server.queue.async { [weak server] in
-                server?.send(.data(data, sequence: sequence), to: fd)
+                guard let server else { return }
+                server.registry.metrics.recordOutputNotification()
+                server.send(.data(data, sequence: sequence), to: fd)
             }
         }) else {
             send(.error("Surface not found"), to: fd)
