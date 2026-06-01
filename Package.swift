@@ -167,7 +167,7 @@ let package = Package(
         ),
         .testTarget(
             name: "HarnessDaemonTests",
-            dependencies: ["HarnessDaemonCore", "HarnessCore"],
+            dependencies: ["HarnessDaemonCore", "HarnessCore", "HarnessTerminalEngine"],
             path: "Tests/HarnessDaemonTests"
         ),
         // Performance baselines for the hot paths (VT parse, IPC codec, scrollback,
