@@ -37,6 +37,7 @@
 		38ED46EBAF81D35F3E683955 /* SurfaceRegistryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A51ECCD77E8E2A9F4EC74E1C /* SurfaceRegistryTests.swift */; };
 		3C7E2A84108B690A43D2E6DB /* WindowBlur.swift in Sources */ = {isa = PBXBuildFile; fileRef = 529595B70272EEEC10AF08E4 /* WindowBlur.swift */; };
 		3E9AE1966905F6D3329046DD /* HarnessTerminalKit in Frameworks */ = {isa = PBXBuildFile; productRef = 0C48BB6BE591F289927C480C /* HarnessTerminalKit */; };
+		3F8493C2DE63B3390B882B6E /* DefaultTerminalManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 518F03651AD8FC7B7ACAB2DC /* DefaultTerminalManager.swift */; };
 		41E1858FBC7BF6CBB35D113B /* KeybindingsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE0A2339E287BD3F748E3103 /* KeybindingsService.swift */; };
 		4562647C37E383D4146761CE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FCE87BB453E378818ABDD29 /* AppDelegate.swift */; };
 		45E2642BFD60553E6EA324C2 /* IPCCodecTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C695B1C26A7FA88933015EA9 /* IPCCodecTests.swift */; };
@@ -93,6 +94,7 @@
 		9A1B943525FD93092608E3C9 /* Phase6KeysTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7893156ECB30158E11DC0B8 /* Phase6KeysTests.swift */; };
 		9A7D72AA4B97D201FA8C32FC /* HarnessCore in Frameworks */ = {isa = PBXBuildFile; productRef = F628D4A8E3A428009E22A230 /* HarnessCore */; };
 		9B42C03A0B29A8D8488F1ECA /* TerminalRecordingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBD4172A892BE31553B95C03 /* TerminalRecordingTests.swift */; };
+		9C41CEB641673C69D69B9E75 /* DefaultTerminalLaunchRequestTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0324B7EC4D6F9F388E1553C5 /* DefaultTerminalLaunchRequestTests.swift */; };
 		9C6DEF330BAF774917666A83 /* OnboardingController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86FAF41DBA8B11C7DD568780 /* OnboardingController.swift */; };
 		9C6FEC7B00D967C393085051 /* ControlModeClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98CBE789A0C0F314695D5D97 /* ControlModeClient.swift */; };
 		9D85B25DAE578F41F445768E /* NotificationDropdownPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA12DE19711C76D4DAF36509 /* NotificationDropdownPanel.swift */; };
@@ -182,6 +184,7 @@
 /* Begin PBXFileReference section */
 		02041E627641793E108CE8CF /* HarnessDaemonTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = HarnessDaemonTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		028273159E468DC46DD4AA0F /* PaneStyleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaneStyleTests.swift; sourceTree = "<group>"; };
+		0324B7EC4D6F9F388E1553C5 /* DefaultTerminalLaunchRequestTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultTerminalLaunchRequestTests.swift; sourceTree = "<group>"; };
 		036B746E8E08D842C7E96A4F /* CommandIPCTranslatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandIPCTranslatorTests.swift; sourceTree = "<group>"; };
 		0711E05B3BE71410054E6BEE /* Phase67Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase67Tests.swift; sourceTree = "<group>"; };
 		0BBE7387149A5556239509BE /* TmuxMigrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TmuxMigrationTests.swift; sourceTree = "<group>"; };
@@ -212,6 +215,7 @@
 		4BACA7ED813936C9B469999C /* TabAlertTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabAlertTests.swift; sourceTree = "<group>"; };
 		5074E518A70BAD1B635A6B0A /* HookFiringTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HookFiringTests.swift; sourceTree = "<group>"; };
 		5122A39E062976C92BBDDDB2 /* DaemonServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DaemonServer.swift; sourceTree = "<group>"; };
+		518F03651AD8FC7B7ACAB2DC /* DefaultTerminalManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultTerminalManager.swift; sourceTree = "<group>"; };
 		529595B70272EEEC10AF08E4 /* WindowBlur.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowBlur.swift; sourceTree = "<group>"; };
 		5417E8EA74A3B5605412B89D /* AgentHookInstallerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentHookInstallerTests.swift; sourceTree = "<group>"; };
 		57E7B54FEAA7751D104044B8 /* TerminalPaneRegistryAccess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalPaneRegistryAccess.swift; sourceTree = "<group>"; };
@@ -622,6 +626,7 @@
 			children = (
 				5A9C10A4B52FB83548EAC0F3 /* CLIInstaller.swift */,
 				2025ED6B78DAA6996707D2F7 /* DaemonLauncher.swift */,
+				518F03651AD8FC7B7ACAB2DC /* DefaultTerminalManager.swift */,
 				BE0A2339E287BD3F748E3103 /* KeybindingsService.swift */,
 				C0BE46A5684BB96C3AA6A5B7 /* MainExecutor.swift */,
 				B8A2D8F06287D6DB6C5606FE /* SessionCoordinator.swift */,
@@ -670,6 +675,7 @@
 				F020335A72A6E59565B2702A /* CommandParserTests.swift */,
 				83526CECC1F254BD9CC5E13F /* CompletionGeneratorTests.swift */,
 				95E00597E6EFB295BF2C5F30 /* DaemonClientTests.swift */,
+				0324B7EC4D6F9F388E1553C5 /* DefaultTerminalLaunchRequestTests.swift */,
 				AD9C05E535461CFC6153C70C /* DoctorRunnerTests.swift */,
 				8986DFF2824FC1BCF050FB78 /* EnvironmentStoreTests.swift */,
 				819339E44FFF2D3D9764E6D5 /* ExperienceModeTests.swift */,
@@ -979,6 +985,7 @@
 				69E1E0B522D02B059CFE5F6A /* CommandPromptController.swift in Sources */,
 				AC246DC4CD09B78E19D44A55 /* ContentAreaViewController.swift in Sources */,
 				084B9F215A3A2B1600D90FDE /* DaemonLauncher.swift in Sources */,
+				3F8493C2DE63B3390B882B6E /* DefaultTerminalManager.swift in Sources */,
 				2A3B080F4B0F44733627AD4D /* DisplayPanesOverlay.swift in Sources */,
 				24D64B6C7D5B7E0AA33F103B /* HarnessChrome.swift in Sources */,
 				D5A35A080C113603A8D707A7 /* HarnessControls.swift in Sources */,
@@ -1097,6 +1104,7 @@
 				841686680E80EF781F32A7FF /* CommandParserTests.swift in Sources */,
 				ADF86CACB1F1D52DDC77A36E /* CompletionGeneratorTests.swift in Sources */,
 				47102D21BF4044022C7ECC55 /* DaemonClientTests.swift in Sources */,
+				9C41CEB641673C69D69B9E75 /* DefaultTerminalLaunchRequestTests.swift in Sources */,
 				E710E251668FE4EADF84ECCC /* DoctorRunnerTests.swift in Sources */,
 				999BB245D67A57F9DD1F6F14 /* EnvironmentStoreTests.swift in Sources */,
 				B244547C177738C471711E62 /* ExperienceModeTests.swift in Sources */,
