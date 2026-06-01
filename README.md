@@ -48,7 +48,7 @@ New installs start in Plain. Moving over from another setup? See [docs/MIGRATION
 - Agent detection for Claude Code, Codex, Cursor, Pi, Hermes, OpenClaw, OpenCode, Aider, Gemini, and Goose — each with a brand color and a sidebar chip
 - Agent alerts as desktop banners, a sidebar bell, and pane rings; `Cmd+Shift+U` jumps to whoever is waiting
 - One-line hook install: `harness-cli install-hooks <agent>`
-- Command palette (`Cmd+K`) and a fully themed Settings window (`Cmd+,`)
+- Command palette (`Cmd+K`) and a native macOS Settings window (`Cmd+,`)
 - 490 built-in color themes including a Ghostty-compatible default, plus `.harnesstheme` export / import for sharing
 - Shell integration (OSC 133): prompt marks for jump-to-prompt and a command success / failure gutter — bash / zsh / fish snippets in [docs/shell-integration/](docs/shell-integration/README.md)
 - Inline images that stay put across reflow and scroll into history
