@@ -142,6 +142,8 @@ targets:
       - target: HarnessDaemonCore
       - package: Harness
         product: HarnessCore
+      - package: Harness
+        product: HarnessTerminalEngine
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: com.robert.harness.HarnessDaemonTests
       GENERATE_INFOPLIST_FILE: YES
