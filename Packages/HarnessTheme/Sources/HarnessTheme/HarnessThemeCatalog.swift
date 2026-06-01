@@ -24,8 +24,16 @@ public enum HarnessThemeCatalog {
     ]
 
     /// Look up a theme by exact name (case-insensitive).
+    ///
+    /// Resolve builtins (the default + every featured theme) first so the common
+    /// path — applying the active/default theme at startup — does NOT force the
+    /// 256 KB community `themes.json` parse. Builtins already win name conflicts in
+    /// `all`, so the result is identical; this only makes the bundle load lazy:
+    /// it happens when a non-builtin theme is actually requested (or the full list
+    /// is shown in Settings/the palette), never on the launch chrome path.
     public static func theme(named name: String) -> HarnessThemeDefinition? {
         let lowered = name.lowercased()
+        if let builtin = builtins.first(where: { $0.name.lowercased() == lowered }) { return builtin }
         return all.first { $0.name.lowercased() == lowered }
     }
 
