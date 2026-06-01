@@ -28,6 +28,39 @@ final class SurfaceRegistryTests: XCTestCase {
         guard case .pong = SurfaceRegistry().handle(.ping) else { return XCTFail("expected pong") }
     }
 
+    func testRevisionMatchesSnapshotAndAdvancesOnMutation() {
+        let registry = SurfaceRegistry()
+        // The lightweight accessor must agree with the full snapshot's revision...
+        XCTAssertEqual(registry.revision, registry.snapshot.revision)
+        let before = registry.revision
+        let wsID = registry.snapshot.activeWorkspaceID!
+        guard case .tabID = registry.handle(.newTab(workspaceID: wsID, cwd: "/tmp")) else {
+            return XCTFail("expected tabID")
+        }
+        // ...and advance after a mutating commit, still matching the snapshot.
+        XCTAssertGreaterThan(registry.revision, before)
+        XCTAssertEqual(registry.revision, registry.snapshot.revision)
+    }
+
+    func testSurfaceTelemetryMatchesListSurfacesAndTracksNewSurfaces() {
+        let registry = SurfaceRegistry()
+        guard case let .surfaces(before) = registry.handle(.listSurfaces) else {
+            return XCTFail("expected surfaces")
+        }
+        // surfaceCount (summed off-lock after a ref snapshot) agrees with listSurfaces;
+        // scrollback bytes are a non-negative aggregate.
+        XCTAssertEqual(registry.surfaceTelemetry.surfaceCount, before.count)
+        XCTAssertGreaterThanOrEqual(registry.surfaceTelemetry.scrollbackBytes, 0)
+
+        let wsID = registry.snapshot.activeWorkspaceID!
+        _ = registry.handle(.newTab(workspaceID: wsID, cwd: "/tmp"))
+        guard case let .surfaces(after) = registry.handle(.listSurfaces) else {
+            return XCTFail("expected surfaces")
+        }
+        XCTAssertEqual(after.count, before.count + 1)
+        XCTAssertEqual(registry.surfaceTelemetry.surfaceCount, after.count)
+    }
+
     func testNewWorkspaceTabAndSelectMutateSnapshotAndBumpRevision() {
         let registry = SurfaceRegistry()
         let startRevision = registry.snapshot.revision
