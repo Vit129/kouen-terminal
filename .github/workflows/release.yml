@@ -98,6 +98,18 @@ jobs:
             exit 1
           fi
 
+      - name: Validate website deploy configuration
+        if: ${{ inputs.deploy_appcast }}
+        env:
+          WEBSITE_REPOSITORY: ${{ vars.WEBSITE_REPOSITORY }}
+          WEBSITE_DEPLOY_TOKEN: ${{ secrets.WEBSITE_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${WEBSITE_REPOSITORY:-}" || -z "${WEBSITE_DEPLOY_TOKEN:-}" ]]; then
+            echo "Set release environment variable WEBSITE_REPOSITORY and secret WEBSITE_DEPLOY_TOKEN before enabling deploy_appcast." >&2
+            exit 1
+          fi
+
       - name: Cache SwiftPM build
         uses: actions/cache@v4
         with:
@@ -159,6 +171,16 @@ jobs:
       - name: Build Harness.app
         run: make release
 
+      - name: Verify release package contents
+        run: |
+          set -euo pipefail
+          stale_bundles="$(find Harness.app/Contents/Resources -maxdepth 1 -name '*.bundle' -print)"
+          if [[ -n "$stale_bundles" ]]; then
+            echo "Unexpected resource bundle(s) in Harness.app:" >&2
+            echo "$stale_bundles" >&2
+            exit 1
+          fi
+
       - name: Sign and notarize Harness.app
         env:
           SIGNING_IDENTITY: ${{ secrets.SIGNING_IDENTITY }}
@@ -183,7 +205,7 @@ jobs:
 
           RELEASE_NAME="$INPUT_RELEASE_NAME"
           if [[ -z "$RELEASE_NAME" ]]; then
-            RELEASE_NAME="Harness $APP_VERSION"
+            RELEASE_NAME="Harness $APP_VERSION ($APP_BUILD)"
           fi
 
           gh release create "$RELEASE_TAG" \
@@ -211,18 +233,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$RELEASE_TAG" dist/appcast.xml --repo "$GITHUB_REPOSITORY" --clobber
-
-      - name: Validate website deploy configuration
-        if: ${{ inputs.deploy_appcast }}
-        env:
-          WEBSITE_REPOSITORY: ${{ vars.WEBSITE_REPOSITORY }}
-          WEBSITE_DEPLOY_TOKEN: ${{ secrets.WEBSITE_DEPLOY_TOKEN }}
-        run: |
-          set -euo pipefail
-          if [[ -z "${WEBSITE_REPOSITORY:-}" || -z "${WEBSITE_DEPLOY_TOKEN:-}" ]]; then
-            echo "Set release environment variable WEBSITE_REPOSITORY and secret WEBSITE_DEPLOY_TOKEN before enabling deploy_appcast." >&2
-            exit 1
-          fi
 
       - name: Checkout website repository
         if: ${{ inputs.deploy_appcast }}
@@ -255,7 +265,22 @@ jobs:
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false
+          INPUT_RELEASE_NAME: ${{ inputs.release_name }}
+        run: |
+          set -euo pipefail
+
+          RELEASE_NAME="$INPUT_RELEASE_NAME"
+          if [[ -z "$RELEASE_NAME" ]]; then
+            RELEASE_NAME="Harness $APP_VERSION ($APP_BUILD)"
+          fi
+
+          gh release edit "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "$RELEASE_NAME" \
+            --notes "Signed and notarized Harness $APP_VERSION ($APP_BUILD)." \
+            --draft=false \
+            --latest
 
       - name: Upload release artifacts
         if: ${{ always() }}
