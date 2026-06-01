@@ -95,7 +95,7 @@ if ! spctl -a -t open --context context:primary-signature -v "$DMG"; then
 fi
 xcrun stapler validate "$DMG" && echo "    DMG ticket stapled + valid."
 
-echo "==> Re-uploading the notarized DMG to GitHub release $TAG…"
+echo "==> Re-uploading the notarized DMG to GitHub release ${TAG}…"
 gh release upload "$TAG" "$DMG" --clobber --repo "$REPO"
 
 if [[ -n "${SPARKLE_EDDSA_PRIVATE_KEY_FILE:-}" ]]; then
