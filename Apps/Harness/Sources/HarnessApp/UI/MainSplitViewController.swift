@@ -25,7 +25,7 @@ final class MainSplitViewController: NSViewController {
         // The root contentView must stay a plain, NON-layer-backed NSView. A plain NSView
         // draws nothing (transparent by default), so the window blur shows through — but it
         // is *not* layer-backed, so the window server rounds the frame + CGS background blur
-        // together (Ghostty's approach). Calling `makeClear` here would set `wantsLayer` and
+        // together. Calling `makeClear` here would set `wantsLayer` and
         // layer-back the whole window, which clips the blur to a rectangle and leaves a dark
         // compositing seam at the rounded edge. See MainWindowController.applyTransparency.
         view = NSView()

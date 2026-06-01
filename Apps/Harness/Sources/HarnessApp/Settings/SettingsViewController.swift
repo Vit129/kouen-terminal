@@ -53,7 +53,7 @@ final class SettingsViewController: NSViewController, NSFontChanging {
     private let cursorTextWell = HarnessSwatchWell(frame: .zero)
     private let dividerWell = HarnessSwatchWell(frame: .zero)
     private let statusLineWell = HarnessSwatchWell(frame: .zero)
-    private let systemNotificationsToggle = HarnessToggle(title: "Push notification when an agent stops or needs input")
+    private let systemNotificationsToggle = HarnessToggle(title: "macOS banner when an agent stops or needs input")
     private let notificationSoundToggle = HarnessToggle(title: "Play a chime with notifications")
     private let notificationTestButton = NSButton(title: "Send Test Notification", target: nil, action: nil)
     private let notificationPermissionButton = NSButton(title: "Open System Settings…", target: nil, action: nil)
@@ -77,6 +77,14 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         let reset: NSButton
         let keyPath: WritableKeyPath<HarnessSettings, String?>
         let themeColor: () -> String?
+    }
+
+    private enum ColorFormMetrics {
+        static let swatchWidth: CGFloat = 42
+        static let swatchHeight: CGFloat = 28
+        static let labelWidth: CGFloat = 118
+        static let fieldWidth: CGFloat = 116
+        static let resetSlotWidth: CGFloat = 24
     }
 
     private static let defaultAnsiPalette = [
@@ -547,19 +555,19 @@ final class SettingsViewController: NSViewController, NSFontChanging {
 
         // colorBindings 0–6 are the terminal colors; 7–8 are the chrome accents. The
         // selected theme seeds every one; the user can then edit any swatch.
-        let colorsGroup = NSStackView(views: [
-            colorPairRow(colorHexRow(title: "Background", binding: colorBindings[0]),
-                         colorHexRow(title: "Foreground", binding: colorBindings[1])),
-            colorPairRow(colorHexRow(title: "Cursor", binding: colorBindings[2]),
-                         colorHexRow(title: "Cursor text", binding: colorBindings[3])),
-            colorPairRow(colorHexRow(title: "Selection", binding: colorBindings[4]),
-                         colorHexRow(title: "Selection text", binding: colorBindings[5])),
-            colorPairRow(colorHexRow(title: "Bold", binding: colorBindings[6]),
-                         NSView()),
-        ])
-        colorsGroup.orientation = .vertical
-        colorsGroup.alignment = .width
-        colorsGroup.spacing = 10
+        let colorsGroup = colorGrid(
+            left: [
+                ("Background", colorBindings[0]),
+                ("Cursor", colorBindings[2]),
+                ("Selection", colorBindings[4]),
+                ("Bold", colorBindings[6]),
+            ],
+            right: [
+                ("Foreground", colorBindings[1]),
+                ("Cursor text", colorBindings[3]),
+                ("Selection text", colorBindings[5]),
+            ]
+        )
 
         let renderingGroup = settingsGroup("Color rendering", [
             settingsToggleRow("Wide gamut", vividColorsToggle, hint: "Opt-in Display P3 conversion."),
@@ -569,9 +577,9 @@ final class SettingsViewController: NSViewController, NSFontChanging {
             settingsToggleRow("Prompt gutter", promptGutterToggle),
         ])
 
-        let chromeAccents = colorPairRow(
-            colorHexRow(title: "Divider lines", binding: colorBindings[7]),
-            colorHexRow(title: "Status line text", binding: colorBindings[8])
+        let chromeAccents = colorGrid(
+            left: [("Divider lines", colorBindings[7])],
+            right: [("Status line text", colorBindings[8])]
         )
 
         let stack = NSStackView(views: [
@@ -1211,31 +1219,60 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         return wrap
     }
 
-    /// `[swatch] Name [hex] [↺]` — consistent width pattern so every row aligns.
+    private func colorGrid(
+        left: [(title: String, binding: ColorBinding)],
+        right: [(title: String, binding: ColorBinding)]
+    ) -> NSView {
+        let leftColumn = colorColumn(left)
+        let rightColumn = colorColumn(right)
+        let row = NSStackView(views: [leftColumn, rightColumn])
+        row.orientation = .horizontal
+        row.alignment = .top
+        row.distribution = .fillEqually
+        row.spacing = 28
+        return row
+    }
+
+    private func colorColumn(_ items: [(title: String, binding: ColorBinding)]) -> NSView {
+        let column = NSStackView(views: items.map { colorHexRow(title: $0.title, binding: $0.binding) })
+        column.orientation = .vertical
+        column.alignment = .width
+        column.spacing = 10
+        return column
+    }
+
+    /// `[swatch] Name [hex] [reset-slot]` with fixed subcolumns so every row aligns.
     private func colorHexRow(title: String, binding: ColorBinding) -> NSView {
-        binding.field.widthAnchor.constraint(equalToConstant: 92).isActive = true
+        binding.field.widthAnchor.constraint(equalToConstant: ColorFormMetrics.fieldWidth).isActive = true
         binding.field.placeholderString = binding.themeColor()?.uppercased() ?? "—"
         binding.field.font = .monospacedDigitSystemFont(ofSize: 11.5, weight: .regular)
         binding.field.usesSingleLineMode = true
 
         let label = NSTextField(labelWithString: title)
-        label.font = .systemFont(ofSize: 12, weight: .medium)
-        label.widthAnchor.constraint(equalToConstant: 110).isActive = true
+        label.font = .systemFont(ofSize: 12.5, weight: .medium)
+        label.textColor = .labelColor
+        label.lineBreakMode = .byTruncatingTail
+        label.widthAnchor.constraint(equalToConstant: ColorFormMetrics.labelWidth).isActive = true
 
-        let row = NSStackView(views: [binding.well, label, binding.field, binding.reset])
+        let resetSlot = NSView()
+        resetSlot.translatesAutoresizingMaskIntoConstraints = false
+        binding.reset.translatesAutoresizingMaskIntoConstraints = false
+        resetSlot.addSubview(binding.reset)
+        NSLayoutConstraint.activate([
+            resetSlot.widthAnchor.constraint(equalToConstant: ColorFormMetrics.resetSlotWidth),
+            resetSlot.heightAnchor.constraint(greaterThanOrEqualToConstant: 22),
+            binding.reset.centerXAnchor.constraint(equalTo: resetSlot.centerXAnchor),
+            binding.reset.centerYAnchor.constraint(equalTo: resetSlot.centerYAnchor),
+        ])
+
+        let spacer = NSView()
+        spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        spacer.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        let row = NSStackView(views: [binding.well, label, binding.field, resetSlot, spacer])
         row.orientation = .horizontal
         row.spacing = 10
         row.alignment = .centerY
-        return row
-    }
-
-    /// Two color rows side by side, matching the chrome-accent pair layout.
-    private func colorPairRow(_ first: NSView, _ second: NSView) -> NSStackView {
-        let row = NSStackView(views: [first, second])
-        row.orientation = .horizontal
-        row.spacing = 28
-        row.alignment = .top
-        row.distribution = .fillEqually
         return row
     }
 
@@ -1505,8 +1542,8 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         well.target = self
         well.action = #selector(colorWellChanged(_:))
         well.translatesAutoresizingMaskIntoConstraints = false
-        well.widthAnchor.constraint(equalToConstant: 30).isActive = true
-        well.heightAnchor.constraint(equalToConstant: 22).isActive = true
+        well.widthAnchor.constraint(equalToConstant: ColorFormMetrics.swatchWidth).isActive = true
+        well.heightAnchor.constraint(equalToConstant: ColorFormMetrics.swatchHeight).isActive = true
     }
 
     @objc private func colorWellChanged(_ sender: HarnessSwatchWell) {

@@ -20,7 +20,7 @@ Prefer to build it yourself? Jump to [Build from source](#build-from-source).
 
 ## Why Harness
 
-- **It's a real terminal first.** GPU rendering, accurate sRGB color by default, opt-in converted Display-P3 vivid color, ligatures, inline images (Sixel / Kitty / iTerm2), and 490 built-in themes including a Ghostty-compatible default. Block and box-drawing glyphs are drawn procedurally, so borders tile without seams at any font.
+- **It's a real terminal first.** GPU rendering, accurate sRGB color by default, opt-in converted Display-P3 vivid color, ligatures, inline images (Sixel / Kitty / iTerm2), and 490 built-in themes with a muted Harness default. Block and box-drawing glyphs are drawn procedurally, so borders tile without seams at any font.
 - **Your work outlives the window.** Sessions, tabs, and splits are owned by a daemon. Quit and reopen and everything is exactly where you left it. Attach the same session from a second window or another machine.
 - **It's scriptable.** `harness-cli` drives the whole thing — open tabs, send keys, capture a pane, resize, swap, zoom — so your tooling can build the layout it needs.
 - **It watches your agents.** Harness detects Claude Code, Codex, Cursor, and others by their process tree, shows which session is running what, and pings you when an agent stops or asks for approval. `Cmd+Shift+U` jumps you to the one that's waiting and skips the ones still thinking.
@@ -49,7 +49,7 @@ New installs start in Plain. Moving over from another setup? See [docs/MIGRATION
 - Agent alerts as desktop banners, a sidebar bell, and pane rings; `Cmd+Shift+U` jumps to whoever is waiting
 - One-line hook install: `harness-cli install-hooks <agent>`
 - Command palette (`Cmd+K`) and a native macOS Settings window (`Cmd+,`)
-- 490 built-in color themes including a Ghostty-compatible default, plus `.harnesstheme` export / import for sharing
+- 490 built-in color themes with a muted Harness default, plus `.harnesstheme` export / import for sharing
 - Shell integration (OSC 133): prompt marks for jump-to-prompt and a command success / failure gutter — bash / zsh / fish snippets in [docs/shell-integration/](docs/shell-integration/README.md)
 - Inline images that stay put across reflow and scroll into history
 - Drag file-backed folders or images into a pane to insert shell-quoted paths
@@ -67,7 +67,7 @@ harness-cli new-tab --workspace Default --cwd ~/Code/myproject
 harness-cli send-keys --surface "$HARNESS_SURFACE" --keys "ls -la Enter"
 harness-cli notify --surface "$HARNESS_SURFACE" --title Agent --body "Needs approval"
 harness-cli color-check
-harness-cli theme-preview --theme "Ghostty Default"
+harness-cli theme-preview --theme "Harness Default"
 ```
 
 Install it onto your `PATH`:

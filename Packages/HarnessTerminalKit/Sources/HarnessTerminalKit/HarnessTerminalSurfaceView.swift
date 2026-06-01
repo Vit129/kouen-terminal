@@ -1163,7 +1163,7 @@ public final class HarnessTerminalSurfaceView: NSView {
     public override func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self)
         if copyMode != nil { return } // copy mode is keyboard-driven; ignore clicks
-        // ⌘-click opens an OSC 8 hyperlink or an auto-detected URL (like Ghostty/Terminal.app).
+        // ⌘-click opens an OSC 8 hyperlink or an auto-detected URL.
         // ⌘ overrides mouse reporting, the same way Shift overrides it for selection.
         if event.modifierFlags.contains(.command), let pos = cell(at: event.locationInWindow),
            let url = linkURL(atRow: pos.row, column: pos.column) {
@@ -1464,7 +1464,7 @@ public final class HarnessTerminalSurfaceView: NSView {
         // Let the app handle Command shortcuts (menus, palette, etc.).
         if event.modifierFlags.contains(.command) {
             // ⌘ + an editing key drives readline line-editing (⌘ is otherwise reserved for the
-            // app), matching Terminal.app/Ghostty: ⌘⌫ = delete to line start (^U), ⌘← / ⌘→ =
+            // app), matching macOS terminal convention: ⌘⌫ = delete to line start (^U), ⌘← / ⌘→ =
             // line start / end (^A / ^E). Other ⌘ keys keep falling through to the app.
             if let special = Self.specialKey(for: event) {
                 let lineEdit: [UInt8]?

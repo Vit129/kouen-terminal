@@ -13,7 +13,10 @@ struct SetupStepView: View {
     @State private var installingHooks = false
 
     private var canInstall: Bool { cliStatus.isReady || daemonStatus.isReady }
-    private var isSuccess: Bool { installReport != nil && errorMessage == nil }
+    private var isSuccess: Bool {
+        guard let installReport, errorMessage == nil else { return false }
+        return installReport.cliInstalled && installReport.daemonInstalled && installReport.launchAgentInstalled
+    }
 
     /// Detected agents that don't yet have Harness hooks — the ones we offer to wire up.
     private var pendingHookAgents: [OnboardingEnvironment.Agent] { agents.filter { !$0.hooksInstalled } }

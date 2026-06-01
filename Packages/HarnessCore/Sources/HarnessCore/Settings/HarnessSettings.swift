@@ -221,8 +221,8 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         offMainParserFramePipeline: Bool = false,
         showPromptGutter: Bool = false,
         showStatusLine: Bool = true,
-        // Fresh installs default to the simplest experience — a fast native terminal that
-        // feels like Ghostty. Existing installs migrate to `.tmux` in `init(from:)` so no
+        // Fresh installs default to the simplest experience — a fast native terminal.
+        // Existing installs migrate to `.tmux` in `init(from:)` so no
         // current user loses the prefix/status they already have.
         experienceMode: ExperienceMode = .plain,
         tmuxControlsEnabled: Bool? = nil

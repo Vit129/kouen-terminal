@@ -2,9 +2,9 @@ import Foundation
 import XCTest
 @testable import HarnessTerminalEngine
 
-/// Phase C engine quick-wins: OSC 9/777 notifications, OSC 22 cursor shape, programmable tab
+/// Harness protocol coverage: OSC 9/777 notifications, OSC 22 cursor shape, programmable tab
 /// stops (HTS/TBC/CHT/CBT), and DEC special-graphics charset designation. All headless.
-final class GhosttyQuickWinsTests: XCTestCase {
+final class TerminalProtocolCompatibilityTests: XCTestCase {
     // MARK: OSC 9 / 777 notifications
 
     func testOSC9NotificationBodyOnly() {

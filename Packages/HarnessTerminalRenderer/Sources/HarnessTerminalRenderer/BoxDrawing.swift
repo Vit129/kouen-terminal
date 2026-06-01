@@ -1,7 +1,7 @@
 import CoreGraphics
 
 /// Procedural rendering of Unicode box-drawing characters (U+2500–U+257F) into a cell-sized
-/// coverage bitmap, the way Ghostty/kitty do it. Drawing the geometry directly — instead of
+/// coverage bitmap. Drawing the geometry directly — instead of
 /// relying on the font's glyphs — guarantees the segments are centered identically in every
 /// cell, so lines, corners, junctions and arcs tile seamlessly regardless of the font.
 ///

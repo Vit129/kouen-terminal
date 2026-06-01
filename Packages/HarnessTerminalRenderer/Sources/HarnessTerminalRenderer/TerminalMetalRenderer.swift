@@ -1169,7 +1169,7 @@ public final class TerminalMetalRenderer {
 
     /// Sub-cell rectangles (x, y, w, h as 0…1 fractions, y from the top) that fill a block
     /// element exactly, or nil for non-block codepoints. Drawing these as solid rects (instead
-    /// of font glyphs) tiles seamlessly the way Ghostty/kitty render block art.
+    /// of font glyphs) tiles seamlessly for block-art output.
     static func blockElementRects(_ cp: UInt32) -> [(Float, Float, Float, Float)]? {
         let e = Float(1) / 8
         switch cp {

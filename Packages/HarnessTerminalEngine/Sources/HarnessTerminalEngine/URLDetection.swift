@@ -1,7 +1,7 @@
 import Foundation
 
 /// Finds clickable URLs in a line of terminal text — the fallback when a cell carries no OSC 8
-/// hyperlink, so plain `https://…` output is still ⌘-clickable (like Ghostty / Terminal.app).
+/// hyperlink, so plain `https://…` output is still ⌘-clickable.
 /// Pure and Foundation-only (uses `NSDataDetector`), so it's unit-testable off the GUI.
 public enum URLDetection {
     /// The URL covering character offset `column` in `line`, or nil. `NSDataDetector` handles

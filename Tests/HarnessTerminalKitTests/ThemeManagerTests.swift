@@ -4,7 +4,7 @@ import HarnessTheme
 
 final class ThemeManagerTests: XCTestCase {
     @MainActor
-    func testDefaultBaselinePaletteMatchesGhosttyANSI16() {
+    func testDefaultBaselinePaletteMatchesMutedANSI16() {
         XCTAssertEqual(ThemeManager.defaultBaselinePaletteHex, [
             "#1d1f21", "#cc6666", "#b5bd68", "#f0c674",
             "#81a2be", "#b294bb", "#8abeb7", "#c5c8c6",
@@ -21,7 +21,7 @@ final class ThemeManagerTests: XCTestCase {
     func testDefaultBaselineIsShippedTheme() {
         let theme = HarnessThemeCatalog.theme(named: ThemeManager.defaultThemeName)
 
-        XCTAssertEqual(ThemeManager.defaultThemeName, "Ghostty Default")
+        XCTAssertEqual(ThemeManager.defaultThemeName, "Harness Default")
         XCTAssertEqual(theme?.paletteHex, ThemeManager.defaultBaselinePaletteHex)
         XCTAssertEqual(ThemeManager.paletteHex(themeName: ThemeManager.defaultDisplayName), theme?.paletteHex)
     }

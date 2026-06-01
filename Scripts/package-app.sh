@@ -14,6 +14,14 @@ cp "$BUILD_DIR/HarnessDaemon" "$APP/Contents/MacOS/HarnessDaemon"
 cp "$BUILD_DIR/harness-cli" "$APP/Contents/MacOS/harness-cli"
 cp "$ROOT/Apps/Harness/Sources/HarnessApp/Resources/Info.plist" "$APP/Contents/Info.plist"
 
+# SwiftPM resource bundles (for example HarnessTheme's bundled themes.json) are
+# emitted next to the built products. The app is assembled by this script rather
+# than by Xcode, so copy those bundles into Contents/Resources explicitly.
+for bundle in "$BUILD_DIR"/*.bundle; do
+  [[ -d "$bundle" ]] || continue
+  ditto "$bundle" "$APP/Contents/Resources/$(basename "$bundle")"
+done
+
 # Embed Sparkle.framework (the only external dependency, GUI-only). SwiftPM links it via
 # `@rpath`, so the app binary needs an rpath into Contents/Frameworks. `ditto` preserves the
 # framework's version symlinks + nested code signatures (a plain `cp` would flatten them).

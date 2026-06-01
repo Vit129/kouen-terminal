@@ -67,7 +67,7 @@ final class TerminalConfigImporterTests: XCTestCase {
 
     func testMergesMultipleConfigLocations() throws {
         let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("harness-ghostty-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("harness-config-import-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 

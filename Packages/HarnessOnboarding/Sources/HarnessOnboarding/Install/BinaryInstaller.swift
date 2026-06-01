@@ -37,6 +37,18 @@ enum BinaryInstaller {
         let messages: [String]
     }
 
+    enum InstallError: LocalizedError {
+        case missingBundledTools(messages: [String])
+
+        var errorDescription: String? {
+            switch self {
+            case .missingBundledTools(let messages):
+                return (messages + ["Harness.app is missing its bundled command-line tools. Rebuild or reinstall Harness."])
+                    .joined(separator: "\n")
+            }
+        }
+    }
+
     // MARK: - Detection (the locations the real harness-cli install also checks)
 
     /// The `Contents/MacOS` directory of the host app. Embedded in Harness.app this is where
@@ -114,6 +126,10 @@ enum BinaryInstaller {
             daemonOK = true
         } else {
             messages.append("HarnessDaemon source not found; skipping binary copy")
+        }
+
+        guard cliOK, daemonOK else {
+            throw InstallError.missingBundledTools(messages: messages)
         }
 
         // LaunchAgent (always try; uses the exact template we captured from the real installer)

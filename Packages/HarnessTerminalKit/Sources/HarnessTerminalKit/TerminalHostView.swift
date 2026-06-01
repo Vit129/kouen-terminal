@@ -33,15 +33,8 @@ public final class TerminalHostView: NSView {
     /// so the app pushes them via `applyBorderColors`. Default until the first push.
     public var activeBorderColor: NSColor = .systemBlue
     public var waitingRingColor: NSColor = .systemBlue
-    private var terminalFrameBorderColor: NSColor = .separatorColor.withAlphaComponent(0.22)
 
-    static let terminalFrameCornerRadius: CGFloat = 10
-    static let terminalFrameInset: CGFloat = 1
-
-    static func terminalFrameLineWidth(backingScaleFactor scale: CGFloat?) -> CGFloat {
-        guard let scale, scale > 1 else { return 1 }
-        return 1 / scale
-    }
+    static let terminalOverlayCornerRadius: CGFloat = 10
 
     public var showsWaitingRing: Bool {
         get { isWaiting }
@@ -334,7 +327,6 @@ public final class TerminalHostView: NSView {
     }
 
     fileprivate func drawTerminalOverlay(in bounds: NSRect) {
-        drawTerminalFrame(in: bounds)
         // The waiting ring (urgent) takes precedence over the quieter active-pane
         // border so a pane that needs attention never reads as merely focused.
         if isWaiting {
@@ -354,27 +346,14 @@ public final class TerminalHostView: NSView {
             let rect = bounds.insetBy(dx: 1.5, dy: 1.5)
             let path = NSBezierPath(
                 roundedRect: rect,
-                xRadius: Self.terminalFrameCornerRadius,
-                yRadius: Self.terminalFrameCornerRadius
+                xRadius: Self.terminalOverlayCornerRadius,
+                yRadius: Self.terminalOverlayCornerRadius
             )
             path.lineWidth = 1.5
             path.setLineDash([5, 3], count: 2, phase: 0)
             waitingRingColor.withAlphaComponent(0.9).setStroke()
             path.stroke()
         }
-    }
-
-    private func drawTerminalFrame(in bounds: NSRect) {
-        guard bounds.width > 2, bounds.height > 2 else { return }
-        let rect = bounds.insetBy(dx: Self.terminalFrameInset, dy: Self.terminalFrameInset)
-        let path = NSBezierPath(
-            roundedRect: rect,
-            xRadius: Self.terminalFrameCornerRadius,
-            yRadius: Self.terminalFrameCornerRadius
-        )
-        terminalFrameBorderColor.setStroke()
-        path.lineWidth = Self.terminalFrameLineWidth(backingScaleFactor: window?.backingScaleFactor)
-        path.stroke()
     }
 
     private func strokeIndicator(
@@ -388,8 +367,8 @@ public final class TerminalHostView: NSView {
         let rect = bounds.insetBy(dx: effectiveInset, dy: effectiveInset)
         let path = NSBezierPath(
             roundedRect: rect,
-            xRadius: Self.terminalFrameCornerRadius,
-            yRadius: Self.terminalFrameCornerRadius
+            xRadius: Self.terminalOverlayCornerRadius,
+            yRadius: Self.terminalOverlayCornerRadius
         )
         color.withAlphaComponent(alpha).setStroke()
         path.lineWidth = lineWidth
@@ -397,10 +376,9 @@ public final class TerminalHostView: NSView {
     }
 
     /// Push theme-derived indicator colors from the app's palette.
-    public func applyBorderColors(active: NSColor, waiting: NSColor, frame: NSColor? = nil) {
+    public func applyBorderColors(active: NSColor, waiting: NSColor) {
         activeBorderColor = active
         waitingRingColor = waiting
-        if let frame { terminalFrameBorderColor = frame }
         borderOverlayView.needsDisplay = true
     }
 

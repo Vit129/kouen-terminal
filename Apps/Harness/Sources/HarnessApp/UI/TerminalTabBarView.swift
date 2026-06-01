@@ -110,7 +110,7 @@ final class TerminalTabBarView: NSView {
 
         for (index, tab) in tabs.enumerated() {
             let id = tab.id
-            // ⌘1–9 switch to the first nine tabs (Ghostty-style); past that, no hint.
+            // ⌘1–9 switch to the first nine tabs; past that, no hint.
             let pill = TabPillView(tab: tab, isActive: tab.id == activeTabID, position: index < 9 ? index + 1 : nil)
             pill.translatesAutoresizingMaskIntoConstraints = true
             pill.toolTip = HarnessDesign.shortenPath(tab.cwd)
@@ -352,7 +352,7 @@ private final class TabPillView: NSView {
     private let titleLabel = NSTextField(labelWithString: "")
     private let closeButton = NSButton()
     private let agentIcon = NSImageView()
-    /// ⌘N hint (Ghostty-style), shown at the trailing edge for the first 9 tabs and
+    /// ⌘N hint, shown at the trailing edge for the first 9 tabs and
     /// swapped for the close button on hover. Empty for tabs past position 9.
     private let shortcutLabel = NSTextField(labelWithString: "")
     private let hasShortcut: Bool

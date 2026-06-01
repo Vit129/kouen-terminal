@@ -194,7 +194,7 @@ final class MenuTarget: NSObject, NSMenuItemValidation {
     }
 
 
-    /// ⌘1–9 switch to the tab at that position in the active session (Ghostty-style).
+    /// ⌘1–9 switch to the tab at that position in the active session.
     @objc func selectTabNumber(_ sender: NSMenuItem) {
         SessionCoordinator.shared.selectTab(atIndex: sender.tag - 1)
     }

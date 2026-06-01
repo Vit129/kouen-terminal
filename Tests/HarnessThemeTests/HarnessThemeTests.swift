@@ -51,10 +51,10 @@ final class HarnessThemeCatalogTests: XCTestCase {
         XCTAssertNotNil(HarnessThemeCatalog.theme(named: HarnessThemeCatalog.defaultThemeName))
     }
 
-    func testDefaultThemeUsesGhosttyCompatiblePalette() {
+    func testDefaultThemeUsesMutedBaselinePalette() {
         let theme = HarnessThemeCatalog.theme(named: HarnessThemeCatalog.defaultThemeName)
 
-        XCTAssertEqual(HarnessThemeCatalog.defaultThemeName, "Ghostty Default")
+        XCTAssertEqual(HarnessThemeCatalog.defaultThemeName, "Harness Default")
         XCTAssertEqual(theme?.backgroundHex, "#000000")
         XCTAssertEqual(theme?.foregroundHex, "#ffffff")
         XCTAssertEqual(theme?.paletteHex, [
@@ -65,10 +65,23 @@ final class HarnessThemeCatalogTests: XCTestCase {
         ])
     }
 
+    func testLegacyDefaultThemeNameStillResolves() {
+        XCTAssertEqual(
+            HarnessThemeCatalog.theme(named: "Ghostty Default"),
+            HarnessThemeCatalog.theme(named: HarnessThemeCatalog.defaultThemeName)
+        )
+    }
+
     func testAllFeaturedThemesPresent() {
         for name in HarnessThemeCatalog.featuredNames {
             XCTAssertNotNil(HarnessThemeCatalog.theme(named: name), "missing featured theme \(name)")
         }
+    }
+
+    func testCommunityThemesResourceIsBundled() {
+        XCTAssertEqual(HarnessThemeCatalog.allThemes.count, 490)
+        XCTAssertNotNil(HarnessThemeCatalog.theme(named: "Zenwritten Light"))
+        XCTAssertNotNil(HarnessThemeCatalog.theme(named: "0x96f"))
     }
 
     func testLookupIsCaseInsensitive() {

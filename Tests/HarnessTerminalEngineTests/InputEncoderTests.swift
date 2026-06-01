@@ -59,7 +59,7 @@ final class InputEncoderTests: XCTestCase {
         XCTAssertEqual(encoder.encode(.deleteForward), bytes("\u{1b}[3~"))
     }
 
-    // MARK: macOS line-editing keys (Terminal.app / Ghostty parity)
+    // MARK: macOS line-editing keys
 
     func testBackspaceModifiers() {
         XCTAssertEqual(encoder.encode(.backspace), [0x7F])                      // plain → DEL

@@ -61,7 +61,7 @@ public struct InputEncoder: Sendable {
         case .up: return cursor("A", modifiers, modes)
         case .down: return cursor("B", modifiers, modes)
         // Option-only Left/Right send the readline/zsh-native word motions (ESC b / ESC f) —
-        // the Terminal.app & Ghostty default that shell line editors understand out of the box.
+        // the macOS terminal convention that shell line editors understand out of the box.
         // Every other modifier combo keeps the xterm CSI form so TUIs that read modified arrows
         // are unaffected.
         case .right:
@@ -90,7 +90,7 @@ public struct InputEncoder: Sendable {
         case .f12: return tilde(24, modifiers)
         case .escape: return [0x1B]
         case .enter: return [0x0D]
-        // Option+Backspace deletes the previous word (ESC DEL), matching Terminal.app/Ghostty;
+        // Option+Backspace deletes the previous word (ESC DEL), matching macOS terminal convention;
         // Ctrl+Backspace sends ^H (a common word-erase). Plain Backspace stays DEL (0x7F).
         case .backspace:
             if modifiers.contains(.option) { return [0x1B, 0x7F] }

@@ -1,8 +1,8 @@
 # Claude Code → Harness
 
 Make Claude Code surface its `Notification` and `Stop` events as Harness pane
-notifications (yellow ring + sidebar dot + macOS push), so you can leave a long
-edit running and pop back when it's actually waiting on you.
+notifications (yellow ring, sidebar dot, and macOS notification banner), so you
+can leave a long edit running and pop back when it's actually waiting on you.
 
 ## One-line install
 

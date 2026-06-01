@@ -1,11 +1,11 @@
 # Migrating to Harness
 
-Harness has tested migration paths from **Ghostty** (terminal config) and **tmux**
-(commands, keybindings, and config). Both rest on first-party code — no plug-ins.
+Harness has tested migration paths for terminal config import and **tmux**
+commands/keybindings. Both rest on first-party code — no plug-ins.
 
-## From Ghostty
+## Import Terminal Colors And Fonts
 
-Harness reads an existing Ghostty config so your terminal looks the same on day one.
+Harness reads compatible source terminal configs so your colors and font carry over on day one.
 
 **What's imported** (`TerminalConfigImporter`, covered by `TerminalConfigImporterTests`):
 colors (background/foreground/cursor/selection/bold/cursor-text), the 16-color ANSI palette,
@@ -15,14 +15,8 @@ blink, copy-on-select, and the default shell.
 **What's not imported:** the font **size** is Harness-owned (default 16) — a terminal's size
 preference doesn't carry over, only the face does.
 
-**Sources tried** (first match wins):
-
-```
-~/.config/ghostty/config
-~/.config/ghostty/config.ghostty
-~/Library/Application Support/com.mitchellh.ghostty/config
-~/Library/Application Support/com.mitchellh.ghostty/config.ghostty
-```
+**Sources tried:** the importer checks its supported compatibility paths in order and
+merges matches, with later files overriding earlier files.
 
 Import happens automatically on first run and is re-applied when the source config's
 fingerprint changes. Re-import manually any time:

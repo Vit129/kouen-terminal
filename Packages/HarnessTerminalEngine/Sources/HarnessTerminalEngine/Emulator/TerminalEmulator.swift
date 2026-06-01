@@ -344,7 +344,7 @@ public final class TerminalEmulator: VTParserHandler {
         }
     }
 
-    /// OSC 133 shell integration (FinalTerm/iTerm2/Ghostty). `A` marks a prompt line, `D[;exit]`
+    /// OSC 133 shell integration. `A` marks a prompt line, `D[;exit]`
     /// reports the finished command's status; `B` (command start) and `C` (output start) are the
     /// input/output delimiters — parsed but not stamped, since the prompt mark + exit status are
     /// what drive jump-to-prompt and the success/failure gutter. Purely informational: nothing is
@@ -360,7 +360,7 @@ public final class TerminalEmulator: VTParserHandler {
         }
     }
 
-    /// OSC 777 `notify;<title>;<body>` (urxvt/Ghostty). Other 777 sub-commands are ignored.
+    /// OSC 777 `notify;<title>;<body>`. Other 777 sub-commands are ignored.
     private func handleNotify777(_ payload: String) {
         let parts = payload.split(separator: ";", maxSplits: 2, omittingEmptySubsequences: false).map(String.init)
         guard parts.first == "notify", parts.count >= 2 else { return }

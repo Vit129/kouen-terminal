@@ -11,7 +11,7 @@ public enum ThemeManager {
     public static let defaultDisplayName = "Default"
     public static let defaultBaselineBackgroundHex = "#000000"
     public static let defaultBaselineForegroundHex = "#ffffff"
-    /// Ghostty-compatible ANSI-16 defaults. Used for terminal *output* when theme→output
+    /// Muted ANSI-16 defaults. Used for terminal *output* when theme→output
     /// recoloring is off (the default), so ANSI tools start from the same muted baseline
     /// instead of the hotter legacy xterm primaries.
     public static let defaultBaselinePaletteHex = [
@@ -22,7 +22,7 @@ public enum ThemeManager {
     ]
 
     public static let featuredThemes = [
-        "Ghostty Default",
+        HarnessThemeCatalog.defaultThemeName,
         "Catppuccin Mocha",
         "Dracula",
         "Tokyo Night",

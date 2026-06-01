@@ -76,7 +76,7 @@ final class MainWindowController: NSWindowController {
         // corners and leaving a dark compositing seam (hairline) around the rounded edge that
         // hardens as the blur thins. Left non-layer-backed (a plain `NSView` is transparent by
         // default, so the blur still shows through), the window server rounds the blur together
-        // with the frame — exactly how Ghostty keeps the same CGS blur rounded. Chrome/terminal
+        // with the frame. Chrome/terminal
         // subviews keep their own layer backing as needed; the root contentView must not.
         // INVARIANT: NO site may layer-back the root. `MainSplitViewController.loadView` creates
         // it as a plain `NSView`, and `MainSplitViewController.applyChrome` must NOT `makeClear`

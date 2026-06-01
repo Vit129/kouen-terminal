@@ -152,8 +152,7 @@ final class SessionCoordinator: NSObject {
         let chrome = HarnessChrome.current
         host.applyBorderColors(
             active: chrome.focusRing,
-            waiting: chrome.waiting,
-            frame: chrome.textPrimary.withAlphaComponent(chrome.isDark ? 0.16 : 0.22)
+            waiting: chrome.waiting
         )
     }
 
@@ -465,7 +464,7 @@ final class SessionCoordinator: NSObject {
         selectTab(workspaceID: workspace.id, tabID: workspace.tabs[nextIndex].id)
     }
 
-    /// Select the Nth (0-based) tab — backs the ⌘1–9 tab-switch shortcuts (Ghostty-style).
+    /// Select the Nth (0-based) tab — backs the ⌘1–9 tab-switch shortcuts.
     /// Out-of-range numbers (e.g. ⌘5 with 3 tabs) are no-ops.
     func selectTab(atIndex index: Int) {
         guard let workspace = snapshot.activeWorkspace,
@@ -1203,7 +1202,7 @@ final class SessionCoordinator: NSObject {
         applyFontSize(settings.fontSize + delta)
     }
 
-    /// ⌘0 — restore the default font size (Ghostty parity, completes the ⌘+/⌘-/⌘0 trio).
+    /// ⌘0 — restore the default font size, completing the ⌘+/⌘-/⌘0 trio.
     func resetFontSize() {
         applyFontSize(HarnessSettings().fontSize)
     }

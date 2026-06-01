@@ -18,6 +18,7 @@ final class NotificationBellButton: NSControl {
         wantsLayer = true
         // Circular soft-button chrome (set in applyChrome/layout) to match SoftIconButton.
         layer?.cornerCurve = .continuous
+        layer?.masksToBounds = false
 
         // Weight matches the rest of the header glyphs (workspace pill, chevron,
         // ellipsis) so the chrome icon set stays one uniform pack.
@@ -48,8 +49,8 @@ final class NotificationBellButton: NSControl {
             iconView.widthAnchor.constraint(equalToConstant: 16),
             iconView.heightAnchor.constraint(equalToConstant: 16),
 
-            badgeBackground.centerXAnchor.constraint(equalTo: trailingAnchor, constant: -5),
-            badgeBackground.centerYAnchor.constraint(equalTo: topAnchor, constant: 5),
+            badgeBackground.topAnchor.constraint(equalTo: topAnchor, constant: 1),
+            badgeBackground.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -1),
             badgeBackground.heightAnchor.constraint(equalToConstant: 14),
             badgeBackground.widthAnchor.constraint(greaterThanOrEqualToConstant: 14),
 
@@ -109,6 +110,7 @@ final class NotificationBellButton: NSControl {
         waitingCount = count
         badge.stringValue = count > 99 ? "99+" : "\(count)"
         badgeBackground.isHidden = count == 0
+        setAccessibilityLabel(count == 0 ? "Notifications" : "\(count) notifications")
         applyChrome()
     }
 

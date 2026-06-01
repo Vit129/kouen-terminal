@@ -1,19 +1,18 @@
 import Foundation
 
-/// The native theme catalog — replacement for the the previous theme catalog.
+/// The native theme catalog.
 ///
 /// Phase 3 ships the hand-curated featured themes with full, accurate 16-color palettes.
-/// The remaining ~400 community themes will be ported from the fork's data into a bundled
-/// `themes.json` resource (a one-off extraction on macOS) and merged in here without any
-/// API change — `theme(named:)`, `search(_:)`, and `allThemes` are the stable surface.
+/// Community themes live in the bundled `themes.json` resource and merge in here without
+/// API changes — `theme(named:)`, `search(_:)`, and `allThemes` are the stable surface.
 public enum HarnessThemeCatalog {
-    /// The default theme used when none is selected. This mirrors Ghostty's muted
-    /// ANSI-16 baseline so fresh installs do not start from over-saturated primaries.
-    public static let defaultThemeName = "Ghostty Default"
+    /// The default theme used when none is selected. This muted ANSI-16 baseline keeps
+    /// fresh installs from starting with over-saturated primaries.
+    public static let defaultThemeName = "Harness Default"
 
     /// Curated, surfaced-first themes.
     public static let featuredNames = [
-        "Ghostty Default",
+        "Harness Default",
         "Catppuccin Mocha",
         "Dracula",
         "Tokyo Night",
@@ -34,9 +33,10 @@ public enum HarnessThemeCatalog {
     /// it happens when a non-builtin theme is actually requested (or the full list
     /// is shown in Settings/the palette), never on the launch chrome path.
     public static func theme(named name: String) -> HarnessThemeDefinition? {
-        let lowered = name.lowercased()
-        if let builtin = builtins.first(where: { $0.name.lowercased() == lowered }) { return builtin }
-        return all.first { $0.name.lowercased() == lowered }
+        let lowered = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let lookupName = legacyThemeAliases[lowered] ?? lowered
+        if let builtin = builtins.first(where: { $0.name.lowercased() == lookupName }) { return builtin }
+        return all.first { $0.name.lowercased() == lookupName }
     }
 
     /// Fuzzy-ish search: empty query returns all (featured first); otherwise themes whose
@@ -64,6 +64,10 @@ public enum HarnessThemeCatalog {
         return builtins + extras
     }()
 
+    private static let legacyThemeAliases = [
+        "ghostty default": defaultThemeName.lowercased(),
+    ]
+
     /// Load the ported community catalog from the bundled `themes.json` (an array of
     /// `HarnessThemeDefinition`). Returns empty if the resource is missing or empty —
     /// the catalog then runs on the curated builtins alone. Regenerate the file with the
@@ -79,7 +83,7 @@ public enum HarnessThemeCatalog {
 
     private static let builtins: [HarnessThemeDefinition] = [
         .make(
-            "Ghostty Default",
+            "Harness Default",
             bg: "#000000", fg: "#ffffff", cursor: "#ffffff",
             selectionBackground: "#333333",
             palette: [
