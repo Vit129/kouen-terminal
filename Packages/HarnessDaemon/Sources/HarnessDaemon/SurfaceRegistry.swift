@@ -12,6 +12,10 @@ public final class SurfaceRegistry: @unchecked Sendable {
     public let optionStore = OptionStore()
     public let environmentStore = EnvironmentStore()
     public let hookRegistry = HookRegistry()
+    /// Opt-in lock/output instrumentation (off unless `HARNESS_DAEMON_METRICS=1`),
+    /// surfaced via the `SIGUSR1` stats log. `DaemonServer` records output
+    /// notifications and backlog through this same instance.
+    public let metrics = DaemonMetrics()
     /// Hooks fire fire-and-forget here, never under `lock`, so a hook-bound command
     /// can re-enter `handle` (which locks) without deadlocking. Serial so hook
     /// reactions run in the order their events occurred.
@@ -135,18 +139,44 @@ public final class SurfaceRegistry: @unchecked Sendable {
         return editor.snapshot
     }
 
-    /// Aggregate counts for `daemon-stats`. Returned in a single locked read so
-    /// the values are mutually consistent.
-    public var surfaceTelemetry: (surfaceCount: Int, scrollbackBytes: Int) {
+    /// The current layout revision without copying the whole `SessionSnapshot`
+    /// (which the `snapshot` getter does, retaining every workspace/tab/pane array).
+    /// Used by `daemon-stats` so reading one `Int` doesn't deep-copy under the lock.
+    public var revision: Int {
         lock.lock()
         defer { lock.unlock() }
-        let count = sessions.count
-        let bytes = sessions.values.reduce(0) { $0 + $1.scrollbackByteCount }
-        return (count, bytes)
+        return editor.snapshot.revision
+    }
+
+    /// Aggregate counts for `daemon-stats`. The registry lock is held only long
+    /// enough to copy the session references; each `scrollbackByteCount` (which
+    /// takes that PTY's own `scrollbackLock`) is then summed **off** the registry
+    /// lock, so a stats read no longer blocks layout mutations while it walks
+    /// every surface. The `Array` holds **strong references**, so a surface closed
+    /// concurrently can't be deallocated mid-sum (its `scrollbackByteCount` stays a
+    /// valid guarded read); the totals are mutually consistent with the copied set.
+    public var surfaceTelemetry: (surfaceCount: Int, scrollbackBytes: Int) {
+        acquireRegistryLock()
+        let surfaces = Array(sessions.values)
+        lock.unlock()
+        let bytes = surfaces.reduce(0) { $0 + $1.scrollbackByteCount }
+        return (surfaces.count, bytes)
+    }
+
+    /// Acquire the registry lock, timing the wait when metrics are enabled. The
+    /// disabled path is a single branch then a plain `lock.lock()`. Paired with a
+    /// normal `lock.unlock()` (or `defer`) at the call site. Used at the two
+    /// dominant lock holders — `handle` and `surfaceTelemetry`; other `lock.lock()`
+    /// sites are left uninstrumented.
+    private func acquireRegistryLock() {
+        guard metrics.enabled else { lock.lock(); return }
+        let start = DispatchTime.now().uptimeNanoseconds
+        lock.lock()
+        metrics.recordLockWait(nanos: DispatchTime.now().uptimeNanoseconds &- start)
     }
 
     public func handle(_ request: IPCRequest) -> IPCResponse {
-        lock.lock()
+        acquireRegistryLock()
         defer { lock.unlock() }
         switch request {
         case .ping:
