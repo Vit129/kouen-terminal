@@ -42,6 +42,11 @@ final class GlyphAtlas {
     private var penY = 0
     private var shelfHeight = 0
 
+    // Startup contract: the atlas is created EMPTY and glyphs are rasterized purely on
+    // demand (`entry(for:)` → `rasterizer.rasterize` → `place`), so launch never pays to
+    // pre-rasterize a glyph set. Only the 1024×1024 texture is allocated up front; the first
+    // visible characters rasterize as they're drawn. Do not add a startup prewarm/preload
+    // here — eager rasterization is exactly the work we keep off the first-paint path.
     init?(device: MTLDevice, rasterizer: GlyphRasterizer, size: Int = 1024) {
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
             pixelFormat: .r8Unorm,
