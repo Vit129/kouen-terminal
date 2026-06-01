@@ -2,7 +2,7 @@ import SwiftUI
 import AppKit
 
 /// Renders a `ComposedFrame` (produced by the genuine ported `GridCompositor`) into a
-/// SwiftUI `Canvas` with authentic Catppuccin Mocha color. One monospaced glyph per cell,
+/// SwiftUI `Canvas` with the onboarding Catppuccin Mocha color. One monospaced glyph per cell,
 /// background fills for non-default cells, a block cursor at the active position.
 ///
 /// The frame is composed upstream and only changes when the demo data changes, so the

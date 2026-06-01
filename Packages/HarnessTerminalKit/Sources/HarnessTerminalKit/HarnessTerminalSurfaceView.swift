@@ -116,9 +116,51 @@ private final class SurfaceEmulatorState: @unchecked Sendable {
 ///
 /// Scope: GPU rendering with accurate sRGB output by default, opt-in converted Display-P3
 /// vivid color, keyboard input, live resize, PTY responses (DSR/DA), mouse reporting,
-/// selection, scrollback, copy mode, IME, inline images, and shell-integration marks.
+/// selection, scrollback, copy mode, file-drop path insertion, IME, inline images, and
+/// shell-integration marks.
 @MainActor
 public final class HarnessTerminalSurfaceView: NSView {
+    private static let legacyFilenamesPasteboardType = NSPasteboard.PasteboardType("NSFilenamesPboardType")
+    private static let droppedPathPasteboardTypes: [NSPasteboard.PasteboardType] = [
+        .fileURL,
+        legacyFilenamesPasteboardType,
+    ]
+
+    static func droppedFileURLs(from pasteboard: NSPasteboard) -> [URL] {
+        var urls: [URL] = []
+        let options: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
+        let objects = pasteboard.readObjects(forClasses: [NSURL.self], options: options) ?? []
+        urls.append(contentsOf: objects.compactMap { object in
+            if let url = object as? URL, url.isFileURL { return url }
+            if let url = object as? NSURL, (url as URL).isFileURL { return url as URL }
+            return nil
+        })
+
+        if let filenames = pasteboard.propertyList(forType: legacyFilenamesPasteboardType) as? [String] {
+            urls.append(contentsOf: filenames.map { URL(fileURLWithPath: $0) })
+        }
+
+        var seen = Set<String>()
+        return urls.compactMap { url in
+            let standardized = url.standardizedFileURL
+            guard seen.insert(standardized.path).inserted else { return nil }
+            return standardized
+        }
+    }
+
+    static func shellQuotedPath(_ path: String) -> String {
+        guard !path.isEmpty else { return "''" }
+        let safe = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789/_:.,@%+=-")
+        if path.unicodeScalars.allSatisfy({ safe.contains($0) }) {
+            return path
+        }
+        return "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
+    }
+
+    static func droppedPathText(for urls: [URL]) -> String {
+        urls.map { shellQuotedPath($0.path) }.joined(separator: " ")
+    }
+
     /// Bytes the terminal produces for the PTY (typed input, key sequences, DSR/DA).
     public var onInput: ((Data) -> Void)?
     /// New grid size after a resize (columns, rows) — the host forwards this to the daemon.
@@ -288,6 +330,7 @@ public final class HarnessTerminalSurfaceView: NSView {
         self.offMainParserFramePipelineEnabled = offMainParserFramePipeline
         self.emulatorState = SurfaceEmulatorState(columns: columns, rows: rows)
         super.init(frame: .zero)
+        registerForDraggedTypes(Self.droppedPathPasteboardTypes)
         colorProviderState.update(
             foreground: theme.foreground,
             background: theme.background,
@@ -1253,6 +1296,35 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// Enter byte) so multi-line pastes run line by line.
     @objc public func paste(_ sender: Any?) {
         guard let raw = NSPasteboard.general.string(forType: .string), !raw.isEmpty else { return }
+        pasteText(raw)
+    }
+
+    public override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        pathDropOperation(for: sender)
+    }
+
+    public override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+        pathDropOperation(for: sender)
+    }
+
+    public override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        let urls = Self.droppedFileURLs(from: sender.draggingPasteboard)
+        let text = Self.droppedPathText(for: urls)
+        guard !text.isEmpty else { return false }
+        window?.makeFirstResponder(self)
+        pasteText(text)
+        return true
+    }
+
+    private func pathDropOperation(for sender: NSDraggingInfo) -> NSDragOperation {
+        guard
+            sender.draggingSourceOperationMask.contains(.copy),
+            !Self.droppedFileURLs(from: sender.draggingPasteboard).isEmpty
+        else { return [] }
+        return .copy
+    }
+
+    private func pasteText(_ raw: String) {
         let normalized = raw
             .replacingOccurrences(of: "\r\n", with: "\r")
             .replacingOccurrences(of: "\n", with: "\r")

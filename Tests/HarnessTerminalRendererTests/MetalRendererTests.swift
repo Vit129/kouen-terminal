@@ -636,9 +636,11 @@ final class MetalRendererTests: XCTestCase {
                                        device: device, renderer: renderer, clearColor: clear)
         XCTAssertEqual(barOut.stats.bgInstances, 1)
         XCTAssertEqual(barOut.stats.bgSpans, 0)
-        assertColor(barOut.pixel(1, renderer.cellPixelHeight / 2),
+        assertColor(barOut.pixel(0, renderer.cellPixelHeight / 2),
                     r: Int(cursor.red), g: Int(cursor.green), b: Int(cursor.blue),
                     label: "bar cursor left edge", tolerance: 24)
+        assertColor(barOut.pixel(1, renderer.cellPixelHeight / 2),
+                    r: 0, g: 0, b: 0, label: "bar cursor second pixel stays clear", tolerance: 8)
         assertColor(barOut.pixel(renderer.cellPixelWidth / 2, renderer.cellPixelHeight / 2),
                     r: 0, g: 0, b: 0, label: "bar cursor center stays clear", tolerance: 8)
 

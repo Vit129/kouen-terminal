@@ -37,6 +37,11 @@ final class HarnessSettingsTests: XCTestCase {
         XCTAssertEqual(migrated.colorRendering, .accurate)
     }
 
+    func testFreshSettingsUseSlimBarCursorByDefault() {
+        XCTAssertEqual(HarnessSettings().cursorStyle, "bar")
+        XCTAssertEqual(HarnessSettings.makeDefaults(imported: nil).cursorStyle, "bar")
+    }
+
     func testVividColorsLoadMigrationPreservesExplicitChoice() throws {
         try withTemporaryHarnessHome { root in
             try HarnessPaths.ensureDirectories()

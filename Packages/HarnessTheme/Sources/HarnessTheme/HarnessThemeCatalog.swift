@@ -7,11 +7,13 @@ import Foundation
 /// `themes.json` resource (a one-off extraction on macOS) and merged in here without any
 /// API change — `theme(named:)`, `search(_:)`, and `allThemes` are the stable surface.
 public enum HarnessThemeCatalog {
-    /// The default theme used when none is selected (matches the previous default).
-    public static let defaultThemeName = "Catppuccin Mocha"
+    /// The default theme used when none is selected. This mirrors Ghostty's muted
+    /// ANSI-16 baseline so fresh installs do not start from over-saturated primaries.
+    public static let defaultThemeName = "Ghostty Default"
 
     /// Curated, surfaced-first themes.
     public static let featuredNames = [
+        "Ghostty Default",
         "Catppuccin Mocha",
         "Dracula",
         "Tokyo Night",
@@ -76,6 +78,17 @@ public enum HarnessThemeCatalog {
     }
 
     private static let builtins: [HarnessThemeDefinition] = [
+        .make(
+            "Ghostty Default",
+            bg: "#000000", fg: "#ffffff", cursor: "#ffffff",
+            selectionBackground: "#333333",
+            palette: [
+                "#1d1f21", "#cc6666", "#b5bd68", "#f0c674",
+                "#81a2be", "#b294bb", "#8abeb7", "#c5c8c6",
+                "#666666", "#d54e53", "#b9ca4a", "#e7c547",
+                "#7aa6da", "#c397d8", "#70c0b1", "#eaeaea",
+            ]
+        ),
         .make(
             "Catppuccin Mocha",
             bg: "#1e1e2e", fg: "#cdd6f4", cursor: "#f5e0dc",
