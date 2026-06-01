@@ -56,6 +56,10 @@ public final class GlyphRasterizer {
     public init(fontFamily: String, size: CGFloat, scale: CGFloat = 2.0) {
         self.scale = scale
         self.pointSize = size
+        // Init only creates the four CTFont objects (regular/bold/italic/bold-italic) — it
+        // does NOT rasterize any glyphs. Rasterization is on demand per codepoint via
+        // `rasterize(...)`, so startup never pays to pre-rasterize ASCII or any warm-up set.
+        // Keep it that way: no eager glyph loop here.
         // CTFontCreateWithName substitutes a system font if the name is unknown, so this
         // never fails — a deliberately forgiving path for user-supplied font names.
         let base = CTFontCreateWithName(fontFamily as CFString, size, nil)

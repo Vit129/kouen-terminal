@@ -8,11 +8,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var menuBarController: MenuBarController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        StartupMetrics.shared.mark(.launchStart)
         // Build the UI immediately so launch never blocks on the daemon. The
         // coordinator starts from a default snapshot and repopulates the moment
         // the daemon answers (below) — no frozen window, no modal timeout dialog.
         mainWindowController = MainWindowController()
         mainWindowController?.showWindow(nil)
+        StartupMetrics.shared.mark(.firstWindow)
         NSApp.activate(ignoringOtherApps: true)
         NSApp.mainMenu = MainMenuBuilder.build()
         // Menu-bar status item: workspaces + active agents, read from the daemon
@@ -28,6 +30,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Locate/spawn the daemon off the main thread, then sync from real state.
         DaemonLauncher.shared.ensureRunning { ok in
+            if ok { StartupMetrics.shared.mark(.daemonConnected) }
             SessionCoordinator.shared.syncFromDaemon()
             if !ok {
                 SessionCoordinator.shared.noteDaemonError(DaemonClientError.timeout)
