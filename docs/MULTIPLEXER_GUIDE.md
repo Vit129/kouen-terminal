@@ -188,6 +188,27 @@ Inside the compositor the prefix (`Ctrl-A`) drives: `%` / `"` split, `x` kill, `
 `d` detach. Copy-mode and SGR mouse work too. Detach keys default to `Ctrl-A d`; override with
 `--detach-keys`. There's also a programmatic **control mode** (`harness-cli control-mode` / `-CC`).
 
+### Driving a headless or remote daemon
+
+The compositor above attaches to a daemon on *your* Mac. You can also point the CLI at a daemon
+running on **another machine** — headless, or on Linux — and control it remotely. Register the
+remote once, then add `--host <name>` to any command:
+
+```bash
+# On the remote box, the daemon listens on a Unix socket (harness-cli doctor prints its path).
+harness-cli remote add --name devbox --ssh me@devbox --socket "/home/me/.config/harness/harness.sock"
+harness-cli new-session --host devbox --cwd ~/Code
+harness-cli send-keys  --host devbox --surface <id> --keys "make test Enter"
+harness-cli capture-pane --host devbox --surface <id>
+harness-cli attach-window --host devbox          # render its layout locally
+```
+
+Harness forwards the remote socket over `ssh -N -L`, reusing your existing SSH trust — no new
+credentials. Because the daemon owns scrollback and persists it to disk, a remote session's
+history survives the daemon restarting on that box. See
+[COMMANDS.md → Remote daemons](COMMANDS.md#remote-daemons-over-ssh) for `remote list` / `remote
+remove` and `--ssh-arg`.
+
 ---
 
 ## 10. Shell integration (prompt marks + the success/failure gutter)

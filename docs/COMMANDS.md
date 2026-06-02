@@ -106,6 +106,24 @@ attaches the active tab. Inside: the prefix (`Ctrl-A`) then `o` / `;` cycles the
 active pane, `d` detaches; `SIGWINCH` re-lays-out live; splitting/killing panes
 in the GUI re-composites automatically.
 
+## Remote daemons (over SSH)
+
+Drive a daemon running on another machine — including a headless or Linux box — by
+registering it and then passing a global `--host <name>` flag to any client command.
+The transport forwards the remote daemon's Unix control socket over `ssh -N -L`, so it
+reuses your existing SSH trust (keys/agent/config); no new credentials or crypto.
+
+| Command | Effect |
+|---|---|
+| `remote add --name <name> --ssh <user@host> --socket <remote-path> [--ssh-arg <arg> …]` | Register a remote daemon. `--socket` is the daemon's control-socket path on the remote (run `harness-cli doctor` there to print it). Repeat `--ssh-arg` to pass extra ssh options. |
+| `remote list` | List registered remotes (`name  ssh-target  socket`). |
+| `remote remove --name <name>` | Forget a remote and tear down its tunnel. |
+| `<command> … --host <name>` | Run any client command against the named remote instead of the local daemon (`ping`, `new-session`, `send-keys`, `capture-pane`, `doctor`, …). |
+
+Allowed `--ssh-arg` options are validated: `-p` (port), `-i` (identity file), `-J` (jump
+host), `-l` (login user), and the flag-only `-4 -6 -A -T -q -v`. Example:
+`remote add --name devbox --ssh me@devbox --socket /home/me/.config/harness/harness.sock --ssh-arg -p --ssh-arg 2222`.
+
 ## Buffers (paste store)
 
 | Command | Effect |

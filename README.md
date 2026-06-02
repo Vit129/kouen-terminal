@@ -4,7 +4,7 @@
 
 The native macOS terminal that keeps your sessions running and tells you the moment a coding agent needs you.
 
-Every pane renders on Harness's own GPU engine. Your splits and sessions live in a background daemon, so they survive quitting the app and you can drive or attach to them from the command line — even over SSH. And Harness watches the agents you run inside it (Claude Code, Codex, Cursor, and more), so an approval prompt never sits unseen behind another tab.
+Every pane renders on Harness's own GPU engine. Your splits and sessions live in a background daemon, so they survive quitting the app — and their scrollback survives a daemon restart. You can drive or attach to them from the command line, including a headless or remote daemon over SSH. And Harness watches the agents you run inside it (Claude Code, Codex, Cursor, and more), so an approval prompt never sits unseen behind another tab.
 
 One self-contained app. The terminal engine, daemon, and CLI are all first-party Swift; the only external dependency is Sparkle (the macOS auto-update framework, GUI-only).
 
@@ -21,8 +21,8 @@ Prefer to build it yourself? Jump to [Build from source](#build-from-source).
 ## Why Harness
 
 - **It's a real terminal first.** GPU rendering, accurate sRGB color by default, opt-in converted Display-P3 vivid color, ligatures, inline images (Sixel / Kitty / iTerm2), and 490 built-in themes with a muted Harness default. Block and box-drawing glyphs are drawn procedurally, so borders tile without seams at any font.
-- **Your work outlives the window.** Sessions, tabs, and splits are owned by a daemon. Quit and reopen and everything is exactly where you left it. Attach the same session from a second window or another machine.
-- **It's scriptable.** `harness-cli` drives the whole thing — open tabs, send keys, capture a pane, resize, swap, zoom — so your tooling can build the layout it needs.
+- **Your work outlives the window.** Sessions, tabs, and splits are owned by a daemon. Quit and reopen and everything is exactly where you left it, scrollback included — history is persisted to disk and restored even if the daemon restarts. Attach the same session from a second window or another machine.
+- **It's scriptable, locally or remotely.** `harness-cli` drives the whole thing — open tabs, send keys, capture a pane, resize, swap, zoom — so your tooling can build the layout it needs. Point any command at a headless or remote daemon with `--host <name>`; the daemon and CLI run on Linux too, so a remote box can host your sessions.
 - **It watches your agents.** Harness detects Claude Code, Codex, Cursor, and others by their process tree, shows which session is running what, and pings you when an agent stops or asks for approval. `Cmd+Shift+U` jumps you to the one that's waiting and skips the ones still thinking.
 
 ## How it feels
@@ -41,6 +41,8 @@ New installs start in Plain. Moving over from another setup? See [docs/MIGRATION
 - GPU-accelerated rendering by Harness's own terminal engine — accurate sRGB output by default, opt-in converted Display-P3 vivid color, a themed translucent canvas, and program output left untouched unless you opt into theme recoloring
 - Sidebar sessions, per-session tabs, and horizontal / vertical splits
 - Session layout persists across quits (daemon-owned, attach from the CLI or over SSH)
+- Persistent scrollback: a pane's history is written to disk per surface and restored when the daemon restarts
+- Remote & headless daemon: run `HarnessDaemon` on a headless or remote box (Linux included) and drive it with `harness-cli --host <name>` over an SSH tunnel — register hosts with `harness-cli remote add`
 - `harness-cli` for automation and agent hooks
 - Color/theme diagnostics from the CLI: `harness-cli color-check` and `harness-cli theme-preview --theme <name>` print deterministic SGR pages for eyeballing fidelity in Harness itself
 - Command set: `send-keys`, `capture-pane`, `kill-pane`, `resize-pane`, `zoom-pane`, `swap-pane`, `rename-tab`, `attach`, and more
@@ -87,6 +89,29 @@ The first-run setup in `Harness.app` performs the same local installation for ne
 users: it copies `harness-cli` and `HarnessDaemon`, registers the LaunchAgent,
 adds PATH blocks for zsh/bash/fish with backups, installs fish completions, asks
 for notification permission, and offers detected agent hooks.
+
+## Remote & headless daemons
+
+`HarnessDaemon` can run on a headless box (no GUI) or a remote machine — including
+Linux — and you can drive it from any `harness-cli` command with a global
+`--host <name>` flag. The transport is an SSH tunnel that forwards the remote
+daemon's control socket, so it reuses your existing SSH trust with no new
+credentials.
+
+```bash
+# On the remote box: run the daemon and note its socket path (harness-cli doctor prints it).
+# On your machine: register the remote, then target it with --host on any command.
+harness-cli remote add --name devbox --ssh me@devbox --socket "/home/me/.config/harness/harness.sock"
+harness-cli remote list
+harness-cli ping --host devbox
+harness-cli new-session --host devbox --cwd ~/Code
+harness-cli send-keys --host devbox --surface <id> --keys "ls -la Enter"
+harness-cli capture-pane --host devbox --surface <id>
+harness-cli remote remove --name devbox
+```
+
+Pass extra SSH options (port, identity file, jump host) with `--ssh-arg`, e.g.
+`--ssh-arg -p --ssh-arg 2222 --ssh-arg -i --ssh-arg ~/.ssh/devbox`.
 
 ## Agent hooks
 
@@ -155,6 +180,7 @@ xcodebuild -project Harness.xcodeproj -scheme Harness -configuration Debug \
 
 - Apple silicon Mac running macOS 15.0 or later for the downloadable DMG
 - Xcode 16+ / Swift 6.0 (to build from source)
+- For a headless/remote daemon: any machine with Swift 6.0 (macOS or Linux) — build the daemon + CLI with `swift build -c release` (the GUI app, renderer, and Sparkle are macOS-only and are dropped from the Linux build)
 
 ## Documentation
 
@@ -164,6 +190,7 @@ xcodebuild -project Harness.xcodeproj -scheme Harness -configuration Debug \
 - [Release runbook](docs/RELEASE.md) — signed/notarized DMG, GitHub Actions release workflow, and Sparkle appcast publishing
 - [Migration](docs/MIGRATION.md) — bringing your config and habits across
 - [Keybindings](docs/KEYBINDINGS.md) · [Commands](docs/COMMANDS.md) · [Shell integration](docs/shell-integration/README.md) · [Agent hooks](docs/agent-hooks/README.md)
+- [Changelog](CHANGELOG.md) — release history
 - [Third-party notices](docs/THIRD-PARTY-NOTICES.md)
 
 ## License
