@@ -200,8 +200,11 @@ harness-cli remote add --name devbox --ssh me@devbox --socket "/home/me/.config/
 harness-cli new-session --host devbox --cwd ~/Code
 harness-cli send-keys  --host devbox --surface <id> --keys "make test Enter"
 harness-cli capture-pane --host devbox --surface <id>
-harness-cli attach-window --host devbox          # render its layout locally
+harness-cli doctor       --host devbox          # health-check the remote daemon
 ```
+
+(`--host` works on the client commands above; `attach-window` always renders the
+*local* daemon, so run it on the machine whose daemon you want to see.)
 
 Harness forwards the remote socket over `ssh -N -L`, reusing your existing SSH trust — no new
 credentials. Because the daemon owns scrollback and persists it to disk, a remote session's
