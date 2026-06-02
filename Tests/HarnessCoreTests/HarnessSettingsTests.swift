@@ -152,7 +152,7 @@ final class HarnessSettingsTests: XCTestCase {
 
         XCTAssertFalse(NotchVisibilityMode.automatic.isEnabled(for: .plain))
         XCTAssertFalse(NotchVisibilityMode.automatic.isEnabled(for: .persistent))
-        XCTAssertFalse(NotchVisibilityMode.automatic.isEnabled(for: .tmux))
+        XCTAssertFalse(NotchVisibilityMode.automatic.isEnabled(for: .full))
         XCTAssertTrue(NotchVisibilityMode.automatic.isEnabled(for: .agent))
         XCTAssertTrue(NotchVisibilityMode.on.isEnabled(for: .plain))
         XCTAssertFalse(NotchVisibilityMode.off.isEnabled(for: .agent))
@@ -181,6 +181,26 @@ final class HarnessSettingsTests: XCTestCase {
         let encoded = try JSONEncoder().encode(settings)
         let decoded = try JSONDecoder().decode(HarnessSettings.self, from: encoded)
         XCTAssertFalse(decoded.offMainParserFramePipeline)
+    }
+
+    func testRestoreWindowSizeDefaultsOffAndRoundTrips() throws {
+        // New option: opt-in window frame persistence. Default off so existing users
+        // keep the centered default-size launch.
+        XCTAssertFalse(HarnessSettings().restoreWindowSize)
+
+        // A settings file predating the key decodes to the off default.
+        let legacy = Data("""
+        { "fontSize": 14, "customBackgroundHex": "#000000" }
+        """.utf8)
+        let migrated = try JSONDecoder().decode(HarnessSettings.self, from: legacy)
+        XCTAssertFalse(migrated.restoreWindowSize, "absent key defaults to off")
+
+        // An explicit value survives a save/load round-trip.
+        var settings = HarnessSettings()
+        settings.restoreWindowSize = true
+        let encoded = try JSONEncoder().encode(settings)
+        let decoded = try JSONDecoder().decode(HarnessSettings.self, from: encoded)
+        XCTAssertTrue(decoded.restoreWindowSize)
     }
 
     func testImportedDefaultsKeepFullColorSet() {
