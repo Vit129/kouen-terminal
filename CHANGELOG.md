@@ -6,6 +6,21 @@ All notable changes to Harness are documented here. The format is based on
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/robzilla1738/harness-terminal/releases).
 
+## [1.1.2] - 2026-06-02
+
+### Added
+- **Finder "New Harness Tab/Window Here."** Right-clicking a folder in Finder now offers
+  "New Harness Tab Here" and "New Harness Window Here" (via `NSServices`), opening a Harness
+  terminal rooted at that folder — the system "open terminal here" workflow, at parity with
+  other terminals.
+
+### Changed
+- **"Set as default terminal" now claims the full terminal type set.** Beyond
+  `ssh`/`telnet`/`x-man-page` links and `.command`/`.tool` files, Harness now registers for
+  `public.unix-executable` and shell scripts (`.sh`/`.zsh`/`.csh`/`.pl`, `public.shell-script`),
+  and the script/command claim is promoted from Alternate to Default rank — so scripts and
+  executables open in Harness instead of falling through to another terminal.
+
 ## [1.1.1] - 2026-06-02
 
 ### Fixed

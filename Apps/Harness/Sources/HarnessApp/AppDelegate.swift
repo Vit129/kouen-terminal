@@ -7,8 +7,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var mainWindowController: MainWindowController?
     private var menuBarController: MenuBarController?
     private var notchController: NotchPanelController?
+    private var terminalServicesProvider: TerminalServicesProvider?
     private var externalOpenReady = false
-    private var queuedExternalOpenURLs: [URL] = []
+    private var queuedExternalOpens: [QueuedExternalOpen] = []
+
+    private struct QueuedExternalOpen {
+        let url: URL
+        let asWindow: Bool
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         StartupMetrics.shared.mark(.launchStart)
@@ -20,6 +26,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         StartupMetrics.shared.mark(.firstWindow)
         NSApp.activate(ignoringOtherApps: true)
         NSApp.mainMenu = MainMenuBuilder.build()
+        // Finder folder right-click "New Harness Tab/Window Here" (declared in Info.plist NSServices).
+        // NSApp.servicesProvider does not retain the provider, so hold it for the app's lifetime.
+        let servicesProvider = TerminalServicesProvider()
+        terminalServicesProvider = servicesProvider
+        NSApp.servicesProvider = servicesProvider
+        NSUpdateDynamicServices()
         // Menu-bar status item: workspaces + active agents, read from the daemon
         // (shell-agnostic). Lives for the app's lifetime.
         menuBarController = MenuBarController()
@@ -45,7 +57,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.externalOpenReady = true
             if synced {
                 self.drainQueuedExternalOpenURLs()
-            } else if !self.queuedExternalOpenURLs.isEmpty {
+            } else if !self.queuedExternalOpens.isEmpty {
                 // Daemon wasn't hydrated yet: opening a queued URL/.command now would create its tab
                 // against a not-ready daemon and be dropped. Retry the drain on a bounded backoff
                 // until a sync succeeds, instead of losing the open.
@@ -101,30 +113,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         sender.reply(toOpenOrPrint: .success)
     }
 
-    private func enqueueExternalOpen(_ urls: [URL]) {
+    /// Entry point for the Finder "New Harness Tab/Window Here" services (`TerminalServicesProvider`).
+    /// Reuses the external-open queue so a service fired at cold launch waits for the daemon.
+    func handleServiceOpen(directories: [URL], asWindow: Bool) {
+        enqueueExternalOpen(directories, asWindow: asWindow)
+    }
+
+    private func enqueueExternalOpen(_ urls: [URL], asWindow: Bool = false) {
         guard !urls.isEmpty else { return }
         NSApp.activate(ignoringOtherApps: true)
         if externalOpenReady {
-            DefaultTerminalOpener.open(urls)
+            DefaultTerminalOpener.open(urls, asWindow: asWindow)
         } else {
-            queuedExternalOpenURLs.append(contentsOf: urls)
+            queuedExternalOpens.append(contentsOf: urls.map { QueuedExternalOpen(url: $0, asWindow: asWindow) })
         }
     }
 
     private func drainQueuedExternalOpenURLs() {
-        guard externalOpenReady, !queuedExternalOpenURLs.isEmpty else { return }
-        let urls = queuedExternalOpenURLs
-        queuedExternalOpenURLs.removeAll()
-        DefaultTerminalOpener.open(urls)
+        guard externalOpenReady, !queuedExternalOpens.isEmpty else { return }
+        let opens = queuedExternalOpens
+        queuedExternalOpens.removeAll()
+        for open in opens {
+            DefaultTerminalOpener.open([open.url], asWindow: open.asWindow)
+        }
     }
 
     /// Bounded retry to drain opens that were queued at launch when the daemon wasn't yet hydrated.
     /// Re-syncs each tick; once a sync succeeds the queued URLs open against a ready daemon. ~10s cap
     /// so a permanently-down daemon doesn't retry forever.
     private func retryQueuedExternalOpenDrain(attempt: Int) {
-        guard !queuedExternalOpenURLs.isEmpty, attempt < 20 else { return }
+        guard !queuedExternalOpens.isEmpty, attempt < 20 else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            guard let self, !self.queuedExternalOpenURLs.isEmpty else { return }
+            guard let self, !self.queuedExternalOpens.isEmpty else { return }
             if SessionCoordinator.shared.syncFromDaemon() {
                 self.drainQueuedExternalOpenURLs()
             } else {

@@ -8,7 +8,7 @@ struct DefaultTerminalStatus: Equatable {
 
     var summary: String {
         if isDefault {
-            return "Harness is default for SSH/Telnet/man-page links and terminal command files."
+            return "Harness is default for SSH/Telnet/man-page links, terminal command files, shell scripts, and executables."
         }
         return "Not default for: \(missingItems.joined(separator: ", "))."
     }
@@ -44,6 +44,12 @@ enum DefaultTerminalManager {
         if defaultHandlerForCommandFiles() != bundleID {
             missing.append(".command/.tool files")
         }
+        if defaultHandler(forContentType: .unixExecutable) != bundleID {
+            missing.append("executables")
+        }
+        if defaultHandler(forContentType: .shellScript) != bundleID {
+            missing.append("shell scripts")
+        }
         return DefaultTerminalStatus(missingItems: missing)
     }
 
@@ -63,6 +69,18 @@ enum DefaultTerminalManager {
             try await setDefaultApplication(appURL, forContentType: commandFileType)
         } catch {
             failures.append(".command/.tool files: \(error.localizedDescription)")
+        }
+
+        do {
+            try await setDefaultApplication(appURL, forContentType: .unixExecutable)
+        } catch {
+            failures.append("executables: \(error.localizedDescription)")
+        }
+
+        do {
+            try await setDefaultApplication(appURL, forContentType: .shellScript)
+        } catch {
+            failures.append("shell scripts: \(error.localizedDescription)")
         }
 
         if !failures.isEmpty {
@@ -112,13 +130,29 @@ enum DefaultTerminalManager {
         guard let appURL = NSWorkspace.shared.urlForApplication(toOpen: url) else { return nil }
         return Bundle(url: appURL)?.bundleIdentifier
     }
+
+    private static func defaultHandler(forContentType type: UTType) -> String? {
+        guard let appURL = NSWorkspace.shared.urlForApplication(toOpen: type) else { return nil }
+        return Bundle(url: appURL)?.bundleIdentifier
+    }
 }
 
 @MainActor
 enum DefaultTerminalOpener {
-    static func open(_ urls: [URL]) {
-        for request in urls.compactMap({ DefaultTerminalLaunchRequest.make(for: $0) }) {
-            SessionCoordinator.shared.openDefaultTerminalLaunch(request)
+    /// Opens each URL as a terminal. `asWindow` only affects a bare directory open (a folder from the
+    /// Finder "New Harness Window Here" service): it starts a new session instead of a tab. ssh/telnet/
+    /// man-page and file-with-command requests always open a tab in the active session.
+    static func open(_ urls: [URL], asWindow: Bool = false) {
+        for url in urls {
+            guard let request = DefaultTerminalLaunchRequest.make(for: url) else { continue }
+            if asWindow, request.command == nil, let cwd = request.cwd {
+                let coordinator = SessionCoordinator.shared
+                guard let workspaceID = coordinator.snapshot.activeWorkspace?.id
+                    ?? coordinator.snapshot.workspaces.first?.id else { continue }
+                coordinator.addSession(to: workspaceID, cwd: cwd, name: request.title)
+            } else {
+                SessionCoordinator.shared.openDefaultTerminalLaunch(request)
+            }
         }
     }
 }
