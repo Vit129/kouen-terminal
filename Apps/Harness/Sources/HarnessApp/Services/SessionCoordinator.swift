@@ -36,6 +36,20 @@ final class SessionCoordinator: NSObject {
     private var synchronizedTabIDs: Set<TabID> = []
     var structureRevision = 0
 
+    /// The most recently closed tab's directory + title, captured so ⇧⌘T can
+    /// reopen a fresh tab in the same place. Holds only the last one (the common
+    /// "undo an accidental close" case); the underlying pty is gone, so this
+    /// spawns a new shell rather than resurrecting the process.
+    private var lastClosedTab: (cwd: String, title: String)?
+
+    /// The active tab's live working directory (kept current by `SurfaceShellTracker`),
+    /// used as the default for new tabs/sessions so they open where the user is
+    /// working — matching Terminal.app / iTerm. `nil` when unknown.
+    private var activeTabCWD: String? {
+        guard let cwd = snapshot.activeWorkspace?.activeTab?.cwd, !cwd.isEmpty else { return nil }
+        return cwd
+    }
+
     private enum ActiveTabCloseDisposition {
         case tab
         case session
@@ -385,7 +399,7 @@ final class SessionCoordinator: NSObject {
     }
 
     func addSession(to workspaceID: WorkspaceID, cwd: String? = nil, name: String? = nil) {
-        requestDaemon(.newSession(workspaceID: workspaceID, cwd: cwd ?? settings.defaultCWD, name: name))
+        requestDaemon(.newSession(workspaceID: workspaceID, cwd: cwd ?? activeTabCWD ?? settings.defaultCWD, name: name))
         syncFromDaemon()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             SurfaceShellTracker.shared.bumpScan()
@@ -393,7 +407,7 @@ final class SessionCoordinator: NSObject {
     }
 
     func addTab(to workspaceID: WorkspaceID, cwd: String? = nil) {
-        requestDaemon(.newTab(workspaceID: workspaceID, cwd: cwd ?? settings.defaultCWD))
+        requestDaemon(.newTab(workspaceID: workspaceID, cwd: cwd ?? activeTabCWD ?? settings.defaultCWD))
         syncFromDaemon()
         // The shell will spawn imminently — kick the cwd tracker so the new
         // tab's path lights up without waiting for the next 500ms tick.
@@ -503,14 +517,54 @@ final class SessionCoordinator: NSObject {
         performClose(disposition)
     }
 
+    private func rememberTabForReopen(_ tab: Tab) {
+        lastClosedTab = (cwd: tab.cwd, title: tab.title)
+    }
+
     private func closeActiveTabOnly() {
-        guard let tabID = snapshot.activeWorkspace?.activeTab?.id else { return }
-        let surfaces = snapshot.activeWorkspace?.activeTab?.rootPane.allSurfaceIDs() ?? []
+        guard let tab = snapshot.activeWorkspace?.activeTab else { return }
+        // Remember where this tab lived so ⇧⌘T can reopen a shell there.
+        rememberTabForReopen(tab)
+        let surfaces = tab.rootPane.allSurfaceIDs()
         for surfaceID in surfaces {
             terminalHosts.removeHost(for: surfaceID)
         }
-        requestDaemon(.closeTab(tabID: tabID))
+        requestDaemon(.closeTab(tabID: tab.id))
         syncFromDaemon()
+    }
+
+    /// Whether ⇧⌘T has a tab to reopen (drives the menu item's enabled state).
+    var canReopenClosedTab: Bool { lastClosedTab != nil }
+
+    /// Reopen the most recently closed tab: spawn a fresh tab in its directory and
+    /// restore a custom title if it had one. Consumes the stored entry so repeated
+    /// presses don't keep cloning the same tab.
+    func reopenLastClosedTab() {
+        guard let workspace = snapshot.activeWorkspace, let closed = lastClosedTab else { return }
+        let cwd = closed.cwd.isEmpty ? settings.defaultCWD : closed.cwd
+        guard case let .tabID(tabID)? = requestDaemon(.newTab(workspaceID: workspace.id, cwd: cwd)) else {
+            syncFromDaemon()
+            return
+        }
+        lastClosedTab = nil
+        // Only re-apply a deliberately customized title (skip the default "Shell").
+        if !closed.title.isEmpty, closed.title != "Shell" {
+            requestDaemon(.renameTab(tabID: tabID, name: closed.title))
+        }
+        syncFromDaemon()
+        if let surfaceID = firstSurfaceID(forTab: tabID) {
+            setActiveSurface(surfaceID)
+            terminalHosts.host(for: surfaceID)?.focusTerminal()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            SurfaceShellTracker.shared.bumpScan()
+        }
+    }
+
+    /// Toggle the find bar (⌘F) on the active pane's terminal surface.
+    func toggleFindBar() {
+        guard let surfaceID = activeSurfaceID, let host = terminalHosts.host(for: surfaceID) else { return }
+        host.toggleFind()
     }
 
     func closeActiveTabWithConfirmation() {
@@ -598,8 +652,10 @@ final class SessionCoordinator: NSObject {
     }
 
     func closeActiveSession() {
-        guard let sessionID = snapshot.activeWorkspace?.activeSession?.id else { return }
-        let surfaces = snapshot.activeWorkspace?.activeSession?.tabs.flatMap { $0.rootPane.allSurfaceIDs() } ?? []
+        guard let session = snapshot.activeWorkspace?.activeSession else { return }
+        if let tab = session.activeTab { rememberTabForReopen(tab) }
+        let sessionID = session.id
+        let surfaces = session.tabs.flatMap { $0.rootPane.allSurfaceIDs() }
         for surfaceID in surfaces {
             terminalHosts.removeHost(for: surfaceID)
         }
@@ -1063,9 +1119,13 @@ final class SessionCoordinator: NSObject {
 
     func closeWorkspace(id: WorkspaceID) {
         guard snapshot.workspaces.count > 1 else { return }
-        let surfaces = snapshot.workspaces.first(where: { $0.id == id })?.sessions.flatMap { session in
+        guard let workspace = snapshot.workspaces.first(where: { $0.id == id }) else { return }
+        if let session = workspace.activeSession, let tab = session.activeTab {
+            rememberTabForReopen(tab)
+        }
+        let surfaces = workspace.sessions.flatMap { session in
             session.tabs.flatMap { $0.rootPane.allSurfaceIDs() }
-        } ?? []
+        }
         for surfaceID in surfaces {
             terminalHosts.removeHost(for: surfaceID)
         }
