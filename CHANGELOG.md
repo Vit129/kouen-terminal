@@ -6,6 +6,17 @@ All notable changes to Harness are documented here. The format is based on
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/robzilla1738/harness-terminal/releases).
 
+## [1.1.1] - 2026-06-02
+
+### Fixed
+- **Crash when setting Harness as the default terminal.** Clicking "Set Harness
+  as default terminal" in Settings ▸ Terminal crashed immediately
+  (`EXC_BREAKPOINT`). `NSWorkspace` invokes its `setDefaultApplication`
+  completion handlers on a background queue, but the handlers had inherited
+  `@MainActor` isolation from the enclosing type, so Swift 6's executor-isolation
+  check trapped on entry. The completion closures are now `@Sendable`
+  (non-isolated); the `NSWorkspace` call itself still runs on the main actor.
+
 ## [1.1.0] - 2026-06-02
 
 ### Added

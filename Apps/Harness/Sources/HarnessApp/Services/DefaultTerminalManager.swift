@@ -70,9 +70,14 @@ enum DefaultTerminalManager {
         }
     }
 
+    // The completion handlers are `@Sendable` so they are NOT inferred as `@MainActor`-isolated
+    // (inherited from the enclosing `@MainActor enum`). NSWorkspace invokes them on a background
+    // queue, and a MainActor-isolated closure entered off-main trips the Swift 6 executor-isolation
+    // check and traps. `@Sendable` makes them non-isolated; they only resume a `Sendable`
+    // continuation, valid from any thread. The NSWorkspace call itself still runs on the main actor.
     private static func setDefaultApplication(_ appURL: URL, forScheme scheme: String) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            NSWorkspace.shared.setDefaultApplication(at: appURL, toOpenURLsWithScheme: scheme) { error in
+            NSWorkspace.shared.setDefaultApplication(at: appURL, toOpenURLsWithScheme: scheme) { @Sendable error in
                 if let error {
                     continuation.resume(throwing: error)
                 } else {
@@ -84,7 +89,7 @@ enum DefaultTerminalManager {
 
     private static func setDefaultApplication(_ appURL: URL, forContentType contentType: UTType) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            NSWorkspace.shared.setDefaultApplication(at: appURL, toOpen: contentType) { error in
+            NSWorkspace.shared.setDefaultApplication(at: appURL, toOpen: contentType) { @Sendable error in
                 if let error {
                     continuation.resume(throwing: error)
                 } else {
