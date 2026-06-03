@@ -13,6 +13,20 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
   "New Harness Tab Here" and "New Harness Window Here" (via `NSServices`), opening a Harness
   terminal rooted at that folder — the system "open terminal here" workflow, at parity with
   other terminals.
+- **Full Kitty keyboard protocol.** The terminal now implements the complete progressive-
+  enhancement protocol — event types (press/repeat/release), alternate keys, report-all-keys,
+  and associated text — so modern TUIs (Neovim, Helix, …) get unambiguous key reporting.
+  Functional, lock, and modifier keys report their Kitty codepoints; F13–F20 are supported.
+  Legacy output is byte-identical until a program opts in.
+
+### Fixed
+- **Shift+Tab (back-tab) now reaches the PTY.** macOS delivers Shift+Tab as `NSBackTabCharacter`
+  (0x19), which was dropped before encoding — it now correctly emits `ESC[Z` (and the Kitty
+  form when enabled), so back-tab navigation in full-screen TUIs works.
+- **Smooth window resize during heavy output.** Resizing while text streamed was jumpy because
+  each drag frame rebuilt the terminal frame synchronously behind the output parser. The drag
+  now re-presents the cached frame without touching the parser queue; the grid reflows once when
+  the drag settles — matching the smoothness of other GPU terminals.
 
 ### Changed
 - **"Set as default terminal" now claims the full terminal type set.** Beyond
