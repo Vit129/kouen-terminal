@@ -12,6 +12,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
     public let optionStore = OptionStore()
     public let environmentStore = EnvironmentStore()
     public let hookRegistry = HookRegistry()
+    private let persistedDefaultShell: String?
     /// Opt-in lock/output instrumentation (off unless `HARNESS_DAEMON_METRICS=1`),
     /// surfaced via the `SIGUSR1` stats log. `DaemonServer` records output
     /// notifications and backlog through this same instance.
@@ -35,6 +36,9 @@ public final class SurfaceRegistry: @unchecked Sendable {
     private var monitorTimer: DispatchSourceTimer?
 
     public init() {
+        let defaultShell = HarnessSettings.load().defaultShell
+        let trimmedDefaultShell = defaultShell.trimmingCharacters(in: .whitespacesAndNewlines)
+        persistedDefaultShell = trimmedDefaultShell.isEmpty ? nil : defaultShell
         editor.snapshot = store.load()
         if editor.snapshot.workspaces.isEmpty {
             editor.snapshot = SessionSnapshot()
@@ -200,34 +204,34 @@ public final class SurfaceRegistry: @unchecked Sendable {
             let id = editor.addWorkspace(name: name)
             commit()
             return .workspaceID(id)
-        case let .newSession(workspaceID, cwd, name):
+        case let .newSession(workspaceID, cwd, name, shell):
             guard let sessionID = editor.addSession(to: workspaceID, cwd: cwd, name: name) else {
                 return .error("Workspace not found")
             }
-            ensureSessionSurfaces(sessionID: sessionID)
+            ensureSessionSurfaces(sessionID: sessionID, shell: shell)
             commit()
             fireHookLocked(.afterNewSession)
             return .sessionID(sessionID)
-        case let .newTab(workspaceID, cwd):
+        case let .newTab(workspaceID, cwd, shell):
             guard let tabID = editor.addTab(to: workspaceID, cwd: cwd) else {
                 return .error("Workspace not found")
             }
-            ensureTabSurfaces(tabID: tabID)
+            ensureTabSurfaces(tabID: tabID, shell: shell)
             commit()
             fireHookLocked(.afterNewTab)
             return .tabID(tabID)
-        case let .newTabInWorkspace(named, cwd):
+        case let .newTabInWorkspace(named, cwd, shell):
             guard let workspaceID = editor.resolveWorkspaceID(nameOrID: named) else {
                 return .error("Workspace not found: \(named)")
             }
             guard let tabID = editor.addTab(to: workspaceID, cwd: cwd) else {
                 return .error("Could not create tab")
             }
-            ensureTabSurfaces(tabID: tabID)
+            ensureTabSurfaces(tabID: tabID, shell: shell)
             commit()
             fireHookLocked(.afterNewTab)
             return .tabID(tabID)
-        case let .newSplit(tabID, paneID, direction):
+        case let .newSplit(tabID, paneID, direction, shell):
             guard let workspace = editor.snapshot.workspaces.first(where: { ws in
                 ws.sessions.contains { session in session.tabs.contains { $0.id == tabID } }
             }) else { return .error("Tab not found") }
@@ -251,7 +255,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
                 _ = createOrEnsureSurface(
                     surfaceID: surfaceID.uuidString,
                     cwd: cwd,
-                    shell: nil,
+                    shell: shell,
                     rows: 24,
                     cols: 80,
                     scrollbackBytes: nil
@@ -1031,7 +1035,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
             return surfaceID
         }
         do {
-            let shellPath = Self.resolveShell(shell ?? ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh")
+            let shellPath = Self.resolveShell(shellCandidate(for: shell))
             let workDir = existingWorkingDirectory(cwd)
             // Terminal identity advertised to the child shell (TERM_PROGRAM). Single source: the
             // `terminal-identity` option the GUI/CLI sets; the app reads the same value for its
@@ -1061,6 +1065,13 @@ public final class SurfaceRegistry: @unchecked Sendable {
             fputs("HarnessDaemon surface launch failed for \(surfaceID): \(error)\n", harnessStderr)
             return nil
         }
+    }
+
+    private func shellCandidate(for requested: String?) -> String {
+        if let requested, !requested.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return requested
+        }
+        return persistedDefaultShell ?? ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
     }
 
     /// Validate the requested shell is executable, falling back (with a log) so a bad
@@ -1099,7 +1110,11 @@ public final class SurfaceRegistry: @unchecked Sendable {
         return fallback
     }
 
-    private func ensureTabSurfaces(tabID: TabID) {
+    func launchedShellForTesting(surfaceID: String) -> String? {
+        sessions[surfaceID]?.launchedShellForTesting
+    }
+
+    private func ensureTabSurfaces(tabID: TabID, shell: String?) {
         let tabs = editor.snapshot.workspaces.flatMap { workspace in workspace.sessions.flatMap { $0.tabs } }
         guard let tab = tabs.first(where: { $0.id == tabID })
         else { return }
@@ -1107,7 +1122,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
             _ = createOrEnsureSurface(
                 surfaceID: surfaceID.uuidString,
                 cwd: tab.cwd,
-                shell: nil,
+                shell: shell,
                 rows: 24,
                 cols: 80,
                 scrollbackBytes: nil
@@ -1115,7 +1130,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
         }
     }
 
-    private func ensureSessionSurfaces(sessionID: SessionID) {
+    private func ensureSessionSurfaces(sessionID: SessionID, shell: String?) {
         let allSessions = editor.snapshot.workspaces.flatMap { $0.sessions }
         guard let session = allSessions.first(where: { $0.id == sessionID })
         else { return }
@@ -1124,7 +1139,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
                 _ = createOrEnsureSurface(
                     surfaceID: surfaceID.uuidString,
                     cwd: tab.cwd,
-                    shell: nil,
+                    shell: shell,
                     rows: 24,
                     cols: 80,
                     scrollbackBytes: nil

@@ -133,6 +133,7 @@ public final class RealPty: @unchecked Sendable {
     /// The shell this surface was spawned with — reused verbatim on `respawn` so a respawned
     /// pane keeps the exact shell it started with (not whatever `$SHELL` happens to be now).
     private let shell: String
+    var launchedShellForTesting: String { shell }
 
     /// `TERM_PROGRAM` / `TERM_PROGRAM_VERSION` exported to the child — the terminal-identity the
     /// daemon advertises so capability-detecting tools (Claude Code) recognize Harness and enable
