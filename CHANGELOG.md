@@ -6,7 +6,11 @@ All notable changes to Harness are documented here. The format is based on
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/robzilla1738/harness-terminal/releases).
 
-## [Unreleased]
+## [1.3.2] - 2026-06-04
+
+The delivery release: updates now reach the parts of Harness that live outside the app bundle.
+After updating, the first launch restarts the daemon once to pick up the new build — sessions
+and scrollback come right back; anything running in a pane restarts.
 
 ### Fixed
 - **App updates now actually update the daemon and CLI.** (#60) The launchd-supervised
