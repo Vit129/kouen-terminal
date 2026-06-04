@@ -39,6 +39,7 @@ New installs start in Plain. Moving over from another setup? See [docs/MIGRATION
 ## Features
 
 - GPU-accelerated rendering by Harness's own terminal engine — accurate sRGB output by default, opt-in converted Display-P3 vivid color, a themed translucent canvas, and program output left untouched unless you opt into theme recoloring
+- Mainstream-GPU-terminal polish: live re-wrap while resizing (with a grid-size overlay), word / line / block selection, middle-click paste, alternate-screen wheel scrolling, focus reporting, hollow unfocused cursor, minimum contrast, auto light/dark themes, bold-is-bright control, and paste protection
 - Sidebar sessions, per-session tabs, and horizontal / vertical splits
 - Session layout persists across quits (daemon-owned, attach from the CLI or over SSH)
 - Persistent scrollback: a pane's history is written to disk per surface and restored when the daemon restarts
