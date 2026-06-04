@@ -6,6 +6,44 @@ All notable changes to Harness are documented here. The format is based on
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/robzilla1738/harness-terminal/releases).
 
+## [1.4.0] - 2026-06-04
+
+The control release: experience presets unbundle into per-piece overrides, persistence gets
+per-tab pins, and the renderer stops re-uploading the whole screen on every keystroke.
+
+### Added
+- **Per-tab persistence pins.** (#71) Right-click a tab → "Keep Tab Running After Quit" — the
+  finest-grained keep-on-quit control. A tab survives a clean quit iff the global switch, its
+  session's pin, or its own pin is set; unpinned siblings close individually while the pinned
+  tab keeps its session alive as a container. The session pin is now always shown in the
+  sidebar (with a note when the global switch supersedes it).
+- **Decoupled experience-preset controls.** (#71) The presets (Plain / Persistent / Full /
+  Agent) now just seed defaults: separate **Command prefix** and **Status line** tri-states
+  (Auto / On / Off) replace the single "Harness controls" umbrella, so e.g. a Plain terminal
+  can show a status line without arming the prefix. Existing settings keep their exact
+  behavior, and switching presets re-syncs the keep-on-quit default without clobbering an
+  explicit choice made in Settings.
+
+### Performance
+- **Row-incremental GPU instance upload.** (#70) Outside the stable-frame fast path, every
+  frame re-uploaded the whole screen's instance arrays to the GPU — one keystroke forced a
+  full-screen memcpy. Frames now upload only the changed rows' bytes (per-stream dirty spans,
+  reconciled across both in-flight ring slots); scroll and full repaints are unchanged — the
+  worst case is identical to the old whole-array upload.
+
+### Fixed
+- **Thai and other combining marks render correctly.** (#59, fixes #56) Zero-width marks now
+  stack onto their base cell instead of occupying their own.
+- **Multi-client sizing actually holds.** (#67) Resize votes ride the persistent subscription
+  fd, so the smallest-client rule survives reconnects instead of decaying to the last writer.
+- **Daemon/session correctness.** (#69) `joinPane` validates before mutating (no partial
+  layouts), client attach/detach hooks always fire in pairs, and dead panes drop their stale
+  metadata and keep their exit status.
+- **Config/CLI hardening.** (#68) `unbind` now writes a tombstone so a re-`source-file` can't
+  resurrect the binding, a corrupt `buffers.json` is backed up instead of silently replaced,
+  CLI targets are strictly validated, and `set-environment` global writes land in
+  `environment.json`.
+
 ## [1.3.2] - 2026-06-04
 
 The delivery release: updates now reach the parts of Harness that live outside the app bundle.
@@ -340,6 +378,10 @@ and a signed/notarized DMG with Sparkle auto-update. See the
 [GitHub Releases](https://github.com/robzilla1738/harness-terminal/releases) for the
 per-patch detail.
 
+[1.4.0]: https://github.com/robzilla1738/harness-terminal/releases/tag/v1.4.0
+[1.3.2]: https://github.com/robzilla1738/harness-terminal/releases/tag/v1.3.2
+[1.3.1]: https://github.com/robzilla1738/harness-terminal/releases/tag/v1.3.1
+[1.3.0]: https://github.com/robzilla1738/harness-terminal/releases/tag/v1.3.0
 [1.2.0]: https://github.com/robzilla1738/harness-terminal/releases/tag/v1.2.0
 [1.1.2]: https://github.com/robzilla1738/harness-terminal/releases/tag/v1.1.2
 [1.1.1]: https://github.com/robzilla1738/harness-terminal/releases/tag/v1.1.1
