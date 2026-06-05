@@ -249,9 +249,10 @@ final class GitPanelView: NSView {
 
     @objc private func toggleStage(_ sender: NSButton) {
         guard let path = currentPath, let file = sender.toolTip else { return }
-        let isStaged = sender.state == .on
+        // After click, .on means user wants to stage, .off means unstage
+        let wantsStaged = sender.state == .on
         Task {
-            _ = await runGit(isStaged ? ["restore", "--staged", file] : ["add", file], in: path)
+            _ = await runGit(wantsStaged ? ["add", file] : ["restore", "--staged", file], in: path)
             await refresh()
         }
     }
