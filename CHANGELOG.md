@@ -6,10 +6,14 @@ All notable changes to Harness are documented here. The format is based on
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/robzilla1738/harness-terminal/releases).
 
-## [Unreleased]
+## [1.5.0] - 2026-06-05
+
+The live-resize release: dragging a window edge now drives the running program in real time
+(Ghostty parity), notifications split into per-event controls, and agents launched through
+wrappers are recognized.
 
 ### Added
-- **Real-time live resize (Ghostty parity).** Dragging the window edge now reflows the grid and
+- **Real-time live resize (Ghostty parity).** (#77) Dragging the window edge now reflows the grid and
   signals the running program (`SIGWINCH`) at every cell boundary, so interactive programs
   (vim/htop/btop/tmux/less) and alternate-screen TUIs redraw *during* the drag instead of snapping
   at release. The authoritative reflow runs off-main with latest-wins coalescing (a fast drag runs
@@ -18,12 +22,12 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
   the daemon isn't stormed. Default on, with a **Real-time resize** setting (`liveResizeReflow`)
   that reverts to the previous defer-to-release behavior. The non-mutating re-wrap preview is
   retained as instant feedback under the live reflow.
-- **Tab persistence indicator.** A tab pinned to stay running after a clean quit
+- **Tab persistence indicator.** (#78) A tab pinned to stay running after a clean quit
   ("Keep Tab Running After Quit") now shows a small accent pin at the leading edge of
   its tab pill — a tmux-style window flag — so kept-alive tabs are identifiable at a
   glance instead of only through the right-click checkmark. The pin also appears beside
   the tab in the overflow menu.
-- **Granular notification settings.** Settings → Agents now splits notifications into
+- **Granular notification settings.** (#79) Settings → Agents now splits notifications into
   *Notify me about* (per-event toggles for **Agent needs input**, **Agent finished**,
   **Terminal bell**, and **Command finished**) and *Delivery* (macOS banner + sound),
   so you can pick exactly which events ping you instead of one all-or-nothing switch.
@@ -31,6 +35,18 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
   automatically. Backed by a new `NotificationEvent` type and a sparse
   `notificationEvents` map in settings; only desktop banners are gated — the in-app
   bell/waiting indicators are unaffected.
+- **Wrapper-aware agent detection (Hermes).** (#51) Agents launched through a wrapper —
+  `python3 …/hermes --tui`, `uv run hermes`, `env FOO=1 hermes` — are now detected: the
+  process scan parses wrapper argv with flag-aware semantics (a `-c` body never false-matches;
+  non-wrapper commands never scan their arguments, so `vim hermes-notes.txt` stays invisible).
+  Agents without a bundled icon get a monogram glyph in the tab pill and agent UI instead of
+  falling back to generic text.
+
+### Fixed
+- **Focusing a pane clears its notification.** (#61) Clicking into a pane or ⌘-Tabbing back to
+  the app now clears its waiting badge — previously only a programmatic tab switch did. The
+  clear is gated on the tab actually showing a waiting badge, so ordinary focus changes skip
+  the daemon round-trip.
 
 ## [1.4.1] - 2026-06-04
 
