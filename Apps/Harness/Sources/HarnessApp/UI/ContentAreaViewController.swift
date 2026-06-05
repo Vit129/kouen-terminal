@@ -7,6 +7,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
     private let titleStrip = WindowTitleStripView()
     private let tabBar = TerminalTabBarView()
     private let terminalHost = NSView()
+    private let sidebarToggle = SoftIconButton(frame: NSRect(x: 0, y: 0, width: 24, height: 24))
     private var paneContainer: PaneContainerView?
     private var lastStructureKey = ""
     private var pendingReload: Bool?
@@ -72,6 +73,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         view.addSubview(titleStrip)
         view.addSubview(tabBar)
         view.addSubview(terminalHost)
+        setupSidebarToggle()
 
         NSLayoutConstraint.activate([
             // Draggable title strip above the tabs: window-move grab area + Ghostty-style
@@ -163,7 +165,28 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
     /// tab bar itself sits below the lights (the strip pushes it down) and needs no inset.
     func setTabBarLeadingInset(_ inset: CGFloat) {
         titleStrip.setLeadingInset(inset)
-        tabBar.setLeadingInset(0)
+        tabBar.setLeadingInset(inset > 0 ? 28 : 0)
+        sidebarToggle.isHidden = inset == 0
+    }
+
+    private func setupSidebarToggle() {
+        sidebarToggle.setSymbol("sidebar.left", accessibilityDescription: "Show sidebar", pointSize: 12, weight: .medium)
+        sidebarToggle.toolTip = "Show sidebar (⌘\\)"
+        sidebarToggle.target = self
+        sidebarToggle.action = #selector(toggleSidebarClicked)
+        sidebarToggle.translatesAutoresizingMaskIntoConstraints = false
+        sidebarToggle.isHidden = true
+        view.addSubview(sidebarToggle)
+        NSLayoutConstraint.activate([
+            sidebarToggle.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 6),
+            sidebarToggle.centerYAnchor.constraint(equalTo: tabBar.centerYAnchor),
+            sidebarToggle.widthAnchor.constraint(equalToConstant: 24),
+            sidebarToggle.heightAnchor.constraint(equalToConstant: 24),
+        ])
+    }
+
+    @objc private func toggleSidebarClicked() {
+        (view.window?.contentViewController as? MainSplitViewController)?.toggleSidebar()
     }
 
     func refreshTabBarMetadata() {
