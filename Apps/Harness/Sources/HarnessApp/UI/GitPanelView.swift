@@ -7,24 +7,23 @@ final class GitPanelView: NSView {
     private let stackView = NSStackView()
     private var currentPath: String?
 
-    // Push/Pull header
-    private let actionBar = NSStackView()
+    // Header
     private let branchLabel = NSTextField(labelWithString: "")
     private let pullButton = NSButton(title: "Pull", target: nil, action: nil)
     private let pushButton = NSButton(title: "Push", target: nil, action: nil)
 
-    // Commit section
+    // Commit
     private let commitField = NSTextField()
     private let commitButton = NSButton(title: "Commit", target: nil, action: nil)
     private let commitPushButton = NSButton(title: "Commit+Push", target: nil, action: nil)
     private let commitAmendButton = NSButton(title: "Amend", target: nil, action: nil)
     private let stageAllButton = NSButton(title: "Stage All", target: nil, action: nil)
 
-    // Changes & log
-    private let statusHeader = NSTextField(labelWithString: "CHANGES")
-    private let logHeader = NSTextField(labelWithString: "COMMITS")
-    private let statusStack = NSStackView()
-    private let logStack = NSStackView()
+    // Sections
+    private let changesHeader = NSTextField(labelWithString: "CHANGES")
+    private let historyHeader = NSTextField(labelWithString: "HISTORY")
+    private let changesStack = NSStackView()
+    private let historyStack = NSStackView()
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -43,15 +42,13 @@ final class GitPanelView: NSView {
     private func setup() {
         translatesAutoresizingMaskIntoConstraints = false
 
-        // Branch + push/pull bar
+        // Branch bar
         branchLabel.font = .monospacedSystemFont(ofSize: 11, weight: .medium)
         branchLabel.textColor = HarnessDesign.chrome.textPrimary
         branchLabel.lineBreakMode = .byTruncatingTail
-        branchLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
         for btn in [pullButton, pushButton, stageAllButton, commitButton, commitPushButton, commitAmendButton] {
-            btn.bezelStyle = .recessed
-            btn.controlSize = .small
+            btn.bezelStyle = .recessed; btn.controlSize = .small
             btn.font = .systemFont(ofSize: 11, weight: .medium)
         }
         pullButton.target = self; pullButton.action = #selector(pullAction)
@@ -61,64 +58,46 @@ final class GitPanelView: NSView {
         commitPushButton.target = self; commitPushButton.action = #selector(commitPushAction)
         commitAmendButton.target = self; commitAmendButton.action = #selector(commitAmendAction)
 
-        actionBar.orientation = .horizontal
-        actionBar.spacing = 6
-        actionBar.addArrangedSubview(branchLabel)
-        actionBar.addArrangedSubview(pullButton)
-        actionBar.addArrangedSubview(pushButton)
+        let branchBar = NSStackView(views: [branchLabel, pullButton, pushButton])
+        branchBar.orientation = .horizontal; branchBar.spacing = 6
 
-        // Commit message area (larger box)
+        // Commit area
         commitField.placeholderString = "Commit message…"
         commitField.font = .systemFont(ofSize: 12)
-        commitField.isBezeled = true
-        commitField.bezelStyle = .roundedBezel
+        commitField.isBezeled = true; commitField.bezelStyle = .roundedBezel
         commitField.focusRingType = .none
         commitField.usesSingleLineMode = false
         commitField.lineBreakMode = .byWordWrapping
-        commitField.maximumNumberOfLines = 6
+        commitField.maximumNumberOfLines = 5
         commitField.translatesAutoresizingMaskIntoConstraints = false
-        commitField.heightAnchor.constraint(greaterThanOrEqualToConstant: 60).isActive = true
+        commitField.heightAnchor.constraint(greaterThanOrEqualToConstant: 52).isActive = true
 
-        let commitButtonRow = NSStackView()
-        commitButtonRow.orientation = .horizontal
-        commitButtonRow.spacing = 6
-        commitButtonRow.addArrangedSubview(stageAllButton)
-        commitButtonRow.addArrangedSubview(commitButton)
-        commitButtonRow.addArrangedSubview(commitPushButton)
-        commitButtonRow.addArrangedSubview(commitAmendButton)
+        let btnRow = NSStackView(views: [stageAllButton, commitButton, commitPushButton, commitAmendButton])
+        btnRow.orientation = .horizontal; btnRow.spacing = 4
 
-        let commitBar = NSStackView()
-        commitBar.orientation = .vertical
-        commitBar.alignment = .width
-        commitBar.spacing = 6
-        commitBar.addArrangedSubview(commitField)
-        commitBar.addArrangedSubview(commitButtonRow)
-
-        // Headers
-        for header in [statusHeader, logHeader] {
-            header.font = .systemFont(ofSize: 10, weight: .semibold)
-            header.textColor = HarnessDesign.chrome.textTertiary
+        // Section headers
+        for h in [changesHeader, historyHeader] {
+            h.font = .systemFont(ofSize: 10, weight: .semibold)
+            h.textColor = HarnessDesign.chrome.textTertiary
         }
 
-        statusStack.orientation = .vertical
-        statusStack.alignment = .width
-        statusStack.spacing = 1
-        logStack.orientation = .vertical
-        logStack.alignment = .width
-        logStack.spacing = 1
+        changesStack.orientation = .vertical; changesStack.alignment = .width; changesStack.spacing = 1
+        historyStack.orientation = .vertical; historyStack.alignment = .width; historyStack.spacing = 0
 
+        // Main stack
         stackView.orientation = .vertical
         stackView.alignment = .width
-        stackView.spacing = 10
+        stackView.spacing = 8
         stackView.translatesAutoresizingMaskIntoConstraints = false
-        stackView.addArrangedSubview(actionBar)
-        stackView.addArrangedSubview(statusHeader)
-        stackView.addArrangedSubview(statusStack)
-        stackView.addArrangedSubview(commitBar)
-        stackView.addArrangedSubview(logHeader)
-        stackView.addArrangedSubview(logStack)
+        stackView.addArrangedSubview(branchBar)
+        stackView.addArrangedSubview(changesHeader)
+        stackView.addArrangedSubview(changesStack)
+        stackView.addArrangedSubview(commitField)
+        stackView.addArrangedSubview(btnRow)
+        stackView.addArrangedSubview(historyHeader)
+        stackView.addArrangedSubview(historyStack)
 
-        let doc = NSView()
+        let doc = FlippedView()
         doc.translatesAutoresizingMaskIntoConstraints = false
         doc.addSubview(stackView)
 
@@ -139,56 +118,29 @@ final class GitPanelView: NSView {
             doc.leadingAnchor.constraint(equalTo: scrollView.contentView.leadingAnchor),
             doc.trailingAnchor.constraint(equalTo: scrollView.contentView.trailingAnchor),
             doc.widthAnchor.constraint(equalTo: scrollView.contentView.widthAnchor),
-            stackView.topAnchor.constraint(equalTo: doc.topAnchor, constant: 8),
-            stackView.leadingAnchor.constraint(equalTo: doc.leadingAnchor, constant: 12),
-            stackView.trailingAnchor.constraint(equalTo: doc.trailingAnchor, constant: -12),
+            stackView.topAnchor.constraint(equalTo: doc.topAnchor, constant: 6),
+            stackView.leadingAnchor.constraint(equalTo: doc.leadingAnchor, constant: 10),
+            stackView.trailingAnchor.constraint(equalTo: doc.trailingAnchor, constant: -10),
             stackView.bottomAnchor.constraint(equalTo: doc.bottomAnchor, constant: -8),
         ])
     }
 
     // MARK: - Actions
 
-    @objc private func pullAction() {
-        guard let path = currentPath else { return }
-        Task {
-            _ = await runGit(["pull"], in: path)
-            await refresh()
-        }
-    }
-
-    @objc private func pushAction() {
-        guard let path = currentPath else { return }
-        Task {
-            _ = await runGit(["push"], in: path)
-            await refresh()
-        }
-    }
-
-    @objc private func stageAllAction() {
-        guard let path = currentPath else { return }
-        Task {
-            _ = await runGit(["add", "-A"], in: path)
-            await refresh()
-        }
-    }
+    @objc private func pullAction() { runAndRefresh(["pull"]) }
+    @objc private func pushAction() { runAndRefresh(["push"]) }
+    @objc private func stageAllAction() { runAndRefresh(["add", "-A"]) }
 
     @objc private func commitAction() {
-        guard let path = currentPath else { return }
-        let message = commitField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !message.isEmpty else { return }
-        Task {
-            _ = await runGit(["commit", "-m", message], in: path)
-            commitField.stringValue = ""
-            await refresh()
-        }
+        guard let msg = commitMessage() else { return }
+        runAndRefresh(["commit", "-m", msg], clearField: true)
     }
 
     @objc private func commitPushAction() {
+        guard let msg = commitMessage() else { return }
         guard let path = currentPath else { return }
-        let message = commitField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !message.isEmpty else { return }
         Task {
-            _ = await runGit(["commit", "-m", message], in: path)
+            _ = await runGit(["commit", "-m", msg], in: path)
             _ = await runGit(["push"], in: path)
             commitField.stringValue = ""
             await refresh()
@@ -196,16 +148,11 @@ final class GitPanelView: NSView {
     }
 
     @objc private func commitAmendAction() {
-        guard let path = currentPath else { return }
-        let message = commitField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        Task {
-            if message.isEmpty {
-                _ = await runGit(["commit", "--amend", "--no-edit"], in: path)
-            } else {
-                _ = await runGit(["commit", "--amend", "-m", message], in: path)
-            }
-            commitField.stringValue = ""
-            await refresh()
+        let msg = commitField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        if msg.isEmpty {
+            runAndRefresh(["commit", "--amend", "--no-edit"])
+        } else {
+            runAndRefresh(["commit", "--amend", "-m", msg], clearField: true)
         }
     }
 
@@ -213,11 +160,21 @@ final class GitPanelView: NSView {
         guard let path = currentPath, let file = sender.toolTip else { return }
         let isStaged = sender.state == .on
         Task {
-            if isStaged {
-                _ = await runGit(["restore", "--staged", file], in: path)
-            } else {
-                _ = await runGit(["add", file], in: path)
-            }
+            _ = await runGit(isStaged ? ["restore", "--staged", file] : ["add", file], in: path)
+            await refresh()
+        }
+    }
+
+    private func commitMessage() -> String? {
+        let msg = commitField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        return msg.isEmpty ? nil : msg
+    }
+
+    private func runAndRefresh(_ args: [String], clearField: Bool = false) {
+        guard let path = currentPath else { return }
+        Task {
+            _ = await runGit(args, in: path)
+            if clearField { commitField.stringValue = "" }
             await refresh()
         }
     }
@@ -228,23 +185,25 @@ final class GitPanelView: NSView {
         guard let path = currentPath else { return }
         let branch = await runGit(["branch", "--show-current"], in: path)
         let status = await runGit(["status", "--porcelain"], in: path)
-        let log = await runGit(["log", "--oneline", "-10"], in: path)
+        let log = await runGit(["log", "--format=%H|%an|%ar|%s", "-20"], in: path)
 
         branchLabel.stringValue = "⎇ " + (branch.isEmpty ? "detached" : branch)
 
-        statusStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        logStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        changesStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        historyStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
 
+        // Changes
         if status.isEmpty {
-            statusStack.addArrangedSubview(makeLabel("Working tree clean"))
+            changesStack.addArrangedSubview(makeLabel("Working tree clean"))
         } else {
             for line in status.components(separatedBy: "\n").prefix(30) where !line.isEmpty {
-                statusStack.addArrangedSubview(makeStatusRow(line))
+                changesStack.addArrangedSubview(makeStatusRow(line))
             }
         }
 
-        for line in log.components(separatedBy: "\n").prefix(10) where !line.isEmpty {
-            logStack.addArrangedSubview(makeCommitRow(line))
+        // History (SourceTree-style)
+        for line in log.components(separatedBy: "\n").prefix(20) where !line.isEmpty {
+            historyStack.addArrangedSubview(makeHistoryRow(line))
         }
     }
 
@@ -255,9 +214,9 @@ final class GitPanelView: NSView {
         let indexStatus = String(xy.first ?? Character(" "))
         let file = String(line.dropFirst(3))
         let isStaged = indexStatus != " " && indexStatus != "?"
+        let workTree = String(xy.last ?? Character(" "))
 
         let color: NSColor
-        let workTree = String(xy.last ?? Character(" "))
         switch isStaged ? indexStatus : workTree {
         case "M": color = .systemOrange
         case "A": color = .systemGreen
@@ -268,15 +227,13 @@ final class GitPanelView: NSView {
         }
 
         let row = NSStackView()
-        row.orientation = .horizontal
-        row.spacing = 4
+        row.orientation = .horizontal; row.spacing = 4
 
         let check = NSButton(checkboxWithTitle: "", target: self, action: #selector(toggleStage(_:)))
         check.state = isStaged ? .on : .off
-        check.toolTip = file
-        check.controlSize = .small
+        check.toolTip = file; check.controlSize = .small
 
-        let badge = NSTextField(labelWithString: String(xy))
+        let badge = NSTextField(labelWithString: String(xy).trimmingCharacters(in: .whitespaces))
         badge.font = .monospacedSystemFont(ofSize: 10, weight: .medium)
         badge.textColor = color
         badge.setContentHuggingPriority(.required, for: .horizontal)
@@ -293,33 +250,48 @@ final class GitPanelView: NSView {
         return row
     }
 
-    private func makeCommitRow(_ line: String) -> NSView {
-        let parts = line.split(separator: " ", maxSplits: 1)
-        let hash = parts.first.map(String.init) ?? ""
-        let msg = parts.count > 1 ? String(parts[1]) : ""
+    private func makeHistoryRow(_ line: String) -> NSView {
+        // format: hash|author|relative_time|subject
+        let parts = line.split(separator: "|", maxSplits: 3).map(String.init)
+        guard parts.count >= 4 else { return makeLabel(line) }
+        let hash = String(parts[0].prefix(7))
+        let author = parts[1]
+        let time = parts[2]
+        let subject = parts[3]
 
-        let row = NSStackView()
-        row.orientation = .horizontal
-        row.spacing = 6
+        let card = NSView()
+        card.wantsLayer = true
+        card.translatesAutoresizingMaskIntoConstraints = false
 
-        let hashLabel = NSTextField(labelWithString: hash)
-        hashLabel.font = .monospacedSystemFont(ofSize: 10, weight: .regular)
-        hashLabel.textColor = HarnessDesign.chrome.textTertiary
-        hashLabel.setContentHuggingPriority(.required, for: .horizontal)
+        let subjectLabel = NSTextField(labelWithString: subject)
+        subjectLabel.font = .systemFont(ofSize: 12, weight: .regular)
+        subjectLabel.textColor = HarnessDesign.chrome.textPrimary
+        subjectLabel.lineBreakMode = .byTruncatingTail
+        subjectLabel.translatesAutoresizingMaskIntoConstraints = false
 
-        let msgLabel = NSTextField(labelWithString: msg)
-        msgLabel.font = .systemFont(ofSize: 11.5)
-        msgLabel.textColor = HarnessDesign.chrome.textSecondary
-        msgLabel.lineBreakMode = .byTruncatingTail
+        let metaLabel = NSTextField(labelWithString: "\(author) · \(time) · \(hash)")
+        metaLabel.font = .systemFont(ofSize: 10)
+        metaLabel.textColor = HarnessDesign.chrome.textTertiary
+        metaLabel.lineBreakMode = .byTruncatingTail
+        metaLabel.translatesAutoresizingMaskIntoConstraints = false
 
-        row.addArrangedSubview(hashLabel)
-        row.addArrangedSubview(msgLabel)
-        return row
+        card.addSubview(subjectLabel)
+        card.addSubview(metaLabel)
+        NSLayoutConstraint.activate([
+            card.heightAnchor.constraint(equalToConstant: 38),
+            subjectLabel.topAnchor.constraint(equalTo: card.topAnchor, constant: 4),
+            subjectLabel.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 4),
+            subjectLabel.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -4),
+            metaLabel.topAnchor.constraint(equalTo: subjectLabel.bottomAnchor, constant: 1),
+            metaLabel.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 4),
+            metaLabel.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -4),
+        ])
+        return card
     }
 
     private func makeLabel(_ text: String) -> NSTextField {
         let label = NSTextField(labelWithString: text)
-        label.font = .systemFont(ofSize: 12)
+        label.font = .systemFont(ofSize: 11.5)
         label.textColor = HarnessDesign.chrome.textTertiary
         return label
     }
@@ -347,4 +319,8 @@ final class GitPanelView: NSView {
             }
         }
     }
+}
+
+private final class FlippedView: NSView {
+    override var isFlipped: Bool { true }
 }
