@@ -750,6 +750,314 @@ final class MetalRendererTests: XCTestCase {
         )
     }
 
+    // MARK: - Persistent flat instance arrays (splice-in-place) + span-list upload
+
+    func testMultiRowMixedDeltaSpliceRebasesSegmentsCorrectly() throws {
+        // The cascading rebase is the sharpest line of the persistent-flats design: when two or
+        // more dirty rows in ONE frame each change instance count, every later row's segment is
+        // rebased per splice, and the second dirty row's `old = rowSeg[row]` must already
+        // reflect the first's delta. Drive mixed GROW/SHRINK deltas through a single splice
+        // frame and pin both the readback and the stat-delta accounting.
+        let (device, renderer) = try makeRenderer()
+        let cols = 16, rows = 8
+        let clear = RenderColor(red: 0, green: 0, blue: 0, alpha: 1)
+        let size = renderer.surfacePixelSize(columns: cols, rows: rows)
+        guard let target = makeTarget(device, width: size.width, height: size.height),
+              let refTarget = makeTarget(device, width: size.width, height: size.height)
+        else { throw XCTSkip("no texture") }
+        func build(_ lines: [String]) -> TerminalFrame {
+            frame("\u{1b}[?25l" + lines.joined(separator: "\r\n"), cols: cols, rows: rows)
+        }
+        var lines = (0 ..< rows).map { "base\($0)line" }
+        renderer.render(build(lines), to: target, clearColor: clear,
+                        damage: TerminalDamage(rows: IndexSet(integersIn: 0 ..< rows), full: true))
+
+        // One frame, three dirty rows, deltas +, -, + (glyph and bg-span counts both move).
+        lines[1] = "\u{1b}[41mgrown row1\u{1b}[49m"  // + bg span, + glyphs
+        lines[4] = "sm4"                              // - glyphs
+        lines[6] = "grown row6 more"                  // + glyphs
+        let f = build(lines)
+        renderer.render(f, to: target, clearColor: clear,
+                        damage: TerminalDamage(rows: IndexSet([1, 4, 6]), full: false))
+        XCTAssertEqual(renderer.stats.encodedRows, 3, "the splice path ran, not a full rebuild")
+        XCTAssertEqual(renderer.stats.reusedRows, rows - 3)
+        let spliceStats = renderer.stats
+
+        let reference = try makeRenderer(device: device)
+        reference.render(f, to: refTarget, clearColor: clear)
+        XCTAssertEqual(
+            readPixelBytes(target, width: size.width, height: size.height),
+            readPixelBytes(refTarget, width: size.width, height: size.height),
+            "mixed-delta multi-row splice must match a from-scratch render"
+        )
+        // The splice-mode stat-delta accounting must agree with a from-scratch accumulation.
+        XCTAssertEqual(spliceStats.bgSpans, reference.stats.bgSpans, "spliced bgSpans delta drifted")
+        XCTAssertEqual(spliceStats.bgCells, reference.stats.bgCells, "spliced bgCells delta drifted")
+
+        // A second mixed-delta round over the already-rebased table (cumulative correctness).
+        lines[2] = "\u{1b}[4munder two\u{1b}[24m"     // + deco instances
+        lines[6] = "g6"                               // - glyphs (was grown above)
+        let f2 = build(lines)
+        renderer.render(f2, to: target, clearColor: clear,
+                        damage: TerminalDamage(rows: IndexSet([2, 6]), full: false))
+        XCTAssertEqual(renderer.stats.encodedRows, 2)
+        let reference2 = try makeRenderer(device: device)
+        reference2.render(f2, to: refTarget, clearColor: clear)
+        XCTAssertEqual(
+            readPixelBytes(target, width: size.width, height: size.height),
+            readPixelBytes(refTarget, width: size.width, height: size.height),
+            "the second splice round over rebased segments must stay byte-identical"
+        )
+        XCTAssertEqual(renderer.stats.bgSpans, reference2.stats.bgSpans)
+        XCTAssertEqual(renderer.stats.bgCells, reference2.stats.bgCells)
+    }
+
+    func testInvalidFrameThenValidFrameRecoversBothRingSlots() throws {
+        // The reset→recover transition the clearFlats()/flatsCoherent machinery protects: an
+        // invalid-shape frame (clears the flats, draws nothing — including the cursor, which is
+        // gated on shape validity) followed by valid frames must be byte-identical to
+        // from-scratch on TWO consecutive frames (each ring slot recovers on its own frame).
+        let (device, renderer) = try makeRenderer()
+        let cols = 8, rows = 4
+        let clear = RenderColor(red: 0, green: 0, blue: 0, alpha: 1)
+        let size = renderer.surfacePixelSize(columns: cols, rows: rows)
+        guard let target = makeTarget(device, width: size.width, height: size.height),
+              let refTarget = makeTarget(device, width: size.width, height: size.height)
+        else { throw XCTSkip("no texture") }
+        let valid = frame("\u{1b}[?25lAAAA\r\nBBBB\r\nCCCC\r\nDDDD", cols: cols, rows: rows)
+        renderer.render(valid, to: target, clearColor: clear,
+                        damage: TerminalDamage(rows: IndexSet(integersIn: 0 ..< rows), full: true))
+
+        var invalid = valid
+        invalid.cells = [] // shape-invalid: cells.count != cols * rows
+        invalid.cursor.visible = true // must NOT draw a stray quad on the cleared canvas
+        renderer.render(invalid, to: target, clearColor: clear, damage: TerminalDamage(rows: [], full: false))
+        XCTAssertEqual(renderer.stats.bgInstances, 0, "an invalid frame draws nothing, cursor included")
+
+        let after = frame("\u{1b}[?25lEEEE\r\nBBBB\r\nCCCC\r\nDDDD", cols: cols, rows: rows)
+        let reference = try makeRenderer(device: device)
+        reference.render(after, to: refTarget, clearColor: clear)
+        for slotPass in 0 ..< 2 {
+            renderer.render(after, to: target, clearColor: clear,
+                            damage: TerminalDamage(rows: [], full: slotPass == 0))
+            XCTAssertEqual(
+                readPixelBytes(target, width: size.width, height: size.height),
+                readPixelBytes(refTarget, width: size.width, height: size.height),
+                "valid frame \(slotPass) after the invalid frame must match from-scratch"
+            )
+        }
+    }
+
+    func testImagesBypassThenValidFrameRecovers() throws {
+        // The images bypass resets the cache and leaves the flats incoherent; the next no-image
+        // damage frame must take the full rebuild and render byte-identically to from-scratch.
+        let (device, renderer) = try makeRenderer()
+        let cols = 8, rows = 4
+        let clear = RenderColor(red: 0, green: 0, blue: 0, alpha: 1)
+        let size = renderer.surfacePixelSize(columns: cols, rows: rows)
+        guard let target = makeTarget(device, width: size.width, height: size.height),
+              let refTarget = makeTarget(device, width: size.width, height: size.height)
+        else { throw XCTSkip("no texture") }
+        let plain = frame("\u{1b}[?25lAAAA\r\nBBBB\r\nCCCC\r\nDDDD", cols: cols, rows: rows)
+        renderer.render(plain, to: target, clearColor: clear,
+                        damage: TerminalDamage(rows: IndexSet(integersIn: 0 ..< rows), full: true))
+
+        var withImage = plain
+        let pixels: [UInt8] = [255, 0, 0, 255]
+        withImage.images = [FrameImage(
+            id: 1, column: 1, row: 1, columns: 1, rows: 1, z: 0,
+            image: DecodedImage(rgba: pixels, pixelWidth: 1, pixelHeight: 1)
+        )]
+        renderer.render(withImage, to: target, clearColor: clear, damage: nil) // the bypass path
+        XCTAssertFalse(renderer.stats.rowCacheCoherent, "the bypass leaves the cache unpopulated")
+
+        let after = frame("\u{1b}[?25lEEEE\r\nBBBB\r\nCCCC\r\nDDDD", cols: cols, rows: rows)
+        renderer.render(after, to: target, clearColor: clear,
+                        damage: TerminalDamage(rows: IndexSet(integer: 0), full: false))
+        let reference = try makeRenderer(device: device)
+        reference.render(after, to: refTarget, clearColor: clear)
+        XCTAssertEqual(
+            readPixelBytes(target, width: size.width, height: size.height),
+            readPixelBytes(refTarget, width: size.width, height: size.height),
+            "the no-image frame after the bypass must rebuild and match from-scratch"
+        )
+    }
+
+    func testSplicedFlatsStayCoherentAcrossFuzzedEdits() throws {
+        // The sharpest risk of the persistent-flats design: a rowSeg off-by-one on a
+        // count-changing splice corrupts every later row's bytes/offsets. Drive a deterministic
+        // fuzzed sequence of single-row edits — same-count glyph swaps, count-changing appends,
+        // decoration toggles (deco count change), explicit backgrounds (bg span change) — and
+        // assert the readback equals a from-scratch render after EVERY step.
+        let (device, renderer) = try makeRenderer()
+        let cols = 14, rows = 8
+        let clear = RenderColor(red: 0, green: 0, blue: 0, alpha: 1)
+        let size = renderer.surfacePixelSize(columns: cols, rows: rows)
+        guard let target = makeTarget(device, width: size.width, height: size.height),
+              let refTarget = makeTarget(device, width: size.width, height: size.height)
+        else { throw XCTSkip("no texture") }
+
+        var lines = (0 ..< rows).map { "row\($0)data" }
+        func currentFrame() -> TerminalFrame {
+            frame("\u{1b}[?25l" + lines.joined(separator: "\r\n"), cols: cols, rows: rows)
+        }
+        renderer.render(currentFrame(), to: target, clearColor: clear,
+                        damage: TerminalDamage(rows: IndexSet(integersIn: 0 ..< rows), full: true))
+
+        var seed: UInt64 = 0x9E3779B97F4A7C15
+        func next() -> UInt64 { seed = seed &* 6364136223846793005 &+ 1442695040888963407; return seed }
+        for step in 0 ..< 40 {
+            let row = Int(next() % UInt64(rows))
+            // Every mutation stays within `cols` — a wrapped line would shift OTHER rows while
+            // the damage below claims only `row`, a lie no real engine tells the renderer.
+            switch next() % 4 {
+            case 0: lines[row] = "swp\(step % 10)data"                        // same glyph count (8)
+            case 1: lines[row] = "len\(step % 10)plus!#"                      // glyph count change (10)
+            case 2: lines[row] = "\u{1b}[4mund\(step % 10)\u{1b}[24m"         // deco count change
+            default: lines[row] = "\u{1b}[41mbg\(step % 10)\u{1b}[49m rest"   // bg span change
+            }
+            let f = currentFrame()
+            renderer.render(f, to: target, clearColor: clear,
+                            damage: TerminalDamage(rows: IndexSet(integer: row), full: false))
+            XCTAssertEqual(renderer.stats.encodedRows, 1, "step \(step) splices exactly one row")
+            let reference = try makeRenderer(device: device)
+            reference.render(f, to: refTarget, clearColor: clear)
+            XCTAssertEqual(
+                readPixelBytes(target, width: size.width, height: size.height),
+                readPixelBytes(refTarget, width: size.width, height: size.height),
+                "step \(step) (row \(row)): spliced flats must match a from-scratch render"
+            )
+        }
+    }
+
+    func testScatteredCountPreservingDamageUploadsSpansNotUnion() throws {
+        // The span-list win: dirtying the FIRST and LAST rows with count-preserving changes
+        // must upload ~two rows' bytes, not the whole region between them (the old single
+        // union range was first.lowerBound ..< last.upperBound — nearly the full stream).
+        let (device, renderer) = try makeRenderer()
+        let cols = 8, rows = 12
+        let clear = RenderColor(red: 0, green: 0, blue: 0, alpha: 1)
+        let size = renderer.surfacePixelSize(columns: cols, rows: rows)
+        guard let target = makeTarget(device, width: size.width, height: size.height) else {
+            throw XCTSkip("no texture")
+        }
+        func text(_ first: String, _ last: String) -> String {
+            "\u{1b}[?25l" + ([first] + (1 ..< rows - 1).map { "midrow\($0)" } + [last]).joined(separator: "\r\n")
+        }
+        let f0 = frame(text("AAAAAA", "BBBBBB"), cols: cols, rows: rows)
+        renderer.render(f0, to: target, clearColor: clear,
+                        damage: TerminalDamage(rows: IndexSet(integersIn: 0 ..< rows), full: true))
+        let fullBytes = renderer.stats.instanceUploadBytes
+        XCTAssertGreaterThan(fullBytes, 0)
+        // Flush the prime's conservative full-pending from the OTHER ring slot (a full upload
+        // unions into both slots; the slot written next still owes it once).
+        renderer.render(f0, to: target, clearColor: clear,
+                        damage: TerminalDamage(rows: IndexSet(integer: 5), full: false))
+
+        // Same glyph counts on both rows → no segment shift → exactly two row-sized spans.
+        let f1 = frame(text("CCCCCC", "DDDDDD"), cols: cols, rows: rows)
+        renderer.render(f1, to: target, clearColor: clear,
+                        damage: TerminalDamage(rows: [0, rows - 1], full: false))
+        XCTAssertEqual(renderer.stats.encodedRows, 2)
+        XCTAssertGreaterThan(renderer.stats.instanceUploadBytes, 0)
+        XCTAssertLessThanOrEqual(
+            renderer.stats.instanceUploadBytes, fullBytes / 3,
+            "two distant count-preserving rows must upload spans, not the union between them"
+        )
+
+        // Readback truth for the same sequence.
+        let reference = try makeRenderer(device: device)
+        guard let refTarget = makeTarget(device, width: size.width, height: size.height) else {
+            throw XCTSkip("no texture")
+        }
+        reference.render(f1, to: refTarget, clearColor: clear)
+        XCTAssertEqual(
+            readPixelBytes(target, width: size.width, height: size.height),
+            readPixelBytes(refTarget, width: size.width, height: size.height)
+        )
+    }
+
+    func testSpanCapFallbackStaysCorrect() throws {
+        // More scattered dirty rows than DynamicInstanceBuffer.maxPendingSpans: the pending list
+        // collapses to its bounding range. Correctness (readback) must be unaffected.
+        let (device, renderer) = try makeRenderer()
+        let cols = 6, rows = 24
+        let clear = RenderColor(red: 0, green: 0, blue: 0, alpha: 1)
+        let size = renderer.surfacePixelSize(columns: cols, rows: rows)
+        guard let target = makeTarget(device, width: size.width, height: size.height) else {
+            throw XCTSkip("no texture")
+        }
+        func text(_ marker: String) -> String {
+            "\u{1b}[?25l" + (0 ..< rows).map { $0 % 2 == 0 ? "\(marker)\($0)" : "odd\($0)" }
+                .joined(separator: "\r\n")
+        }
+        renderer.render(frame(text("ev"), cols: cols, rows: rows), to: target, clearColor: clear,
+                        damage: TerminalDamage(rows: IndexSet(integersIn: 0 ..< rows), full: true))
+        // Dirty every even row (12 spans > the cap of 8).
+        let changed = frame(text("ch"), cols: cols, rows: rows)
+        renderer.render(changed, to: target, clearColor: clear,
+                        damage: TerminalDamage(rows: IndexSet((0 ..< rows).filter { $0 % 2 == 0 }), full: false))
+        let reference = try makeRenderer(device: device)
+        guard let refTarget = makeTarget(device, width: size.width, height: size.height) else {
+            throw XCTSkip("no texture")
+        }
+        reference.render(changed, to: refTarget, clearColor: clear)
+        XCTAssertEqual(
+            readPixelBytes(target, width: size.width, height: size.height),
+            readPixelBytes(refTarget, width: size.width, height: size.height),
+            "past the span cap the bounding-range fallback must stay pixel-correct"
+        )
+    }
+
+    func testDynamicBufferMergeCoalescesAndCaps() {
+        // Pure span-list semantics: sort, coalesce adjacent/overlapping, collapse past the cap.
+        XCTAssertEqual(DynamicInstanceBuffer.merge([], adding: [3 ..< 5]), [3 ..< 5])
+        XCTAssertEqual(DynamicInstanceBuffer.merge([3 ..< 5], adding: [5 ..< 7]), [3 ..< 7])
+        XCTAssertEqual(DynamicInstanceBuffer.merge([3 ..< 5], adding: [4 ..< 6]), [3 ..< 6])
+        XCTAssertEqual(DynamicInstanceBuffer.merge([0 ..< 1], adding: [8 ..< 9]), [0 ..< 1, 8 ..< 9])
+        XCTAssertEqual(
+            DynamicInstanceBuffer.merge([10 ..< 12], adding: [0 ..< 2, 5 ..< 6]),
+            [0 ..< 2, 5 ..< 6, 10 ..< 12]
+        )
+        // 9 disjoint spans exceed the cap of 8 → bounding range.
+        let many = (0 ..< 9).map { ($0 * 10) ..< ($0 * 10 + 2) }
+        XCTAssertEqual(DynamicInstanceBuffer.merge([], adding: many), [0 ..< 82])
+    }
+
+    func testDynamicBufferUploadsExactSpansAcrossRingSlots() throws {
+        // The span-list upload writes exactly the pending bytes per slot, and a change reaches
+        // BOTH ring slots (each is written on its own frame) — leaving every slot byte-identical
+        // to the current array.
+        guard let device = MTLCreateSystemDefaultDevice() else { throw XCTSkip("No Metal device") }
+        let ring = DynamicInstanceBuffer(device: device, ringSize: 2, label: "test")
+        var values: [Float] = (0 ..< 16).map(Float.init)
+        let stride = MemoryLayout<Float>.stride
+
+        // Prime both slots (grow → full reseed), then drain the conservative cross-slot
+        // pendings (each prime unions its full span into BOTH slots) so steady state is clean.
+        let p0 = try XCTUnwrap(ring.uploadIncremental(values, dirty: nil, slot: 0))
+        XCTAssertEqual(p0.bytesWritten, 16 * stride)
+        let p1 = try XCTUnwrap(ring.uploadIncremental(values, dirty: nil, slot: 1))
+        XCTAssertEqual(p1.bytesWritten, 16 * stride)
+        _ = ring.uploadIncremental(values, dirty: [], slot: 0) // drain slot 0's leftover
+        let settled = try XCTUnwrap(ring.uploadIncremental(values, dirty: [], slot: 1))
+        XCTAssertEqual(settled.bytesWritten, 0, "both slots settled — nothing pending")
+
+        // Two distant single-element changes → exactly two element-sized spans on slot 0.
+        values[2] = 100; values[12] = 200
+        let w0 = try XCTUnwrap(ring.uploadIncremental(values, dirty: [2 ..< 3, 12 ..< 13], slot: 0))
+        XCTAssertEqual(w0.bytesWritten, 2 * stride, "two spans upload exactly their bytes")
+        // The next frame's slot (1) still owes those spans even with nothing new dirty.
+        let w1 = try XCTUnwrap(ring.uploadIncremental(values, dirty: [], slot: 1))
+        XCTAssertEqual(w1.bytesWritten, 2 * stride, "the other ring slot still receives the spans")
+        for (slot, result) in [(0, w0), (1, w1)] {
+            let contents = result.buffer.contents().bindMemory(to: Float.self, capacity: 16)
+            for i in 0 ..< 16 {
+                XCTAssertEqual(contents[i], values[i], "slot \(slot) index \(i) must match the array")
+            }
+        }
+    }
+
     func testRendererDamageRebuildsBlockCursorGlyphRowWhenBlinking() throws {
         let (device, renderer) = try makeRenderer()
         var visible = frame("A", cols: 1, rows: 1)
