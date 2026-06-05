@@ -188,7 +188,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
 
     func tabBarDidRequestNewTab() {
         guard let workspaceID = SessionCoordinator.shared.snapshot.activeWorkspaceID else { return }
-        SessionCoordinator.shared.addTab(to: workspaceID)
+        SessionCoordinator.shared.addSession(to: workspaceID)
     }
 
     func tabBarDidRequestClose(tabID: TabID) {
