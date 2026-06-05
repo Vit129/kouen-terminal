@@ -98,9 +98,9 @@ final class GitPanelView: NSView {
         stackView.spacing = 10
         stackView.translatesAutoresizingMaskIntoConstraints = false
         stackView.addArrangedSubview(actionBar)
-        stackView.addArrangedSubview(commitBar)
         stackView.addArrangedSubview(statusHeader)
         stackView.addArrangedSubview(statusStack)
+        stackView.addArrangedSubview(commitBar)
         stackView.addArrangedSubview(logHeader)
         stackView.addArrangedSubview(logStack)
 
