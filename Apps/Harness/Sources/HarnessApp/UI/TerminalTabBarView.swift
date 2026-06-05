@@ -422,7 +422,7 @@ private final class TabPillView: NSView {
         closeButton.target = self
         closeButton.action = #selector(closeClicked)
         closeButton.translatesAutoresizingMaskIntoConstraints = false
-        closeButton.alphaValue = 0
+        closeButton.alphaValue = 1
         closeButton.wantsLayer = true
         closeButton.layer?.cornerRadius = HarnessDesign.Radius.badge
         closeButton.layer?.cornerCurve = .continuous

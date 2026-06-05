@@ -56,6 +56,7 @@ final class WorkspaceFileTreeView: NSView, NSOutlineViewDelegate, NSOutlineViewD
         outlineView.menu = menu
 
         // Drag source
+        outlineView.setDraggingSourceOperationMask(.copy, forLocal: true)
         outlineView.setDraggingSourceOperationMask(.copy, forLocal: false)
         outlineView.registerForDraggedTypes([.fileURL])
 
