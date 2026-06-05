@@ -1,5 +1,7 @@
 # Harness
 
+> Forked from [robzilla1738/harness-terminal](https://github.com/robzilla1738/harness-terminal)
+
 The native macOS terminal that keeps your sessions running and tells you the moment a coding agent needs you.
 
 Every pane renders on Harness's own GPU engine. Your splits and sessions live in a background daemon, so they survive quitting the app — and their scrollback survives a daemon restart. You can drive or attach to them from the command line, including a headless or remote daemon over SSH. And Harness watches the agents you run inside it (Claude Code, Codex, Cursor, and more), so an approval prompt never sits unseen behind another tab.
