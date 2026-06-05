@@ -58,6 +58,11 @@ New installs start in Plain. Moving over from another setup? See [docs/MIGRATION
 - Drag file-backed folders or images into a pane to insert shell-quoted paths
 - Set Harness as the default terminal for SSH/Telnet/man-page links and `.command` / `.tool` files from Settings > Terminal
 - Automatic, signed background updates (Sparkle + EdDSA)
+- **IDE sidebar** — Files tab (project file tree), Git tab (Zed-style changes/history, stage/commit/push), and session management
+- **Project-aware file tree** — follows active session cwd, right-click to copy path, drag files to terminal
+- **Git workflow** — stage/unstage files, commit, fetch/pull/push, branch switcher — all from the sidebar
+- **Session-as-tab** — each tab in the tab bar is a project session; + creates a new session, ✕ closes it
+- **Recent projects** — clock button in sidebar footer shows last 10 projects, switches to existing session on duplicate
 
 ## harness-cli
 
@@ -144,11 +149,44 @@ The command prefix (default `Ctrl-A`) adds the full pane / session keymap on top
 
 ## Build from source
 
+### Prerequisites
+
+- Apple silicon Mac running **macOS 15.0+**
+- **Xcode 16+** / Swift 6.0
+- (Optional) [XcodeGen](https://github.com/yonaskolb/XcodeGen) for Xcode project regeneration
+
+### Quick install
+
 ```bash
-git clone https://github.com/robzilla1738/harness-terminal.git harness
+git clone https://github.com/Vit129/harness-terminal.git harness
 cd harness
 make release
 open Harness.app
+```
+
+### Install CLI + Daemon
+
+```bash
+# From the built app:
+./Harness.app/Contents/MacOS/harness-cli install
+
+# Add to your shell profile:
+export PATH="$HOME/Library/Application Support/Harness/bin:$PATH"
+```
+
+Or install from source directly:
+
+```bash
+swift build -c release
+cp .build/release/harness-cli /usr/local/bin/
+cp .build/release/HarnessDaemon /usr/local/bin/
+```
+
+### Development preview
+
+```bash
+make preview        # build + launch preview app (isolated from production)
+make preview-stop   # stop preview
 ```
 
 Validate a source checkout before shipping changes:
@@ -186,6 +224,7 @@ xcodebuild -project Harness.xcodeproj -scheme Harness -configuration Debug \
 ## Documentation
 
 - [Experience modes](docs/MODES.md) — Plain / Persistent / Full / Agent
+- [IDE sidebar](docs/IDE-SIDEBAR.md) — Files tab, Git tab, session tabs, recent projects
 - [Sessions & panes guide](docs/MULTIPLEXER_GUIDE.md) — prefix, panes, sessions, copy mode, attach from anywhere
 - [tmux-style capabilities PDF](docs/HARNESS_TMUX_CAPABILITIES.pdf) — printable setup, shortcuts, commands, attach, copy mode, and troubleshooting
 - [Release runbook](docs/RELEASE.md) — signed/notarized DMG, GitHub Actions release workflow, and Sparkle appcast publishing
