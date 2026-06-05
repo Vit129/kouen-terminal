@@ -9,6 +9,15 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [Unreleased]
 
 ### Added
+- **Real-time live resize (Ghostty parity).** Dragging the window edge now reflows the grid and
+  signals the running program (`SIGWINCH`) at every cell boundary, so interactive programs
+  (vim/htop/btop/tmux/less) and alternate-screen TUIs redraw *during* the drag instead of snapping
+  at release. The authoritative reflow runs off-main with latest-wins coalescing (a fast drag runs
+  ~1–3 reflows, not one per column), presents inside an explicit `CATransaction` so it flushes even
+  when the pointer is held still, and the PTY vote coalesces per-fd and to distinct cell counts so
+  the daemon isn't stormed. Default on, with a **Real-time resize** setting (`liveResizeReflow`)
+  that reverts to the previous defer-to-release behavior. The non-mutating re-wrap preview is
+  retained as instant feedback under the live reflow.
 - **Tab persistence indicator.** A tab pinned to stay running after a clean quit
   ("Keep Tab Running After Quit") now shows a small accent pin at the leading edge of
   its tab pill — a tmux-style window flag — so kept-alive tabs are identifiable at a
