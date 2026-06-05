@@ -505,8 +505,14 @@ final class HarnessSidebarPanelViewController: NSViewController {
         switch index {
         case 1:
             sectionLabel.stringValue = "FILES"
+            if let cwd = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd {
+                fileTreeView.updateRoot(path: cwd)
+            }
         case 2:
             sectionLabel.stringValue = "GIT"
+            if let cwd = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd {
+                gitPanelView.updateRoot(path: cwd)
+            }
         default:
             sectionLabel.stringValue = "SESSIONS"
         }
