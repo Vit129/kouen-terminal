@@ -50,6 +50,15 @@ final class WorkspaceFileTreeView: NSView, NSOutlineViewDelegate, NSOutlineViewD
         outlineView.target = self
         outlineView.doubleAction = #selector(doubleClickFile)
 
+        // Right-click context menu
+        let menu = NSMenu()
+        menu.delegate = self
+        outlineView.menu = menu
+
+        // Drag source
+        outlineView.setDraggingSourceOperationMask(.copy, forLocal: false)
+        outlineView.registerForDraggedTypes([.fileURL])
+
         scrollView.documentView = outlineView
         scrollView.hasVerticalScroller = true
         scrollView.drawsBackground = false
@@ -125,6 +134,45 @@ final class WorkspaceFileTreeView: NSView, NSOutlineViewDelegate, NSOutlineViewD
         guard let surfaceID = coordinator.activeSurfaceID else { return }
         let command = "open \(item.node.path)\r"
         coordinator.requestDaemon(.sendData(surfaceID: surfaceID.uuidString, data: Data(command.utf8)))
+    }
+
+    // MARK: - Context menu
+
+    private func clickedItem() -> FileTreeItem? {
+        let row = outlineView.clickedRow
+        guard row >= 0 else { return nil }
+        return outlineView.item(atRow: row) as? FileTreeItem
+    }
+
+    @objc private func copyPath() {
+        guard let item = clickedItem() else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(item.node.path, forType: .string)
+    }
+
+    @objc private func copyRelativePath() {
+        guard let item = clickedItem() else { return }
+        let relative = item.node.path.replacingOccurrences(of: rootPath + "/", with: "")
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(relative, forType: .string)
+    }
+
+    // MARK: - Drag source
+
+    func outlineView(_ outlineView: NSOutlineView, pasteboardWriterForRow row: Int) -> NSPasteboardWriting? {
+        guard let item = outlineView.item(atRow: row) as? FileTreeItem else { return nil }
+        return NSURL(fileURLWithPath: item.node.path)
+    }
+}
+
+// MARK: - NSMenuDelegate
+
+extension WorkspaceFileTreeView: NSMenuDelegate {
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        menu.removeAllItems()
+        guard clickedItem() != nil else { return }
+        menu.addItem(NSMenuItem(title: "Copy Path", action: #selector(copyPath), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "Copy Relative Path", action: #selector(copyRelativePath), keyEquivalent: ""))
     }
 }
 
