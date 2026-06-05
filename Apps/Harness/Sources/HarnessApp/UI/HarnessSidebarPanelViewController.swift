@@ -711,7 +711,19 @@ final class HarnessSidebarPanelViewController: NSViewController {
 
     @objc private func addSession() {
         guard let activeWorkspaceID else { return }
-        SessionCoordinator.shared.addSession(to: activeWorkspaceID)
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Open"
+        panel.message = "Choose a project folder"
+        panel.begin { [weak self] response in
+            guard response == .OK, let url = panel.url else { return }
+            DispatchQueue.main.async {
+                guard let self, let id = self.activeWorkspaceID ?? activeWorkspaceID as WorkspaceID? else { return }
+                SessionCoordinator.shared.addSession(to: id, cwd: url.path, name: url.lastPathComponent)
+            }
+        }
     }
 
     @objc private func sessionDoubleClick() {
