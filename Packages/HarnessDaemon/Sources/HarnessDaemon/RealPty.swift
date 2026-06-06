@@ -208,6 +208,25 @@ public final class RealPty: @unchecked Sendable {
         let argv: [UnsafeMutablePointer<CChar>?] = argvStrings.map { strdup($0) } + [nil]
 
         var environment = ProcessInfo.processInfo.environment
+        let lang = environment["LANG"] ?? ""
+        if lang.isEmpty || lang == "C" || lang == "POSIX" || lang == "C.UTF-8" || !lang.lowercased().contains("utf") {
+            let baseLang = (Locale.current.languageCode ?? "en").lowercased()
+            let resolved: String
+            switch baseLang {
+            case "zh": resolved = "zh_CN.UTF-8"
+            case "ja": resolved = "ja_JP.UTF-8"
+            case "ko": resolved = "ko_KR.UTF-8"
+            case "de": resolved = "de_DE.UTF-8"
+            case "fr": resolved = "fr_FR.UTF-8"
+            case "es": resolved = "es_ES.UTF-8"
+            case "it": resolved = "it_IT.UTF-8"
+            case "nl": resolved = "nl_NL.UTF-8"
+            case "pt": resolved = "pt_BR.UTF-8"
+            case "ru": resolved = "ru_RU.UTF-8"
+            default:   resolved = "en_US.UTF-8"
+            }
+            environment["LANG"] = resolved
+        }
         environment["TERM"] = "xterm-256color"
         // Advertise 24-bit color so TUIs (Claude Code, etc.) emit truecolor instead of
         // downgrading to the muted 256-color cube. The renderer passes truecolor through
@@ -355,6 +374,25 @@ public final class RealPty: @unchecked Sendable {
         let argv: [UnsafeMutablePointer<CChar>?] = argvStrings.map { strdup($0) } + [nil]
 
         var environment = ProcessInfo.processInfo.environment
+        let lang = environment["LANG"] ?? ""
+        if lang.isEmpty || lang == "C" || lang == "POSIX" || lang == "C.UTF-8" || !lang.lowercased().contains("utf") {
+            let baseLang = (Locale.current.languageCode ?? "en").lowercased()
+            let resolved: String
+            switch baseLang {
+            case "zh": resolved = "zh_CN.UTF-8"
+            case "ja": resolved = "ja_JP.UTF-8"
+            case "ko": resolved = "ko_KR.UTF-8"
+            case "de": resolved = "de_DE.UTF-8"
+            case "fr": resolved = "fr_FR.UTF-8"
+            case "es": resolved = "es_ES.UTF-8"
+            case "it": resolved = "it_IT.UTF-8"
+            case "nl": resolved = "nl_NL.UTF-8"
+            case "pt": resolved = "pt_BR.UTF-8"
+            case "ru": resolved = "ru_RU.UTF-8"
+            default:   resolved = "en_US.UTF-8"
+            }
+            environment["LANG"] = resolved
+        }
         environment["TERM"] = "xterm-256color"
         // Advertise 24-bit color so TUIs (Claude Code, etc.) emit truecolor instead of
         // downgrading to the muted 256-color cube. The renderer passes truecolor through

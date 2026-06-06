@@ -39,6 +39,14 @@ final class SessionCoordinator: NSObject {
     /// Tabs with `synchronize-panes` on — input typed in any pane mirrors to all.
     private var synchronizedTabIDs: Set<TabID> = []
     var structureRevision = 0
+    /// Tracks the last theme + settings combination applied to all hosts.
+    /// Compared before calling `applyThemeToAllHosts()` so we skip the
+    /// per-host apply loop on every tab/pane switch where nothing changed.
+    private var appliedThemeKey = ""
+    /// Flat index rebuilt once per `syncFromDaemon`. Replaces O(W×S×T×P)
+    /// triple-nested scans in `paneBorderContext`, `tabAndPane`, `paneCount`,
+    /// `tabID`, `syncWaitingRings`, and `refreshSyncSiblings` with O(1) lookups.
+    private var surfaceIndex: [SurfaceID: (tab: Tab, tabID: TabID)] = [:]
 
     /// The most recently closed tab's directory + title, captured so ⇧⌘T can
     /// reopen a fresh tab in the same place. Holds only the last one (the common
@@ -179,8 +187,15 @@ final class SessionCoordinator: NSObject {
         }
         pushNewRemoteNotifications(from: remote)
         pushAgentActivityNotifications(from: remote)
+        // Rebuild the surface→tab index once per sync so all downstream
+        // methods can do O(1) lookups instead of triple-nested scans.
+        surfaceIndex = buildSurfaceIndex(remote)
         if !metadataOnly {
-            applyThemeToAllHosts()
+            let themeKey = "\(snapshot.themeName)|\(settings.backgroundOpacity)|\(settings.backgroundBlur)|\(settings.customBackgroundHex ?? "")|\(settings.customForegroundHex ?? "")|\(settings.customCursorHex ?? "")"
+            if themeKey != appliedThemeKey {
+                appliedThemeKey = themeKey
+                applyThemeToAllHosts()
+            }
         }
         syncWaitingRings()
         updateDockBadge(from: remote)
@@ -208,6 +223,23 @@ final class SessionCoordinator: NSObject {
             if attempt == 0 { Thread.sleep(forTimeInterval: 0.1) } // brief gap before the single retry
         }
         fputs("Harness: closeEphemeralSessions did not confirm before quit\n", harnessStderr)
+    }
+
+    /// Build a flat surface→tab index from a snapshot. O(W×S×T×P) one-time
+    /// cost replaces repeated per-call scans across `paneBorderContext`,
+    /// `tabAndPane`, `paneCount`, `tabID`, and `refreshSyncSiblings`.
+    private func buildSurfaceIndex(_ snap: SessionSnapshot) -> [SurfaceID: (tab: Tab, tabID: TabID)] {
+        var index: [SurfaceID: (tab: Tab, tabID: TabID)] = [:]
+        for workspace in snap.workspaces {
+            for session in workspace.sessions {
+                for tab in session.tabs {
+                    for sid in tab.rootPane.allSurfaceIDs() {
+                        index[sid] = (tab, tab.id)
+                    }
+                }
+            }
+        }
+        return index
     }
 
     private func structureFingerprint(_ snap: SessionSnapshot) -> String {
@@ -256,10 +288,8 @@ final class SessionCoordinator: NSObject {
 
     private func syncWaitingRings() {
         for host in terminalHosts.allHosts() {
-            if let match = snapshot.workspaces.flatMap({ workspace in workspace.sessions.flatMap { $0.tabs } }).first(where: { tab in
-                tab.rootPane.allSurfaceIDs().contains(host.surfaceID)
-            }) {
-            }
+            // surfaceIndex provides O(1) lookup; previously triple-nested scan.
+            _ = surfaceIndex[host.surfaceID]
         }
     }
 
@@ -873,16 +903,10 @@ final class SessionCoordinator: NSObject {
     /// Format context for a specific pane (for `pane-border-format`): its index in the owning
     /// tab's pane order, the tab title (Harness has no per-pane title), and active state.
     private func paneBorderContext(forSurface surfaceID: SurfaceID) -> FormatContext {
-        var owningTab: Tab?
-        var paneIndex: Int?
-        outer: for workspace in snapshot.workspaces {
-            for session in workspace.sessions {
-                for tab in session.tabs {
-                    if let idx = tab.rootPane.allSurfaceIDs().firstIndex(of: surfaceID) {
-                        owningTab = tab; paneIndex = idx; break outer
-                    }
-                }
-            }
+        // O(1) via surfaceIndex instead of triple-nested scan.
+        let owningTab = surfaceIndex[surfaceID]?.tab
+        let paneIndex = owningTab.flatMap { tab in
+            tab.rootPane.allSurfaceIDs().firstIndex(of: surfaceID)
         }
         return FormatContext(
             paneID: surfaceID.uuidString,
@@ -900,16 +924,11 @@ final class SessionCoordinator: NSObject {
 
     /// Resolve the owning tab + pane IDs for a surface, for daemon focus sync.
     private func tabAndPane(forSurface surfaceID: SurfaceID) -> (tabID: TabID, paneID: PaneID)? {
-        for workspace in snapshot.workspaces {
-            for session in workspace.sessions {
-                for tab in session.tabs {
-                    if let pane = paneID(for: surfaceID, in: tab.rootPane) {
-                        return (tab.id, pane)
-                    }
-                }
-            }
-        }
-        return nil
+        // O(1) via surfaceIndex instead of triple-nested scan.
+        guard let entry = surfaceIndex[surfaceID],
+              let pane = paneID(for: surfaceID, in: entry.tab.rootPane)
+        else { return nil }
+        return (entry.tabID, pane)
     }
 
     /// Reflect the daemon's authoritative `activePaneID` (e.g. changed by another
@@ -936,27 +955,15 @@ final class SessionCoordinator: NSObject {
 
     /// Number of panes in the tab that owns `surfaceID` (1 when unsplit).
     private func paneCount(forSurface surfaceID: SurfaceID) -> Int {
-        for workspace in snapshot.workspaces {
-            for session in workspace.sessions {
-                for tab in session.tabs {
-                    let ids = tab.rootPane.allSurfaceIDs()
-                    if ids.contains(surfaceID) { return ids.count }
-                }
-            }
-        }
-        return 0
+        // O(1) via surfaceIndex instead of triple-nested scan.
+        guard let tab = surfaceIndex[surfaceID]?.tab else { return 0 }
+        return tab.rootPane.allSurfaceIDs().count
     }
 
     /// The tab that owns `surfaceID`, if any.
     private func tabID(forSurface surfaceID: SurfaceID) -> TabID? {
-        for workspace in snapshot.workspaces {
-            for session in workspace.sessions {
-                for tab in session.tabs where tab.rootPane.allSurfaceIDs().contains(surfaceID) {
-                    return tab.id
-                }
-            }
-        }
-        return nil
+        // O(1) via surfaceIndex instead of triple-nested scan.
+        surfaceIndex[surfaceID]?.tabID
     }
 
     /// Jump to the most-recently-active pane in the current tab (`select-pane -l`).
@@ -1015,18 +1022,19 @@ final class SessionCoordinator: NSObject {
     /// Push each live host its sibling surface ids when its tab is synchronized
     /// (and clears them otherwise). Called on toggle and after every structure sync.
     func refreshSyncSiblings() {
-        let liveTabIDs = Set(snapshot.workspaces.flatMap { $0.sessions.flatMap { $0.tabs.map(\.id) } })
+        // O(1) lookup via surfaceIndex; previously triple-nested scan for liveTabIDs
+        // and then again for each tab's surfaceIDs.
+        let liveTabIDs = Set(surfaceIndex.values.map(\.tabID))
         synchronizedTabIDs.formIntersection(liveTabIDs)
-        for workspace in snapshot.workspaces {
-            for session in workspace.sessions {
-                for tab in session.tabs {
-                    let surfaceIDs = tab.rootPane.allSurfaceIDs()
-                    let synced = synchronizedTabIDs.contains(tab.id) && surfaceIDs.count > 1
-                    for sid in surfaceIDs {
-                        guard let host = terminalHosts.host(for: sid) else { continue }
-                        host.setSyncSiblings(synced ? surfaceIDs.filter { $0 != sid }.map(\.uuidString) : [])
-                    }
-                }
+        // Walk tabs once via the index values (deduplicated by tab identity).
+        var seenTabIDs = Set<TabID>()
+        for (_, entry) in surfaceIndex {
+            guard seenTabIDs.insert(entry.tabID).inserted else { continue }
+            let surfaceIDs = entry.tab.rootPane.allSurfaceIDs()
+            let synced = synchronizedTabIDs.contains(entry.tabID) && surfaceIDs.count > 1
+            for sid in surfaceIDs {
+                guard let host = terminalHosts.host(for: sid) else { continue }
+                host.setSyncSiblings(synced ? surfaceIDs.filter { $0 != sid }.map(\.uuidString) : [])
             }
         }
     }
@@ -1385,12 +1393,20 @@ final class SessionCoordinator: NSObject {
         metadataTask = Task { [weak self] in
             let git = GitMetadataProvider()
             while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                // Reduced from 2s → 5s: git probes are disk I/O; polling every 2s
+                // for N sessions adds up. 5s is still fast enough to feel live.
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
                 let work = await MainActor.run { () -> [(WorkspaceID, Tab)] in
                     guard let self, let workspace = self.snapshot.activeWorkspace else { return [] }
                     return workspace.sessions.flatMap { $0.tabs }.map { (workspace.id, $0) }
                 }
+                // Dedup by CWD: multiple sessions sharing the same directory (e.g.
+                // main + feat branches of the same repo) need only one git probe.
+                var probedCWDs = Set<String>()
                 let updates = work.compactMap { workspaceID, tab -> (WorkspaceID, TabID, String?)? in
+                    let cwd = tab.cwd
+                    guard !probedCWDs.contains(cwd) else { return nil }
+                    probedCWDs.insert(cwd)
                     let updated = git.refresh(tab: tab)
                     guard updated.gitBranch != tab.gitBranch else { return nil }
                     return (workspaceID, tab.id, updated.gitBranch)

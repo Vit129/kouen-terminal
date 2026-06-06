@@ -48,6 +48,12 @@ final class HarnessSidebarPanelViewController: NSViewController {
     /// Live filter text from the search field; empty shows all sessions.
     private var sessionFilter = ""
     private var collapsedGroups = Set<String>()
+    /// Cached result of buildSidebarRows(). Rebuilt only when sessions, filter, or
+    /// collapsed groups change — not on every NSTableViewDelegate call.
+    private var cachedSidebarRows: [SidebarSessionRow] = []
+    /// Last session ID sent to fileTreeView so we can detect session changes even
+    /// when the CWD is the same (e.g. two sessions sharing the same repo root).
+    private var lastFileTreeSessionID: SessionID?
 
     /// Sessions after applying the search filter. Drag-reorder is disabled while a
     /// filter is active (see the data source), so callers that reorder still use the
@@ -58,19 +64,23 @@ final class HarnessSidebarPanelViewController: NSViewController {
         return sessions.filter { sessionMatches($0, query: q) }
     }
 
-    private var sidebarRows: [SidebarSessionRow] {
+    /// Rebuild `cachedSidebarRows` from the current `displayedSessions` and
+    /// `collapsedGroups`. O(N×G) but only called from explicit invalidation
+    /// sites, not from every NSTableViewDelegate callback.
+    private func rebuildSidebarRows() {
+        var groupMap: [String: Int] = [:]   // rootPath → index in `groups`
         var groups: [(name: String, rootPath: String, firstIndex: Int, sessions: [SessionGroup])] = []
         for (index, session) in displayedSessions.enumerated() {
             let name = projectGroupName(for: session)
             let rootPath = projectGroupRootPath(for: session)
-            if let groupIndex = groups.firstIndex(where: { $0.rootPath == rootPath }) {
+            if let groupIndex = groupMap[rootPath] {
                 groups[groupIndex].sessions.append(session)
             } else {
+                groupMap[rootPath] = groups.count
                 groups.append((name: name, rootPath: rootPath, firstIndex: index, sessions: [session]))
             }
         }
-
-        return groups
+        cachedSidebarRows = groups
             .sorted { $0.firstIndex < $1.firstIndex }
             .flatMap { group -> [SidebarSessionRow] in
                 let isCollapsed = collapsedGroups.contains(group.rootPath)
@@ -104,14 +114,14 @@ final class HarnessSidebarPanelViewController: NSViewController {
     }
 
     private func sessionRow(at tableRow: Int) -> SessionGroup? {
-        let rows = sidebarRows
+        let rows = cachedSidebarRows
         guard tableRow >= 0, tableRow < rows.count else { return nil }
         if case let .session(session) = rows[tableRow] { return session }
         return nil
     }
 
     private func rowIndex(for sessionID: SessionID) -> Int? {
-        sidebarRows.firstIndex {
+        cachedSidebarRows.firstIndex {
             if case let .session(session) = $0 { return session.id == sessionID }
             return false
         }
@@ -585,7 +595,8 @@ final class HarnessSidebarPanelViewController: NSViewController {
         case 1:
             sectionLabel.stringValue = "FILES"
             if let cwd = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd {
-                fileTreeView.updateRoot(path: cwd)
+                let activeSessionID = SessionCoordinator.shared.snapshot.activeWorkspace?.activeSessionID
+                fileTreeView.updateRoot(path: cwd, sessionID: activeSessionID)
             }
         case 2:
             sectionLabel.stringValue = "GIT"
@@ -593,6 +604,9 @@ final class HarnessSidebarPanelViewController: NSViewController {
                 gitPanelView.updateRoot(path: cwd)
             }
         default:
+            // Switching back to Sessions tab: rebuild cache so heightOfRow/viewFor
+            // read O(1) cachedSidebarRows if sessions changed while tab was hidden.
+            rebuildSidebarRows()
             sectionLabel.stringValue = "SESSIONS"
         }
     }
@@ -670,12 +684,16 @@ final class HarnessSidebarPanelViewController: NSViewController {
         sessions = snap.activeWorkspace?.sessions ?? []
         let name = snap.activeWorkspace?.name ?? "Workspace"
         workspacePill.configure(name: name, count: sessions.count)
+        // Rebuild once before reloadData() so all NSTableViewDelegate callbacks
+        // read the O(1) cache instead of recomputing sidebarRows N times.
+        rebuildSidebarRows()
         sessionTable.reloadData()
 
         selectActiveSessionRowIfVisible(scroll: true)
 
         if let cwd = snap.activeWorkspace?.activeTab?.cwd {
-            fileTreeView.updateRoot(path: cwd)
+            let activeSessionID = snap.activeWorkspace?.activeSessionID
+            fileTreeView.updateRoot(path: cwd, sessionID: activeSessionID)
             gitPanelView.updateRoot(path: cwd)
             let home = NSHomeDirectory()
             if cwd != home, cwd != "/" {
@@ -701,7 +719,9 @@ final class HarnessSidebarPanelViewController: NSViewController {
         workspaces = snap.workspaces
         let name = snap.activeWorkspace?.name ?? "Workspace"
         workspacePill.configure(name: name, count: sessions.count)
-        let rows = sidebarRows
+        // Rebuild cache once; iterate the stored result — no redundant recomputation.
+        rebuildSidebarRows()
+        let rows = cachedSidebarRows
         for row in 0 ..< rows.count {
             if let cell = sessionTable.view(atColumn: 0, row: row, makeIfNecessary: false) as? SessionCardRowView {
                 guard case let .session(session) = rows[row] else { continue }
@@ -1146,11 +1166,11 @@ extension HarnessSidebarPanelViewController: NSTableViewDataSource, NSTableViewD
     fileprivate static let sessionRowPasteboardType = NSPasteboard.PasteboardType("com.robert.harness.session-row")
 
     func numberOfRows(in tableView: NSTableView) -> Int {
-        sidebarRows.count
+        cachedSidebarRows.count
     }
 
     func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
-        switch sidebarRows[row] {
+        switch cachedSidebarRows[row] {
         case .groupHeader:
             return 28
         case .session:
@@ -1213,7 +1233,7 @@ extension HarnessSidebarPanelViewController: NSTableViewDataSource, NSTableViewD
     }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-        switch sidebarRows[row] {
+        switch cachedSidebarRows[row] {
         case let .groupHeader(name, rootPath, isCollapsed):
             let header = SessionGroupHeaderRowView()
             header.configure(name: name, isCollapsed: isCollapsed)
@@ -1227,6 +1247,9 @@ extension HarnessSidebarPanelViewController: NSTableViewDataSource, NSTableViewD
                 } else {
                     self.collapsedGroups.insert(rootPath)
                 }
+                // Rebuild cache before reloadData() so all delegate callbacks
+                // read O(1) cachedSidebarRows, not recomputed sidebarRows.
+                self.rebuildSidebarRows()
                 self.sessionTable.reloadData()
             }
             header.onOptions = { [weak self] anchor in
@@ -1267,7 +1290,7 @@ extension HarnessSidebarPanelViewController: NSTableViewDataSource, NSTableViewD
               let sourceIndex = sessionIndex(for: movingSessionID)
         else { return nil }
 
-        let rows = sidebarRows
+        let rows = cachedSidebarRows
         guard !rows.isEmpty else { return nil }
         let clampedRow = max(0, min(row, rows.count))
 

@@ -405,15 +405,17 @@ final class PaneContainerView: NSView {
                 split.trailingAnchor.constraint(equalTo: parent.trailingAnchor),
                 split.bottomAnchor.constraint(equalTo: parent.bottomAnchor),
             ])
-            // Build the child panes first, then set the divider — so each child lays out once
-            // at ~final bounds instead of resizing (and re-sizing its PTY) twice.
+            // Build the child panes first, then resolve the divider synchronously.
+            // `layoutSubtreeIfNeeded()` forces Auto Layout to compute `split.frame`
+            // before we call `setPosition`, so each child lays out exactly once at
+            // its final size — no async bounce, no PTY double-SIGWINCH, no flicker.
             build(node: firstNode, cwd: cwd, into: first)
             build(node: secondNode, cwd: cwd, into: second)
-            DispatchQueue.main.async {
-                let position = (direction == .horizontal ? split.frame.width : split.frame.height) * ratio
-                if position > 50 {
-                    split.setPosition(position, ofDividerAt: 0)
-                }
+            split.layoutSubtreeIfNeeded()
+            let totalSize = direction == .horizontal ? split.frame.width : split.frame.height
+            let position = totalSize * ratio
+            if position > 0, position < totalSize {
+                split.setPosition(position, ofDividerAt: 0)
             }
         }
     }
