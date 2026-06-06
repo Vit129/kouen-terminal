@@ -48,6 +48,7 @@ final class WorkspaceFileTreeView: NSView, NSOutlineViewDelegate, NSOutlineViewD
         outlineView.dataSource = self
         outlineView.delegate = self
         outlineView.target = self
+        outlineView.action = #selector(singleClickFile)
         outlineView.doubleAction = #selector(doubleClickFile)
 
         // Right-click context menu
@@ -120,6 +121,17 @@ final class WorkspaceFileTreeView: NSView, NSOutlineViewDelegate, NSOutlineViewD
         let cell = FileTreeCellView()
         cell.configure(node: item.node)
         return cell
+    }
+
+    @objc private func singleClickFile() {
+        let row = outlineView.clickedRow
+        guard row >= 0, let item = outlineView.item(atRow: row) as? FileTreeItem else { return }
+        guard item.node.isDirectory else { return }
+        if outlineView.isItemExpanded(item) {
+            outlineView.collapseItem(item)
+        } else {
+            outlineView.expandItem(item)
+        }
     }
 
     @objc private func doubleClickFile() {
