@@ -126,6 +126,20 @@ enum ControlModeClient {
         case let .showHooks(event):
             guard case let .hooks(hooks)? = try? client.request(.listHooks(event: event), timeout: 3) else { return nil }
             return hooks.map { "\($0.event) → \($0.commandSource) [\($0.id.uuidString)]" }.joined(separator: "\n")
+        case let .findWindow(pattern, name, content, title):
+            // Only the -C form reaches here (non-content translated to selectTab upstream).
+            _ = content
+            guard case let .snapshot(snapshot)? = try? client.request(.getSnapshot, timeout: 3) else { return nil }
+            let match = FindWindowMatcher.firstMatch(
+                snapshot, pattern: pattern, name: name, title: title
+            ) { surfaceID in
+                guard case let .text(text)? = try? client.request(
+                    .capturePane(surfaceID: surfaceID, includeScrollback: false), timeout: 3) else { return nil }
+                return text
+            }
+            guard let match else { return "find-window: no matches for '\(pattern)'" }
+            _ = try? client.request(.selectTab(workspaceID: match.workspaceID, tabID: match.tabID), timeout: 3)
+            return "find-window: focused \(match.tabID.uuidString)"
         default:
             return nil
         }

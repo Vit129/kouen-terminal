@@ -210,6 +210,23 @@ final class MainExecutor: CommandExecutor {
                 let lines = hooks.map { "\($0.event) → \($0.commandSource)  [\($0.id.uuidString.prefix(8))]" }
                 DisplayMessage.show(lines.isEmpty ? "no hooks bound" : lines.joined(separator: "\n"))
             }
+        case let .findWindow(pattern, name, content, title):
+            // Non-content searches translate to a selectTab request; -C needs live
+            // captures, done inline (re-dispatching the clientLocal result would loop).
+            guard content else { return try runViaTranslator(command, coordinator: coordinator) }
+            let match = FindWindowMatcher.firstMatch(
+                coordinator.snapshot, pattern: pattern, name: name, title: title
+            ) { surfaceID in
+                guard case let .text(text)? = coordinator.requestDaemon(
+                    .capturePane(surfaceID: surfaceID, includeScrollback: false)) else { return nil }
+                return text
+            }
+            guard let match else {
+                DisplayMessage.show("find-window: no matches for '\(pattern)'")
+                return
+            }
+            _ = coordinator.requestDaemon(.selectTab(workspaceID: match.workspaceID, tabID: match.tabID))
+            coordinator.syncFromDaemon()
         case .reloadKeybindings:
             KeybindingsService.shared.reload()
             PrefixKeymap.shared.rebuildFromSettings()

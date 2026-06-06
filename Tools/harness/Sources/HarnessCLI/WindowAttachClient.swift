@@ -1216,6 +1216,22 @@ private final class WindowSession: @unchecked Sendable {
                 flashStatus(hooks.isEmpty ? "no hooks bound"
                     : hooks.prefix(2).map { "\($0.event)→\($0.commandSource)" }.joined(separator: " · "))
             }
+        case let .findWindow(pattern, name, content, title):
+            // Only the -C form reaches here (non-content translated to selectTab upstream).
+            _ = content
+            let snapshot = latestSnapshot ?? SessionSnapshot()
+            let match = FindWindowMatcher.firstMatch(
+                snapshot, pattern: pattern, name: name, title: title
+            ) { surfaceID in
+                guard case let .text(text)? = try? client.request(
+                    .capturePane(surfaceID: surfaceID, includeScrollback: false), timeout: 1) else { return nil }
+                return text
+            }
+            if let match {
+                _ = try? client.request(.selectTab(workspaceID: match.workspaceID, tabID: match.tabID), timeout: 1)
+            } else {
+                flashStatus("find-window: no matches for '\(pattern)'")
+            }
         default:
             break
         }
