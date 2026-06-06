@@ -3,6 +3,28 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.1.0] - 2026-06-06
+
+### Added
+- **Files tab** — SwiftUI rewrite: click folder name to expand/collapse (DisclosureGroup)
+- **Files tab** — drag file or folder from tree into terminal pastes shell-quoted path (fixed)
+- **Files tab** — lazy child loading on first folder expansion
+- **Drag-to-terminal** — image drag support (writes temp PNG, pastes path)
+- **Drag-to-terminal** — relaxed operation mask accepts `.generic` / `.every` source masks
+
+### Fixed
+- File tree drag-drop broken: removed `registerForDraggedTypes` on NSOutlineView that conflicted with drop routing
+- File tree drag-drop broken: removed empty `outlineView.action` that blocked drag initiation
+- App crash on launch (macOS 26 beta): `UNUserNotificationCenter.current()` throws during `dispatch_once` init — disabled all `UNUserNotificationCenter` calls in `DesktopNotifier` and `NotificationPermission`; sound fallback preserved
+
+### Changed
+- File tree rebuilt in SwiftUI (`List` + `DisclosureGroup`) — replaced 160-line NSOutlineView+delegate implementation with 100-line SwiftUI view
+- Desktop notifications disabled on macOS 26 beta (system bug — re-enable when Apple fixes `UNUserNotificationCenter` init)
+
+### Known Issues
+- Git tab checkbox stage/unstage not receiving clicks (CASE-001 — needs Xcode View Debugger)
+- Desktop notifications unavailable on macOS 26 beta (workaround: sound alert still plays)
+
 ## [1.0.0] - 2026-06-05
 
 ### Added
