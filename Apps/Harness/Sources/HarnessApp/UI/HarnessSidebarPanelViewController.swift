@@ -5,7 +5,7 @@ import HarnessCore
 @MainActor
 final class HarnessSidebarPanelViewController: NSViewController {
     private enum SidebarSessionRow {
-        case groupHeader(name: String, rootPath: String)
+        case groupHeader(name: String, rootPath: String, isCollapsed: Bool)
         case session(SessionGroup)
     }
 
@@ -47,6 +47,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
     private var workspaceDropdownMonitor: Any?
     /// Live filter text from the search field; empty shows all sessions.
     private var sessionFilter = ""
+    private var collapsedGroups = Set<String>()
 
     /// Sessions after applying the search filter. Drag-reorder is disabled while a
     /// filter is active (see the data source), so callers that reorder still use the
@@ -62,7 +63,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
         for (index, session) in displayedSessions.enumerated() {
             let name = projectGroupName(for: session)
             let rootPath = projectGroupRootPath(for: session)
-            if let groupIndex = groups.firstIndex(where: { $0.name == name }) {
+            if let groupIndex = groups.firstIndex(where: { $0.rootPath == rootPath }) {
                 groups[groupIndex].sessions.append(session)
             } else {
                 groups.append((name: name, rootPath: rootPath, firstIndex: index, sessions: [session]))
@@ -72,7 +73,13 @@ final class HarnessSidebarPanelViewController: NSViewController {
         return groups
             .sorted { $0.firstIndex < $1.firstIndex }
             .flatMap { group -> [SidebarSessionRow] in
-                [.groupHeader(name: group.name, rootPath: group.rootPath)] + group.sessions.map { .session($0) }
+                let isCollapsed = collapsedGroups.contains(group.rootPath)
+                let header = SidebarSessionRow.groupHeader(name: group.name, rootPath: group.rootPath, isCollapsed: isCollapsed)
+                if isCollapsed {
+                    return [header]
+                } else {
+                    return [header] + group.sessions.map { .session($0) }
+                }
             }
     }
 
@@ -804,6 +811,37 @@ final class HarnessSidebarPanelViewController: NSViewController {
         SessionCoordinator.shared.addSession(to: activeWorkspaceID, cwd: rootPath, name: name)
     }
 
+    private func showGroupActionsMenu(for rootPath: String, name: String, anchor: NSView) {
+        let menu = NSMenu()
+        let closeGroup = NSMenuItem(title: "Close all sessions in \(name)", action: #selector(closeGroupSessionsFromMenu(_:)), keyEquivalent: "")
+        closeGroup.target = self
+        closeGroup.representedObject = rootPath
+        menu.addItem(closeGroup)
+        
+        let point = NSPoint(x: anchor.bounds.width / 2, y: anchor.bounds.height + 4)
+        menu.popUp(positioning: nil, at: point, in: anchor)
+    }
+
+    @objc private func closeGroupSessionsFromMenu(_ sender: NSMenuItem) {
+        guard let rootPath = sender.representedObject as? String else { return }
+        let groupSessions = sessions.filter { projectGroupRootPath(for: $0) == rootPath }
+        guard !groupSessions.isEmpty else { return }
+        
+        let alert = NSAlert()
+        alert.messageText = "Close all sessions in this group?"
+        alert.informativeText = "This will close \(groupSessions.count) session\(groupSessions.count == 1 ? "" : "s") and all their tabs. This cannot be undone."
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Close All")
+        alert.addButton(withTitle: "Cancel")
+        
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        
+        for session in groupSessions {
+            SessionCoordinator.shared.closeSession(session)
+        }
+        SessionCoordinator.shared.syncFromDaemon()
+    }
+
     // MARK: - Recent Projects
 
     private static let recentProjectsKey = "RecentProjectPaths"
@@ -1176,11 +1214,23 @@ extension HarnessSidebarPanelViewController: NSTableViewDataSource, NSTableViewD
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         switch sidebarRows[row] {
-        case let .groupHeader(name, rootPath):
+        case let .groupHeader(name, rootPath, isCollapsed):
             let header = SessionGroupHeaderRowView()
-            header.configure(name: name)
+            header.configure(name: name, isCollapsed: isCollapsed)
             header.onAdd = { [weak self] in
                 self?.addSessionInGroup(rootPath: rootPath)
+            }
+            header.onToggleCollapse = { [weak self] in
+                guard let self else { return }
+                if self.collapsedGroups.contains(rootPath) {
+                    self.collapsedGroups.remove(rootPath)
+                } else {
+                    self.collapsedGroups.insert(rootPath)
+                }
+                self.sessionTable.reloadData()
+            }
+            header.onOptions = { [weak self] anchor in
+                self?.showGroupActionsMenu(for: rootPath, name: name, anchor: anchor)
             }
             return header
         case let .session(session):
@@ -1622,10 +1672,15 @@ final class WorkspacePillButton: NSButton {
 @MainActor
 private final class SessionGroupHeaderRowView: NSView {
     var onAdd: (() -> Void)?
+    var onToggleCollapse: (() -> Void)?
+    var onOptions: ((NSView) -> Void)?
 
-    private let stack = NSStackView()
+    private let leftStack = NSStackView()
+    private let rightStack = NSStackView()
+    private let disclosureLabel = NSTextField(labelWithString: "▾")
     private let label = NSTextField(labelWithString: "")
     private let addButton = NSButton()
+    private let optionsButton = NSButton()
     private var isHovered = false
     private var trackingArea: NSTrackingArea?
 
@@ -1634,11 +1689,17 @@ private final class SessionGroupHeaderRowView: NSView {
         wantsLayer = true
         layer?.backgroundColor = NSColor.clear.cgColor
 
+        disclosureLabel.font = .systemFont(ofSize: 10, weight: .bold)
+        disclosureLabel.textColor = HarnessDesign.chrome.textTertiary
+        disclosureLabel.alignment = .center
+        disclosureLabel.translatesAutoresizingMaskIntoConstraints = false
+        disclosureLabel.setContentHuggingPriority(.required, for: .horizontal)
+
         label.font = HarnessDesign.Typography.sectionLabel
         label.alignment = .left
         label.lineBreakMode = .byTruncatingTail
         label.translatesAutoresizingMaskIntoConstraints = false
-        label.setContentHuggingPriority(.required, for: .horizontal)
+        label.setContentHuggingPriority(.defaultLow, for: .horizontal)
         label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
         addButton.title = "+"
@@ -1653,20 +1714,50 @@ private final class SessionGroupHeaderRowView: NSView {
         addButton.setContentHuggingPriority(.required, for: .horizontal)
         addButton.setContentCompressionResistancePriority(.required, for: .horizontal)
 
-        stack.orientation = .horizontal
-        stack.alignment = .centerY
-        stack.spacing = 6
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        stack.addArrangedSubview(label)
-        stack.addArrangedSubview(addButton)
-        addSubview(stack)
+        optionsButton.title = "..."
+        optionsButton.font = .systemFont(ofSize: 13, weight: .semibold)
+        optionsButton.alignment = .center
+        optionsButton.bezelStyle = .inline
+        optionsButton.isBordered = false
+        optionsButton.translatesAutoresizingMaskIntoConstraints = false
+        optionsButton.target = self
+        optionsButton.action = #selector(optionsClicked)
+        optionsButton.toolTip = "Group options"
+        optionsButton.setContentHuggingPriority(.required, for: .horizontal)
+        optionsButton.setContentCompressionResistancePriority(.required, for: .horizontal)
+
+        leftStack.orientation = .horizontal
+        leftStack.alignment = .centerY
+        leftStack.spacing = 4
+        leftStack.translatesAutoresizingMaskIntoConstraints = false
+        leftStack.addArrangedSubview(disclosureLabel)
+        leftStack.addArrangedSubview(label)
+
+        rightStack.orientation = .horizontal
+        rightStack.alignment = .centerY
+        rightStack.spacing = 4
+        rightStack.translatesAutoresizingMaskIntoConstraints = false
+        rightStack.addArrangedSubview(addButton)
+        rightStack.addArrangedSubview(optionsButton)
+
+        addSubview(leftStack)
+        addSubview(rightStack)
 
         NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: HarnessDesign.horizontalInset - 4),
-            stack.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -(HarnessDesign.horizontalInset - 4)),
-            stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -3),
-            addButton.widthAnchor.constraint(equalToConstant: 18),
-            addButton.heightAnchor.constraint(equalToConstant: 18),
+            leftStack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: HarnessDesign.horizontalInset - 4),
+            leftStack.centerYAnchor.constraint(equalTo: centerYAnchor),
+            leftStack.trailingAnchor.constraint(lessThanOrEqualTo: rightStack.leadingAnchor, constant: -8),
+
+            rightStack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -(HarnessDesign.horizontalInset - 4)),
+            rightStack.centerYAnchor.constraint(equalTo: centerYAnchor),
+
+            disclosureLabel.widthAnchor.constraint(equalToConstant: 12),
+
+            addButton.widthAnchor.constraint(equalToConstant: 16),
+            addButton.heightAnchor.constraint(equalToConstant: 16),
+
+            optionsButton.widthAnchor.constraint(equalToConstant: 16),
+            optionsButton.heightAnchor.constraint(equalToConstant: 16),
         ])
     }
 
@@ -1696,9 +1787,19 @@ private final class SessionGroupHeaderRowView: NSView {
         refresh()
     }
 
-    func configure(name: String) {
+    override func mouseDown(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+        if addButton.frame.contains(point) || optionsButton.frame.contains(point) {
+            super.mouseDown(with: event)
+        } else {
+            onToggleCollapse?()
+        }
+    }
+
+    func configure(name: String, isCollapsed: Bool) {
         label.stringValue = name
         toolTip = name
+        disclosureLabel.stringValue = isCollapsed ? "▸" : "▾"
         refresh()
     }
 
@@ -1706,9 +1807,15 @@ private final class SessionGroupHeaderRowView: NSView {
         onAdd?()
     }
 
+    @objc private func optionsClicked() {
+        onOptions?(optionsButton)
+    }
+
     private func refresh() {
         let c = HarnessDesign.chrome
         label.textColor = c.textTertiary
+        disclosureLabel.textColor = c.textTertiary
+
         let plusColor = isHovered ? c.textSecondary : c.textTertiary
         addButton.attributedTitle = NSAttributedString(
             string: "+",
@@ -1717,7 +1824,17 @@ private final class SessionGroupHeaderRowView: NSView {
                 .font: NSFont.systemFont(ofSize: 13, weight: .semibold),
             ]
         )
-        addButton.alphaValue = isHovered ? 1 : 0.72
+        addButton.alphaValue = isHovered ? 1 : 0
+
+        let optionsColor = isHovered ? c.textSecondary : c.textTertiary
+        optionsButton.attributedTitle = NSAttributedString(
+            string: "...",
+            attributes: [
+                .foregroundColor: optionsColor,
+                .font: NSFont.systemFont(ofSize: 13, weight: .semibold),
+            ]
+        )
+        optionsButton.alphaValue = isHovered ? 1 : 0
     }
 }
 

@@ -121,10 +121,17 @@ Change:
 
 Group header view:
 
-- Use a simple `NSTableCellView`.
-- Uppercase or semibold text, muted tertiary color.
-- Height around 22-26 pt.
-- No hover/selection chrome.
+- Use a custom `NSTableCellView` subclass (e.g. `SessionGroupHeaderCellView`).
+- **Layout Alignment (ปุ่ม + ขวาสุด):**
+  - จัดวางชื่อกลุ่ม (Text Label) ไว้ด้านซ้าย และวางปุ่มเพิ่มเซสชัน (`+` button) ไว้ที่ **ฝั่งขวาสุด (Trailing Edge)** 
+  - ตั้งค่า Trailing Constraint ของปุ่ม `+` ให้เว้นระยะเยื้องเข้าด้านใน (เช่น -12pt หรือ -16pt) ให้ตรงแนวเดียวกับปุ่ม `✕` (Close Button) ของ Session Card ด้านล่าง เพื่อความสวยงามเป็นระเบียบของสายตา
+- **การยืด/หดกลุ่ม (Expand/Collapse):**
+  - เพิ่มไอคอนหัวลูกศร (Disclosure Chevron เช่น `chevron.right` / `chevron.down`) ไว้ด้านหน้าชื่อกลุ่ม
+  - จัดทำตัวแปรสถานะใน Controller: `private var collapsedGroups: Set<String> = []`
+  - คัดกรองแถวใน `sidebarRows` โดยหากกลุ่มใดอยู่ใน `collapsedGroups` จะไม่เรนเดอร์แถวประเภท `.session` ของกลุ่มนั้น
+  - เมื่อผู้ใช้คลิกที่แถวหัวข้อกลุ่ม (หรือคลิกที่ปุ่มลูกศร) ให้ทำการสลับค่าในเซ็ตและสั่ง `sessionTable.reloadData()`
+- Height around 24-28 pt.
+- No hover/selection chrome for the header background.
 
 Session card row:
 
