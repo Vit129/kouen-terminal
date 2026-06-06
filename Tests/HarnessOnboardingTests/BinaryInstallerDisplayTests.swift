@@ -21,8 +21,8 @@ final class BinaryInstallerDisplayTests: XCTestCase {
     @MainActor
     func testFoundDisplayPrefersExplicitVersion() {
         let withVersion = BinaryInstaller.DetectionStatus.found(
-            version: "1.1.2", path: URL(fileURLWithPath: "/x/harness-cli")
+            version: "1.2.0", path: URL(fileURLWithPath: "/x/harness-cli")
         )
-        XCTAssertEqual(withVersion.display, "Found 1.1.2")
+        XCTAssertEqual(withVersion.display, "Found 1.2.0")
     }
 }
