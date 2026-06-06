@@ -57,6 +57,13 @@ final class WindowTitleStripView: NSView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        if let _ = super.hitTest(point) {
+            return self
+        }
+        return nil
+    }
+
     /// A drag anywhere on the strip moves the window (matches the empty tab-bar background).
     override var mouseDownCanMoveWindow: Bool { true }
 

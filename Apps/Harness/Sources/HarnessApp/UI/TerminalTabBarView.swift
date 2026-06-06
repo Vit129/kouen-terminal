@@ -99,8 +99,9 @@ final class TerminalTabBarView: NSView {
 
         let height = heightAnchor.constraint(equalToConstant: HarnessDesign.tabBarHeight)
         height.priority = .defaultHigh
-        height.isActive = true
     }
+
+    override var mouseDownCanMoveWindow: Bool { true }
 
     func reload(tabs: [Tab], activeTabID: TabID?) {
         // A metadata-driven reload can land mid-drag (agent status updates fire often);
@@ -169,6 +170,29 @@ final class TerminalTabBarView: NSView {
     func setLeadingInset(_ inset: CGFloat) {
         leadingInset = inset
         layoutSubtreeIfNeeded()
+     }
+
+    // MARK: - Mouse Events
+
+    override func mouseUp(with event: NSEvent) {
+        if event.clickCount >= 2,
+           let controller = window?.windowController as? MainWindowController
+        {
+            let local = convert(event.locationInWindow, from: nil)
+            for pill in orderedPills {
+                if pill.frame.contains(local) {
+                    super.mouseUp(with: event)
+                    return
+                }
+            }
+            if newTabButton.frame.contains(local) || overflowButton.frame.contains(local) {
+                super.mouseUp(with: event)
+                return
+            }
+            controller.toggleVisibleFrameZoom(self)
+            return
+        }
+        super.mouseUp(with: event)
     }
 
     // MARK: - Layout
