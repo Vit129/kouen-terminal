@@ -6,6 +6,35 @@ All notable changes to Harness are documented here. The format is based on
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/robzilla1738/harness-terminal/releases).
 
+## [Unreleased]
+
+Redraw-efficiency series from the proven-best-practice deep dive (kitty/foot/Alacritty/Windows
+Terminal parity + Apple Metal guidance): overlays no longer disable damage-driven rendering,
+streaming output reuses the scrolled band, and invisible panes stop presenting.
+
+### Changed
+- **Selection, find highlights, and IME composition ride damage-driven rendering.** (#85) Any of
+  these used to force a full grid rebuild every frame for their whole duration and poison the
+  reuse caches. The live view now always builds clean and a cell-overlay pass re-shades only the
+  overlay rows (byte-identical by construction — it runs the same row resolver the baked path
+  used); per-row fingerprints add exactly the changed rows to the damage. A selection drag
+  re-encodes the rows it crossed instead of the grid; an idle find bar adds zero per-frame work;
+  composition dirties only its row.
+- **Streaming output shift-copies the scrolled band.** (#84) Whole-viewport scrolls (`cat`,
+  builds, `tail -f`) report a purely additive damage hint; the frame builder re-resolves only the
+  fresh rows and the renderer rotates its row-instance cache, as it already did for scrollback
+  scrolls. Frame builds during streaming: 299µs → 74µs per tick at 200×60 (4×).
+- **Covered and minimized windows stop presenting.** (#86) A pane with output flowing in a fully
+  occluded window presented invisibly at full cadence; per Apple guidance it now never acquires a
+  drawable while covered (parsing continues; one fresh frame presents on un-occlusion).
+- **ProMotion displays render at the panel's full rate while active.** (#83) The render display
+  link now requests the variable-refresh panel's maximum via `preferredFrameRateRange`; the link
+  still pauses at idle.
+- **Frame telemetry: p99 percentiles and classified drops.** (#83) The signpost flush line gains
+  p99 (tail dropouts were invisible between p95 and max) and splits dropped presents by cause
+  (drawable-pool exhaustion vs encode failure). Cursor-blink cost is pinned by test at ≤1
+  re-encoded row per toggle (#87).
+
 ## [1.5.1] - 2026-06-05
 
 Cursor and resize-fluidity fixes on the live-resize release: the cursor no longer turns into a
