@@ -29,16 +29,20 @@ hosts `HarnessTerminalSurfaceView` (a `CAMetalLayer` view) driving `HarnessTermi
 (VT parser + screen/scrollback), `HarnessTheme` (490-theme catalog + `.harnesstheme`), and
 `HarnessTerminalRenderer` (CoreText atlas + Metal). Features: themed translucent canvas with
 untouched program output (`applyThemeToTerminalOutput` toggles theme-colored output), balanced
-window padding (centered grid) + a live resize HUD, cursor styles + blink (a hollow box when the
-window is unfocused), word/line (double/triple-click) + Option-rectangle text selection + copy /
+window padding (centered grid) + a live resize HUD, cursor styles + blink (DECSCUSR; `0` / a
+bare `CSI SP q` resets to the *user-configured* style — the Ghostty/kitty semantics, not a hard
+blinking block — and a hollow box when the window is unfocused), word/line (double/triple-click)
++ Option-rectangle text selection + copy /
 paste (bracketed-paste aware, with paste protection) / copy-on-select / right-click menu, mouse
 reporting (SGR 1006), pixel-smooth scrollback (wheel / Shift+PageUp/Down; trackpad scrolls by
 sub-line fractions — `scrollFraction` renders as a whole-device-pixel vertex `scrollPx` uniform
 over the unchanged row-instance cache, with a display-only peek row appended to scrolled frames
 and a grid-box scissor; consumers stay line-based on the integer `scrollOffset`), reflow on
 resize (drag repaints reuse the renderer row cache under the frozen origin — empty damage when
-`lastPresentedResultIsRendererCoherent`, `encodedRows == 0` per sub-cell tick — and output/tick
-presents defer to the layout repaint while `presentsWithTransaction` is on; cell-boundary
+`lastPresentedResultIsRendererCoherent`, `encodedRows == 0` per sub-cell tick — while mid-drag
+PTY output presents live through the scheduler inside explicit `CATransaction`s under real-time
+reflow; only the reflow-off escape hatch and the main-confined pipeline keep the legacy
+defer-to-the-layout-repaint hold; cell-boundary
 crossings build their re-wrap preview ASYNC on the emulator queue — latest-wins preview token,
 landed via `presentResizePreview` with generation/token/target stale-drop guards — so a boundary
 tick costs main no more than a sub-cell tick, and the renderer salvages content-identical rows
@@ -98,13 +102,16 @@ users moving in keep their colors/font — kept by product decision.
   fire per path:
   - **Real-time (default, Ghostty parity, `liveResizeReflow` on):** during a window-edge drag
     (`presentsWithTransaction`), `requestLiveResizeCommit` commits the reflow + SIGWINCH at every
-    cell boundary so interactive programs redraw live. The O(history) reflow runs off-main and
-    coalesces latest-wins (the `renderNowOffMain` frame token), the reflowed frame flushes inside
-    an explicit `CATransaction` (no layout pass needed when the pointer holds still), and the PTY
-    vote coalesces per-fd (`TerminalHostView.resize` epoch) + to distinct cell counts
-    (`lastSentPTYSize`). No main-thread generation bump — the builder caches are cleared on the
-    queue after the resize, so `repaintLastFrame` keeps stretching the cached frame between
-    boundaries with no synchronous rebuild.
+    cell boundary so interactive programs redraw live. The reflow target is staged queue-side
+    (`SurfaceEmulatorState.pendingResize`) and materialized by the NEXT output/commit build to
+    run — builds coalesce latest-wins (the `renderNowOffMain` frame token), and the staging is
+    what lets a superseding output build carry the resize forward instead of stranding the grid
+    at a pre-vote size when it cancels an in-flight commit build. Mid-drag PTY output presents
+    live (each landing flushes its own explicit `CATransaction`, so no layout pass is needed when
+    the pointer holds still), the PTY vote coalesces per-fd (`TerminalHostView.resize` epoch) +
+    to distinct cell counts (`lastSentPTYSize`), and there is no main-thread generation bump —
+    the builder caches are cleared on the queue when the resize applies, so `repaintLastFrame`
+    keeps stretching the cached frame between boundaries with no synchronous rebuild.
   - **Animated / escape-hatch (`liveResizeReflow` off, or sidebar slide / tiling):** the reflow +
     SIGWINCH are **coalesced** (`scheduleResizeCommit`, ~60ms debounce, kept in lockstep via
     `commitGridSize`) and the non-mutating `previewViewportReflow` shows a live re-wrap; firing
@@ -114,7 +121,12 @@ users moving in keep their colors/font — kept by product decision.
   The first sizing commits immediately (no open-flash). `TerminalScreen.resize` *reflows* the
   primary screen — rejoin soft-wrapped rows via a per-row wrap flag, re-wrap to the new width
   (wide chars never split), map the cursor; the alternate screen just clamps (TUIs redraw on
-  SIGWINCH). The PTY env sets `COLORTERM=truecolor`.
+  SIGWINCH). The rewrap is a streaming pass (`rewrapRows`): source rows arrive by reference
+  through a closure (history arrays are never gather-copied), logical lines are tracked as row
+  extents + effective lengths, and lines without wide glyphs — the overwhelming majority —
+  re-wrap as `nc`-sized bulk slice copies (~10ms per width change at the 10k-line scrollback
+  cap, 3× the per-cell predecessor; wide-bearing lines keep the per-cell stepping loop, byte-
+  identical against the `ReflowGolden/` corpus). The PTY env sets `COLORTERM=truecolor`.
 - **Decorations** (underline/strike/overline) are pixel-snapped for crisp 1–2px lines.
 - **Glyph baseline** is pixel-snapped at rasterization: `GlyphRasterizer.render` draws each glyph
   with its pen origin (baseline + left edge) on integer device pixels, so every glyph shares the
