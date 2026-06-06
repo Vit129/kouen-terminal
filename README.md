@@ -54,7 +54,7 @@ New installs start in Plain. Moving over from another setup? See [docs/MIGRATION
 - **IDE sidebar** — Sessions, Files, and Git panels toggled with `Cmd+\`
 - **Project-aware file tree** — SwiftUI tree with folder expand/collapse, right-click copy path, and drag-to-terminal
 - **Git workflow** — stage/unstage files, commit, fetch/pull/push, branch switcher, and worktree controls from the sidebar
-- **Session-as-tab** — each top tab is a project session; `+` creates a new session and the session card `×` appears on hover to close it
+- **Session-as-tab** — each top tab is a project session; sidebar group headers can create a new session in that group with `+`, and the session card `×` appears on hover to close it
 - **Recent projects** — clock button in the sidebar footer shows the last 10 project roots and switches to an existing session on duplicate
 
 ## IDE Sidebar
@@ -66,6 +66,7 @@ Toggle the sidebar with `Cmd+\`. It has three panels:
 Each project session appears as a tab in the sidebar tab bar. The session panel gives you:
 
 - **+ button** — opens a new session in the current working directory
+- **Group header `+`** — adds a new session inside that project group, using the group root as the working directory
 - **× button** — appears on session card hover and closes the session after confirmation
 - **Recent projects** — clock button in the sidebar footer lists the last 10 visited project roots; clicking one switches to an existing session or opens a new one
 - Sessions are daemon-owned, so they survive quitting and relaunching the app

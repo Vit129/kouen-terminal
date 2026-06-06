@@ -4,6 +4,11 @@ import HarnessCore
 /// Left session rail — workspace pill, sessions list, and a quiet footer.
 @MainActor
 final class HarnessSidebarPanelViewController: NSViewController {
+    private enum SidebarSessionRow {
+        case groupHeader(name: String, rootPath: String)
+        case session(SessionGroup)
+    }
+
     private let chromeHeader = NSView()
     private let workspaceBar = NSView()
     private let workspacePill = WorkspacePillButton()
@@ -52,6 +57,25 @@ final class HarnessSidebarPanelViewController: NSViewController {
         return sessions.filter { sessionMatches($0, query: q) }
     }
 
+    private var sidebarRows: [SidebarSessionRow] {
+        var groups: [(name: String, rootPath: String, firstIndex: Int, sessions: [SessionGroup])] = []
+        for (index, session) in displayedSessions.enumerated() {
+            let name = projectGroupName(for: session)
+            let rootPath = projectGroupRootPath(for: session)
+            if let groupIndex = groups.firstIndex(where: { $0.name == name }) {
+                groups[groupIndex].sessions.append(session)
+            } else {
+                groups.append((name: name, rootPath: rootPath, firstIndex: index, sessions: [session]))
+            }
+        }
+
+        return groups
+            .sorted { $0.firstIndex < $1.firstIndex }
+            .flatMap { group -> [SidebarSessionRow] in
+                [.groupHeader(name: group.name, rootPath: group.rootPath)] + group.sessions.map { .session($0) }
+            }
+    }
+
     private func sessionMatches(_ session: SessionGroup, query: String) -> Bool {
         if session.name.lowercased().contains(query) { return true }
         for tab in session.tabs {
@@ -60,6 +84,53 @@ final class HarnessSidebarPanelViewController: NSViewController {
             if HarnessDesign.pathDisplayName(tab.cwd).lowercased().contains(query) { return true }
         }
         return false
+    }
+
+    private func projectGroupName(for session: SessionGroup) -> String {
+        let path = (session.activeTab ?? session.tabs.first)?.cwd ?? ""
+        return HarnessDesign.projectGroupName(for: path)
+    }
+
+    private func projectGroupRootPath(for session: SessionGroup) -> String {
+        let path = (session.activeTab ?? session.tabs.first)?.cwd ?? ""
+        return HarnessDesign.projectGroupRootPath(for: path)
+    }
+
+    private func sessionRow(at tableRow: Int) -> SessionGroup? {
+        let rows = sidebarRows
+        guard tableRow >= 0, tableRow < rows.count else { return nil }
+        if case let .session(session) = rows[tableRow] { return session }
+        return nil
+    }
+
+    private func rowIndex(for sessionID: SessionID) -> Int? {
+        sidebarRows.firstIndex {
+            if case let .session(session) = $0 { return session.id == sessionID }
+            return false
+        }
+    }
+
+    private func sessionIndex(for sessionID: SessionID) -> Int? {
+        sessions.firstIndex { $0.id == sessionID }
+    }
+
+    private func sessionGroupName(for sessionID: SessionID) -> String? {
+        sessions.first(where: { $0.id == sessionID }).map(projectGroupName(for:))
+    }
+
+    private func selectActiveSessionRowIfVisible(scroll: Bool) {
+        guard let activeSessionID,
+              let row = rowIndex(for: activeSessionID)
+        else {
+            isProgrammaticSelection = true
+            sessionTable.deselectAll(nil)
+            isProgrammaticSelection = false
+            return
+        }
+        isProgrammaticSelection = true
+        sessionTable.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+        isProgrammaticSelection = false
+        if scroll { sessionTable.scrollRowToVisible(row) }
     }
 
     override func loadView() {
@@ -432,6 +503,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
     private func searchChanged() {
         sessionFilter = searchField.stringValue
         sessionTable.reloadData()
+        selectActiveSessionRowIfVisible(scroll: false)
     }
 
     private func setupSessionList() {
@@ -593,14 +665,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
         workspacePill.configure(name: name, count: sessions.count)
         sessionTable.reloadData()
 
-        if let activeSessionID,
-           let row = displayedSessions.firstIndex(where: { $0.id == activeSessionID })
-        {
-            isProgrammaticSelection = true
-            sessionTable.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
-            isProgrammaticSelection = false
-            sessionTable.scrollRowToVisible(row)
-        }
+        selectActiveSessionRowIfVisible(scroll: true)
 
         if let cwd = snap.activeWorkspace?.activeTab?.cwd {
             fileTreeView.updateRoot(path: cwd)
@@ -629,10 +694,11 @@ final class HarnessSidebarPanelViewController: NSViewController {
         workspaces = snap.workspaces
         let name = snap.activeWorkspace?.name ?? "Workspace"
         workspacePill.configure(name: name, count: sessions.count)
-        let displayed = displayedSessions
-        for row in 0 ..< displayed.count {
+        let rows = sidebarRows
+        for row in 0 ..< rows.count {
             if let cell = sessionTable.view(atColumn: 0, row: row, makeIfNecessary: false) as? SessionCardRowView {
-                cell.configure(session: displayed[row], isSelected: displayed[row].id == activeID)
+                guard case let .session(session) = rows[row] else { continue }
+                cell.configure(session: session, isSelected: session.id == activeID)
             }
         }
     }
@@ -729,6 +795,13 @@ final class HarnessSidebarPanelViewController: NSViewController {
                 SessionCoordinator.shared.addSession(to: id, cwd: url.path, name: url.lastPathComponent)
             }
         }
+    }
+
+    private func addSessionInGroup(rootPath: String) {
+        guard let activeWorkspaceID else { return }
+        let name = HarnessDesign.pathDisplayName(rootPath)
+        Self.recordRecentProject(rootPath)
+        SessionCoordinator.shared.addSession(to: activeWorkspaceID, cwd: rootPath, name: name)
     }
 
     // MARK: - Recent Projects
@@ -871,9 +944,8 @@ final class HarnessSidebarPanelViewController: NSViewController {
 
     private func selectSessionRow() {
         let row = sessionTable.selectedRow
-        let displayed = displayedSessions
-        guard row >= 0, row < displayed.count, let activeWorkspaceID else { return }
-        SessionCoordinator.shared.selectSession(workspaceID: activeWorkspaceID, sessionID: displayed[row].id)
+        guard let session = sessionRow(at: row), let activeWorkspaceID else { return }
+        SessionCoordinator.shared.selectSession(workspaceID: activeWorkspaceID, sessionID: session.id)
     }
 
     private func confirmCloseSession(_ session: SessionGroup) {
@@ -1036,7 +1108,24 @@ extension HarnessSidebarPanelViewController: NSTableViewDataSource, NSTableViewD
     fileprivate static let sessionRowPasteboardType = NSPasteboard.PasteboardType("com.robert.harness.session-row")
 
     func numberOfRows(in tableView: NSTableView) -> Int {
-        displayedSessions.count
+        sidebarRows.count
+    }
+
+    func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
+        switch sidebarRows[row] {
+        case .groupHeader:
+            return 28
+        case .session:
+            return HarnessDesign.sessionRowHeight
+        }
+    }
+
+    func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool {
+        sessionRow(at: row) != nil
+    }
+
+    func tableView(_ tableView: NSTableView, isGroupRow row: Int) -> Bool {
+        return false
     }
 
     // MARK: - Drag to reorder
@@ -1045,8 +1134,9 @@ extension HarnessSidebarPanelViewController: NSTableViewDataSource, NSTableViewD
         // Reorder maps to the unfiltered list, so it's only meaningful with no
         // active filter (displayed rows == sessions then).
         guard sessionFilter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        guard let session = sessionRow(at: row) else { return nil }
         let item = NSPasteboardItem()
-        item.setString(String(row), forType: Self.sessionRowPasteboardType)
+        item.setString(session.id.uuidString, forType: Self.sessionRowPasteboardType)
         return item
     }
 
@@ -1058,6 +1148,7 @@ extension HarnessSidebarPanelViewController: NSTableViewDataSource, NSTableViewD
     ) -> NSDragOperation {
         guard dropOperation == .above else { return [] }
         guard sessionFilter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return [] }
+        guard canDropSession(info, aboveRow: row) else { return [] }
         return .move
     }
 
@@ -1070,40 +1161,102 @@ extension HarnessSidebarPanelViewController: NSTableViewDataSource, NSTableViewD
         guard let workspaceID = activeWorkspaceID,
               let item = info.draggingPasteboard.pasteboardItems?.first,
               let raw = item.string(forType: Self.sessionRowPasteboardType),
-              let from = Int(raw),
-              from >= 0, from < sessions.count
+              let sessionID = UUID(uuidString: raw),
+              let from = sessionIndex(for: sessionID),
+              let target = targetSessionIndex(forDropAboveRow: row, movingSessionID: sessionID)
         else { return false }
-        // NSTableView reports the *gap* index; adjust so a downward move lands at
-        // the slot just below the gap (drop above row 3 from row 1 → target 2).
-        let target = from < row ? row - 1 : row
         guard target != from else { return false }
         SessionCoordinator.shared.reorderSession(
             workspaceID: workspaceID,
-            sessionID: sessions[from].id,
+            sessionID: sessionID,
             toIndex: target
         )
         return true
     }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-        let session = displayedSessions[row]
-        let cell = SessionCardRowView()
-        cell.configure(
-            session: session,
-            isSelected: session.id == SessionCoordinator.shared.snapshot.activeWorkspace?.activeSessionID
-        )
-        cell.onClose = { [weak self] in
-            self?.confirmCloseSession(session)
+        switch sidebarRows[row] {
+        case let .groupHeader(name, rootPath):
+            let header = SessionGroupHeaderRowView()
+            header.configure(name: name)
+            header.onAdd = { [weak self] in
+                self?.addSessionInGroup(rootPath: rootPath)
+            }
+            return header
+        case let .session(session):
+            let cell = SessionCardRowView()
+            cell.configure(
+                session: session,
+                isSelected: session.id == SessionCoordinator.shared.snapshot.activeWorkspace?.activeSessionID
+            )
+            cell.onClose = { [weak self] in
+                self?.confirmCloseSession(session)
+            }
+            cell.onContextMenu = { [weak self] in
+                self?.sessionActionsMenu(for: session)
+            }
+            return cell
         }
-        cell.onContextMenu = { [weak self] in
-            self?.sessionActionsMenu(for: session)
-        }
-        return cell
     }
 
     func tableViewSelectionDidChange(_ notification: Notification) {
         guard !isProgrammaticSelection else { return }
         selectSessionRow()
+    }
+
+    private func canDropSession(_ info: NSDraggingInfo, aboveRow row: Int) -> Bool {
+        guard let item = info.draggingPasteboard.pasteboardItems?.first,
+              let raw = item.string(forType: Self.sessionRowPasteboardType),
+              let sessionID = UUID(uuidString: raw)
+        else { return false }
+        return targetSessionIndex(forDropAboveRow: row, movingSessionID: sessionID) != nil
+    }
+
+    private func targetSessionIndex(forDropAboveRow row: Int, movingSessionID: SessionID) -> Int? {
+        guard let sourceGroup = sessionGroupName(for: movingSessionID),
+              let sourceIndex = sessionIndex(for: movingSessionID)
+        else { return nil }
+
+        let rows = sidebarRows
+        guard !rows.isEmpty else { return nil }
+        let clampedRow = max(0, min(row, rows.count))
+
+        let targetSession: SessionGroup?
+        let placeAfterTarget: Bool
+        if clampedRow < rows.count {
+            switch rows[clampedRow] {
+            case let .session(session):
+                targetSession = session
+                placeAfterTarget = false
+            case .groupHeader:
+                targetSession = previousSession(beforeRow: clampedRow, in: rows)
+                placeAfterTarget = true
+            }
+        } else {
+            targetSession = rows.reversed().compactMap {
+                if case let .session(session) = $0 { return session }
+                return nil
+            }.first
+            placeAfterTarget = true
+        }
+
+        guard let targetSession,
+              projectGroupName(for: targetSession) == sourceGroup,
+              let rawTargetIndex = sessionIndex(for: targetSession.id)
+        else { return nil }
+
+        let rawDropIndex = placeAfterTarget ? rawTargetIndex + 1 : rawTargetIndex
+        let targetIndex = sourceIndex < rawDropIndex ? rawDropIndex - 1 : rawDropIndex
+        return max(0, min(targetIndex, sessions.count - 1))
+    }
+
+    private func previousSession(beforeRow row: Int, in rows: [SidebarSessionRow]) -> SessionGroup? {
+        guard row > 0 else { return nil }
+        for index in stride(from: row - 1, through: 0, by: -1) {
+            if case let .session(session) = rows[index] { return session }
+            if case .groupHeader = rows[index] { return nil }
+        }
+        return nil
     }
 }
 
@@ -1464,7 +1617,109 @@ final class WorkspacePillButton: NSButton {
     }
 }
 
-// MARK: - Session card
+// MARK: - Session rows
+
+@MainActor
+private final class SessionGroupHeaderRowView: NSView {
+    var onAdd: (() -> Void)?
+
+    private let stack = NSStackView()
+    private let label = NSTextField(labelWithString: "")
+    private let addButton = NSButton()
+    private var isHovered = false
+    private var trackingArea: NSTrackingArea?
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        layer?.backgroundColor = NSColor.clear.cgColor
+
+        label.font = HarnessDesign.Typography.sectionLabel
+        label.alignment = .left
+        label.lineBreakMode = .byTruncatingTail
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.setContentHuggingPriority(.required, for: .horizontal)
+        label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        addButton.title = "+"
+        addButton.font = .systemFont(ofSize: 13, weight: .semibold)
+        addButton.alignment = .center
+        addButton.bezelStyle = .inline
+        addButton.isBordered = false
+        addButton.translatesAutoresizingMaskIntoConstraints = false
+        addButton.target = self
+        addButton.action = #selector(addClicked)
+        addButton.toolTip = "New session in group"
+        addButton.setContentHuggingPriority(.required, for: .horizontal)
+        addButton.setContentCompressionResistancePriority(.required, for: .horizontal)
+
+        stack.orientation = .horizontal
+        stack.alignment = .centerY
+        stack.spacing = 6
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        stack.addArrangedSubview(label)
+        stack.addArrangedSubview(addButton)
+        addSubview(stack)
+
+        NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: HarnessDesign.horizontalInset - 4),
+            stack.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -(HarnessDesign.horizontalInset - 4)),
+            stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -3),
+            addButton.widthAnchor.constraint(equalToConstant: 18),
+            addButton.heightAnchor.constraint(equalToConstant: 18),
+        ])
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let trackingArea { removeTrackingArea(trackingArea) }
+        let area = NSTrackingArea(
+            rect: bounds,
+            options: [.mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(area)
+        trackingArea = area
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        isHovered = true
+        refresh()
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        isHovered = false
+        refresh()
+    }
+
+    func configure(name: String) {
+        label.stringValue = name
+        toolTip = name
+        refresh()
+    }
+
+    @objc private func addClicked() {
+        onAdd?()
+    }
+
+    private func refresh() {
+        let c = HarnessDesign.chrome
+        label.textColor = c.textTertiary
+        let plusColor = isHovered ? c.textSecondary : c.textTertiary
+        addButton.attributedTitle = NSAttributedString(
+            string: "+",
+            attributes: [
+                .foregroundColor: plusColor,
+                .font: NSFont.systemFont(ofSize: 13, weight: .semibold),
+            ]
+        )
+        addButton.alphaValue = isHovered ? 1 : 0.72
+    }
+}
 
 @MainActor
 final class SessionCardRowView: NSView {

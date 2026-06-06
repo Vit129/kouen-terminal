@@ -229,6 +229,37 @@ enum HarnessDesign {
         return last.isEmpty ? shortened : last
     }
 
+    static func projectGroupName(for path: String) -> String {
+        pathDisplayName(projectGroupRootPath(for: path))
+    }
+
+    static func projectGroupRootPath(for path: String) -> String {
+        let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "Sessions" }
+
+        let manager = FileManager.default
+        var isDirectory: ObjCBool = false
+        let startPath: String
+        if manager.fileExists(atPath: trimmed, isDirectory: &isDirectory), !isDirectory.boolValue {
+            startPath = (trimmed as NSString).deletingLastPathComponent
+        } else {
+            startPath = trimmed
+        }
+
+        var current = (startPath as NSString).standardizingPath
+        while !current.isEmpty {
+            let gitPath = (current as NSString).appendingPathComponent(".git")
+            if manager.fileExists(atPath: gitPath) {
+                return current
+            }
+            let parent = (current as NSString).deletingLastPathComponent
+            if parent == current { break }
+            current = parent
+        }
+
+        return startPath
+    }
+
     /// Soft icon button with circular hover fill — used in footer / workspace bar.
     static func softIconButton(symbol: String, tooltip: String, size: CGFloat = 26) -> SoftIconButton {
         let button = SoftIconButton(frame: NSRect(x: 0, y: 0, width: size, height: size))
