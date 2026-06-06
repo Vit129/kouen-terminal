@@ -2,6 +2,14 @@
 
 These are the commands Harness accepts from the `:` prompt, key bindings, hooks, and `harness-cli`.
 
+The 2026-06 parity series added bindable forms of the config/buffer/hook verbs
+(`set-option`/`set`/`setw`, `show-options`, `set-environment`/`setenv`, `set-buffer`,
+`paste-buffer`, `delete-buffer`, `list-buffers`, `show-buffer`, `set-hook`, `show-hooks`,
+`unbind-hook`), plus `find-window`, `refresh-client`, `respawn-window`, `show-messages`,
+grouped sessions (`new-session -t <session>`), and full `-t` targets on
+`select-pane`/`swap-pane`. tmux-parity status, adaptations, and divergences live in
+[TMUX_PARITY.md](TMUX_PARITY.md).
+
 ## Pane operations
 
 | Command | What it does |
