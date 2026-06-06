@@ -1836,8 +1836,8 @@ private final class SessionGroupHeaderRowView: NSView {
 
     private func refresh() {
         let c = HarnessDesign.chrome
-        label.textColor = c.textTertiary
-        disclosureLabel.textColor = c.textTertiary
+        label.textColor = isHovered ? c.textPrimary : c.textSecondary
+        disclosureLabel.textColor = isHovered ? c.textPrimary : c.textSecondary
 
         let plusColor = isHovered ? c.textSecondary : c.textTertiary
         addButton.attributedTitle = NSAttributedString(
@@ -1974,12 +1974,19 @@ final class SessionCardRowView: NSView {
         let folder = HarnessDesign.shortenPath(tab.cwd)
         let folderName = HarnessDesign.pathDisplayName(tab.cwd)
         let displayedAgentKind = tab.agent?.kind ?? AgentTitleInference.kind(from: tab.title)
-        titleLabel.stringValue = session.name.isEmpty ? folderName : session.name
-        toolTip = session.name.isEmpty ? folder : "\(session.name) — \(folder)"
+        let defaultTitle = displayedAgentKind?.displayName ?? folderName
+        titleLabel.stringValue = session.name.isEmpty ? defaultTitle : session.name
+        toolTip = session.name.isEmpty ? (displayedAgentKind != nil ? "\(defaultTitle) — \(folder)" : folder) : "\(session.name) — \(folder)"
 
         var metaParts: [String] = []
+        var repoWithBranch = folderName
         if let branch = tab.gitBranch, !branch.isEmpty {
-            metaParts.append("⎇ \(branch)")
+            repoWithBranch += " (⎇ \(branch))"
+        }
+        metaParts.append(repoWithBranch)
+
+        if !tab.title.isEmpty {
+            metaParts.append(tab.title)
         }
         if session.tabs.count > 1 {
             metaParts.append("\(session.tabs.count) tabs")
