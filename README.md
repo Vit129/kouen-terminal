@@ -51,8 +51,11 @@ New installs start in Plain. Moving over from another setup? See [docs/MIGRATION
 - Inline images that stay put across reflow and scroll into history
 - Drag files, folders, or images into a pane to insert shell-quoted paths
 - Set Harness as the default terminal for SSH/Telnet/man-page links and `.command` / `.tool` files from Settings > Terminal
-<<<<<<< HEAD
-- **IDE sidebar** — Session panel, Files tab, and Git tab toggled with `Cmd+\`
+- **IDE sidebar** — Sessions, Files, and Git panels toggled with `Cmd+\`
+- **Project-aware file tree** — SwiftUI tree with folder expand/collapse, right-click copy path, and drag-to-terminal
+- **Git workflow** — stage/unstage files, commit, fetch/pull/push, branch switcher, and worktree controls from the sidebar
+- **Session-as-tab** — each top tab is a project session; `+` creates a new session and the session card `×` appears on hover to close it
+- **Recent projects** — clock button in the sidebar footer shows the last 10 project roots and switches to an existing session on duplicate
 
 ## IDE Sidebar
 
@@ -63,7 +66,7 @@ Toggle the sidebar with `Cmd+\`. It has three panels:
 Each project session appears as a tab in the sidebar tab bar. The session panel gives you:
 
 - **+ button** — opens a new session in the current working directory
-- **✕ button** — closes the session (always visible on hover)
+- **× button** — appears on session card hover and closes the session after confirmation
 - **Recent projects** — clock button in the sidebar footer lists the last 10 visited project roots; clicking one switches to an existing session or opens a new one
 - Sessions are daemon-owned, so they survive quitting and relaunching the app
 
@@ -95,14 +98,6 @@ A three-tab Git panel covering the full day-to-day workflow without leaving the 
 - Lists all `git worktree` entries for the current repo: folder name (bold), branch, and short HEAD hash
 - **✕** button on each row to run `git worktree remove` (hidden for the main worktree)
 - **+** button at the top right — prompts for a path and branch name, then runs `git worktree add`
-=======
-- Automatic, signed background updates (Sparkle + EdDSA)
-- **IDE sidebar** — Files tab (project file tree), Git tab (Zed-style changes/history, stage/commit/push), and session management
-- **Project-aware file tree** — SwiftUI, click folder to expand/collapse, drag files to terminal, right-click to copy path
-- **Git workflow** — stage/unstage files, commit, fetch/pull/push, branch switcher — all from the sidebar
-- **Session-as-tab** — each tab in the tab bar is a project session; + creates a new session, ✕ closes it
-- **Recent projects** — clock button in sidebar footer shows last 10 projects, switches to existing session on duplicate
->>>>>>> worktree-fix-drag-drop
 
 ## harness-cli
 
@@ -195,9 +190,12 @@ The command prefix (default `Ctrl-A`) adds the full pane / session keymap on top
 ### Quick install
 
 ```bash
-swift build
-open Harness.app
+make preview
 ```
+
+`make preview` builds and launches an isolated preview app under `.harness-preview/`.
+For a production-style app bundle, run `make run` or `Scripts/run.sh app`; it
+builds, packages, signs, and opens `Harness.app`.
 
 ### Install CLI + Daemon
 
@@ -220,8 +218,10 @@ cp .build/release/HarnessDaemon /usr/local/bin/
 ### Development preview
 
 ```bash
-make preview        # build + launch preview app (isolated from production)
-make preview-stop   # stop preview
+make preview            # build + launch preview app (isolated from production)
+make run                # build + package + sign + open Harness.app
+Scripts/run.sh graphify # refresh graphify-out and delete generated HTML
+make preview-stop       # stop preview
 ```
 
 Validate a source checkout before shipping changes:
@@ -252,7 +252,7 @@ xcodebuild -project Harness.xcodeproj -scheme Harness -configuration Debug \
 
 ## Requirements
 
-- Apple silicon Mac running macOS 15.0 or later for the downloadable DMG
+- Apple silicon Mac running macOS 15.0 or later for the GUI app
 - Xcode 16+ / Swift 6.0 (to build from source)
 - For a headless/remote daemon: any machine with Swift 6.0 (macOS or Linux) — build the daemon + CLI with `swift build -c release` (the GUI app, renderer, and Sparkle are macOS-only and are dropped from the Linux build)
 

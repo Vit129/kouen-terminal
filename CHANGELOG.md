@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.1.1] - 2026-06-06
+
+### Added
+- **Session row close** — session cards now show a `×` close affordance on hover and reuse the existing close-confirmation flow.
+- **Run script** — `make run` / `Scripts/run.sh app` now provide one entrypoint for building, packaging, signing, and opening `Harness.app`; `make preview` remains the isolated preview path.
+
+### Fixed
+- README IDE sidebar section no longer contains stale merge-conflict markers.
+- `HarnessVersion.swift` now matches the app bundle version metadata for packaging.
+
+### Changed
+- README quick install keeps developers on `make preview`, while `make run` now opens a production-style app bundle with embedded Sparkle framework.
+- Refreshed `graphify-out` navigation artifacts without committed HTML output.
+
 ## [1.1.0] - 2026-06-06
 
 ### Added
