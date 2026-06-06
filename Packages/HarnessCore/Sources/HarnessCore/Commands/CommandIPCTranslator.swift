@@ -158,6 +158,51 @@ public enum CommandIPCTranslator {
                 return translate(inner, target: resolved, baseIndex: baseIndex, paneBaseIndex: paneBaseIndex)
             }
 
+        // MARK: Config / buffer / hook verbs
+        case let .setOption(scope, explicitTarget, key, rawValue):
+            // A scoped set without -T resolves against the caller's focus chain (tmux
+            // behavior); the CLI form requires -T because it has no focus to fall back on.
+            var resolvedTarget = explicitTarget
+            if resolvedTarget == nil {
+                switch scope {
+                case "workspace": resolvedTarget = target.workspace?.id.uuidString
+                case "session": resolvedTarget = target.session?.id.uuidString
+                case "tab": resolvedTarget = target.tab?.id.uuidString
+                case "pane": resolvedTarget = target.paneID?.uuidString
+                default: break
+                }
+            }
+            guard scope == "global" || resolvedTarget != nil else { return .unresolved }
+            return .requests([.setOption(scope: scope, target: resolvedTarget, key: key, rawValue: rawValue)])
+
+        case let .setEnvironment(global, key, value):
+            // tmux default scope is the focused session; -g writes the global table.
+            let sessionID = global ? nil : target.session?.id
+            guard global || sessionID != nil else { return .unresolved }
+            return .requests([.setEnvironment(sessionID: sessionID, key: key, value: value)])
+
+        case let .setBuffer(name, text):
+            return .requests([.setBuffer(name: name, data: Data(text.utf8))])
+
+        case let .pasteBuffer(name):
+            guard let pane = target.paneID, let surface = target.surfaceID(of: pane) else { return .unresolved }
+            return .requests([.pasteBuffer(surfaceID: surface, name: name, bracketed: true)])
+
+        case let .deleteBuffer(name):
+            return .requests([.deleteBuffer(name: name)])
+
+        case let .setHook(event, source, condition):
+            return .requests([.bindHook(event: event, source: source, condition: condition)])
+
+        case let .unbindHook(id):
+            return .requests([.unbindHook(id: id)])
+
+        // Show verbs produce OUTPUT — each front-end queries the daemon and renders
+        // through its own surface (GUI message, compositor status flash, control-mode
+        // lines). The daemon's hook executor logs them as no-ops.
+        case .showOptions, .showEnvironment, .listBuffers, .showBuffer, .showHooks:
+            return .clientLocal(command)
+
         // MARK: Pane structure
         case let .splitWindow(direction):
             guard let tab = target.tab, let pane = target.paneID else { return .unresolved }

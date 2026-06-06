@@ -97,6 +97,28 @@ public indirect enum Command: Codable, Sendable, Equatable {
     case displayPopup(command: String?)            // display-popup [-E <command>]
     case displayMenu(items: [MenuItem])            // display-menu -T title <name> <key> <command> …
 
+    // MARK: Config / buffer / hook verbs
+    // Bindable forms of the harness-cli subcommands (same IPC underneath), so bind-key,
+    // the `:` prompt, hooks, and source-file can drive configuration like tmux.
+    /// `set-option [-g|-w|-s|-t|-p] [-T <target>] <key> <value>`. Unlike the CLI form
+    /// (which requires `-T` for scoped writes), a scoped set without `-T` resolves
+    /// against the caller's focus chain at translate time — tmux behavior.
+    case setOption(scope: String, target: String?, key: String, rawValue: String)
+    case showOptions(scope: String?)               // show-options [-g|-w|-s|-t|-p]
+    /// `set-environment [-g] [-u] <key> [value]`. tmux semantics: default scope is the
+    /// focused session (resolved at translate time); `-g` writes the global table;
+    /// `-u`/nil value unsets.
+    case setEnvironment(global: Bool, key: String, value: String?)
+    case showEnvironment(global: Bool)             // show-environment [-g]
+    case setBuffer(name: String?, text: String)    // set-buffer [-b <name>] <text>
+    case pasteBuffer(name: String?)                // paste-buffer [-b <name>] → focused pane
+    case deleteBuffer(name: String)                // delete-buffer [-b] <name>
+    case listBuffers                               // list-buffers
+    case showBuffer(name: String?)                 // show-buffer [-b <name>]
+    case setHook(event: String, source: String, condition: String?) // set-hook <event> "<cmd>"
+    case showHooks(event: String?)                 // show-hooks [<event>]
+    case unbindHook(id: UUID)                      // unbind-hook <id>
+
     // MARK: Targeting
     /// Run `command` as if the client's focus were `spec`'s resolved target
     /// (tmux's universal `-t session:window.pane`). Resolved centrally in
@@ -196,6 +218,21 @@ extension Command {
         case .unlinkWindow: return "unlink-window"
         case let .displayPopup(command): return command.map { "display-popup -E '\($0)'" } ?? "display-popup"
         case let .displayMenu(items): return "display-menu (\(items.count) items)"
+        case let .setOption(scope, target, key, rawValue):
+            let scopeFlag = ["workspace": " -w", "session": " -s", "tab": " -t", "pane": " -p"][scope] ?? ""
+            return "set-option\(scopeFlag)\(target.map { " -T \($0)" } ?? "") \(key) \(rawValue)"
+        case let .showOptions(scope): return "show-options\(scope.map { " (\($0))" } ?? "")"
+        case let .setEnvironment(global, key, value):
+            return "set-environment\(global ? " -g" : "")\(value == nil ? " -u" : "") \(key)\(value.map { " \($0)" } ?? "")"
+        case let .showEnvironment(global): return "show-environment\(global ? " -g" : "")"
+        case let .setBuffer(name, _): return "set-buffer\(name.map { " -b \($0)" } ?? "")"
+        case let .pasteBuffer(name): return "paste-buffer\(name.map { " -b \($0)" } ?? "")"
+        case let .deleteBuffer(name): return "delete-buffer \(name)"
+        case .listBuffers: return "list-buffers"
+        case let .showBuffer(name): return "show-buffer\(name.map { " -b \($0)" } ?? "")"
+        case let .setHook(event, source, _): return "set-hook \(event) '\(source)'"
+        case let .showHooks(event): return "show-hooks\(event.map { " \($0)" } ?? "")"
+        case let .unbindHook(id): return "unbind-hook \(id.uuidString)"
         case let .targeted(spec, command):
             return "\(command.shortDescription)\(spec.raw.isEmpty ? "" : " -t \(spec.raw)")"
         }

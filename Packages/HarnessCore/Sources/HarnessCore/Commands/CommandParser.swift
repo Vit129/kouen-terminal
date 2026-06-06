@@ -90,6 +90,11 @@ public enum CommandParser {
         "renames": "rename-session", "news": "new-session", "kills": "kill-session",
         "nextl": "next-layout", "prevl": "previous-layout", "selectl": "select-layout",
         "lockc": "lock-client", "lock-server": "lock-client",
+        "set": "set-option", "setw": "set-window-option",
+        "show": "show-options", "showw": "show-window-options",
+        "setenv": "set-environment", "showenv": "show-environment",
+        "setb": "set-buffer", "pasteb": "paste-buffer", "deleteb": "delete-buffer",
+        "lsb": "list-buffers", "showb": "show-buffer",
     ]
 
     private static func resolveAlias(_ name: String) -> String? { aliases[name] }
@@ -113,6 +118,11 @@ public enum CommandParser {
         "select-window", "select-workspace", "send-keys", "send-prefix", "show-cheatsheet",
         "source-config", "source-file", "swap-pane", "swap-window", "switch-client",
         "synchronize-panes", "unbind-key", "unlink-window", "zoom-pane",
+        // Config / buffer / hook verbs (bindable forms of the CLI subcommands).
+        "set-option", "set-window-option", "show-options", "show-window-options",
+        "set-environment", "show-environment",
+        "set-buffer", "paste-buffer", "delete-buffer", "list-buffers", "show-buffer",
+        "set-hook", "show-hooks", "unbind-hook",
     ]
 
     private static func buildCommand(name rawName: String, tokens: [String]) throws -> Command {
@@ -406,9 +416,109 @@ public enum CommandParser {
         case "display-menu", "menu":
             return .displayMenu(items: try parseMenuItems(tokens))
 
+        // MARK: Config / buffer / hook verbs (bindable forms of the CLI subcommands)
+        case "set-option":
+            return try parseSetOption(tokens, defaultScope: "global")
+        case "set-window-option":
+            // tmux `setw` — a window option; Harness windows are tabs.
+            return try parseSetOption(tokens, defaultScope: "tab")
+        case "show-options", "show-window-options":
+            return .showOptions(scope: optionScope(in: tokens, default: name == "show-window-options" ? "tab" : nil))
+        case "set-environment":
+            let positional = positionalTokens(tokens, skippingValuesFor: [])
+            guard let key = positional.first else {
+                throw CommandParseError.missingArgument("set-environment requires a key")
+            }
+            let unset = tokens.contains("-u")
+            let value = positional.dropFirst().joined(separator: " ")
+            return .setEnvironment(
+                global: tokens.contains("-g"),
+                key: key,
+                value: unset ? nil : value
+            )
+        case "show-environment":
+            return .showEnvironment(global: tokens.contains("-g"))
+        case "set-buffer":
+            let name = stringValue(for: "-b", in: tokens)
+            let text = positionalTokens(tokens, skippingValuesFor: ["-b"]).joined(separator: " ")
+            guard !text.isEmpty else { throw CommandParseError.missingArgument("set-buffer requires text") }
+            return .setBuffer(name: name, text: text)
+        case "paste-buffer":
+            return .pasteBuffer(name: stringValue(for: "-b", in: tokens))
+        case "delete-buffer":
+            guard let name = stringValue(for: "-b", in: tokens)
+                ?? positionalTokens(tokens, skippingValuesFor: ["-b"]).first
+            else { throw CommandParseError.missingArgument("delete-buffer requires a buffer name") }
+            return .deleteBuffer(name: name)
+        case "list-buffers":
+            return .listBuffers
+        case "show-buffer":
+            return .showBuffer(name: stringValue(for: "-b", in: tokens))
+        case "set-hook":
+            let positional = positionalTokens(tokens, skippingValuesFor: [])
+            guard positional.count >= 2 else {
+                throw CommandParseError.missingArgument("set-hook requires an event and a command")
+            }
+            return .setHook(
+                event: positional[0],
+                source: positional.dropFirst().joined(separator: " "),
+                condition: nil
+            )
+        case "show-hooks":
+            return .showHooks(event: positionalTokens(tokens, skippingValuesFor: []).first)
+        case "unbind-hook":
+            guard let raw = positionalTokens(tokens, skippingValuesFor: []).first,
+                  let id = UUID(uuidString: raw)
+            else { throw CommandParseError.missingArgument("unbind-hook requires a hook id (see show-hooks)") }
+            return .unbindHook(id: id)
+
         default:
             throw CommandParseError.unknownCommand(resolveAlias(name) ?? name)
         }
+    }
+
+    /// `set-option [-g|-w|-s|-t|-p] [-T <target>] <key> <value>`. Mirrors the CLI scope
+    /// flags (`-w` workspace, `-t` tab — Harness's window); the translator resolves a
+    /// scoped set without `-T` against the caller's focus chain.
+    private static func parseSetOption(_ tokens: [String], defaultScope: String) throws -> Command {
+        let scope = optionScope(in: tokens, default: defaultScope) ?? defaultScope
+        let target = stringValue(for: "-T", in: tokens)
+        let positional = positionalTokens(tokens, skippingValuesFor: ["-T"])
+        guard positional.count >= 2 else {
+            throw CommandParseError.missingArgument("set-option requires <key> <value>")
+        }
+        return .setOption(
+            scope: scope,
+            target: target,
+            key: positional[0],
+            rawValue: positional.dropFirst().joined(separator: " ")
+        )
+    }
+
+    /// The CLI's option-scope flag vocabulary (`-g` global, `-w` workspace, `-s` session,
+    /// `-t` tab, `-p` pane). Note `-t` is a SCOPE here — these verbs are excluded from the
+    /// universal `-t <target>` extraction; explicit targets use `-T`.
+    private static func optionScope(in tokens: [String], default defaultScope: String?) -> String? {
+        if tokens.contains("-g") { return "global" }
+        if tokens.contains("-w") { return "workspace" }
+        if tokens.contains("-s") { return "session" }
+        if tokens.contains("-t") { return "tab" }
+        if tokens.contains("-p") { return "pane" }
+        return defaultScope
+    }
+
+    /// Tokens that are not flags and not the value of one of `skippingValuesFor`'s flags.
+    private static func positionalTokens(_ tokens: [String], skippingValuesFor valueFlags: [String]) -> [String] {
+        var positional: [String] = []
+        var index = 0
+        while index < tokens.count {
+            let token = tokens[index]
+            if valueFlags.contains(token) { index += 2; continue }
+            if token.hasPrefix("-"), token.count > 1, Int(token) == nil { index += 1; continue }
+            positional.append(token)
+            index += 1
+        }
+        return positional
     }
 
     /// `display-menu … <title> <key> <command>` triples (key may be empty as `""`).

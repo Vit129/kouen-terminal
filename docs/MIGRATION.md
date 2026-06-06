@@ -71,16 +71,19 @@ The default prefix differs (`Ctrl-A` vs `Ctrl-B`) — change it in Settings if y
 
 ### Bringing your `.tmux.conf` over
 
-Two mechanisms, split by what the line *is* (verified by `TmuxMigrationTests`):
-
-**Commands and bindings** run through the same parser as the command prompt. Put your `bind`
-lines (and any one-shot commands) in a file and `source-file` it — `#` comments are skipped:
+One mechanism: every line runs through the same parser as the command prompt (verified by
+`TmuxMigrationTests`). Put your `bind` lines, `set`/`setw` options, environment, and one-shot
+commands in a file and `source-file` it — `#` comments are skipped:
 
 ```tmux
-# ~/.harness.conf  — commands + bindings only
+# ~/.harness.conf  — bindings + options + commands
 bind | split-window -h
 bind - split-window -v
 bind -r H resize-pane -L 2
+set  -g status-left " #{session_name} "
+set  -g base-index 1
+setw monitor-activity on
+setenv -g EDITOR vim
 ```
 
 ```
@@ -90,9 +93,9 @@ bind -r H resize-pane -L 2
 Persistent key bindings also live in `keybindings.json` (merged over the defaults); set them
 with `harness-cli bind-key` / `unbind-key`, or edit the file directly.
 
-**Options** (`status-left`, `base-index`, mouse, …) are *not* commands — set them with
-`harness-cli set-option` (`setw` for window scope), which is the same store the Settings ▸
-Advanced page edits:
+Options write the same store the Settings ▸ Advanced page and `harness-cli set-option` edit —
+the CLI form requires `-T <target>` for scoped writes, while the command form resolves a
+missing target against the focused workspace/session/tab/pane like tmux:
 
 ```bash
 harness-cli set-option -g status-left  " #{session_name} "

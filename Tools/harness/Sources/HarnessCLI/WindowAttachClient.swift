@@ -1189,6 +1189,33 @@ private final class WindowSession: @unchecked Sendable {
         case .showCheatsheet, .sourceConfig, .reloadKeybindings, .bindKey, .unbindKey, .listKeys,
              .renameWindow, .renameSession, .runShell, .ifShell:
             break
+        case let .showOptions(scope):
+            if case let .options(items)? = try? client.request(.showOptions(scope: scope), timeout: 1) {
+                flashStatus(items.isEmpty ? "no options set"
+                    : "\(items.count) options · " + items.prefix(3).map { "\($0.key)=\($0.value)" }.joined(separator: " "))
+            }
+        case let .showEnvironment(global):
+            let sessionID = global ? nil : self.sessionID
+            if case let .options(items)? = try? client.request(.showEnvironment(sessionID: sessionID), timeout: 1) {
+                flashStatus(items.isEmpty ? "no environment entries"
+                    : items.prefix(4).map { "\($0.key)=\($0.value)" }.joined(separator: " "))
+            }
+        case .listBuffers:
+            if case let .buffers(buffers)? = try? client.request(.listBuffers, timeout: 1) {
+                flashStatus(buffers.isEmpty ? "no buffers"
+                    : buffers.prefix(3).map { "\($0.name)(\($0.byteCount)B)" }.joined(separator: " "))
+            }
+        case let .showBuffer(name):
+            if case let .buffer(buffer)? = try? client.request(.getBuffer(name: name), timeout: 1) {
+                flashStatus(buffer.preview.isEmpty ? "buffer is empty" : buffer.preview)
+            } else {
+                flashStatus("no such buffer")
+            }
+        case let .showHooks(event):
+            if case let .hooks(hooks)? = try? client.request(.listHooks(event: event), timeout: 1) {
+                flashStatus(hooks.isEmpty ? "no hooks bound"
+                    : hooks.prefix(2).map { "\($0.event)→\($0.commandSource)" }.joined(separator: " · "))
+            }
         default:
             break
         }

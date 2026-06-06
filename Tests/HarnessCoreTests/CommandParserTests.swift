@@ -256,6 +256,67 @@ final class CommandParserTests: XCTestCase {
         )
     }
 
+    // MARK: - Config / buffer / hook verbs (bindable forms)
+
+    func testSetOptionParsesScopesAndJoinsValue() throws {
+        XCTAssertEqual(
+            try CommandParser.parse("set-option -g status-left ' #{session_name} '"),
+            .setOption(scope: "global", target: nil, key: "status-left", rawValue: " #{session_name} ")
+        )
+        XCTAssertEqual(
+            try CommandParser.parse("set -t automatic-rename off"),
+            .setOption(scope: "tab", target: nil, key: "automatic-rename", rawValue: "off")
+        )
+        XCTAssertEqual(
+            try CommandParser.parse("set-option -s -T abc history-limit 5000"),
+            .setOption(scope: "session", target: "abc", key: "history-limit", rawValue: "5000")
+        )
+        // tmux setw = window option = Harness tab scope.
+        XCTAssertEqual(
+            try CommandParser.parse("setw monitor-activity on"),
+            .setOption(scope: "tab", target: nil, key: "monitor-activity", rawValue: "on")
+        )
+        XCTAssertThrowsError(try CommandParser.parse("set-option -g status"))
+    }
+
+    func testShowVerbsParse() throws {
+        XCTAssertEqual(try CommandParser.parse("show-options -g"), .showOptions(scope: "global"))
+        XCTAssertEqual(try CommandParser.parse("show"), .showOptions(scope: nil))
+        XCTAssertEqual(try CommandParser.parse("show-environment -g"), .showEnvironment(global: true))
+        XCTAssertEqual(try CommandParser.parse("list-buffers"), .listBuffers)
+        XCTAssertEqual(try CommandParser.parse("show-buffer -b scratch"), .showBuffer(name: "scratch"))
+        XCTAssertEqual(try CommandParser.parse("show-hooks after-new-tab"), .showHooks(event: "after-new-tab"))
+    }
+
+    func testEnvironmentAndBufferVerbsParse() throws {
+        XCTAssertEqual(
+            try CommandParser.parse("setenv -g EDITOR vim"),
+            .setEnvironment(global: true, key: "EDITOR", value: "vim")
+        )
+        XCTAssertEqual(
+            try CommandParser.parse("set-environment -u EDITOR"),
+            .setEnvironment(global: false, key: "EDITOR", value: nil)
+        )
+        XCTAssertEqual(
+            try CommandParser.parse(#"set-buffer -b notes "hello world""#),
+            .setBuffer(name: "notes", text: "hello world")
+        )
+        XCTAssertEqual(try CommandParser.parse("paste-buffer -b notes"), .pasteBuffer(name: "notes"))
+        XCTAssertEqual(try CommandParser.parse("delete-buffer notes"), .deleteBuffer(name: "notes"))
+        XCTAssertThrowsError(try CommandParser.parse("delete-buffer"))
+    }
+
+    func testSetHookParsesEventAndCommand() throws {
+        XCTAssertEqual(
+            try CommandParser.parse(#"set-hook after-new-tab "display-message hi""#),
+            .setHook(event: "after-new-tab", source: "display-message hi", condition: nil)
+        )
+        XCTAssertThrowsError(try CommandParser.parse("set-hook after-new-tab"))
+        let id = UUID()
+        XCTAssertEqual(try CommandParser.parse("unbind-hook \(id.uuidString)"), .unbindHook(id: id))
+        XCTAssertThrowsError(try CommandParser.parse("unbind-hook not-a-uuid"))
+    }
+
     func testKnownVerbsAreAllParseable() {
         // Drift guard: every verb advertised by `list-commands` must be one the parser actually
         // accepts. A verb may still throw missing-arg/flag (it needs operands) — that proves it's

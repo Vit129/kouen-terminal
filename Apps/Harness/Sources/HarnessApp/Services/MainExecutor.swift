@@ -173,6 +173,43 @@ final class MainExecutor: CommandExecutor {
             DisplayMessage.show(KeybindingsService.shared.summary(table: table.map { KeyTableID(rawValue: $0) }))
         case .sourceConfig:
             coordinator.reimportTerminalConfig()
+        // Config / buffer / hook write verbs: resolve scope/session/pane against the GUI's
+        // focus through the shared translator (same path as the compositor and hooks).
+        case .setOption, .setEnvironment, .setBuffer, .pasteBuffer, .deleteBuffer,
+             .setHook, .unbindHook:
+            try runViaTranslator(command, coordinator: coordinator)
+        // Show verbs: query the daemon and render through the message overlay (the same
+        // surface list-keys uses).
+        case let .showOptions(scope):
+            if case let .options(items)? = coordinator.requestDaemon(.showOptions(scope: scope)) {
+                let lines = items.map { entry in
+                    "\(entry.scope)\(entry.target.map { "(\($0.prefix(8)))" } ?? "") \(entry.key) = \(entry.value)"
+                }
+                DisplayMessage.show(lines.isEmpty ? "no options set" : lines.joined(separator: "\n"))
+            }
+        case let .showEnvironment(global):
+            let sessionID = global ? nil : coordinator.snapshot.activeWorkspace?.activeSession?.id
+            if case let .options(items)? = coordinator.requestDaemon(.showEnvironment(sessionID: sessionID)) {
+                let lines = items.map { "\($0.key)=\($0.value)" }
+                DisplayMessage.show(lines.isEmpty ? "no environment entries" : lines.joined(separator: "\n"))
+            }
+        case .listBuffers:
+            if case let .buffers(buffers)? = coordinator.requestDaemon(.listBuffers) {
+                let lines = buffers.map { "\($0.name): \($0.byteCount) bytes: \"\($0.preview)\"" }
+                DisplayMessage.show(lines.isEmpty ? "no buffers" : lines.joined(separator: "\n"))
+            }
+        case let .showBuffer(name):
+            if case let .buffer(buffer)? = coordinator.requestDaemon(.getBuffer(name: name)) {
+                let text = buffer.data.map { String(decoding: $0, as: UTF8.self) } ?? buffer.preview
+                DisplayMessage.show(text.isEmpty ? "buffer is empty" : text)
+            } else {
+                DisplayMessage.show("no such buffer")
+            }
+        case let .showHooks(event):
+            if case let .hooks(hooks)? = coordinator.requestDaemon(.listHooks(event: event)) {
+                let lines = hooks.map { "\($0.event) → \($0.commandSource)  [\($0.id.uuidString.prefix(8))]" }
+                DisplayMessage.show(lines.isEmpty ? "no hooks bound" : lines.joined(separator: "\n"))
+            }
         case .reloadKeybindings:
             KeybindingsService.shared.reload()
             PrefixKeymap.shared.rebuildFromSettings()

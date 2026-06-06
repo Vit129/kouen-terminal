@@ -95,10 +95,39 @@ enum ControlModeClient {
                 if case let .text(text)? = try? client.request(request, timeout: 3) { output += text }
             }
             return output
-        case .clientLocal:
-            return ""   // UI-only verbs have no control-mode output
+        case let .clientLocal(local):
+            // Show verbs print their query results as control-mode lines; UI-only
+            // verbs (overlays, modes) have no control-mode output.
+            return showVerbOutput(local, client: client) ?? ""
         case .unresolved:
             throw ControlModeError.unresolved
+        }
+    }
+
+    /// Render the config/buffer/hook show verbs as text lines (the control-mode analog of
+    /// the GUI message overlay and the compositor status flash).
+    private static func showVerbOutput(_ command: Command, client: DaemonClient) -> String? {
+        switch command {
+        case let .showOptions(scope):
+            guard case let .options(items)? = try? client.request(.showOptions(scope: scope), timeout: 3) else { return nil }
+            return items.map { "\($0.scope)\($0.target.map { "(\($0))" } ?? "") \($0.key) = \($0.value)" }
+                .joined(separator: "\n")
+        case let .showEnvironment(global):
+            // Control mode has no focused session; non-global reads fall back to global too.
+            _ = global
+            guard case let .options(items)? = try? client.request(.showEnvironment(sessionID: nil), timeout: 3) else { return nil }
+            return items.map { "\($0.key)=\($0.value)" }.joined(separator: "\n")
+        case .listBuffers:
+            guard case let .buffers(buffers)? = try? client.request(.listBuffers, timeout: 3) else { return nil }
+            return buffers.map { "\($0.name): \($0.byteCount) bytes: \"\($0.preview)\"" }.joined(separator: "\n")
+        case let .showBuffer(name):
+            guard case let .buffer(buffer)? = try? client.request(.getBuffer(name: name), timeout: 3) else { return nil }
+            return buffer.data.map { String(decoding: $0, as: UTF8.self) } ?? buffer.preview
+        case let .showHooks(event):
+            guard case let .hooks(hooks)? = try? client.request(.listHooks(event: event), timeout: 3) else { return nil }
+            return hooks.map { "\($0.event) → \($0.commandSource) [\($0.id.uuidString)]" }.joined(separator: "\n")
+        default:
+            return nil
         }
     }
 
