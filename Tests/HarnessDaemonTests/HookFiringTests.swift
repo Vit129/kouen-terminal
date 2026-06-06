@@ -55,6 +55,64 @@ final class HookFiringTests: XCTestCase {
         wait(for: [exp], timeout: 5)
     }
 
+    // MARK: - Session/window lifecycle events (tmux parity P4)
+
+    func testSessionLifecycleHooksFire() throws {
+        let registry = SurfaceRegistry()
+        let wsID = registry.snapshot.activeWorkspaceID!
+
+        let created = "HOOK_SESSION_CREATED_\(UUID().uuidString.prefix(8))"
+        let (createdExp, createdToken) = expectNotification(containing: created)
+        defer { NotificationCenter.default.removeObserver(createdToken) }
+        _ = registry.handle(.bindHook(event: "session-created", source: "display-message \"\(created)\"", condition: nil))
+
+        guard case let .sessionID(sessionID) = registry.handle(.newSession(workspaceID: wsID, cwd: "/tmp", name: "p4")) else {
+            return XCTFail("expected sessionID")
+        }
+        wait(for: [createdExp], timeout: 5)
+
+        let renamed = "HOOK_SESSION_RENAMED_\(UUID().uuidString.prefix(8))"
+        let (renamedExp, renamedToken) = expectNotification(containing: renamed)
+        defer { NotificationCenter.default.removeObserver(renamedToken) }
+        _ = registry.handle(.bindHook(event: "session-renamed", source: "display-message \"\(renamed)\"", condition: nil))
+        _ = registry.handle(.renameSession(sessionID: sessionID, name: "p4-renamed"))
+        wait(for: [renamedExp], timeout: 5)
+
+        let closed = "HOOK_SESSION_CLOSED_\(UUID().uuidString.prefix(8))"
+        let (closedExp, closedToken) = expectNotification(containing: closed)
+        defer { NotificationCenter.default.removeObserver(closedToken) }
+        _ = registry.handle(.bindHook(event: "session-closed", source: "display-message \"\(closed)\"", condition: nil))
+        _ = registry.handle(.closeSession(sessionID: sessionID))
+        wait(for: [closedExp], timeout: 5)
+    }
+
+    func testWindowRenameAndLayoutHooksFire() throws {
+        let registry = SurfaceRegistry()
+        let wsID = registry.snapshot.activeWorkspaceID!
+        guard case let .tabID(tabID) = registry.handle(.newTab(workspaceID: wsID, cwd: "/tmp")) else {
+            return XCTFail("expected tabID")
+        }
+
+        let renamed = "HOOK_WINDOW_RENAMED_\(UUID().uuidString.prefix(8))"
+        let (renamedExp, renamedToken) = expectNotification(containing: renamed)
+        defer { NotificationCenter.default.removeObserver(renamedToken) }
+        _ = registry.handle(.bindHook(event: "window-renamed", source: "display-message \"\(renamed)\"", condition: nil))
+        _ = registry.handle(.renameTab(tabID: tabID, name: "p4-tab"))
+        wait(for: [renamedExp], timeout: 5)
+
+        // Layout change needs ≥2 panes.
+        let tab = registry.snapshot.workspaces.flatMap(\.sessions).flatMap(\.tabs).first { $0.id == tabID }!
+        let paneID = tab.rootPane.allPaneIDs().first!
+        _ = registry.handle(.newSplit(tabID: tabID, paneID: paneID, direction: .horizontal, shell: nil))
+
+        let layout = "HOOK_LAYOUT_CHANGED_\(UUID().uuidString.prefix(8))"
+        let (layoutExp, layoutToken) = expectNotification(containing: layout)
+        defer { NotificationCenter.default.removeObserver(layoutToken) }
+        _ = registry.handle(.bindHook(event: "window-layout-changed", source: "display-message \"\(layout)\"", condition: nil))
+        _ = registry.handle(.applyLayout(tabID: tabID, layout: "even-horizontal", mainPaneID: nil))
+        wait(for: [layoutExp], timeout: 5)
+    }
+
     func testHookConditionTrueFires() throws {
         let registry = SurfaceRegistry()
         let marker = "HOOK_COND_TRUE_\(UUID().uuidString.prefix(8))"

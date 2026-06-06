@@ -21,6 +21,18 @@ public enum HookEvent: String, Codable, Sendable, CaseIterable {
     case paneActivity = "alert-activity"
     case paneSilence = "alert-silence"
     case paneBell = "alert-bell"
+    // tmux session/window lifecycle events. `session-created` fires alongside
+    // `after-new-session` (tmux emits both); renames fire for manual AND
+    // OSC/automatic renames, like tmux. `window-layout-changed` fires for the
+    // layout verbs (apply/next/previous/rotate) — splits/kills/resizes already
+    // have their own after-* events.
+    case sessionCreated = "session-created"
+    case sessionRenamed = "session-renamed"
+    case sessionClosed = "session-closed"
+    case windowRenamed = "window-renamed"
+    case windowLinked = "window-linked"
+    case windowUnlinked = "window-unlinked"
+    case windowLayoutChanged = "window-layout-changed"
 }
 
 /// One binding: event → command (with an optional `if` condition format).
