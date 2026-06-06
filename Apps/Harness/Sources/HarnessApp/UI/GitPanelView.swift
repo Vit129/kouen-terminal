@@ -4,6 +4,7 @@ import HarnessCore
 @MainActor
 final class GitPanelView: NSView {
     private var currentPath: String?
+    private var didCommitSinceLastSync = false
 
     // Top tabs: Changes | History | Worktrees
     private let tabSelector = NSSegmentedControl(labels: ["Changes", "History", "Worktrees"], trackingMode: .selectOne, target: nil, action: nil)
@@ -360,6 +361,13 @@ final class GitPanelView: NSView {
                 alert.alertStyle = .warning
                 alert.runModal()
             }
+            if code == 0 {
+                if args.first == "commit" {
+                    didCommitSinceLastSync = true
+                } else if args.first == "push" {
+                    didCommitSinceLastSync = false
+                }
+            }
             if clearField { commitField.stringValue = "" }
             await refresh()
         }
@@ -396,6 +404,17 @@ final class GitPanelView: NSView {
         let log = await runGit(["log", "--format=%H|%an|%ar|%s", "-25"], in: path)
 
         branchLabel.stringValue = "⎇ " + (branch.isEmpty ? "detached" : branch)
+
+        let remotes = await runGit(["remote"], in: path)
+        let hasRemotes = !remotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        var isAhead = false
+        if hasRemotes {
+            let aheadStr = await runGit(["rev-list", "--count", "HEAD", "--not", "--remotes"], in: path)
+            if let aheadCount = Int(aheadStr.trimmingCharacters(in: .whitespacesAndNewlines)), aheadCount > 0 {
+                isAhead = true
+            }
+        }
+        syncButton.title = (isAhead || didCommitSinceLastSync) ? "Push ▾" : "Fetch ▾"
 
         let changeCount = porcelain.components(separatedBy: "\n").filter { !$0.isEmpty }.count
         tabSelector.setLabel("Changes (\(changeCount))", forSegment: 0)
