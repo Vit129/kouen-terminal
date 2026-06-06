@@ -31,13 +31,18 @@ hosts `HarnessTerminalSurfaceView` (a `CAMetalLayer` view) driving `HarnessTermi
 untouched program output (`applyThemeToTerminalOutput` toggles theme-colored output), balanced
 window padding (centered grid) + a live resize HUD, cursor styles + blink (DECSCUSR; `0` / a
 bare `CSI SP q` resets to the *user-configured* style — the Ghostty/kitty semantics, not a hard
-blinking block — and a hollow box when the window is unfocused), word/line (double/triple-click)
+blinking block — and a hollow box when the window is unfocused; a blink toggle re-encodes ≤1 row,
+pinned by test), word/line (double/triple-click)
 + Option-rectangle text selection + copy /
-paste (bracketed-paste aware, with paste protection) / copy-on-select / right-click menu, mouse
+paste (bracketed-paste aware, with paste protection) / copy-on-select / right-click menu —
+selection, find highlights, and IME preedit ride damage-driven rendering via the cell-overlay
+pass (see invariants below) instead of forcing per-frame full rebuilds, mouse
 reporting (SGR 1006), pixel-smooth scrollback (wheel / Shift+PageUp/Down; trackpad scrolls by
 sub-line fractions — `scrollFraction` renders as a whole-device-pixel vertex `scrollPx` uniform
 over the unchanged row-instance cache, with a display-only peek row appended to scrolled frames
-and a grid-box scissor; consumers stay line-based on the integer `scrollOffset`), reflow on
+and a grid-box scissor; consumers stay line-based on the integer `scrollOffset`; OUTPUT scrolls
+report a whole-viewport `TerminalDamage.scroll` hint so streaming `cat`/build frames shift-copy
+the moved band instead of re-resolving the grid), reflow on
 resize (drag repaints reuse the renderer row cache under the frozen origin — empty damage when
 `lastPresentedResultIsRendererCoherent`, `encodedRows == 0` per sub-cell tick — while mid-drag
 PTY output presents live through the scheduler inside explicit `CATransaction`s under real-time
@@ -148,6 +153,42 @@ users moving in keep their colors/font — kept by product decision.
   outline regardless of style (full alpha — `bgPipeline` has `blending: false`, so a dim-via-alpha
   approach would be a no-op), and a hollow block does not invert its glyph
   (`CursorCacheKey.invertsGlyph` folds in `!hollow`, dirtying the cursor row on a focus change).
+- **Cell-overlay pass (selection / find / IME never disable damage-driven rendering):** the live
+  view (`scrollOffset == 0`) ALWAYS builds clean — incremental, damage-driven, with
+  `lastPlainFrame`/`lastViewportFrame` kept warm — and the overlay rows of a COPY are re-shaded
+  per present via `FrameBuilder.applyHighlights` (which re-runs the exact same private
+  `appendRow` the baked path uses, so shaded rows are **byte-identical by construction**; IME
+  preedit applies after via `applyPreedit` as before). Per-row overlay FINGERPRINTS
+  (`HarnessTerminalSurfaceView.overlayRowKeys`, geometry-hashed — no cell walks; stored
+  queue-side in `SurfaceEmulatorState.lastOverlayKeys`) diff against the previous build and
+  union exactly the changed rows into the render damage: a selection drag re-encodes the rows it
+  crossed, a static highlight adds zero per-frame work, clearing dirties exactly the old rows.
+  Scrolled views (offset > 0) and copy mode keep the baked full-rebuild path; the legacy
+  main-confined pipeline is deliberately unoptimized (still correct — see the damage hint below).
+- **Whole-viewport scroll damage hint (`TerminalDamage.scroll` + `scrolledRows`) — purely
+  additive:** `rows` stays COMPLETE (the moved band is still listed), so hint-unaware consumers
+  (compositor, CLI attach, the main-confined pipeline) redraw exactly what they did before the
+  hint existed; only opted-in consumers shift-copy. `TerminalScreen` moves pre-scroll content
+  marks WITH the content (damage is always current-coordinate), accumulates whole-viewport
+  shifts arithmetically (SU then SD composes soundly), and POISONS the hint — degrading to the
+  old whole-region mark — for anything it can't describe (sub-region scrolls, a net shift
+  covering the grid, full damage). `FrameBuilder.buildShifted(freshRows:)` re-resolves the fresh
+  band and shift-copies the rest; the renderer rotates its row-instance cache via the same
+  `scrollShift` machinery scrollback scrolls use. Differentially pinned byte-identical
+  (`testBuildShiftedWithFreshRowsMatchesFullBuildOnOutputScroll`).
+- **Occlusion gating:** `RenderScheduler.isOccluded` (ANDed into `hasPendingWork` and the
+  `presentNow` echo gate) holds every present while the hosting window is covered/minimized —
+  the display link pauses even under output flood; parsing and dirty marks continue, and
+  un-occlusion presents the accumulated damage as one fresh frame. Driven by
+  `NSWindow.didChangeOcclusionStateNotification` with **no attach-time seed** (a window never
+  ordered on screen reads as non-visible — every headless test window — so seeding would wrongly
+  gate those); `forceRender` stays ungated and `scheduler.stop()` resets the flag on re-host.
+- **Frame pacing / telemetry:** on variable-refresh (ProMotion) panels the render display link
+  requests the panel's full rate via `preferredFrameRateRange` (min 60 so the system can adapt
+  down; re-applied on backing-property changes; the link still pauses at idle).
+  `FrameSignposter` flush lines report p50/p95/**p99**/max and split dropped presents by cause
+  (`nilDrawable` = pool exhaustion vs `encodeFailure`) — `presentFrame` returns a
+  `PresentAttempt`, not a `Bool`.
 - **Minimum contrast** (`CellColorResolver.minimumContrast`, default 1 = off, byte-identical):
   after faint / before inverse, the foreground is lifted toward black/white until it meets the WCAG
   ratio (symmetric, so it survives an inverse swap; conceal still wins). Imported from a source
