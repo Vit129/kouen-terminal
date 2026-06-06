@@ -15,13 +15,43 @@ public actor FileTreeWatcher {
         self.fileManager = fileManager
     }
 
-    public func scan(rootPath: String) async throws -> [FileNode] {
-        try scanDirectory(atPath: rootPath)
+    /// Scan `rootPath` and optionally merge a pre-fetched git status map.
+    ///
+    /// - Parameters:
+    ///   - rootPath: Directory to scan.
+    ///   - gitStatus: Optional map of relative path → `GitStatusType` from
+    ///     `GitStatusProvider.status(rootPath:)`. Pass `nil` (default) to skip
+    ///     git colouring (e.g. when expanding a child directory).
+    public func scan(rootPath: String, gitStatus: [String: GitStatusType]? = nil) async throws -> [FileNode] {
+        let nodes = try scanDirectory(atPath: rootPath)
+        guard let gitStatus, !gitStatus.isEmpty else { return nodes }
+        return applyGitStatus(gitStatus, rootPath: rootPath, to: nodes)
     }
 
-    public func expand(node: FileNode) async throws -> [FileNode] {
+    public func expand(node: FileNode, gitStatus: [String: GitStatusType]? = nil) async throws -> [FileNode] {
         guard node.isDirectory else { return [] }
-        return try scanDirectory(atPath: node.path)
+        let nodes = try scanDirectory(atPath: node.path)
+        guard let gitStatus, !gitStatus.isEmpty else { return nodes }
+        return applyGitStatus(gitStatus, rootPath: node.path, to: nodes)
+    }
+
+    // MARK: - Private
+
+    private func applyGitStatus(
+        _ gitStatus: [String: GitStatusType],
+        rootPath: String,
+        to nodes: [FileNode]
+    ) -> [FileNode] {
+        // rootPath may or may not have a trailing slash; normalise once.
+        let prefix = rootPath.hasSuffix("/") ? rootPath : rootPath + "/"
+        return nodes.map { node in
+            let rel = node.path.hasPrefix(prefix)
+                ? String(node.path.dropFirst(prefix.count))
+                : node.path
+            var updated = node
+            updated.gitStatus = gitStatus[rel] ?? .unmodified
+            return updated
+        }
     }
 
     private func scanDirectory(atPath path: String) throws -> [FileNode] {

@@ -49,17 +49,32 @@ if [[ -d "$SPARKLE" ]]; then
     "$SPARKLE"/Versions/*/Updater.app \
     "$SPARKLE"/Versions/*/Autoupdate; do
     [[ -e "$component" ]] || continue
-    codesign --force --options runtime --timestamp --sign "$IDENTITY" "$component"
+    if [[ "$IDENTITY" != "-" ]]; then
+      codesign --force --options runtime --timestamp --sign "$IDENTITY" "$component"
+    else
+      codesign --force --sign "$IDENTITY" "$component"
+    fi
   done
-  codesign --force --options runtime --timestamp --sign "$IDENTITY" "$SPARKLE"
+  if [[ "$IDENTITY" != "-" ]]; then
+    codesign --force --options runtime --timestamp --sign "$IDENTITY" "$SPARKLE"
+  else
+    codesign --force --sign "$IDENTITY" "$SPARKLE"
+  fi
 fi
 
-codesign --force --options runtime --timestamp --sign "$IDENTITY" \
-  "$APP/Contents/MacOS/HarnessDaemon" \
-  "$APP/Contents/MacOS/harness-cli" \
-  "$APP/Contents/MacOS/Harness"
-# Seal the app bundle last (no --deep — nested code is already signed above).
-codesign --force --options runtime --timestamp --sign "$IDENTITY" "$APP"
+if [[ "$IDENTITY" != "-" ]]; then
+  codesign --force --options runtime --timestamp --sign "$IDENTITY" \
+    "$APP/Contents/MacOS/HarnessDaemon" \
+    "$APP/Contents/MacOS/harness-cli" \
+    "$APP/Contents/MacOS/Harness"
+  codesign --force --options runtime --timestamp --sign "$IDENTITY" "$APP"
+else
+  codesign --force --sign "$IDENTITY" \
+    "$APP/Contents/MacOS/HarnessDaemon" \
+    "$APP/Contents/MacOS/harness-cli" \
+    "$APP/Contents/MacOS/Harness"
+  codesign --force --sign "$IDENTITY" "$APP"
+fi
 
 # Verify the whole bundle (nested helpers + app) before we go any further — a broken nested
 # signature can pass signing yet fail notarization/Gatekeeper later, so catch it here.
