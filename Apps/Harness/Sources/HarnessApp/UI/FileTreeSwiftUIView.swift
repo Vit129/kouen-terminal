@@ -60,23 +60,39 @@ struct FileTreeSwiftUIView: View {
             guard !node.node.isDirectory else { return }
             openFile(node.node.path)
         }
-        .task {
-            guard node.node.isDirectory, node.children?.isEmpty == true else { return }
-            do {
-                let childNodes = try await watcher.expand(node: node.node)
-                node.children = childNodes.map { FileTreeNode(node: $0) }
-            } catch {
-                node.children = []
-            }
+        .task(id: node.id) {
+            await loadChildren(of: node)
         }
     }
 
     private func loadRoot() async {
         do {
             let nodes = try await watcher.scan(rootPath: rootPath)
-            rootNodes = nodes.map { FileTreeNode(node: $0) }
+            var treeNodes: [FileTreeNode] = []
+            for node in nodes {
+                let treeNode = FileTreeNode(node: node)
+                if node.isDirectory {
+                    let children = (try? await watcher.expand(node: node)) ?? []
+                    treeNode.children = children.map { FileTreeNode(node: $0) }
+                }
+                treeNodes.append(treeNode)
+            }
+            rootNodes = treeNodes
         } catch {
             rootNodes = []
+        }
+    }
+
+    private func loadChildren(of node: FileTreeNode) async {
+        guard node.node.isDirectory, node.children?.isEmpty == true else { return }
+        do {
+            let childNodes = try await watcher.expand(node: node.node)
+            node.children = childNodes.map { child in
+                let n = FileTreeNode(node: child)
+                return n
+            }
+        } catch {
+            node.children = []
         }
     }
 
