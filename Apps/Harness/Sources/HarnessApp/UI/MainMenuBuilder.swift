@@ -164,7 +164,7 @@ enum MainMenuBuilder {
         let windowMenu = NSMenu(title: "Window")
         window.submenu = windowMenu
         windowMenu.addItem(NSMenuItem(title: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m"))
-        windowMenu.addItem(NSMenuItem(title: "Zoom", action: #selector(NSWindow.performZoom(_:)), keyEquivalent: ""))
+        windowMenu.addItem(NSMenuItem(title: "Zoom", action: #selector(MainWindowController.toggleVisibleFrameZoom(_:)), keyEquivalent: ""))
         let fullScreen = NSMenuItem(title: "Enter Full Screen", action: #selector(NSWindow.toggleFullScreen(_:)), keyEquivalent: "f")
         fullScreen.keyEquivalentModifierMask = [.command, .control]
         windowMenu.addItem(fullScreen)

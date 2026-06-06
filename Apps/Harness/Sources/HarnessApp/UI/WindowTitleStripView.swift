@@ -60,6 +60,16 @@ final class WindowTitleStripView: NSView {
     /// A drag anywhere on the strip moves the window (matches the empty tab-bar background).
     override var mouseDownCanMoveWindow: Bool { true }
 
+    override func mouseUp(with event: NSEvent) {
+        if event.clickCount >= 2,
+           let controller = window?.windowController as? MainWindowController
+        {
+            controller.toggleVisibleFrameZoom(self)
+            return
+        }
+        super.mouseUp(with: event)
+    }
+
     /// Shift the readout right of the macOS traffic lights while the sidebar is collapsed
     /// (0 = sidebar visible; ~72 = collapsed). Driven by `MainSplitViewController` during
     /// the toggle so it slides in lockstep with the divider.

@@ -80,6 +80,9 @@ final class MainWindowController: NSWindowController {
     /// Frame saved before entering non-native fullscreen; nil when not in it.
     private var preFullscreenFrame: NSRect?
 
+    /// Frame saved before titlebar zoom; nil when the window is not zoomed by Harness.
+    private var preVisibleFrameZoom: NSRect?
+
     /// Non-native ("fast") full screen — fill the screen without the macOS Space transition the
     /// native ⌃⌘F uses. Auto-hides the menu bar + Dock and resizes to the screen frame; toggles
     /// back to the saved frame. Deliberately does NOT touch the style mask, so the transparent
@@ -95,6 +98,21 @@ final class MainWindowController: NSWindowController {
             NSApp.presentationOptions = [.autoHideMenuBar, .autoHideDock]
             window.setFrame(screen.frame, display: true, animate: false)
         }
+    }
+
+    @objc func toggleVisibleFrameZoom(_ sender: Any?) {
+        guard let window, !window.styleMask.contains(.fullScreen) else { return }
+        if let saved = preVisibleFrameZoom {
+            window.setFrame(saved, display: true, animate: false)
+            preVisibleFrameZoom = nil
+            return
+        }
+
+        guard let screen = window.screen ?? NSScreen.main else { return }
+        let target = screen.visibleFrame
+        if window.frame.equalTo(target) { return }
+        preVisibleFrameZoom = window.frame
+        window.setFrame(target, display: true, animate: false)
     }
 
     /// Under auto light/dark (both theme names set), the window follows the macOS system appearance
