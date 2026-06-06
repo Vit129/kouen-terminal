@@ -13,7 +13,7 @@ final class GitPanelView: NSView {
 
     // Changes view
     private let changesScroll = NSScrollView()
-    private let changesStack = NSStackView()
+    private let changesStack = FlippedStackView()
     private let stageAllButton = NSButton(title: "Stage All", target: nil, action: nil)
 
     // Commit area (bottom of changes)
@@ -22,11 +22,11 @@ final class GitPanelView: NSView {
 
     // History view
     private let historyScroll = NSScrollView()
-    private let historyStack = NSStackView()
+    private let historyStack = FlippedStackView()
 
     // Worktrees view
     private let worktreesScroll = NSScrollView()
-    private let worktreesStack = NSStackView()
+    private let worktreesStack = FlippedStackView()
     private let addWorktreeButton = NSButton(title: "+", target: nil, action: nil)
 
     // Empty state shown when not inside a git repo
@@ -45,8 +45,8 @@ final class GitPanelView: NSView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 
-    func updateRoot(path: String) {
-        guard path != currentPath else { return }
+    func updateRoot(path: String, force: Bool = false) {
+        guard force || path != currentPath else { return }
         currentPath = path
         Task { [weak self] in await self?.refresh() }
     }
@@ -63,23 +63,8 @@ final class GitPanelView: NSView {
 
         // Changes container — scrollable list
         changesContainer.translatesAutoresizingMaskIntoConstraints = false
-        changesStack.orientation = .vertical; changesStack.alignment = .width; changesStack.spacing = 0
-        changesStack.translatesAutoresizingMaskIntoConstraints = false
-
-        changesScroll.documentView = changesStack
-        changesScroll.hasVerticalScroller = true
-        changesScroll.drawsBackground = false
-        changesScroll.scrollerStyle = .overlay
-        changesScroll.autohidesScrollers = true
-        changesScroll.translatesAutoresizingMaskIntoConstraints = false
-
-        changesContainer.addSubview(changesScroll)
-        NSLayoutConstraint.activate([
-            changesScroll.topAnchor.constraint(equalTo: changesContainer.topAnchor),
-            changesScroll.leadingAnchor.constraint(equalTo: changesContainer.leadingAnchor),
-            changesScroll.trailingAnchor.constraint(equalTo: changesContainer.trailingAnchor),
-            changesScroll.bottomAnchor.constraint(equalTo: changesContainer.bottomAnchor),
-        ])
+        changesStack.orientation = .vertical; changesStack.alignment = .leading; changesStack.spacing = 0
+        setupScrollView(changesScroll, with: changesStack, in: changesContainer)
 
         // Stage All button bar
         stageAllButton.bezelStyle = .recessed; stageAllButton.controlSize = .small
@@ -105,13 +90,13 @@ final class GitPanelView: NSView {
         // History container
         historyContainer.translatesAutoresizingMaskIntoConstraints = false
         historyContainer.isHidden = true
-        historyStack.orientation = .vertical; historyStack.alignment = .width; historyStack.spacing = 0
+        historyStack.orientation = .vertical; historyStack.alignment = .leading; historyStack.spacing = 0
         setupScrollView(historyScroll, with: historyStack, in: historyContainer)
 
         // Worktrees container
         worktreesContainer.translatesAutoresizingMaskIntoConstraints = false
         worktreesContainer.isHidden = true
-        worktreesStack.orientation = .vertical; worktreesStack.alignment = .width; worktreesStack.spacing = 0
+        worktreesStack.orientation = .vertical; worktreesStack.alignment = .leading; worktreesStack.spacing = 0
         setupScrollView(worktreesScroll, with: worktreesStack, in: worktreesContainer)
 
         addWorktreeButton.bezelStyle = .recessed; addWorktreeButton.controlSize = .small
@@ -157,23 +142,23 @@ final class GitPanelView: NSView {
 
         NSLayoutConstraint.activate([
             tabSelector.topAnchor.constraint(equalTo: topAnchor, constant: 4),
-            tabSelector.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
-            tabSelector.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
+            tabSelector.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
+            tabSelector.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
 
             stageAllButton.topAnchor.constraint(equalTo: tabSelector.bottomAnchor, constant: 4),
-            stageAllButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
+            stageAllButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
 
             changesContainer.topAnchor.constraint(equalTo: stageAllButton.bottomAnchor, constant: 2),
             changesContainer.leadingAnchor.constraint(equalTo: leadingAnchor),
             changesContainer.trailingAnchor.constraint(equalTo: trailingAnchor),
             changesContainer.bottomAnchor.constraint(equalTo: commitField.topAnchor, constant: -6),
 
-            commitField.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
-            commitField.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
+            commitField.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
+            commitField.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
             commitField.heightAnchor.constraint(greaterThanOrEqualToConstant: 48),
             commitField.bottomAnchor.constraint(equalTo: commitButton.topAnchor, constant: -4),
 
-            commitButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
+            commitButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
             commitButton.bottomAnchor.constraint(equalTo: bottomBar.topAnchor, constant: -6),
 
             historyContainer.topAnchor.constraint(equalTo: tabSelector.bottomAnchor, constant: 4),
@@ -187,11 +172,11 @@ final class GitPanelView: NSView {
             worktreesContainer.bottomAnchor.constraint(equalTo: bottomBar.topAnchor, constant: -4),
 
             addWorktreeButton.topAnchor.constraint(equalTo: worktreesContainer.topAnchor, constant: 4),
-            addWorktreeButton.trailingAnchor.constraint(equalTo: worktreesContainer.trailingAnchor, constant: -8),
+            addWorktreeButton.trailingAnchor.constraint(equalTo: worktreesContainer.trailingAnchor, constant: -10),
             addWorktreeButton.widthAnchor.constraint(equalToConstant: 28),
 
-            bottomBar.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
-            bottomBar.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
+            bottomBar.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
+            bottomBar.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
             bottomBar.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -6),
             bottomBar.heightAnchor.constraint(equalToConstant: 22),
 
@@ -209,12 +194,9 @@ final class GitPanelView: NSView {
     }
 
     private func setupScrollView(_ scroll: NSScrollView, with stack: NSStackView, in container: NSView) {
-        let doc = FlippedView()
-        doc.translatesAutoresizingMaskIntoConstraints = false
         stack.translatesAutoresizingMaskIntoConstraints = false
-        doc.addSubview(stack)
 
-        scroll.documentView = doc
+        scroll.documentView = stack
         scroll.hasVerticalScroller = true
         scroll.drawsBackground = false
         scroll.scrollerStyle = .overlay
@@ -227,14 +209,9 @@ final class GitPanelView: NSView {
             scroll.leadingAnchor.constraint(equalTo: container.leadingAnchor),
             scroll.trailingAnchor.constraint(equalTo: container.trailingAnchor),
             scroll.bottomAnchor.constraint(equalTo: container.bottomAnchor),
-            doc.topAnchor.constraint(equalTo: scroll.contentView.topAnchor),
-            doc.leadingAnchor.constraint(equalTo: scroll.contentView.leadingAnchor),
-            doc.trailingAnchor.constraint(equalTo: scroll.contentView.trailingAnchor),
-            doc.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor),
-            stack.topAnchor.constraint(equalTo: doc.topAnchor),
-            stack.leadingAnchor.constraint(equalTo: doc.leadingAnchor),
-            stack.trailingAnchor.constraint(equalTo: doc.trailingAnchor),
-            stack.bottomAnchor.constraint(equalTo: doc.bottomAnchor),
+            stack.leadingAnchor.constraint(equalTo: scroll.contentView.leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: scroll.contentView.trailingAnchor),
+            stack.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor),
         ])
     }
 
@@ -426,17 +403,23 @@ final class GitPanelView: NSView {
         // Changes
         changesStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         if porcelain.isEmpty {
-            changesStack.addArrangedSubview(makeLabel("Working tree clean"))
+            let label = makeLabel("Working tree clean")
+            changesStack.addArrangedSubview(label)
+            label.widthAnchor.constraint(equalTo: changesStack.widthAnchor).isActive = true
         } else {
             for line in porcelain.components(separatedBy: "\n").prefix(40) where !line.isEmpty {
-                changesStack.addArrangedSubview(makeChangeRow(line))
+                let row = makeChangeRow(line, rootPath: path)
+                changesStack.addArrangedSubview(row)
+                row.widthAnchor.constraint(equalTo: changesStack.widthAnchor).isActive = true
             }
         }
 
         // History
         historyStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         for line in log.components(separatedBy: "\n").prefix(25) where !line.isEmpty {
-            historyStack.addArrangedSubview(makeHistoryCard(line))
+            let card = makeHistoryCard(line)
+            historyStack.addArrangedSubview(card)
+            card.widthAnchor.constraint(equalTo: historyStack.widthAnchor).isActive = true
         }
 
         await refreshWorktrees()
@@ -451,10 +434,10 @@ final class GitPanelView: NSView {
         let isMain: Bool
     }
 
-    private func makeChangeRow(_ line: String) -> NSView {
+    private func makeChangeRow(_ line: String, rootPath: String) -> NSView {
         let xy = line.prefix(2)
         let indexStatus = String(xy.first ?? Character(" "))
-        let file = String(line.dropFirst(3))
+        let file = displayPath(fromPorcelainPath: String(line.dropFirst(3)))
         let isStaged = indexStatus != " " && indexStatus != "?"
         let workTree = String(xy.last ?? Character(" "))
 
@@ -470,17 +453,33 @@ final class GitPanelView: NSView {
         let check = NSButton(checkboxWithTitle: "", target: self, action: #selector(toggleStage(_:)))
         check.state = isStaged ? .on : .off
         check.toolTip = file; check.controlSize = .small
+        check.setContentHuggingPriority(.required, for: .horizontal)
 
         let name = NSTextField(labelWithString: (file as NSString).lastPathComponent)
         name.font = .systemFont(ofSize: 12)
         name.textColor = color
         name.lineBreakMode = .byTruncatingMiddle
         name.toolTip = file
+        name.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-        let row = NSStackView(views: [check, name])
+        let row = GitChangeRowView(filePath: absolutePath(for: file, rootPath: rootPath), views: [check, name])
         row.orientation = .horizontal; row.spacing = 4
-        row.edgeInsets = NSEdgeInsets(top: 2, left: 8, bottom: 2, right: 8)
+        row.alignment = .centerY
+        row.translatesAutoresizingMaskIntoConstraints = false
+        row.edgeInsets = NSEdgeInsets(top: 2, left: 10, bottom: 2, right: 10)
         return row
+    }
+
+    private func displayPath(fromPorcelainPath path: String) -> String {
+        if let range = path.range(of: " -> ", options: .backwards) {
+            return String(path[range.upperBound...])
+        }
+        return path
+    }
+
+    private func absolutePath(for path: String, rootPath: String) -> String {
+        guard !path.hasPrefix("/") else { return path }
+        return (rootPath as NSString).appendingPathComponent(path)
     }
 
     private func makeHistoryCard(_ line: String) -> NSView {
@@ -581,10 +580,14 @@ final class GitPanelView: NSView {
         return row
     }
 
-    private func makeLabel(_ text: String) -> NSTextField {
+    private func makeLabel(_ text: String) -> NSView {
         let l = NSTextField(labelWithString: text)
         l.font = .systemFont(ofSize: 11.5); l.textColor = HarnessDesign.chrome.textTertiary
-        return l
+        let container = NSStackView(views: [l])
+        container.orientation = .horizontal
+        container.edgeInsets = NSEdgeInsets(top: 4, left: 10, bottom: 4, right: 10)
+        container.translatesAutoresizingMaskIntoConstraints = false
+        return container
     }
 
     private func refreshWorktrees() async {
@@ -608,9 +611,15 @@ final class GitPanelView: NSView {
         }
 
         if entries.isEmpty {
-            worktreesStack.addArrangedSubview(makeLabel("No worktrees"))
+            let label = makeLabel("No worktrees")
+            worktreesStack.addArrangedSubview(label)
+            label.widthAnchor.constraint(equalTo: worktreesStack.widthAnchor).isActive = true
         } else {
-            entries.forEach { worktreesStack.addArrangedSubview(makeWorktreeRow($0)) }
+            entries.forEach { entry in
+                let row = makeWorktreeRow(entry)
+                worktreesStack.addArrangedSubview(row)
+                row.widthAnchor.constraint(equalTo: worktreesStack.widthAnchor).isActive = true
+            }
         }
     }
 
@@ -644,6 +653,51 @@ final class GitPanelView: NSView {
     }
 }
 
-private final class FlippedView: NSView {
+private final class FlippedStackView: NSStackView {
     override var isFlipped: Bool { true }
+}
+
+@MainActor
+private final class GitChangeRowView: NSStackView {
+    private let filePath: String
+    private var mouseDownLocation: NSPoint?
+
+    init(filePath: String, views: [NSView]) {
+        self.filePath = filePath
+        super.init(frame: .zero)
+        views.forEach { addArrangedSubview($0) }
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func mouseDown(with event: NSEvent) {
+        mouseDownLocation = event.locationInWindow
+        super.mouseDown(with: event)
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        if let start = mouseDownLocation,
+           hypot(event.locationInWindow.x - start.x, event.locationInWindow.y - start.y) < 4 {
+            return
+        }
+        let item = NSPasteboardItem()
+        item.setString(URL(fileURLWithPath: filePath).absoluteString, forType: .fileURL)
+        let draggingItem = NSDraggingItem(pasteboardWriter: item)
+        let image = NSImage(systemSymbolName: "doc", accessibilityDescription: "Changed file") ?? NSImage(size: NSSize(width: 16, height: 16))
+        let rect = NSRect(origin: convert(event.locationInWindow, from: nil), size: NSSize(width: 18, height: 18))
+        draggingItem.setDraggingFrame(rect, contents: image)
+        beginDraggingSession(with: [draggingItem], event: event, source: self)
+    }
+}
+
+extension GitChangeRowView: NSDraggingSource {
+    nonisolated func draggingSession(
+        _ session: NSDraggingSession,
+        sourceOperationMaskFor context: NSDraggingContext
+    ) -> NSDragOperation {
+        .copy
+    }
+
+    nonisolated var ignoreModifierKeysForDraggingSession: Bool { true }
 }

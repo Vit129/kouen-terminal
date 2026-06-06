@@ -6,9 +6,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [1.3.0] - 2026-06-06
 
 ### Added
-- **Antigravity / agy support** — Full native support for the Antigravity agent family (process-tree detection, `agy`/`antigravity` title inference, custom brand color, and the Gemini spark vector brand mark).
+- **Antigravity / agy and Kiro support** — Full native support for the Antigravity agent family (process-tree detection, `agy`/`antigravity` title inference, custom brand color, and the Gemini spark vector brand mark) and the Kiro agent family (process-tree detection, custom brand color, and the official Kiro brand mark in the session UI).
 - **File Tree Auto-Update & Git Status** — Integrated real-time FSEvents filesystem watcher for auto-refreshing the file tree on branch switches and file changes. Added Git status color indicators directly in the file tree (yellow for modified, green for untracked, red/strikethrough for deleted).
-- **Richer Sidebar UI** — Default session titles now show the active AI agent name (e.g., `Claude Code`, `Codex`, `Antigravity`), while the subtitle shows the repository name, active Git branch, running command/process, and directory path.
+- **Richer Sidebar UI** — Default session titles now show the active AI agent name (e.g., `Claude Code`, `Codex`, `Antigravity`, `Kiro`), while the subtitle shows the repository name, active Git branch, running command/process, and directory path.
 - **Dynamic Session Group Headers** — Enlarged font size/weight of group session names (`13 semibold`) and disclosure chevrons (`15 bold`), with dynamic color highlights on hover (`textSecondary` -> `textPrimary` white).
 
 ### Fixed

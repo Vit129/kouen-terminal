@@ -32,7 +32,7 @@ This branch adds IDE-like sidebar functionality to Harness Terminal, transformin
 
 | ID | Issue | Status |
 |----|-------|--------|
-| CASE-001 | Checkbox in Git Changes list not receiving clicks (NSScrollView event blocking) | Unresolved — needs Xcode View Debugger |
+| CASE-001 | Checkbox in Git Changes list not receiving clicks (NSScrollView event blocking) | Resolved (Direct FlippedStackView documentView) |
 
 ## Branch
 

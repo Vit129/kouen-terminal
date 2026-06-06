@@ -39,12 +39,12 @@ final class MainWindowController: NSWindowController {
         }
         window.appearance = Self.resolvedWindowAppearance()
         window.contentViewController = MainSplitViewController()
-        // Assigning `contentViewController` resizes the window to the split view's
-        // fitting size (~sidebar width). Re-assert the intended default explicitly —
-        // otherwise the window opens tiny (previously `minSize` masked this; lowering
-        // the floor exposed it).
-        window.setContentSize(NSSize(width: 1280, height: 820))
         self.init(window: window)
+        // Launch full-size by default so the terminal opens in the visible frame on the
+        // current screen. If autosave is enabled and a saved frame exists, that still wins.
+        if let screen = window.screen ?? NSScreen.main {
+            window.setFrame(screen.visibleFrame, display: false)
+        }
         // Window-edge hairline — topmost subview of the root contentView (added after the
         // split view loads, so it stays above all chrome). Click-through; layer island only.
         if let contentView = window.contentView {
@@ -63,10 +63,10 @@ final class MainWindowController: NSWindowController {
         if SessionCoordinator.shared.settings.restoreWindowSize {
             window.setFrameAutosaveName(Self.frameAutosaveName)
             if !window.setFrameUsingName(Self.frameAutosaveName) {
-                window.center()
+                if let screen = window.screen ?? NSScreen.main {
+                    window.setFrame(screen.visibleFrame, display: false)
+                }
             }
-        } else {
-            window.center()
         }
         applyTransparency()
     }

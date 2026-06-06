@@ -91,6 +91,61 @@ final class SessionEditorTests: XCTestCase {
         XCTAssertNil(editor.paneLocation(forSurfaceKey: UUID().uuidString), "unknown surface → nil")
     }
 
+    func testPaneLeafLegacyDecodeBackfillsSurfaceTabs() throws {
+        let surfaceID = UUID()
+        let json = """
+        {
+          "id": "\(UUID().uuidString)",
+          "surfaceID": "\(surfaceID.uuidString)"
+        }
+        """.data(using: .utf8)!
+
+        let leaf = try JSONDecoder().decode(PaneLeaf.self, from: json)
+        XCTAssertEqual(leaf.surfaceID, surfaceID)
+        XCTAssertEqual(leaf.activeSurfaceID, surfaceID)
+        XCTAssertEqual(leaf.surfaces.map(\.id), [surfaceID])
+        XCTAssertEqual(leaf.surfaceIDs, [surfaceID])
+    }
+
+    func testPaneSurfaceTabsCanAddAndSelectActiveSurface() throws {
+        var editor = SessionEditor()
+        let tab = try XCTUnwrap(editor.snapshot.activeWorkspace?.activeTab)
+        let paneID = try XCTUnwrap(tab.activePaneID)
+        let originalSurface = try XCTUnwrap(editor.surfaceID(forPaneID: paneID))
+
+        let newSurface = try XCTUnwrap(editor.addSurface(tabID: tab.id, paneID: paneID))
+        XCTAssertEqual(editor.surfaceID(forPaneID: paneID), newSurface)
+
+        XCTAssertTrue(editor.selectPaneSurface(tabID: tab.id, paneID: paneID, surfaceID: originalSurface))
+        XCTAssertEqual(editor.surfaceID(forPaneID: paneID), originalSurface)
+
+        let updated = try XCTUnwrap(editor.snapshot.activeWorkspace?.activeTab)
+        let leaf = try XCTUnwrap(updated.rootPane.allLeaves().first)
+        XCTAssertEqual(Set(leaf.surfaceIDs), Set([originalSurface, newSurface]))
+    }
+
+    func testPaneSurfaceTabCanSplitOutOfPane() throws {
+        var editor = SessionEditor()
+        let tab = try XCTUnwrap(editor.snapshot.activeWorkspace?.activeTab)
+        let paneID = try XCTUnwrap(tab.activePaneID)
+        let originalSurface = try XCTUnwrap(editor.surfaceID(forPaneID: paneID))
+        let movedSurface = try XCTUnwrap(editor.addSurface(tabID: tab.id, paneID: paneID))
+
+        let newPaneID = try XCTUnwrap(editor.splitPaneSurface(
+            tabID: tab.id,
+            sourcePaneID: paneID,
+            surfaceID: movedSurface,
+            targetPaneID: paneID,
+            direction: .horizontal,
+            beforeTarget: false
+        ))
+
+        XCTAssertEqual(editor.surfaceID(forPaneID: newPaneID), movedSurface)
+        let updated = try XCTUnwrap(editor.snapshot.activeWorkspace?.activeTab)
+        XCTAssertEqual(Set(updated.rootPane.allSurfaceIDs()), Set([originalSurface, movedSurface]))
+        XCTAssertEqual(updated.rootPane.allPaneIDs().count, 2)
+    }
+
     /// v2 layout.json had no `activePaneID`/`lastActivePaneID`; decoding must backfill
     /// the focus to the first leaf so older files load with a valid active pane.
     func testTabDecodeBackfillsActivePaneFromV2() throws {

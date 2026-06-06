@@ -8,6 +8,9 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
     private let tabBar = TerminalTabBarView()
     private let terminalHost = NSView()
     private let sidebarToggle = SoftIconButton(frame: NSRect(x: 0, y: 0, width: 24, height: 24))
+    /// Thin separator under the tab bar so the chrome reads as its own band instead of
+    /// relying on empty space to imply separation from the terminal canvas.
+    private let tabBarDivider = HarnessDesign.divider()
     private var paneContainer: PaneContainerView?
     private var lastStructureKey = ""
     private var pendingReload: Bool?
@@ -67,11 +70,13 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         super.viewDidLoad()
         tabBar.delegate = self
         tabBar.translatesAutoresizingMaskIntoConstraints = false
+        tabBarDivider.translatesAutoresizingMaskIntoConstraints = false
         terminalHost.translatesAutoresizingMaskIntoConstraints = false
         refreshTerminalHostFill()
 
         view.addSubview(titleStrip)
         view.addSubview(tabBar)
+        view.addSubview(tabBarDivider)
         view.addSubview(terminalHost)
         setupSidebarToggle()
 
@@ -89,7 +94,11 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
 
             // No divider line under the tab bar: the elevated chrome background now
             // provides the tab-strip/terminal boundary (see HarnessChromePalette).
-            terminalHost.topAnchor.constraint(equalTo: tabBar.bottomAnchor),
+            tabBarDivider.topAnchor.constraint(equalTo: tabBar.bottomAnchor),
+            tabBarDivider.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            tabBarDivider.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+
+            terminalHost.topAnchor.constraint(equalTo: tabBarDivider.bottomAnchor),
             terminalHost.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             terminalHost.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             terminalHost.bottomAnchor.constraint(equalTo: view.bottomAnchor),
@@ -303,7 +312,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
     private func paneKey(_ node: PaneNode) -> String {
         switch node {
         case let .leaf(leaf):
-            return "l:\(leaf.surfaceID.uuidString)"
+            return "l:\((leaf.activeSurfaceID ?? leaf.surfaceID).uuidString)"
         case let .branch(direction, _, first, second):
             // Ratio is intentionally excluded from the rebuild key: a divider drag
             // persists the ratio but must not force a pane remount (that was the
@@ -374,14 +383,37 @@ final class PaneContainerView: NSView {
     private func build(node: PaneNode, cwd: String, into parent: NSView) {
         switch node {
         case let .leaf(leaf):
-            let host = coordinator.terminalHost(for: leaf.surfaceID, cwd: cwd)
-            host.translatesAutoresizingMaskIntoConstraints = false
-            parent.addSubview(host)
+            let paneShell = PaneSurfaceDropTargetView(tabID: tabID, paneID: leaf.id)
+            HarnessDesign.makeClear(paneShell)
+            paneShell.translatesAutoresizingMaskIntoConstraints = false
+            parent.addSubview(paneShell)
             NSLayoutConstraint.activate([
-                host.topAnchor.constraint(equalTo: parent.topAnchor),
-                host.leadingAnchor.constraint(equalTo: parent.leadingAnchor),
-                host.trailingAnchor.constraint(equalTo: parent.trailingAnchor),
-                host.bottomAnchor.constraint(equalTo: parent.bottomAnchor),
+                paneShell.topAnchor.constraint(equalTo: parent.topAnchor),
+                paneShell.leadingAnchor.constraint(equalTo: parent.leadingAnchor),
+                paneShell.trailingAnchor.constraint(equalTo: parent.trailingAnchor),
+                paneShell.bottomAnchor.constraint(equalTo: parent.bottomAnchor),
+            ])
+
+            if let tabID {
+                let strip = PaneSurfaceTabStripView(tabID: tabID, leaf: leaf)
+                strip.translatesAutoresizingMaskIntoConstraints = false
+                paneShell.addSubview(strip)
+                NSLayoutConstraint.activate([
+                    strip.topAnchor.constraint(equalTo: paneShell.topAnchor),
+                    strip.leadingAnchor.constraint(equalTo: paneShell.leadingAnchor),
+                    strip.trailingAnchor.constraint(equalTo: paneShell.trailingAnchor),
+                    strip.heightAnchor.constraint(equalToConstant: 26),
+                ])
+            }
+
+            let host = coordinator.terminalHost(for: leaf.activeSurfaceID ?? leaf.surfaceID, cwd: cwd)
+            host.translatesAutoresizingMaskIntoConstraints = false
+            paneShell.addSubview(host)
+            NSLayoutConstraint.activate([
+                host.topAnchor.constraint(equalTo: paneShell.topAnchor, constant: 26),
+                host.leadingAnchor.constraint(equalTo: paneShell.leadingAnchor),
+                host.trailingAnchor.constraint(equalTo: paneShell.trailingAnchor),
+                host.bottomAnchor.constraint(equalTo: paneShell.bottomAnchor),
             ])
             if let tab = coordinator.snapshot.activeWorkspace?.activeTab {
             }
@@ -426,6 +458,224 @@ final class PaneContainerView: NSView {
         switch node {
         case let .leaf(leaf): return leaf.id
         case let .branch(_, _, first, _): return firstLeafID(first)
+        }
+    }
+}
+
+@MainActor
+private final class PaneSurfaceTabStripView: NSView {
+    private let tabID: TabID
+    private let leaf: PaneLeaf
+    private let stack = NSStackView()
+    private let plusButton = SoftIconButton(frame: NSRect(x: 0, y: 0, width: 22, height: 22))
+
+    init(tabID: TabID, leaf: PaneLeaf) {
+        self.tabID = tabID
+        self.leaf = leaf
+        super.init(frame: .zero)
+        setup()
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError() }
+
+    private func setup() {
+        HarnessDesign.makeClear(self)
+        stack.orientation = .horizontal
+        stack.alignment = .centerY
+        stack.spacing = 4
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(stack)
+
+        for (index, surface) in leaf.surfaces.enumerated() {
+            let button = PaneSurfaceDragButton(
+                title: surfaceTitle(surface, index: index),
+                tabID: tabID,
+                paneID: leaf.id,
+                surfaceID: surface.id
+            )
+            button.target = self
+            button.action = #selector(selectSurface(_:))
+            button.bezelStyle = .texturedRounded
+            button.controlSize = .small
+            button.font = .systemFont(ofSize: 10, weight: surface.id == leaf.activeSurfaceID ? .semibold : .regular)
+            button.contentTintColor = surface.id == leaf.activeSurfaceID
+                ? HarnessDesign.chrome.textPrimary
+                : HarnessDesign.chrome.textSecondary
+            button.toolTip = surface.cwd
+            button.identifier = NSUserInterfaceItemIdentifier(surface.id.uuidString)
+            stack.addArrangedSubview(button)
+        }
+
+        plusButton.setSymbol("plus", accessibilityDescription: "New surface", pointSize: 10, weight: .medium)
+        plusButton.toolTip = "New surface in pane"
+        plusButton.target = self
+        plusButton.action = #selector(newSurface)
+        plusButton.translatesAutoresizingMaskIntoConstraints = false
+        stack.addArrangedSubview(plusButton)
+        plusButton.widthAnchor.constraint(equalToConstant: 22).isActive = true
+        plusButton.heightAnchor.constraint(equalToConstant: 22).isActive = true
+
+        NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 6),
+            stack.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -6),
+            stack.centerYAnchor.constraint(equalTo: centerYAnchor),
+        ])
+    }
+
+    private func surfaceTitle(_ surface: PaneSurface, index: Int) -> String {
+        let trimmed = surface.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty || trimmed == "Shell" ? "S\(index + 1)" : trimmed
+    }
+
+    @objc private func selectSurface(_ sender: NSButton) {
+        guard let raw = sender.identifier?.rawValue,
+              let surfaceID = UUID(uuidString: raw)
+        else { return }
+        SessionCoordinator.shared.selectPaneSurface(tabID: tabID, paneID: leaf.id, surfaceID: surfaceID)
+    }
+
+    @objc private func newSurface() {
+        SessionCoordinator.shared.newSurface(tabID: tabID, paneID: leaf.id)
+    }
+}
+
+private struct PaneSurfaceDragPayload: Codable {
+    var tabID: TabID
+    var sourcePaneID: PaneID
+    var surfaceID: SurfaceID
+
+    static let pasteboardType = NSPasteboard.PasteboardType("dev.harness.pane-surface")
+
+    init(tabID: TabID, sourcePaneID: PaneID, surfaceID: SurfaceID) {
+        self.tabID = tabID
+        self.sourcePaneID = sourcePaneID
+        self.surfaceID = surfaceID
+    }
+
+    init?(pasteboard: NSPasteboard) {
+        guard let data = pasteboard.data(forType: Self.pasteboardType),
+              let payload = try? JSONDecoder().decode(Self.self, from: data)
+        else { return nil }
+        self = payload
+    }
+
+    func pasteboardItem() -> NSPasteboardItem? {
+        guard let data = try? JSONEncoder().encode(self) else { return nil }
+        let item = NSPasteboardItem()
+        item.setData(data, forType: Self.pasteboardType)
+        return item
+    }
+}
+
+@MainActor
+private final class PaneSurfaceDragButton: NSButton, NSDraggingSource {
+    private let payload: PaneSurfaceDragPayload
+    private var dragStarted = false
+
+    init(title: String, tabID: TabID, paneID: PaneID, surfaceID: SurfaceID) {
+        self.payload = PaneSurfaceDragPayload(tabID: tabID, sourcePaneID: paneID, surfaceID: surfaceID)
+        super.init(frame: .zero)
+        self.title = title
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func mouseDown(with event: NSEvent) {
+        dragStarted = false
+        super.mouseDown(with: event)
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard !dragStarted, let item = payload.pasteboardItem() else {
+            super.mouseDragged(with: event)
+            return
+        }
+        dragStarted = true
+        let draggingItem = NSDraggingItem(pasteboardWriter: item)
+        draggingItem.setDraggingFrame(bounds, contents: dragImage())
+        beginDraggingSession(with: [draggingItem], event: event, source: self)
+    }
+
+    func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
+        .move
+    }
+
+    private func dragImage() -> NSImage {
+        guard let bitmap = bitmapImageRepForCachingDisplay(in: bounds) else {
+            return NSImage(size: bounds.size)
+        }
+        cacheDisplay(in: bounds, to: bitmap)
+        let image = NSImage(size: bounds.size)
+        image.addRepresentation(bitmap)
+        return image
+    }
+}
+
+@MainActor
+private final class PaneSurfaceDropTargetView: NSView {
+    private let tabID: TabID?
+    private let paneID: PaneID
+
+    init(tabID: TabID?, paneID: PaneID) {
+        self.tabID = tabID
+        self.paneID = paneID
+        super.init(frame: .zero)
+        registerForDraggedTypes([PaneSurfaceDragPayload.pasteboardType])
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        dragOperation(sender)
+    }
+
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+        dragOperation(sender)
+    }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        guard let tabID,
+              let payload = PaneSurfaceDragPayload(pasteboard: sender.draggingPasteboard),
+              payload.tabID == tabID
+        else { return false }
+        let placement = splitPlacement(for: convert(sender.draggingLocation, from: nil))
+        SessionCoordinator.shared.splitPaneSurface(
+            tabID: tabID,
+            sourcePaneID: payload.sourcePaneID,
+            surfaceID: payload.surfaceID,
+            targetPaneID: paneID,
+            direction: placement.direction,
+            beforeTarget: placement.beforeTarget
+        )
+        return true
+    }
+
+    private func dragOperation(_ sender: NSDraggingInfo) -> NSDragOperation {
+        guard let tabID,
+              let payload = PaneSurfaceDragPayload(pasteboard: sender.draggingPasteboard),
+              payload.tabID == tabID
+        else { return [] }
+        return .move
+    }
+
+    private func splitPlacement(for point: NSPoint) -> (direction: SplitDirection, beforeTarget: Bool) {
+        let left = max(0, point.x)
+        let right = max(0, bounds.width - point.x)
+        let bottom = max(0, point.y)
+        let top = max(0, bounds.height - point.y)
+        let nearest = min(left, right, bottom, top)
+        switch nearest {
+        case left:
+            return (.horizontal, true)
+        case right:
+            return (.horizontal, false)
+        case bottom:
+            return (.vertical, false)
+        default:
+            return (.vertical, true)
         }
     }
 }

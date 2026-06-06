@@ -544,9 +544,47 @@ final class SessionCoordinator: NSObject {
         syncFromDaemon()
     }
 
+    func newSurface(tabID: TabID, paneID: PaneID) {
+        guard case let .surfaceID(raw)? = requestDaemon(.newSurface(tabID: tabID, paneID: paneID, shell: settings.defaultShell)),
+              let surfaceID = UUID(uuidString: raw)
+        else {
+            syncFromDaemon()
+            return
+        }
+        syncFromDaemon()
+        setActiveSurface(surfaceID)
+        terminalHosts.host(for: surfaceID)?.focusTerminal()
+    }
+
+    func selectPaneSurface(tabID: TabID, paneID: PaneID, surfaceID: SurfaceID) {
+        requestDaemon(.selectPaneSurface(tabID: tabID, paneID: paneID, surfaceID: surfaceID))
+        syncFromDaemon()
+        setActiveSurface(surfaceID)
+        terminalHosts.host(for: surfaceID)?.focusTerminal()
+    }
+
+    func splitPaneSurface(
+        tabID: TabID,
+        sourcePaneID: PaneID,
+        surfaceID: SurfaceID,
+        targetPaneID: PaneID,
+        direction: SplitDirection,
+        beforeTarget: Bool
+    ) {
+        requestDaemon(.splitPaneSurface(
+            tabID: tabID,
+            sourcePaneID: sourcePaneID,
+            surfaceID: surfaceID,
+            targetPaneID: targetPaneID,
+            direction: direction,
+            beforeTarget: beforeTarget
+        ))
+        syncFromDaemon()
+    }
+
     private func paneID(for surfaceID: SurfaceID, in node: PaneNode) -> PaneID? {
         switch node {
-        case let .leaf(leaf) where leaf.surfaceID == surfaceID:
+        case let .leaf(leaf) where leaf.surfaceIDs.contains(surfaceID):
             return leaf.id
         case let .branch(_, _, first, second):
             return paneID(for: surfaceID, in: first) ?? paneID(for: surfaceID, in: second)
@@ -793,6 +831,13 @@ final class SessionCoordinator: NSObject {
     /// split lands in the right tab regardless of which tab was previously active.
     func splitTab(workspaceID: WorkspaceID, tabID: TabID, direction: SplitDirection) {
         selectTab(workspaceID: workspaceID, tabID: tabID)
+        splitActivePane(direction: direction)
+    }
+
+    /// Select a session, then split its active pane. Used by the sidebar session
+    /// context menu so split actions apply to the row the user clicked.
+    func splitSession(workspaceID: WorkspaceID, sessionID: SessionID, direction: SplitDirection) {
+        selectSession(workspaceID: workspaceID, sessionID: sessionID)
         splitActivePane(direction: direction)
     }
 
@@ -1104,7 +1149,7 @@ final class SessionCoordinator: NSObject {
     private func surfaceID(forPane paneID: PaneID, in node: PaneNode) -> SurfaceID? {
         switch node {
         case let .leaf(leaf) where leaf.id == paneID:
-            return leaf.surfaceID
+            return leaf.activeSurfaceID ?? leaf.surfaceID
         case let .branch(_, _, first, second):
             return surfaceID(forPane: paneID, in: first) ?? surfaceID(forPane: paneID, in: second)
         default:

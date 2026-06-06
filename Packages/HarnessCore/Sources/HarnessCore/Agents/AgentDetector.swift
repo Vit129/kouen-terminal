@@ -277,6 +277,7 @@ public struct AgentTable: Codable, Sendable {
         AgentTableEntry(kind: .gemini, executables: ["gemini", "gemini-cli"]),
         AgentTableEntry(kind: .goose, executables: ["goose"]),
         AgentTableEntry(kind: .antigravity, executables: ["antigravity", "antigravity-cli", "agy"]),
+        AgentTableEntry(kind: .kiro, executables: ["kiro", "kiro-cli"]),
     ])
 
     public static func loadFromDisk() -> AgentTable {

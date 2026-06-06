@@ -388,7 +388,7 @@ final class MainExecutor: CommandExecutor {
     @MainActor
     private func neighborSurface(paneID: PaneID, in node: PaneNode) -> SurfaceID? {
         switch node {
-        case let .leaf(leaf): return leaf.id == paneID ? leaf.surfaceID : nil
+        case let .leaf(leaf): return leaf.id == paneID ? (leaf.activeSurfaceID ?? leaf.surfaceID) : nil
         case let .branch(_, _, first, second):
             return neighborSurface(paneID: paneID, in: first) ?? neighborSurface(paneID: paneID, in: second)
         }
@@ -442,7 +442,7 @@ final class MainExecutor: CommandExecutor {
     @MainActor
     private func panePathLookup(surfaceID: SurfaceID, in node: PaneNode) -> PaneID? {
         switch node {
-        case let .leaf(leaf): return leaf.surfaceID == surfaceID ? leaf.id : nil
+        case let .leaf(leaf): return leaf.surfaceIDs.contains(surfaceID) ? leaf.id : nil
         case let .branch(_, _, first, second):
             return panePathLookup(surfaceID: surfaceID, in: first)
                 ?? panePathLookup(surfaceID: surfaceID, in: second)

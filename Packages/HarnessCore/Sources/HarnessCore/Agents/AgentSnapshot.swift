@@ -16,6 +16,7 @@ public enum AgentKind: String, Codable, Sendable, CaseIterable {
     case gemini
     case goose
     case antigravity
+    case kiro
     case generic
 
     public var displayName: String {
@@ -32,6 +33,7 @@ public enum AgentKind: String, Codable, Sendable, CaseIterable {
         case .gemini: return "Gemini"
         case .goose: return "Goose"
         case .antigravity: return "Antigravity"
+        case .kiro: return "Kiro"
         case .generic: return "Agent"
         }
     }
@@ -51,6 +53,7 @@ public enum AgentKind: String, Codable, Sendable, CaseIterable {
         case .gemini: return "GM"
         case .goose: return "GS"
         case .antigravity: return "AV"
+        case .kiro: return "KR"
         case .generic: return "AG"
         }
     }
@@ -69,7 +72,8 @@ public enum AgentKind: String, Codable, Sendable, CaseIterable {
         case .aider: return "6ee7b7"
         case .gemini: return "8ab4f8"
         case .goose: return "f4b400"
-        case .antigravity: return "a855f7"
+        case .antigravity: return "3186ff"
+        case .kiro: return "8b5cf6"
         case .generic: return "9aa0a6"
         }
     }

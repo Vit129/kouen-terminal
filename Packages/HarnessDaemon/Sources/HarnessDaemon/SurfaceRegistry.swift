@@ -264,6 +264,44 @@ public final class SurfaceRegistry: @unchecked Sendable {
             commit()
             fireHookLocked(.afterSplitPane, surfaceKey: editor.surfaceID(forPaneID: newPaneID)?.uuidString)
             return .paneID(newPaneID)
+        case let .newSurface(tabID, paneID, shell):
+            guard let surfaceID = editor.addSurface(tabID: tabID, paneID: paneID) else {
+                return .error("Could not create surface")
+            }
+            let cwd = editor.snapshot.workspaces
+                .flatMap { workspace in workspace.sessions.flatMap { $0.tabs } }
+                .first(where: { $0.id == tabID })?
+                .cwd
+            _ = createOrEnsureSurface(
+                surfaceID: surfaceID.uuidString,
+                cwd: cwd,
+                shell: shell,
+                rows: 24,
+                cols: 80,
+                scrollbackBytes: nil
+            )
+            commit()
+            return .surfaceID(surfaceID.uuidString)
+        case let .selectPaneSurface(tabID, paneID, surfaceID):
+            guard editor.selectPaneSurface(tabID: tabID, paneID: paneID, surfaceID: surfaceID) else {
+                return .error("Surface not found in pane")
+            }
+            commit()
+            return .ok
+        case let .splitPaneSurface(tabID, sourcePaneID, surfaceID, targetPaneID, direction, beforeTarget):
+            guard let newPaneID = editor.splitPaneSurface(
+                tabID: tabID,
+                sourcePaneID: sourcePaneID,
+                surfaceID: surfaceID,
+                targetPaneID: targetPaneID,
+                direction: direction,
+                beforeTarget: beforeTarget
+            ) else {
+                return .error("Could not split surface")
+            }
+            commit()
+            fireHookLocked(.afterSplitPane, surfaceKey: surfaceID.uuidString)
+            return .paneID(newPaneID)
         case let .selectWorkspace(id):
             guard editor.selectWorkspace(id) else { return .error("Workspace not found") }
             commit()

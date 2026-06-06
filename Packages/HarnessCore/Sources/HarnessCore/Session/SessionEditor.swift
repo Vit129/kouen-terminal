@@ -87,6 +87,70 @@ public struct SessionEditor: Sendable {
         return newPaneID
     }
 
+    public mutating func addSurface(tabID: TabID, paneID: PaneID) -> SurfaceID? {
+        guard let match = tabIndex(tabID: tabID) else { return nil }
+        var tab = snapshot.workspaces[match.workspaceIndex].sessions[match.sessionIndex].tabs[match.tabIndex]
+        let surfaceID = UUID()
+        guard addSurface(to: &tab.rootPane, paneID: paneID, surfaceID: surfaceID, cwd: tab.cwd) else { return nil }
+        tab.lastActivePaneID = tab.activePaneID
+        tab.activePaneID = paneID
+        snapshot.workspaces[match.workspaceIndex].sessions[match.sessionIndex].tabs[match.tabIndex] = tab
+        bumpRevision()
+        return surfaceID
+    }
+
+    @discardableResult
+    public mutating func selectPaneSurface(tabID: TabID, paneID: PaneID, surfaceID: SurfaceID) -> Bool {
+        guard let match = tabIndex(tabID: tabID) else { return false }
+        var tab = snapshot.workspaces[match.workspaceIndex].sessions[match.sessionIndex].tabs[match.tabIndex]
+        guard selectSurface(in: &tab.rootPane, paneID: paneID, surfaceID: surfaceID) else { return false }
+        tab.lastActivePaneID = tab.activePaneID
+        tab.activePaneID = paneID
+        snapshot.workspaces[match.workspaceIndex].sessions[match.sessionIndex].tabs[match.tabIndex] = tab
+        bumpRevision()
+        return true
+    }
+
+    public mutating func splitPaneSurface(
+        tabID: TabID,
+        sourcePaneID: PaneID,
+        surfaceID: SurfaceID,
+        targetPaneID: PaneID,
+        direction: SplitDirection,
+        beforeTarget: Bool = false
+    ) -> PaneID? {
+        guard let match = tabIndex(tabID: tabID) else { return nil }
+        var tab = snapshot.workspaces[match.workspaceIndex].sessions[match.sessionIndex].tabs[match.tabIndex]
+        guard tab.rootPane.allPaneIDs().contains(targetPaneID) else { return nil }
+        if sourcePaneID == targetPaneID,
+           let leaf = leaf(in: tab.rootPane, paneID: sourcePaneID),
+           leaf.surfaceIDs.count <= 1
+        {
+            return nil
+        }
+        guard let movedSurface = removeSurface(from: &tab.rootPane, paneID: sourcePaneID, surfaceID: surfaceID) else {
+            return nil
+        }
+        if leaf(in: tab.rootPane, paneID: sourcePaneID)?.surfaceIDs.isEmpty == true {
+            _ = removePane(&tab.rootPane, target: sourcePaneID)
+        }
+        let newLeaf = PaneLeaf(
+            id: UUID(),
+            surfaceID: movedSurface.id,
+            daemonSurfaceID: movedSurface.daemonSurfaceID,
+            surfaces: [movedSurface],
+            activeSurfaceID: movedSurface.id
+        )
+        guard split(node: &tab.rootPane, targetPaneID: targetPaneID, with: newLeaf, direction: direction, beforeTarget: beforeTarget) else {
+            return nil
+        }
+        tab.lastActivePaneID = tab.activePaneID
+        tab.activePaneID = newLeaf.id
+        snapshot.workspaces[match.workspaceIndex].sessions[match.sessionIndex].tabs[match.tabIndex] = tab
+        bumpRevision()
+        return newLeaf.id
+    }
+
     /// Commit the active pane for a tab server-side, rolling the previous active pane
     /// into `lastActivePaneID` (MRU) for `select-pane -l`. Validates membership.
     @discardableResult
@@ -133,6 +197,107 @@ public struct SessionEditor: Sendable {
             if let id = split(node: &second, targetPaneID: targetPaneID, direction: direction) {
                 node = .branch(direction: existingDirection, ratio: ratio, first: first, second: second)
                 return id
+            }
+            return nil
+        default:
+            return nil
+        }
+    }
+
+    private func split(
+        node: inout PaneNode,
+        targetPaneID: PaneID,
+        with newLeaf: PaneLeaf,
+        direction: SplitDirection,
+        beforeTarget: Bool
+    ) -> Bool {
+        switch node {
+        case let .leaf(leaf) where leaf.id == targetPaneID:
+            node = beforeTarget
+                ? .branch(direction: direction, ratio: 0.5, first: .leaf(newLeaf), second: .leaf(leaf))
+                : .branch(direction: direction, ratio: 0.5, first: .leaf(leaf), second: .leaf(newLeaf))
+            return true
+        case .branch(let existingDirection, let ratio, var first, var second):
+            if split(node: &first, targetPaneID: targetPaneID, with: newLeaf, direction: direction, beforeTarget: beforeTarget) {
+                node = .branch(direction: existingDirection, ratio: ratio, first: first, second: second)
+                return true
+            }
+            if split(node: &second, targetPaneID: targetPaneID, with: newLeaf, direction: direction, beforeTarget: beforeTarget) {
+                node = .branch(direction: existingDirection, ratio: ratio, first: first, second: second)
+                return true
+            }
+            return false
+        default:
+            return false
+        }
+    }
+
+    private func addSurface(to node: inout PaneNode, paneID: PaneID, surfaceID: SurfaceID, cwd: String?) -> Bool {
+        switch node {
+        case var .leaf(leaf) where leaf.id == paneID:
+            leaf.surfaces.append(PaneSurface(id: surfaceID, title: "Shell", cwd: cwd))
+            leaf.activeSurfaceID = surfaceID
+            node = .leaf(leaf)
+            return true
+        case .branch(let direction, let ratio, var first, var second):
+            if addSurface(to: &first, paneID: paneID, surfaceID: surfaceID, cwd: cwd) {
+                node = .branch(direction: direction, ratio: ratio, first: first, second: second)
+                return true
+            }
+            if addSurface(to: &second, paneID: paneID, surfaceID: surfaceID, cwd: cwd) {
+                node = .branch(direction: direction, ratio: ratio, first: first, second: second)
+                return true
+            }
+            return false
+        default:
+            return false
+        }
+    }
+
+    private func selectSurface(in node: inout PaneNode, paneID: PaneID, surfaceID: SurfaceID) -> Bool {
+        switch node {
+        case var .leaf(leaf) where leaf.id == paneID:
+            guard leaf.surfaceIDs.contains(surfaceID) else { return false }
+            leaf.activeSurfaceID = surfaceID
+            node = .leaf(leaf)
+            return true
+        case .branch(let direction, let ratio, var first, var second):
+            if selectSurface(in: &first, paneID: paneID, surfaceID: surfaceID) {
+                node = .branch(direction: direction, ratio: ratio, first: first, second: second)
+                return true
+            }
+            if selectSurface(in: &second, paneID: paneID, surfaceID: surfaceID) {
+                node = .branch(direction: direction, ratio: ratio, first: first, second: second)
+                return true
+            }
+            return false
+        default:
+            return false
+        }
+    }
+
+    private func removeSurface(from node: inout PaneNode, paneID: PaneID, surfaceID: SurfaceID) -> PaneSurface? {
+        switch node {
+        case var .leaf(leaf) where leaf.id == paneID:
+            guard let index = leaf.surfaces.firstIndex(where: { $0.id == surfaceID }) else { return nil }
+            let removed = leaf.surfaces.remove(at: index)
+            if let next = leaf.surfaces.first {
+                leaf.surfaceID = next.id
+                leaf.daemonSurfaceID = next.daemonSurfaceID
+                leaf.activeSurfaceID = next.id
+            } else {
+                leaf.activeSurfaceID = nil
+            }
+            node = .leaf(leaf)
+            return removed
+        case .branch(let direction, let ratio, var first, var second):
+            if let removed = removeSurface(from: &first, paneID: paneID, surfaceID: surfaceID) {
+                node = .branch(direction: direction, ratio: ratio, first: first, second: second)
+                return removed
+            }
+            if let removed = removeSurface(from: &second, paneID: paneID, surfaceID: surfaceID) {
+                node = .branch(direction: direction, ratio: ratio, first: first, second: second)
+                return removed
             }
             return nil
         default:
@@ -574,7 +739,7 @@ public struct SessionEditor: Sendable {
     private func surfaceID(forPaneID paneID: PaneID, in node: PaneNode) -> SurfaceID? {
         switch node {
         case let .leaf(leaf) where leaf.id == paneID:
-            return leaf.surfaceID
+            return leaf.activeSurfaceID ?? leaf.surfaceID
         case let .branch(_, _, first, second):
             return surfaceID(forPaneID: paneID, in: first) ?? surfaceID(forPaneID: paneID, in: second)
         default:
