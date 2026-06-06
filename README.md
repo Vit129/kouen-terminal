@@ -47,11 +47,11 @@ New installs start in Plain. Moving over from another setup? See [docs/MIGRATION
 - 490 built-in color themes with a muted Harness default, plus `.harnesstheme` export / import for sharing
 - Shell integration (OSC 133): prompt marks for jump-to-prompt and a command success / failure gutter — bash / zsh / fish snippets in [docs/shell-integration/](docs/shell-integration/README.md)
 - Inline images that stay put across reflow and scroll into history
-- Drag file-backed folders or images into a pane to insert shell-quoted paths
+- Drag files, folders, or images into a pane to insert shell-quoted paths
 - Set Harness as the default terminal for SSH/Telnet/man-page links and `.command` / `.tool` files from Settings > Terminal
 - Automatic, signed background updates (Sparkle + EdDSA)
 - **IDE sidebar** — Files tab (project file tree), Git tab (Zed-style changes/history, stage/commit/push), and session management
-- **Project-aware file tree** — follows active session cwd, right-click to copy path, drag files to terminal
+- **Project-aware file tree** — SwiftUI, click folder to expand/collapse, drag files to terminal, right-click to copy path
 - **Git workflow** — stage/unstage files, commit, fetch/pull/push, branch switcher — all from the sidebar
 - **Session-as-tab** — each tab in the tab bar is a project session; + creates a new session, ✕ closes it
 - **Recent projects** — clock button in sidebar footer shows last 10 projects, switches to existing session on duplicate
