@@ -25,6 +25,12 @@ final class FileTreeNode: Identifiable {
 /// - `loadRoot()` runs filesystem scan and `git status` concurrently, then
 ///   merges the status map into each `FileNode.gitStatus`.
 /// - `NodeRow` renders a coloured dot and optional strikethrough per status.
+///
+/// **Live FSEvents watcher (F1-G):**
+/// - A second `.task(id:)` with the same key starts the watcher alongside
+///   `loadRoot()` and cancels it automatically when the view disappears or the
+///   key changes (session/path switch). The watcher fires `loadRoot()` on the
+///   main actor after a 500 ms debounce.
 @MainActor
 struct FileTreeSwiftUIView: View {
     let rootPath: String
@@ -36,6 +42,8 @@ struct FileTreeSwiftUIView: View {
     /// Kept alive across expands so child nodes inherit the same status map.
     @State private var currentGitStatus: [String: GitStatusType] = [:]
 
+    private var taskID: String { "\(sessionID?.uuidString ?? "nil")|\(rootPath)" }
+
     var body: some View {
         List {
             ForEach(rootNodes) { node in
@@ -46,7 +54,23 @@ struct FileTreeSwiftUIView: View {
         .scrollContentBackground(.hidden)
         // React to both path and session changes — different sessions may be on
         // different branches sharing the same rootPath.
-        .task(id: "\(sessionID?.uuidString ?? "nil")|\(rootPath)") { await loadRoot() }
+        .task(id: taskID) { await loadRoot() }
+        // FSEvents live watcher: starts alongside loadRoot, auto-cancelled on
+        // key change (session/path switch) or view disappearance.
+        .task(id: taskID) {
+            await watcher.startWatching(rootPath: rootPath) {
+                // Called on @MainActor after 500ms debounce.
+                Task { await loadRoot() }
+            }
+            // Task is cancelled when view disappears or taskID changes.
+            // Await cancellation so we stay alive while the view is visible.
+            await withTaskCancellationHandler(operation: {
+                // Sleep indefinitely; the watcher fires onChange callbacks independently.
+                try? await Task.sleep(nanoseconds: .max)
+            }, onCancel: {
+                Task { await watcher.stopWatching() }
+            })
+        }
     }
 
     private func loadRoot() async {
@@ -70,6 +94,7 @@ struct FileTreeSwiftUIView: View {
         }
     }
 }
+
 
 // MARK: - NodeRow
 
