@@ -9,6 +9,9 @@ public enum IPCRequest: Codable, Sendable {
     case listAgents
     case newWorkspace(name: String)
     case newSession(workspaceID: UUID, cwd: String?, name: String?, shell: String? = nil)
+    /// tmux `new-session -t <session>`: an independent session grouped with the target,
+    /// sharing its window list (linked windows / shared surfaces).
+    case newSessionInGroup(targetSessionID: UUID, name: String?)
     case newTab(workspaceID: UUID, cwd: String?, shell: String? = nil)
     case newTabInWorkspace(named: String, cwd: String?, shell: String? = nil)
     case newSplit(tabID: UUID, paneID: UUID?, direction: SplitDirection, shell: String? = nil)

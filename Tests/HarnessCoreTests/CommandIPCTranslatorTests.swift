@@ -188,6 +188,28 @@ final class CommandIPCTranslatorTests: XCTestCase {
         else { return XCTFail("-C must be clientLocal") }
     }
 
+    /// tmux `new-session -t <session>` means GROUP WITH the target, not create-at.
+    func testTargetedNewSessionTranslatesToGrouping() throws {
+        var editor = SessionEditor()
+        let ws = try XCTUnwrap(editor.snapshot.activeWorkspace)
+        let original = try XCTUnwrap(ws.activeSession)
+        _ = editor.renameSession(original.id, name: "main")
+        let target = CommandTarget(snapshot: editor.snapshot)
+
+        let spec = TargetSpec(session: .byName("main"), raw: "main")
+        guard case let .requests(reqs) = CommandIPCTranslator.translate(
+            .targeted(spec, .newSession(name: "mirror")), target: target),
+            case let .newSessionInGroup(targetSessionID, name) = reqs.first
+        else { return XCTFail("expected newSessionInGroup") }
+        XCTAssertEqual(targetSessionID, original.id)
+        XCTAssertEqual(name, "mirror")
+
+        let missing = TargetSpec(session: .byName("nope"), raw: "nope")
+        guard case .unresolved = CommandIPCTranslator.translate(
+            .targeted(missing, .newSession(name: nil)), target: target)
+        else { return XCTFail("unknown group target must be unresolved") }
+    }
+
     func testTargetedHonorsBaseIndex() throws {
         var editor = SessionEditor()
         let ws = try XCTUnwrap(editor.snapshot.activeWorkspace)
