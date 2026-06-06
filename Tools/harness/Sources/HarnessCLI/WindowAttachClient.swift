@@ -1150,7 +1150,9 @@ private final class WindowSession: @unchecked Sendable {
         case let .clientLocal(local):
             handleLocalCommand(local, target: target)
         case .unresolved:
-            break
+            // Loud, like the GUI prompt and control mode: a typo'd `-t` (or a command with
+            // no resolvable focus) must never read as a silent success.
+            flashStatus("no resolvable target for command")
         }
     }
 

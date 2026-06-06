@@ -179,16 +179,56 @@ final class CommandParserTests: XCTestCase {
         XCTAssertEqual(try CommandParser.parse("swap-pane -t !"), .swapPane(target: .last))
     }
 
-    /// An unrecognized -t used to silently route to `.next`, moving the WRONG pane with no
-    /// feedback — it must throw like every other invalid argument.
-    func testPaneTargetInvalidValueThrows() {
-        XCTAssertThrowsError(try CommandParser.parse("select-pane -t bogus"))
-        XCTAssertThrowsError(try CommandParser.parse("swap-pane -t api:1.0")) { error in
+    /// Absolute `-t` targets parse via the full `TargetSpec` grammar into `.targeted` —
+    /// names that don't exist (`bogus`) parse fine and fail loudly at *resolution*, exactly
+    /// like tmux's "can't find session". Deliberate rewrite of the v1.7.1 throws-pin: the
+    /// no-silent-misroute policy moved from parse time to resolve time (see
+    /// `testPaneTargetEmptySpecStillThrows` for what parse still rejects).
+    func testPaneTargetAbsoluteFormsParseAsTargeted() throws {
+        guard case let .targeted(spec, inner) = try CommandParser.parse("swap-pane -t api:1.0") else {
+            return XCTFail("expected .targeted")
+        }
+        XCTAssertEqual(spec.session, .byName("api"))
+        XCTAssertEqual(spec.window, .byIndex(1))
+        XCTAssertEqual(spec.pane, .byIndex(0))
+        XCTAssertEqual(inner, .swapPane(target: .next))
+
+        let paneID = UUID()
+        guard case let .targeted(byID, select) = try CommandParser.parse("select-pane -t %\(paneID.uuidString)") else {
+            return XCTFail("expected .targeted")
+        }
+        XCTAssertEqual(byID.pane, .byID(paneID))
+        XCTAssertEqual(select, .selectPane(target: .next))
+
+        // A lone `{top}` is level-ambiguous at parse (window vs pane) — it rides
+        // `bareToken` and resolves at the command's natural level.
+        guard case let .targeted(geometry, _) = try CommandParser.parse("select-pane -t {top}") else {
+            return XCTFail("expected .targeted")
+        }
+        XCTAssertEqual(geometry.bareToken, "{top}")
+
+        // A lone unknown name is a session/level-ambiguous ref — parses, resolves to nothing.
+        guard case .targeted = try CommandParser.parse("select-pane -t bogus") else {
+            return XCTFail("expected .targeted")
+        }
+    }
+
+    /// Relative fast paths are untouched by the absolute-target branch.
+    func testPaneTargetRelativeFormsStayRelative() throws {
+        XCTAssertEqual(try CommandParser.parse("select-pane -t :.+"), .selectPane(target: .next))
+        XCTAssertEqual(try CommandParser.parse("swap-pane -t !"), .swapPane(target: .last))
+        XCTAssertEqual(try CommandParser.parse("select-pane -L"), .selectPane(target: .left))
+    }
+
+    /// What parse still rejects loudly: a `-t` value that parses to nothing actionable.
+    func testPaneTargetEmptySpecStillThrows() {
+        XCTAssertThrowsError(try CommandParser.parse("select-pane -t :")) { error in
             guard let parseError = error as? CommandParseError,
                   case .invalidArgument = parseError else {
                 return XCTFail("expected invalidArgument, got \(error)")
             }
         }
+        XCTAssertThrowsError(try CommandParser.parse("swap-pane -t :."))
     }
 
     /// A dangling -t (flag present, value missing) is a typo, not a request for the default.

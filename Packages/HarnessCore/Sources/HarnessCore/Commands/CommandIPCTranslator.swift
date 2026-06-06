@@ -154,6 +154,14 @@ public enum CommandIPCTranslator {
             case .selectWindow:
                 guard let ws = resolved.workspace, let tab = resolved.tab else { return .unresolved }
                 return .requests([.selectTab(workspaceID: ws.id, tabID: tab.id)])
+            case .swapPane:
+                // tmux `swap-pane -t X`: swap the CALLER's active pane with X — the spec
+                // names the destination, not the pane to act from. (Translating against
+                // `resolved` would swap X with X's own neighbor.)
+                guard let dst = resolved.paneID, let src = target.paneID, dst != src else {
+                    return .unresolved
+                }
+                return .requests([.swapPanes(srcPaneID: src, dstPaneID: dst)])
             default:
                 return translate(inner, target: resolved, baseIndex: baseIndex, paneBaseIndex: paneBaseIndex)
             }

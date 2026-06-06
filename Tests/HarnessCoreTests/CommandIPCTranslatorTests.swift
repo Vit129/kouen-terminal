@@ -90,6 +90,64 @@ final class CommandIPCTranslatorTests: XCTestCase {
         XCTAssertEqual(pane, tab1Pane)
     }
 
+    /// tmux `swap-pane -t X`: swap the CALLER's active pane with X — not X with X's
+    /// own neighbor (which is what falling through to the relative translation against
+    /// the resolved target would do).
+    func testTargetedSwapPaneSwapsActiveWithResolved() throws {
+        let (target, _, activePane) = try makeTarget(splitOnce: true)
+        let other = try XCTUnwrap(target.paneOrder.first { $0 != activePane })
+
+        let spec = TargetSpec(pane: .byID(other), raw: "%\(other.uuidString)")
+        guard case let .requests(reqs) = CommandIPCTranslator.translate(
+            .targeted(spec, .swapPane(target: .next)), target: target),
+            case let .swapPanes(src, dst) = reqs.first
+        else { return XCTFail("expected swapPanes") }
+        XCTAssertEqual(src, activePane, "source is the caller's active pane")
+        XCTAssertEqual(dst, other, "destination is the resolved -t pane")
+    }
+
+    /// Swapping a pane with itself (target resolves to the active pane) is unresolved,
+    /// and so is a target that names nothing — never a silent wrong-pane swap.
+    func testTargetedSwapPaneRejectsSelfAndUnresolvable() throws {
+        let (target, _, activePane) = try makeTarget(splitOnce: true)
+        let selfSpec = TargetSpec(pane: .byID(activePane), raw: "%\(activePane.uuidString)")
+        guard case .unresolved = CommandIPCTranslator.translate(
+            .targeted(selfSpec, .swapPane(target: .next)), target: target)
+        else { return XCTFail("self-swap must be unresolved") }
+
+        let missing = TargetSpec(session: .byName("bogus"), raw: "bogus")
+        guard case .unresolved = CommandIPCTranslator.translate(
+            .targeted(missing, .swapPane(target: .next)), target: target)
+        else { return XCTFail("unknown session must be unresolved") }
+    }
+
+    /// `select-pane -t %id` resolves absolutely (the existing `.targeted(.selectPane)` path
+    /// the parser now reaches for any absolute target).
+    func testTargetedSelectPaneResolvesAbsolutely() throws {
+        let (target, tabID, activePane) = try makeTarget(splitOnce: true)
+        let other = try XCTUnwrap(target.paneOrder.first { $0 != activePane })
+        let spec = TargetSpec(pane: .byID(other), raw: "%\(other.uuidString)")
+        guard case let .requests(reqs) = CommandIPCTranslator.translate(
+            .targeted(spec, .selectPane(target: .next)), target: target),
+            case let .selectPane(reqTab, reqPane) = reqs.first
+        else { return XCTFail("expected selectPane") }
+        XCTAssertEqual(reqTab, tabID)
+        XCTAssertEqual(reqPane, other)
+    }
+
+    /// A level-ambiguous `{top}` rides `bareToken` and resolves at the pane level for a
+    /// pane-kind command — the full grammar path the parser now reaches for select-pane.
+    func testTargetedSelectPaneResolvesGeometryBareToken() throws {
+        let (target, tabID, _) = try makeTarget(splitOnce: true)
+        let spec = TargetSpec.parse("{top}")
+        guard case let .requests(reqs) = CommandIPCTranslator.translate(
+            .targeted(spec, .selectPane(target: .next)), target: target),
+            case let .selectPane(reqTab, reqPane) = reqs.first
+        else { return XCTFail("expected selectPane for {top}") }
+        XCTAssertEqual(reqTab, tabID)
+        XCTAssertTrue(target.paneOrder.contains(reqPane))
+    }
+
     func testTargetedHonorsBaseIndex() throws {
         var editor = SessionEditor()
         let ws = try XCTUnwrap(editor.snapshot.activeWorkspace)
