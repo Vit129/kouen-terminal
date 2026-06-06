@@ -94,7 +94,7 @@ public enum PaneRectSolver {
             }
             out.append(PaneRect(
                 paneID: leaf.id,
-                surfaceID: leaf.surfaceID,
+                surfaceID: leaf.activeSurfaceID ?? leaf.surfaceID,
                 x: x, y: iy, cols: cols, rows: irows, labelRow: labelRow
             ))
 

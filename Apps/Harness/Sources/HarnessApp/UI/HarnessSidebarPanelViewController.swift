@@ -27,7 +27,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
     /// Wraps the search field so it gets the same radius-7 elevated-surface chrome as
     /// the workspace pill and session cards.
     private let searchContainer = NSView()
-    private let sidebarTabs = NSSegmentedControl(labels: ["Sessions", "Files"], trackingMode: .selectOne, target: nil, action: nil)
+    private let sidebarTabs = NSSegmentedControl(labels: ["Sessions", "Files", "Git"], trackingMode: .selectOne, target: nil, action: nil)
     private let sectionHeader = NSView()
     private let sectionLabel = NSTextField(labelWithString: "Sessions")
     private let sessionTable = NSTableView()
@@ -694,7 +694,8 @@ final class HarnessSidebarPanelViewController: NSViewController {
         if let cwd = snap.activeWorkspace?.activeTab?.cwd {
             let activeSessionID = snap.activeWorkspace?.activeSessionID
             fileTreeView.updateRoot(path: cwd, sessionID: activeSessionID)
-            gitPanelView.updateRoot(path: cwd)
+            gitPanelView.updateRoot(path: cwd, force: activeSessionID != lastFileTreeSessionID)
+            lastFileTreeSessionID = activeSessionID
             let home = NSHomeDirectory()
             if cwd != home, cwd != "/" {
                 Self.recordRecentProject(cwd)
@@ -719,6 +720,12 @@ final class HarnessSidebarPanelViewController: NSViewController {
         workspaces = snap.workspaces
         let name = snap.activeWorkspace?.name ?? "Workspace"
         workspacePill.configure(name: name, count: sessions.count)
+        if let cwd = snap.activeWorkspace?.activeTab?.cwd {
+            let activeSessionID = snap.activeWorkspace?.activeSessionID
+            fileTreeView.updateRoot(path: cwd, sessionID: activeSessionID)
+            gitPanelView.updateRoot(path: cwd, force: activeSessionID != lastFileTreeSessionID)
+            lastFileTreeSessionID = activeSessionID
+        }
         // Rebuild cache once; iterate the stored result — no redundant recomputation.
         rebuildSidebarRows()
         let rows = cachedSidebarRows
@@ -1054,6 +1061,20 @@ final class HarnessSidebarPanelViewController: NSViewController {
 
         menu.addItem(.separator())
 
+        let splitRight = NSMenuItem(title: "Split session right", action: #selector(splitSessionFromMenu(_:)), keyEquivalent: "")
+        splitRight.target = self
+        splitRight.representedObject = session.id
+        splitRight.toolTip = SplitDirection.horizontal.rawValue
+        menu.addItem(splitRight)
+
+        let splitDown = NSMenuItem(title: "Split session down", action: #selector(splitSessionFromMenu(_:)), keyEquivalent: "")
+        splitDown.target = self
+        splitDown.representedObject = session.id
+        splitDown.toolTip = SplitDirection.vertical.rawValue
+        menu.addItem(splitDown)
+
+        menu.addItem(.separator())
+
         // Pin a session to survive a clean quit even in Plain mode (and the reverse). Always
         // offered for discoverability; the checkmark reflects the stored per-session intent. When
         // keep-on-quit is globally on, that intent is currently superseded (everything survives),
@@ -1121,6 +1142,15 @@ final class HarnessSidebarPanelViewController: NSViewController {
         let title = session.name.isEmpty ? sessionTitle(for: session) : session.name
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(title, forType: .string)
+    }
+
+    @objc private func splitSessionFromMenu(_ sender: NSMenuItem) {
+        guard let workspaceID = activeWorkspaceID,
+              let sessionID = sender.representedObject as? SessionID,
+              let rawDirection = sender.toolTip,
+              let direction = SplitDirection(rawValue: rawDirection)
+        else { return }
+        SessionCoordinator.shared.splitSession(workspaceID: workspaceID, sessionID: sessionID, direction: direction)
     }
 
     @objc private func toggleSessionPersistent(_ sender: NSMenuItem) {

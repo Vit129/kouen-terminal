@@ -96,6 +96,18 @@ final class MainSplitViewController: NSViewController {
             name: NotificationBus.shared.snapshotChanged,
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(windowFullScreenStateChanged),
+            name: NSWindow.didEnterFullScreenNotification,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(windowFullScreenStateChanged),
+            name: NSWindow.didExitFullScreenNotification,
+            object: nil
+        )
     }
 
     /// Resolve the divider line color: user override (`settings.dividerHex`) wins; otherwise
@@ -128,6 +140,7 @@ final class MainSplitViewController: NSViewController {
         content.applyChrome()
         statusLine.applyChrome()
         (view.window?.windowController as? MainWindowController)?.applyTransparency()
+        updateContentLeadingInset()
     }
 
     @objc private func snapshotChanged(_ note: Notification) {
@@ -156,6 +169,16 @@ final class MainSplitViewController: NSViewController {
         view.window?.title = snap.activeWorkspace.map { "Harness — \($0.name)" } ?? "Harness"
     }
 
+    override func viewDidAppear() {
+        super.viewDidAppear()
+        updateContentLeadingInset()
+    }
+
+    @objc private func windowFullScreenStateChanged(_ note: Notification) {
+        guard let window = note.object as? NSWindow, window === view.window else { return }
+        updateContentLeadingInset()
+    }
+
     func setSidebarVisible(_ visible: Bool) {
         setSidebarVisible(visible, animated: false)
     }
@@ -181,7 +204,7 @@ final class MainSplitViewController: NSViewController {
             panel?.isHidden = !visible
             splitDelegate.allowFullCollapse = false
             edgeDivider.isHidden = !visible
-            updateContentLeadingInset(visible: visible)
+            updateContentLeadingInset()
             return
         }
 
@@ -194,7 +217,7 @@ final class MainSplitViewController: NSViewController {
             split.setPosition(target, ofDividerAt: 0)
             if !visible { panel.isHidden = true }
             splitDelegate.allowFullCollapse = false
-            updateContentLeadingInset(visible: visible)
+            updateContentLeadingInset()
             return
         }
         animateSidebar(from: start, to: target, t0: CACurrentMediaTime(), visible: visible, token: sidebarAnimToken)
@@ -224,7 +247,7 @@ final class MainSplitViewController: NSViewController {
         if raw >= 1 {
             if !visible { panel.isHidden = true }
             splitDelegate.allowFullCollapse = false   // restore the 200pt drag floor
-            updateContentLeadingInset(visible: visible)
+            updateContentLeadingInset()
             return
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0 / 60.0) { [weak self] in
@@ -239,15 +262,24 @@ final class MainSplitViewController: NSViewController {
     /// The tab bar itself sits below the lights and never needs one.
     private let trafficLightInset: CGFloat = 72
 
+    private var effectiveTrafficLightInset: CGFloat {
+        guard let window = view.window else { return 0 }
+        let settings = SessionCoordinator.shared.settings
+        guard settings.transparentTitlebar else { return 0 }
+        guard !window.styleMask.contains(.fullScreen) else { return 0 }
+        return trafficLightInset
+    }
+
     /// Inset the strip readout proportionally to how collapsed the sidebar is: full inset
     /// at width 0, none once the sidebar is wide enough to cover the traffic lights.
     private func setContentLeadingInset(forSidebarWidth width: CGFloat) {
         let t = max(0, min(1, 1 - width / trafficLightInset))
-        content.setTabBarLeadingInset(trafficLightInset * t)
+        content.setTabBarLeadingInset(effectiveTrafficLightInset * t)
     }
 
-    private func updateContentLeadingInset(visible: Bool) {
-        content.setTabBarLeadingInset(visible ? 0 : trafficLightInset)
+    private func updateContentLeadingInset() {
+        let visible = SessionCoordinator.shared.settings.sidebarVisible
+        content.setTabBarLeadingInset(visible ? 0 : effectiveTrafficLightInset)
     }
 
     func toggleSidebar() {

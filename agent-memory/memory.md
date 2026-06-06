@@ -10,14 +10,10 @@
 ✅ Files tab: root follows active session cwd  
 ✅ + button: opens NSOpenPanel → new session at selected folder  
 ✅ Recent projects button (clock icon): dropdown of last 10 cwds, switch to existing session if duplicate  
-✅ Git tab: Zed-style layout (Changes/History tabs, branch switcher, Fetch▾ dropdown)  
-🐛 **BLOCKED:** Checkbox stage/unstage in Git tab not clickable (CASE-001)
+✅ Git tab: Zed-style layout (Changes/History tabs, branch switcher, Fetch▾ dropdown, working stage/unstage checkboxes)
 
 ## Known Issues
-- **CASE-001:** NSButton checkbox in Git panel changes list doesn't receive mouse clicks.
-  - Attempted: FlippedView hitTest override, removing scroll view, NSStackView rows, direct documentView.
-  - Hypothesis: layout constraints give changesContainer zero height, or historyContainer (hidden but in same frame) steals events.
-  - Next step: Use Xcode View Debugger or add frame-logging to verify container bounds at runtime.
+None
 
 ## Architecture Notes
 - Sidebar: `HarnessSidebarPanelViewController` — tabs (Sessions/Files/Git) via NSSegmentedControl

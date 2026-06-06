@@ -52,7 +52,7 @@ public enum SnapshotQueryFormatter {
     /// `display-panes`/`select-pane`, flagging the active pane.
     public static func paneRows(in tab: Tab) -> [PaneListRow] {
         tab.rootPane.allLeaves().enumerated().map { index, leaf in
-            PaneListRow(index: index, paneID: leaf.id, surfaceID: leaf.surfaceID,
+            PaneListRow(index: index, paneID: leaf.id, surfaceID: leaf.activeSurfaceID ?? leaf.surfaceID,
                         active: leaf.id == tab.activePaneID)
         }
     }
