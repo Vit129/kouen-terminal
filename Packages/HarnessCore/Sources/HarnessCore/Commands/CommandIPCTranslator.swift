@@ -154,6 +154,16 @@ public enum CommandIPCTranslator {
             case .selectWindow:
                 guard let ws = resolved.workspace, let tab = resolved.tab else { return .unresolved }
                 return .requests([.selectTab(workspaceID: ws.id, tabID: tab.id)])
+            case let .newSession(name):
+                // tmux `new-session -t <session>`: a session GROUPED with the target,
+                // sharing its window list — not a session created "at" the target.
+                // STRICT lookup: `resolving` falls back to the focused session when a
+                // ref doesn't match, which here would silently group with the wrong
+                // session — the misroute class the v1.7.1 validation eliminated.
+                guard let sref = spec.session,
+                      let (_, targetSession) = CommandTarget.findSession(sref, in: target.snapshot, current: target.session)
+                else { return .unresolved }
+                return .requests([.newSessionInGroup(targetSessionID: targetSession.id, name: name)])
             default:
                 return translate(inner, target: resolved, baseIndex: baseIndex, paneBaseIndex: paneBaseIndex)
             }
