@@ -6,6 +6,83 @@ All notable changes to Harness are documented here. The format is based on
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/robzilla1738/harness-terminal/releases).
 
+## [Unreleased]
+
+The production-hardening pass: a full adversarial audit (multi-dimension bug hunt →
+refute-by-default verification → fixes → post-fix review) across the daemon, IPC, terminal
+engine, CLI, settings, and onboarding. Every fix below was verified with a repro or code-trace
+before it was written.
+
+### Fixed
+- **Daemon could refuse to start forever after a force-kill or reboot.** (#93) The stale-instance
+  gate trusted `daemon.pid` + `kill(pid, 0)` alone; a recycled PID belonging to any live process
+  made the fresh daemon exit, and launchd's restart loop never escaped. The gate now verifies the
+  prior PID is actually a HarnessDaemon via `proc_pidpath` and otherwise clears the stale file —
+  the socket-ping guard remains the authority.
+- **Attaching to a busy surface could silently drop output.** (#95) Attach was
+  replay-then-subscribe across two sockets with no backfill: bytes arriving in the window were
+  persisted but never delivered (repro'd: 217 lost markers). Attach now subscribes first, buffers
+  live frames, replays, then flushes the buffer deduplicated by the daemon's byte sequence — with
+  a compatible fallback against older daemons.
+- **Keystrokes typed while a daemon subscription was dying were silently dropped.** (#95)
+  `sendInput` now reports failure and input immediately falls back to the one-shot request path.
+- **Daemon startup could permanently delete scrollback for a surface whose shell failed to
+  spawn.** (#93) The orphan-file sweep only considered live PTYs; it now keeps any scrollback
+  referenced by the layout, so a transient spawn failure (fork pressure, missing shell) no longer
+  costs the pane's history.
+- **A keystroke could stall behind a full process-tree scan every 1.5s.** (#93) The metadata
+  refresher held the registry lock — the one every IPC request needs — across an
+  all-system-PIDs walk per pane (measured 6–12ms at 10–20 panes). The scan now runs off-lock
+  with identity-checked write-back, plus a `childPID` read race and the log-rotation race fixed
+  and the PID file made owner-checked.
+- **Children that ignore SIGTERM+SIGHUP leaked a blocked reaper thread per close.** (#93)
+  `close()`/`respawn()` now escalate to SIGKILL after a grace period, with PID-reuse guards;
+  the watcher remains the sole reaper.
+- **Thai: SARA AM after a marked base rendered a dotted circle** (น้ำ, ต่ำ, ซ้ำ). (#94, closes #66)
+  U+0E33 now decomposes on input into NIKHAHIT (folded onto the base) + SARA AA, so CoreText never
+  shapes an orphaned spacing mark; buffer search splits the needle the same way so precomposed
+  queries keep matching, and the cursor-text color now applies on marked clusters.
+- **`harness-cli bind-hook --if <cond>` crashed with a Swift range trap.** (#92) Malformed
+  argument shapes now print usage and exit 1 before any IPC.
+- **Invalid `--detach-keys` silently attached with the default detach binding.** (#92) Both attach
+  paths now fail loudly (exit 64) naming the bad value and accepted formats; `new-split --pane`
+  and `select-layout --main` with a malformed UUID now error instead of silently acting on the
+  active pane.
+- **CSI parameters above 65535 dropped the whole control sequence.** (#91) `ESC[99999H` (the
+  "jump to bottom" idiom) was a no-op; oversized values now clamp (xterm/Ghostty parity) while the
+  DoS guards for parameter count stay intact. Invalid DECSTBM (`top ≥ bottom`) no longer clobbers
+  the scroll region and homes the cursor (now a no-op), and DECRC without a prior DECSC restores
+  the default pen instead of leaking the current SGR state.
+- **`fontSize` from a hand-edited settings.json was unclamped.** (#89) Extreme values blanked
+  glyphs (atlas overflow at ~500pt) or allocated hundreds of MB of grid (sub-1pt); the persistence
+  boundary now clamps to the same 8–32 the zoom shortcuts use. An empty font family now falls back
+  to Menlo like an unknown one.
+- **Re-running onboarding from an older Harness.app could silently downgrade newer installed
+  binaries.** (#90) Install is now version-aware (build-number probe): byte-identical copies are
+  skipped and a newer installed daemon/CLI is kept, with the outcome shown in the wizard.
+- **The onboarding fish completion drifted from the real CLI.** (#90) The wizard now uses the same
+  catalog-driven generator as `harness-cli completions`; the catalog gained the missing verbs and
+  a drift-guard test asserts it covers every dispatch case.
+
+### Changed
+- **Slider drags persist once on release.** (#89) Opacity/blur/border/contrast drags wrote
+  settings.json on every tick (60–120Hz); live-apply is now decoupled from persistence.
+- **Destructive resets ask first.** (#89) "Reset to defaults" and "Reset agent colors" confirm
+  before wiping; the resize-overlay position picker is now exposed in Appearance.
+- **Hex color fields and the notification threshold re-sync after commit** instead of silently
+  reverting invalid input. (#89)
+- **A disconnected pane now shows a "Reconnecting…" chip** instead of freezing silently for up to
+  a minute, and the Settings Advanced page shows an explicit banner (controls disabled) when the
+  daemon is unreachable instead of rendering defaults as if they were real. Session IPC requests
+  past 250ms now emit throttled signposts. (#95)
+- **Onboarding locks navigation while installs run, notes when the CLI won't be on PATH, and
+  rescans for agents when the window regains focus.** (#90)
+
+### Added
+- **SSH tunnel characterization tests** (16 — the remote-host path previously had zero coverage)
+  and a **GridCompositor drift canary** asserting the onboarding preview's compositor port stays
+  byte-identical to the live one. (#88)
+
 ## [1.6.0] - 2026-06-05
 
 The redraw-efficiency release, from a proven-best-practice deep dive (kitty/foot/Alacritty/
