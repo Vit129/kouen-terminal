@@ -1532,87 +1532,24 @@ struct NotificationEntry: Identifiable, Equatable {
 }
 
 enum DesktopNotifier {
-    /// Call once at app launch. macOS only shows the system prompt the first
-    /// time; subsequent calls are no-ops, so it's safe to call eagerly. Also
-    /// installs the foreground-presentation delegate (see `ForegroundPresenter`).
-    static func requestAuthorizationIfNeeded() {
-        let center = UNUserNotificationCenter.current()
-        // Without a delegate that opts in, macOS suppresses banners while Harness is
-        // the *frontmost* app — so an agent notification fired while you're looking at
-        // another tab would silently no-op. The presenter forces banner + sound + list
-        // even in the foreground, so agent alerts always land.
-        center.delegate = ForegroundPresenter.shared
-        center.requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
-    }
+    // UNUserNotificationCenter.current() crashes on macOS 26 beta due to a corrupted
+    // NSCalendarDate in the notification database. All banner delivery is disabled until
+    // the system issue is resolved; sound fallback is preserved.
+
+    static func requestAuthorizationIfNeeded() {}
 
     static func show(title: String, body: String, withSound: Bool = true) {
-        let center = UNUserNotificationCenter.current()
-        center.delegate = ForegroundPresenter.shared
-        center.getNotificationSettings { settings in
-            switch settings.authorizationStatus {
-            case .authorized, .provisional, .ephemeral:
-                add(title: title, body: body, withSound: withSound)
-            case .notDetermined:
-                UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
-                    if granted {
-                        add(title: title, body: body, withSound: withSound)
-                    } else if withSound {
-                        DispatchQueue.main.async { NSSound(named: "Glass")?.play() }
-                    }
-                }
-            case .denied:
-                if withSound {
-                    DispatchQueue.main.async { NSSound(named: "Glass")?.play() }
-                }
-            @unknown default:
-                add(title: title, body: body, withSound: withSound)
-            }
+        if withSound {
+            DispatchQueue.main.async { NSSound(named: "Glass")?.play() }
         }
     }
 
-    private static func add(title: String, body: String, withSound: Bool) {
-        let content = UNMutableNotificationContent()
-        content.title = title
-        content.body = body
-        content.sound = withSound ? .default : nil
-        let request = UNNotificationRequest(
-            identifier: UUID().uuidString,
-            content: content,
-            trigger: nil
-        )
-        UNUserNotificationCenter.current().add(request) { error in
-            if let error {
-                fputs("Harness notification delivery failed: \(error)\n", harnessStderr)
-            }
-        }
-    }
-
-    /// The current system authorization status, on the main actor — drives the Settings
-    /// permission indicator so the user can tell whether macOS is allowing alerts at all.
     static func authorizationStatus(_ completion: @escaping @MainActor (UNAuthorizationStatus) -> Void) {
-        UNUserNotificationCenter.current().getNotificationSettings { settings in
-            let status = settings.authorizationStatus
-            DispatchQueue.main.async { MainActor.assumeIsolated { completion(status) } }
-        }
+        DispatchQueue.main.async { MainActor.assumeIsolated { completion(.notDetermined) } }
     }
 
-    /// Drive the permission flow from a user action: prompt when undecided, or open System
-    /// Settings ▸ Notifications when macOS has already denied us (the system never re-prompts
-    /// after a denial, so the only path back is the settings pane).
     static func requestOrOpenSettings() {
-        UNUserNotificationCenter.current().delegate = ForegroundPresenter.shared
-        UNUserNotificationCenter.current().getNotificationSettings { settings in
-            switch settings.authorizationStatus {
-            case .denied:
-                DispatchQueue.main.async { openSystemNotificationSettings() }
-            default:
-                UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
-                    if !granted {
-                        DispatchQueue.main.async { openSystemNotificationSettings() }
-                    }
-                }
-            }
-        }
+        openSystemNotificationSettings()
     }
 
     static func openSystemNotificationSettings() {
@@ -1620,45 +1557,7 @@ enum DesktopNotifier {
         NSWorkspace.shared.open(url)
     }
 
-    /// Fire a one-off banner so the user can confirm delivery end-to-end (bypasses the
-    /// agent-activity gates; still honors the system permission). If permission isn't granted
-    /// yet, request/route it first so the test isn't a silent no-op.
-    static func sendTest() {
-        UNUserNotificationCenter.current().delegate = ForegroundPresenter.shared
-        UNUserNotificationCenter.current().getNotificationSettings { settings in
-            let status = settings.authorizationStatus
-            DispatchQueue.main.async {
-                switch status {
-                case .authorized, .provisional:
-                    show(title: "Harness", body: "Test notification — alerts are working.", withSound: true)
-                case .denied:
-                    openSystemNotificationSettings()
-                default:
-                    UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
-                        DispatchQueue.main.async {
-                            if granted {
-                                show(title: "Harness", body: "Test notification — alerts are working.", withSound: true)
-                            } else {
-                                openSystemNotificationSettings()
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-/// Presents agent notifications as banners even when Harness is frontmost (the OS
-/// default is to swallow them). Retained for the process lifetime as the UN delegate.
-private final class ForegroundPresenter: NSObject, UNUserNotificationCenterDelegate, @unchecked Sendable {
-    static let shared = ForegroundPresenter()
-
-    func userNotificationCenter(_ center: UNUserNotificationCenter,
-                                willPresent notification: UNNotification,
-                                withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
-        completionHandler([.banner, .sound, .list])
-    }
+    static func sendTest() {}
 }
 
 private enum HarnessPathDisplay {
