@@ -514,7 +514,12 @@ enum DisplayMessage {
     static func show(_ format: String) {
         let rendered = FormatString.evaluate(format, context: SessionCoordinator.shared.currentFormatContext())
         guard let host = (NSApp.keyWindow ?? NSApp.mainWindow ?? NSApp.windows.first(where: { $0.contentView != nil }))?.contentView else { return }
-        Toast.show(rendered, in: host)
+        // `display-time` (ms, tmux) bounds the toast hold, same as the compositor's flash.
+        let ms = SessionCoordinator.shared.requestDaemon(.showOptions(scope: nil)).flatMap { response -> Int? in
+            guard case let .options(entries) = response else { return nil }
+            return entries.first { $0.key == "display-time" }.flatMap { Int($0.value) }
+        } ?? 750
+        Toast.show(rendered, in: host, hold: max(Double(ms) / 1000, 0.1))
     }
 }
 

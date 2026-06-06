@@ -211,6 +211,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
             ensureSessionSurfaces(sessionID: sessionID, shell: shell)
             commit()
             fireHookLocked(.afterNewSession)
+            fireHookLocked(.sessionCreated)
             return .sessionID(sessionID)
         case let .newTab(workspaceID, cwd, shell):
             guard let tabID = editor.addTab(to: workspaceID, cwd: cwd) else {
@@ -343,6 +344,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
             environmentStore.clearSession(sessionID.uuidString)
             ensureAllSnapshotSurfaces()
             commit()
+            fireHookLocked(.sessionClosed)
             return .ok
         case let .closeWorkspace(id):
             let workspaceSessionIDs = editor.snapshot.workspaces
@@ -449,6 +451,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
                automaticRenameEnabled(forSurfaceKey: surfaceID) {
                 editor.updateTabTitle(surfaceID: uuid, title: title)
                 commit()
+                fireHookLocked(.windowRenamed, surfaceKey: surfaceID)
             }
             return .ok
         case let .updateTabCwd(surfaceID, path):
@@ -522,6 +525,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
             }
             ensureAllSnapshotSurfaces()
             commit()
+            fireHookLocked(.windowLinked)
             return .tabID(newTabID)
         case let .unlinkWindow(tabID):
             let removed = editor.snapshot.workspaces
@@ -531,6 +535,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
             guard editor.unlinkWindow(tabID) else { return .error("Window is not linked") }
             closeSurfaces(removed)   // ref-counted: shared surfaces survive
             commit()
+            fireHookLocked(.windowUnlinked)
             return .ok
         case let .killPane(paneID):
             let killedSurfaceID = editor.surfaceID(forPaneID: paneID)?.uuidString
@@ -575,10 +580,12 @@ public final class SurfaceRegistry: @unchecked Sendable {
             // later OSC title doesn't clobber the chosen name.
             optionStore.set(.bool(false), key: "automatic-rename", scope: .tab, target: tabID.uuidString)
             commit()
+            fireHookLocked(.windowRenamed)
             return .ok
         case let .renameSession(sessionID, name):
             guard editor.renameSession(sessionID, name: name) else { return .error("Session not found") }
             commit()
+            fireHookLocked(.sessionRenamed)
             return .ok
         case let .renameWorkspace(workspaceID, name):
             guard editor.renameWorkspace(workspaceID, name: name) else { return .error("Workspace not found") }
@@ -700,6 +707,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
                 return .error("Tab not found or has fewer than 2 panes")
             }
             commit()
+            fireHookLocked(.windowLayoutChanged)
             return .ok
         case let .nextLayout(tabID):
             // No per-tab "last layout" memory yet (lands in Phase 6 with the
@@ -709,18 +717,21 @@ public final class SurfaceRegistry: @unchecked Sendable {
                 return .error("Tab not found")
             }
             commit()
+            fireHookLocked(.windowLayoutChanged)
             return .ok
         case let .previousLayout(tabID):
             guard editor.applyLayout(tabID: tabID, layout: .evenHorizontal.previous(), mainPaneID: nil) else {
                 return .error("Tab not found")
             }
             commit()
+            fireHookLocked(.windowLayoutChanged)
             return .ok
         case let .rotatePanes(tabID, forward):
             guard editor.rotatePanes(tabID: tabID, forward: forward) else {
                 return .error("Tab not found")
             }
             commit()
+            fireHookLocked(.windowLayoutChanged)
             return .ok
         case let .breakPane(paneID):
             guard let newTab = editor.breakPane(paneID: paneID) else {

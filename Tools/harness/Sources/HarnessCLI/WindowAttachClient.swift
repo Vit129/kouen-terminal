@@ -129,7 +129,8 @@ private final class WindowSession: @unchecked Sendable {
     private let configuration: WindowAttachClient.Configuration
     private var tab: Tab
     private let workspaceID: WorkspaceID?
-    private let sessionID: SessionID
+    /// var: `detach-on-destroy off` re-targets a surviving session on destroy.
+    private var sessionID: SessionID
     /// Merged prefix/copy-mode key tables (defaults + `keybindings.json`), so the
     /// compositor honors the exact same bindings — and user overrides — as the GUI.
     private let keyTables: KeyTableSet
@@ -155,6 +156,16 @@ private final class WindowSession: @unchecked Sendable {
     /// A transient status override (e.g. `display-message`), shown briefly.
     private var statusOverride: String?
     private var statusOverrideToken = 0
+    /// `display-time` (ms): how long a status flash stays up. Refreshed with the options.
+    private var displayTimeMS = 750
+    /// `set-titles` + rendered `set-titles-string`: when on, the OUTER terminal's title
+    /// follows the attached window (OSC 2). Cleared on detach via restoreOuterTitle.
+    private var setTitles = false
+    private var setTitlesString = ""
+    private var lastOuterTitle: String?
+    /// `detach-on-destroy off`: when the attached session dies, re-target the most recently
+    /// active surviving session instead of detaching (tmux semantics).
+    private var detachOnDestroy = true
     /// Current composited dimensions (kept for status-line right-alignment).
     private var cols = 80
     private var rows = 24
@@ -535,7 +546,9 @@ private final class WindowSession: @unchecked Sendable {
         statusOverride = message
         compositor.invalidate()
         composeAndWrite()
-        renderQueue.asyncAfter(deadline: .now() + 2) { [weak self] in
+        // `display-time` (ms, tmux) bounds the flash; floor keeps a sub-100ms setting readable.
+        let seconds = max(Double(displayTimeMS) / 1000, 0.1)
+        renderQueue.asyncAfter(deadline: .now() + seconds) { [weak self] in
             guard let self, self.statusOverrideToken == token else { return }
             self.statusOverride = nil
             self.compositor.invalidate()
@@ -583,6 +596,39 @@ private final class WindowSession: @unchecked Sendable {
             let on = entry.value == "on" || entry.value == "true" || entry.value == "1"
             if on != mouseEnabled { mouseEnabled = on; setOuterMouseTracking(on) }
         }
+        for entry in entries where entry.key == "display-time" {
+            displayTimeMS = Int(entry.value) ?? displayTimeMS
+        }
+        for entry in entries where entry.key == "detach-on-destroy" {
+            detachOnDestroy = !(entry.value == "off" || entry.value == "false" || entry.value == "0")
+        }
+        // `synchronize-panes` as a window option (tmux setw): the option is authoritative
+        // when set per-tab; the toggle command still works and writes only local state.
+        for entry in entries where entry.key == "synchronize-panes" && entry.scope == "tab" && entry.target == tab.id.uuidString {
+            synchronize = entry.value == "on" || entry.value == "true" || entry.value == "1"
+        }
+        for entry in entries where entry.key == "set-titles" {
+            setTitles = entry.value == "on" || entry.value == "true" || entry.value == "1"
+        }
+        for entry in entries where entry.key == "set-titles-string" { setTitlesString = entry.value }
+        applyOuterTitle()
+    }
+
+    /// OSC 2 to the outer terminal when `set-titles` is on (tmux behavior); restores an
+    /// empty title on detach so the user's shell title machinery takes back over.
+    private func applyOuterTitle() {
+        guard setTitles else {
+            if lastOuterTitle != nil { writeOut("\u{1b}]2;\u{07}"); lastOuterTitle = nil }
+            return
+        }
+        let format = setTitlesString.isEmpty
+            ? (OptionStore.builtinDefaults["set-titles-string"]?.stringValue ?? "")
+            : setTitlesString
+        let rendered = FormatString.evaluate(format, context: formatContext(target: currentTarget()))
+        guard rendered != lastOuterTitle else { return }
+        lastOuterTitle = rendered
+        // OSC 2 (window title); BEL terminator for maximum outer-terminal compatibility.
+        writeOut("\u{1b}]2;\(rendered)\u{07}")
     }
 
     /// Enable/disable SGR mouse tracking on the *outer* terminal so the compositor receives
@@ -1268,7 +1314,18 @@ private final class WindowSession: @unchecked Sendable {
         guard case let .snapshot(snapshot)? = try? client.request(.getSnapshot, timeout: 1) else { return }
         latestSnapshot = snapshot
         guard let session = WindowAttachClient.session(snapshot, id: sessionID) else {
-            requestDetach()   // session destroyed
+            // Session destroyed. tmux `detach-on-destroy off` jumps to another session
+            // instead of detaching; the most recently saved active chain is the best analog.
+            if !detachOnDestroy,
+               let fallback = snapshot.activeWorkspace?.activeSession ?? snapshot.workspaces.flatMap(\.sessions).first,
+               let fallbackTab = fallback.activeTab ?? fallback.tabs.first {
+                sessionID = fallback.id
+                tab = fallbackTab
+                rebuildLayout(initial: false)
+                flashStatus("session closed — switched to \(fallback.name.isEmpty ? "another session" : fallback.name)")
+                return
+            }
+            requestDetach()
             return
         }
         // Follow the session's focused window (or fall back to its first tab).
