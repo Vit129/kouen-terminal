@@ -1092,6 +1092,9 @@ extension HarnessSidebarPanelViewController: NSTableViewDataSource, NSTableViewD
             session: session,
             isSelected: session.id == SessionCoordinator.shared.snapshot.activeWorkspace?.activeSessionID
         )
+        cell.onClose = { [weak self] in
+            self?.confirmCloseSession(session)
+        }
         cell.onContextMenu = { [weak self] in
             self?.sessionActionsMenu(for: session)
         }
@@ -1468,11 +1471,13 @@ final class SessionCardRowView: NSView {
     /// Builds the right-click actions menu for this row (rename, close, …). Shown
     /// via `menu(for:)` — the row no longer carries inline ⋮ / × buttons.
     var onContextMenu: (() -> NSMenu?)?
+    var onClose: (() -> Void)?
 
     private let fill = NSView()
     private let titleLabel = NSTextField(labelWithString: "")
     private let metaLabel = NSTextField(labelWithString: "")
     private let agentChip = AgentChipView()
+    private let closeButton = NSButton()
     private var isSelected = false
     private var isHovered = false
     private var trackingArea: NSTrackingArea?
@@ -1506,10 +1511,20 @@ final class SessionCardRowView: NSView {
         agentChip.translatesAutoresizingMaskIntoConstraints = false
         agentChip.isHidden = true
 
+        closeButton.title = "×"
+        closeButton.bezelStyle = .accessoryBarAction
+        closeButton.isBordered = false
+        closeButton.translatesAutoresizingMaskIntoConstraints = false
+        closeButton.target = self
+        closeButton.action = #selector(closeClicked)
+        closeButton.toolTip = "Close session"
+        closeButton.alphaValue = 0
+
         addSubview(fill)
         fill.addSubview(titleLabel)
         fill.addSubview(metaLabel)
         fill.addSubview(agentChip)
+        fill.addSubview(closeButton)
 
         NSLayoutConstraint.activate([
             fill.topAnchor.constraint(equalTo: topAnchor, constant: 2),
@@ -1520,21 +1535,27 @@ final class SessionCardRowView: NSView {
             titleLabel.leadingAnchor.constraint(equalTo: fill.leadingAnchor, constant: 12),
             titleLabel.topAnchor.constraint(equalTo: fill.topAnchor, constant: 8),
             titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: agentChip.leadingAnchor, constant: -6),
+            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: closeButton.leadingAnchor, constant: -6),
 
-            // No inline controls anymore — the agent chip sits flush to the card's
-            // trailing edge (actions moved to the right-click menu).
-            agentChip.trailingAnchor.constraint(equalTo: fill.trailingAnchor, constant: -10),
+            agentChip.trailingAnchor.constraint(lessThanOrEqualTo: closeButton.leadingAnchor, constant: -6),
             agentChip.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor),
             agentChip.heightAnchor.constraint(equalToConstant: 18),
             agentChip.widthAnchor.constraint(lessThanOrEqualToConstant: 140),
 
+            closeButton.topAnchor.constraint(equalTo: fill.topAnchor, constant: 7),
+            closeButton.trailingAnchor.constraint(equalTo: fill.trailingAnchor, constant: -8),
+            closeButton.widthAnchor.constraint(equalToConstant: 22),
+            closeButton.heightAnchor.constraint(equalToConstant: 22),
+
             metaLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
             metaLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 2),
-            // Meta sits on its own line below the title/controls, so it gets the full
-            // card width — the cwd path was being clipped early against the close button.
             metaLabel.trailingAnchor.constraint(equalTo: fill.trailingAnchor, constant: -10),
             metaLabel.bottomAnchor.constraint(lessThanOrEqualTo: fill.bottomAnchor, constant: -6),
         ])
+    }
+
+    @objc private func closeClicked() {
+        onClose?()
     }
 
     @available(*, unavailable)
@@ -1590,6 +1611,15 @@ final class SessionCardRowView: NSView {
     private func refresh() {
         let c = HarnessDesign.chrome
         metaLabel.textColor = c.textTertiary
+        closeButton.alphaValue = isHovered ? 1 : 0
+        let closeColor = c.textSecondary
+        closeButton.attributedTitle = NSAttributedString(
+            string: "×",
+            attributes: [
+                .foregroundColor: closeColor,
+                .font: NSFont.systemFont(ofSize: 20, weight: .regular),
+            ]
+        )
         if isSelected {
             // Selected row: theme-tinted fill + accent rim + resting elevation. The
             // fill is the accent at low alpha (legible on every theme) so the active

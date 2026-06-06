@@ -1,4 +1,7 @@
-.PHONY: build bench preview preview-stop preview-clean release package dmg smoke-dmg sign appcast finalize hotfix-release icon clean video-skills video-dev video-check video-render video-doctor
+.PHONY: run build bench preview preview-stop preview-clean release package dmg smoke-dmg sign appcast finalize hotfix-release icon clean video-skills video-dev video-check video-render video-doctor
+
+run:
+	./Scripts/run.sh app
 
 build:
 	swift build
