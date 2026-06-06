@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.1.2] - 2026-06-06
+
+### Added
+- **Grouped sessions** — sidebar project groups now render as headers, with a `+` affordance on each header to open a new session in that project root.
+
+### Changed
+- README and changelog now describe the grouped session sidebar and the group-header add action.
+- Refreshed `graphify-out` artifacts for the current codebase snapshot without committing generated HTML.
+
+### Fixed
+- Version metadata is bumped in lockstep across `HarnessVersion.swift` and `Info.plist` for release packaging.
+
 ## [1.1.1] - 2026-06-06
 
 ### Added
