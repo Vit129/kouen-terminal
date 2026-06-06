@@ -3,6 +3,15 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.2.0] - 2026-06-06
+
+### Added
+- **Double-click window zoom & drag** — Enabled full-width window dragging and double-click maximizing/zooming across the entire top panel, including the empty space of the tab bar, the folder path/icon area in the middle of the titlebar, and the sidebar titlebar header region.
+- **Grouped sessions options** — Added a context options menu (`...`) on project headers in the sidebar with options such as closing all sessions in the group, alongside disclosure chevrons to expand and collapse groups.
+
+### Changed
+- **Sidebar Tabs** — Simplified the sidebar tab navigation to show only "Sessions" and "Files" tabs, hiding the "Git" tab to keep the interface clean and focused.
+
 ## [1.1.2] - 2026-06-06
 
 ### Added
