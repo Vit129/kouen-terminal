@@ -9,7 +9,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
         case session(SessionGroup)
     }
 
-    private let chromeHeader = NSView()
+    private let chromeHeader = SidebarTitlebarHeaderView()
     private let workspaceBar = NSView()
     private let workspacePill = WorkspacePillButton()
     private let notificationBell = NotificationBellButton()
@@ -2028,5 +2028,20 @@ final class SessionCardRowView: NSView {
         HarnessMotion.animate(HarnessDesign.Motion.microFast) { _ in
             refresh()
         }
+    }
+}
+
+@MainActor
+final class SidebarTitlebarHeaderView: NSView {
+    override var mouseDownCanMoveWindow: Bool { true }
+
+    override func mouseUp(with event: NSEvent) {
+        if event.clickCount >= 2,
+           let controller = window?.windowController as? MainWindowController
+        {
+            controller.toggleVisibleFrameZoom(self)
+            return
+        }
+        super.mouseUp(with: event)
     }
 }
