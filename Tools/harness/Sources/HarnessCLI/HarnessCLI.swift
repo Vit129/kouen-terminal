@@ -292,12 +292,26 @@ struct HarnessCLI {
     }
 
     static func handleNewSession(_ args: [String], client: DaemonClient) throws {
+        let name = flagValue(args, flag: "--name")
+        // tmux `new-session -t <session>`: a session GROUPED with the target,
+        // sharing its window list. Loud lookup — never group with the wrong session.
+        if let groupWith = flagValue(args, flag: "--group-with") {
+            guard case let .snapshot(snapshot)? = try? client.request(.getSnapshot, timeout: 2),
+                  let target = snapshot.workspaces.flatMap(\.sessions)
+                      .first(where: { $0.name == groupWith || $0.id.uuidString == groupWith })
+            else {
+                fputs("new-session: --group-with: no session named '\(groupWith)'\n", harnessStderr)
+                exit(1)
+            }
+            let response = try checkedRequest(client, .newSessionInGroup(targetSessionID: target.id, name: name))
+            if case let .sessionID(id) = response { print(id.uuidString) }
+            return
+        }
         guard let workspaceID = try resolveWorkspaceID(args, client: client) else {
-            fputs("Usage: harness-cli new-session --workspace <name|uuid> [--cwd path] [--name name]\n", harnessStderr)
+            fputs("Usage: harness-cli new-session --workspace <name|uuid> [--cwd path] [--name name] [--group-with <session>]\n", harnessStderr)
             exit(1)
         }
         let cwd = flagValue(args, flag: "--cwd")
-        let name = flagValue(args, flag: "--name")
         let response = try checkedRequest(client, .newSession(workspaceID: workspaceID, cwd: cwd, name: name))
         if case let .sessionID(id) = response { print(id.uuidString) }
     }
@@ -1645,7 +1659,7 @@ struct HarnessCLI {
           list-commands
           get-snapshot
           new-workspace --name <name>
-          new-session --workspace <name|uuid> [--cwd path] [--name name]
+          new-session --workspace <name|uuid> [--cwd path] [--name name] [--group-with <session>]
           new-tab --workspace <name|uuid> [--cwd path]
           new-split --tab <uuid> --direction horizontal|vertical [--pane <uuid>]
           select-workspace --workspace <name|uuid>

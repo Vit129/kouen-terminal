@@ -1058,6 +1058,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
         context.sessionWindows = session?.tabs.count
         context.windowPanes = tab?.rootPane.allPaneIDs().count
         if let tab, let session { context.windowActive = tab.id == session.activeTabID }
+        context.sessionGroup = session.flatMap { editor.snapshot.groupName(of: $0) }
         context.sessionAttached = attachedClientCountProvider?()
         context.serverPID = Int(getpid())
         return context
