@@ -327,7 +327,15 @@ final class MainExecutor: CommandExecutor {
         )
         switch CommandIPCTranslator.translate(command, target: focus, baseIndex: baseIndex, paneBaseIndex: paneBaseIndex) {
         case let .requests(requests):
-            for request in requests { _ = coordinator.requestDaemon(request) }
+            // Daemon validation errors (unknown hook event, bad option scope, …) must
+            // reach the user — a silently-dropped .error reads as success (fail-loud
+            // policy). First error aborts the remainder.
+            for request in requests {
+                if case let .error(message)? = coordinator.requestDaemon(request) {
+                    coordinator.syncFromDaemon()
+                    throw CommandExecutionError.daemonError(message)
+                }
+            }
             coordinator.syncFromDaemon()
         case let .clientLocal(local):
             try dispatch(local)
