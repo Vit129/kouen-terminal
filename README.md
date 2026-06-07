@@ -61,6 +61,8 @@ New installs start in Plain. Moving over from another setup? See [docs/MIGRATION
 - **Sidebar position** — move sidebar to left or right via View menu or right-click (real-time toggle, persists across restarts)
 - **Session-as-tab** — each top tab is a project session; sidebar group headers can create a new session in that group with `+`, and the session card `×` appears on hover to close it
 - **Recent projects** — clock button in the sidebar footer shows the last 10 project roots and switches to an existing session on duplicate
+- **ACP Client** — Agent sidebar tab for chatting with coding agents (Claude, Codex, Gemini, Kiro) via Agent Client Protocol over stdio. Streaming responses, tool call display, and approval UI for file edits and command execution. Configure agents in Settings → Agents.
+- **Real-time Git** — FSEvents watcher on `.git` auto-refreshes Changes tab on stage/commit/checkout/branch switch without manual tab switching
 
 ## Philosophy — Terminal First, IDE Convenience
 
@@ -270,7 +272,48 @@ xcodebuild -project Harness.xcodeproj -scheme Harness -configuration Debug \
 - Xcode 16+ / Swift 6.0 (to build from source)
 - For a headless/remote daemon: any machine with Swift 6.0 (macOS or Linux) — build the daemon + CLI with `swift build -c release` (the GUI app, renderer, and Sparkle are macOS-only and are dropped from the Linux build)
 
-## Documentation
+## 🧠 Agent Memory System
+
+Three complementary layers keep context across sessions:
+
+| Layer | Location | Purpose |
+|-------|----------|---------|
+| **Auto Memory** | `~/.claude/projects/.../memory/` | Session knowledge: build commands, debugging patterns, component quirks (Claude writes automatically) |
+| **agent-memory/** | `agent-memory/` | Structured state: memory.md (active context), playbook.md (resolved cases), skill-log.md, user-profile.md |
+| **CLAUDE.md / AGENTS.md** | repo root | Build/test commands, architecture, constraints — read by all agents on session start |
+
+Auto Memory patterns that recur 2+ times → promote to `agent-memory/playbook.md`. The playbook is a flat table of Problem Resolution Cases searchable by domain/trigger.
+
+---
+
+## 📊 Graphify (Knowledge Graph)
+
+```bash
+graphify update .          # rebuild graph from source (no API cost)
+graphify serve             # local Obsidian-compatible graph viewer
+```
+
+- **Location:** `graphify-out/GRAPH_REPORT.md`
+- **Stats:** 7179 nodes · 13044 edges · 422 communities
+- **Use:** Navigate architecture, find dependencies, trace call paths across packages
+
+---
+
+## 🤖 Multi-Agent Development
+
+This repo is developed with multiple AI coding agents. Config files at the root:
+
+| File | Agent | Purpose |
+|------|-------|---------|
+| `CLAUDE.md` | Claude Code | Build commands, architecture, constraints |
+| `AGENTS.md` | Codex / Gemini / Kiro | Same info in agent-agnostic format |
+| `agent-memory/memory.md` | All | Active sprint context, known issues |
+| `agent-memory/playbook.md` | All | Resolved AppKit/Metal/Swift6 cases (CASE-001–008) |
+| `agent-memory/user-profile.md` | All | User preferences (Thai interaction, English code, Conventional Commits) |
+
+---
+
+## 📖 Documentation
 
 - [Experience modes](docs/MODES.md) — Plain / Persistent / Full / Agent
 - [IDE sidebar](docs/IDE-SIDEBAR.md) — Files tab, Git tab, session tabs, recent projects
@@ -279,6 +322,7 @@ xcodebuild -project Harness.xcodeproj -scheme Harness -configuration Debug \
 - [Release runbook](docs/RELEASE.md) — signed/notarized DMG, GitHub Actions release workflow, and Sparkle appcast publishing
 - [Migration](docs/MIGRATION.md) — bringing your config and habits across
 - [Keybindings](docs/KEYBINDINGS.md) · [Commands](docs/COMMANDS.md) · [Shell integration](docs/shell-integration/README.md) · [Agent hooks](docs/agent-hooks/README.md)
+- [Agent handbook](docs/AGENT-HANDBOOK.md) — agent detection, hooks, ACP client
 - [Changelog](CHANGELOG.md) — release history
 - [Third-party notices](docs/THIRD-PARTY-NOTICES.md)
 

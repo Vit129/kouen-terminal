@@ -6,6 +6,9 @@ final class GitPanelView: NSView {
     private var currentPath: String?
     private var didCommitSinceLastSync = false
     private var selectedCommitHash: String?
+    private var watchSource: DispatchSourceFileSystemObject?
+    private var watchFd: Int32 = -1
+    private var watchDebounce: DispatchWorkItem?
 
     // Top tabs: Changes | History | Worktrees
     private let tabSelector = NSSegmentedControl(labels: ["Changes", "History", "Worktrees"], trackingMode: .selectOne, target: nil, action: nil)
@@ -57,13 +60,52 @@ final class GitPanelView: NSView {
         guard force || path != currentPath else { return }
         currentPath = path
         selectedCommitHash = nil
+        startWatching(path: path)
         Task { [weak self] in await self?.refresh() }
     }
 
     func clearRoot() {
         currentPath = nil
         selectedCommitHash = nil
+        stopWatching()
         Task { [weak self] in await self?.refresh() }
+    }
+
+    // MARK: - File Watcher
+
+    private func startWatching(path: String) {
+        stopWatching()
+        let gitDir = path + "/.git"
+        let watchPath = FileManager.default.fileExists(atPath: gitDir) ? gitDir : path
+        let fd = open(watchPath, O_EVTONLY)
+        guard fd >= 0 else { return }
+        watchFd = fd
+        let source = DispatchSource.makeFileSystemObjectSource(
+            fileDescriptor: fd,
+            eventMask: [.write, .rename, .delete, .extend],
+            queue: DispatchQueue.global(qos: .utility)
+        )
+        watchSource = source
+        source.setEventHandler { [weak self] in
+            self?.watchDebounce?.cancel()
+            let work = DispatchWorkItem { [weak self] in
+                Task { @MainActor [weak self] in
+                    await self?.refresh()
+                }
+            }
+            self?.watchDebounce = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)
+        }
+        source.setCancelHandler { [fd] in close(fd) }
+        source.resume()
+    }
+
+    private func stopWatching() {
+        watchDebounce?.cancel()
+        watchDebounce = nil
+        watchSource?.cancel()
+        watchSource = nil
+        watchFd = -1
     }
 
     private func setup() {
@@ -552,7 +594,14 @@ final class GitPanelView: NSView {
 
     @objc private func historyFileClicked(_ sender: GitHistoryFileButton) {
         Task { [weak self] in
-            await self?.loadCommitFileDiff(commitHash: sender.commitHash, path: sender.filePath)
+            guard let self, let rootPath = self.currentPath else { return }
+            await self.loadCommitFileDiff(commitHash: sender.commitHash, path: sender.filePath)
+            // Also open in file editor panel (Zed-like)
+            let fullPath = self.absolutePath(for: sender.filePath, rootPath: rootPath)
+            if FileManager.default.fileExists(atPath: fullPath) {
+                guard let split = self.window?.contentViewController as? MainSplitViewController else { return }
+                split.contentVC.openFileTab(path: fullPath)
+            }
         }
     }
 
@@ -1166,6 +1215,13 @@ private final class GitChangeRowView: NSStackView {
 
     override func mouseDown(with event: NSEvent) {
         mouseDownLocation = event.locationInWindow
+        if event.clickCount == 2 {
+            // Double-click: open file in editor panel
+            if let split = window?.contentViewController as? MainSplitViewController {
+                split.contentVC.openFileTab(path: filePath)
+            }
+            return
+        }
         super.mouseDown(with: event)
     }
 
