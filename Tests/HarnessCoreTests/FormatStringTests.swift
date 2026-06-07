@@ -302,4 +302,19 @@ final class FormatStringExtendedVariableTests: XCTestCase {
         XCTAssertEqual(FormatString.evaluate("#{pane_pid}#{session_id}#{session_group}#{client_width}", context: plain), "")
         XCTAssertEqual(FormatString.evaluate("#{window_active}", context: plain), "")
     }
+
+    /// `#{session_group}` is LIVE for grouped sessions: the snapshot helper feeds the
+    /// context fill every builder applies (regression: the token rendered empty
+    /// everywhere because no builder assigned the field).
+    func testSessionGroupTokenRendersFromSnapshotHelper() throws {
+        var editor = SessionEditor()
+        let ws = try XCTUnwrap(editor.snapshot.activeWorkspace)
+        let original = try XCTUnwrap(ws.activeSession)
+        _ = editor.renameSession(original.id, name: "main")
+        _ = try XCTUnwrap(editor.addGroupedSession(groupWith: original.id, name: "mirror"))
+        let member = try XCTUnwrap(editor.snapshot.workspaces[0].sessions.first { $0.name == "mirror" })
+        var ctx = context()
+        ctx.sessionGroup = editor.snapshot.groupName(of: member)
+        XCTAssertEqual(FormatString.evaluate("#{session_group}", context: ctx), "main")
+    }
 }
