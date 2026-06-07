@@ -32,11 +32,14 @@ struct VersionBannerStore {
         return (try? JSONDecoder().decode(State.self, from: data))?.lastSeenBuild
     }
 
-    func markSeen(build: Int = HarnessVersion.build, version: String = HarnessVersion.short) {
+    /// Returns whether the ack reached disk — a false return means the banner decision
+    /// would replay on the next daemon start, so the caller schedules a retry.
+    @discardableResult
+    func markSeen(build: Int = HarnessVersion.build, version: String = HarnessVersion.short) -> Bool {
         guard let data = try? JSONEncoder().encode(State(lastSeenBuild: build, lastSeenVersion: version)) else {
-            return
+            return false
         }
-        _ = HarnessPaths.atomicWrite(data, to: url, label: "version-state")
+        return HarnessPaths.atomicWrite(data, to: url, label: "version-state")
     }
 
     static func decidePending(
