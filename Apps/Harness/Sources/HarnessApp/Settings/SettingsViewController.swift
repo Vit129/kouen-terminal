@@ -1026,6 +1026,7 @@ final class SettingsViewController: NSViewController, NSFontChanging {
 
         let stack = NSStackView(views: [
             header,
+            buildACPAgentsGroup(),
             notificationsGroup,
             notchGroup,
             settingsGroup("Detection & hooks", [detectionBox]),
@@ -1037,6 +1038,134 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         stack.spacing = 18
         stack.translatesAutoresizingMaskIntoConstraints = false
         return scrollWrap(stack)
+    }
+
+    // MARK: - ACP Agent Configs
+
+    private var acpAgentRows: NSStackView?
+
+    private func buildACPAgentsGroup() -> NSView {
+        let store = AgentRegistryStore()
+        let configs = store.load()
+
+        let rows = NSStackView()
+        rows.orientation = .vertical
+        rows.alignment = .leading
+        rows.spacing = 6
+        acpAgentRows = rows
+
+        for config in configs {
+            rows.addArrangedSubview(makeACPAgentRow(config))
+        }
+
+        let addButton = makeRoundedButton("Add Agent…", action: #selector(addACPAgent))
+        let caption = settingsCaption("Add CLI agents that support ACP (Agent Client Protocol) over stdio. Use the Agent sidebar tab to chat with the active agent.")
+
+        return settingsGroup("ACP Agents (Chat)", [caption, rows, leadingRow(addButton)])
+    }
+
+    private func makeACPAgentRow(_ config: AgentConfig) -> NSView {
+        let nameLabel = NSTextField(labelWithString: config.name)
+        nameLabel.font = .systemFont(ofSize: 12, weight: .medium)
+        nameLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
+
+        let pathLabel = NSTextField(labelWithString: config.binaryPath)
+        pathLabel.font = .monospacedSystemFont(ofSize: 10.5, weight: .regular)
+        pathLabel.textColor = .secondaryLabelColor
+        pathLabel.lineBreakMode = .byTruncatingMiddle
+        pathLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
+
+        let enableToggle = NSButton(checkboxWithTitle: "", target: self, action: #selector(acpAgentToggled(_:)))
+        enableToggle.state = config.isEnabled ? .on : .off
+        enableToggle.tag = config.id.hashValue
+        enableToggle.identifier = NSUserInterfaceItemIdentifier(config.id.uuidString)
+
+        let removeButton = NSButton(image: NSImage(systemSymbolName: "trash", accessibilityDescription: "Remove")!, target: self, action: #selector(removeACPAgent(_:)))
+        removeButton.bezelStyle = .inline
+        removeButton.isBordered = false
+        removeButton.identifier = NSUserInterfaceItemIdentifier(config.id.uuidString)
+
+        let left = NSStackView(views: [nameLabel, pathLabel])
+        left.orientation = .vertical
+        left.alignment = .leading
+        left.spacing = 2
+
+        let row = NSStackView(views: [enableToggle, left, removeButton])
+        row.orientation = .horizontal
+        row.alignment = .centerY
+        row.spacing = 8
+        row.identifier = NSUserInterfaceItemIdentifier(config.id.uuidString)
+        left.widthAnchor.constraint(greaterThanOrEqualToConstant: 200).isActive = true
+        return row
+    }
+
+    @objc private func addACPAgent() {
+        let alert = NSAlert()
+        alert.messageText = "Add ACP Agent"
+        alert.informativeText = "Enter agent name and binary path."
+        alert.addButton(withTitle: "Add")
+        alert.addButton(withTitle: "Cancel")
+
+        let stack = NSStackView()
+        stack.orientation = .vertical
+        stack.spacing = 8
+        stack.alignment = .leading
+
+        let nameField = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
+        nameField.placeholderString = "Name (e.g. Claude)"
+        let pathField = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
+        pathField.placeholderString = "Binary path (e.g. /usr/local/bin/claude)"
+        let argsField = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
+        argsField.placeholderString = "Args (space-separated, e.g. --acp --chat)"
+
+        stack.addArrangedSubview(nameField)
+        stack.addArrangedSubview(pathField)
+        stack.addArrangedSubview(argsField)
+        stack.setCustomSpacing(4, after: nameField)
+        stack.setCustomSpacing(4, after: pathField)
+        NSLayoutConstraint.activate([
+            nameField.widthAnchor.constraint(equalToConstant: 300),
+            pathField.widthAnchor.constraint(equalToConstant: 300),
+            argsField.widthAnchor.constraint(equalToConstant: 300),
+        ])
+        alert.accessoryView = stack
+
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        let name = nameField.stringValue.trimmingCharacters(in: .whitespaces)
+        let path = pathField.stringValue.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty, !path.isEmpty else { return }
+        let args = argsField.stringValue.split(separator: " ").map(String.init)
+
+        let store = AgentRegistryStore()
+        var configs = store.load()
+        let config = AgentConfig(name: name, binaryPath: path, args: args)
+        configs.append(config)
+        store.save(configs)
+        acpAgentRows?.addArrangedSubview(makeACPAgentRow(config))
+    }
+
+    @objc private func removeACPAgent(_ sender: NSButton) {
+        guard let idStr = sender.identifier?.rawValue,
+              let uuid = UUID(uuidString: idStr) else { return }
+        let store = AgentRegistryStore()
+        var configs = store.load()
+        configs.removeAll { $0.id == uuid }
+        store.save(configs)
+        // Remove the row from UI
+        if let row = acpAgentRows?.arrangedSubviews.first(where: { $0.identifier?.rawValue == idStr }) {
+            row.removeFromSuperview()
+        }
+    }
+
+    @objc private func acpAgentToggled(_ sender: NSButton) {
+        guard let idStr = sender.identifier?.rawValue,
+              let uuid = UUID(uuidString: idStr) else { return }
+        let store = AgentRegistryStore()
+        var configs = store.load()
+        if let idx = configs.firstIndex(where: { $0.id == uuid }) {
+            configs[idx].isEnabled = sender.state == .on
+            store.save(configs)
+        }
     }
 
     /// One per-agent row: brand icon + name + the executables it matches + a color-override

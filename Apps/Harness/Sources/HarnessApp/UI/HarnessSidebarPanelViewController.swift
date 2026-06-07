@@ -27,7 +27,8 @@ final class HarnessSidebarPanelViewController: NSViewController {
     /// Wraps the search field so it gets the same radius-7 elevated-surface chrome as
     /// the workspace pill and session cards.
     private let searchContainer = NSView()
-    private let sidebarTabs = NSSegmentedControl(labels: ["Sessions", "Files", "Git"], trackingMode: .selectOne, target: nil, action: nil)
+    private let sidebarTabs = NSSegmentedControl(labels: ["Sessions", "Files", "Git", "Agent"], trackingMode: .selectOne, target: nil, action: nil)
+    private let agentChatPanel = AgentChatPanelView()
     private let sectionHeader = NSView()
     private let sectionLabel = NSTextField(labelWithString: "Sessions")
     private let sessionTable = NSTableView()
@@ -170,6 +171,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
         setupFileTree()
         setupFileViewer()
         setupGitPlaceholder()
+        setupAgentPanel()
         selectSidebarTab(index: 0)
         reload()
         applyChromeColors()
@@ -636,6 +638,35 @@ final class HarnessSidebarPanelViewController: NSViewController {
         ])
     }
 
+    private func setupAgentPanel() {
+        agentChatPanel.translatesAutoresizingMaskIntoConstraints = false
+        agentChatPanel.isHidden = true
+        view.addSubview(agentChatPanel)
+        NSLayoutConstraint.activate([
+            agentChatPanel.topAnchor.constraint(equalTo: sectionHeader.bottomAnchor),
+            agentChatPanel.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            agentChatPanel.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            agentChatPanel.bottomAnchor.constraint(equalTo: footer.topAnchor),
+        ])
+    }
+
+    private func connectAgentIfNeeded() {
+        guard agentSession == nil else { return }
+        let registryStore = AgentRegistryStore()
+        let configs = registryStore.load()
+        guard let config = configs.first(where: { $0.isEnabled }) else { return }
+        let client = ACPClient()
+        let session = ACPSession(client: client)
+        agentSession = session
+        agentChatPanel.bind(session: session)
+        let cwd = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd ?? FileManager.default.currentDirectoryPath
+        Task {
+            await session.connect(config: config, cwd: cwd)
+        }
+    }
+
+    private var agentSession: ACPSession?
+
     @objc private func sidebarTabChanged() {
         selectSidebarTab(index: sidebarTabs.selectedSegment)
     }
@@ -651,6 +682,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
             fileTreeView.isHidden = fileViewerVC.view.isHidden == false
         }
         gitPanelView.isHidden = index != 2
+        agentChatPanel.isHidden = index != 3
         switch index {
         case 1:
             sectionLabel.stringValue = "FILES"
@@ -665,6 +697,9 @@ final class HarnessSidebarPanelViewController: NSViewController {
             } else {
                 gitPanelView.clearRoot()
             }
+        case 3:
+            sectionLabel.stringValue = "AGENT"
+            connectAgentIfNeeded()
         default:
             // Switching back to Sessions tab: rebuild cache so heightOfRow/viewFor
             // read O(1) cachedSidebarRows if sessions changed while tab was hidden.
