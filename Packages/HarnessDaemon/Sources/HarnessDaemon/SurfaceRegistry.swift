@@ -18,6 +18,10 @@ public final class SurfaceRegistry: @unchecked Sendable {
     /// registries) or once shown for this build.
     private var pendingVersionBanner: PendingVersionBanner?
     private let versionBannerStore = VersionBannerStore()
+    /// Set when the seen-build ack failed to reach disk (full disk, permissions): retried
+    /// on later surface creations — without re-rendering the banner — so a transient write
+    /// failure can't replay the one-shot card on the next daemon start.
+    private var versionAckRetryNeeded = false
     /// Opt-in lock/output instrumentation (off unless `HARNESS_DAEMON_METRICS=1`),
     /// surfaced via the `SIGUSR1` stats log. `DaemonServer` records output
     /// notifications and backlog through this same instance.
@@ -1182,11 +1186,13 @@ public final class SurfaceRegistry: @unchecked Sendable {
     /// it into the surface's output stream (scrollback + fan-out, like real shell output).
     /// The `update-banner` option (default on) suppresses the output; either way the state
     /// file records the current build immediately, so the banner never repeats — not on
-    /// later surfaces, and not after a daemon restart.
+    /// later surfaces, and not after a daemon restart. The on-screen render stays
+    /// at-most-once per run regardless; only the durable ack is retried on failure.
     private func injectVersionBannerIfPending(into session: RealPty, columns: Int) {
+        if versionAckRetryNeeded { versionAckRetryNeeded = !versionBannerStore.markSeen() }
         guard let banner = pendingVersionBanner else { return }
         pendingVersionBanner = nil
-        versionBannerStore.markSeen()
+        versionAckRetryNeeded = !versionBannerStore.markSeen()
         guard optionStore.get("update-banner")?.boolValue ?? true else { return }
         let bytes: Data
         switch banner {
