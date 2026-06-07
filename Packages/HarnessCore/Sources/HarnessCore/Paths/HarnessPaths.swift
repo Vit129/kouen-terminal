@@ -3,11 +3,43 @@ import Foundation
 public enum HarnessPaths {
     private static var overrideRoot: URL? {
         guard let raw = ProcessInfo.processInfo.environment["HARNESS_HOME"], !raw.isEmpty else {
+            let fm = FileManager.default
+            if Bundle.main.bundleIdentifier == "com.robert.harness.preview" {
+                return Bundle.main.bundleURL.deletingLastPathComponent()
+            }
             if let bundled = Bundle.main.object(forInfoDictionaryKey: "HarnessPreviewHome") as? String,
                !bundled.isEmpty
             {
                 return URL(fileURLWithPath: (bundled as NSString).expandingTildeInPath, isDirectory: true)
             }
+            
+            // Auto-detect if running inside a directory (e.g. repo) that contains a `.harness-preview` folder.
+            // This automatically points harness-cli or debug daemon to the preview state when run from the repo.
+            // Skip this auto-detection for the main GUI app (com.robert.harness) so it doesn't share sessions
+            // with the preview environment when launched from within the repo directory.
+            if NSClassFromString("XCTestCase") == nil {
+                if Bundle.main.bundleIdentifier != "com.robert.harness" {
+                    var dir = URL(fileURLWithPath: fm.currentDirectoryPath)
+                    while dir.path != "/" {
+                        let previewDir = dir.appendingPathComponent(".harness-preview", isDirectory: true)
+                        var isDir: ObjCBool = false
+                        if fm.fileExists(atPath: previewDir.path, isDirectory: &isDir), isDir.boolValue {
+                            return previewDir
+                        }
+                        dir = dir.deletingLastPathComponent()
+                    }
+                }
+            }
+            
+            // In debug builds, use a dedicated debug directory so development/testing
+            // never interferes with or clobbers the production daily-use sessions.
+            #if DEBUG
+            if NSClassFromString("XCTestCase") == nil {
+                return fm.homeDirectoryForCurrentUser
+                    .appendingPathComponent("Library/Application Support/HarnessDebug", isDirectory: true)
+            }
+            #endif
+            
             return nil
         }
         return URL(fileURLWithPath: (raw as NSString).expandingTildeInPath, isDirectory: true)

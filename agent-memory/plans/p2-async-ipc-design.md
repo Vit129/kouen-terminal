@@ -1,6 +1,6 @@
 # P2 — Async IPC Refactor: Design Document
 
-Status: **design-only** — not yet implemented. See `perf/panel-session-performance` for completed P1–P6 and F1.
+Status: **completed** — fully implemented. IPC and metadata updates are transitioned to non-blocking async/await (via DaemonClientActor and background Task contexts).
 
 ---
 

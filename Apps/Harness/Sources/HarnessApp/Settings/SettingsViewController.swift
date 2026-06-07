@@ -104,6 +104,8 @@ final class SettingsViewController: NSViewController, NSFontChanging {
     private var keyRecorder: KeyRecorderView!
     /// Live "Installed ✓ / Install hooks" buttons keyed by agent (Agents page).
     private var hookButtons: [AgentKind: NSButton] = [:]
+    /// "Enable for Chat" toggles keyed by agent (Agents page).
+    private var chatToggles: [AgentKind: NSButton] = [:]
 
     private struct ColorBinding {
         let field: HarnessTextField
@@ -498,7 +500,7 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         pages[5] = buildAdvancedPage()
     }
 
-    private func showPage(_ index: Int) {
+    fileprivate func showPage(_ index: Int) {
         for button in sidebarButtons { button.isSelected = (button.tag == index) }
         for subview in pageContainer.subviews { subview.removeFromSuperview() }
         guard let page = pages[index] else { return }
@@ -1100,48 +1102,44 @@ final class SettingsViewController: NSViewController, NSFontChanging {
     }
 
     @objc private func addACPAgent() {
+        guard let window = view.window else { return }
         let alert = NSAlert()
         alert.messageText = "Add ACP Agent"
         alert.informativeText = "Enter agent name and binary path."
         alert.addButton(withTitle: "Add")
         alert.addButton(withTitle: "Cancel")
 
-        let stack = NSStackView()
-        stack.orientation = .vertical
-        stack.spacing = 8
-        stack.alignment = .leading
+        let fieldW: CGFloat = 300
+        let fieldH: CGFloat = 24
+        let spacing: CGFloat = 8
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: fieldW, height: fieldH * 3 + spacing * 2))
 
-        let nameField = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
+        let nameField = NSTextField(frame: NSRect(x: 0, y: spacing * 2 + fieldH * 2, width: fieldW, height: fieldH))
         nameField.placeholderString = "Name (e.g. Claude)"
-        let pathField = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
+        let pathField = NSTextField(frame: NSRect(x: 0, y: spacing + fieldH, width: fieldW, height: fieldH))
         pathField.placeholderString = "Binary path (e.g. /usr/local/bin/claude)"
-        let argsField = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
+        let argsField = NSTextField(frame: NSRect(x: 0, y: 0, width: fieldW, height: fieldH))
         argsField.placeholderString = "Args (space-separated, e.g. --acp --chat)"
 
-        stack.addArrangedSubview(nameField)
-        stack.addArrangedSubview(pathField)
-        stack.addArrangedSubview(argsField)
-        stack.setCustomSpacing(4, after: nameField)
-        stack.setCustomSpacing(4, after: pathField)
-        NSLayoutConstraint.activate([
-            nameField.widthAnchor.constraint(equalToConstant: 300),
-            pathField.widthAnchor.constraint(equalToConstant: 300),
-            argsField.widthAnchor.constraint(equalToConstant: 300),
-        ])
-        alert.accessoryView = stack
+        container.addSubview(nameField)
+        container.addSubview(pathField)
+        container.addSubview(argsField)
+        alert.accessoryView = container
 
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
-        let name = nameField.stringValue.trimmingCharacters(in: .whitespaces)
-        let path = pathField.stringValue.trimmingCharacters(in: .whitespaces)
-        guard !name.isEmpty, !path.isEmpty else { return }
-        let args = argsField.stringValue.split(separator: " ").map(String.init)
+        alert.beginSheetModal(for: window) { [weak self] response in
+            guard response == .alertFirstButtonReturn else { return }
+            let name = nameField.stringValue.trimmingCharacters(in: .whitespaces)
+            let path = pathField.stringValue.trimmingCharacters(in: .whitespaces)
+            guard !name.isEmpty, !path.isEmpty else { return }
+            let args = argsField.stringValue.split(separator: " ").map(String.init)
 
-        let store = AgentRegistryStore()
-        var configs = store.load()
-        let config = AgentConfig(name: name, binaryPath: path, args: args)
-        configs.append(config)
-        store.save(configs)
-        acpAgentRows?.addArrangedSubview(makeACPAgentRow(config))
+            let store = AgentRegistryStore()
+            var configs = store.load()
+            let config = AgentConfig(name: name, binaryPath: path, args: args)
+            configs.append(config)
+            store.save(configs)
+            self?.acpAgentRows?.addArrangedSubview(self?.makeACPAgentRow(config) ?? NSView())
+        }
     }
 
     @objc private func removeACPAgent(_ sender: NSButton) {
@@ -1211,6 +1209,17 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         trailing.alignment = .centerY
         trailing.spacing = 10
         if let well = agentColorWells[kind] { trailing.addArrangedSubview(well) }
+
+        // "Chat" toggle — enables this agent as an ACP chat agent
+        let chatToggle = NSButton(checkboxWithTitle: "Chat", target: self, action: #selector(chatToggleClicked(_:)))
+        chatToggle.tag = kind.hashValue
+        chatToggle.identifier = NSUserInterfaceItemIdentifier(kind.rawValue)
+        let store = AgentRegistryStore()
+        let isRegistered = store.load().contains { $0.name == kind.displayName && $0.isEnabled }
+        chatToggle.state = isRegistered ? .on : .off
+        chatToggles[kind] = chatToggle
+        trailing.addArrangedSubview(chatToggle)
+
         if AgentHookInstaller.canInstall(kind) {
             let installed = AgentHookInstaller.isInstalled(agent: kind)
             let button = NSButton(title: installed ? "Reinstall Hooks" : "Install Hooks", target: self, action: #selector(installHooksClicked(_:)))
@@ -1314,6 +1323,42 @@ final class SettingsViewController: NSViewController, NSFontChanging {
                 }
             }
         }
+    }
+
+    @objc private func chatToggleClicked(_ sender: NSButton) {
+        guard let kindRaw = sender.identifier?.rawValue,
+              let kind = AgentKind(rawValue: kindRaw) else { return }
+        let store = AgentRegistryStore()
+        var configs = store.load()
+
+        if sender.state == .on {
+            // Resolve binary path from $PATH
+            let table = AgentTable.default
+            let executables = table.entries.first { $0.kind == kind }?.executables ?? []
+            let binaryPath = resolveBinaryPath(executables) ?? executables.first ?? kind.rawValue
+            // Don't duplicate
+            if !configs.contains(where: { $0.name == kind.displayName }) {
+                let config = AgentConfig(name: kind.displayName, binaryPath: binaryPath, args: [])
+                configs.append(config)
+            }
+        } else {
+            configs.removeAll { $0.name == kind.displayName }
+        }
+        store.save(configs)
+    }
+
+    /// Find the first executable on $PATH from the given list.
+    private func resolveBinaryPath(_ executables: [String]) -> String? {
+        let pathDirs = (ProcessInfo.processInfo.environment["PATH"] ?? "")
+            .split(separator: ":").map(String.init)
+        let fm = FileManager.default
+        for exe in executables {
+            for dir in pathDirs {
+                let full = dir + "/" + exe
+                if fm.isExecutableFile(atPath: full) { return full }
+            }
+        }
+        return nil
     }
 
     // MARK: - Page: Advanced (harness-cli set-option surface)
@@ -2521,7 +2566,7 @@ final class SettingsSidebarButton: NSControl {
 enum SettingsWindowController {
     private static var window: NSWindow?
 
-    static func show() {
+    static func show(page: Int = 0) {
         window?.close()
         let controller = SettingsViewController()
         let win = NSWindow(contentViewController: controller)
@@ -2541,5 +2586,6 @@ enum SettingsWindowController {
         win.center()
         win.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+        if page != 0 { controller.showPage(page) }
     }
 }

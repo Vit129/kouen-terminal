@@ -19,6 +19,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NSLog("DEBUG: Bundle.main.object(forInfoDictionaryKey: 'HarnessPreviewHome'): \(String(describing: Bundle.main.object(forInfoDictionaryKey: "HarnessPreviewHome")))")
+        NSLog("DEBUG: HarnessPaths.applicationSupport: \(HarnessPaths.applicationSupport.path)")
+        NSLog("DEBUG: HarnessPaths.socketURL: \(HarnessPaths.socketURL.path)")
         StartupMetrics.shared.mark(.launchStart)
         // Build the UI immediately so launch never blocks on the daemon. The
         // coordinator starts from a default snapshot and repopulates the moment
@@ -59,24 +62,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Locate/spawn the daemon off the main thread, then sync from real state.
         DaemonLauncher.shared.ensureRunning { ok in
             if ok { StartupMetrics.shared.mark(.daemonConnected) }
-            let synced = SessionCoordinator.shared.syncFromDaemon()
-            if !ok || !synced {
-                SessionCoordinator.shared.noteDaemonError(DaemonClientError.timeout)
-            }
-            // Apply the auto light/dark theme now that the daemon is hydrated (so the theme change
-            // lands), then refresh the window chrome to match.
-            SessionCoordinator.shared.applyAutoThemeForCurrentAppearance()
-            self.mainWindowController?.applyChrome()
-            Self.reconcileSessionPersistenceWithMode()
-            OnboardingController.presentIfNeeded()
-            self.externalOpenReady = true
-            if synced {
-                self.drainQueuedExternalOpenURLs()
-            } else if !self.queuedExternalOpens.isEmpty {
-                // Daemon wasn't hydrated yet: opening a queued URL/.command now would create its tab
-                // against a not-ready daemon and be dropped. Retry the drain on a bounded backoff
-                // until a sync succeeds, instead of losing the open.
-                self.retryQueuedExternalOpenDrain(attempt: 0)
+            Task {
+                let synced = await SessionCoordinator.shared.syncFromDaemon()
+                if !ok || !synced {
+                    SessionCoordinator.shared.noteDaemonError(DaemonClientError.timeout)
+                }
+                // Apply the auto light/dark theme now that the daemon is hydrated (so the theme change
+                // lands), then refresh the window chrome to match.
+                SessionCoordinator.shared.applyAutoThemeForCurrentAppearance()
+                self.mainWindowController?.applyChrome()
+                Self.reconcileSessionPersistenceWithMode()
+                OnboardingController.presentIfNeeded()
+                self.externalOpenReady = true
+                if synced {
+                    self.drainQueuedExternalOpenURLs()
+                } else if !self.queuedExternalOpens.isEmpty {
+                    // Daemon wasn't hydrated yet: opening a queued URL/.command now would create its tab
+                    // against a not-ready daemon and be dropped. Retry the drain on a bounded backoff
+                    // until a sync succeeds, instead of losing the open.
+                    self.retryQueuedExternalOpenDrain(attempt: 0)
+                }
             }
         }
     }
@@ -184,10 +189,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard !queuedExternalOpens.isEmpty, attempt < 20 else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             guard let self, !self.queuedExternalOpens.isEmpty else { return }
-            if SessionCoordinator.shared.syncFromDaemon() {
-                self.drainQueuedExternalOpenURLs()
-            } else {
-                self.retryQueuedExternalOpenDrain(attempt: attempt + 1)
+            Task {
+                if await SessionCoordinator.shared.syncFromDaemon() {
+                    self.drainQueuedExternalOpenURLs()
+                } else {
+                    self.retryQueuedExternalOpenDrain(attempt: attempt + 1)
+                }
             }
         }
     }

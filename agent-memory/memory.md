@@ -16,6 +16,8 @@
 ✅ Git real-time refresh — DispatchSource watcher on `.git` with 500ms debounce  
 ✅ History file click → opens in file editor panel (Zed-like)  
 ✅ Changes tab double-click → opens file in editor panel  
+✅ P2-async implementation in DaemonClientActor, DaemonSessionService, and SessionCoordinator (non-blocking background Task for IPC)  
+✅ Separation of Prod/Debug and Preview session states (com.robert.harness bundle filter in HarnessPaths)  
 
 ## Known Issues
 - **Split right 4+ panes slightly uneven** — NSSplitView default resize algorithm compresses middle panes on window resize. Tolerable for now.

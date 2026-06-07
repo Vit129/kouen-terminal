@@ -28,13 +28,20 @@ final class DaemonLauncher: @unchecked Sendable {
     private var fallbackProcess: Process?
     private let queue = DispatchQueue(label: "com.robert.harness.daemon-launcher")
 
-    /// True when running as a preview/SIT build (HarnessPreviewHome set in Info.plist).
-    /// Preview must never interact with the production LaunchAgent.
+    /// True when running as a preview/SIT build or debug build.
+    /// Preview/Debug must never interact with the production LaunchAgent.
     private let isPreview: Bool = {
+        if Bundle.main.bundleIdentifier == "com.robert.harness.preview" {
+            return true
+        }
         if let val = Bundle.main.object(forInfoDictionaryKey: "HarnessPreviewHome") as? String, !val.isEmpty {
             return true
         }
+        #if DEBUG
+        return true
+        #else
         return false
+        #endif
     }()
 
     private init() {}
