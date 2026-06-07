@@ -1330,9 +1330,12 @@ private final class WindowSession: @unchecked Sendable {
             // Only the -C form reaches here (non-content translated to selectTab upstream).
             _ = content
             let snapshot = latestSnapshot ?? SessionSnapshot()
+            // Resolve a relative/empty `-t` against THIS client's attached window (same
+            // `current` the non-content path uses via the translator's `target.session`), not
+            // the globally-active session — the compositor may be attached elsewhere.
             let match = FindWindowMatcher.firstMatch(
                 snapshot, pattern: pattern, name: name, title: title,
-                target: scopeTarget, current: snapshot.activeWorkspace?.activeSession
+                target: scopeTarget, current: currentTarget().session
             ) { surfaceID in
                 guard case let .text(text)? = try? client.request(
                     .capturePane(surfaceID: surfaceID, includeScrollback: false), timeout: 1) else { return nil }
