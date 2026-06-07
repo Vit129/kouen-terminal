@@ -224,8 +224,12 @@ struct HarnessCLI {
                 try handleRespawnPane(args, client: client)
             case "select-pane":
                 try handleSelectPane(args, client: client)
-            case "set-option", "setw":
-                try handleSetOption(args, client: client)
+            case "set-option":
+                try handleSetOption(args, defaultScope: "global", client: client)
+            case "setw", "set-window-option":
+                // tmux `setw` is a WINDOW option — same default the bindable parser
+                // uses, so a sourced `.tmux.conf` line and the CLI write the same scope.
+                try handleSetOption(args, defaultScope: "tab", client: client)
             case "show-options":
                 try handleShowOptions(args, client: client)
             case "set-environment", "setenv":
@@ -1213,20 +1217,25 @@ struct HarnessCLI {
         if case let .paneID(id) = response { print(id.uuidString) }
     }
 
-    static func handleSetOption(_ args: [String], client: DaemonClient) throws {
+    static func handleSetOption(_ args: [String], defaultScope: String, client: DaemonClient) throws {
         // Usage: set-option [-g|-w|-s|-t|-p] [-T <target>] <key> <value>
-        var scope = "global"
+        var scope = defaultScope
         if args.contains("-g") { scope = "global" }
         if args.contains("-w") { scope = "workspace" }
         if args.contains("-s") { scope = "session" }
         if args.contains("-t") { scope = "tab" }
         if args.contains("-p") { scope = "pane" }
-        let target = flagValue(args, flag: "-T")
+        var target = flagValue(args, flag: "-T")
         // Scoped options resolve by exact target — a nil-target workspace/session/tab/pane
         // entry is stored but unreachable by every read path (the fallback chain only widens
-        // toward global). Require the target instead of silently writing a dead option.
+        // toward global). Without -T, resolve the target from the calling pane
+        // ($HARNESS_SURFACE — tmux: scoped sets apply to the current window); outside
+        // a Harness pane, require -T instead of silently writing a dead option.
         if scope != "global", target == nil {
-            fputs("set-option: \(scope) scope requires -T <target>\n", harnessStderr)
+            target = callingPaneTarget(scope: scope, client: client)
+        }
+        if scope != "global", target == nil {
+            fputs("set-option: \(scope) scope requires -T <target> (or run inside a Harness pane)\n", harnessStderr)
             exit(1)
         }
         // `positionalArgs` skips the subcommand at index 0 plus `-T <target>` (and any
@@ -1239,6 +1248,31 @@ struct HarnessCLI {
         let key = positional[0]
         let value = positional.dropFirst().joined(separator: " ")
         _ = try checkedRequest(client, .setOption(scope: scope, target: target, key: key, rawValue: value))
+    }
+
+    /// The calling pane's workspace/session/tab/pane ID for a scoped option write —
+    /// the CLI's "focus" when it runs inside a Harness pane ($HARNESS_SURFACE).
+    /// nil outside a pane or when the surface is gone from the snapshot.
+    static func callingPaneTarget(scope: String, client: DaemonClient) -> String? {
+        guard let surface = ProcessInfo.processInfo.environment["HARNESS_SURFACE"],
+              let surfaceID = UUID(uuidString: surface),
+              case let .snapshot(snapshot)? = try? client.request(.getSnapshot, timeout: 2)
+        else { return nil }
+        for workspace in snapshot.workspaces {
+            for session in workspace.sessions {
+                for tab in session.tabs where tab.rootPane.allSurfaceIDs().contains(surfaceID) {
+                    switch scope {
+                    case "workspace": return workspace.id.uuidString
+                    case "session": return session.id.uuidString
+                    case "tab": return tab.id.uuidString
+                    case "pane":
+                        return tab.rootPane.allLeaves().first { $0.surfaceID == surfaceID }?.id.uuidString
+                    default: return nil
+                    }
+                }
+            }
+        }
+        return nil
     }
 
     static func handleShowOptions(_ args: [String], client: DaemonClient) throws {
@@ -1662,6 +1696,7 @@ struct HarnessCLI {
           respawn-pane --surface <id> [--clear-history|-k]
           select-pane --pane <uuid> --dir L|R|U|D
           set-option [-g|-w|-s|-t|-p] [-T target] <key> <value>
+          setw <key> <value>   (window option for the calling pane's tab; -T overrides)
           show-options [-g|-w|-s|-t|-p] [--json] [--pretty]
           set-environment [-g] [-u] [-s <sessionID>] <key> [value]
           show-environment [-g] [-s <sessionID>] [--json] [--pretty]
