@@ -139,6 +139,14 @@ struct HarnessCLI {
                 try handleUnlinkWindow(args, client: client)
             case "control-mode", "-CC":
                 exit(try ControlModeClient.run(client: client))
+            case "kill-server":
+                handleKillServer(args)
+            case "start-server":
+                handleStartServer(args, client: client)
+            case "show-messages":
+                if case let .text(log) = try checkedRequest(client, .showMessages) {
+                    print(log.isEmpty ? "no messages" : log)
+                }
             case "kill-pane":
                 try handlePaneCommand(args, client: client) { paneID in .killPane(paneID: paneID) }
             case "swap-pane":
@@ -1231,6 +1239,88 @@ struct HarnessCLI {
         }
         let response = try checkedRequest(client, .selectPaneDirectional(currentPaneID: paneID, direction: axis))
         if case let .paneID(id) = response { print(id.uuidString) }
+    }
+
+    /// tmux `kill-server`, adapted to launchd supervision: SIGTERM stops the daemon
+    /// gracefully; KeepAlive respawns it with sessions restored from layout.json. A
+    /// permanent stop is launchctl's job, so say so instead of fighting it.
+    /// Local-only by construction (PID file + signal): with `--host`, refuse loudly
+    /// instead of SIGTERMing the LOCAL daemon while targeting a remote one.
+    static func handleKillServer(_ args: [String]) {
+        if flagValue(args, flag: "--host") != nil {
+            fputs("kill-server: operates on the local daemon only — run it on the host (ssh <host> harness-cli kill-server)\n", harnessStderr)
+            exit(64)
+        }
+        let raw = (try? String(contentsOf: HarnessPaths.daemonPIDURL, encoding: .utf8)) ?? ""
+        guard let pid = Int32(raw.trimmingCharacters(in: .whitespacesAndNewlines)), pid > 0 else {
+            fputs("kill-server: no daemon.pid — is the daemon running? (try: harness-cli ping)\n", harnessStderr)
+            exit(1)
+        }
+        // PID-reuse guard: after an unclean shutdown the recorded PID can belong to an
+        // unrelated process — never signal anything that isn't a live HarnessDaemon.
+        guard isLiveHarnessDaemon(pid) else {
+            fputs("kill-server: pid \(pid) from daemon.pid is not a running HarnessDaemon (stale file?) — nothing to signal\n", harnessStderr)
+            exit(1)
+        }
+        guard kill(pid, SIGTERM) == 0 else {
+            fputs("kill-server: kill(\(pid)) failed: \(String(cString: strerror(errno)))\n", harnessStderr)
+            exit(1)
+        }
+        print("sent SIGTERM to HarnessDaemon (pid \(pid))")
+        #if os(macOS)
+        print("note: launchd KeepAlive restarts it (sessions restore from layout.json);")
+        print("      to stop it for good: launchctl bootout gui/$(id -u)/\(HarnessPaths.launchAgentLabel)")
+        #endif
+    }
+
+    /// `kill(pid, 0)` liveness probe + executable identity (mirrors
+    /// `DaemonLifecycle.executablePath`, which the CLI target doesn't link).
+    static func isLiveHarnessDaemon(_ pid: Int32) -> Bool {
+        guard kill(pid, 0) == 0 || errno == EPERM else { return false }
+        #if canImport(Darwin)
+        var buffer = [UInt8](repeating: 0, count: Int(MAXPATHLEN))
+        let length = buffer.withUnsafeMutableBufferPointer { ptr -> Int32 in
+            proc_pidpath(pid, ptr.baseAddress, UInt32(MAXPATHLEN))
+        }
+        guard length > 0 else { return false }
+        let path = String(decoding: buffer.prefix(Int(length)), as: UTF8.self)
+        #else
+        var buffer = [CChar](repeating: 0, count: 4096)
+        let len = readlink("/proc/\(pid)/exe", &buffer, buffer.count - 1)
+        guard len > 0 else { return false }
+        let path = String(decoding: buffer[0 ..< len].map { UInt8(bitPattern: $0) }, as: UTF8.self)
+        #endif
+        return (path as NSString).lastPathComponent.contains("HarnessDaemon")
+    }
+
+    /// tmux `start-server`, adapted: ensure the daemon is up (ping → launchctl kickstart).
+    /// The ping honours `--host` (tunnelled client); the kickstart cannot — refuse the
+    /// remote form instead of starting the LOCAL LaunchAgent while the remote stays down.
+    static func handleStartServer(_ args: [String], client: DaemonClient) {
+        if case .pong? = try? client.request(.ping, timeout: 1) {
+            print("daemon already running")
+            return
+        }
+        if flagValue(args, flag: "--host") != nil {
+            fputs("start-server: cannot start a remote daemon — start it on the host (systemd/launchctl or harness-cli install)\n", harnessStderr)
+            exit(1)
+        }
+        #if os(macOS)
+        let kick = Process()
+        kick.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+        kick.arguments = ["kickstart", "gui/\(getuid())/\(HarnessPaths.launchAgentLabel)"]
+        try? kick.run()
+        kick.waitUntilExit()
+        if case .pong? = try? client.request(.ping, timeout: 3) {
+            print("daemon started")
+            return
+        }
+        fputs("start-server: could not start the daemon — run 'harness-cli install' (LaunchAgent) or open Harness.app\n", harnessStderr)
+        exit(1)
+        #else
+        fputs("start-server: start HarnessDaemon directly (e.g. via systemd) on this platform\n", harnessStderr)
+        exit(1)
+        #endif
     }
 
     static func handleSetOption(_ args: [String], defaultScope: String, client: DaemonClient) throws {

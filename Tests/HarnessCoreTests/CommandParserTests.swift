@@ -429,6 +429,23 @@ final class CommandParserTests: XCTestCase {
         XCTAssertEqual(try CommandParser.parse("list-keys -T copy-mode-emacs"), .listKeys(table: "copy-mode-emacs"))
     }
 
+    func testServerAdminVerbsParse() throws {
+        XCTAssertEqual(try CommandParser.parse("refresh-client"), .refreshClient)
+        XCTAssertEqual(try CommandParser.parse("refresh-client -S"), .refreshClient)
+        XCTAssertEqual(try CommandParser.parse("respawn-window"), .respawnWindow(keepHistory: true))
+        XCTAssertEqual(try CommandParser.parse("respawn-window -k"), .respawnWindow(keepHistory: false))
+        XCTAssertEqual(try CommandParser.parse("show-messages"), .showMessages)
+        // respawn-window takes the universal -t — and so does its alias.
+        guard case let .targeted(spec, inner) = try CommandParser.parse("respawn-window -t :1") else {
+            return XCTFail("expected .targeted")
+        }
+        XCTAssertEqual(spec.window, .byIndex(1))
+        XCTAssertEqual(inner, .respawnWindow(keepHistory: true))
+        guard case .targeted = try CommandParser.parse("respawnw -t :1") else {
+            return XCTFail("respawnw alias must take the universal -t too")
+        }
+    }
+
     /// `--if <format>` makes bindable set-hook condition-capable like CLI bind-hook.
     func testSetHookParsesCondition() throws {
         XCTAssertEqual(

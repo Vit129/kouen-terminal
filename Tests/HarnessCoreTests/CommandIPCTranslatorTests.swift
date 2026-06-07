@@ -289,6 +289,37 @@ final class CommandIPCTranslatorTests: XCTestCase {
         else { return XCTFail("unknown group target must be unresolved") }
     }
 
+    /// respawn-window fans out to one respawnPane per pane in the window.
+    func testRespawnWindowFansOutToEveryPane() throws {
+        let (target, _, _) = try makeTarget(splitOnce: true)
+        guard case let .requests(reqs) = CommandIPCTranslator.translate(
+            .respawnWindow(keepHistory: false), target: target)
+        else { return XCTFail("expected requests") }
+        XCTAssertEqual(reqs.count, 2, "one respawn per pane")
+        for request in reqs {
+            guard case let .respawnPane(_, keepHistory) = request else {
+                return XCTFail("expected respawnPane, got \(request)")
+            }
+            XCTAssertFalse(keepHistory)
+        }
+        // The display verbs are client-local.
+        for command: Command in [.refreshClient, .showMessages] {
+            guard case .clientLocal = CommandIPCTranslator.translate(command, target: target) else {
+                return XCTFail("\(command.shortDescription) must be clientLocal")
+            }
+        }
+    }
+
+    /// A destructive respawn with a bad `-t` is `.unresolved` — never a silent
+    /// respawn of the caller's focused window (the strict-resolution policy).
+    func testTargetedRespawnWindowRejectsMissingTarget() throws {
+        let (target, _, _) = try makeTarget(splitOnce: true)
+        let spec = TargetSpec(window: .byIndex(99), raw: ":99")
+        guard case .unresolved = CommandIPCTranslator.translate(
+            .targeted(spec, .respawnWindow(keepHistory: true)), target: target)
+        else { return XCTFail("respawn-window -t :99 must be unresolved, not respawn the focused window") }
+    }
+
     /// `swap-pane -s X -t Y` swaps X with Y (neither needs to be the active pane);
     /// `-s X` alone swaps X with the current pane; an unresolvable `-s` is loud.
     func testSwapPaneSourceFlagResolves() throws {
