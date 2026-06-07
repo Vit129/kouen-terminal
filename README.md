@@ -40,13 +40,13 @@ New installs start in Plain. Moving over from another setup? See [docs/MIGRATION
 
 - GPU-accelerated rendering by Harness's own terminal engine — accurate sRGB output by default, opt-in converted Display-P3 vivid color, a themed translucent canvas, and program output left untouched unless you opt into theme recoloring; damage-driven redraws keep selection drags, find highlights, IME composition, and streaming output cheap, full-rate on ProMotion displays, and covered or minimized windows stop rendering entirely
 - Mainstream-GPU-terminal polish: live re-wrap while resizing (with a grid-size overlay), word / line / block selection, middle-click paste, alternate-screen wheel scrolling, focus reporting, hollow unfocused cursor, minimum contrast, auto light/dark themes, bold-is-bright control, and paste protection
-- Sidebar sessions, per-session tabs, and horizontal / vertical splits
+- Sidebar sessions, per-session tabs, and horizontal / vertical splits — group sessions with shared window lists
 - Session layout persists across quits (daemon-owned, attach from the CLI or over SSH); if the daemon restarts under a pane, a quiet "Reconnecting…" chip rides the ~1-minute automatic backoff before the click-to-re-grab overlay takes over
 - Persistent scrollback: a pane's history is written to disk per surface and restored when the daemon restarts
 - Remote & headless daemon: run `HarnessDaemon` on a headless or remote box (Linux included) and drive it with `harness-cli --host <name>` over an SSH tunnel — register hosts with `harness-cli remote add`
 - `harness-cli` for automation and agent hooks
 - Color/theme diagnostics from the CLI: `harness-cli color-check` and `harness-cli theme-preview --theme <name>` print deterministic SGR pages for eyeballing fidelity in Harness itself
-- Command set: `send-keys`, `capture-pane`, `kill-pane`, `resize-pane`, `zoom-pane`, `swap-pane`, `rename-tab`, `attach`, and more
+- Command set: `send-keys`, `capture-pane`, `kill-pane`, `resize-pane`, `zoom-pane`, `swap-pane`, `rename-tab`, `attach`, `find-window`, `kill-server`, `start-server`, `respawn-window`, `refresh-client`, and more
 - Command prefix keymap (default `Ctrl-A`) with a live cheatsheet (prefix `?`)
 - Agent detection for Claude Code, Codex, Cursor, Grok, Pi, Hermes, OpenClaw, OpenCode, Aider, Gemini, and Goose — each with a brand color and a sidebar chip
 - Agent alerts as desktop banners and a sidebar bell; `Cmd+Shift+U` jumps to whoever is waiting
@@ -89,7 +89,8 @@ export PATH="$HOME/Library/Application Support/Harness/bin:$PATH"
 The first-run setup in `Harness.app` performs the same local installation for new
 users: it copies `harness-cli` and `HarnessDaemon`, registers the LaunchAgent,
 adds PATH blocks for zsh/bash/fish with backups, installs fish completions, asks
-for notification permission, and offers detected agent hooks.
+for notification permission, and offers detected agent hooks. On a fresh install, Harness displays
+a one-shot welcome tour; after an update, it shows release highlights (suppressible via the `update-banner` option).
 
 ## Remote & headless daemons
 
@@ -187,6 +188,7 @@ xcodebuild -project Harness.xcodeproj -scheme Harness -configuration Debug \
 
 - [Experience modes](docs/MODES.md) — Plain / Persistent / Full / Agent
 - [Sessions & panes guide](docs/MULTIPLEXER_GUIDE.md) — prefix, panes, sessions, copy mode, attach from anywhere
+- [tmux parity ledger](docs/TMUX_PARITY.md) — capability status, adaptations for the daemon-owned model, explicitly rejected tmux features with rationale
 - [tmux-style capabilities PDF](docs/HARNESS_TMUX_CAPABILITIES.pdf) — printable setup, shortcuts, commands, attach, copy mode, and troubleshooting
 - [Release runbook](docs/RELEASE.md) — signed/notarized DMG, GitHub Actions release workflow, and Sparkle appcast publishing
 - [Migration](docs/MIGRATION.md) — bringing your config and habits across

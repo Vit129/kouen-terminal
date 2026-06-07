@@ -64,6 +64,7 @@ See the [multiplexer guide](MULTIPLEXER_GUIDE.md) for the full command and short
 | `prefix :` command-prompt | Same `:` prompt |
 | `tmux a` (attach) | `harness-cli attach-window` (full layout, incl. ssh) |
 | `tmux send-keys` | `harness-cli send-keys --surface <id> --keys "…"` |
+| `tmux bind -T copy-mode-vi` | `bind -T copy-mode-vi …` (alias for the vi table; `copy-mode` and `copy-mode-vi` are interchangeable everywhere) |
 | `tmux capture-pane` | `harness-cli capture-pane --surface <id>` (`-S/-E/-e/-J`) |
 | `$TMUX` set inside a pane | `$HARNESS` (and `$HARNESS_SURFACE` for the pane id) |
 
@@ -86,6 +87,17 @@ setw monitor-activity on
 setenv -g EDITOR vim
 ```
 
+Scope flags in options:
+- `-g` = global (like tmux)
+- `-s` = session (tmux uses `-s` for the SERVER scope; Harness's global ≈ tmux's server)
+- `-w` = workspace (Harness-specific; above the session level)
+- `-t` = tab (Harness's windows are tabs; tmux: window scope)
+- `-p` = pane (like tmux)
+
+`setw` is tab-scoped everywhere. From a source file or `:` prompt, a scoped set without `-T`
+resolves against the caller's focus chain; in the CLI it resolves the calling pane's tab via
+`$HARNESS_SURFACE` (outside a Harness pane, pass `-T <target>` explicitly).
+
 ```
 :source-file ~/.harness.conf      # from the command prompt (prefix :)
 ```
@@ -94,8 +106,8 @@ Persistent key bindings also live in `keybindings.json` (merged over the default
 with `harness-cli bind-key` / `unbind-key`, or edit the file directly.
 
 Options write the same store the Settings ▸ Advanced page and `harness-cli set-option` edit —
-the CLI form requires `-T <target>` for scoped writes, while the command form resolves a
-missing target against the focused workspace/session/tab/pane like tmux:
+the CLI form requires `-T <target>` for scoped writes, while the command form (`:` prompt or source-file) resolves a
+missing target against the focused workspace/session/tab/pane like tmux. Unresolvable targets (bad names in `-t`) fail loudly rather than silently falling back to focus.
 
 ```bash
 harness-cli set-option -g status-left  " #{session_name} "

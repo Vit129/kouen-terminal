@@ -78,7 +78,7 @@ pane into the current one (Harness's `move-pane`/`join-pane`).
 **Type to several panes at once:** `prefix S` toggles `synchronize-panes` for the tab.
 
 > macOS shortcuts work too: `Cmd-D` splits side-by-side, `Cmd-Shift-D` splits top/bottom.
-> In the GUI, directional pane nav is the **arrow keys**; the `attach-window` compositor (§9)
+> In the GUI, directional pane nav is the **arrow keys**; the `attach-window` compositor (§10)
 > uses **`hjkl`** instead.
 
 ---
@@ -111,6 +111,11 @@ sidebar rather than something you "attach" to one at a time.
   menu or `harness-cli promote-session` / `demote-session`. A crash leaves everything running.
 - `Cmd-Shift-N` makes a new workspace.
 
+**Grouped sessions:** `harness-cli new-session --group-with <session>` creates an independent session
+sharing the target session's window list (linked windows with shared surfaces). Every member sees the
+same tab bar; opening or closing a tab propagates to all members. Members may have divergent split
+layouts within each shared tab. See [TMUX_PARITY.md](TMUX_PARITY.md#at-parity) for full details.
+
 ---
 
 ## 6. Copy mode (scrollback, selection, search)
@@ -124,7 +129,7 @@ Enter with **`prefix [`**. Copy mode is modal and vim-flavored (`mode-keys vi`):
 | `w` / `b` | Next / previous word |
 | `g` / `G` | Top / bottom of history |
 | `PageUp`/`PageDown`, `C-u`/`C-d` | Page / half-page scroll |
-| `[` / `]` | **Jump to previous / next shell prompt** (needs OSC 133 — see §10) |
+| `[` / `]` | **Jump to previous / next shell prompt** (needs OSC 133 — see §12) |
 | `v` / `V` / `C-v` | Start char / line / rectangle (block) selection |
 | `/` … `Enter`, `?` | Search forward / backward; `n` / `N` cycle matches |
 | `y` or `Enter` | Yank selection to the clipboard **and** a paste buffer, then exit |
@@ -167,11 +172,41 @@ Anything you can bind, you can type.
   `~/Library/Application Support/Harness/keybindings.json` (merged under the defaults, so deleting
   one restores the default). Full details in [KEYBINDINGS.md](KEYBINDINGS.md).
 - **Hooks** fire commands on events (`after-new-tab`, `pane-exited`, `agent-state-changed`, …):
-  `harness-cli bind-hook after-split-pane 'display-message "split!"'`.
+  `harness-cli bind-hook after-split-pane 'display-message "split!"'`. Use `set-hook --if` with
+  a format condition to make a hook conditional: `set-hook pane-exited --if "#{?pane_dead,1,0}"
+  'display-message pane exited'`. Lifecycle events include `session-created/renamed/closed`,
+  `window-linked/unlinked/layout-changed`, and alert events (`alert-activity`, `alert-silence`,
+  `alert-bell`). See [TMUX_PARITY.md](TMUX_PARITY.md#at-parity) for the full list.
+- **Paste buffers** store text in named slots: `harness-cli set-buffer -b myname 'text'`,
+  `paste-buffer -b myname` (into the active pane), `list-buffers`, `show-buffer -b myname`,
+  `delete-buffer -b myname`. All bindable so copy-mode `y` yanks to both the clipboard and a
+  paste buffer.
 
 ---
 
-## 9. Attach over ssh — the compositor
+## 9. Options and configuration
+
+Harness uses a scoped option store with a fallback chain: `pane → tab → session → workspace → global`.
+This means you can set a global default and override it per-session, tab, or pane.
+
+- **`set-option -g key value`** (or `set`) sets a global option.
+- **`-s`** / **`-w`** / **`-t`** / **`-p`** select the session / workspace / tab / pane SCOPE;
+  without `-T <target>` the write resolves against your focus (the CLI uses the calling pane
+  via `$HARNESS_SURFACE`), and `-T <target>` pins an explicit one.
+
+Common options include `status` (show/hide status bar), `mode-keys` (vi/emacs in copy mode),
+`allow-rename` (let programs change tab title), `history-limit`, `base-index` (start window
+numbers at 0 or 1), and `set-titles` (OSC 2 titles for attach clients). The **`setw`** alias is
+shorthand for `set-window-option` and defaults the scope to `tab` — so `setw synchronize-panes on`
+mirrors input across the focused tab's panes, in the GUI and the ssh compositor alike. All forms
+are bindable and persist to disk.
+
+See [COMMANDS.md](COMMANDS.md) for the full option reference and [TMUX_PARITY.md](TMUX_PARITY.md#at-parity)
+for scope details.
+
+---
+
+## 10. Attach over ssh — the compositor
 
 `harness-cli attach-window` renders a tab's **entire split layout** — every pane, borders,
 the status line, the active cursor — into any plain terminal, including over ssh. It's
@@ -212,9 +247,46 @@ history survives the daemon restarting on that box. See
 [COMMANDS.md → Remote daemons](COMMANDS.md#remote-daemons-over-ssh) for `remote list` / `remote
 remove` and `--ssh-arg`.
 
+### Server administration
+
+Two commands manage the daemon lifecycle:
+
+- **`harness-cli kill-server`** sends `SIGTERM` to the local daemon, stopping it gracefully.
+  launchd's `KeepAlive` respawns it, restoring all sessions from disk — so shells and scrollback
+  survive. For a permanent shutdown, use `launchctl bootout` (see `harness-cli doctor`).
+- **`harness-cli start-server`** ensures the daemon is running (a no-op if it already is).
+
+Both are local-only; with `--host`, they error loudly instead of targeting the wrong daemon.
+
+### Strict targeting and error handling
+
+Every command using a `-t <target>` grammar (`session:window.pane`, `$session-id`, `@session-name`,
+`%pane-id`, named indices, etc.) applies **strict resolution**: if a named component doesn't match
+(e.g., `kill-pane -t nonexistent:0`), the command fails with `.unresolved` instead of silently
+acting on a fallback. This prevents accidental misroutes. The resolution happens centrally in
+`CommandIPCTranslator`, so every front-end (GUI, attach-window compositor, CLI, hooks) behaves
+identically. See [TMUX_PARITY.md](TMUX_PARITY.md#at-parity) under "Targeting" for the full
+grammar and `base-index` / `pane-base-index` option details.
+
 ---
 
-## 10. Shell integration (prompt marks + the success/failure gutter)
+## 11. Window search and filtering
+
+**`find-window`** searches for a tab by name, title, or pane content and focuses it:
+
+```bash
+:find-window pattern         # match tab name or title (default)
+:find-window -N pattern      # search name only
+:find-window -T pattern      # search title only
+:find-window -C pattern      # search pane content (slower)
+```
+
+Patterns are fnmatch-style globs. The first match in snapshot order is focused; if multiple matches
+would be useful, use `choose-window` instead.
+
+---
+
+## 12. Shell integration (prompt marks + the success/failure gutter)
 
 Harness understands **OSC 133** semantic prompts. Once installed, each shell prompt is marked and
 each command's exit status is recorded, which powers:
@@ -238,7 +310,7 @@ on `$HARNESS` (exported by the daemon into every pane). Details:
 
 ---
 
-## 11. Agent hooks (notifications)
+## 13. Agent hooks (notifications)
 
 Harness detects coding agents (Claude Code, Codex, Cursor, Pi, Hermes, OpenClaw, and more) and
 can notify you when one stops or needs input. For the agents with a hook mechanism, wire it up
@@ -254,7 +326,7 @@ automatically and notify via Harness's activity path, so there's nothing to inst
 
 ---
 
-## 12. macOS shortcuts (no prefix)
+## 14. macOS shortcuts (no prefix)
 
 | Shortcut | Action | | Shortcut | Action |
 |---|---|---|---|---|
@@ -266,11 +338,14 @@ automatically and notify via Harness's activity path, so there's nothing to inst
 | `Cmd-Shift-U` | Jump to next notification | | `prefix ?` | Cheatsheet |
 
 > Coming from another multiplexer? [MIGRATION.md](MIGRATION.md) has a key-by-key translation table
-> and a tested path for bringing your config and bindings over.
+> and a tested path for bringing your config and bindings over. You can migrate a `.tmux.conf` by
+> running `:source-file ~/.tmux.conf` from the prompt — lines like `bind`, `set`, `setw`, and `setenv`
+> parse and execute as-is (see [TMUX_PARITY.md](TMUX_PARITY.md#invariants-this-ledger-protects)
+> for the one-mechanism guarantee).
 
 ---
 
-## 13. One-screen cheat sheet
+## 15. One-screen cheat sheet
 
 ```
 PREFIX = Ctrl-A   (Settings ▸ Keys to change;  prefix ? = live cheatsheet)
