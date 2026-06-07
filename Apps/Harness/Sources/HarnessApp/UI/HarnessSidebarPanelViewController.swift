@@ -654,7 +654,10 @@ final class HarnessSidebarPanelViewController: NSViewController {
         guard agentSession == nil else { return }
         let registryStore = AgentRegistryStore()
         let configs = registryStore.load()
-        guard let config = configs.first(where: { $0.isEnabled }) else { return }
+        guard let config = configs.first(where: { $0.isEnabled }) else {
+            agentChatPanel.showEmptyState()
+            return
+        }
         let client = ACPClient()
         let session = ACPSession(client: client)
         agentSession = session

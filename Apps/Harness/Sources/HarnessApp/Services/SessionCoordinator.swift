@@ -212,6 +212,49 @@ final class SessionCoordinator: NSObject {
         return true
     }
 
+    @discardableResult
+    func syncFromDaemon(metadataOnly: Bool = false) async -> Bool {
+        let remote: SessionSnapshot
+        do {
+            remote = try await daemon.fetchSnapshot()
+        } catch {
+            fputs("Harness: snapshot fetch failed: \(error)\n", harnessStderr)
+            noteDaemonError(error)
+            return false
+        }
+        StartupMetrics.shared.mark(.firstSnapshot)
+        let structureChanged = structureFingerprint(remote) != structureFingerprint(snapshot)
+        snapshot = remote
+        lastRevision = remote.revision
+        if structureChanged {
+            structureRevision += 1
+        }
+        pushNewRemoteNotifications(from: remote)
+        pushAgentActivityNotifications(from: remote)
+        surfaceIndex = buildSurfaceIndex(remote)
+        if !metadataOnly {
+            let themeKey = "\(snapshot.themeName)|\(settings.backgroundOpacity)|\(settings.backgroundBlur)|\(settings.customBackgroundHex ?? "")|\(settings.customForegroundHex ?? "")|\(settings.customCursorHex ?? "")"
+            if themeKey != appliedThemeKey {
+                appliedThemeKey = themeKey
+                applyThemeToAllHosts()
+            }
+        }
+        syncWaitingRings()
+        updateDockBadge(from: remote)
+        reflectRemoteActivePane()
+        NotificationCenter.default.post(
+            name: NotificationBus.shared.snapshotChanged,
+            object: nil,
+            userInfo: [
+                "revision": remote.revision,
+                "structureChanged": structureChanged,
+                "chromeChanged": !metadataOnly,
+                "metadataOnly": metadataOnly,
+            ]
+        )
+        return true
+    }
+
     /// Clean-quit reap of ephemeral (Plain-mode, unpinned) sessions. Best-effort but *reliable*: the
     /// daemon can be momentarily busy at quit and a single default-timeout request that drops would
     /// silently leave Plain tabs alive (breaking "quit closes my tabs"). Uses a longer timeout and one
@@ -492,8 +535,10 @@ final class SessionCoordinator: NSObject {
     }
 
     func addWorkspace(name: String) {
-        requestDaemon(.newWorkspace(name: name))
-        syncFromDaemon()
+        Task {
+            await requestDaemon(.newWorkspace(name: name))
+            await syncFromDaemon()
+        }
     }
 
     func addSession(to workspaceID: WorkspaceID, cwd: String? = nil, name: String? = nil) {
@@ -515,52 +560,58 @@ final class SessionCoordinator: NSObject {
             targetIndex = nil
         }
 
-        guard case let .sessionID(sessionID)? = requestDaemon(.newSession(
-            workspaceID: workspaceID,
-            cwd: resolvedCWD,
-            name: name,
-            shell: settings.defaultShell
-        )) else {
-            syncFromDaemon()
-            return
-        }
-        syncFromDaemon()
-        if let targetIndex,
-           let workspace = snapshot.activeWorkspace,
-           workspace.sessions.firstIndex(where: { $0.id == sessionID }) != targetIndex {
-            reorderSession(workspaceID: workspaceID, sessionID: sessionID, toIndex: targetIndex)
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            SurfaceShellTracker.shared.bumpScan()
+        Task {
+            guard case let .sessionID(sessionID)? = await requestDaemon(.newSession(
+                workspaceID: workspaceID,
+                cwd: resolvedCWD,
+                name: name,
+                shell: settings.defaultShell
+            )) else {
+                await syncFromDaemon()
+                return
+            }
+            await syncFromDaemon()
+            if let targetIndex,
+               let workspace = snapshot.activeWorkspace,
+               workspace.sessions.firstIndex(where: { $0.id == sessionID }) != targetIndex {
+                reorderSession(workspaceID: workspaceID, sessionID: sessionID, toIndex: targetIndex)
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                SurfaceShellTracker.shared.bumpScan()
+            }
         }
     }
 
     func addTab(to workspaceID: WorkspaceID, cwd: String? = nil) {
-        requestDaemon(.newTab(workspaceID: workspaceID, cwd: cwd ?? activeTabCWD ?? settings.defaultCWD, shell: settings.defaultShell))
-        syncFromDaemon()
-        // The shell will spawn imminently — kick the cwd tracker so the new
-        // tab's path lights up without waiting for the next 500ms tick.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            SurfaceShellTracker.shared.bumpScan()
+        Task {
+            await requestDaemon(.newTab(workspaceID: workspaceID, cwd: cwd ?? activeTabCWD ?? settings.defaultCWD, shell: settings.defaultShell))
+            await syncFromDaemon()
+            // The shell will spawn imminently — kick the cwd tracker so the new
+            // tab's path lights up without waiting for the next 500ms tick.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                SurfaceShellTracker.shared.bumpScan()
+            }
         }
     }
 
     func openDefaultTerminalLaunch(_ launch: DefaultTerminalLaunchRequest) {
         guard let workspaceID = snapshot.activeWorkspace?.id ?? snapshot.workspaces.first?.id else { return }
         let cwd = launch.cwd ?? settings.defaultCWD
-        guard case let .tabID(tabID)? = requestDaemon(.newTab(workspaceID: workspaceID, cwd: cwd, shell: settings.defaultShell)) else {
-            syncFromDaemon()
-            return
-        }
-        if let title = launch.title, !title.isEmpty {
-            requestDaemon(.renameTab(tabID: tabID, name: title))
-        }
-        syncFromDaemon()
-        guard let surfaceID = firstSurfaceID(forTab: tabID) else { return }
-        setActiveSurface(surfaceID)
-        terminalHosts.host(for: surfaceID)?.focusTerminal()
-        if let command = launch.command, !command.isEmpty {
-            requestDaemon(.sendData(surfaceID: surfaceID.uuidString, data: Data((command + "\r").utf8)))
+        Task {
+            guard case let .tabID(tabID)? = await requestDaemon(.newTab(workspaceID: workspaceID, cwd: cwd, shell: settings.defaultShell)) else {
+                await syncFromDaemon()
+                return
+            }
+            if let title = launch.title, !title.isEmpty {
+                await requestDaemon(.renameTab(tabID: tabID, name: title))
+            }
+            await syncFromDaemon()
+            guard let surfaceID = firstSurfaceID(forTab: tabID) else { return }
+            setActiveSurface(surfaceID)
+            terminalHosts.host(for: surfaceID)?.focusTerminal()
+            if let command = launch.command, !command.isEmpty {
+                await requestDaemon(.sendData(surfaceID: surfaceID.uuidString, data: Data((command + "\r").utf8)))
+            }
         }
     }
 
@@ -571,8 +622,10 @@ final class SessionCoordinator: NSObject {
               let paneID = activeSurfaceID.flatMap({ paneID(for: $0, in: tab.rootPane) })
                 ?? tab.rootPane.allPaneIDs().last
         else { return }
-        requestDaemon(.newSplit(tabID: tab.id, paneID: paneID, direction: direction, shell: settings.defaultShell))
-        syncFromDaemon()
+        Task {
+            await requestDaemon(.newSplit(tabID: tab.id, paneID: paneID, direction: direction, shell: settings.defaultShell))
+            await syncFromDaemon()
+        }
     }
 
     func focusPaneDirectional(_ direction: DirectionalAxis) {
@@ -581,33 +634,39 @@ final class SessionCoordinator: NSObject {
               let paneID = activeSurfaceID.flatMap({ paneID(for: $0, in: tab.rootPane) })
                 ?? tab.rootPane.allPaneIDs().last
         else { return }
-        if case let .surfaceID(raw)? = requestDaemon(.selectPaneDirectional(currentPaneID: paneID, direction: direction)),
-           let surfaceID = UUID(uuidString: raw) {
-            syncFromDaemon()
-            setActiveSurface(surfaceID)
-            terminalHosts.host(for: surfaceID)?.focusTerminal()
-        } else {
-            syncFromDaemon()
+        Task {
+            if case let .surfaceID(raw)? = await requestDaemon(.selectPaneDirectional(currentPaneID: paneID, direction: direction)),
+               let surfaceID = UUID(uuidString: raw) {
+                await syncFromDaemon()
+                setActiveSurface(surfaceID)
+                terminalHosts.host(for: surfaceID)?.focusTerminal()
+            } else {
+                await syncFromDaemon()
+            }
         }
     }
 
     func newSurface(tabID: TabID, paneID: PaneID) {
-        guard case let .surfaceID(raw)? = requestDaemon(.newSurface(tabID: tabID, paneID: paneID, shell: settings.defaultShell)),
-              let surfaceID = UUID(uuidString: raw)
-        else {
-            syncFromDaemon()
-            return
+        Task {
+            guard case let .surfaceID(raw)? = await requestDaemon(.newSurface(tabID: tabID, paneID: paneID, shell: settings.defaultShell)),
+                  let surfaceID = UUID(uuidString: raw)
+            else {
+                await syncFromDaemon()
+                return
+            }
+            await syncFromDaemon()
+            setActiveSurface(surfaceID)
+            terminalHosts.host(for: surfaceID)?.focusTerminal()
         }
-        syncFromDaemon()
-        setActiveSurface(surfaceID)
-        terminalHosts.host(for: surfaceID)?.focusTerminal()
     }
 
     func selectPaneSurface(tabID: TabID, paneID: PaneID, surfaceID: SurfaceID) {
-        requestDaemon(.selectPaneSurface(tabID: tabID, paneID: paneID, surfaceID: surfaceID))
-        syncFromDaemon()
-        setActiveSurface(surfaceID)
-        terminalHosts.host(for: surfaceID)?.focusTerminal()
+        Task {
+            await requestDaemon(.selectPaneSurface(tabID: tabID, paneID: paneID, surfaceID: surfaceID))
+            await syncFromDaemon()
+            setActiveSurface(surfaceID)
+            terminalHosts.host(for: surfaceID)?.focusTerminal()
+        }
     }
 
     func splitPaneSurface(
@@ -1546,6 +1605,17 @@ final class SessionCoordinator: NSObject {
         }
     }
 
+    @discardableResult
+    func requestDaemon(_ request: IPCRequest) async -> IPCResponse? {
+        do {
+            return try await daemon.request(request)
+        } catch {
+            fputs("Harness daemon request failed: \(error)\n", harnessStderr)
+            noteDaemonError(error)
+            return nil
+        }
+    }
+
     /// A throttled, non-blocking notice that the daemon is unreachable.
     func noteDaemonError(_ error: Error) {
         let now = Date()
@@ -1565,12 +1635,22 @@ final class SessionCoordinator: NSObject {
             fputs("Harness daemon metadata update failed: \(error)\n", harnessStderr)
         }
     }
+
+    private func logIfFailed(_ request: IPCRequest) async {
+        do {
+            _ = try await daemon.request(request)
+        } catch {
+            fputs("Harness daemon metadata update failed: \(error)\n", harnessStderr)
+        }
+    }
 }
 
 extension SessionCoordinator: TerminalHostDelegate {
     func terminalHostDidChangeTitle(_ title: String, surfaceID: SurfaceID) {
-        logIfFailed(.updateTabTitle(surfaceID: surfaceID.uuidString, title: title))
-        syncFromDaemon(metadataOnly: true)
+        Task {
+            await logIfFailed(.updateTabTitle(surfaceID: surfaceID.uuidString, title: title))
+            await syncFromDaemon(metadataOnly: true)
+        }
     }
 
     /// OSC 9;4 progress — ephemeral GUI state (Ghostty parity), deliberately NOT mirrored
@@ -1581,8 +1661,10 @@ extension SessionCoordinator: TerminalHostDelegate {
     }
 
     func terminalHostDidChangeWorkingDirectory(_ path: String, surfaceID: SurfaceID) {
-        logIfFailed(.updateTabCwd(surfaceID: surfaceID.uuidString, path: path))
-        syncFromDaemon(metadataOnly: true)
+        Task {
+            await logIfFailed(.updateTabCwd(surfaceID: surfaceID.uuidString, path: path))
+            await syncFromDaemon(metadataOnly: true)
+        }
     }
 
     /// Called by `SurfaceShellTracker` when a polled cwd changes (the OSC 7
@@ -1594,8 +1676,10 @@ extension SessionCoordinator: TerminalHostDelegate {
             .flatMap { workspace in workspace.sessions.flatMap { $0.tabs } }
             .first { $0.rootPane.allSurfaceIDs().contains(surfaceID) }?.cwd
         if current == cwd { return }
-        logIfFailed(.updateTabCwd(surfaceID: surfaceID.uuidString, path: cwd))
-        syncFromDaemon(metadataOnly: true)
+        Task {
+            await logIfFailed(.updateTabCwd(surfaceID: surfaceID.uuidString, path: cwd))
+            await syncFromDaemon(metadataOnly: true)
+        }
     }
 
     func terminalHostDidChangeFocus(_ focused: Bool, surfaceID: SurfaceID) {

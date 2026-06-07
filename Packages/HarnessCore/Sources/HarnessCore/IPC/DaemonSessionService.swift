@@ -19,10 +19,12 @@ public final class DaemonSessionService: @unchecked Sendable {
     private let lock = NSLock()
     private var client: DaemonClient
     private var _endpoint: Endpoint
+    private let clientActor: DaemonClientActor
 
     public init(endpoint: Endpoint = .localControlSocket) {
         _endpoint = endpoint
         client = DaemonClient(endpoint: endpoint)
+        clientActor = DaemonClientActor(endpoint: endpoint)
     }
 
     /// The daemon this service currently targets.
@@ -37,6 +39,10 @@ public final class DaemonSessionService: @unchecked Sendable {
         _endpoint = endpoint
         client = DaemonClient(endpoint: endpoint)
         lock.unlock()
+
+        Task {
+            await clientActor.switchEndpoint(endpoint)
+        }
     }
 
     private func currentClient() -> DaemonClient {
@@ -69,6 +75,36 @@ public final class DaemonSessionService: @unchecked Sendable {
 
     public func ping() -> Bool {
         guard let response = try? request(.ping) else { return false }
+        if case .pong = response { return true }
+        return false
+    }
+
+    // MARK: - Async Methods
+
+    @discardableResult
+    public func request(_ ipcRequest: IPCRequest) async throws -> IPCResponse {
+        try await request(ipcRequest, timeout: 2)
+    }
+
+    @discardableResult
+    public func request(_ ipcRequest: IPCRequest, timeout: TimeInterval) async throws -> IPCResponse {
+        let response = try await clientActor.request(ipcRequest, timeout: timeout)
+        if case let .error(message) = response {
+            throw DaemonSessionError.daemonError(message)
+        }
+        return response
+    }
+
+    public func fetchSnapshot() async throws -> SessionSnapshot {
+        let response = try await request(.getSnapshot)
+        guard case let .snapshot(snapshot) = response else {
+            throw DaemonSessionError.unexpectedResponse
+        }
+        return snapshot
+    }
+
+    public func ping() async -> Bool {
+        guard let response = try? await request(.ping) else { return false }
         if case .pong = response { return true }
         return false
     }

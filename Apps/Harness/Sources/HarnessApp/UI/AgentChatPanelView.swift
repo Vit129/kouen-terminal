@@ -15,12 +15,14 @@ final class AgentChatPanelView: NSView {
     private let rejectButton = NSButton(title: "Reject", target: nil, action: nil)
     private let approvalLabel = NSTextField(labelWithString: "")
 
+    private let emptyStateView = NSStackView()
     private var session: ACPSession?
     private var agentPicker: NSPopUpButton?
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         setupUI()
+        setupEmptyState()
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -124,10 +126,76 @@ final class AgentChatPanelView: NSView {
         ])
     }
 
+    // MARK: - Empty State
+
+    private func setupEmptyState() {
+        emptyStateView.orientation = .vertical
+        emptyStateView.alignment = .centerX
+        emptyStateView.spacing = 12
+        emptyStateView.translatesAutoresizingMaskIntoConstraints = false
+
+        let icon = NSImageView()
+        icon.image = NSImage(systemSymbolName: "bubble.left.and.text.bubble.right", accessibilityDescription: "Agent")
+        icon.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 32, weight: .light)
+        icon.contentTintColor = .tertiaryLabelColor
+
+        let title = NSTextField(labelWithString: "No Agent Configured")
+        title.font = .systemFont(ofSize: 14, weight: .medium)
+        title.textColor = .secondaryLabelColor
+
+        let subtitle = NSTextField(labelWithString: "Add an ACP agent in Settings → ACP Agents (Chat)")
+        subtitle.font = .systemFont(ofSize: 12)
+        subtitle.textColor = .tertiaryLabelColor
+        subtitle.alignment = .center
+
+        let addButton = NSButton(title: "Add Agent…", target: self, action: #selector(openAgentsSettings))
+        addButton.bezelStyle = .rounded
+        addButton.controlSize = .regular
+
+        emptyStateView.addArrangedSubview(icon)
+        emptyStateView.addArrangedSubview(title)
+        emptyStateView.addArrangedSubview(subtitle)
+        emptyStateView.addArrangedSubview(addButton)
+        addSubview(emptyStateView)
+
+        NSLayoutConstraint.activate([
+            emptyStateView.centerXAnchor.constraint(equalTo: centerXAnchor),
+            emptyStateView.centerYAnchor.constraint(equalTo: centerYAnchor),
+            emptyStateView.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor, constant: 16),
+            emptyStateView.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -16),
+        ])
+    }
+
+    @objc private func openAgentsSettings() {
+        SettingsWindowController.show(page: 4)
+    }
+
+    func showEmptyState(message: String? = nil) {
+        emptyStateView.isHidden = false
+        scrollView.isHidden = true
+        inputContainer.isHidden = true
+        statusLabel.isHidden = true
+        approvalBar.isHidden = true
+        if let message {
+            // Update subtitle
+            if let subtitle = emptyStateView.arrangedSubviews.last as? NSTextField {
+                subtitle.stringValue = message
+            }
+        }
+    }
+
+    private func hideEmptyState() {
+        emptyStateView.isHidden = true
+        scrollView.isHidden = false
+        inputContainer.isHidden = false
+        statusLabel.isHidden = false
+    }
+
     // MARK: - Session Binding
 
     func bind(session: ACPSession) {
         self.session = session
+        hideEmptyState()
         session.onUpdate = { [weak self] in self?.refreshUI() }
         refreshUI()
     }
