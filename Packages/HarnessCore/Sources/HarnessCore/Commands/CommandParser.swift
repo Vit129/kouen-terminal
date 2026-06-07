@@ -479,7 +479,9 @@ public enum CommandParser {
             else { throw CommandParseError.missingArgument("unbind-hook requires a hook id (see show-hooks)") }
             return .unbindHook(id: id)
         case "find-window":
-            guard let pattern = positionalTokens(tokens, skippingValuesFor: []).first else {
+            // `-t` (a target window/session for the search) isn't supported, but its
+            // VALUE must never be mistaken for the search pattern.
+            guard let pattern = positionalTokens(tokens, skippingValuesFor: ["-t"]).first else {
                 throw CommandParseError.missingArgument("find-window requires a pattern")
             }
             // tmux defaults to matching everything (-CNT); Harness defaults to the cheap
@@ -533,7 +535,7 @@ public enum CommandParser {
     /// tmux key-table name aliases. Harness's vi-flavored copy-mode table is named
     /// `copy-mode` (selected when `mode-keys` is vi, the default) — tmux calls that table
     /// `copy-mode-vi`, so accept both everywhere a table name is typed.
-    private static func canonicalTableName(_ name: String) -> String {
+    public static func canonicalTableName(_ name: String) -> String {
         name == "copy-mode-vi" ? "copy-mode" : name
     }
 

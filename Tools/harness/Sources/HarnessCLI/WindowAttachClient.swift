@@ -1158,7 +1158,12 @@ private final class WindowSession: @unchecked Sendable {
         case let .clientLocal(local):
             handleLocalCommand(local, target: target)
         case .unresolved:
-            flashStatus("no resolvable target for command")
+            // find-window's no-match reads as a search result, like the -C path.
+            if case let .findWindow(pattern, _, _, _) = command {
+                flashStatus("find-window: no matches for '\(pattern)'")
+            } else {
+                flashStatus("no resolvable target for command")
+            }
         }
     }
 
