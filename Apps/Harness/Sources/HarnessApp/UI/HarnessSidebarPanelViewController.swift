@@ -2096,8 +2096,12 @@ final class SessionCardRowView: NSView {
         let folderName = HarnessDesign.pathDisplayName(tab.cwd)
         let displayedAgentKind = tab.agent?.kind ?? AgentTitleInference.kind(from: tab.title)
         let defaultTitle = displayedAgentKind?.displayName ?? folderName
-        titleLabel.stringValue = session.name.isEmpty ? defaultTitle : session.name
-        toolTip = session.name.isEmpty ? (displayedAgentKind != nil ? "\(defaultTitle) — \(folder)" : folder) : "\(session.name) — \(folder)"
+        // Treat the name as dynamic (show current cwd) when it was auto-assigned from
+        // the original folder name — i.e. user never explicitly renamed it.
+        let nameIsDynamic = session.name.isEmpty || session.name == folderName
+            || session.name == (tab.cwd as NSString).lastPathComponent
+        titleLabel.stringValue = nameIsDynamic ? defaultTitle : session.name
+        toolTip = nameIsDynamic ? (displayedAgentKind != nil ? "\(defaultTitle) — \(folder)" : folder) : "\(session.name) — \(folder)"
 
         var metaParts: [String] = []
         var repoWithBranch = folderName
