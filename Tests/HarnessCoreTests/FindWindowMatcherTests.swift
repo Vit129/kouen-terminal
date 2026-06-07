@@ -33,6 +33,25 @@ final class FindWindowMatcherTests: XCTestCase {
         XCTAssertEqual(matches.first?.tabID, tabs[1].id)
     }
 
+    func testTabMatchesNameSearchesSubtitleButTitleDoesNot() {
+        var editor = SessionEditor()
+        let tab = editor.snapshot.workspaces[0].sessions[0].tabs[0]
+        let surface = tab.rootPane.allSurfaceIDs().first!
+        editor.updateTabTitle(surfaceID: surface, title: "frontend")
+        editor.updateTabCwd(surfaceID: surface, path: "/home/user/myproject")
+        let updated = editor.snapshot.workspaces[0].sessions[0].tabs[0]
+        XCTAssertEqual(updated.displaySubtitle, "myproject")
+
+        // Title (and name) both match the tab's title.
+        XCTAssertTrue(FindWindowMatcher.tabMatches(updated, pattern: "frontend", name: false, title: true))
+        XCTAssertTrue(FindWindowMatcher.tabMatches(updated, pattern: "frontend", name: true, title: true))
+        // Only name additionally searches the display subtitle (cwd basename / branch).
+        XCTAssertTrue(FindWindowMatcher.tabMatches(updated, pattern: "myproject", name: true, title: false))
+        XCTAssertFalse(FindWindowMatcher.tabMatches(updated, pattern: "myproject", name: false, title: true))
+        // Neither flag set never matches.
+        XCTAssertFalse(FindWindowMatcher.tabMatches(updated, pattern: "frontend", name: false, title: false))
+    }
+
     func testFirstMatchFallsBackToContentCapture() {
         let snap = snapshot(titles: ["frontend", "backend"])
         let tabs = snap.workspaces[0].sessions.flatMap(\.tabs)

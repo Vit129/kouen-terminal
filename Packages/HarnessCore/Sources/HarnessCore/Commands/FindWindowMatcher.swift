@@ -21,11 +21,10 @@ public enum FindWindowMatcher {
     }
 
     public static func tabMatches(_ tab: Tab, pattern: String, name: Bool, title: Bool) -> Bool {
-        if title, matches(pattern: pattern, in: tab.title) { return true }
-        if name {
-            if matches(pattern: pattern, in: tab.title) { return true }
-            if matches(pattern: pattern, in: tab.displaySubtitle) { return true }
-        }
+        // Name and title both match the tab's title; name additionally matches the
+        // display subtitle (cwd basename / git branch).
+        if name || title, matches(pattern: pattern, in: tab.title) { return true }
+        if name, matches(pattern: pattern, in: tab.displaySubtitle) { return true }
         return false
     }
 
