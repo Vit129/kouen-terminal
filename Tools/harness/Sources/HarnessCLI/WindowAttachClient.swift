@@ -1238,6 +1238,8 @@ private final class WindowSession: @unchecked Sendable {
         case let .clientLocal(local):
             handleLocalCommand(local, target: target)
         case .unresolved:
+            // Loud, like the GUI prompt and control mode: a typo'd `-t` (or a command
+            // with no resolvable focus) must never read as a silent success.
             // find-window's no-match reads as a search result, like the -C path.
             if case let .findWindow(pattern, _, _, _) = command {
                 flashStatus("find-window: no matches for '\(pattern)'")
