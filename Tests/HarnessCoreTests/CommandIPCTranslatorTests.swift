@@ -99,7 +99,7 @@ final class CommandIPCTranslatorTests: XCTestCase {
 
         let spec = TargetSpec(pane: .byID(other), raw: "%\(other.uuidString)")
         guard case let .requests(reqs) = CommandIPCTranslator.translate(
-            .targeted(spec, .swapPane(target: .next)), target: target),
+            .targeted(spec, .swapPane(target: .next, source: nil)), target: target),
             case let .swapPanes(src, dst) = reqs.first
         else { return XCTFail("expected swapPanes") }
         XCTAssertEqual(src, activePane, "source is the caller's active pane")
@@ -112,12 +112,12 @@ final class CommandIPCTranslatorTests: XCTestCase {
         let (target, _, activePane) = try makeTarget(splitOnce: true)
         let selfSpec = TargetSpec(pane: .byID(activePane), raw: "%\(activePane.uuidString)")
         guard case .unresolved = CommandIPCTranslator.translate(
-            .targeted(selfSpec, .swapPane(target: .next)), target: target)
+            .targeted(selfSpec, .swapPane(target: .next, source: nil)), target: target)
         else { return XCTFail("self-swap must be unresolved") }
 
         let missing = TargetSpec(session: .byName("bogus"), raw: "bogus")
         guard case .unresolved = CommandIPCTranslator.translate(
-            .targeted(missing, .swapPane(target: .next)), target: target)
+            .targeted(missing, .swapPane(target: .next, source: nil)), target: target)
         else { return XCTFail("unknown session must be unresolved") }
     }
 
@@ -146,6 +146,58 @@ final class CommandIPCTranslatorTests: XCTestCase {
         else { return XCTFail("expected selectPane for {top}") }
         XCTAssertEqual(reqTab, tabID)
         XCTAssertTrue(target.paneOrder.contains(reqPane))
+    }
+
+    /// STRICT resolution applies to EVERY targeted verb, not just select/swap: a `-t`
+    /// naming a missing session/window/pane makes destructive verbs `.unresolved`
+    /// instead of silently acting on the caller's focus (the v1.7.1 misroute class —
+    /// pre-fix, `kill-pane -t bogus` killed the CURRENT pane).
+    func testTargetedVerbsRejectUnresolvableTargets() throws {
+        let (target, _, _) = try makeTarget(splitOnce: true)
+        let badSession = TargetSpec(session: .byName("bogus"), raw: "bogus:")
+        let badWindow = TargetSpec(window: .byIndex(99), raw: ":99")
+        let badPane = TargetSpec(pane: .byID(UUID()), raw: "%ghost")
+        for (spec, inner): (TargetSpec, Command) in [
+            (badSession, .killPane), (badWindow, .killPane), (badPane, .killPane),
+            (badSession, .killWindow), (badWindow, .killWindow),
+            (badPane, .selectPane(target: .next)),
+            (badWindow, .selectWindow(index: 99)),
+        ] {
+            guard case .unresolved = CommandIPCTranslator.translate(.targeted(spec, inner), target: target) else {
+                return XCTFail("\(inner.shortDescription) -t \(spec.raw) must be unresolved, not act on focus")
+            }
+        }
+    }
+
+    /// `swap-pane -s X -t Y` swaps X with Y (neither needs to be the active pane);
+    /// `-s X` alone swaps X with the current pane; an unresolvable `-s` is loud.
+    func testSwapPaneSourceFlagResolves() throws {
+        let (target, _, activePane) = try makeTarget(splitOnce: true)
+        let other = try XCTUnwrap(target.paneOrder.first { $0 != activePane })
+
+        // -s other (no -t): swap other with the CURRENT pane.
+        let sourceSpec = TargetSpec(pane: .byID(other), raw: "%\(other.uuidString)")
+        guard case let .requests(reqs) = CommandIPCTranslator.translate(
+            .swapPane(target: .current, source: sourceSpec), target: target),
+            case let .swapPanes(src, dst) = reqs.first
+        else { return XCTFail("expected swapPanes for -s") }
+        XCTAssertEqual(src, other, "source is the -s pane")
+        XCTAssertEqual(dst, activePane, "destination defaults to the current pane")
+
+        // -s with a -t destination: swap the two named panes.
+        let dstSpec = TargetSpec(pane: .byID(activePane), raw: "%\(activePane.uuidString)")
+        guard case let .requests(reqs2) = CommandIPCTranslator.translate(
+            .targeted(dstSpec, .swapPane(target: .next, source: sourceSpec)), target: target),
+            case let .swapPanes(src2, dst2) = reqs2.first
+        else { return XCTFail("expected swapPanes for -s + -t") }
+        XCTAssertEqual(src2, other)
+        XCTAssertEqual(dst2, activePane)
+
+        // Unresolvable -s never silently swaps the focused pane.
+        let ghost = TargetSpec(pane: .byID(UUID()), raw: "%ghost")
+        guard case .unresolved = CommandIPCTranslator.translate(
+            .swapPane(target: .current, source: ghost), target: target)
+        else { return XCTFail("unresolvable -s must be unresolved") }
     }
 
     func testTargetedHonorsBaseIndex() throws {

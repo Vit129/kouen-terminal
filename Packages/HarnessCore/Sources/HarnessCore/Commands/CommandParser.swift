@@ -168,11 +168,19 @@ public enum CommandParser {
             default: return .synchronizePanes(set: nil)
             }
         case "swap-pane":
+            // tmux `swap-pane [-s src] [-t dst]` — `-s` names the pane to act FROM
+            // (default: the caller's active pane); without `-t` the destination is
+            // the current pane (tmux behavior), spelled here as a self-target the
+            // translator resolves against the caller's focus.
+            let source = try explicitPaneTargetSpec(from: tokens, flag: "-s")
             if let spec = try explicitPaneTargetSpec(from: tokens) {
-                return .targeted(spec, .swapPane(target: .next))
+                return .targeted(spec, .swapPane(target: .next, source: source))
+            }
+            if source != nil, stringValue(for: "-t", in: tokens) == nil, !tokens.contains("-l") {
+                return .swapPane(target: .current, source: source)
             }
             let target = try paneTarget(from: tokens, defaultValue: .next)
-            return .swapPane(target: target)
+            return .swapPane(target: target, source: source)
         case "new-window", "new-tab":
             return .newWindow
         case "kill-window", "kill-tab":
@@ -444,12 +452,15 @@ public enum CommandParser {
     /// misroutes (the v1.7.1 policy) — when the value parses to nothing actionable (a bare
     /// `:` or `.`); a *name* that doesn't exist parses fine and fails loudly at resolution
     /// instead, matching tmux's "can't find session" behavior.
-    private static func explicitPaneTargetSpec(from tokens: [String]) throws -> TargetSpec? {
-        guard !tokens.contains("-L"), !tokens.contains("-R"), !tokens.contains("-U"),
-              !tokens.contains("-D"), !tokens.contains("-l"),
-              let raw = stringValue(for: "-t", in: tokens),
-              ![":.+", ":.-", "!"].contains(raw)
-        else { return nil }
+    private static func explicitPaneTargetSpec(from tokens: [String], flag: String = "-t") throws -> TargetSpec? {
+        if flag == "-t" {
+            // Directional / relative forms are `paneTarget`'s fast paths, not specs.
+            guard !tokens.contains("-L"), !tokens.contains("-R"), !tokens.contains("-U"),
+                  !tokens.contains("-D"), !tokens.contains("-l")
+            else { return nil }
+        }
+        guard let raw = stringValue(for: flag, in: tokens) else { return nil }
+        if flag == "-t", [":.+", ":.-", "!"].contains(raw) { return nil }
         let spec = TargetSpec.parse(raw)
         guard !spec.isEmpty else {
             throw CommandParseError.invalidArgument(

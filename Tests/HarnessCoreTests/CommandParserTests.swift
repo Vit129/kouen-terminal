@@ -176,7 +176,7 @@ final class CommandParserTests: XCTestCase {
     func testPaneTargetSpecialFormsParse() throws {
         XCTAssertEqual(try CommandParser.parse("select-pane -t :.+"), .selectPane(target: .next))
         XCTAssertEqual(try CommandParser.parse("select-pane -t :.-"), .selectPane(target: .previous))
-        XCTAssertEqual(try CommandParser.parse("swap-pane -t !"), .swapPane(target: .last))
+        XCTAssertEqual(try CommandParser.parse("swap-pane -t !"), .swapPane(target: .last, source: nil))
     }
 
     /// Absolute `-t` targets parse via the full `TargetSpec` grammar into `.targeted` —
@@ -191,7 +191,7 @@ final class CommandParserTests: XCTestCase {
         XCTAssertEqual(spec.session, .byName("api"))
         XCTAssertEqual(spec.window, .byIndex(1))
         XCTAssertEqual(spec.pane, .byIndex(0))
-        XCTAssertEqual(inner, .swapPane(target: .next))
+        XCTAssertEqual(inner, .swapPane(target: .next, source: nil))
 
         let paneID = UUID()
         guard case let .targeted(byID, select) = try CommandParser.parse("select-pane -t %\(paneID.uuidString)") else {
@@ -213,10 +213,36 @@ final class CommandParserTests: XCTestCase {
         }
     }
 
+    /// tmux `swap-pane -s <src>`: the source pane rides the command; without `-t`
+    /// the destination is the current pane.
+    func testSwapPaneSourceFlagParses() throws {
+        let paneID = UUID()
+        guard case let .swapPane(target, source) = try CommandParser.parse("swap-pane -s %\(paneID.uuidString)") else {
+            return XCTFail("expected bare swapPane with source")
+        }
+        XCTAssertEqual(target, .current, "-s without -t swaps with the current pane")
+        XCTAssertEqual(source?.pane, .byID(paneID))
+
+        guard case let .targeted(spec, .swapPane(_, src2)) = try CommandParser.parse(
+            "swap-pane -s %\(paneID.uuidString) -t api:1.0") else {
+            return XCTFail("expected targeted swapPane with source")
+        }
+        XCTAssertEqual(spec.session, .byName("api"))
+        XCTAssertEqual(src2?.pane, .byID(paneID))
+
+        // `-s` with a relative `-t` keeps the relative destination.
+        guard case let .swapPane(rel, src3) = try CommandParser.parse(
+            "swap-pane -s %\(paneID.uuidString) -t :.-") else {
+            return XCTFail("expected relative swapPane with source")
+        }
+        XCTAssertEqual(rel, .previous)
+        XCTAssertEqual(src3?.pane, .byID(paneID))
+    }
+
     /// Relative fast paths are untouched by the absolute-target branch.
     func testPaneTargetRelativeFormsStayRelative() throws {
         XCTAssertEqual(try CommandParser.parse("select-pane -t :.+"), .selectPane(target: .next))
-        XCTAssertEqual(try CommandParser.parse("swap-pane -t !"), .swapPane(target: .last))
+        XCTAssertEqual(try CommandParser.parse("swap-pane -t !"), .swapPane(target: .last, source: nil))
         XCTAssertEqual(try CommandParser.parse("select-pane -L"), .selectPane(target: .left))
     }
 
