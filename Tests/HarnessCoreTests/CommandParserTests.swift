@@ -322,6 +322,20 @@ final class CommandParserTests: XCTestCase {
         )
     }
 
+    func testDisplayMenuIgnoresTrailingPartialTriple() throws {
+        // A dangling group that isn't a full (title, key, command) triple is dropped,
+        // not crashed on — the loop only consumes complete triples.
+        XCTAssertEqual(
+            try CommandParser.parse(#"display-menu "Item A" a kill-pane "Item B" b"#),
+            .displayMenu(items: [.init(title: "Item A", key: "a", command: .killPane)])
+        )
+        // No positional triples at all yields an empty menu.
+        XCTAssertEqual(
+            try CommandParser.parse(#"display-menu -T "Menu""#),
+            .displayMenu(items: [])
+        )
+    }
+
     // MARK: - Config / buffer / hook verbs (bindable forms)
 
     func testSetOptionParsesScopesAndJoinsValue() throws {
