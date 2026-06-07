@@ -52,7 +52,7 @@ public final class DaemonServer: @unchecked Sendable {
     /// format builder runs under its own lock on arbitrary threads, so it can't hop onto
     /// `queue` (the daemon queue itself calls into the registry — `queue.sync` would
     /// deadlock); it reads this counter instead.
-    private let identifiedClientCount = CountBox()
+    private let registeredClientCount = CountBox()
     private final class CountBox: @unchecked Sendable {
         private let lock = NSLock()
         private var value = 0
@@ -70,8 +70,8 @@ public final class DaemonServer: @unchecked Sendable {
             guard let self else { return }
             self.queue.async { [weak self] in self?.pushSnapshotRevision(revision) }
         }
-        registry.attachedClientCountProvider = { [identifiedClientCount] in
-            identifiedClientCount.read()
+        registry.attachedClientCountProvider = { [registeredClientCount] in
+            registeredClientCount.read()
         }
     }
 
@@ -173,7 +173,7 @@ public final class DaemonServer: @unchecked Sendable {
             guard let self else { close(clientFD); return }
             if let removed = self.clients.removeValue(forKey: clientFD) {
                 self.clientFDsByID.removeValue(forKey: removed.id)
-                self.identifiedClientCount.update(self.clients.count)
+                self.registeredClientCount.update(self.clients.count)
                 self.registry.fireClientDetached(label: removed.label)
             }
             self.clientBuffers.removeValue(forKey: clientFD)
@@ -317,7 +317,7 @@ public final class DaemonServer: @unchecked Sendable {
             let record = ClientRecord(id: UUID(), label: label, connectedAt: Date())
             clients[fd] = record
             clientFDsByID[record.id] = fd
-            identifiedClientCount.update(clients.count)
+            registeredClientCount.update(clients.count)
             registry.fireClientAttached(label: label)
             return .clientID(record.id)
         case .listClients:
@@ -505,6 +505,9 @@ public final class DaemonServer: @unchecked Sendable {
             // ones — without this, every real client (GUI, attach, attach-window) produced a
             // detached event with no matching attached.
             registry.fireClientAttached(label: record.label)
+            // Keep the off-queue mirror (`#{session_attached}`) in step with `clients` —
+            // GUI/attach clients register here, never through identifyClient.
+            registeredClientCount.update(clients.count)
         }
         send(.ok, to: fd)
     }
@@ -542,6 +545,8 @@ public final class DaemonServer: @unchecked Sendable {
             clientFDsByID[record.id] = fd
             // Pair with the cancel handler's client-detached (see handleSubscribe).
             registry.fireClientAttached(label: record.label)
+            // Mirror update, as in handleSubscribe — `#{session_attached}` reads this.
+            registeredClientCount.update(clients.count)
         }
         send(.ok, to: fd)
     }

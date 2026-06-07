@@ -319,7 +319,9 @@ public enum FormatString {
         case "cwd_basename":
             guard let cwd = context.paneCwd else { return "" }
             return (cwd as NSString).lastPathComponent
-        case "pane_active": return context.paneActive ? "1" : ""
+        // Flag tokens render tmux's "1"/"0" (conditionals treat "0" and "" as falsy
+        // either way, but the literal output should be uniform across the vocabulary).
+        case "pane_active": return context.paneActive ? "1" : "0"
         case "pane_index": return context.paneIndex.map(String.init) ?? ""
         case "pane_pid": return context.panePID.map(String.init) ?? ""
         case "pane_current_command": return context.paneCurrentCommand ?? ""

@@ -213,6 +213,22 @@ final class FormatStringExtendedVariableTests: XCTestCase {
         XCTAssertEqual(FormatString.evaluate("#{pid}", context: context), "99")
     }
 
+    /// Flag tokens share one literal convention: tmux's "1"/"0" — never "" for false.
+    /// (Conditionals treat "0" and "" as falsy alike; the literal output is the contract.)
+    func testFlagTokensRenderZeroOneUniformly() {
+        var context = FormatContext(paneActive: false)
+        context.paneDead = false
+        context.windowActive = false
+        XCTAssertEqual(
+            FormatString.evaluate("#{pane_active},#{pane_dead},#{window_active}", context: context),
+            "0,0,0"
+        )
+        XCTAssertEqual(
+            FormatString.evaluate("#{?pane_active,on,off}", context: context), "off",
+            "the literal 0 must stay falsy in conditionals"
+        )
+    }
+
     /// IDs render with the tmux-style `$`/`@` prefixes so they round-trip into `-t` targets.
     func testIdentifierTokensCarryTargetPrefixes() {
         let context = extendedContext()
