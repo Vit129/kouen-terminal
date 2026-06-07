@@ -597,10 +597,8 @@ public enum CommandParser {
         }.map(\.element)
         var items: [Command.MenuItem] = []
         var i = 0
-        while i + 2 < positional.count + 1, i + 2 <= positional.count {
-            // Need at least title, key, command (3 tokens).
-            guard i + 2 < positional.count + 0 || i + 3 <= positional.count else { break }
-            if i + 3 > positional.count { break }
+        // Each item is a (title, key, command) triple; a trailing partial group is ignored.
+        while i + 3 <= positional.count {
             let title = positional[i], key = positional[i + 1], cmd = positional[i + 2]
             items.append(.init(title: title, key: key.isEmpty ? nil : key, command: (try? parse(cmd)) ?? .displayMessage(format: cmd)))
             i += 3
