@@ -332,7 +332,7 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         commandFinishedNotifications: Bool = false,
         commandFinishedThresholdSeconds: Int = 10,
         boldIsBright: Bool = true,
-        lspAutoStart: Bool = true,
+        lspAutoStart: Bool = false,
         lspServers: [String: String] = [:]
     ) {
         self.fontSize = fontSize

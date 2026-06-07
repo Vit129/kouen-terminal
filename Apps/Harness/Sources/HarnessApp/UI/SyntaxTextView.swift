@@ -252,6 +252,8 @@ private final class SyntaxLineNumberGutterView: NSView {
     var diffLines: [Int: SyntaxTextView.DiffLineType] = [:]
     var diagnostics: [LSPDiagnostic] = []
 
+    override var isFlipped: Bool { true }
+
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         wantsLayer = true
