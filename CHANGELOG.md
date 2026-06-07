@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.1.0] - 2026-06-07
+
+### Added
+- **Expanded syntax highlighting** — Added keyword highlighting for Kotlin, Java, C/C++, Shell (bash/zsh), Ruby, Dart, Lua, PHP, SQL, HTML, CSS/SCSS. Total: 22 languages with full keywords + comments + strings + numbers coloring.
+
+### Fixed
+- **Preview/Production isolation** — `make preview` no longer interferes with a running production Harness app. Preview `DaemonLauncher` skips all LaunchAgent interaction (no `launchctl kickstart/relaunch`) when `HarnessPreviewHome` is set, using direct daemon spawn only.
+- **Preview build speed** — `make preview` skips `swift build` when `.build/debug/Harness` is already up-to-date (source mtime check). Removed redundant pre-spawn of daemon from `preview.sh` — the app's `DaemonLauncher` handles it.
+
+### Changed
+- **LSP disabled by default** — LSP integration (hover, go-to-definition, diagnostics) commented out in `FileViewerViewController` and `FileEditorView`. File preview still works with syntax highlighting. Re-enable by uncommenting `LSPFileSession` usage and setting `lspAutoStart = true`.
+
 ## [2.0.0] - 2026-06-07
 
 ### Philosophy
