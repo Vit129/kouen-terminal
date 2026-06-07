@@ -1145,12 +1145,20 @@ private final class WindowSession: @unchecked Sendable {
         )
         switch CommandIPCTranslator.translate(command, target: target, baseIndex: baseIndex, paneBaseIndex: paneBaseIndex) {
         case let .requests(requests):
-            for request in requests { _ = try? client.request(request, timeout: 2) }
+            for request in requests {
+                // Surface daemon validation errors (unknown hook event, bad option
+                // scope, …) in the status line — never a silent no-op. First error
+                // aborts the remainder, like the GUI and CLI.
+                if case let .error(message)? = try? client.request(request, timeout: 2) {
+                    flashStatus(message)
+                    break
+                }
+            }
             checkStructure()
         case let .clientLocal(local):
             handleLocalCommand(local, target: target)
         case .unresolved:
-            break
+            flashStatus("no resolvable target for command")
         }
     }
 
