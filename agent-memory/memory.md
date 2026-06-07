@@ -13,11 +13,13 @@
 ✅ ⌥⇧⌘W — close pane  
 ✅ Drag divider to resize panes  
 ✅ Removed old S1/S2/S3 pane-local surface tabs (broken drag UX)  
+✅ N-ary flatten: same-direction splits use single NSSplitView with equal distribution  
+✅ Infinite recursion fix: isApplyingPositions guard in HarnessSplitView.layout()  
+✅ Host reuse: detach terminal hosts before rebuild, re-insert without losing Metal state  
 
 ## Known Issues
 - **Split down (⌘⇧D) terminal disappears** — Metal CADisplayLink not re-activated after view rebuild (viewDidMoveToWindow not fired on same-window reparent)
-- **Split 3+ panes stack right** — binary tree PaneNode nests 50/50 NSSplitViews; need N-ary flat model + single NSSplitView with adjustSubviews()
-- **Fix plan:** Refactor PaneNode from binary tree → N-ary list, use one NSSplitView per direction with N subviews, incremental view update (don't removeFromSuperview existing hosts)
+- **Fix plan:** Full incremental update (P3 plan) — don't removeFromSuperview existing hosts, use insertArrangedSubview
 
 ## Completed Sprints
 - **v1.3.0** — IDE-like Sidebar (PBI-001): Files tab, Git tab, session tabs, recent projects
