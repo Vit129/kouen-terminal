@@ -68,16 +68,14 @@ Everything below that says "`prefix X`" means: tap the prefix, release, then tap
 | `prefix q` | Show numbered pane overlay — press a digit to jump |
 | `prefix Space` | Cycle through the layout presets |
 
-**Layouts:** `even-horizontal`, `even-vertical`, `main-horizontal`, `main-vertical`, `tiled` —
-cycle with `prefix Space`, or pick one with `:select-layout tiled`. Also `rotate-window`,
-`break-pane` (pop a pane into its own tab), and `join-pane`.
+**Layouts:** `even-horizontal` — cycle with `prefix Space`, or pick one with `:select-layout even-horizontal`. Also `rotate-window`, `break-pane` (pop a pane into its own tab), and `join-pane`. *(Note: Vertical/downward splits are no longer supported)*
 
 **Move a pane between tabs:** `prefix m` marks the active pane, then `prefix j` joins that marked
 pane into the current one (Harness's `move-pane`/`join-pane`).
 
 **Type to several panes at once:** `prefix S` toggles `synchronize-panes` for the tab.
 
-> macOS shortcuts work too: `Cmd-D` splits side-by-side, `Cmd-Shift-D` splits top/bottom.
+> macOS shortcuts work too: `Cmd-D` splits side-by-side. *(Note: Vertical/downward split shortcut `Cmd-Shift-D` has been removed)*
 > In the GUI, directional pane nav is the **arrow keys**; the `attach-window` compositor (§9)
 > uses **`hjkl`** instead.
 
@@ -275,10 +273,10 @@ automatically and notify via Harness's activity path, so there's nothing to inst
 ```
 PREFIX = Ctrl-A   (Settings ▸ Keys to change;  prefix ? = live cheatsheet)
 
-PANES        prefix %  split →      prefix "  split ↓
-             prefix ←→↑↓  focus     prefix o/;  cycle     prefix l  last
+PANES        prefix %  split →      (Vertical/downward split " is disabled)
+             prefix ←→  focus        prefix o/;  cycle     prefix l  last
              prefix z  zoom         prefix x  kill        prefix q  numbers
-             prefix S-←→↑↓  resize   prefix Space  layouts
+             prefix S-←→  resize    prefix Space  layouts
              prefix m / j  mark / join pane     prefix S  sync-panes
 
 TABS         prefix c  new          prefix n/p  next/prev   prefix ,  rename

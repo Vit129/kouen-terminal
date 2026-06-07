@@ -141,16 +141,6 @@ enum CommandPaletteController {
                 coordinator.splitActivePane(direction: .horizontal)
             },
             PaletteAction(
-                id: "action.splitV",
-                title: "Split Vertical",
-                subtitle: "Split the active pane downward",
-                symbol: "rectangle.split.1x2",
-                shortcut: "⇧⌘D",
-                section: .actions
-            ) {
-                coordinator.splitActivePane(direction: .vertical)
-            },
-            PaletteAction(
                 id: "action.zoomPane",
                 title: "Zoom Pane",
                 subtitle: "Toggle full-tab zoom on the active pane",

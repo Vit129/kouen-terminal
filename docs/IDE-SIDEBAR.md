@@ -22,7 +22,7 @@ This branch adds IDE-like sidebar functionality to Harness Terminal, transformin
 - **Sync button** (Fetch ▼ / Push ▼) — contextual menu: Fetch, Fetch From (per-remote), Pull, Pull (Rebase), Push, Push To (per-remote), Force Push; auto-switches to "Push" when ahead of upstream
 
 ### CMUX Pane Splitting
-- **Drag surface tabs** between panes to split left/right/top/bottom
+- **Drag surface tabs** between panes to split left/right
 - **Drop overlay** — accent-colored half-pane highlight shows where the split will land
 - **Ratio preservation** — custom split ratios persist across tab switches and rebuilds (CASE-002 fix)
 

@@ -7,7 +7,7 @@ These are the commands Harness accepts from the `:` prompt, key bindings, hooks,
 | Command | What it does |
 |---|---|
 | `split-window` (alias `split-window -h`) | Split active pane side-by-side (vertical divider). |
-| `split-window -v` | Split active pane top/bottom (horizontal divider). |
+| `split-window -v` | *Deprecated/Removed* (Vertical/downward splits are no longer supported). |
 | `kill-pane` | Close the active pane. Collapses the parent branch. |
 | `zoom-pane` (alias `resize-pane -Z`) | Toggle full-tab zoom on the active pane. |
 | `select-pane -L` / `-R` / `-U` / `-D` | Move focus to the neighboring pane in that direction. |
@@ -15,11 +15,11 @@ These are the commands Harness accepts from the `:` prompt, key bindings, hooks,
 | `select-pane -l` | Jump to the last (most-recently-active) pane in the tab. |
 | `select-pane -m` / `-M` | Mark / unmark the active pane (the implicit `join-pane` source). |
 | `swap-pane` | Swap the active pane with the next pane in flat order. |
-| `join-pane` (alias `join-pane -v` for top/bottom) | Join the marked pane into the active pane as a split. |
+| `join-pane` (alias `join-pane -h`) | Join the marked pane into the active pane as a side-by-side split. *(Note: `-v` for top/bottom join is no longer supported)* |
 | `resize-pane -L` / `-R` / `-U` / `-D` `N` | Shift the parent divider `N` units. |
 | `respawn-pane` (alias `respawn-pane -k` to clear scrollback) | Kill and re-spawn the shell with the same surface ID. |
 | `break-pane` | Move the active pane to a new tab in the same session. |
-| `move-pane -s <target> [-h\|-v]` | Move the `-s` source pane into the `-t` (or active) pane as a split. Like `join-pane` with an explicit source. |
+| `move-pane -s <target> [-h]` | Move the `-s` source pane into the `-t` (or active) pane as a side-by-side split. *(Note: `-v` option is no longer supported)* |
 | `rotate-window` (alias `rotate-window -D` for reverse) | Cycle children at every branch. |
 | `display-panes` | Overlay a number on each pane; press the digit to jump to it. |
 | `synchronize-panes [on\|off]` | Toggle mirroring typed input to every pane in the tab. |
