@@ -54,6 +54,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
     /// Last session ID sent to fileTreeView so we can detect session changes even
     /// when the CWD is the same (e.g. two sessions sharing the same repo root).
     private var lastFileTreeSessionID: SessionID?
+    private var lastFileTreeGitBranch: String?
 
     /// Sessions after applying the search filter. Drag-reorder is disabled while a
     /// filter is active (see the data source), so callers that reorder still use the
@@ -175,6 +176,12 @@ final class HarnessSidebarPanelViewController: NSViewController {
             self,
             selector: #selector(reload),
             name: NotificationBus.shared.snapshotChanged,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(refreshMetadata),
+            name: Notification.Name("HarnessActiveTabGitBranchDidChange"),
             object: nil
         )
     }
@@ -693,9 +700,19 @@ final class HarnessSidebarPanelViewController: NSViewController {
 
         if let cwd = snap.activeWorkspace?.activeTab?.cwd {
             let activeSessionID = snap.activeWorkspace?.activeSessionID
+            let gitBranch = snap.activeWorkspace?.activeTab?.gitBranch
+            let sessionChanged = activeSessionID != lastFileTreeSessionID
+            if sessionChanged {
+                lastFileTreeGitBranch = nil
+            }
+            let branchChanged = gitBranch != lastFileTreeGitBranch
             fileTreeView.updateRoot(path: cwd, sessionID: activeSessionID)
-            gitPanelView.updateRoot(path: cwd, force: activeSessionID != lastFileTreeSessionID)
+            if branchChanged {
+                fileTreeView.updateRoot(path: cwd, sessionID: activeSessionID)
+            }
+            gitPanelView.updateRoot(path: cwd, force: sessionChanged)
             lastFileTreeSessionID = activeSessionID
+            lastFileTreeGitBranch = gitBranch
             let home = NSHomeDirectory()
             if cwd != home, cwd != "/" {
                 Self.recordRecentProject(cwd)
@@ -705,7 +722,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
 
     /// Updates session card labels in place (title/cwd/branch/agent) without
     /// rebuilding the table — preserves selection + scroll position.
-    func refreshMetadata() {
+    @objc func refreshMetadata() {
         let snap = SessionCoordinator.shared.snapshot
         let newSessions = snap.activeWorkspace?.sessions ?? []
         let activeID = snap.activeWorkspace?.activeSessionID
@@ -722,9 +739,19 @@ final class HarnessSidebarPanelViewController: NSViewController {
         workspacePill.configure(name: name, count: sessions.count)
         if let cwd = snap.activeWorkspace?.activeTab?.cwd {
             let activeSessionID = snap.activeWorkspace?.activeSessionID
+            let gitBranch = snap.activeWorkspace?.activeTab?.gitBranch
+            let sessionChanged = activeSessionID != lastFileTreeSessionID
+            if sessionChanged {
+                lastFileTreeGitBranch = nil
+            }
+            let branchChanged = gitBranch != lastFileTreeGitBranch
             fileTreeView.updateRoot(path: cwd, sessionID: activeSessionID)
-            gitPanelView.updateRoot(path: cwd, force: activeSessionID != lastFileTreeSessionID)
+            if branchChanged {
+                fileTreeView.updateRoot(path: cwd, sessionID: activeSessionID)
+            }
+            gitPanelView.updateRoot(path: cwd, force: sessionChanged)
             lastFileTreeSessionID = activeSessionID
+            lastFileTreeGitBranch = gitBranch
         }
         // Rebuild cache once; iterate the stored result — no redundant recomputation.
         rebuildSidebarRows()

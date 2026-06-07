@@ -1474,14 +1474,25 @@ final class SessionCoordinator: NSObject {
                 }
                 await MainActor.run {
                     guard let self else { return }
+                    var activeTabGitBranchDidChange = false
                     for update in updates {
                         self.logIfFailed(.updateTabGitBranch(
                             workspaceID: update.0,
                             tabID: update.1,
                             branch: update.2
                         ))
+                        if self.snapshot.activeWorkspaceID == update.0,
+                           self.snapshot.activeWorkspace?.activeTab?.id == update.1 {
+                            activeTabGitBranchDidChange = true
+                        }
                     }
                     self.syncFromDaemon(metadataOnly: true)
+                    if activeTabGitBranchDidChange {
+                        NotificationCenter.default.post(
+                            name: Notification.Name("HarnessActiveTabGitBranchDidChange"),
+                            object: nil
+                        )
+                    }
                 }
             }
         }
