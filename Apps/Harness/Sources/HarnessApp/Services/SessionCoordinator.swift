@@ -456,6 +456,7 @@ final class SessionCoordinator: NSObject {
         context.sessionWindows = session?.tabs.count
         context.windowPanes = tab?.rootPane.allPaneIDs().count
         if let tab, let session { context.windowActive = tab.id == session.activeTabID }
+        context.sessionGroup = session.flatMap { snapshot.groupName(of: $0) }
         // Same expression as the daemon's builder so `#{window_flags}` agrees between
         // GUI display-message and CLI/hook output.
         context.windowFlags = tab.map { ($0.zoomedPaneID != nil ? "Z" : "") + $0.alertFlags }
