@@ -340,6 +340,12 @@ final class MainExecutor: CommandExecutor {
         case let .clientLocal(local):
             try dispatch(local)
         case .unresolved:
+            // find-window's no-match is a search result, not a focus problem — say so
+            // (matches the -C path and the compositor/control-mode wording).
+            if case let .findWindow(pattern, _, _, _) = command {
+                DisplayMessage.show("find-window: no matches for '\(pattern)'")
+                return
+            }
             throw CommandExecutionError.noActiveSurface
         }
     }

@@ -334,6 +334,11 @@ final class CommandParserTests: XCTestCase {
             .findWindow(pattern: "build", matchName: true, matchContent: false, matchTitle: true)
         )
         XCTAssertThrowsError(try CommandParser.parse("find-window"))
+        // A `-t` value is a (currently unsupported) target, never the pattern.
+        XCTAssertEqual(
+            try CommandParser.parse("find-window -t somewhere build"),
+            .findWindow(pattern: "build", matchName: true, matchContent: false, matchTitle: true)
+        )
     }
 
     /// tmux's table name for the vi copy-mode table is `copy-mode-vi`; Harness's is
