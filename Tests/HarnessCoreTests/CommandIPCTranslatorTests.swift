@@ -90,6 +90,78 @@ final class CommandIPCTranslatorTests: XCTestCase {
         XCTAssertEqual(pane, tab1Pane)
     }
 
+    // MARK: - Config / buffer / hook verbs
+
+    /// A scoped set without -T resolves the target from the focus chain (tmux behavior —
+    /// the CLI form requires -T because it has no focus to fall back on).
+    func testSetOptionResolvesScopedTargetFromFocus() throws {
+        let (target, tabID, paneID) = try makeTarget()
+        guard case let .requests(reqs) = CommandIPCTranslator.translate(
+            .setOption(scope: "tab", target: nil, key: "automatic-rename", rawValue: "off"), target: target),
+            case let .setOption(scope, resolvedTarget, key, rawValue) = reqs.first
+        else { return XCTFail("expected setOption") }
+        XCTAssertEqual(scope, "tab")
+        XCTAssertEqual(resolvedTarget, tabID.uuidString)
+        XCTAssertEqual(key, "automatic-rename")
+        XCTAssertEqual(rawValue, "off")
+
+        guard case let .requests(paneReqs) = CommandIPCTranslator.translate(
+            .setOption(scope: "pane", target: nil, key: "x", rawValue: "1"), target: target),
+            case let .setOption(_, paneTarget, _, _) = paneReqs.first
+        else { return XCTFail("expected setOption") }
+        XCTAssertEqual(paneTarget, paneID.uuidString)
+
+        // Global needs no target; an explicit -T wins over the focus chain.
+        guard case .requests = CommandIPCTranslator.translate(
+            .setOption(scope: "global", target: nil, key: "status", rawValue: "off"), target: target)
+        else { return XCTFail("global set must translate") }
+        guard case let .requests(explicit) = CommandIPCTranslator.translate(
+            .setOption(scope: "tab", target: "abc", key: "k", rawValue: "v"), target: target),
+            case let .setOption(_, explicitTarget, _, _) = explicit.first
+        else { return XCTFail("expected setOption") }
+        XCTAssertEqual(explicitTarget, "abc")
+    }
+
+    func testEnvironmentBufferAndHookVerbsTranslate() throws {
+        let (target, _, paneID) = try makeTarget()
+
+        guard case let .requests(env) = CommandIPCTranslator.translate(
+            .setEnvironment(global: false, key: "EDITOR", value: "vim"), target: target),
+            case let .setEnvironment(sessionID, key, value) = env.first
+        else { return XCTFail("expected setEnvironment") }
+        XCTAssertEqual(sessionID, target.session?.id, "non-global writes the focused session")
+        XCTAssertEqual(key, "EDITOR")
+        XCTAssertEqual(value, "vim")
+
+        guard case let .requests(paste) = CommandIPCTranslator.translate(
+            .pasteBuffer(name: "notes"), target: target),
+            case let .pasteBuffer(surfaceID, name, bracketed) = paste.first
+        else { return XCTFail("expected pasteBuffer") }
+        XCTAssertEqual(surfaceID, target.surfaceID(of: paneID))
+        XCTAssertEqual(name, "notes")
+        XCTAssertTrue(bracketed)
+
+        guard case let .requests(hook) = CommandIPCTranslator.translate(
+            .setHook(event: "after-new-tab", source: "display-message hi", condition: nil), target: target),
+            case let .bindHook(event, source, _) = hook.first
+        else { return XCTFail("expected bindHook") }
+        XCTAssertEqual(event, "after-new-tab")
+        XCTAssertEqual(source, "display-message hi")
+    }
+
+    /// Show verbs are client-local: they produce output each front-end renders itself.
+    func testShowVerbsAreClientLocal() throws {
+        let (target, _, _) = try makeTarget()
+        for command: Command in [
+            .showOptions(scope: nil), .showEnvironment(global: true),
+            .listBuffers, .showBuffer(name: nil), .showHooks(event: nil),
+        ] {
+            guard case .clientLocal = CommandIPCTranslator.translate(command, target: target) else {
+                return XCTFail("\(command.shortDescription) must be clientLocal")
+            }
+        }
+    }
+
     /// tmux `swap-pane -t X`: swap the CALLER's active pane with X — not X with X's
     /// own neighbor (which is what falling through to the relative translation against
     /// the resolved target would do).
