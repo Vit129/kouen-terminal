@@ -147,6 +147,9 @@ enum MainMenuBuilder {
         sidebarItem.keyEquivalentModifierMask = [.command]
         sidebarItem.target = MenuTarget.shared
         view.submenu?.addItem(sidebarItem)
+        let sidebarPosItem = NSMenuItem(title: "Move Sidebar to Right", action: #selector(MenuTarget.toggleSidebarPosition), keyEquivalent: "")
+        sidebarPosItem.target = MenuTarget.shared
+        view.submenu?.addItem(sidebarPosItem)
         let zoomIn = NSMenuItem(title: "Increase Font Size", action: #selector(MenuTarget.zoomIn), keyEquivalent: "+")
         zoomIn.keyEquivalentModifierMask = [.command]
         zoomIn.target = MenuTarget.shared
@@ -228,6 +231,10 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
         case #selector(detachPane): return !SessionCoordinator.shared.activePaneIsDetached
         case #selector(reattachPane): return SessionCoordinator.shared.activePaneIsDetached
         case #selector(reopenClosedTab): return SessionCoordinator.shared.canReopenClosedTab
+        case #selector(toggleSidebarPosition):
+            let right = SessionCoordinator.shared.settings.sidebarOnRight
+            menuItem.title = right ? "Move Sidebar to Left" : "Move Sidebar to Right"
+            return true
         default: return true
         }
     }
@@ -402,6 +409,12 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
     @objc func toggleSidebar() {
         if let split = NSApp.keyWindow?.contentViewController as? MainSplitViewController {
             split.toggleSidebar()
+        }
+    }
+
+    @objc func toggleSidebarPosition() {
+        if let split = NSApp.keyWindow?.contentViewController as? MainSplitViewController {
+            split.toggleSidebarPosition()
         }
     }
 

@@ -202,7 +202,12 @@ final class HarnessSidebarPanelViewController: NSViewController {
         HarnessDesign.makeClear(footer)
         sectionLabel.textColor = HarnessDesign.chrome.textTertiary
         workspacePill.applyChrome()
+        
+        let sidebarOnRight = SessionCoordinator.shared.settings.sidebarOnRight
+        let symbol = sidebarOnRight ? "sidebar.right" : "sidebar.left"
+        sidebarToggleButton.setSymbol(symbol, accessibilityDescription: "Toggle sidebar", pointSize: 13, weight: .medium)
         sidebarToggleButton.applyChrome()
+        
         dismissWorkspaceDropdown()
         for case let button as SoftIconButton in footer.subviews {
             button.applyChrome()
@@ -235,7 +240,6 @@ final class HarnessSidebarPanelViewController: NSViewController {
         notificationBell.target = self
         notificationBell.action = #selector(notificationBellClicked)
 
-        sidebarToggleButton.setSymbol("sidebar.left", accessibilityDescription: "Toggle sidebar", pointSize: 13, weight: .medium)
         sidebarToggleButton.toolTip = "Hide sidebar (⌘\\)"
         sidebarToggleButton.target = self
         sidebarToggleButton.action = #selector(sidebarToggleClicked)

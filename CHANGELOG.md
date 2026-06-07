@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.6.0] - 2026-06-07
+
+### Added
+- **Right Sidebar support** — Added settings configuration to align the main Sessions/Files sidebar to either the left or right side of the window. Can be toggled via Settings panel under "Window" or via "View" menu ("Move Sidebar to Right" / "Move Sidebar to Left").
+- **Dynamic Icons & Insets** — Sidebar toggle button symbols and position constraints dynamically update to match the sidebar alignment (e.g. `sidebar.left`/`sidebar.right`), preventing overlap with traffic lights and other controls.
+
 ## [1.5.0] - 2026-06-06
 
 ### Added

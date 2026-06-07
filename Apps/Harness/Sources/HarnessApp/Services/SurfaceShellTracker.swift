@@ -160,10 +160,9 @@ final class SurfaceShellTracker {
         let size = Int32(MemoryLayout<proc_vnodepathinfo>.size)
         let bytes = proc_pidinfo(pid, PROC_PIDVNODEPATHINFO, 0, &info, size)
         guard bytes == size else { return nil }
-        return withUnsafePointer(to: &info.pvi_cdir.vip_path) { ptr -> String in
-            ptr.withMemoryRebound(to: CChar.self, capacity: Int(MAXPATHLEN)) {
-                decodeBoundedCString($0, capacity: Int(MAXPATHLEN))
-            }
+        return withUnsafeBytes(of: &info.pvi_cdir.vip_path) { rawBuffer -> String in
+            let charPointer = rawBuffer.baseAddress!.assumingMemoryBound(to: CChar.self)
+            return decodeBoundedCString(charPointer, capacity: rawBuffer.count)
         }
     }
 

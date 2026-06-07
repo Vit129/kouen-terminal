@@ -33,6 +33,11 @@ This branch adds IDE-like sidebar functionality to Harness Terminal, transformin
 - **Recent projects** (🕐 button) — dropdown of last 10 projects, switches to existing session if already open
 - **✕ close** on each tab (hover) — closes the session
 
+### Sidebar Layout Customization
+- **Right Sidebar Support** — The sidebar can be aligned to either the left or right side of the window.
+- **Toggles** — Toggled via "View" menu item ("Move Sidebar to Right" / "Move Sidebar to Left") or Settings -> Window ("Sidebar on right" checkbox).
+- **Dynamic Icons & Insets** — Icons (`sidebar.left`/`sidebar.right`) and margins/insets update dynamically so window traffic lights never overlap content.
+
 ## Known Issues
 
 | ID | Issue | Status |
