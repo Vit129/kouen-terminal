@@ -55,8 +55,14 @@ final class MainSplitViewController: NSViewController {
             sidebar.view.bottomAnchor.constraint(equalTo: sidebarContainer.bottomAnchor),
         ])
 
-        split.addSubview(sidebarContainer)
-        split.addSubview(content.view)
+        let sidebarOnRight = SessionCoordinator.shared.settings.sidebarOnRight
+        if sidebarOnRight {
+            split.addSubview(content.view)
+            split.addSubview(sidebarContainer)
+        } else {
+            split.addSubview(sidebarContainer)
+            split.addSubview(content.view)
+        }
         addChild(sidebar)
         addChild(content)
 
@@ -80,9 +86,9 @@ final class MainSplitViewController: NSViewController {
 
             edgeDivider.topAnchor.constraint(equalTo: view.topAnchor),
             edgeDivider.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            edgeDivider.leadingAnchor.constraint(equalTo: sidebarContainer.trailingAnchor),
             edgeDivider.widthAnchor.constraint(equalToConstant: 1),
         ])
+        updateEdgeDividerConstraints(sidebarContainer: sidebarContainer)
 
         edgeDivider.layer?.backgroundColor = resolvedDividerColor().cgColor
 
@@ -127,7 +133,7 @@ final class MainSplitViewController: NSViewController {
         // Never `makeClear(view)` here: the root contentView must stay non-layer-backed
         // (see loadView) so the window stays rounded with no dark perimeter seam. It is
         // transparent already; there is nothing to repaint on it.
-        if let sidebarContainer = split.subviews.first {
+        if let sidebarContainer = sidebarContainerView {
             // Keep this transparent — the sidebar view inside owns the chrome. This is a
             // child layer-backing island and does not affect the root's backing.
             HarnessDesign.makeClear(sidebarContainer)
@@ -197,10 +203,10 @@ final class MainSplitViewController: NSViewController {
         let target = visible ? HarnessDesign.sidebarWidth : 0
         splitDelegate.allowFullCollapse = true
 
-        guard animated, let panel = split.subviews.first else {
-            let panel = split.subviews.first
+        guard animated, let panel = sidebarContainerView else {
+            let panel = sidebarContainerView
             panel?.isHidden = false              // unhide so setPosition can size it to 0
-            split.setPosition(target, ofDividerAt: 0)
+            setSidebarWidth(target)
             panel?.isHidden = !visible
             splitDelegate.allowFullCollapse = false
             edgeDivider.isHidden = !visible
@@ -214,7 +220,7 @@ final class MainSplitViewController: NSViewController {
         edgeDivider.isHidden = !visible
         let start = panel.frame.width
         guard abs(target - start) > 0.5 else {
-            split.setPosition(target, ofDividerAt: 0)
+            setSidebarWidth(target)
             if !visible { panel.isHidden = true }
             splitDelegate.allowFullCollapse = false
             updateContentLeadingInset()
@@ -224,7 +230,7 @@ final class MainSplitViewController: NSViewController {
     }
 
     private func animateSidebar(from start: CGFloat, to target: CGFloat, t0: CFTimeInterval, visible: Bool, token: Int) {
-        guard token == sidebarAnimToken, let panel = split.subviews.first else { return }
+        guard token == sidebarAnimToken, let panel = sidebarContainerView else { return }
         let duration = HarnessDesign.Motion.standard
         let raw = min(1, max(0, (CACurrentMediaTime() - t0) / duration))
         // easeInOutQuad — smooth start and settle.
@@ -238,7 +244,7 @@ final class MainSplitViewController: NSViewController {
         // layout keeps the backdrop locked to the divider every step.
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        split.setPosition(width, ofDividerAt: 0)
+        setSidebarWidth(width)
         // Interpolate the tab-strip inset against the live sidebar width so it slides
         // in lockstep with the divider rather than snapping at the end.
         setContentLeadingInset(forSidebarWidth: width)
@@ -273,17 +279,85 @@ final class MainSplitViewController: NSViewController {
     /// Inset the strip readout proportionally to how collapsed the sidebar is: full inset
     /// at width 0, none once the sidebar is wide enough to cover the traffic lights.
     private func setContentLeadingInset(forSidebarWidth width: CGFloat) {
-        let t = max(0, min(1, 1 - width / trafficLightInset))
-        content.setTabBarLeadingInset(effectiveTrafficLightInset * t)
+        if SessionCoordinator.shared.settings.sidebarOnRight {
+            content.setTabBarLeadingInset(effectiveTrafficLightInset)
+        } else {
+            let t = max(0, min(1, 1 - width / trafficLightInset))
+            content.setTabBarLeadingInset(effectiveTrafficLightInset * t)
+        }
     }
 
     private func updateContentLeadingInset() {
-        let visible = SessionCoordinator.shared.settings.sidebarVisible
-        content.setTabBarLeadingInset(visible ? 0 : effectiveTrafficLightInset)
+        if SessionCoordinator.shared.settings.sidebarOnRight {
+            content.setTabBarLeadingInset(effectiveTrafficLightInset)
+        } else {
+            let visible = SessionCoordinator.shared.settings.sidebarVisible
+            content.setTabBarLeadingInset(visible ? 0 : effectiveTrafficLightInset)
+        }
     }
 
     func toggleSidebar() {
         setSidebarVisible(!SessionCoordinator.shared.settings.sidebarVisible, animated: true)
+    }
+
+    private var edgeDividerConstraint: NSLayoutConstraint?
+
+    private func updateEdgeDividerConstraints(sidebarContainer: NSView) {
+        edgeDividerConstraint?.isActive = false
+        let sidebarOnRight = SessionCoordinator.shared.settings.sidebarOnRight
+        if sidebarOnRight {
+            edgeDividerConstraint = edgeDivider.trailingAnchor.constraint(equalTo: sidebarContainer.leadingAnchor)
+        } else {
+            edgeDividerConstraint = edgeDivider.leadingAnchor.constraint(equalTo: sidebarContainer.trailingAnchor)
+        }
+        edgeDividerConstraint?.isActive = true
+    }
+
+    private var sidebarContainerIndex: Int {
+        return SessionCoordinator.shared.settings.sidebarOnRight ? 1 : 0
+    }
+
+    private var sidebarContainerView: NSView? {
+        let subviews = split.subviews
+        guard subviews.count >= 2 else { return nil }
+        return subviews[sidebarContainerIndex]
+    }
+
+    func updateSidebarPlacement() {
+        let right = SessionCoordinator.shared.settings.sidebarOnRight
+        let subviews = split.subviews
+        guard subviews.count == 2, let sidebarContainer = sidebar.view.superview else { return }
+
+        let currentFirstIsSidebar = subviews[0] === sidebarContainer
+        if right && currentFirstIsSidebar {
+            sidebarContainer.removeFromSuperview()
+            split.addSubview(sidebarContainer)
+        } else if !right && !currentFirstIsSidebar {
+            sidebarContainer.removeFromSuperview()
+            split.addSubview(sidebarContainer, positioned: .below, relativeTo: nil)
+        }
+        updateEdgeDividerConstraints(sidebarContainer: sidebarContainer)
+        setSidebarVisible(SessionCoordinator.shared.settings.sidebarVisible, animated: false)
+        sidebar.applyChromeColors()
+        content.applyChrome()
+    }
+
+    private func setSidebarWidth(_ width: CGFloat) {
+        let totalWidth = split.bounds.width
+        let sidebarOnRight = SessionCoordinator.shared.settings.sidebarOnRight
+        let position: CGFloat
+        if sidebarOnRight {
+            position = totalWidth > width ? (totalWidth - width) : 0
+        } else {
+            position = width
+        }
+        split.setPosition(position, ofDividerAt: 0)
+    }
+
+    func toggleSidebarPosition() {
+        SessionCoordinator.shared.settings.sidebarOnRight.toggle()
+        try? SessionCoordinator.shared.settings.save()
+        updateSidebarPlacement()
     }
 
 }
@@ -296,12 +370,26 @@ private final class SplitChromeDelegate: NSObject, NSSplitViewDelegate {
     var allowFullCollapse = false
 
     func splitView(_ splitView: NSSplitView, constrainMinCoordinate proposedMinimum: CGFloat, ofSubviewAt index: Int) -> CGFloat {
-        guard index == 0 else { return proposedMinimum }
-        return allowFullCollapse ? 0 : 200
+        let right = SessionCoordinator.shared.settings.sidebarOnRight
+        if right {
+            guard index == 0 else { return proposedMinimum }
+            let totalWidth = splitView.bounds.width
+            return totalWidth - 320
+        } else {
+            guard index == 0 else { return proposedMinimum }
+            return allowFullCollapse ? 0 : 200
+        }
     }
 
     func splitView(_ splitView: NSSplitView, constrainMaxCoordinate proposedMaximum: CGFloat, ofSubviewAt index: Int) -> CGFloat {
-        index == 0 ? 320 : proposedMaximum
+        let right = SessionCoordinator.shared.settings.sidebarOnRight
+        if right {
+            guard index == 0 else { return proposedMaximum }
+            let totalWidth = splitView.bounds.width
+            return allowFullCollapse ? totalWidth : (totalWidth - 200)
+        } else {
+            return index == 0 ? 320 : proposedMaximum
+        }
     }
 
     func splitView(_ splitView: NSSplitView, effectiveRect proposedEffectiveRect: NSRect, forDrawnRect drawnRect: NSRect, ofDividerAt dividerIndex: Int) -> NSRect {

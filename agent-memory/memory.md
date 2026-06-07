@@ -19,6 +19,8 @@
 
 ## Known Issues
 - **Split down removed** — The Split Down (vertical split/rows) functionality was completely removed from the menu bar, command palette, and UI buttons per user request. Split Right remains fully functional.
+- **Sidebar Right persistence & transition** — Sidebar position reverts to Left on app restart, and real-time transitions show layout anomalies (traffic light overlaps). See [sidebar-and-split-issues.md](file:///Users/supavit.cho/Git/harness-terminal/agent-memory/plans/sidebar-and-split-issues.md).
+- **Split Right squeezing** — Splitting horizontal panes more than 3 times causes the middle ones to be squeezed during resizes because NSSplitView's default resize algorithm is unequal. See [sidebar-and-split-issues.md](file:///Users/supavit.cho/Git/harness-terminal/agent-memory/plans/sidebar-and-split-issues.md).
 
 ## Completed Sprints
 - **v1.3.0** — IDE-like Sidebar (PBI-001): Files tab, Git tab, session tabs, recent projects

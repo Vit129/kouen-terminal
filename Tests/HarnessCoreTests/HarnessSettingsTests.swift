@@ -4,6 +4,18 @@ import XCTest
 final class HarnessSettingsTests: XCTestCase {
     private let colorMigrationKey = "HarnessColorFidelityMigrationV1"
 
+    func testSidebarOnRightLoadPreservesTrue() throws {
+        try withTemporaryHarnessHome { root in
+            try HarnessPaths.ensureDirectories()
+            try Data("""
+            { "fontSize": 14, "sidebarOnRight": true }
+            """.utf8).write(to: root.appendingPathComponent("settings.json"))
+
+            let settings = HarnessSettings.load()
+            XCTAssertTrue(settings.sidebarOnRight)
+        }
+    }
+
     func testOldSettingsWithCustomHexDoNotSilentlyOverrideThemes() throws {
         let data = Data("""
         {

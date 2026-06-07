@@ -28,6 +28,7 @@ final class SettingsViewController: NSViewController, NSFontChanging {
     private let transparentTitlebarToggle = HarnessToggle(title: "Transparent title bar")
     private let showStatusLineToggle = HarnessToggle(title: "Show status line (bottom bar)")
     private let sidebarVisibleToggle = HarnessToggle(title: "Show sidebar")
+    private let sidebarOnRightToggle = HarnessToggle(title: "Sidebar on right")
     private let restoreWindowSizeToggle = HarnessToggle(title: "Remember window size")
     private let experienceSegment = HarnessSegmented(frame: .zero)
     // Per-component overrides for the chrome the experience preset would otherwise bundle. Each is
@@ -373,6 +374,10 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         sidebarVisibleToggle.state = settings.sidebarVisible ? .on : .off
         sidebarVisibleToggle.target = self
         sidebarVisibleToggle.action = #selector(sidebarVisibilityChanged)
+
+        sidebarOnRightToggle.state = settings.sidebarOnRight ? .on : .off
+        sidebarOnRightToggle.target = self
+        sidebarOnRightToggle.action = #selector(sidebarOnRightChanged)
 
         restoreWindowSizeToggle.state = settings.restoreWindowSize ? .on : .off
         restoreWindowSizeToggle.target = self
@@ -749,6 +754,7 @@ final class SettingsViewController: NSViewController, NSFontChanging {
             settingsToggleRow("Transparent title bar", transparentTitlebarToggle),
             settingsToggleRow("Status line", showStatusLineToggle),
             settingsToggleRow("Sidebar", sidebarVisibleToggle),
+            settingsToggleRow("Sidebar on right", sidebarOnRightToggle),
             settingsToggleRow("Remember window size", restoreWindowSizeToggle,
                               hint: "Reopen at the last size and position."),
         ])
@@ -1976,6 +1982,17 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         }
     }
 
+    @objc private func sidebarOnRightChanged() {
+        let right = sidebarOnRightToggle.state == .on
+        SessionCoordinator.shared.settings.sidebarOnRight = right
+        try? SessionCoordinator.shared.settings.save()
+        for window in NSApp.windows {
+            if let split = window.contentViewController as? MainSplitViewController {
+                split.updateSidebarPlacement()
+            }
+        }
+    }
+
     @objc private func appearanceTextDidCommit() {
         flushAndApply()
     }
@@ -2103,6 +2120,7 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         darkThemePopup.selectItem(withTitle: settings.darkThemeName ?? SessionCoordinator.shared.snapshot.themeName)
         showStatusLineToggle.state = settings.showStatusLine ? .on : .off
         sidebarVisibleToggle.state = settings.sidebarVisible ? .on : .off
+        sidebarOnRightToggle.state = settings.sidebarOnRight ? .on : .off
         restoreWindowSizeToggle.state = settings.restoreWindowSize ? .on : .off
         prefixControlSegment.selectItem(withTitle: harnessControlsTitle(settings.prefixKeyEnabled))
         statusLineControlSegment.selectItem(withTitle: harnessControlsTitle(settings.statusLineEnabled))
@@ -2170,6 +2188,7 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         coordinator.settings.transparentTitlebar = transparentTitlebarToggle.state == .on
         coordinator.settings.showStatusLine = showStatusLineToggle.state == .on
         coordinator.settings.sidebarVisible = sidebarVisibleToggle.state == .on
+        coordinator.settings.sidebarOnRight = sidebarOnRightToggle.state == .on
         coordinator.settings.restoreWindowSize = restoreWindowSizeToggle.state == .on
         coordinator.settings.windowPaddingX = Float(paddingXField.stringValue) ?? 12
         coordinator.settings.windowPaddingY = Float(paddingYField.stringValue) ?? 12

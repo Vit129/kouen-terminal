@@ -59,6 +59,10 @@ final class TerminalTabBarView: NSView {
         didSet { guard leadingInset != oldValue else { return }; needsLayout = true }
     }
 
+    var trailingInset: CGFloat = 0 {
+        didSet { guard trailingInset != oldValue else { return }; needsLayout = true }
+    }
+
     /// Leading x for all tab pills / buttons (rides the traffic-light inset). The
     /// sidebar toggle now lives in the sidebar header, so nothing precedes the pills.
     private var contentLeft: CGFloat { edgeInset + leadingInset }
@@ -213,7 +217,7 @@ final class TerminalTabBarView: NSView {
         }
 
         // Try to fit every pill inline alongside the "+" button.
-        let inlineAvail = bounds.width - contentLeft - edgeInset - buttonSize - pillSpacing
+        let inlineAvail = bounds.width - contentLeft - edgeInset - trailingInset - buttonSize - pillSpacing
         var pillWidth = min(maxPillWidth, (inlineAvail - pillSpacing * CGFloat(count - 1)) / CGFloat(count))
 
         var needsOverflow = false
@@ -221,7 +225,7 @@ final class TerminalTabBarView: NSView {
         if pillWidth < minPillWidth {
             // Can't fit all even at minimum width — reserve the overflow button too.
             needsOverflow = true
-            let avail = bounds.width - contentLeft - edgeInset - buttonSize * 2 - pillSpacing * 2
+            let avail = bounds.width - contentLeft - edgeInset - trailingInset - buttonSize * 2 - pillSpacing * 2
             vCount = min(count, max(1, Int((avail + pillSpacing) / (minPillWidth + pillSpacing))))
             pillWidth = max(minPillWidth, (avail - pillSpacing * CGFloat(vCount - 1)) / CGFloat(vCount))
         }
@@ -251,7 +255,7 @@ final class TerminalTabBarView: NSView {
 
         overflowButton.isHidden = !needsOverflow
         if needsOverflow {
-            overflowButton.frame = NSRect(x: bounds.width - edgeInset - buttonSize, y: buttonY, width: buttonSize, height: buttonSize)
+            overflowButton.frame = NSRect(x: bounds.width - edgeInset - trailingInset - buttonSize, y: buttonY, width: buttonSize, height: buttonSize)
         }
     }
 
@@ -269,7 +273,7 @@ final class TerminalTabBarView: NSView {
             pill.layer?.zPosition = 100
         }
         var f = pill.frame
-        f.origin.x = max(contentLeft, min(loc.x - dragGrabOffsetX, bounds.width - edgeInset - f.width))
+        f.origin.x = max(contentLeft, min(loc.x - dragGrabOffsetX, bounds.width - edgeInset - trailingInset - f.width))
         pill.frame = f
         repositionForDrag(pill)
     }

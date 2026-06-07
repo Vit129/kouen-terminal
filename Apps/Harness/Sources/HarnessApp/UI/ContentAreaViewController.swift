@@ -20,6 +20,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
     /// "Selection copied" toast.
     private var pasteboardCountAtMouseDown: Int = NSPasteboard.general.changeCount
     private var copySelectionMonitor: Any?
+    private var sidebarToggleConstraint: NSLayoutConstraint?
 
     override func loadView() {
         view = NSView()
@@ -35,6 +36,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         titleStrip.applyColors()
         tabBar.applyChrome()
         paneContainer?.applyChrome()
+        updateSidebarToggleConstraints()
     }
 
     /// Reflect the active tab's cwd in the title strip's folder/path readout. Hidden while a
@@ -173,13 +175,24 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
     /// the sidebar is collapsed. Driven by `MainSplitViewController` during the toggle. The
     /// tab bar itself sits below the lights (the strip pushes it down) and needs no inset.
     func setTabBarLeadingInset(_ inset: CGFloat) {
+        let settings = SessionCoordinator.shared.settings
         titleStrip.setLeadingInset(inset)
-        tabBar.setLeadingInset(inset > 0 ? 28 : 0)
-        sidebarToggle.isHidden = inset == 0
+        
+        let sidebarVisible = settings.sidebarVisible
+        let sidebarOnRight = settings.sidebarOnRight
+        
+        if sidebarOnRight {
+            tabBar.setLeadingInset(0)
+            tabBar.trailingInset = sidebarVisible ? 0 : 28
+        } else {
+            tabBar.setLeadingInset(sidebarVisible ? 0 : 28)
+            tabBar.trailingInset = 0
+        }
+        
+        sidebarToggle.isHidden = sidebarVisible
     }
 
     private func setupSidebarToggle() {
-        sidebarToggle.setSymbol("sidebar.left", accessibilityDescription: "Show sidebar", pointSize: 12, weight: .medium)
         sidebarToggle.toolTip = "Show sidebar (⌘\\)"
         sidebarToggle.target = self
         sidebarToggle.action = #selector(toggleSidebarClicked)
@@ -187,11 +200,25 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         sidebarToggle.isHidden = true
         view.addSubview(sidebarToggle)
         NSLayoutConstraint.activate([
-            sidebarToggle.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 6),
             sidebarToggle.centerYAnchor.constraint(equalTo: tabBar.centerYAnchor),
             sidebarToggle.widthAnchor.constraint(equalToConstant: 24),
             sidebarToggle.heightAnchor.constraint(equalToConstant: 24),
         ])
+        updateSidebarToggleConstraints()
+    }
+
+    private func updateSidebarToggleConstraints() {
+        sidebarToggleConstraint?.isActive = false
+        let sidebarOnRight = SessionCoordinator.shared.settings.sidebarOnRight
+        if sidebarOnRight {
+            sidebarToggleConstraint = sidebarToggle.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -6)
+        } else {
+            sidebarToggleConstraint = sidebarToggle.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 6)
+        }
+        sidebarToggleConstraint?.isActive = true
+
+        let symbol = sidebarOnRight ? "sidebar.right" : "sidebar.left"
+        sidebarToggle.setSymbol(symbol, accessibilityDescription: "Show sidebar", pointSize: 12, weight: .medium)
     }
 
     @objc private func toggleSidebarClicked() {
