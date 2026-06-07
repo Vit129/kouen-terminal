@@ -475,7 +475,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         // Set initial 50/50 split
         DispatchQueue.main.async {
             let total = split.bounds.width
-            if total > 0 { split.setPosition(total * 0.4, ofDividerAt: 0) }
+            if total > 0 { split.setPosition(total * 0.3, ofDividerAt: 0) }
         }
         fileEditorSplit = split
     }
