@@ -154,6 +154,29 @@ final class OptionStoreTests: XCTestCase {
         let reader = OptionStore(url: url)
         XCTAssertEqual(reader.get("status-left", scope: .global)?.stringValue, custom)
     }
+
+    /// tmux's `default-terminal` maps onto Harness's terminal-identity option — one
+    /// storage slot, both names (P4 alias), for set, get, AND unset.
+    func testDefaultTerminalAliasesTerminalIdentity() {
+        let store = OptionStore(url: tmpURL())
+        store.set(.string("harness"), key: "default-terminal")
+        XCTAssertEqual(store.get(TerminalIdentity.optionKey)?.stringValue, "harness")
+        XCTAssertEqual(store.get("default-terminal")?.stringValue, "harness")
+        // Unset through the alias clears the canonical slot (falls back to default).
+        store.unset(key: "default-terminal")
+        XCTAssertEqual(
+            store.get(TerminalIdentity.optionKey)?.stringValue,
+            OptionStore.builtinDefaults[TerminalIdentity.optionKey]?.stringValue,
+            "alias unset must remove the canonical value"
+        )
+    }
+
+    func testP4OptionDefaultsExist() {
+        XCTAssertEqual(OptionStore.builtinDefaults["display-time"]?.intValue, 750)
+        XCTAssertEqual(OptionStore.builtinDefaults["set-titles"]?.boolValue, false)
+        XCTAssertNotNil(OptionStore.builtinDefaults["set-titles-string"]?.stringValue)
+        XCTAssertEqual(OptionStore.builtinDefaults["detach-on-destroy"]?.boolValue, true)
+    }
 }
 
 final class FormatStringExtendedVariableTests: XCTestCase {
