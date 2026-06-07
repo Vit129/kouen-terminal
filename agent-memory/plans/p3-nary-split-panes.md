@@ -1,21 +1,39 @@
 # P3 — N-ary Split Panes (Fix terminal disappearing + even sizing)
 
-Status: **planned**  
+Status: **in progress** — same-direction flatten done, split-down still broken  
 Priority: **P0** — core UX broken  
 Depends on: none  
+Reference: [cmuxlayer](https://github.com/EtanHey/cmuxlayer) — MCP tool layer over CMUX socket (architecture reference for P5 ACP)
 
 ---
 
-## Problem
+## Progress
 
-1. **Split down → terminal goes black** — `PaneContainerView` rebuilds entire view tree on structure change; `removeFromSuperview()` kills Metal CADisplayLink; `viewDidMoveToWindow` not fired on same-window reparent.
-2. **Split 3+ panes stack right** — PaneNode is a binary tree; nested 50/50 NSSplitViews = each new pane gets half of the previous (50% → 25% → 12.5%).
+✅ Same-direction flatten: binary tree chain flattened into single NSSplitView + N subviews  
+✅ Equal distribution: `layout()` sets divider positions at `totalSize/N` intervals  
+✅ Recursion fix: `isApplyingPositions` guard prevents layout→setPosition→layout loop  
+✅ Host reuse: detach existing TerminalHostViews before rebuild, re-insert into new container  
+⚠️ Split right 3+ still slightly uneven (minor — ratio math correct but timing race)  
+❌ Split down (⌘⇧D) still causes terminal black (Metal CADisplayLink dies on reparent)  
 
-## Root Cause
+## Remaining Work
 
-- Binary tree model forces nested NSSplitView (2 children each)
-- Full rebuild on every structure change destroys live Metal surfaces
-- NSSplitView natively supports N subviews with `adjustSubviews()` — we don't leverage this
+1. **Split down terminal black** — `viewDidMoveToWindow` not called on same-window reparent → CADisplayLink dead
+   - Fix: Override `viewDidMoveToSuperview()` in HarnessTerminalSurfaceView to restart display link
+   - Alt: Incremental update — don't rebuild container, just `insertArrangedSubview` into existing NSSplitView
+2. **Slight unevenness at 3+ splits** — timing race between `setPosition` and Auto Layout
+   - Fix: Schedule `setPosition` in `DispatchQueue.main.async` after layout settles
+3. **Mixed H+V splits** — split-down uses old binary nest (different direction path)
+   - Fix: For cross-direction, nest a child NSSplitView with opposite `isVertical` inside the flat parent
+
+## Key Insights
+
+**Ghostty has the [same bug](https://github.com/ghostty-org/ghostty/discussions/9442):**
+"SurfaceScrollView instance is not persistent, it's replaced every time the split tree is rebuilt"
+
+**[cmuxlayer](https://github.com/EtanHey/cmuxlayer):** 33-tool MCP server over CMUX Unix socket.
+Architecture reference for P5 (ACP) — shows split/surface/agent operations via JSON-RPC.
+Socket (0.1ms) vs CLI (142ms) matches our daemon IPC approach.
 
 ## Solution: Flat N-ary PaneNode + Incremental Update
 
