@@ -162,32 +162,6 @@ final class CommandIPCTranslatorTests: XCTestCase {
         }
     }
 
-    /// find-window without -C resolves entirely in the translator: focus the first
-    /// name/title match, unresolved (loud) when nothing matches.
-    func testFindWindowTranslatesToSelectTabOrUnresolved() throws {
-        var editor = SessionEditor()
-        let ws = try XCTUnwrap(editor.snapshot.activeWorkspace)
-        _ = try XCTUnwrap(editor.addTab(to: ws.id))
-        let tabs = editor.snapshot.workspaces[0].sessions.flatMap(\.tabs)
-        editor.updateTabTitle(surfaceID: try XCTUnwrap(tabs[1].rootPane.allSurfaceIDs().first), title: "api-server")
-        let target = CommandTarget(snapshot: editor.snapshot)
-
-        guard case let .requests(reqs) = CommandIPCTranslator.translate(
-            .findWindow(pattern: "api", matchName: true, matchContent: false, matchTitle: true), target: target),
-            case let .selectTab(_, tabID) = reqs.first
-        else { return XCTFail("expected selectTab") }
-        XCTAssertEqual(tabID, tabs[1].id)
-
-        guard case .unresolved = CommandIPCTranslator.translate(
-            .findWindow(pattern: "zzz-nope", matchName: true, matchContent: false, matchTitle: true), target: target)
-        else { return XCTFail("no match must be unresolved") }
-
-        // -C hands off to the front-end (it owns the capture connection).
-        guard case .clientLocal = CommandIPCTranslator.translate(
-            .findWindow(pattern: "x", matchName: false, matchContent: true, matchTitle: false), target: target)
-        else { return XCTFail("-C must be clientLocal") }
-    }
-
     /// tmux `swap-pane -t X`: swap the CALLER's active pane with X — not X with X's
     /// own neighbor (which is what falling through to the relative translation against
     /// the resolved target would do).
@@ -265,6 +239,54 @@ final class CommandIPCTranslatorTests: XCTestCase {
                 return XCTFail("\(inner.shortDescription) -t \(spec.raw) must be unresolved, not act on focus")
             }
         }
+    }
+
+    /// find-window without -C resolves entirely in the translator: focus the first
+    /// name/title match, unresolved (loud) when nothing matches.
+    func testFindWindowTranslatesToSelectTabOrUnresolved() throws {
+        var editor = SessionEditor()
+        let ws = try XCTUnwrap(editor.snapshot.activeWorkspace)
+        _ = try XCTUnwrap(editor.addTab(to: ws.id))
+        let tabs = editor.snapshot.workspaces[0].sessions.flatMap(\.tabs)
+        editor.updateTabTitle(surfaceID: try XCTUnwrap(tabs[1].rootPane.allSurfaceIDs().first), title: "api-server")
+        let target = CommandTarget(snapshot: editor.snapshot)
+
+        guard case let .requests(reqs) = CommandIPCTranslator.translate(
+            .findWindow(pattern: "api", matchName: true, matchContent: false, matchTitle: true), target: target),
+            case let .selectTab(_, tabID) = reqs.first
+        else { return XCTFail("expected selectTab") }
+        XCTAssertEqual(tabID, tabs[1].id)
+
+        guard case .unresolved = CommandIPCTranslator.translate(
+            .findWindow(pattern: "zzz-nope", matchName: true, matchContent: false, matchTitle: true), target: target)
+        else { return XCTFail("no match must be unresolved") }
+
+        // -C hands off to the front-end (it owns the capture connection).
+        guard case .clientLocal = CommandIPCTranslator.translate(
+            .findWindow(pattern: "x", matchName: false, matchContent: true, matchTitle: false), target: target)
+        else { return XCTFail("-C must be clientLocal") }
+    }
+
+    /// tmux `new-session -t <session>` means GROUP WITH the target, not create-at.
+    func testTargetedNewSessionTranslatesToGrouping() throws {
+        var editor = SessionEditor()
+        let ws = try XCTUnwrap(editor.snapshot.activeWorkspace)
+        let original = try XCTUnwrap(ws.activeSession)
+        _ = editor.renameSession(original.id, name: "main")
+        let target = CommandTarget(snapshot: editor.snapshot)
+
+        let spec = TargetSpec(session: .byName("main"), raw: "main")
+        guard case let .requests(reqs) = CommandIPCTranslator.translate(
+            .targeted(spec, .newSession(name: "mirror")), target: target),
+            case let .newSessionInGroup(targetSessionID, name) = reqs.first
+        else { return XCTFail("expected newSessionInGroup") }
+        XCTAssertEqual(targetSessionID, original.id)
+        XCTAssertEqual(name, "mirror")
+
+        let missing = TargetSpec(session: .byName("nope"), raw: "nope")
+        guard case .unresolved = CommandIPCTranslator.translate(
+            .targeted(missing, .newSession(name: nil)), target: target)
+        else { return XCTFail("unknown group target must be unresolved") }
     }
 
     /// `swap-pane -s X -t Y` swaps X with Y (neither needs to be the active pane);

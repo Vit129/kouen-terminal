@@ -248,11 +248,23 @@ public final class SurfaceRegistry: @unchecked Sendable {
             fireHookLocked(.afterNewSession)
             fireHookLocked(.sessionCreated)
             return .sessionID(sessionID)
+        case let .newSessionInGroup(targetSessionID, name):
+            guard let sessionID = editor.addGroupedSession(groupWith: targetSessionID, name: name) else {
+                return .error("Target session not found")
+            }
+            // Linked windows share live surfaces — ensure is an idempotent no-op for
+            // them and a revival for any dead leaf.
+            ensureSessionSurfaces(sessionID: sessionID, shell: nil)
+            commit()
+            fireHookLocked(.afterNewSession)
+            fireHookLocked(.sessionCreated)
+            return .sessionID(sessionID)
         case let .newTab(workspaceID, cwd, shell):
             guard let tabID = editor.addTab(to: workspaceID, cwd: cwd) else {
                 return .error("Workspace not found")
             }
             ensureTabSurfaces(tabID: tabID, shell: shell)
+            editor.propagateNewTabToGroup(tabID)   // grouped sessions share the window list
             commit()
             fireHookLocked(.afterNewTab)
             return .tabID(tabID)
@@ -264,6 +276,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
                 return .error("Could not create tab")
             }
             ensureTabSurfaces(tabID: tabID, shell: shell)
+            editor.propagateNewTabToGroup(tabID)
             commit()
             fireHookLocked(.afterNewTab)
             return .tabID(tabID)
@@ -358,7 +371,11 @@ public final class SurfaceRegistry: @unchecked Sendable {
                 .rootPane
                 .allSurfaceIDs()
                 .map(\.uuidString) ?? []
+            // Grouped sessions: killing a window removes it from every member (tmux).
+            // Counterparts gathered BEFORE the close mutates the snapshot.
+            let counterparts = editor.groupCounterparts(of: tabID)
             guard editor.closeTab(tabID) else { return .error("Tab not found") }
+            for counterpart in counterparts { _ = editor.closeTab(counterpart) }
             closeSurfaces(closedSurfaces)
             ensureAllSnapshotSurfaces()
             // tmux `renumber-windows`: keep indices contiguous after a tab closes.
@@ -1078,6 +1095,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
         context.sessionWindows = session?.tabs.count
         context.windowPanes = tab?.rootPane.allPaneIDs().count
         if let tab, let session { context.windowActive = tab.id == session.activeTabID }
+        context.sessionGroup = session.flatMap { editor.snapshot.groupName(of: $0) }
         context.sessionAttached = attachedClientCountProvider?()
         context.serverPID = Int(getpid())
         return context

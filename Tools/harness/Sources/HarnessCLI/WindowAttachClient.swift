@@ -544,6 +544,12 @@ private final class WindowSession: @unchecked Sendable {
         context.sessionWindows = session?.tabs.count
         context.windowPanes = tab.rootPane.allPaneIDs().count
         if let session { context.windowActive = tab.id == session.activeTabID }
+        if let session, let snapshot = latestSnapshot {
+            context.sessionGroup = snapshot.groupName(of: session)
+        }
+        // The compositor knows the agent state from the snapshot like the GUI does.
+        context.agentKind = context.agentKind ?? tab.agent?.kind.rawValue
+        context.agentActivity = context.agentActivity ?? tab.agent?.activity.rawValue
         context.clientWidth = cols
         context.clientHeight = rows
         if let tty = ttyname(STDIN_FILENO) { context.clientTTY = String(cString: tty) }
