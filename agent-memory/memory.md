@@ -18,8 +18,7 @@
 ✅ Host reuse: detach terminal hosts before rebuild, re-insert without losing Metal state  
 
 ## Known Issues
-- **Split down (⌘⇧D) terminal disappears** — Metal CADisplayLink not re-activated after view rebuild (viewDidMoveToWindow not fired on same-window reparent)
-- **Fix plan:** Full incremental update (P3 plan) — don't removeFromSuperview existing hosts, use insertArrangedSubview
+- **Split down removed** — The Split Down (vertical split/rows) functionality was completely removed from the menu bar, command palette, and UI buttons per user request. Split Right remains fully functional.
 
 ## Completed Sprints
 - **v1.3.0** — IDE-like Sidebar (PBI-001): Files tab, Git tab, session tabs, recent projects

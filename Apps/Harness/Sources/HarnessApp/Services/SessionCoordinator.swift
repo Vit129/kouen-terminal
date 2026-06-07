@@ -111,8 +111,7 @@ final class SessionCoordinator: NSObject {
 
     @objc private func notificationPosted(_ note: Notification) {
         guard let notification = note.userInfo?["notification"] as? AgentNotification else { return }
-        if let surfaceID = notification.surfaceID {
-        }
+        _ = notification
         NotificationCenter.default.post(name: NotificationBus.shared.tabStatusChanged, object: nil)
     }
 
@@ -535,6 +534,7 @@ final class SessionCoordinator: NSObject {
     }
 
     func splitActivePane(direction: SplitDirection) {
+        guard direction == .horizontal else { return } // vertical splits are removed
         guard let workspace = snapshot.activeWorkspace,
               let tab = workspace.activeTab,
               let paneID = activeSurfaceID.flatMap({ paneID(for: $0, in: tab.rootPane) })

@@ -1124,6 +1124,15 @@ public final class HarnessTerminalSurfaceView: NSView {
         }
     }
 
+    public override func viewDidMoveToSuperview() {
+        super.viewDidMoveToSuperview()
+        if window != nil {
+            stopDisplayLink()
+            startDisplayLink()
+            scheduleRender()
+        }
+    }
+
     /// Drive renders at the display's refresh rate while in a window. The link starts paused;
     /// `scheduleRender` wakes it, and `displayTick` re-pauses it once the screen is up to date, so an
     /// idle terminal costs nothing. macOS 14+ `NSView.displayLink` is the main-thread display source.

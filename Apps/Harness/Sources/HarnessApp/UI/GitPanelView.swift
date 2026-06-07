@@ -68,8 +68,7 @@ final class GitPanelView: NSView {
         setupScrollView(changesScroll, with: changesStack, in: changesContainer)
 
         // Stage All button bar
-        stageAllButton.bezelStyle = .recessed; stageAllButton.controlSize = .small
-        stageAllButton.font = .systemFont(ofSize: 11, weight: .medium)
+        HarnessDesign.configurePillButton(stageAllButton, title: "Stage All", symbolName: "plus.circle")
         stageAllButton.target = self; stageAllButton.action = #selector(stageAllAction)
         stageAllButton.translatesAutoresizingMaskIntoConstraints = false
 
@@ -83,12 +82,7 @@ final class GitPanelView: NSView {
         commitField.maximumNumberOfLines = 4
         commitField.translatesAutoresizingMaskIntoConstraints = false
 
-        let symbolConfig = NSImage.SymbolConfiguration(pointSize: 11, weight: .semibold)
-        commitButton.title = "Commit ▼"
-        commitButton.bezelStyle = .recessed; commitButton.controlSize = .small
-        commitButton.font = .systemFont(ofSize: 12, weight: .semibold)
-        commitButton.image = NSImage(systemSymbolName: "checkmark.circle", accessibilityDescription: nil)?.withSymbolConfiguration(symbolConfig)
-        commitButton.imagePosition = .imageLeft
+        HarnessDesign.configurePillButton(commitButton, title: "Commit ▼", symbolName: "checkmark.circle")
         commitButton.target = self; commitButton.action = #selector(showCommitMenu)
         commitButton.translatesAutoresizingMaskIntoConstraints = false
 
@@ -104,8 +98,7 @@ final class GitPanelView: NSView {
         worktreesStack.orientation = .vertical; worktreesStack.alignment = .leading; worktreesStack.spacing = 0
         setupScrollView(worktreesScroll, with: worktreesStack, in: worktreesContainer)
 
-        addWorktreeButton.bezelStyle = .recessed; addWorktreeButton.controlSize = .small
-        addWorktreeButton.font = .systemFont(ofSize: 12, weight: .semibold)
+        HarnessDesign.configurePillButton(addWorktreeButton, title: "", symbolName: "plus")
         addWorktreeButton.target = self; addWorktreeButton.action = #selector(addWorktreeAction)
         addWorktreeButton.translatesAutoresizingMaskIntoConstraints = false
         worktreesContainer.addSubview(addWorktreeButton)
@@ -121,11 +114,8 @@ final class GitPanelView: NSView {
         branchLabel.addGestureRecognizer(branchClick)
         branchLabel.isSelectable = false
 
-        syncButton.bezelStyle = .recessed; syncButton.controlSize = .small
-        syncButton.font = .systemFont(ofSize: 12, weight: .semibold)
+        HarnessDesign.configurePillButton(syncButton, title: "Fetch ▼", symbolName: "arrow.triangle.2.circlepath")
         syncButton.target = self; syncButton.action = #selector(showSyncMenu)
-        syncButton.image = NSImage(systemSymbolName: "arrow.triangle.2.circlepath", accessibilityDescription: nil)?.withSymbolConfiguration(symbolConfig)
-        syncButton.imagePosition = .imageLeft
         syncButton.translatesAutoresizingMaskIntoConstraints = false
 
         bottomBar.addSubview(branchLabel)
@@ -430,7 +420,12 @@ final class GitPanelView: NSView {
         guard !worktreePath.isEmpty, !branch.isEmpty else { return }
 
         Task {
-            _ = await runGit(["worktree", "add", worktreePath, branch], in: path)
+            _ = await runGitWithToast(
+                ["worktree", "add", worktreePath, branch],
+                in: path,
+                start: "Adding worktree \(branch)...",
+                success: "Added worktree \(branch)"
+            )
             await refresh()
         }
     }
@@ -438,7 +433,13 @@ final class GitPanelView: NSView {
     @objc private func removeWorktreeAction(_ sender: NSButton) {
         guard let path = currentPath, let worktreePath = sender.toolTip else { return }
         Task {
-            _ = await runGit(["worktree", "remove", worktreePath], in: path)
+            let name = (worktreePath as NSString).lastPathComponent
+            _ = await runGitWithToast(
+                ["worktree", "remove", worktreePath],
+                in: path,
+                start: "Removing worktree \(name)...",
+                success: "Removed worktree \(name)"
+            )
             await refresh()
         }
     }
@@ -448,16 +449,38 @@ final class GitPanelView: NSView {
         // After click, .on means user wants to stage, .off means unstage
         let wantsStaged = sender.state == .on
         NSLog("[GitPanel] toggleStage: file=%@ wantsStaged=%d path=%@", file, wantsStaged ? 1 : 0, path)
+        pulseStageCheckbox(sender)
         Task {
-            let result = await runGit(wantsStaged ? ["add", file] : ["restore", "--staged", file], in: path)
+            let fileName = (file as NSString).lastPathComponent
+            let result = await runGitWithToast(
+                wantsStaged ? ["add", file] : ["restore", "--staged", file],
+                in: path,
+                start: wantsStaged ? "Staging \(fileName)..." : "Unstaging \(fileName)...",
+                success: wantsStaged ? "Staged \(fileName)" : "Unstaged \(fileName)"
+            )
             NSLog("[GitPanel] git result: %@", result)
             await refresh()
         }
     }
 
+    private func pulseStageCheckbox(_ checkbox: NSButton) {
+        checkbox.wantsLayer = true
+        let animation = CABasicAnimation(keyPath: "transform.scale")
+        animation.fromValue = 1.0
+        animation.toValue = 1.12
+        animation.duration = HarnessDesign.Motion.microFast
+        animation.autoreverses = true
+        animation.timingFunction = HarnessDesign.Motion.standardEase
+        checkbox.layer?.add(animation, forKey: "stage-pulse")
+    }
+
     private func runAndRefresh(_ args: [String], clearField: Bool = false) {
         guard let path = currentPath else { return }
         Task {
+            let toast = await gitToastMessages(for: args, in: path)
+            if let toast {
+                DisplayMessage.show(toast.start)
+            }
             let (_, stderr, code) = await runGitResult(args, in: path)
             if code != 0, !stderr.isEmpty {
                 let alert = NSAlert()
@@ -471,6 +494,9 @@ final class GitPanelView: NSView {
                     didCommitSinceLastSync = true
                 } else if args.first == "push" {
                     didCommitSinceLastSync = false
+                }
+                if let toast {
+                    DisplayMessage.show(toast.success)
                 }
             }
             if clearField { commitField.stringValue = "" }
@@ -519,13 +545,10 @@ final class GitPanelView: NSView {
                 isAhead = true
             }
         }
-        let symbolConfig = NSImage.SymbolConfiguration(pointSize: 11, weight: .semibold)
         if isAhead || didCommitSinceLastSync {
-            syncButton.title = "Push ▼"
-            syncButton.image = NSImage(systemSymbolName: "arrow.up", accessibilityDescription: nil)?.withSymbolConfiguration(symbolConfig)
+            HarnessDesign.configurePillButton(syncButton, title: "Push ▼", symbolName: "arrow.up")
         } else {
-            syncButton.title = "Fetch ▼"
-            syncButton.image = NSImage(systemSymbolName: "arrow.triangle.2.circlepath", accessibilityDescription: nil)?.withSymbolConfiguration(symbolConfig)
+            HarnessDesign.configurePillButton(syncButton, title: "Fetch ▼", symbolName: "arrow.triangle.2.circlepath")
         }
 
         let changeCount = porcelain.components(separatedBy: "\n").filter { !$0.isEmpty }.count
@@ -671,9 +694,11 @@ final class GitPanelView: NSView {
         meta.lineBreakMode = .byTruncatingTail
         meta.translatesAutoresizingMaskIntoConstraints = false
 
-        let removeButton = NSButton(title: "✕", target: self, action: #selector(removeWorktreeAction(_:)))
+        let removeButton = NSButton(title: "", target: self, action: #selector(removeWorktreeAction(_:)))
+        removeButton.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: "Remove worktree")?
+            .withSymbolConfiguration(HarnessDesign.symbolConfig(pointSize: HarnessDesign.IconSize.small, weight: .semibold))
+        removeButton.imagePosition = .imageOnly
         removeButton.bezelStyle = .recessed; removeButton.controlSize = .small
-        removeButton.font = .systemFont(ofSize: 11, weight: .medium)
         removeButton.toolTip = worktree.path
         removeButton.isHidden = worktree.isMain
         removeButton.translatesAutoresizingMaskIntoConstraints = false
@@ -781,6 +806,61 @@ final class GitPanelView: NSView {
     private func runGit(_ args: [String], in directory: String) async -> String {
         let (out, _, _) = await runGitResult(args, in: directory)
         return out
+    }
+
+    private func runGitWithToast(_ args: [String], in directory: String, start: String, success: String) async -> String {
+        DisplayMessage.show(start)
+        let (out, stderr, code) = await runGitResult(args, in: directory)
+        if code == 0 {
+            DisplayMessage.show(success)
+        } else if !stderr.isEmpty {
+            let alert = NSAlert()
+            alert.messageText = "git \(args.first ?? "") failed"
+            alert.informativeText = stderr
+            alert.alertStyle = .warning
+            alert.runModal()
+        }
+        return out
+    }
+
+    private func gitToastMessages(for args: [String], in directory: String) async -> (start: String, success: String)? {
+        guard let command = args.first, command != "commit" else { return nil }
+
+        switch command {
+        case "fetch":
+            let remote = args.dropFirst().first
+            if let remote, !remote.isEmpty {
+                return ("Fetching from \(remote)...", "Fetched from \(remote)")
+            }
+            return ("Fetching...", "Fetch succeeded")
+        case "pull":
+            if args.contains("--rebase") {
+                return ("Pulling with rebase...", "Pull rebase succeeded")
+            }
+            return ("Pulling...", "Pull succeeded")
+        case "push":
+            let target = await pushTargetDescription(for: args, in: directory)
+            let force = args.contains("--force-with-lease")
+            return (
+                force ? "Force pushing to \(target)..." : "Pushing to \(target)...",
+                force ? "Force push to \(target) succeeded" : "Push to \(target) succeeded"
+            )
+        case "add":
+            return ("Staging changes...", "Staged changes")
+        case "checkout":
+            let branch = args.dropFirst().first ?? "branch"
+            return ("Switching to \(branch)...", "Switched to \(branch)")
+        default:
+            return nil
+        }
+    }
+
+    private func pushTargetDescription(for args: [String], in directory: String) async -> String {
+        let remote = args.dropFirst().first { !$0.hasPrefix("-") }
+        let branch = await runGit(["branch", "--show-current"], in: directory)
+        let targetBranch = branch.isEmpty ? "detached HEAD" : branch
+        guard let remote, !remote.isEmpty else { return targetBranch }
+        return "\(remote)/\(targetBranch)"
     }
 }
 

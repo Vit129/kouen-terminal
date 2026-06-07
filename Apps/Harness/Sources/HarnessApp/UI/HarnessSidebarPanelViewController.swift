@@ -1757,10 +1757,11 @@ private final class SessionGroupHeaderRowView: NSView {
 
     private let leftStack = NSStackView()
     private let rightStack = NSStackView()
-    private let disclosureLabel = NSTextField(labelWithString: "▼")
+    private let disclosureImage = NSImageView()
     private let label = NSTextField(labelWithString: "")
     private let addButton = NSButton()
     private let optionsButton = NSButton()
+    private var isCollapsed = false
     private var isHovered = false
     private var trackingArea: NSTrackingArea?
 
@@ -1769,11 +1770,11 @@ private final class SessionGroupHeaderRowView: NSView {
         wantsLayer = true
         layer?.backgroundColor = NSColor.clear.cgColor
 
-        disclosureLabel.font = .systemFont(ofSize: 10, weight: .bold)
-        disclosureLabel.textColor = HarnessDesign.chrome.textTertiary
-        disclosureLabel.alignment = .center
-        disclosureLabel.translatesAutoresizingMaskIntoConstraints = false
-        disclosureLabel.setContentHuggingPriority(.required, for: .horizontal)
+        disclosureImage.image = NSImage(systemSymbolName: "chevron.right", accessibilityDescription: nil)?
+            .withSymbolConfiguration(HarnessDesign.symbolConfig(pointSize: HarnessDesign.IconSize.tiny, weight: .semibold))
+        disclosureImage.translatesAutoresizingMaskIntoConstraints = false
+        disclosureImage.imageScaling = .scaleProportionallyUpOrDown
+        disclosureImage.setContentHuggingPriority(.required, for: .horizontal)
 
         label.font = .systemFont(ofSize: 13, weight: .semibold)
         label.alignment = .left
@@ -1782,8 +1783,10 @@ private final class SessionGroupHeaderRowView: NSView {
         label.setContentHuggingPriority(.defaultLow, for: .horizontal)
         label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-        addButton.title = "+"
-        addButton.font = .systemFont(ofSize: 13, weight: .semibold)
+        addButton.title = ""
+        addButton.image = NSImage(systemSymbolName: "plus", accessibilityDescription: "New session in group")?
+            .withSymbolConfiguration(HarnessDesign.symbolConfig(pointSize: HarnessDesign.IconSize.small, weight: .semibold))
+        addButton.imagePosition = .imageOnly
         addButton.alignment = .center
         addButton.bezelStyle = .inline
         addButton.isBordered = false
@@ -1794,8 +1797,10 @@ private final class SessionGroupHeaderRowView: NSView {
         addButton.setContentHuggingPriority(.required, for: .horizontal)
         addButton.setContentCompressionResistancePriority(.required, for: .horizontal)
 
-        optionsButton.title = "..."
-        optionsButton.font = .systemFont(ofSize: 13, weight: .semibold)
+        optionsButton.title = ""
+        optionsButton.image = NSImage(systemSymbolName: "ellipsis", accessibilityDescription: "Group options")?
+            .withSymbolConfiguration(HarnessDesign.symbolConfig(pointSize: HarnessDesign.IconSize.small, weight: .semibold))
+        optionsButton.imagePosition = .imageOnly
         optionsButton.alignment = .center
         optionsButton.bezelStyle = .inline
         optionsButton.isBordered = false
@@ -1810,7 +1815,7 @@ private final class SessionGroupHeaderRowView: NSView {
         leftStack.alignment = .centerY
         leftStack.spacing = 4
         leftStack.translatesAutoresizingMaskIntoConstraints = false
-        leftStack.addArrangedSubview(disclosureLabel)
+        leftStack.addArrangedSubview(disclosureImage)
         leftStack.addArrangedSubview(label)
 
         rightStack.orientation = .horizontal
@@ -1831,7 +1836,8 @@ private final class SessionGroupHeaderRowView: NSView {
             rightStack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -(HarnessDesign.horizontalInset - 4)),
             rightStack.centerYAnchor.constraint(equalTo: centerYAnchor),
 
-            disclosureLabel.widthAnchor.constraint(equalToConstant: 16),
+            disclosureImage.widthAnchor.constraint(equalToConstant: 16),
+            disclosureImage.heightAnchor.constraint(equalToConstant: 12),
 
             addButton.widthAnchor.constraint(equalToConstant: 16),
             addButton.heightAnchor.constraint(equalToConstant: 16),
@@ -1879,7 +1885,18 @@ private final class SessionGroupHeaderRowView: NSView {
     func configure(name: String, isCollapsed: Bool) {
         label.stringValue = name
         toolTip = name
-        disclosureLabel.stringValue = isCollapsed ? "▶" : "▼"
+        let changed = self.isCollapsed != isCollapsed
+        self.isCollapsed = isCollapsed
+        let rotation: CGFloat = isCollapsed ? 0 : -90
+        if changed {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = HarnessDesign.Motion.standard
+                context.timingFunction = HarnessDesign.Motion.standardEase
+                disclosureImage.animator().frameCenterRotation = rotation
+            }
+        } else {
+            disclosureImage.frameCenterRotation = rotation
+        }
         refresh()
     }
 
@@ -1894,26 +1911,13 @@ private final class SessionGroupHeaderRowView: NSView {
     private func refresh() {
         let c = HarnessDesign.chrome
         label.textColor = isHovered ? c.textPrimary : c.textSecondary
-        disclosureLabel.textColor = isHovered ? c.textPrimary : c.textSecondary
+        disclosureImage.contentTintColor = isHovered ? c.textPrimary : c.textSecondary
 
-        let plusColor = isHovered ? c.textSecondary : c.textTertiary
-        addButton.attributedTitle = NSAttributedString(
-            string: "+",
-            attributes: [
-                .foregroundColor: plusColor,
-                .font: NSFont.systemFont(ofSize: 13, weight: .semibold),
-            ]
-        )
+        let buttonColor = isHovered ? c.textSecondary : c.textTertiary
+        addButton.contentTintColor = buttonColor
         addButton.alphaValue = isHovered ? 1 : 0
 
-        let optionsColor = isHovered ? c.textSecondary : c.textTertiary
-        optionsButton.attributedTitle = NSAttributedString(
-            string: "...",
-            attributes: [
-                .foregroundColor: optionsColor,
-                .font: NSFont.systemFont(ofSize: 13, weight: .semibold),
-            ]
-        )
+        optionsButton.contentTintColor = buttonColor
         optionsButton.alphaValue = isHovered ? 1 : 0
     }
 }

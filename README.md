@@ -34,7 +34,7 @@ New installs start in Plain. Moving over from another setup? See [docs/MIGRATION
 
 - GPU-accelerated rendering by Harness's own terminal engine — accurate sRGB output by default, opt-in converted Display-P3 vivid color, a themed translucent canvas, and program output left untouched unless you opt into theme recoloring
 - Mainstream-GPU-terminal polish: live re-wrap while resizing (with a grid-size overlay), word / line / block selection, middle-click paste, alternate-screen wheel scrolling, focus reporting, hollow unfocused cursor, minimum contrast, auto light/dark themes, bold-is-bright control, and paste protection
-- Sidebar sessions, per-session tabs, and horizontal / vertical splits
+- Sidebar sessions, per-session tabs, and horizontal splits
 - Session layout persists across quits (daemon-owned, attach from the CLI or over SSH)
 - Persistent scrollback: a pane's history is written to disk per surface and restored when the daemon restarts
 - Remote & headless daemon: run `HarnessDaemon` on a headless or remote box (Linux included) and drive it with `harness-cli --host <name>` over an SSH tunnel — register hosts with `harness-cli remote add`
@@ -54,7 +54,7 @@ New installs start in Plain. Moving over from another setup? See [docs/MIGRATION
 - **IDE sidebar** — Sessions, Files, and Git panels toggled with `Cmd+\`
 - **Project-aware file tree** — SwiftUI tree with folder expand/collapse, right-click copy path, and drag-to-terminal
 - **Git workflow** — stage/unstage files, commit (with amend & signoff), fetch/pull/push (with per-remote and rebase options), branch switcher, and worktree controls from the sidebar
-- **CMUX pane splitting** — drag surface tabs to split left/right/top/bottom with live drop overlays and ratio auto-restoration
+- **CMUX pane splitting** — drag surface tabs to split left/right with live drop overlays and ratio auto-restoration
 - **Session-as-tab** — each top tab is a project session; sidebar group headers can create a new session in that group with `+`, and the session card `×` appears on hover to close it
 - **Recent projects** — clock button in the sidebar footer shows the last 10 project roots and switches to an existing session on duplicate
 

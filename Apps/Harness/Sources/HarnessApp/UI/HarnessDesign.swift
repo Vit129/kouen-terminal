@@ -73,16 +73,59 @@ enum HarnessDesign {
     }
 
     /// Semantic fonts so sizes/weights live in one place.
+    enum FontSize {
+        static let chromeSmall: CGFloat = 11
+        static let chromeBody: CGFloat = 12
+        static let sidebarLabel: CGFloat = 13
+        static let sectionLabel: CGFloat = 10.5
+    }
+
+    /// SF Symbol sizes used by AppKit chrome controls.
+    enum IconSize {
+        static let tiny: CGFloat = 9
+        static let small: CGFloat = 11
+        static let medium: CGFloat = 12
+        static let sidebar: CGFloat = 13
+        static let paneAction: CGFloat = 12
+    }
+
+    /// Shared symbol configurations so icon weights stay consistent.
+    static func symbolConfig(pointSize: CGFloat, weight: NSFont.Weight = .medium) -> NSImage.SymbolConfiguration {
+        NSImage.SymbolConfiguration(pointSize: pointSize, weight: weight)
+    }
+
+    /// Centralized AppKit pill button styling for menu-backed chrome actions.
+    static func configurePillButton(
+        _ button: NSButton,
+        title: String,
+        symbolName: String?,
+        accessibilityDescription: String? = nil
+    ) {
+        button.title = title
+        button.bezelStyle = .recessed
+        button.controlSize = .small
+        button.font = .systemFont(ofSize: FontSize.chromeBody, weight: .semibold)
+        if let symbolName {
+            button.image = NSImage(
+                systemSymbolName: symbolName,
+                accessibilityDescription: accessibilityDescription ?? title
+            )?.withSymbolConfiguration(symbolConfig(pointSize: IconSize.small, weight: .semibold))
+            button.imagePosition = .imageLeft
+        } else {
+            button.image = nil
+        }
+    }
+
     enum Typography {
         /// The one font every primary chrome label uses — workspace name, search
         /// field, session titles, tab titles, switcher rows, the Settings row. Keeping
         /// these identical (size + weight) is what makes the sidebar and tab strip read
         /// as one consistent surface instead of a mix of sizes/weights.
-        static var sidebarLabel: NSFont { .systemFont(ofSize: 13, weight: .medium) }
+        static var sidebarLabel: NSFont { .systemFont(ofSize: FontSize.sidebarLabel, weight: .medium) }
         static var rowTitle: NSFont { sidebarLabel }
         static var rowMeta: NSFont { .monospacedSystemFont(ofSize: 11, weight: .regular) }
         static var tabTitle: NSFont { sidebarLabel }
-        static var sectionLabel: NSFont { .systemFont(ofSize: 10.5, weight: .semibold) }
+        static var sectionLabel: NSFont { .systemFont(ofSize: FontSize.sectionLabel, weight: .semibold) }
         static var badge: NSFont { .monospacedSystemFont(ofSize: 10.5, weight: .semibold) }
         static var kbd: NSFont { .monospacedSystemFont(ofSize: 12, weight: .semibold) }
         static var paletteTitle: NSFont { .systemFont(ofSize: 13.5, weight: .medium) }
@@ -663,12 +706,10 @@ final class ChromeBackdrop: NSView {
     }
 
     private func material(for role: HarnessDesign.ChromeRole) -> NSVisualEffectView.Material {
-        // We deliberately avoid `.sidebar`/`.titlebar` here — those materials
-        // add a noticeable blue tint that breaks the deep-black look.
-        // `.underWindowBackground` gives an honest desktop blur that we then
-        // dim with our own theme tint on top.
         switch role {
-        case .sidebar, .tabBar:
+        case .sidebar:
+            return .sidebar
+        case .tabBar:
             return .underWindowBackground
         }
     }
