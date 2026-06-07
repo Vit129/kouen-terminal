@@ -39,19 +39,27 @@ struct FileTreeSwiftUIView: View {
     let sessionID: SessionID?
     let watcher: FileTreeWatcher
     @State private var rootNodes: [FileTreeNode] = []
+    @State private var gitBranch: String?
     /// Kept alive across expands so child nodes inherit the same status map.
     @State private var currentGitStatus: [String: GitStatusType] = [:]
 
-    private var taskID: String { "\(sessionID?.uuidString ?? "nil")|\(rootPath)" }
+    private var taskID: String { "\(sessionID?.uuidString ?? "nil")|\(rootPath)|\(gitBranch ?? "nil")" }
 
     var body: some View {
         List {
+            if let gitBranch, !gitBranch.isEmpty {
+                branchChip(gitBranch)
+            }
             ForEach(rootNodes) { node in
                 NodeRow(node: node, rootPath: rootPath, watcher: watcher, gitStatus: currentGitStatus)
             }
         }
         .listStyle(.sidebar)
         .scrollContentBackground(.hidden)
+        .onAppear { refreshGitBranch() }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("HarnessActiveTabGitBranchDidChange"))) { _ in
+            refreshGitBranch()
+        }
         // React to both path and session changes — different sessions may be on
         // different branches sharing the same rootPath.
         .task(id: taskID) { await loadRoot() }
@@ -71,6 +79,38 @@ struct FileTreeSwiftUIView: View {
                 Task { await watcher.stopWatching() }
             })
         }
+    }
+
+    private func branchChip(_ name: String) -> some View {
+        HStack(spacing: HarnessDesign.Spacing.xs) {
+            Image(systemName: "point.3.connected.trianglepath.dotted")
+                .font(.system(size: 10, weight: .medium))
+            Text(name)
+                .font(.system(size: 11, weight: .medium))
+                .lineLimit(1)
+                .truncationMode(.middle)
+        }
+        .foregroundStyle(Color(HarnessDesign.chrome.textSecondary))
+        .padding(.horizontal, HarnessDesign.Spacing.sm)
+        .padding(.vertical, HarnessDesign.Spacing.xs)
+        .background(Color(HarnessDesign.chrome.surfaceElevated))
+        .clipShape(RoundedRectangle(cornerRadius: HarnessDesign.Radius.badge, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: HarnessDesign.Radius.badge, style: .continuous)
+                .stroke(Color(HarnessDesign.chrome.border), lineWidth: 1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .listRowInsets(EdgeInsets(
+            top: HarnessDesign.Spacing.xs,
+            leading: HarnessDesign.horizontalInset,
+            bottom: HarnessDesign.Spacing.sm,
+            trailing: HarnessDesign.horizontalInset
+        ))
+        .listRowBackground(Color.clear)
+    }
+
+    private func refreshGitBranch() {
+        gitBranch = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.gitBranch
     }
 
     private func loadRoot() async {
