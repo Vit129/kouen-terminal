@@ -371,15 +371,17 @@ public final class SurfaceRegistry: @unchecked Sendable {
             let owningSession = editor.snapshot.workspaces
                 .flatMap(\.sessions)
                 .first(where: { $0.tabs.contains { $0.id == tabID } })?.id
-            let closedSurfaces = editor.snapshot.workspaces
-                .flatMap { workspace in workspace.sessions.flatMap { $0.tabs } }
-                .first(where: { $0.id == tabID })?
-                .rootPane
-                .allSurfaceIDs()
-                .map(\.uuidString) ?? []
             // Grouped sessions: killing a window removes it from every member (tmux).
-            // Counterparts gathered BEFORE the close mutates the snapshot.
+            // Counterparts + their surfaces gathered BEFORE the close mutates the snapshot.
             let counterparts = editor.groupCounterparts(of: tabID)
+            let allTabs = editor.snapshot.workspaces.flatMap { $0.sessions.flatMap { $0.tabs } }
+            // Union the surfaces of the window AND its counterparts: a peer's local split can
+            // diverge the layout, so a counterpart may carry surfaces this copy doesn't — omit
+            // them and those PTYs leak when the peer tab closes (closeSurfaces only reaps the
+            // ids it's handed, and nothing else sweeps surfaces orphaned mid-run).
+            let closedSurfaces = Array(Set(([tabID] + counterparts).flatMap { id in
+                allTabs.first(where: { $0.id == id })?.rootPane.allSurfaceIDs().map(\.uuidString) ?? []
+            }))
             guard editor.closeTab(tabID) else { return .error("Tab not found") }
             for counterpart in counterparts { _ = editor.closeTab(counterpart) }
             closeSurfaces(closedSurfaces)
