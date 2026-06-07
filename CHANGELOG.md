@@ -3,6 +3,31 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.0.0] - 2026-06-07
+
+### Philosophy
+**Terminal First, IDE Convenience** — Harness is a terminal, not an editor with a terminal panel. Every IDE feature is a shortcut that saves you from typing `cat`, `git status`, or `vim`.
+
+### Added
+- **File Editor Panel** — Split panel file viewer in the content area (30% editor, 70% terminal). Click a file in sidebar to preview; terminal stays dominant and fully usable.
+- **Vi-like editing** — Files open in read-only mode (like `less`). Press `i` to enter INSERT mode, `Esc` to return to normal mode. `⌘S` to save.
+- **Syntax highlighting** — Regex-based highlighting for Swift, TypeScript/JavaScript, Python, Rust, Go, JSON, YAML. Keywords, strings, comments, and numbers colored.
+- **Line numbers gutter** — Monospaced line numbers alongside the editor with scroll sync.
+- **Git diff gutter** — Colored 3px bars next to line numbers: green (added), yellow (modified), red (deleted). Runs `git diff` async on file load.
+- **File tabs** — Open multiple files in tabs with close buttons. Tab bar above editor panel.
+- **Quick Look** — Images and PDFs rendered inline (PNG, JPG, GIF, WebP, SVG, PDF).
+- **Find & Replace** — `⌘F` for find bar, `⌘⇧F` for find and replace (native macOS NSTextFinder).
+- **Undo/Redo** — `⌘Z` / `⌘⇧Z` with full NSTextView undo stack.
+- **File tree context menu** — New File, New Folder, Reveal in Finder, Open in Default App, Copy Path, Copy Relative Path, Rename, Duplicate, Move to Trash.
+- **Real-time sidebar position toggle** — Move sidebar left/right instantly via View menu or right-click toggle button. No restart required.
+- **Right-click sidebar toggle** — Context menu on toggle button and session rows for "Move Sidebar to Left/Right".
+
+### Changed
+- **Split Down removed** — Vertical/downward splits removed from all menus, command palette, context menus, keybindings, and documentation. Split Right remains fully functional.
+- **UI Polish (P6)** — SF Symbols everywhere, animated disclosure chevrons, `configurePillButton` shared helper, sidebar vibrancy `.sidebar` material, git stage checkbox pulse animation.
+- **Git panel toasts** — Progress feedback for fetch/pull/push/stage operations.
+- **Metal CADisplayLink fix** — `viewDidMoveToSuperview()` restarts display link on reparent, fixing terminal black screen after split.
+
 ## [1.6.0] - 2026-06-07
 
 ### Added
