@@ -289,11 +289,17 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         }
         lastStructureKey = key
 
+        // Incremental update: detach existing terminal hosts from old container
+        // (without removing them from window) then rebuild container around them.
+        let existingHosts = paneContainer?.collectTerminalHosts() ?? [:]
+        paneContainer?.detachHostsOnly()
         paneContainer?.removeFromSuperview()
+
         let container = PaneContainerView(
             node: displayNode,
             cwd: tab.cwd,
-            themeName: coordinator.snapshot.themeName
+            themeName: coordinator.snapshot.themeName,
+            existingHosts: existingHosts
         )
         container.translatesAutoresizingMaskIntoConstraints = false
         terminalHost.addSubview(container)
@@ -304,17 +310,6 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
             container.bottomAnchor.constraint(equalTo: terminalHost.bottomAnchor),
         ])
         paneContainer = container
-        // Force re-render: hosts reused within the same window don't fire
-        // viewDidMoveToWindow, so their CADisplayLink may be stale.
-        DispatchQueue.main.async {
-            for surfaceID in tab.rootPane.allSurfaceIDs() {
-                if let host = TerminalPaneRegistryAccess.host(for: surfaceID) {
-                    host.needsLayout = true
-                    host.needsDisplay = true
-                    host.subviews.forEach { $0.needsDisplay = true }
-                }
-            }
-        }
         // Re-assert the focused-pane border after the (re)mount — reused hosts keep
         // their flag, but a freshly shown tab needs its active pane established.
         coordinator.ensureActivePane(for: tab)
@@ -353,8 +348,10 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
 final class PaneContainerView: NSView {
     private let coordinator = SessionCoordinator.shared
     private let tabID: TabID?
+    private var existingHosts: [SurfaceID: TerminalHostView]
 
-    init(node: PaneNode, cwd: String, themeName: String) {
+    init(node: PaneNode, cwd: String, themeName: String, existingHosts: [SurfaceID: TerminalHostView] = [:]) {
+        self.existingHosts = existingHosts
         self.tabID = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.id
         super.init(frame: .zero)
         HarnessDesign.makeClear(self)
@@ -368,6 +365,39 @@ final class PaneContainerView: NSView {
     @available(*, unavailable)
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    /// Collect all terminal hosts keyed by surfaceID before teardown.
+    func collectTerminalHosts() -> [SurfaceID: TerminalHostView] {
+        var result: [SurfaceID: TerminalHostView] = [:]
+        collectHosts(in: self, into: &result)
+        return result
+    }
+
+    private func collectHosts(in view: NSView, into result: inout [SurfaceID: TerminalHostView]) {
+        for sub in view.subviews {
+            if let host = sub as? TerminalHostView {
+                result[host.surfaceID] = host
+            } else {
+                collectHosts(in: sub, into: &result)
+            }
+        }
+    }
+
+    /// Remove terminal hosts from the view hierarchy without triggering dealloc —
+    /// they'll be re-inserted into the new container.
+    func detachHostsOnly() {
+        detachHosts(in: self)
+    }
+
+    private func detachHosts(in view: NSView) {
+        for sub in view.subviews {
+            if sub is TerminalHostView {
+                sub.removeFromSuperview()
+            } else {
+                detachHosts(in: sub)
+            }
+        }
     }
 
     func refreshChrome(snapshot: SessionSnapshot) {
@@ -405,7 +435,13 @@ final class PaneContainerView: NSView {
                 paneShell.bottomAnchor.constraint(equalTo: parent.bottomAnchor),
             ])
 
-            let host = coordinator.terminalHost(for: leaf.activeSurfaceID ?? leaf.surfaceID, cwd: cwd)
+            let surfaceID = leaf.activeSurfaceID ?? leaf.surfaceID
+            let host: TerminalHostView
+            if let existing = existingHosts.removeValue(forKey: surfaceID) {
+                host = existing
+            } else {
+                host = coordinator.terminalHost(for: surfaceID, cwd: cwd)
+            }
             host.translatesAutoresizingMaskIntoConstraints = false
             paneShell.addSubview(host)
             NSLayoutConstraint.activate([
@@ -427,23 +463,18 @@ final class PaneContainerView: NSView {
                     splitButtons.topAnchor.constraint(equalTo: paneShell.topAnchor, constant: 8),
                 ])
             }
-        case let .branch(direction, ratio, firstNode, secondNode):
+        case let .branch(direction, _, _, _):
+            // Flatten same-direction chain into a single NSSplitView with N children
+            let flatChildren = flattenSameDirection(node, direction: direction)
             let split = HarnessSplitView()
             split.dividerStyle = .thin
             split.isVertical = direction == .horizontal
             split.tabID = tabID
-            split.firstPaneID = firstLeafID(firstNode)
-            split.secondPaneID = firstLeafID(secondNode)
-            split.ratio = ratio
             split.direction = direction
+            split.ratio = nil  // signal: distribute equally among N children
             split.delegate = split
-            let first = NSView()
-            first.autoresizingMask = [.width, .height]
-            let second = NSView()
-            second.autoresizingMask = [.width, .height]
-            split.addSubview(first)
-            split.addSubview(second)
             split.translatesAutoresizingMaskIntoConstraints = false
+
             parent.addSubview(split)
             NSLayoutConstraint.activate([
                 split.topAnchor.constraint(equalTo: parent.topAnchor),
@@ -451,18 +482,27 @@ final class PaneContainerView: NSView {
                 split.trailingAnchor.constraint(equalTo: parent.trailingAnchor),
                 split.bottomAnchor.constraint(equalTo: parent.bottomAnchor),
             ])
-            // Build the child panes first, then resolve the divider synchronously.
-            // `layoutSubtreeIfNeeded()` forces Auto Layout to compute `split.frame`
-            // before we call `setPosition`, so each child lays out exactly once at
-            // its final size — no async bounce, no PTY double-SIGWINCH, no flicker.
-            build(node: firstNode, cwd: cwd, into: first)
-            build(node: secondNode, cwd: cwd, into: second)
-            split.layoutSubtreeIfNeeded()
-            let totalSize = direction == .horizontal ? split.frame.width : split.frame.height
-            let position = totalSize * ratio
-            if position > 0, position < totalSize {
-                split.setPosition(position, ofDividerAt: 0)
+
+            for child in flatChildren {
+                let container = NSView()
+                container.autoresizingMask = [.width, .height]
+                split.addSubview(container)
+                build(node: child, cwd: cwd, into: container)
             }
+        }
+    }
+
+    /// Flatten a chain of same-direction branches into a flat list of child nodes.
+    /// e.g., branch(H, branch(H, L1, L2), L3) → [L1, L2, L3]
+    /// Different-direction branches are kept as single nodes in the list.
+    private func flattenSameDirection(_ node: PaneNode, direction: SplitDirection) -> [PaneNode] {
+        switch node {
+        case .leaf:
+            return [node]
+        case let .branch(d, _, first, second) where d == direction:
+            return flattenSameDirection(first, direction: direction) + flattenSameDirection(second, direction: direction)
+        default:
+            return [node]
         }
     }
 
@@ -570,22 +610,41 @@ final class HarnessSplitView: NSSplitView, NSSplitViewDelegate {
     var ratio: Double?
     var direction: SplitDirection?
     private var appliedRatio = false
+    private var isApplyingPositions = false
     private var ratioDebounce: DispatchWorkItem?
 
     override var dividerColor: NSColor { HarnessChrome.current.border }
 
     override func layout() {
         super.layout()
-        if !appliedRatio, let ratio, let direction {
-            let totalSize = direction == .horizontal ? frame.width : frame.height
-            if totalSize > 0 {
-                let position = totalSize * ratio
-                if position > 0, position < totalSize {
-                    appliedRatio = true
-                    setPosition(position, ofDividerAt: 0)
-                }
+        guard !appliedRatio, !isApplyingPositions else { return }
+        let count = subviews.count
+        guard count >= 2 else { return }
+        let totalSize = (direction == .horizontal) ? frame.width : frame.height
+        guard totalSize > 0 else { return }
+
+        isApplyingPositions = true
+        defer { isApplyingPositions = false }
+        appliedRatio = true
+
+        if ratio == nil {
+            // N children: distribute equally
+            let paneSize = totalSize / CGFloat(count)
+            for i in 0..<(count - 1) {
+                setPosition(paneSize * CGFloat(i + 1), ofDividerAt: i)
+            }
+        } else if let ratio {
+            // 2 children: use stored ratio
+            let position = totalSize * ratio
+            if position > 0, position < totalSize {
+                setPosition(position, ofDividerAt: 0)
             }
         }
+    }
+
+    override func adjustSubviews() {
+        guard !isApplyingPositions else { super.adjustSubviews(); return }
+        super.adjustSubviews()
     }
 
     func splitView(

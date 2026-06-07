@@ -76,15 +76,31 @@ public struct SessionEditor: Sendable {
         guard let match = tabIndex(workspaceID: workspaceID, tabID: tabID) else { return nil }
 
         var tab = snapshot.workspaces[match.workspaceIndex].sessions[match.sessionIndex].tabs[match.tabIndex]
-        guard let newPaneID = split(node: &tab.rootPane, targetPaneID: paneID, direction: direction) else {
-            return nil
+        // Flatten same-direction splits: wrap root as first child + new pane as second.
+        // Gives visually equal panes: 2→50/50, 3→67/33(of 50/50)=33/33/33, 4→75/25=25/25/25/25
+        let rootDirection: SplitDirection?
+        if case .branch(let d, _, _, _) = tab.rootPane { rootDirection = d } else { rootDirection = nil }
+
+        if rootDirection == direction || tab.rootPane.allPaneIDs().count == 1 {
+            let newLeaf = PaneLeaf()
+            let existingCount = Double(tab.rootPane.allPaneIDs().count)
+            let ratio = existingCount / (existingCount + 1.0)
+            tab.rootPane = .branch(direction: direction, ratio: ratio, first: tab.rootPane, second: .leaf(newLeaf))
+            tab.lastActivePaneID = tab.activePaneID
+            tab.activePaneID = newLeaf.id
+            snapshot.workspaces[match.workspaceIndex].sessions[match.sessionIndex].tabs[match.tabIndex] = tab
+            bumpRevision()
+            return newLeaf.id
+        } else {
+            guard let newPaneID = split(node: &tab.rootPane, targetPaneID: paneID, direction: direction) else {
+                return nil
+            }
+            tab.lastActivePaneID = tab.activePaneID
+            tab.activePaneID = newPaneID
+            snapshot.workspaces[match.workspaceIndex].sessions[match.sessionIndex].tabs[match.tabIndex] = tab
+            bumpRevision()
+            return newPaneID
         }
-        // Focus follows the split, tmux-style: the new pane becomes active.
-        tab.lastActivePaneID = tab.activePaneID
-        tab.activePaneID = newPaneID
-        snapshot.workspaces[match.workspaceIndex].sessions[match.sessionIndex].tabs[match.tabIndex] = tab
-        bumpRevision()
-        return newPaneID
     }
 
     public mutating func addSurface(tabID: TabID, paneID: PaneID) -> SurfaceID? {
