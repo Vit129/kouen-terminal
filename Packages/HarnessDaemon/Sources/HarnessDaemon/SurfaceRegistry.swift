@@ -22,6 +22,12 @@ public final class SurfaceRegistry: @unchecked Sendable {
     /// on later surface creations — without re-rendering the banner — so a transient write
     /// failure can't replay the one-shot card on the next daemon start.
     private var versionAckRetryNeeded = false
+    /// tmux `show-messages`: recent rendered display-message lines (most recent last),
+    /// capped so a chatty hook can't grow the daemon. Own lock (not `lock`): appends
+    /// come from both the IPC handler (lock held) and hook firing (hookQueue, no lock).
+    private var messageLog: [String] = []
+    private let messageLogLock = NSLock()
+    private static let messageLogCap = 50
     /// Opt-in lock/output instrumentation (off unless `HARNESS_DAEMON_METRICS=1`),
     /// surfaced via the `SIGUSR1` stats log. `DaemonServer` records output
     /// notifications and backlog through this same instance.
@@ -885,6 +891,9 @@ public final class SurfaceRegistry: @unchecked Sendable {
                 HookEntry(id: $0.id, event: $0.event.rawValue, commandSource: $0.command.shortDescription, condition: $0.conditionFormat)
             }
             return .hooks(entries)
+        case .showMessages:
+            messageLogLock.lock(); defer { messageLogLock.unlock() }
+            return .text(messageLog.joined(separator: "\n"))
         case let .displayMessage(format):
             // Render via FormatString using whatever context the daemon can
             // build right now (active workspace/tab from snapshot). UI clients
@@ -894,10 +903,20 @@ public final class SurfaceRegistry: @unchecked Sendable {
         }
     }
 
-    /// Post an already-rendered display-message line. Split from the IPC handler so
-    /// hook-fired display-message can render with the HOOK's context (the event's
-    /// subject — e.g. the closed session) instead of the active chain.
+    /// ISO8601DateFormatter is documented thread-safe; one instance instead of a
+    /// per-message allocation while serializing the message lock.
+    nonisolated(unsafe) private static let messageTimestamp = ISO8601DateFormatter()
+
+    /// Post an already-rendered display-message line: append to the `show-messages`
+    /// log and notify UI clients. Split from the IPC handler so hook-fired
+    /// display-message can render with the HOOK's context (the event's subject —
+    /// e.g. the closed session) instead of the active chain — which also means
+    /// hook-fired messages land in `show-messages` like client-sent ones.
     func postDisplayMessage(_ text: String) {
+        messageLogLock.lock()
+        messageLog.append("[\(Self.messageTimestamp.string(from: Date()))] \(text)")
+        if messageLog.count > Self.messageLogCap { messageLog.removeFirst(messageLog.count - Self.messageLogCap) }
+        messageLogLock.unlock()
         NotificationBus.shared.post(AgentNotification(
             surfaceID: nil,
             daemonSurfaceID: nil,

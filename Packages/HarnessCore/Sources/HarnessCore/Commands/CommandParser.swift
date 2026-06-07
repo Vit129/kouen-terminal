@@ -63,7 +63,7 @@ public enum CommandParser {
         "synchronize-panes", "synchronize-pane", "setw-synchronize",
         "kill-window", "kill-tab", "rename-window", "rename-tab",
         "new-window", "new-tab", "rotate-window", "select-layout",
-        "new-session", "kill-session", "rename-session",
+        "new-session", "kill-session", "rename-session", "respawn-window",
         // `link-window` is excluded: its leaf parser interprets `-t` itself as the
         // target session to link into, so stripping it here would leave it empty.
         "unlink-window",
@@ -85,6 +85,7 @@ public enum CommandParser {
         "resizep": "resize-pane", "swapp": "swap-pane", "swapw": "swap-window",
         "movew": "move-window", "rotatew": "rotate-window", "breakp": "break-pane",
         "joinp": "join-pane", "respawnp": "respawn-pane", "movep": "move-pane",
+        "respawnw": "respawn-window", "refreshc": "refresh-client",
         "renumberw": "renumber-windows",
         "renamew": "rename-window", "rename": "rename-window",
         "renames": "rename-session", "news": "new-session", "kills": "kill-session",
@@ -123,6 +124,7 @@ public enum CommandParser {
         "set-environment", "show-environment",
         "set-buffer", "paste-buffer", "delete-buffer", "list-buffers", "show-buffer",
         "set-hook", "show-hooks", "unbind-hook", "find-window",
+        "refresh-client", "respawn-window", "show-messages",
     ]
 
     private static func buildCommand(name rawName: String, tokens: [String]) throws -> Command {
@@ -494,6 +496,16 @@ public enum CommandParser {
                   let id = UUID(uuidString: raw)
             else { throw CommandParseError.missingArgument("unbind-hook requires a hook id (see show-hooks)") }
             return .unbindHook(id: id)
+        case "refresh-client":
+            return .refreshClient
+        case "respawn-window":
+            // Aliases (respawnw/refreshc) resolve via the alias TABLE before the
+            // universal `-t` wrap — a case-pattern alias here would skip the wrap,
+            // silently respawning the focused window on `respawnw -t <bad>`.
+            let keep = !(tokens.contains("-k") || tokens.contains("--clear-history"))
+            return .respawnWindow(keepHistory: keep)
+        case "show-messages":
+            return .showMessages
         case "find-window":
             // `-t` (a target window/session for the search) isn't supported, but its
             // VALUE must never be mistaken for the search pattern.
