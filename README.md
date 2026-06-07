@@ -54,7 +54,7 @@ New installs start in Plain. Moving over from another setup? See [docs/MIGRATION
 - **IDE sidebar** — Sessions, Files, and Git panels toggled with `Cmd+\`
 - **Project-aware file tree** — SwiftUI tree with folder expand/collapse, right-click context menu (New File, Rename, Duplicate, Move to Trash, Reveal in Finder)
 - **File editor panel** — click a file to preview in a split panel (30% editor, 70% terminal). Vi-like mode: read-only by default, press `i` to edit, `Esc` to return. `⌘S` saves, `⌘F` finds, `⌘⇧F` replaces.
-- **Syntax highlighting** — Swift, TypeScript, Python, Rust, Go, JSON, YAML with colored keywords, strings, comments, and numbers
+- **Syntax highlighting** — Swift, TypeScript/JavaScript, Python, Rust, Go, Kotlin, Java, C/C++, Shell, Ruby, Dart, Lua, PHP, SQL, HTML, CSS/SCSS, JSON, YAML, TOML, Markdown with colored keywords, strings, comments, and numbers
 - **Git diff gutter** — green/yellow/red bars next to line numbers showing added/modified/deleted lines
 - **Git workflow** — stage/unstage files, commit (with amend & signoff), fetch/pull/push (with per-remote and rebase options), branch switcher, and worktree controls from the sidebar
 - **CMUX pane splitting** — drag surface tabs to split left/right with live drop overlays and ratio auto-restoration

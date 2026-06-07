@@ -28,6 +28,15 @@ final class DaemonLauncher: @unchecked Sendable {
     private var fallbackProcess: Process?
     private let queue = DispatchQueue(label: "com.robert.harness.daemon-launcher")
 
+    /// True when running as a preview/SIT build (HarnessPreviewHome set in Info.plist).
+    /// Preview must never interact with the production LaunchAgent.
+    private let isPreview: Bool = {
+        if let val = Bundle.main.object(forInfoDictionaryKey: "HarnessPreviewHome") as? String, !val.isEmpty {
+            return true
+        }
+        return false
+    }()
+
     private init() {}
 
     /// Ensure a daemon is reachable, off the main thread. `completion` runs on the
@@ -43,6 +52,15 @@ final class DaemonLauncher: @unchecked Sendable {
     /// Synchronous variant for non-main callers/tests. Never call from the main thread.
     @discardableResult
     func ensureRunningBlocking() -> Bool {
+        // Preview builds (HarnessPreviewHome in Info.plist) must never touch the production
+        // LaunchAgent — they use their own isolated daemon spawned directly.
+        if isPreview {
+            if daemonResponds(timeout: 0.4) { return true }
+            spawnFallbackProcess()
+            if pollUntilResponding(timeoutSeconds: 3) { return true }
+            return false
+        }
+
         // Refresh the installed bin/ copies before any staleness check so the restart below
         // brings up the *updated* daemon. Release-only: a DEBUG build must never clobber the
         // user's installed release binaries (the bin/ copies and the LaunchAgent label are

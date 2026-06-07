@@ -378,8 +378,34 @@ enum SyntaxHighlighter {
             return ["fn", "let", "mut", "const", "struct", "enum", "impl", "trait", "pub", "use", "mod", "if", "else", "match", "for", "while", "loop", "return", "self", "Self", "true", "false", "async", "await", "move", "where", "type", "unsafe"]
         case "go":
             return ["package", "import", "func", "var", "const", "type", "struct", "interface", "if", "else", "for", "range", "switch", "case", "return", "go", "defer", "chan", "map", "nil", "true", "false", "select", "break", "continue"]
+        case "kt", "kts":
+            return ["fun", "val", "var", "class", "object", "interface", "import", "package", "if", "else", "when", "for", "while", "do", "return", "throw", "try", "catch", "finally", "is", "as", "in", "null", "true", "false", "this", "super", "override", "open", "abstract", "sealed", "data", "companion", "suspend", "lateinit", "by", "lazy"]
+        case "java":
+            return ["import", "package", "class", "interface", "extends", "implements", "public", "private", "protected", "static", "final", "abstract", "void", "new", "return", "if", "else", "for", "while", "do", "switch", "case", "break", "continue", "try", "catch", "finally", "throw", "throws", "this", "super", "null", "true", "false", "synchronized", "volatile"]
+        case "c", "h":
+            return ["include", "define", "ifdef", "ifndef", "endif", "if", "else", "for", "while", "do", "switch", "case", "break", "continue", "return", "void", "int", "char", "float", "double", "long", "short", "unsigned", "signed", "const", "static", "extern", "struct", "enum", "typedef", "sizeof", "NULL"]
+        case "cpp", "hpp", "cc", "cxx":
+            return ["include", "define", "ifdef", "ifndef", "endif", "if", "else", "for", "while", "do", "switch", "case", "break", "continue", "return", "void", "int", "char", "float", "double", "long", "short", "unsigned", "signed", "const", "static", "extern", "struct", "enum", "typedef", "sizeof", "NULL", "class", "public", "private", "protected", "virtual", "override", "new", "delete", "namespace", "using", "template", "typename", "auto", "nullptr", "true", "false", "throw", "try", "catch", "constexpr", "noexcept"]
+        case "sh", "bash", "zsh":
+            return ["if", "then", "else", "elif", "fi", "for", "while", "do", "done", "case", "esac", "in", "function", "return", "local", "export", "source", "echo", "exit", "true", "false", "set", "unset", "readonly"]
+        case "rb":
+            return ["def", "class", "module", "if", "elsif", "else", "unless", "end", "do", "while", "for", "in", "return", "yield", "begin", "rescue", "ensure", "raise", "nil", "true", "false", "self", "require", "include", "attr_accessor", "attr_reader", "puts", "lambda", "proc"]
+        case "toml":
+            return ["true", "false"]
         case "json", "yaml", "yml":
             return ["true", "false", "null", "yes", "no"]
+        case "html", "htm":
+            return ["html", "head", "body", "div", "span", "p", "a", "img", "script", "style", "link", "meta", "title", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "table", "tr", "td", "th", "form", "input", "button", "select", "option", "textarea"]
+        case "css", "scss", "sass":
+            return ["import", "media", "keyframes", "font-face", "supports", "inherit", "initial", "unset", "none", "auto", "block", "inline", "flex", "grid", "absolute", "relative", "fixed", "sticky", "hidden", "visible", "solid", "dashed", "dotted"]
+        case "sql":
+            return ["SELECT", "FROM", "WHERE", "INSERT", "INTO", "VALUES", "UPDATE", "SET", "DELETE", "CREATE", "TABLE", "ALTER", "DROP", "INDEX", "JOIN", "LEFT", "RIGHT", "INNER", "OUTER", "ON", "AND", "OR", "NOT", "NULL", "IS", "IN", "LIKE", "ORDER", "BY", "GROUP", "HAVING", "LIMIT", "OFFSET", "AS", "DISTINCT", "COUNT", "SUM", "AVG", "MAX", "MIN", "TRUE", "FALSE"]
+        case "dart":
+            return ["import", "class", "extends", "implements", "mixin", "abstract", "final", "const", "var", "void", "if", "else", "for", "while", "do", "switch", "case", "break", "continue", "return", "async", "await", "Future", "Stream", "null", "true", "false", "this", "super", "new", "throw", "try", "catch", "finally", "late", "required"]
+        case "lua":
+            return ["local", "function", "end", "if", "then", "else", "elseif", "for", "while", "do", "repeat", "until", "return", "nil", "true", "false", "and", "or", "not", "in", "require"]
+        case "php":
+            return ["function", "class", "interface", "extends", "implements", "public", "private", "protected", "static", "final", "abstract", "new", "return", "if", "else", "elseif", "for", "foreach", "while", "do", "switch", "case", "break", "continue", "try", "catch", "finally", "throw", "null", "true", "false", "echo", "require", "include", "namespace", "use", "as"]
         default:
             return []
         }
@@ -387,10 +413,20 @@ enum SyntaxHighlighter {
 
     private static func commentPattern(for ext: String) -> String? {
         switch ext {
-        case "swift", "ts", "tsx", "js", "jsx", "rs", "go", "c", "cpp", "h", "java", "kt":
+        case "swift", "ts", "tsx", "js", "jsx", "rs", "go", "c", "cpp", "h", "hpp", "cc", "cxx", "java", "kt", "kts", "dart", "scss":
             return #"//.*$|/\*[\s\S]*?\*/"#
         case "py", "rb", "sh", "bash", "zsh", "yaml", "yml", "toml":
             return "#.*$"
+        case "lua":
+            return #"--.*$|--\[\[[\s\S]*?\]\]"#
+        case "php":
+            return #"//.*$|/\*[\s\S]*?\*/|#.*$"#
+        case "sql":
+            return #"--.*$|/\*[\s\S]*?\*/"#
+        case "html", "htm":
+            return #"<!--[\s\S]*?-->"#
+        case "css", "sass":
+            return #"/\*[\s\S]*?\*/"#
         default:
             return nil
         }

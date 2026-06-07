@@ -8,22 +8,31 @@ PREVIEW_HOME="$ROOT/.harness-preview"
 APP="$PREVIEW_HOME/HarnessPreview.app"
 mkdir -p "$PREVIEW_HOME"
 
-echo "Building debug preview..."
-swift build --product Harness
-swift build --product HarnessDaemon
-swift build --product harness-cli
+# ─── Build (shared .build/debug output) ───────────────────────────────────────
+# Only rebuild if sources are newer than the binary, or binary doesn't exist.
+HARNESS_BIN="$ROOT/.build/debug/Harness"
+if [[ ! -x "$HARNESS_BIN" ]] || [[ -n "$(find "$ROOT/Packages" "$ROOT/Apps" "$ROOT/Tools" -name '*.swift' -newer "$HARNESS_BIN" 2>/dev/null | head -n1)" ]]; then
+  echo "Building debug..."
+  swift build --product Harness
+  swift build --product HarnessDaemon
+  swift build --product harness-cli
+else
+  echo "Build up-to-date, skipping."
+fi
 
 BUILD_DIR="$ROOT/.build/debug"
 
+# ─── Kill previous preview (ONLY preview, never prod) ─────────────────────────
 pkill -f "$APP/Contents/MacOS/Harness" 2>/dev/null || true
 pkill -f "$APP/Contents/MacOS/HarnessDaemon" 2>/dev/null || true
 rm -f "$PREVIEW_HOME/harness.sock" "$PREVIEW_HOME/daemon.pid"
 
+# ─── Package preview app bundle ───────────────────────────────────────────────
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
-cp "$ROOT/.build/debug/Harness" "$APP/Contents/MacOS/Harness"
-cp "$ROOT/.build/debug/HarnessDaemon" "$APP/Contents/MacOS/HarnessDaemon"
-cp "$ROOT/.build/debug/harness-cli" "$APP/Contents/MacOS/harness-cli"
+cp "$BUILD_DIR/Harness" "$APP/Contents/MacOS/Harness"
+cp "$BUILD_DIR/HarnessDaemon" "$APP/Contents/MacOS/HarnessDaemon"
+cp "$BUILD_DIR/harness-cli" "$APP/Contents/MacOS/harness-cli"
 chmod +x "$APP/Contents/MacOS/"*
 for bundle in "$BUILD_DIR"/*.bundle; do
   [[ -d "$bundle" ]] || continue
@@ -47,8 +56,6 @@ fi
 if [[ -f "$ROOT/Apps/Harness/Resources/HarnessLogo.png" ]]; then
   cp "$ROOT/Apps/Harness/Resources/HarnessLogo.png" "$APP/Contents/Resources/HarnessLogo.png"
 fi
-# Bundled "Symbols Nerd Font Mono" (MIT) — auto-activated via ATSApplicationFontsPath below
-# so Nerd Font / Powerline glyphs render in the preview too.
 if [[ -d "$ROOT/Apps/Harness/Resources/Fonts" ]]; then
   ditto "$ROOT/Apps/Harness/Resources/Fonts" "$APP/Contents/Resources/Fonts"
 fi
@@ -91,21 +98,22 @@ PLIST
 
 codesign --force --sign - --deep "$APP" >/dev/null
 
+# ─── Launch ───────────────────────────────────────────────────────────────────
+# The app's DaemonLauncher detects HarnessPreviewHome and spawns an isolated
+# daemon automatically — no need to pre-spawn one here.
 cat <<EOF
 
-Launching Harness preview.
-State directory:
-  $PREVIEW_HOME
+Launching Harness Preview (isolated SIT environment).
+State directory:  $PREVIEW_HOME
+Socket:           $PREVIEW_HOME/harness.sock
 
-This does not install Harness, create a DMG, or write to:
-  ~/Library/Application Support/Harness
+Production app is NOT affected.
 
-Preview CLI while it is running:
-  HARNESS_HOME="$PREVIEW_HOME" "$ROOT/.build/debug/harness-cli" ping
+Preview CLI:
+  HARNESS_HOME="$PREVIEW_HOME" "$BUILD_DIR/harness-cli" ping
 
 EOF
 
-# PREVIEW_SIGNPOSTS=1: turn on the frame signposter (FrameSignposter).
 if [[ "${PREVIEW_SIGNPOSTS:-0}" == "1" ]]; then
   open -n "$APP" --args -HARNESS_FRAME_SIGNPOSTS 1
 else
