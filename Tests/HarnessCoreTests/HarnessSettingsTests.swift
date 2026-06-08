@@ -179,6 +179,23 @@ final class HarnessSettingsTests: XCTestCase {
         XCTAssertFalse(decoded.notificationSoundEnabled)
     }
 
+    func testSecureKeyboardEntryDefaultsOffAndRoundTrips() throws {
+        // Opt-in security feature: a fresh install and any settings file predating it must decode
+        // to off (never silently force the global secure-input lock on for existing users).
+        XCTAssertFalse(HarnessSettings().secureKeyboardEntry)
+        let legacy = Data("""
+        { "fontSize": 14, "customBackgroundHex": "#000000" }
+        """.utf8)
+        let migrated = try JSONDecoder().decode(HarnessSettings.self, from: legacy)
+        XCTAssertFalse(migrated.secureKeyboardEntry)
+
+        // An explicit on value survives a save/load round-trip.
+        var settings = HarnessSettings()
+        settings.secureKeyboardEntry = true
+        let decoded = try JSONDecoder().decode(HarnessSettings.self, from: try JSONEncoder().encode(settings))
+        XCTAssertTrue(decoded.secureKeyboardEntry)
+    }
+
     func testNotchSettingsDefaultAndLegacyDecode() throws {
         XCTAssertEqual(HarnessSettings().notchVisibilityMode, .automatic)
         XCTAssertTrue(HarnessSettings().notchOpenOnHover)
