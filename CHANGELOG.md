@@ -45,6 +45,12 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 - **Primary device attributes (DA1) now advertise Sixel.** The `CSI c` reply is `CSI ?1;2;4c`
   (feature code `4` = Sixel), so tools that gate graphics on the DA1 response (`img2sixel`,
   `chafa`, `timg`) will actually emit Sixel — which the engine decodes.
+- **Three copy-mode motions were silently mis-aliased to the wrong action.** `next-word-end`
+  landed on a word *start* (aliased to `next-word`), `top-line`/`bottom-line` jumped to the
+  scrollback *extent* (aliased to `history-top`/`history-bottom`) instead of the visible top/bottom
+  row, and `back-to-indentation` went to column 0 ignoring indent (aliased to `start-of-line`).
+  Each is now its own motion — plus `middle-line` — and bound to the vi keys `e`, `H`/`M`/`L`,
+  and `^` in copy mode.
 - **Format conditionals can now nest an operator in the test.** `#{?#{==:#{pane_current_command},vim},…,…}`
   and friends (a `.tmux.conf` staple) previously evaluated the test only as a bare token, so any
   nested comparison/operator read as unknown → empty → falsy and the else-branch always won. The
