@@ -676,6 +676,16 @@ public final class RealPty: @unchecked Sendable {
         return (pid, cwd)
     }
 
+    /// Lightweight CWD probe: reads only the direct child shell's cwd via `proc_pidinfo`.
+    /// No process-tree walk — O(1) syscall, suitable for high-frequency polling (~500ms).
+    public func probeShellCwd() -> (pid: pid_t, cwd: String)? {
+        lifecycleLock.lock()
+        let pid = childPID
+        lifecycleLock.unlock()
+        guard pid > 0, let cwd = Self.cwd(for: pid) else { return nil }
+        return (pid, cwd)
+    }
+
     /// Name of the process that owns the terminal foreground (`#{pane_current_command}`):
     /// `tcgetpgrp` on the master names the foreground process group, whose leader's PID
     /// equals the group ID. Falls back to the spawned child when the ioctl fails (e.g. no

@@ -8,12 +8,16 @@ import HarnessCore
 public final class AgentScanner: @unchecked Sendable {
     public static let shared = AgentScanner()
     private var timer: DispatchSourceTimer?
+    private var cwdTimer: DispatchSourceTimer?
     private weak var registry: SurfaceRegistry?
     private let queue = DispatchQueue(label: "com.robert.harness.agent-scanner")
 
     public func start(registry: SurfaceRegistry) {
         self.registry = registry
-        timer?.cancel() // idempotent: a second start() must not leak the prior timer
+        timer?.cancel()
+        cwdTimer?.cancel()
+
+        // Full metadata scan (process tree walk + agent detection) — every 1.5s
         let timer = DispatchSource.makeTimerSource(queue: queue)
         timer.schedule(deadline: .now() + 1.5, repeating: 1.5)
         timer.setEventHandler { [weak self] in
@@ -21,12 +25,23 @@ public final class AgentScanner: @unchecked Sendable {
         }
         timer.resume()
         self.timer = timer
+
+        // Lightweight CWD-only probe (single proc_pidinfo per surface) — every 500ms
+        let cwdTimer = DispatchSource.makeTimerSource(queue: queue)
+        cwdTimer.schedule(deadline: .now() + 0.5, repeating: 0.5)
+        cwdTimer.setEventHandler { [weak self] in
+            self?.registry?.refreshCwdOnly()
+        }
+        cwdTimer.resume()
+        self.cwdTimer = cwdTimer
     }
 
     /// Stop the periodic scan (orderly daemon shutdown / between tests). Safe to call repeatedly.
     public func stop() {
         timer?.cancel()
         timer = nil
+        cwdTimer?.cancel()
+        cwdTimer = nil
     }
 
     private func scan() {

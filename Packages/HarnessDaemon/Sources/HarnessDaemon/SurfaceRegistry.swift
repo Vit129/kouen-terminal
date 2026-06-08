@@ -1168,6 +1168,40 @@ public final class SurfaceRegistry: @unchecked Sendable {
         if changed { commit() }
     }
 
+    /// Lightweight CWD-only refresh: reads each surface's direct shell PID cwd via a single
+    /// `proc_pidinfo` syscall (no process-tree walk). O(N) where N = open surfaces, ~0.1ms
+    /// total. Suitable for 500ms polling without significant CPU cost.
+    public func refreshCwdOnly() {
+        lock.lock()
+        let snap = Array(sessions)
+        lock.unlock()
+
+        let probed: [(key: String, session: RealPty, uuid: UUID, pid: pid_t, cwd: String)] = snap.compactMap { key, session in
+            guard let uuid = UUID(uuidString: key), let result = session.probeShellCwd() else { return nil }
+            return (key, session, uuid, result.pid, result.cwd)
+        }
+        guard !probed.isEmpty else { return }
+
+        lock.lock()
+        defer { lock.unlock() }
+        var changed = false
+        for entry in probed {
+            guard sessions[entry.key] === entry.session,
+                  entry.session.currentChildPID == entry.pid,
+                  let match = editor.tab(for: entry.uuid)
+            else { continue }
+            let tab = editor.snapshot.workspaces
+                .first(where: { $0.id == match.workspaceID })?
+                .sessions.flatMap { $0.tabs }
+                .first(where: { $0.id == match.tabID })
+            if tab?.cwd != entry.cwd {
+                editor.updateTabCwd(surfaceID: entry.uuid, path: entry.cwd)
+                changed = true
+            }
+        }
+        if changed { commit() }
+    }
+
     /// Count of identified clients, injected by `DaemonServer` (which owns the FDs) for
     /// `#{session_attached}`. Must be safe to call under `lock` from any thread — the
     /// server backs it with its own counter, never a hop onto the daemon queue.
