@@ -16,6 +16,10 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
   C1 string family (DCS/SOS/PM/APC) and consumes multi-byte escapes (intermediates + final).
 
 ### Changed
+- **Agent scanning builds the process tree once per tick.** The ~1.5s agent scan rebuilt the whole
+  `pid → ppid` map once *per surface*; it now builds it once per tick and shares it across all
+  surfaces (O(surfaces × processes) syscalls → O(processes)). The GUI shell-cwd tracker now uses
+  that same shared `ProcessScan` primitive instead of its own duplicate. No behavior change.
 - **Layout persistence moved off the input-latency path.** The daemon no longer does a full
   prettyPrinted `layout.json` encode + atomic write under the registry lock on every mutation;
   writes are now coalesced through a 0.5s debounce and flushed synchronously on graceful
