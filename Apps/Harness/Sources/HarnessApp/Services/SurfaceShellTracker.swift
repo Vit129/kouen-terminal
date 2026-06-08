@@ -114,24 +114,13 @@ final class SurfaceShellTracker {
     /// (root would be depth 0, immediate children depth 1, …). Used so we can
     /// prefer deeper PIDs when picking which process represents a surface.
     private nonisolated static func processTree(rootedAt root: pid_t) -> [(pid: pid_t, depth: Int)] {
-        let count = proc_listpids(UInt32(PROC_ALL_PIDS), 0, nil, 0)
-        guard count > 0 else { return [] }
-        let bufferCount = Int(count) / MemoryLayout<pid_t>.size
-        var pids = [pid_t](repeating: 0, count: bufferCount)
-        let bytes = proc_listpids(
-            UInt32(PROC_ALL_PIDS),
-            0,
-            &pids,
-            Int32(MemoryLayout<pid_t>.size * bufferCount)
-        )
-        let actual = Int(bytes) / MemoryLayout<pid_t>.size
-        let all = pids.prefix(actual).filter { $0 > 0 }
-
-        var parents: [pid_t: pid_t] = [:]
-        for pid in all { parents[pid] = parentPID(pid) }
-
+        // One source of process-tree truth: `ProcessScan.parentMap()` is the shared primitive the
+        // daemon's agent scanner uses too (previously this view kept its own `proc_listpids` +
+        // `parentPID` copy, which could drift). We still compute depth here since the tracker
+        // prefers the deepest PID per surface.
+        let parents = ProcessScan.parentMap()
         var result: [(pid: pid_t, depth: Int)] = []
-        for candidate in all where candidate != root {
+        for candidate in parents.keys where candidate != root {
             var cursor = candidate
             var depth = 0
             while let parent = parents[cursor], parent != 0, depth < 32 {
@@ -144,14 +133,6 @@ final class SurfaceShellTracker {
             }
         }
         return result
-    }
-
-    private nonisolated static func parentPID(_ pid: pid_t) -> pid_t {
-        var info = proc_bsdinfo()
-        let size = Int32(MemoryLayout<proc_bsdinfo>.size)
-        let bytes = proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &info, size)
-        guard bytes == size else { return 0 }
-        return pid_t(info.pbi_ppid)
     }
 
     /// Read another process's working directory via `proc_pidinfo`.
