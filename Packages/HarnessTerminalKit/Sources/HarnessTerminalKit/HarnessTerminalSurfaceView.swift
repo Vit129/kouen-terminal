@@ -942,6 +942,17 @@ public final class HarnessTerminalSurfaceView: NSView {
         return body(emulatorState.emulator)
     }
 
+    /// Snapshot the buffer text + cursor position for the accessibility (VoiceOver) layer, taken
+    /// atomically under the one emulator-access seam. Lives here (not the `+Accessibility` extension)
+    /// because `emulatorSync` is file-private. Lines are the full scrollback + screen, so VoiceOver
+    /// can review history; the cursor line is offset past the scrollback so it indexes those lines.
+    func accessibilitySnapshot() -> (lines: [String], cursorLine: Int, cursorColumn: Int) {
+        emulatorSync { emulator in
+            let cursor = emulator.readGrid().cursor
+            return (emulator.captureLines(joinWrapped: false), emulator.historyCount + cursor.row, cursor.col)
+        }
+    }
+
     /// Main-thread mirror of the emulator state the *input* paths need (key/mouse/paste encoding),
     /// refreshed by every parsed chunk's main hop in `receiveOffMain`. Reading the mirror keeps a
     /// keystroke from doing a `queue.sync` against the parser — a held arrow key must never stall
