@@ -242,9 +242,35 @@ public struct InputEncoder: Sendable {
 
     /// Wrap pasted text in bracketed-paste markers when the mode is enabled.
     public func encodePaste(_ text: String, modes: TerminalModes) -> [UInt8] {
-        let body = Array(text.utf8)
+        var body = Array(text.utf8)
         guard modes.bracketedPaste else { return body }
+        // Defang paste injection: a clipboard payload that itself contains the bracketed-paste END
+        // marker would otherwise close the paste early, so everything after it reaches the program
+        // as typed input — running on paste, the exact attack bracketed paste exists to prevent.
+        // Strip every embedded end marker before wrapping, like kitty/ghostty/foot. Only the 7-bit
+        // `ESC[201~` form is removed: all six bytes are ASCII (< 0x80) and so can never fall inside
+        // a UTF-8 multi-byte scalar in `body`, making the byte scan safe.
+        stripBracketedPasteEnd(&body)
         return esc("[200~") + body + esc("[201~")
+    }
+
+    /// Remove every 7-bit bracketed-paste end marker (`ESC [ 2 0 1 ~`) from `body`, in place.
+    private func stripBracketedPasteEnd(_ body: inout [UInt8]) {
+        let marker: [UInt8] = [0x1B, 0x5B, 0x32, 0x30, 0x31, 0x7E] // ESC [ 2 0 1 ~
+        // Common case — a paste with no ESC at all — touches nothing and allocates nothing.
+        guard body.contains(marker[0]) else { return }
+        var out: [UInt8] = []
+        out.reserveCapacity(body.count)
+        var i = 0
+        while i < body.count {
+            if body[i] == marker[0], i + marker.count <= body.count, body[i ..< i + marker.count].elementsEqual(marker) {
+                i += marker.count
+            } else {
+                out.append(body[i])
+                i += 1
+            }
+        }
+        body = out
     }
 
     // MARK: - Helpers
