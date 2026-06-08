@@ -25,6 +25,12 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
   process can't keylog keystrokes typed at a sudo / ssh-passphrase prompt. The lock is released
   whenever Harness is backgrounded or quits (balanced accounting, pinned by test).
 
+### Fixed
+- **Format conditionals can now nest an operator in the test.** `#{?#{==:#{pane_current_command},vim},…,…}`
+  and friends (a `.tmux.conf` staple) previously evaluated the test only as a bare token, so any
+  nested comparison/operator read as unknown → empty → falsy and the else-branch always won. The
+  test is now evaluated as a full expression. Also removes a dead identity-no-op helper.
+
 ### Security
 - **Paste-injection hardening.** A clipboard payload that embeds the bracketed-paste end marker
   (`ESC[201~`) can no longer terminate the paste early and run the trailing text as typed input —

@@ -120,16 +120,16 @@ public enum FormatString {
     private static func operatorEquals(_ body: String, context: FormatContext) -> String {
         let parts = topLevelSplit(body, on: ",")
         guard parts.count >= 2 else { return "" }
-        let a = evaluate(wrapInline(parts[0]), context: context)
-        let b = evaluate(wrapInline(parts[1]), context: context)
+        let a = evaluate(parts[0], context: context)
+        let b = evaluate(parts[1], context: context)
         return a == b ? "1" : ""
     }
 
     private static func operatorMatch(_ body: String, context: FormatContext) -> String {
         let parts = topLevelSplit(body, on: ",")
         guard parts.count >= 2 else { return "" }
-        let pattern = evaluate(wrapInline(parts[0]), context: context)
-        let str = evaluate(wrapInline(parts[1]), context: context)
+        let pattern = evaluate(parts[0], context: context)
+        let str = evaluate(parts[1], context: context)
         guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { return "" }
         return regex.firstMatch(in: str, range: NSRange(str.startIndex..., in: str)) != nil ? "1" : ""
     }
@@ -143,7 +143,7 @@ public enum FormatString {
         guard pieces.count == 3, let colon = pieces[2].firstIndex(of: ":") else { return "" }
         let re = pieces[0], rep = pieces[1]
         let flags = String(pieces[2][pieces[2].startIndex..<colon])
-        let target = evaluate(wrapInline(String(pieces[2][pieces[2].index(after: colon)...])), context: context)
+        let target = evaluate(String(pieces[2][pieces[2].index(after: colon)...]), context: context)
         var options: NSRegularExpression.Options = []
         if flags.contains("i") { options.insert(.caseInsensitive) }
         guard let regex = try? NSRegularExpression(pattern: re, options: options) else { return target }
@@ -156,8 +156,8 @@ public enum FormatString {
         let parts = topLevelSplit(String(body.dropFirst(2)), on: "|")
         guard parts.count >= 3 else { return "" }
         let op = parts[0].first.map(String.init) ?? "+"
-        let a = Double(evaluate(wrapInline(parts[1]), context: context).trimmingCharacters(in: .whitespaces)) ?? 0
-        let b = Double(evaluate(wrapInline(parts[2]), context: context).trimmingCharacters(in: .whitespaces)) ?? 0
+        let a = Double(evaluate(parts[1], context: context).trimmingCharacters(in: .whitespaces)) ?? 0
+        let b = Double(evaluate(parts[2], context: context).trimmingCharacters(in: .whitespaces)) ?? 0
         let result: Double
         switch op {
         case "-": result = a - b
@@ -239,18 +239,19 @@ public enum FormatString {
         // Split on top-level commas. Commas inside #{...} are protected.
         let parts = topLevelSplit(body, on: ",")
         guard parts.count >= 2 else { return "" }
-        let condition = resolve(token: parts[0], context: context)
+        // Evaluate the test as a full expression so a nested operator/comparison works, e.g.
+        // `#{?#{==:#{pane_current_command},vim},…,…}` (common in real `.tmux.conf`): a wrapped
+        // `#{…}` test runs through the token evaluator, a bare variable name resolves directly.
+        // (Previously the test was only ever resolved as a bare token, so any nested operator read
+        // as "unknown" → empty → falsy, and the else-branch always won.)
+        let test = parts[0]
+        let condition = test.contains("#{")
+            ? evaluate(test, context: context)
+            : evaluateToken(test, context: context)
         let truthy = !condition.isEmpty && condition != "0" && condition != "false"
-        if truthy { return evaluate(wrapInline(parts[1]), context: context) }
-        if parts.count >= 3 { return evaluate(wrapInline(parts[2]), context: context) }
+        if truthy { return evaluate(parts[1], context: context) }
+        if parts.count >= 3 { return evaluate(parts[2], context: context) }
         return ""
-    }
-
-    private static func wrapInline(_ part: String) -> String {
-        // If the part looks like a format string (has `#{`), pass through.
-        // Otherwise treat as literal text — that matches user intuition for
-        // `#{?agent_activity,● working,}` where `● working` is a literal.
-        part.contains("#{") ? part : part
     }
 
     private static func topLevelSplit(_ source: String, on separator: Character) -> [String] {
