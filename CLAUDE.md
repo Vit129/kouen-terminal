@@ -43,6 +43,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - IPC framing: control messages are 4-byte big-endian length-prefixed JSON. PTY hot paths use binary frames in `IPCCodec`: daemon-to-client output magic `0xF5` with sequence, and client-to-daemon input magic `0xF6` with surface id and raw bytes.
 - Remote daemon access still uses the same IPC protocol. `SSHTunnelManager` starts `ssh -N -L <local-socket>:<remote-socket>` and returns `Endpoint.unix`; native `Endpoint.tcp` is reserved and currently unsupported.
 - ACP is separate agent-process plumbing in `HarnessCore/ACP`: `ACPMessage` models JSON-RPC 2.0, `ACPTransport` frames messages with `Content-Length`, and `ACPProcess` launches an external agent binary over stdin/stdout.
+- **⚠️ ACP Client is shelved/experimental.** The Agent sidebar tab and Chat toggle in Settings are commented out. Reason: most CLI agents require separate ACP adapter binaries that aren't widely installed, PATH resolution inside macOS .app bundles is unreliable, and there's no way to control which tools an agent invokes. The underlying code (`ACPClient`, `ACPSession`, `AgentChatPanelView`, `AgentConfig`) remains intact for future re-enablement.
 - Shared command mapping lives in `CommandIPCTranslator` (`HarnessCore/Commands/CommandIPCTranslator.swift`). It maps parsed `Command` values to `IPCRequest`s for headless frontends and daemon hooks; GUI `MainExecutor` consults it while keeping AppKit-specific prompts/toasts local.
 
 ## Non-obvious constraints

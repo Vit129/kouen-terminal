@@ -2,6 +2,8 @@
 
 <!-- Flat table. Search by domain or trigger keywords at session start. -->
 <!-- Sequential IDs: CASE-001, CASE-002, etc. -->
+<!-- Max 120 chars per field. Archive rule: zero Applied+Prevented after 30 days → move to completed-archive.md -->
+<!-- Promote rule: recurring pattern (Applied 2+) → agent-memory/knowledge/*.md -->
 
 | ID | Trigger | Fix | Domain | Outcome | Applied | Prevented |
 |----|---------|-----|--------|---------|---------|-----------|
