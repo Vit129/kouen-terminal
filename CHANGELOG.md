@@ -16,6 +16,11 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
   written compactly (still deterministically key-sorted).
 
 ### Added
+- **`status-position` is now honored** (tmux `set -g status-position top|bottom`, default bottom).
+  The GUI status footer moves to the top or bottom of the window and its `status 2..5` rows
+  stack so the main line stays against the terminal; the `attach-window` compositor reserves and
+  paints the band at the matching edge. Changing it in Settings ▸ Advanced re-lays-out live.
+  Previously the option (and its Settings toggle) existed but nothing read it.
 - **`@`-prefixed user options.** `set-option @my_var value` is stored and `#{@my_var}` now renders
   it (resolved through the scope chain, global preferred) — the mechanism theme/status-line
   `.tmux.conf` plugins rely on. Previously `@`-options were accepted but `#{@foo}` always read empty.
