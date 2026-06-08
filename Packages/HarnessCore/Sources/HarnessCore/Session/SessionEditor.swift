@@ -33,14 +33,24 @@ public struct SessionEditor: Sendable {
         guard let workspaceIndex = snapshot.workspaces.firstIndex(where: { $0.id == workspaceID }) else {
             return nil
         }
-        let tab = Tab(cwd: existingWorkingDirectory(cwd))
+        let resolvedCwd = existingWorkingDirectory(cwd)
+        let tab = Tab(cwd: resolvedCwd)
         let session = SessionGroup(
             name: name ?? "",
             tabs: [tab],
             activeTabID: tab.id,
             sortOrder: snapshot.workspaces[workspaceIndex].sessions.count
         )
-        snapshot.workspaces[workspaceIndex].sessions.append(session)
+        // Insert adjacent to the last session sharing the same cwd (project grouping).
+        let sessions = snapshot.workspaces[workspaceIndex].sessions
+        if let lastSibling = sessions.lastIndex(where: { ($0.activeTab ?? $0.tabs.first)?.cwd == resolvedCwd }) {
+            snapshot.workspaces[workspaceIndex].sessions.insert(session, at: lastSibling + 1)
+        } else {
+            snapshot.workspaces[workspaceIndex].sessions.append(session)
+        }
+        for i in snapshot.workspaces[workspaceIndex].sessions.indices {
+            snapshot.workspaces[workspaceIndex].sessions[i].sortOrder = i
+        }
         snapshot.workspaces[workspaceIndex].activeSessionID = session.id
         bumpRevision()
         return session.id
@@ -422,6 +432,7 @@ public struct SessionEditor: Sendable {
         let session = workspace.sessions.remove(at: from)
         let target = max(0, min(workspace.sessions.count, toIndex))
         workspace.sessions.insert(session, at: target)
+        for i in workspace.sessions.indices { workspace.sessions[i].sortOrder = i }
         snapshot.workspaces[workspaceIndex] = workspace
         bumpRevision()
         return true

@@ -90,7 +90,13 @@ final class SurfaceShellTracker {
     /// outer wrappers are typically setuid `login` processes whose cwds macOS won't expose to a
     /// user-owned reader.
     private nonisolated static func computeSurfaceCwds() -> [String: String] {
-        let tree = processTree(rootedAt: getpid())
+        var tree = processTree(rootedAt: getpid())
+        // Daemon is a separate process; scan its subtree too for shells it spawned.
+        if let pidStr = try? String(contentsOf: HarnessPaths.daemonPIDURL, encoding: .utf8),
+           let daemonPID = Int32(pidStr.trimmingCharacters(in: .whitespacesAndNewlines)),
+           daemonPID != getpid() {
+            tree += processTree(rootedAt: daemonPID)
+        }
         var candidates: [String: [(pid: pid_t, depth: Int)]] = [:]
         for entry in tree {
             guard let env = environment(of: entry.pid),

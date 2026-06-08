@@ -27,7 +27,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
     /// Wraps the search field so it gets the same radius-7 elevated-surface chrome as
     /// the workspace pill and session cards.
     private let searchContainer = NSView()
-    private let sidebarTabs = NSSegmentedControl(labels: ["Sessions", "Files", "Git", "Agent"], trackingMode: .selectOne, target: nil, action: nil)
+    private let sidebarTabs = NSSegmentedControl(labels: ["Sessions", "Files", "Git"], trackingMode: .selectOne, target: nil, action: nil)
     private let agentChatPanel = AgentChatPanelView()
     private let sectionHeader = NSView()
     private let sectionLabel = NSTextField(labelWithString: "Sessions")
@@ -702,7 +702,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
             }
         case 3:
             sectionLabel.stringValue = "AGENT"
-            connectAgentIfNeeded()
+            // [ACP SHELVED] connectAgentIfNeeded()
         default:
             // Switching back to Sessions tab: rebuild cache so heightOfRow/viewFor
             // read O(1) cachedSidebarRows if sessions changed while tab was hidden.
@@ -1191,6 +1191,11 @@ final class HarnessSidebarPanelViewController: NSViewController {
         copyTitle.representedObject = session.id
         menu.addItem(copyTitle)
 
+        let copyID = NSMenuItem(title: "Copy Session ID", action: #selector(copySessionID(_:)), keyEquivalent: "")
+        copyID.target = self
+        copyID.representedObject = session.id
+        menu.addItem(copyID)
+
         menu.addItem(.separator())
 
         let splitRight = NSMenuItem(title: "Split session right", action: #selector(splitSessionFromMenu(_:)), keyEquivalent: "")
@@ -1275,6 +1280,12 @@ final class HarnessSidebarPanelViewController: NSViewController {
         let title = session.name.isEmpty ? sessionTitle(for: session) : session.name
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(title, forType: .string)
+    }
+
+    @objc private func copySessionID(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? SessionID else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(id.uuidString, forType: .string)
     }
 
     @objc private func splitSessionFromMenu(_ sender: NSMenuItem) {
@@ -2150,6 +2161,7 @@ final class SessionCardRowView: NSView {
         toolTip = nameIsDynamic ? (displayedAgentKind != nil ? "\(defaultTitle) — \(folder)" : folder) : "\(session.name) — \(folder)"
 
         var metaParts: [String] = []
+        metaParts.append(String(session.id.uuidString.prefix(8)))
         var repoWithBranch = folderName
         if let branch = tab.gitBranch, !branch.isEmpty {
             repoWithBranch += " (⎇ \(branch))"
