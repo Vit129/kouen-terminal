@@ -5,10 +5,11 @@ import HarnessCore
 final class GitPanelView: NSView {
     private var currentPath: String?
 
-    // Top tabs: Changes | History
-    private let tabSelector = NSSegmentedControl(labels: ["Changes", "History"], trackingMode: .selectOne, target: nil, action: nil)
+    // Top tabs: Changes | History | Worktrees
+    private let tabSelector = NSSegmentedControl(labels: ["Changes", "History", "Worktrees"], trackingMode: .selectOne, target: nil, action: nil)
     private let changesContainer = NSView()
     private let historyContainer = NSView()
+    private let worktreesContainer = NSView()
 
     // Changes view
     private let changesScroll = NSScrollView()
@@ -22,6 +23,11 @@ final class GitPanelView: NSView {
     // History view
     private let historyScroll = NSScrollView()
     private let historyStack = NSStackView()
+
+    // Worktrees view
+    private let worktreesScroll = NSScrollView()
+    private let worktreesStack = NSStackView()
+    private let addWorktreeButton = NSButton(title: "+", target: nil, action: nil)
 
     // Bottom bar: branch + fetch
     private let bottomBar = NSView()
@@ -99,6 +105,18 @@ final class GitPanelView: NSView {
         historyStack.orientation = .vertical; historyStack.alignment = .width; historyStack.spacing = 0
         setupScrollView(historyScroll, with: historyStack, in: historyContainer)
 
+        // Worktrees container
+        worktreesContainer.translatesAutoresizingMaskIntoConstraints = false
+        worktreesContainer.isHidden = true
+        worktreesStack.orientation = .vertical; worktreesStack.alignment = .width; worktreesStack.spacing = 0
+        setupScrollView(worktreesScroll, with: worktreesStack, in: worktreesContainer)
+
+        addWorktreeButton.bezelStyle = .recessed; addWorktreeButton.controlSize = .small
+        addWorktreeButton.font = .systemFont(ofSize: 12, weight: .semibold)
+        addWorktreeButton.target = self; addWorktreeButton.action = #selector(addWorktreeAction)
+        addWorktreeButton.isHidden = true
+        addWorktreeButton.translatesAutoresizingMaskIntoConstraints = false
+
         // Bottom bar
         bottomBar.translatesAutoresizingMaskIntoConstraints = false
         branchLabel.font = .monospacedSystemFont(ofSize: 11, weight: .medium)
@@ -124,6 +142,8 @@ final class GitPanelView: NSView {
         addSubview(commitField)
         addSubview(commitButton)
         addSubview(historyContainer)
+        addSubview(addWorktreeButton)
+        addSubview(worktreesContainer)
         addSubview(bottomBar)
 
         NSLayoutConstraint.activate([
@@ -151,6 +171,15 @@ final class GitPanelView: NSView {
             historyContainer.leadingAnchor.constraint(equalTo: leadingAnchor),
             historyContainer.trailingAnchor.constraint(equalTo: trailingAnchor),
             historyContainer.bottomAnchor.constraint(equalTo: bottomBar.topAnchor, constant: -4),
+
+            addWorktreeButton.topAnchor.constraint(equalTo: tabSelector.bottomAnchor, constant: 4),
+            addWorktreeButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
+            addWorktreeButton.widthAnchor.constraint(equalToConstant: 28),
+
+            worktreesContainer.topAnchor.constraint(equalTo: addWorktreeButton.bottomAnchor, constant: 2),
+            worktreesContainer.leadingAnchor.constraint(equalTo: leadingAnchor),
+            worktreesContainer.trailingAnchor.constraint(equalTo: trailingAnchor),
+            worktreesContainer.bottomAnchor.constraint(equalTo: bottomBar.topAnchor, constant: -4),
 
             bottomBar.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
             bottomBar.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
@@ -198,12 +227,14 @@ final class GitPanelView: NSView {
     // MARK: - Tab switching
 
     @objc private func tabChanged() {
-        let isHistory = tabSelector.selectedSegment == 1
-        changesContainer.isHidden = isHistory
-        commitField.isHidden = isHistory
-        commitButton.isHidden = isHistory
-        stageAllButton.isHidden = isHistory
-        historyContainer.isHidden = !isHistory
+        let selected = tabSelector.selectedSegment
+        changesContainer.isHidden = selected != 0
+        commitField.isHidden = selected != 0
+        commitButton.isHidden = selected != 0
+        stageAllButton.isHidden = selected != 0
+        historyContainer.isHidden = selected != 1
+        worktreesContainer.isHidden = selected != 2
+        addWorktreeButton.isHidden = selected != 2
     }
 
     // MARK: - Actions
@@ -262,6 +293,59 @@ final class GitPanelView: NSView {
         runAndRefresh(["commit", "-m", msg], clearField: true)
     }
 
+    @objc private func addWorktreeAction() {
+        guard let path = currentPath else { return }
+
+        let alert = NSAlert()
+        alert.messageText = "Add Worktree"
+        alert.addButton(withTitle: "Add")
+        alert.addButton(withTitle: "Cancel")
+
+        let stack = NSStackView()
+        stack.orientation = .vertical; stack.alignment = .width; stack.spacing = 8
+        stack.translatesAutoresizingMaskIntoConstraints = false
+
+        let pathField = NSTextField()
+        pathField.placeholderString = "/path/to/worktree"
+        pathField.translatesAutoresizingMaskIntoConstraints = false
+
+        let branchField = NSTextField()
+        branchField.placeholderString = "branch"
+        branchField.translatesAutoresizingMaskIntoConstraints = false
+
+        stack.addArrangedSubview(makeFieldRow("Path:", field: pathField))
+        stack.addArrangedSubview(makeFieldRow("Branch:", field: branchField))
+
+        let accessory = NSView(frame: NSRect(x: 0, y: 0, width: 320, height: 58))
+        accessory.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: accessory.topAnchor),
+            stack.leadingAnchor.constraint(equalTo: accessory.leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: accessory.trailingAnchor),
+            stack.bottomAnchor.constraint(equalTo: accessory.bottomAnchor),
+            pathField.widthAnchor.constraint(equalToConstant: 240),
+        ])
+        alert.accessoryView = accessory
+
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        let worktreePath = pathField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        let branch = branchField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !worktreePath.isEmpty, !branch.isEmpty else { return }
+
+        Task {
+            _ = await runGit(["worktree", "add", worktreePath, branch], in: path)
+            await refresh()
+        }
+    }
+
+    @objc private func removeWorktreeAction(_ sender: NSButton) {
+        guard let path = currentPath, let worktreePath = sender.toolTip else { return }
+        Task {
+            _ = await runGit(["worktree", "remove", worktreePath], in: path)
+            await refresh()
+        }
+    }
+
     @objc private func toggleStage(_ sender: NSButton) {
         guard let path = currentPath, let file = sender.toolTip else { return }
         // After click, .on means user wants to stage, .off means unstage
@@ -312,9 +396,18 @@ final class GitPanelView: NSView {
         for line in log.components(separatedBy: "\n").prefix(25) where !line.isEmpty {
             historyStack.addArrangedSubview(makeHistoryCard(line))
         }
+
+        await refreshWorktrees()
     }
 
     // MARK: - Row builders
+
+    private struct WorktreeEntry {
+        let path: String
+        let head: String
+        let branch: String
+        let isMain: Bool
+    }
 
     private func makeChangeRow(_ line: String) -> NSView {
         let xy = line.prefix(2)
@@ -388,10 +481,95 @@ final class GitPanelView: NSView {
         return card
     }
 
+    private func makeWorktreeRow(_ worktree: WorktreeEntry) -> NSView {
+        let card = NSView()
+        card.wantsLayer = true
+        card.translatesAutoresizingMaskIntoConstraints = false
+
+        let name = NSTextField(labelWithString: (worktree.path as NSString).lastPathComponent)
+        name.font = .systemFont(ofSize: 12, weight: .bold)
+        name.textColor = HarnessDesign.chrome.textPrimary
+        name.lineBreakMode = .byTruncatingTail
+        name.toolTip = worktree.path
+        name.translatesAutoresizingMaskIntoConstraints = false
+
+        let meta = NSTextField(labelWithString: "\(worktree.branch) · \(String(worktree.head.prefix(7)))")
+        meta.font = .systemFont(ofSize: 10)
+        meta.textColor = HarnessDesign.chrome.textTertiary
+        meta.lineBreakMode = .byTruncatingTail
+        meta.translatesAutoresizingMaskIntoConstraints = false
+
+        let removeButton = NSButton(title: "✕", target: self, action: #selector(removeWorktreeAction(_:)))
+        removeButton.bezelStyle = .recessed; removeButton.controlSize = .small
+        removeButton.font = .systemFont(ofSize: 11, weight: .medium)
+        removeButton.toolTip = worktree.path
+        removeButton.isHidden = worktree.isMain
+        removeButton.translatesAutoresizingMaskIntoConstraints = false
+
+        card.addSubview(name)
+        card.addSubview(meta)
+        card.addSubview(removeButton)
+        NSLayoutConstraint.activate([
+            card.heightAnchor.constraint(equalToConstant: 40),
+            name.topAnchor.constraint(equalTo: card.topAnchor, constant: 5),
+            name.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 10),
+            name.trailingAnchor.constraint(equalTo: removeButton.leadingAnchor, constant: -8),
+            meta.topAnchor.constraint(equalTo: name.bottomAnchor, constant: 1),
+            meta.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 10),
+            meta.trailingAnchor.constraint(equalTo: removeButton.leadingAnchor, constant: -8),
+            removeButton.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -8),
+            removeButton.centerYAnchor.constraint(equalTo: card.centerYAnchor),
+            removeButton.widthAnchor.constraint(equalToConstant: 24),
+        ])
+        return card
+    }
+
+    private func makeFieldRow(_ label: String, field: NSTextField) -> NSView {
+        let labelView = NSTextField(labelWithString: label)
+        labelView.font = .systemFont(ofSize: 12)
+        labelView.textColor = HarnessDesign.chrome.textSecondary
+        labelView.translatesAutoresizingMaskIntoConstraints = false
+
+        let row = NSStackView(views: [labelView, field])
+        row.orientation = .horizontal; row.alignment = .centerY; row.spacing = 8
+        row.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            labelView.widthAnchor.constraint(equalToConstant: 52),
+        ])
+        return row
+    }
+
     private func makeLabel(_ text: String) -> NSTextField {
         let l = NSTextField(labelWithString: text)
         l.font = .systemFont(ofSize: 11.5); l.textColor = HarnessDesign.chrome.textTertiary
         return l
+    }
+
+    private func refreshWorktrees() async {
+        guard let path = currentPath else { return }
+        let output = await runGit(["worktree", "list", "--porcelain"], in: path)
+
+        worktreesStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+
+        let entries = output.components(separatedBy: "\n\n").enumerated().compactMap { index, block -> WorktreeEntry? in
+            let lines = block.components(separatedBy: "\n").filter { !$0.isEmpty }
+            guard let worktreeLine = lines.first(where: { $0.hasPrefix("worktree ") }),
+                  let headLine = lines.first(where: { $0.hasPrefix("HEAD ") }) else { return nil }
+            let worktreePath = String(worktreeLine.dropFirst("worktree ".count))
+            let head = String(headLine.dropFirst("HEAD ".count))
+            let branchLine = lines.first(where: { $0.hasPrefix("branch ") })
+            let branch = branchLine.map { line in
+                let ref = String(line.dropFirst("branch ".count))
+                return ref.hasPrefix("refs/heads/") ? String(ref.dropFirst("refs/heads/".count)) : ref
+            } ?? "detached"
+            return WorktreeEntry(path: worktreePath, head: head, branch: branch, isMain: index == 0)
+        }
+
+        if entries.isEmpty {
+            worktreesStack.addArrangedSubview(makeLabel("No worktrees"))
+        } else {
+            entries.forEach { worktreesStack.addArrangedSubview(makeWorktreeRow($0)) }
+        }
     }
 
     // MARK: - Git
