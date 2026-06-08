@@ -88,8 +88,11 @@ public enum FormatString {
             let count = max(0, parsed)
             let inner = String(body[body.index(after: colon)...])
             let resolved = evaluate(wrap(inner), context: context)
-            if resolved.count <= count { return resolved }
-            return String(resolved.prefix(count))
+            // Truncate by display columns, not Swift Character count: a CJK/emoji glyph is two
+            // cells, so a character-count prefix would overrun the requested width in the status
+            // bar (matching the display-width-aware status clipping). DisplayWidth.prefix also cuts
+            // on grapheme boundaries, so a combining sequence is never split.
+            return DisplayWidth.prefix(resolved, maxColumns: count)
         }
         // Strftime time formatter: #{time:%H:%M}
         //
@@ -163,7 +166,16 @@ public enum FormatString {
         case "%": result = b == 0 ? 0 : a.truncatingRemainder(dividingBy: b)
         default: result = a + b
         }
-        return result == result.rounded() ? String(Int(result)) : String(result)
+        // Only stringify as an integer when the value is finite, whole, AND fits in Int.
+        // `Int(Double)` traps on infinite/NaN or out-of-range magnitudes (e.g.
+        // `#{e|*|1e10|1e10}` = 1e20 > Int.max, or an operand that parses to +inf), and
+        // status formats re-render every frame, so a trap here would crash-loop the
+        // renderer / daemon — the same "degrade to text, never crash" invariant the
+        // negative-width clamp upholds.
+        if result.isFinite, result == result.rounded(), let whole = Int(exactly: result) {
+            return String(whole)
+        }
+        return String(result)
     }
 
     /// Split into at most `max` pieces by `delim` (no nesting awareness — for `s///` parts).
@@ -313,7 +325,10 @@ public enum FormatString {
 
     private static func resolve(token: String, context: FormatContext) -> String {
         switch token {
-        case "pane_id": return context.paneID ?? ""
+        // tmux renders pane ids as `%id`; the `%` prefix matches the `-t` pane grammar
+        // (TargetSpec.parsePaneToken) so a displayed id round-trips straight into a target,
+        // exactly like session_id (`$`) and window_id (`@`) below.
+        case "pane_id": return context.paneID.map { "%" + $0 } ?? ""
         case "pane_title", "pane_name": return context.paneTitle ?? ""
         case "pane_cwd", "pane_current_path": return context.paneCwd ?? ""
         case "cwd_basename":

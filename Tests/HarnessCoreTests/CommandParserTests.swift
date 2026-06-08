@@ -322,6 +322,20 @@ final class CommandParserTests: XCTestCase {
         )
     }
 
+    func testDisplayMenuIgnoresTrailingPartialTriple() throws {
+        // A dangling group that isn't a full (title, key, command) triple is dropped,
+        // not crashed on — the loop only consumes complete triples.
+        XCTAssertEqual(
+            try CommandParser.parse(#"display-menu "Item A" a kill-pane "Item B" b"#),
+            .displayMenu(items: [.init(title: "Item A", key: "a", command: .killPane)])
+        )
+        // No positional triples at all yields an empty menu.
+        XCTAssertEqual(
+            try CommandParser.parse(#"display-menu -T "Menu""#),
+            .displayMenu(items: [])
+        )
+    }
+
     // MARK: - Config / buffer / hook verbs (bindable forms)
 
     func testSetOptionParsesScopesAndJoinsValue() throws {
@@ -389,21 +403,21 @@ final class CommandParserTests: XCTestCase {
         // No flags: match name + title (cheap snapshot fields), not content.
         XCTAssertEqual(
             try CommandParser.parse("find-window api"),
-            .findWindow(pattern: "api", matchName: true, matchContent: false, matchTitle: true)
+            .findWindow(pattern: "api", matchName: true, matchContent: false, matchTitle: true, target: nil)
         )
         XCTAssertEqual(
             try CommandParser.parse("find-window -C 'error 42'"),
-            .findWindow(pattern: "error 42", matchName: false, matchContent: true, matchTitle: false)
+            .findWindow(pattern: "error 42", matchName: false, matchContent: true, matchTitle: false, target: nil)
         )
         XCTAssertEqual(
             try CommandParser.parse("find-window -N -T build"),
-            .findWindow(pattern: "build", matchName: true, matchContent: false, matchTitle: true)
+            .findWindow(pattern: "build", matchName: true, matchContent: false, matchTitle: true, target: nil)
         )
         XCTAssertThrowsError(try CommandParser.parse("find-window"))
-        // A `-t` value is a (currently unsupported) target, never the pattern.
+        // A `-t` value is the search scope (a session), captured as the target — never the pattern.
         XCTAssertEqual(
             try CommandParser.parse("find-window -t somewhere build"),
-            .findWindow(pattern: "build", matchName: true, matchContent: false, matchTitle: true)
+            .findWindow(pattern: "build", matchName: true, matchContent: false, matchTitle: true, target: "somewhere")
         )
     }
 
