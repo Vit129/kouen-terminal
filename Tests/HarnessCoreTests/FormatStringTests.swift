@@ -35,6 +35,22 @@ final class FormatStringTests: XCTestCase {
                        "idle")
     }
 
+    func testConditionalTestEvaluatesNestedOperators() {
+        // The conditional TEST may itself be a nested operator/comparison — a `.tmux.conf` staple
+        // like `#{?#{==:#{pane_current_command},vim},…,…}`. Before, the test was only resolved as a
+        // bare token, so any nested operator read as unknown → empty → falsy and the else always won.
+        let ctx = context()
+        XCTAssertEqual(FormatString.evaluate("#{?#{==:a,a},Y,N}", context: ctx), "Y")
+        XCTAssertEqual(FormatString.evaluate("#{?#{==:a,b},Y,N}", context: ctx), "N")
+        // …with a token resolved inside the comparison (session_name == "work").
+        XCTAssertEqual(FormatString.evaluate("#{?#{==:#{session_name},work},Y,N}", context: ctx), "Y")
+        XCTAssertEqual(FormatString.evaluate("#{?#{==:#{session_name},nope},Y,N}", context: ctx), "N")
+        // A nested regex-match test resolves too.
+        XCTAssertEqual(FormatString.evaluate("#{?#{m:wor,#{session_name}},Y,N}", context: ctx), "Y")
+        // The bare-variable test path is unchanged (regression): a non-empty variable is truthy.
+        XCTAssertEqual(FormatString.evaluate("#{?session_name,Y,N}", context: ctx), "Y")
+    }
+
     func testTruncationCapsLength() {
         let result = FormatString.evaluate("#{=4:pane_cwd}", context: context())
         XCTAssertEqual(result, "/Use")
