@@ -6,6 +6,20 @@ All notable changes to Harness are documented here. The format is based on
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/robzilla1738/harness-terminal/releases).
 
+## [2.2.2] - 2026-06-08
+
+### Fixed
+- **File preview text rendering.** Reverted NSTextView layout changes that caused text
+  to be invisible (zero-width text container). Preview now reliably displays file content.
+- **File path handling.** Strip surrounding quotes and resolve symlinks when opening
+  file paths from terminal clicks or sidebar.
+
+### Added
+- **Draggable file editor divider.** The editor/terminal split can now be resized by
+  dragging, like Zed.
+- **Cmd-click file paths in terminal.** Detect and open quoted/unquoted file paths,
+  `file://` URLs, and paths with `:line:col` suffixes.
+
 ## [2.2.1] - 2026-06-08
 
 ### Fixed

@@ -96,6 +96,9 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
+codesign --force --sign - --entitlements "$ROOT/Harness.entitlements" "$APP/Contents/MacOS/Harness" >/dev/null
+codesign --force --sign - --entitlements "$ROOT/Harness.entitlements" "$APP/Contents/MacOS/HarnessDaemon" >/dev/null
+codesign --force --sign - --entitlements "$ROOT/Harness.entitlements" "$APP/Contents/MacOS/harness-cli" >/dev/null
 codesign --force --sign - --deep "$APP" >/dev/null
 
 # ─── Launch ───────────────────────────────────────────────────────────────────

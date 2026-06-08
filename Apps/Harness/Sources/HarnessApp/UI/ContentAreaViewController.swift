@@ -410,6 +410,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
     private var fileEditorTabBar: FileEditorTabBarView?
     private var terminalHostLeading: NSLayoutConstraint?
     private var editorWidthConstraint: NSLayoutConstraint?
+    private var editorDivider: NSView?
 
     private func showFileEditorSplit() {
         if fileEditorPanel != nil {
@@ -420,8 +421,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         let panel = NSView()
         panel.wantsLayer = true
         let c = HarnessDesign.chrome
-        // Match terminal background (includes user's opacity setting)
-        panel.layer?.backgroundColor = c.terminalBackground.withAlphaComponent(HarnessChrome.backgroundOpacity).cgColor
+        panel.layer?.backgroundColor = c.terminalBackground.cgColor
         panel.layer?.borderColor = c.border.cgColor
         panel.layer?.borderWidth = 1
         panel.translatesAutoresizingMaskIntoConstraints = false
@@ -450,15 +450,32 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         ])
 
         view.addSubview(panel)
-        // Editor: 40% width, pinned left aligned with terminalHost
-        let widthC = panel.widthAnchor.constraint(equalTo: terminalHost.widthAnchor, multiplier: 0.4 / 0.6)
+        // Editor: start at 40% width, draggable
+        let initialWidth = view.bounds.width > 0 ? view.bounds.width * 0.4 : 400
+        let widthC = panel.widthAnchor.constraint(equalToConstant: initialWidth)
+        widthC.priority = .defaultHigh
         NSLayoutConstraint.activate([
             panel.topAnchor.constraint(equalTo: terminalHost.topAnchor),
             panel.bottomAnchor.constraint(equalTo: terminalHost.bottomAnchor),
             panel.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             widthC,
+            panel.widthAnchor.constraint(greaterThanOrEqualToConstant: 200),
         ])
         editorWidthConstraint = widthC
+
+        // Drag divider between editor and terminal
+        let divider = EditorDividerView()
+        divider.translatesAutoresizingMaskIntoConstraints = false
+        divider.widthConstraint = widthC
+        divider.containerView = view
+        view.addSubview(divider)
+        NSLayoutConstraint.activate([
+            divider.topAnchor.constraint(equalTo: panel.topAnchor),
+            divider.bottomAnchor.constraint(equalTo: panel.bottomAnchor),
+            divider.leadingAnchor.constraint(equalTo: panel.trailingAnchor, constant: -2),
+            divider.widthAnchor.constraint(equalToConstant: 5),
+        ])
+        editorDivider = divider
 
         // Shift terminalHost leading to make room
         if let existing = terminalHostLeading {
@@ -474,10 +491,12 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
     private func hideFileEditorSplit() {
         guard let panel = fileEditorPanel else { return }
         panel.removeFromSuperview()
+        editorDivider?.removeFromSuperview()
         fileEditorPanel = nil
         fileEditorView = nil
         fileEditorTabBar = nil
         editorWidthConstraint = nil
+        editorDivider = nil
         // Restore terminalHost leading to view edge
         if let lc = terminalHostLeading {
             lc.isActive = false
@@ -832,5 +851,32 @@ final class HarnessSplitView: NSSplitView, NSSplitViewDelegate {
         }
         ratioDebounce = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: work)
+    }
+}
+
+// MARK: - Draggable divider between file editor and terminal
+
+@MainActor
+private final class EditorDividerView: NSView {
+    weak var widthConstraint: NSLayoutConstraint?
+    weak var containerView: NSView?
+    private var dragStartX: CGFloat = 0
+    private var dragStartWidth: CGFloat = 0
+
+    override func resetCursorRects() {
+        addCursorRect(bounds, cursor: .resizeLeftRight)
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        dragStartX = event.locationInWindow.x
+        dragStartWidth = widthConstraint?.constant ?? 0
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard let wc = widthConstraint, let container = containerView else { return }
+        let delta = event.locationInWindow.x - dragStartX
+        let maxWidth = container.bounds.width - 200
+        let newWidth = min(max(200, dragStartWidth + delta), maxWidth)
+        wc.constant = newWidth
     }
 }
