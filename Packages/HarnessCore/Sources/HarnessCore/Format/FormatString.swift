@@ -325,6 +325,8 @@ public enum FormatString {
     }
 
     private static func resolve(token: String, context: FormatContext) -> String {
+        // User options (`#{@name}`): resolved by the builder into `userOptions`. Unset → empty.
+        if token.hasPrefix("@") { return context.userOptions[token] ?? "" }
         switch token {
         // tmux renders pane ids as `%id`; the `%` prefix matches the `-t` pane grammar
         // (TargetSpec.parsePaneToken) so a displayed id round-trips straight into a target,
@@ -435,6 +437,10 @@ public struct FormatContext: Sendable {
     public var clientHeight: Int?
     public var clientTTY: String?
     public var clientTermname: String?
+    /// User options (`@`-prefixed, e.g. `@my_var`) resolved for this vantage point's scope chain.
+    /// Keyed by the full option name *including* the `@`, matching `#{@name}` and the OptionStore
+    /// key. The builder fills it from the OptionStore; `#{@unset}` renders empty.
+    public var userOptions: [String: String] = [:]
 
     public init(
         paneID: String? = nil,

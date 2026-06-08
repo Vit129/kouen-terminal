@@ -60,6 +60,42 @@ public final class OptionStore: @unchecked Sendable {
     ]
     private static func canonical(_ key: String) -> String { keyAliases[key] ?? key }
 
+    /// Recognized option names beyond `builtinDefaults`: options Harness reads but doesn't seed a
+    /// default for (`status-center`, the per-row `status-format-<N>`), plus real tmux options
+    /// Harness accepts for `.tmux.conf` compatibility even when not yet honored (so migrating a
+    /// config doesn't hard-fail). A name that is neither here, in `builtinDefaults`/`keyAliases`,
+    /// nor `@`-prefixed is a typo or an unsupported invention and is rejected by `set-option`.
+    private static let additionalRecognizedKeys: Set<String> = [
+        // Implemented but unseeded (no global default; written per-tab by the sync-panes toggle).
+        "synchronize-panes",
+        // Read but intentionally unseeded (empty default).
+        "status-center",
+        // Common tmux options Harness recognizes but does not yet fully honor — accepted so a
+        // real `.tmux.conf` migrates without a loud failure (tracked on the parity roadmap).
+        "status-interval", "status-justify", "status-keys", "status-style", "status-bg", "status-fg",
+        "message-style", "message-command-style", "mode-style",
+        "window-status-style", "window-status-current-style", "window-status-format",
+        "window-status-current-format", "window-status-separator", "window-status-activity-style",
+        "pane-border-style", "pane-active-border-style", "display-panes-time", "display-panes-colour",
+        "word-separators", "wrap-search", "aggressive-resize", "destroy-unattached",
+        "visual-bell", "visual-activity", "visual-silence", "bell-action", "activity-action",
+        "silence-action", "escape-time", "focus-events", "default-shell", "default-command",
+        "default-size", "set-titles-string", "assume-paste-time", "cursor-style",
+    ]
+
+    /// Whether `key` is a settable option: a known Harness/tmux option name, or a `@`-prefixed user
+    /// option (always allowed — arbitrary user storage). Drives `set-option`'s loud rejection of
+    /// unknown keys, so a typo like `moused` fails instead of being silently stored and never read.
+    public static func isRecognizedOptionKey(_ rawKey: String) -> Bool {
+        if rawKey.hasPrefix("@") { return rawKey.count > 1 } // user option (must name something)
+        let key = canonical(rawKey)
+        if builtinDefaults[key] != nil || keyAliases[rawKey] != nil { return true }
+        if additionalRecognizedKeys.contains(key) { return true }
+        // Per-row status format (`status-format-0`, `status-format-1`, …).
+        if key.hasPrefix("status-format-"), Int(key.dropFirst("status-format-".count)) != nil { return true }
+        return false
+    }
+
     public func get(_ rawKey: String, scope: Scope = .global, target: String? = nil) -> Value? {
         let key = Self.canonical(rawKey)
         lock.lock(); defer { lock.unlock() }
