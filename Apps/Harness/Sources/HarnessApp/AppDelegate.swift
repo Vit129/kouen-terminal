@@ -42,6 +42,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         notchController?.start()
         PrefixKeymap.shared.install()
         SurfaceShellTracker.shared.start()
+        // Secure keyboard entry: take the process-global keylogging lock while frontmost iff the
+        // user enabled it. Observes app-active transitions and releases the lock on resign/terminate.
+        SecureKeyboardEntry.shared.start()
         // Follow the macOS system appearance for auto light/dark theme switching. The startup
         // application happens post-daemon-sync below (so the theme change reaches a ready daemon);
         // this observer handles every later Light/Dark flip.
@@ -138,6 +141,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // "keep my work"), and the next clean quit will reap them. Synchronous + longer-timeout +
         // single retry so a momentarily busy daemon still reaps before the process exits.
         SessionCoordinator.shared.closeEphemeralSessionsBeforeQuit()
+        // Balance any held secure-input enable before the process exits so the OS lock is never
+        // leaked (a stranded enable forces secure input on system-wide until reboot).
+        SecureKeyboardEntry.shared.releaseForShutdown()
     }
 
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {

@@ -1502,6 +1502,15 @@ final class SessionCoordinator: NSObject {
         }
     }
 
+    /// Persist the secure-keyboard-entry setting and apply it immediately (takes/releases the
+    /// process-global secure-input lock based on the new value + current app-active state).
+    func setSecureKeyboardEntry(_ enabled: Bool) {
+        guard settings.secureKeyboardEntry != enabled else { return }
+        settings.secureKeyboardEntry = enabled
+        try? settings.save()
+        SecureKeyboardEntry.shared.settingChanged()
+    }
+
     private func startMetadataRefresh() {
         metadataTask?.cancel()
         metadataTask = Task { [weak self] in
