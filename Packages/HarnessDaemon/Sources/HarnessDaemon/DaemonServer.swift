@@ -598,9 +598,11 @@ public final class DaemonServer: @unchecked Sendable {
         // socket layer. Otherwise a scan/monitor tick could fire against a half-stopped server.
         AgentScanner.shared.stop()
         registry.stopMonitoring()
-        // Persist any buffered scrollback before tearing down, so a graceful restart replays the
-        // most recent output instead of losing the last debounce window.
+        // Persist any buffered scrollback AND the latest layout snapshot before tearing down, so a
+        // graceful restart replays the most recent output and restores the last committed layout
+        // instead of losing the last debounce window of either.
         registry.flushAllScrollback()
+        registry.flushSnapshot()
         queue.sync {
             listener?.cancel() // cancel handler closes the listener fd
             listener = nil

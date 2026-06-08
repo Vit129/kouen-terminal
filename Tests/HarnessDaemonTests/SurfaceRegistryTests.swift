@@ -201,6 +201,20 @@ final class SurfaceRegistryTests: XCTestCase {
         XCTAssertGreaterThan(registry.snapshot.revision, startRevision)
     }
 
+    /// Layout writes are now debounced (off the per-mutation critical path), so a graceful shutdown
+    /// must flush the latest snapshot synchronously — otherwise the last debounce window of layout
+    /// changes would be lost on restart. `flushSnapshot()` is the path `DaemonServer.stop()` calls.
+    func testFlushSnapshotPersistsLatestLayoutSynchronously() {
+        let registry = SurfaceRegistry()
+        guard case let .workspaceID(wsID) = registry.handle(.newWorkspace(name: "flush-me")) else {
+            return XCTFail("expected workspaceID")
+        }
+        registry.flushSnapshot()
+        let reloaded = SessionStore().load()
+        XCTAssertTrue(reloaded.workspaces.contains { $0.id == wsID && $0.name == "flush-me" },
+                      "flushSnapshot must persist the latest layout for a graceful restart")
+    }
+
     func testNewTabUsesConfiguredShellWhenProvided() throws {
         let registry = SurfaceRegistry()
         let fish = try makeExecutable(named: "fish", contents: "#!/bin/sh\nsleep 2\n")
