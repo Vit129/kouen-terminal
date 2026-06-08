@@ -476,12 +476,21 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
             split.trailingAnchor.constraint(equalTo: terminalHost.trailingAnchor),
             split.bottomAnchor.constraint(equalTo: terminalHost.bottomAnchor),
         ])
-        // Set initial 50/50 split
-        DispatchQueue.main.async {
-            let total = split.bounds.width
-            if total > 0 { split.setPosition(total * 0.3, ofDividerAt: 0) }
-        }
+        // Set file editor to 40% width, terminal 60%
+        split.arrangesAllSubviews = true
         fileEditorSplit = split
+        DispatchQueue.main.async { [weak split] in
+            guard let split, split.bounds.width > 0 else {
+                // Retry once after layout
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak split] in
+                    guard let split else { return }
+                    let total = split.bounds.width
+                    if total > 0 { split.setPosition(total * 0.4, ofDividerAt: 0) }
+                }
+                return
+            }
+            split.setPosition(split.bounds.width * 0.4, ofDividerAt: 0)
+        }
     }
 
     private func hideFileEditorSplit() {
