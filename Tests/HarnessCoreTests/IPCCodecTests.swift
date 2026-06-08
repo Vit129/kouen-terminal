@@ -5,32 +5,10 @@ final class IPCCodecTests: XCTestCase {
     /// Encode → decode → re-encode must be byte-stable (IPCRequest/Response aren't
     /// Equatable, so we compare the encoded form).
     func testRequestRoundTripIsStable() throws {
-        let requests: [IPCRequest] = [
-            .ping,
-            .listSurfaces,
-            .newTab(workspaceID: UUID(), cwd: "/tmp/project", shell: "/opt/homebrew/bin/fish"),
-            .newSession(workspaceID: UUID(), cwd: "/tmp/project", name: "api", shell: "/bin/zsh"),
-            .newTabInWorkspace(named: "Default", cwd: "/tmp/project", shell: "/bin/bash"),
-            .reorderTab(workspaceID: UUID(), tabID: UUID(), toIndex: 3),
-            .resizePaneRatio(tabID: UUID(), firstPaneID: UUID(), secondPaneID: UUID(), ratio: 0.42),
-            .sendData(surfaceID: "surface-1", data: Data([0, 1, 2, 254, 255])),
-            .notify(surfaceID: "surface-1", title: "Agent", body: "Needs approval"),
-            .newSplit(tabID: UUID(), paneID: UUID(), direction: .vertical, shell: "/opt/homebrew/bin/fish"),
-            .selectPane(tabID: UUID(), paneID: UUID()),
-            .identifyClient(label: "harness-cli attach"),
-            .listClients,
-            .detachClient(clientID: UUID()),
-            .daemonStats,
-            .subscribeSurfaceOutput(surfaceID: "surface-1", label: "harness-cli attach"),
-            .subscribeSurfaceOutput(surfaceID: "surface-1", label: nil),
-            .setBuffer(name: "scratch", data: Data("hello".utf8)),
-            .setBuffer(name: nil, data: Data([1, 2, 3])),
-            .getBuffer(name: "scratch"),
-            .getBuffer(name: nil),
-            .listBuffers,
-            .deleteBuffer(name: "scratch"),
-            .pasteBuffer(surfaceID: "surface-1", name: "scratch", bracketed: true),
-        ]
+        // The full case list (see `allRequestSamples` + the `requestExhaustivenessTripwire`
+        // compile-time guard) round-trips, not a hand-picked subset — a new IPCRequest case
+        // breaks the build until it's added here, so the wire format can't silently regress.
+        let requests = Self.allRequestSamples
         for request in requests {
             let original = try IPCCodec.encode(IPCEnvelope(request: request))
             var buffer = original
@@ -70,48 +48,9 @@ final class IPCCodecTests: XCTestCase {
     }
 
     func testResponseRoundTripIsStable() throws {
-        let responses: [IPCResponse] = [
-            .ok,
-            .pong,
-            .tabID(UUID()),
-            .paneID(UUID()),
-            .text("scrollback contents"),
-            .data(Data([9, 8, 7]), sequence: 42),
-            .clientID(UUID()),
-            .clients([
-                ClientSummary(
-                    id: UUID(),
-                    label: "harness-cli attach",
-                    attachedSurfaceIDs: ["surface-1", "surface-2"],
-                    connectedAt: Date(timeIntervalSince1970: 1_700_000_000)
-                ),
-            ]),
-            .daemonStats(DaemonStats(
-                pid: 1234,
-                uptimeSeconds: 42.5,
-                surfaceCount: 7,
-                totalScrollbackBytes: 12_345,
-                clientCount: 2,
-                subscriberCount: 3,
-                snapshotRevision: 42
-            )),
-            .buffer(BufferSummary(
-                name: "scratch",
-                byteCount: 5,
-                preview: "hello",
-                createdAt: Date(timeIntervalSince1970: 1_700_000_000),
-                data: Data("hello".utf8)
-            )),
-            .buffers([
-                BufferSummary(
-                    name: "buffer0",
-                    byteCount: 5,
-                    preview: "hello",
-                    createdAt: Date(timeIntervalSince1970: 1_700_000_000)
-                ),
-            ]),
-            .error("Tab not found"),
-        ]
+        // Exhaustive (see `allResponseSamples` + `responseExhaustivenessTripwire`) — every
+        // IPCResponse case round-trips, and a new case won't compile until it's covered here.
+        let responses = Self.allResponseSamples
         for response in responses {
             let original = try IPCCodec.encode(IPCReply(response: response))
             var buffer = original
@@ -313,6 +252,208 @@ final class IPCCodecTests: XCTestCase {
             guard case IPCCodec.FrameError.undecodable = error else {
                 return XCTFail("expected FrameError.undecodable, got \(error)")
             }
+        }
+    }
+
+    // MARK: - Exhaustive wire-format coverage
+
+    /// Calling the exhaustiveness tripwires keeps them "used" and documents the contract: the
+    /// round-trip tests above iterate these same fixtures, so every IPC case is byte-stable.
+    func testExhaustivenessTripwiresCoverEveryCase() {
+        for request in Self.allRequestSamples { requestExhaustivenessTripwire(request) }
+        for response in Self.allResponseSamples { responseExhaustivenessTripwire(response) }
+        XCTAssertFalse(Self.allRequestSamples.isEmpty)
+        XCTAssertFalse(Self.allResponseSamples.isEmpty)
+    }
+
+    /// One sample per `IPCRequest` case (plus a few optional-field variants), in enum order.
+    /// `requestExhaustivenessTripwire` is the compile-time partner: adding an enum case breaks
+    /// its no-`default` switch, forcing a sample here so the wire format can't silently regress.
+    static let allRequestSamples: [IPCRequest] = [
+        .ping,
+        .listWorkspaces,
+        .listSurfaces,
+        .listAgents,
+        .newWorkspace(name: "Work"),
+        .newSession(workspaceID: UUID(), cwd: "/tmp/project", name: "api", shell: "/bin/zsh"),
+        .newSessionInGroup(targetSessionID: UUID(), name: "api-2"),
+        .newTab(workspaceID: UUID(), cwd: "/tmp/project", shell: "/opt/homebrew/bin/fish"),
+        .newTabInWorkspace(named: "Default", cwd: "/tmp/project", shell: "/bin/bash"),
+        .newSplit(tabID: UUID(), paneID: UUID(), direction: .vertical, shell: "/opt/homebrew/bin/fish"),
+        .selectWorkspace(id: UUID()),
+        .selectWorkspaceByName(name: "Default"),
+        .selectSession(workspaceID: UUID(), sessionID: UUID()),
+        .selectTab(workspaceID: UUID(), tabID: UUID()),
+        .reorderTab(workspaceID: UUID(), tabID: UUID(), toIndex: 3),
+        .swapTab(workspaceID: UUID(), tabID: UUID(), withIndex: 1),
+        .renumberWindows(sessionID: UUID()),
+        .reorderSession(workspaceID: UUID(), sessionID: UUID(), toIndex: 2),
+        .closeTab(tabID: UUID()),
+        .closeSession(sessionID: UUID()),
+        .closeWorkspace(id: UUID()),
+        .setTheme(name: "Catppuccin Mocha"),
+        .setKeepSessionsOnQuit(true),
+        .setSessionPersistent(sessionID: UUID(), persistent: true),
+        .setTabPersistent(tabID: UUID(), persistent: false),
+        .closeEphemeralSessions,
+        .notify(surfaceID: "surface-1", title: "Agent", body: "Needs approval"),
+        .clearNotification(surfaceID: "surface-1"),
+        .updateTabTitle(surfaceID: "surface-1", title: "vim"),
+        .updateTabCwd(surfaceID: "surface-1", path: "/tmp/project/src"),
+        .updateTabGitBranch(workspaceID: UUID(), tabID: UUID(), branch: "main"),
+        .send(surfaceID: "surface-1", text: "ls -la\n"),
+        .sendData(surfaceID: "surface-1", data: Data([0, 1, 2, 254, 255])),
+        .getSnapshot,
+        .createSurface(cwd: "/tmp", shell: "/bin/zsh"),
+        .ensureSurface(surfaceID: "surface-1", cwd: "/tmp", shell: "/bin/zsh", rows: 40, cols: 120, scrollbackBytes: 1_048_576),
+        .attachSurface(surfaceID: "surface-1"),
+        .closeSurface(surfaceID: "surface-1"),
+        .sendKeys(surfaceID: "surface-1", keys: ["C-a", "n", "Enter"]),
+        .capturePane(surfaceID: "surface-1", includeScrollback: true),
+        .capturePaneRange(surfaceID: "surface-1", start: -100, end: 0, escapeSequences: true, joinWrapped: false),
+        .pipePane(surfaceID: "surface-1", shellCommand: "cat >> /tmp/log"),
+        .waitFor(channel: "build-done", mode: "wait"),
+        .linkWindow(tabID: UUID(), targetSessionID: UUID()),
+        .unlinkWindow(tabID: UUID()),
+        .killPane(paneID: UUID()),
+        .swapPanes(srcPaneID: UUID(), dstPaneID: UUID()),
+        .resizePane(paneID: UUID(), direction: .left, amount: 5),
+        .resizePaneRatio(tabID: UUID(), firstPaneID: UUID(), secondPaneID: UUID(), ratio: 0.42),
+        .zoomPane(paneID: UUID()),
+        .setCopyMode(surfaceID: "surface-1", enabled: true),
+        .renameTab(tabID: UUID(), name: "logs"),
+        .renameSession(sessionID: UUID(), name: "api"),
+        .renameWorkspace(workspaceID: UUID(), name: "Work"),
+        .detectAgent(surfaceID: "surface-1"),
+        .subscribeSurfaceOutput(surfaceID: "surface-1", label: "harness-cli attach"),
+        .cancelSubscription(surfaceID: "surface-1"),
+        .replayScrollback(surfaceID: "surface-1", fromSequence: 100),
+        .replayScrollbackSequenced(surfaceID: "surface-1", fromSequence: nil),
+        .resizeSurface(surfaceID: "surface-1", rows: 50, cols: 200),
+        .detachSurface(surfaceID: "surface-1"),
+        .identifyClient(label: "harness-cli attach"),
+        .listClients,
+        .detachClient(clientID: UUID()),
+        .daemonStats,
+        .setBuffer(name: "scratch", data: Data("hello".utf8)),
+        .getBuffer(name: nil),
+        .listBuffers,
+        .deleteBuffer(name: "scratch"),
+        .pasteBuffer(surfaceID: "surface-1", name: "scratch", bracketed: true),
+        .selectPaneDirectional(currentPaneID: UUID(), direction: .left),
+        .selectPane(tabID: UUID(), paneID: UUID()),
+        .subscribeSnapshot(label: "harness-cli attach"),
+        .applyLayout(tabID: UUID(), layout: "main-vertical", mainPaneID: UUID()),
+        .nextLayout(tabID: UUID()),
+        .previousLayout(tabID: UUID()),
+        .rotatePanes(tabID: UUID(), forward: true),
+        .breakPane(paneID: UUID()),
+        .joinPane(sourcePaneID: UUID(), destPaneID: UUID(), direction: .horizontal),
+        .respawnPane(surfaceID: "surface-1", keepHistory: false),
+        .setOption(scope: "global", target: nil, key: "status-position", rawValue: "top"),
+        .showOptions(scope: "global"),
+        .setEnvironment(sessionID: nil, key: "EDITOR", value: "nvim"),
+        .showEnvironment(sessionID: UUID()),
+        .bindHook(event: "pane-exited", source: "display-message done", condition: nil),
+        .unbindHook(id: UUID()),
+        .listHooks(event: nil),
+        .displayMessage(format: "#{session_name}"),
+        .showMessages,
+        // Optional-field variants — exercise both the present and absent branch of the optionals.
+        .newTab(workspaceID: UUID(), cwd: nil, shell: nil),
+        .subscribeSurfaceOutput(surfaceID: "surface-1", label: nil),
+        .getBuffer(name: "named"),
+        .setBuffer(name: nil, data: Data([1, 2, 3])),
+        .updateTabGitBranch(workspaceID: UUID(), tabID: UUID(), branch: nil),
+        .ensureSurface(surfaceID: "surface-1", cwd: nil, shell: nil, rows: 24, cols: 80, scrollbackBytes: nil),
+    ]
+
+    /// One sample per `IPCResponse` case, partnered with `responseExhaustivenessTripwire`.
+    static let allResponseSamples: [IPCResponse] = [
+        .ok,
+        .pong,
+        .workspaces([WorkspaceSummary(id: UUID(), name: "Default", tabCount: 2)]),
+        .surfaces([SurfaceSummary(surfaceID: "surface-1", tabTitle: "fish", workspaceName: "Default", cwd: "/tmp")]),
+        .agents([AgentSessionSummary(
+            workspaceName: "Default", sessionID: UUID(), sessionName: "api", tabID: UUID(),
+            tabTitle: "claude", surfaceID: "surface-1", paneID: "pane-1", kind: .claudeCode,
+            activity: .idle, waiting: false, lastActivityAt: Date(timeIntervalSince1970: 1_700_000_000),
+            notificationText: "needs approval"
+        )]),
+        .workspaceID(UUID()),
+        .sessionID(UUID()),
+        .tabID(UUID()),
+        .paneID(UUID()),
+        .surfaceID("surface-1"),
+        .snapshot(SessionSnapshot(revision: 7)),
+        .text("scrollback contents"),
+        .data(Data([9, 8, 7]), sequence: 42),
+        .replayResult(text: "history", endSequence: 99),
+        .snapshotChanged(revision: 12),
+        .agentInfo(AgentSnapshot(kind: .claudeCode, executable: "/usr/bin/claude", pid: 4321)),
+        .agentInfo(nil),
+        .clients([ClientSummary(
+            id: UUID(), label: "harness-cli attach",
+            attachedSurfaceIDs: ["surface-1", "surface-2"],
+            connectedAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )]),
+        .daemonStats(DaemonStats(
+            pid: 1234, uptimeSeconds: 42.5, surfaceCount: 7, totalScrollbackBytes: 12_345,
+            clientCount: 2, subscriberCount: 3, snapshotRevision: 42
+        )),
+        .clientID(UUID()),
+        .buffer(BufferSummary(
+            name: "scratch", byteCount: 5, preview: "hello",
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000), data: Data("hello".utf8)
+        )),
+        .buffers([BufferSummary(
+            name: "buffer0", byteCount: 5, preview: "hello",
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )]),
+        .options([OptionEntry(scope: "global", target: nil, key: "status", value: "on")]),
+        .hookID(UUID()),
+        .hooks([HookEntry(id: UUID(), event: "pane-exited", commandSource: "display-message done", condition: nil)]),
+        .error("Tab not found"),
+    ]
+
+    /// Compile-time guard: this no-`default` switch fails to build when an `IPCRequest` case is
+    /// added — the prompt to add a matching sample to `allRequestSamples`. Never relied on at
+    /// runtime; its value is the exhaustiveness check the Swift compiler performs on it.
+    private func requestExhaustivenessTripwire(_ request: IPCRequest) {
+        switch request {
+        case .ping, .listWorkspaces, .listSurfaces, .listAgents, .getSnapshot, .listClients,
+             .daemonStats, .listBuffers, .closeEphemeralSessions, .showMessages:
+            break
+        case .newWorkspace, .newSession, .newSessionInGroup, .newTab, .newTabInWorkspace, .newSplit,
+             .selectWorkspace, .selectWorkspaceByName, .selectSession, .selectTab, .reorderTab,
+             .swapTab, .renumberWindows, .reorderSession, .closeTab, .closeSession, .closeWorkspace,
+             .setTheme, .setKeepSessionsOnQuit, .setSessionPersistent, .setTabPersistent,
+             .notify, .clearNotification, .updateTabTitle, .updateTabCwd, .updateTabGitBranch,
+             .send, .sendData, .createSurface, .ensureSurface, .attachSurface, .closeSurface,
+             .sendKeys, .capturePane, .capturePaneRange, .pipePane, .waitFor, .linkWindow,
+             .unlinkWindow, .killPane, .swapPanes, .resizePane, .resizePaneRatio, .zoomPane,
+             .setCopyMode, .renameTab, .renameSession, .renameWorkspace, .detectAgent,
+             .subscribeSurfaceOutput, .cancelSubscription, .replayScrollback,
+             .replayScrollbackSequenced, .resizeSurface, .detachSurface, .identifyClient,
+             .detachClient, .setBuffer, .getBuffer, .deleteBuffer, .pasteBuffer,
+             .selectPaneDirectional, .selectPane, .subscribeSnapshot, .applyLayout, .nextLayout,
+             .previousLayout, .rotatePanes, .breakPane, .joinPane, .respawnPane, .setOption,
+             .showOptions, .setEnvironment, .showEnvironment, .bindHook, .unbindHook, .listHooks,
+             .displayMessage:
+            break
+        }
+    }
+
+    /// Compile-time guard partner for `allResponseSamples` — see `requestExhaustivenessTripwire`.
+    private func responseExhaustivenessTripwire(_ response: IPCResponse) {
+        switch response {
+        case .ok, .pong:
+            break
+        case .workspaces, .surfaces, .agents, .workspaceID, .sessionID, .tabID, .paneID,
+             .surfaceID, .snapshot, .text, .data, .replayResult, .snapshotChanged, .agentInfo,
+             .clients, .daemonStats, .clientID, .buffer, .buffers, .options, .hookID, .hooks,
+             .error:
+            break
         }
     }
 }

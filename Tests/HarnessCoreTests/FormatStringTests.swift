@@ -205,6 +205,39 @@ final class OptionStoreTests: XCTestCase {
         XCTAssertNotNil(OptionStore.builtinDefaults["set-titles-string"]?.stringValue)
         XCTAssertEqual(OptionStore.builtinDefaults["detach-on-destroy"]?.boolValue, true)
     }
+
+    // MARK: - Scope-chain edges (roadmap PR-11)
+
+    /// The deepest scope wins, and a per-target value is isolated to that target: a sibling pane
+    /// with no override still inherits the less-specific (session) value.
+    func testPaneScopeWinsAndSiblingPanesAreIsolated() {
+        let store = OptionStore(url: tmpURL())
+        store.set(.string("session"), key: "status-left", scope: .session)
+        store.set(.string("pane-1"), key: "status-left", scope: .pane, target: "pane-1")
+        XCTAssertEqual(store.get("status-left", scope: .pane, target: "pane-1")?.stringValue, "pane-1")
+        XCTAssertEqual(store.get("status-left", scope: .pane, target: "pane-2")?.stringValue, "session",
+                       "a pane with no override inherits the session value, not pane-1's")
+    }
+
+    /// `unset` at a specific scope falls back to the next-less-specific value (not all the way to
+    /// the builtin default) — the inheritance chain still resolves after an override is cleared.
+    func testUnsetFallsBackToLessSpecificScope() {
+        let store = OptionStore(url: tmpURL())
+        store.set(.string("session"), key: "status-left", scope: .session)
+        store.set(.string("pane"), key: "status-left", scope: .pane, target: "pane-1")
+        XCTAssertEqual(store.get("status-left", scope: .pane, target: "pane-1")?.stringValue, "pane")
+        store.unset(key: "status-left", scope: .pane, target: "pane-1")
+        XCTAssertEqual(store.get("status-left", scope: .pane, target: "pane-1")?.stringValue, "session",
+                       "clearing the pane override falls back to the session value")
+    }
+
+    /// A recognized-for-set-option but unseeded key (tmux-compat options with no builtin default)
+    /// reads back nil rather than a bogus empty value — the `builtinDefaults` fallback is honest.
+    func testUnseededRecognizedKeyReadsNil() {
+        let store = OptionStore(url: tmpURL())
+        XCTAssertTrue(OptionStore.isRecognizedOptionKey("status-interval"))
+        XCTAssertNil(store.get("status-interval"), "unseeded option with no default reads nil")
+    }
 }
 
 final class FormatStringExtendedVariableTests: XCTestCase {

@@ -879,7 +879,11 @@ public final class RealPty: @unchecked Sendable {
                     while i < buffer.count, !(buffer[i].value >= 0x40 && buffer[i].value <= 0x7e) { i += 1 }
                     i += 1
                     continue
-                } else if next == "]" { // OSC … terminated by BEL or ESC \
+                } else if next == "]" || next == "P" || next == "X" || next == "^" || next == "_" {
+                    // C1 string controls — OSC (]), DCS (P), SOS (X), PM (^), APC (_) — all run
+                    // until a String Terminator (BEL or ESC \). Without folding DCS/SOS/PM/APC in
+                    // here, a DCS reply (e.g. a DECRQSS / XTGETTCAP answer) would leak its raw
+                    // payload into an otherwise plain-text capture.
                     i += 2
                     while i < buffer.count {
                         if buffer[i] == "\u{07}" { i += 1; break }
@@ -888,7 +892,12 @@ public final class RealPty: @unchecked Sendable {
                     }
                     continue
                 } else {
-                    i += 2 // ESC + one byte (e.g. charset select)
+                    // Generic escape: ESC, optional intermediate bytes (0x20–0x2F), one final byte
+                    // (0x30–0x7E). Covers charset designation (ESC ( B / ESC ) 0) and the single-byte
+                    // forms (ESC 7/8/=/M). A bare ESC at end-of-input is consumed harmlessly.
+                    i += 1 // past ESC
+                    while i < buffer.count, buffer[i].value >= 0x20, buffer[i].value <= 0x2f { i += 1 }
+                    if i < buffer.count { i += 1 } // the final byte
                     continue
                 }
             }
