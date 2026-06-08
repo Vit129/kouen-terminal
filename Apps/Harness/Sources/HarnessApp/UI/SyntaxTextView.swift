@@ -308,7 +308,7 @@ private final class SyntaxLineNumberGutterView: NSView {
         let text = textView.string as NSString
         let attrs: [NSAttributedString.Key: Any] = [
             .font: NSFont.monospacedSystemFont(ofSize: 10, weight: .regular),
-            .foregroundColor: c.textTertiary,
+            .foregroundColor: c.textSecondary,
         ]
 
         var lineNumber = 1
@@ -363,7 +363,7 @@ enum SyntaxHighlighter {
 
         if let comments, let regex = try? NSRegularExpression(pattern: comments, options: .anchorsMatchLines) {
             regex.matches(in: text, range: fullRange).forEach {
-                attributed.addAttribute(.foregroundColor, value: NSColor.systemGreen.withAlphaComponent(0.8), range: $0.range)
+                attributed.addAttribute(.foregroundColor, value: NSColor.systemGreen, range: $0.range)
             }
         }
         if let regex = try? NSRegularExpression(pattern: strings, options: [.anchorsMatchLines]) {
