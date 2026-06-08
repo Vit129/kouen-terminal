@@ -733,16 +733,24 @@ public final class TerminalEmulator: VTParserHandler {
     }
 
     private func handleWorkingDirectoryOSC(_ payload: String) {
-        // OSC 7 value is a file URL: file://host/path
+        // OSC 7 reports the shell's cwd as a file URL: `file://<host>/<absolute-path>`. Accept only
+        // a `file://` URL that resolves to an absolute path; ignore a relative path, a non-`file`
+        // scheme, or junk, so hostile output can't steer the cwd inherited by new tabs to an
+        // attacker-chosen value. No existence check — the path may live on a remote host (cwd
+        // reported over ssh), and the engine is filesystem-agnostic by design.
+        let path: String
         if let url = URL(string: payload), url.isFileURL {
-            onWorkingDirectoryChange?(url.path)
+            path = url.path
         } else if payload.hasPrefix("file://") {
-            // Fallback: strip scheme + authority manually.
+            // Fallback: strip scheme + authority manually (URL() rejects some unencoded paths).
             let withoutScheme = String(payload.dropFirst("file://".count))
-            if let slash = withoutScheme.firstIndex(of: "/") {
-                onWorkingDirectoryChange?(String(withoutScheme[slash...]))
-            }
+            guard let slash = withoutScheme.firstIndex(of: "/") else { return }
+            path = String(withoutScheme[slash...])
+        } else {
+            return
         }
+        guard path.hasPrefix("/") else { return }
+        onWorkingDirectoryChange?(path)
     }
 
     private func fullReset() {

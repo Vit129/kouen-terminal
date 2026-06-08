@@ -118,6 +118,47 @@ final class InputEncoderTests: XCTestCase {
         XCTAssertEqual(encoder.encodePaste("hi", modes: modes), bytes("\u{1b}[200~hi\u{1b}[201~"))
     }
 
+    /// A hostile clipboard payload that embeds the bracketed-paste END marker must not be able to
+    /// break out: the inner `ESC[201~` is stripped so everything stays inside the one paste, and
+    /// the trailing `; rm -rf /` never reaches the program as typed input.
+    func testBracketedPasteStripsEmbeddedEndMarker() {
+        var modes = TerminalModes()
+        modes.bracketedPaste = true
+        let hostile = "a\u{1b}[201~; rm -rf /\n"
+        let out = encoder.encodePaste(hostile, modes: modes)
+        // Exactly one START and one END marker remain — the wrappers we added, none from the body —
+        // so the trailing `; rm -rf /` stays inside the paste rather than running as typed input.
+        XCTAssertEqual(out, bytes("\u{1b}[200~a; rm -rf /\n\u{1b}[201~"))
+    }
+
+    /// Multiple embedded markers (and a marker spanning would-be boundaries) are all removed.
+    func testBracketedPasteStripsRepeatedEndMarkers() {
+        var modes = TerminalModes()
+        modes.bracketedPaste = true
+        let hostile = "\u{1b}[201~one\u{1b}[201~two\u{1b}[201~"
+        let out = encoder.encodePaste(hostile, modes: modes)
+        XCTAssertEqual(out, bytes("\u{1b}[200~onetwo\u{1b}[201~"))
+    }
+
+    /// Stripping operates on raw bytes, so it must never corrupt a multi-byte UTF-8 scalar whose
+    /// continuation bytes happen to overlap marker byte values.
+    func testBracketedPastePreservesMultibyteContent() {
+        var modes = TerminalModes()
+        modes.bracketedPaste = true
+        // U+06DB ("ۛ") encodes as 0xDB 0x9B; the leading scalar must survive untouched.
+        let text = "café — ۛ test"
+        XCTAssertEqual(encoder.encodePaste(text, modes: modes),
+                       bytes("\u{1b}[200~") + bytes(text) + bytes("\u{1b}[201~"))
+    }
+
+    /// When bracketed paste is off there is no paste boundary to defend, so the body passes through
+    /// verbatim (the GUI's separate paste-protection prompt covers the unbracketed case).
+    func testUnbracketedPasteIsVerbatim() {
+        let modes = TerminalModes()
+        let text = "a\u{1b}[201~b"
+        XCTAssertEqual(encoder.encodePaste(text, modes: modes), bytes(text))
+    }
+
     // MARK: Mouse
 
     func testMouseReturnsEmptyWhenTrackingOff() {

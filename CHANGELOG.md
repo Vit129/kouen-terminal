@@ -6,6 +6,16 @@ All notable changes to Harness are documented here. The format is based on
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/robzilla1738/harness-terminal/releases).
 
+## [Unreleased]
+
+### Security
+- **Paste-injection hardening.** A clipboard payload that embeds the bracketed-paste end marker
+  (`ESC[201~`) can no longer terminate the paste early and run the trailing text as typed input —
+  every embedded end marker is stripped before the paste is wrapped, matching kitty/ghostty/foot.
+- **OSC 7 working-directory validation.** A directory report is now honored only when it is a
+  `file://` URL resolving to an absolute path; a relative path, a non-`file` scheme, or junk is
+  ignored, so program output can't steer the cwd inherited by new tabs.
+
 ## [1.8.0] - 2026-06-07
 
 The tmux-parity close-out: every remaining tracked gap is either shipped, adapted with a
