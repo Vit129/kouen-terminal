@@ -52,7 +52,7 @@ final class DaemonLauncher: @unchecked Sendable {
     func ensureRunning(then completion: @escaping @MainActor (Bool) -> Void = { _ in }) {
         queue.async { [weak self] in
             let ok = self?.ensureRunningBlocking() ?? false
-            DispatchQueue.main.async { MainActor.assumeIsolated { completion(ok) } }
+            Task { @MainActor in completion(ok) }
         }
     }
 

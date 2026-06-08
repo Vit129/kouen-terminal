@@ -82,13 +82,6 @@ struct FileTreeSwiftUIView: View {
                 Task { await watcher.stopWatching() }
             })
         }
-        .task(id: taskID) {
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(3))
-                guard !Task.isCancelled else { return }
-                await loadRoot()
-            }
-        }
     }
 
     private func branchChip(_ name: String) -> some View {
@@ -171,23 +164,37 @@ struct FileTreeSwiftUIView: View {
 
     private func loadRoot() async {
         let statusProvider = GitStatusProvider()
-        // Fetch git status and scan the filesystem concurrently.
         async let gitStatusTask  = statusProvider.status(rootPath: rootPath)
         async let rawNodesTask   = (try? watcher.scan(rootPath: rootPath)) ?? []
         let (status, rawNodes)   = await (gitStatusTask, rawNodesTask)
 
         currentGitStatus = status
-        // Merge status into nodes (watcher also accepts the map, but we already
-        // have the raw nodes — apply inline to avoid a second scan).
         let prefix = rootPath.hasSuffix("/") ? rootPath : rootPath + "/"
-        rootNodes = rawNodes.map { node in
+
+        // Build updated node list with git status applied.
+        let updatedNodes = rawNodes.map { node -> FileNode in
             let rel = node.path.hasPrefix(prefix)
                 ? String(node.path.dropFirst(prefix.count))
                 : node.path
             var updated = node
             updated.gitStatus = status[rel] ?? .unmodified
-            return FileTreeNode(node: updated)
+            return updated
         }
+
+        // Reconcile in-place: preserve existing FileTreeNode identity so
+        // SwiftUI @State (expand/collapse) is retained.
+        let existingByID = Dictionary(uniqueKeysWithValues: rootNodes.map { ($0.id, $0) })
+        var reconciled: [FileTreeNode] = []
+        for node in updatedNodes {
+            if let existing = existingByID[node.id] {
+                // Update the FileNode data without replacing the object.
+                existing.children = existing.children // keep children intact
+                reconciled.append(existing)
+            } else {
+                reconciled.append(FileTreeNode(node: node))
+            }
+        }
+        rootNodes = reconciled
     }
 }
 
@@ -215,7 +222,12 @@ private struct NodeRow: View {
                     .onTapGesture { isExpanded.toggle() }
             }
             .onChange(of: isExpanded) { _, expanded in
-                if expanded { Task { await loadChildren() } }
+                if expanded {
+                    Task { await loadChildren() }
+                } else {
+                    // Reset children so sub-expand states are cleared on collapse.
+                    node.children = []
+                }
             }
         } else {
             rowLabel(systemImage: "doc")

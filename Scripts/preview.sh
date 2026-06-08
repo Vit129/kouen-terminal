@@ -115,7 +115,7 @@ Preview CLI:
 EOF
 
 if [[ "${PREVIEW_SIGNPOSTS:-0}" == "1" ]]; then
-  open -n "$APP" --args -HARNESS_FRAME_SIGNPOSTS 1
+  HARNESS_HOME="$PREVIEW_HOME" "$APP/Contents/MacOS/Harness" -HARNESS_FRAME_SIGNPOSTS 1 &
 else
-  open -n "$APP"
+  HARNESS_HOME="$PREVIEW_HOME" "$APP/Contents/MacOS/Harness" &
 fi

@@ -76,15 +76,10 @@ final class GitPanelView: NSView {
         let source = DispatchSource.makeFileSystemObjectSource(
             fileDescriptor: fd,
             eventMask: [.write, .rename, .delete],
-            queue: .global(qos: .utility)
+            queue: .main
         )
         source.setEventHandler { [weak self] in
-            // Bounce to main immediately — avoid touching @MainActor self from utility queue.
-            DispatchQueue.main.async { [weak self] in
-                MainActor.assumeIsolated {
-                    self?.debouncedRefresh()
-                }
-            }
+            self?.debouncedRefresh()
         }
         source.setCancelHandler { close(fd) }
         source.resume()
@@ -418,11 +413,43 @@ final class GitPanelView: NSView {
     }
 
     private func presentCommitDetail(_ text: String, anchor: NSView) {
+        let mono = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
+        let monoBold = NSFont.monospacedSystemFont(ofSize: 11, weight: .bold)
+        let baseAttrs: [NSAttributedString.Key: Any] = [.font: mono, .foregroundColor: NSColor.labelColor]
+
+        // Build attributed string with diff coloring
+        let attributed = NSMutableAttributedString()
+        let lines = text.components(separatedBy: "\n")
+        // Track diff file header ranges for navigation
+        var fileRanges: [(name: String, location: Int)] = []
+
+        for (i, line) in lines.enumerated() {
+            let suffix = i < lines.count - 1 ? "\n" : ""
+            let full = line + suffix
+            if line.hasPrefix("diff --git ") {
+                // Extract file name from "diff --git a/foo b/foo"
+                let parts = line.split(separator: " ")
+                let name = parts.count >= 4 ? String(parts.last!.dropFirst(2)) : line
+                fileRanges.append((name: name, location: attributed.length))
+                attributed.append(NSAttributedString(string: full, attributes: [.font: monoBold, .foregroundColor: NSColor.systemBlue]))
+            } else if line.hasPrefix("@@") {
+                attributed.append(NSAttributedString(string: full, attributes: [.font: monoBold, .foregroundColor: NSColor.systemPurple]))
+            } else if line.hasPrefix("+") && !line.hasPrefix("+++") {
+                attributed.append(NSAttributedString(string: full, attributes: [.font: mono, .foregroundColor: NSColor.systemGreen]))
+            } else if line.hasPrefix("-") && !line.hasPrefix("---") {
+                attributed.append(NSAttributedString(string: full, attributes: [.font: mono, .foregroundColor: NSColor.systemRed]))
+            } else if line.hasPrefix("+++") || line.hasPrefix("---") {
+                attributed.append(NSAttributedString(string: full, attributes: [.font: monoBold, .foregroundColor: NSColor.labelColor]))
+            } else {
+                attributed.append(NSAttributedString(string: full, attributes: baseAttrs))
+            }
+        }
+
+        // Diff text view
         let textView = NSTextView()
         textView.isEditable = false
         textView.isSelectable = true
-        textView.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
-        textView.string = text
+        textView.textStorage?.setAttributedString(attributed)
         textView.textContainerInset = NSSize(width: 8, height: 8)
         textView.translatesAutoresizingMaskIntoConstraints = false
 
@@ -432,15 +459,65 @@ final class GitPanelView: NSView {
         scroll.drawsBackground = false
         scroll.translatesAutoresizingMaskIntoConstraints = false
 
-        let contentView = NSView(frame: NSRect(x: 0, y: 0, width: 480, height: 360))
-        contentView.addSubview(scroll)
-        NSLayoutConstraint.activate([
-            scroll.topAnchor.constraint(equalTo: contentView.topAnchor),
-            scroll.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            scroll.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            scroll.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
-            textView.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor),
-        ])
+        let contentView = NSView(frame: NSRect(x: 0, y: 0, width: 520, height: 400))
+
+        // File navigation bar (if files found)
+        if !fileRanges.isEmpty {
+            let navScroll = NSScrollView()
+            navScroll.hasVerticalScroller = false
+            navScroll.hasHorizontalScroller = true
+            navScroll.drawsBackground = false
+            navScroll.translatesAutoresizingMaskIntoConstraints = false
+
+            let navStack = NSStackView()
+            navStack.orientation = .horizontal
+            navStack.spacing = 4
+            navStack.translatesAutoresizingMaskIntoConstraints = false
+
+            for entry in fileRanges {
+                let btn = NSButton(title: entry.name, target: nil, action: nil)
+                btn.bezelStyle = .inline
+                btn.isBordered = true
+                btn.font = .monospacedSystemFont(ofSize: 10, weight: .medium)
+                btn.tag = entry.location
+                btn.target = self
+                btn.action = #selector(scrollToFileInDiff(_:))
+                btn.identifier = NSUserInterfaceItemIdentifier("diffNav")
+                navStack.addArrangedSubview(btn)
+            }
+
+            navScroll.documentView = navStack
+            contentView.addSubview(navScroll)
+            contentView.addSubview(scroll)
+
+            NSLayoutConstraint.activate([
+                navScroll.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 4),
+                navScroll.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 4),
+                navScroll.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -4),
+                navScroll.heightAnchor.constraint(equalToConstant: 24),
+                navStack.topAnchor.constraint(equalTo: navScroll.contentView.topAnchor),
+                navStack.leadingAnchor.constraint(equalTo: navScroll.contentView.leadingAnchor),
+                navStack.heightAnchor.constraint(equalTo: navScroll.contentView.heightAnchor),
+                scroll.topAnchor.constraint(equalTo: navScroll.bottomAnchor, constant: 4),
+                scroll.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+                scroll.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+                scroll.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+                textView.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor),
+            ])
+        } else {
+            contentView.addSubview(scroll)
+            NSLayoutConstraint.activate([
+                scroll.topAnchor.constraint(equalTo: contentView.topAnchor),
+                scroll.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+                scroll.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+                scroll.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+                textView.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor),
+            ])
+        }
+
+        // Store textView ref for scroll action
+        contentView.identifier = NSUserInterfaceItemIdentifier("commitDetailContent")
+        textView.identifier = NSUserInterfaceItemIdentifier("commitDiffTextView")
 
         let controller = NSViewController()
         controller.view = contentView
@@ -449,6 +526,32 @@ final class GitPanelView: NSView {
         popover.contentViewController = controller
         popover.behavior = .transient
         popover.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .maxX)
+    }
+
+    @objc private func scrollToFileInDiff(_ sender: NSButton) {
+        // Walk up to find the text view via identifier
+        var view: NSView? = sender
+        while let v = view {
+            if v.identifier?.rawValue == "commitDetailContent" {
+                if let textView = findSubview(of: v, identifier: "commitDiffTextView") as? NSTextView {
+                    let location = sender.tag
+                    let length = textView.textStorage?.length ?? 0
+                    guard location < length else { return }
+                    textView.scrollRangeToVisible(NSRange(location: location, length: 0))
+                    textView.setSelectedRange(NSRange(location: location, length: 0))
+                }
+                return
+            }
+            view = v.superview
+        }
+    }
+
+    private func findSubview(of view: NSView, identifier: String) -> NSView? {
+        if view.identifier?.rawValue == identifier { return view }
+        for sub in view.subviews {
+            if let found = findSubview(of: sub, identifier: identifier) { return found }
+        }
+        return nil
     }
 
     @objc private func toggleStage(_ sender: NSButton) {
