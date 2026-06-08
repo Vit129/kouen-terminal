@@ -43,6 +43,7 @@ the single honest ledger. Updated last for the post-close-out parity roadmap (#1
 | `set-option` scopes | Bare `set` defaults to **global** (tmux: the current session); `-s` selects the **session** scope (tmux: server). tmux's server scope ≈ Harness global | One fallback chain (pane→tab→session→workspace→global) instead of two option trees |
 | `session_attached` | Count of registered daemon clients (subscription **or** identify) | Harness has no per-session attach registry; the GUI attaches everything |
 | Option scope flags | `-w` = workspace, `-t` = tab (tmux's window), `-T <target>` for explicit targets | Harness has a workspace level above sessions; documented in COMMANDS.md |
+| `send-keys` named-key encoding | Encoded by the same engine `InputEncoder` as physical keypresses (one encoder), but in **normal cursor-key mode** — the daemon is a byte-pipe with no live per-surface emulator, so it can't consult the target's DECCKM/Kitty state the way tmux does | Normal-mode sequences are what nearly all apps accept; `-H` injects raw bytes when an exact app-mode sequence is required |
 
 ## Rejected (with rationale)
 

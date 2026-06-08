@@ -1,5 +1,6 @@
 import Foundation
 import HarnessCore
+import HarnessTerminalEngine
 
 /// Single source of truth for Harness session layout and notifications.
 /// @unchecked Sendable: all access to `sessions` and `editor` is serialized by `lock`.
@@ -603,7 +604,11 @@ public final class SurfaceRegistry: @unchecked Sendable {
         case .attachSurface:
             return .ok
         case let .sendKeys(surfaceID, keys):
-            let bytes = KeyTokenParser.encode(keys: keys)
+            // The daemon is a byte-pipe: it does not run a live per-surface emulator, so it can't
+            // know the target's DECCKM / Kitty state and passes default modes. That yields the
+            // normal-mode encoding (byte-identical to before this unified onto InputEncoder). A
+            // client that DOES emulate could thread real modes for mode-correct injection.
+            let bytes = KeyTokenParser.encode(keys: keys, modes: TerminalModes())
             if let session = sessions[surfaceID] {
                 session.write(bytes)
                 return .ok
