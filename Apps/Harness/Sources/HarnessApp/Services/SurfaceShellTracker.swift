@@ -55,12 +55,10 @@ final class SurfaceShellTracker {
         scanning = true
         Self.scanQueue.async { [weak self] in
             let cwds = Self.computeSurfaceCwds() // all blocking syscalls happen here, off-main
-            DispatchQueue.main.async {
-                MainActor.assumeIsolated {
-                    guard let self else { return }
-                    self.scanning = false
-                    self.applyCwds(cwds)
-                }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.scanning = false
+                self.applyCwds(cwds)
             }
         }
     }
