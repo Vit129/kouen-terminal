@@ -1378,13 +1378,17 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         var configs = store.load()
 
         if sender.state == .on {
-            // Resolve binary path from $PATH
-            let table = AgentTable.default
-            let executables = table.entries.first { $0.kind == kind }?.executables ?? []
-            let binaryPath = resolveBinaryPath(executables) ?? executables.first ?? kind.rawValue
+            let (binary, args) = acpBinaryInfo(for: kind)
+            guard let binaryPath = resolveBinaryPath([binary]) ?? resolveBinaryPath(
+                AgentTable.default.entries.first { $0.kind == kind }?.executables ?? []
+            ) else {
+                sender.state = .off
+                Toast.show("\(kind.displayName) not found on PATH", in: view)
+                return
+            }
             // Don't duplicate
             if !configs.contains(where: { $0.name == kind.displayName }) {
-                let config = AgentConfig(name: kind.displayName, binaryPath: binaryPath, args: ["--acp"])
+                let config = AgentConfig(name: kind.displayName, binaryPath: binaryPath, args: args)
                 configs.append(config)
             }
             store.save(configs)
@@ -1408,6 +1412,21 @@ final class SettingsViewController: NSViewController, NSFontChanging {
             }
         }
         return nil
+    }
+
+    /// Returns (binary name to search on PATH, args) for ACP mode per agent.
+    private func acpBinaryInfo(for kind: AgentKind) -> (String, [String]) {
+        switch kind {
+        case .claudeCode: return ("claude-agent-acp", [])
+        case .codex: return ("codex", ["--acp"])
+        case .gemini: return ("gemini", ["--acp"])
+        case .antigravity: return ("agy", ["--acp"])
+        case .kiro: return ("kiro", ["--acp"])
+        case .openCode: return ("opencode", ["--acp"])
+        case .openClaw: return ("openclaw", ["--acp"])
+        case .goose: return ("goose", ["--acp"])
+        default: return (kind.rawValue, ["--acp"])
+        }
     }
 
     // MARK: - Page: Advanced (harness-cli set-option surface)
