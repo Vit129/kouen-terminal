@@ -48,6 +48,20 @@ final class TerminalScreen {
     var cursorBlinking: Bool? = nil
     var autowrap = true
 
+    /// IRM (insert/replace mode, ANSI mode 4). When set, each printed glyph opens space at the
+    /// cursor and shifts the rest of the line right (dropping what falls off the right edge) instead
+    /// of overwriting; off (replace) by default. Toggled by `CSI 4 h` / `CSI 4 l`.
+    var insertMode = false
+
+    /// DECOM (origin mode, DEC private mode 6). When set, CUP/HVP/VPA address rows relative to the
+    /// top scroll margin and confine the cursor to the scroll region; when reset (default) they are
+    /// screen-absolute. Set via `setOriginMode(_:)`, which also homes the cursor per the DEC spec.
+    private(set) var originMode = false
+
+    /// The last graphic scalar written to a cell (post-charset translation), for REP (`CSI Ps b`),
+    /// which repeats the preceding character. 0 = nothing printed yet (REP is then a no-op).
+    private var lastGraphicChar: UInt32 = 0
+
     /// Inclusive scroll region (DECSTBM). Defaults to the whole screen.
     private var scrollTop = 0
     private var scrollBottom: Int
@@ -1120,6 +1134,10 @@ final class TerminalScreen {
             wrapLine()
         }
 
+        // IRM (insert mode): open `w` cells at the cursor, shifting the line's tail right, before
+        // writing the glyph over them.
+        if insertMode { openCellsForInsert(w) }
+        lastGraphicChar = scalar
         if w == 2 {
             writeCell(makeCell(scalar, width: .wide), at: cursorCol)
             if cursorCol + 1 < cols {
@@ -1132,6 +1150,16 @@ final class TerminalScreen {
         }
     }
 
+    /// Open `n` cells at the cursor for IRM insert-mode printing: shift the line's tail right by `n`,
+    /// dropping cells that fall off the right edge. The opened cells are immediately overwritten by
+    /// the printed glyph, so they need not be blanked here.
+    private func openCellsForInsert(_ n: Int) {
+        guard cursorRow >= 0, cursorRow < rows, cursorCol < cols else { return }
+        let count = min(n, cols - cursorCol)
+        let rowStart = cursorRow * cols
+        moveCells(dst: rowStart + cursorCol + count, src: rowStart + cursorCol, count: cols - cursorCol - count)
+    }
+
     /// Write a run of printable ASCII bytes (each `0x20...0x7E`, always width 1, never combining)
     /// at the cursor. Byte-for-byte equivalent to `print(UInt32(b))` for each `b`, but batched per
     /// row: the cell template (pen + hyperlink, constant across a run with no embedded escapes) is
@@ -1141,6 +1169,11 @@ final class TerminalScreen {
     func printASCIIRun(_ bytes: UnsafeBufferPointer<UInt8>) {
         let n = bytes.count
         guard n > 0 else { return }
+        // IRM shifts the line on every glyph; the batched row-fill can't express that. Replay
+        // scalar-wise (byte-identical to `print`) so the fast path stays the common replace case.
+        if insertMode { for b in bytes { print(UInt32(b)) }; return }
+        // All bytes are width-1 graphic ASCII, so the last one is the trailing graphic char (REP).
+        lastGraphicChar = UInt32(bytes[n - 1])
         var template = makeCell(0, width: .normal)
         var i = 0
         while i < n {
@@ -1208,6 +1241,9 @@ final class TerminalScreen {
     func printCodepointRun(_ codepoints: UnsafeBufferPointer<UInt32>) {
         let n = codepoints.count
         guard n > 0 else { return }
+        // IRM shifts the line on every glyph; the batched writes can't express that. Replay
+        // scalar-wise (byte-identical to `print`) so the fast path stays the common replace case.
+        if insertMode { for cp in codepoints { print(cp) }; return }
         var template = makeCell(0, width: .normal)
         var lastMarkedRow = -1
         var i = 0
@@ -1236,6 +1272,7 @@ final class TerminalScreen {
             guard cursorRow >= 0, cursorRow < rows else { return }
             let rowBase = cursorRow * cols
             let writeRow = cursorRow
+            lastGraphicChar = scalar // base glyph (w >= 1 here) — trailing graphic char for REP
             if w == 2 {
                 template.codepoint = scalar
                 template.width = .wide
@@ -1464,6 +1501,69 @@ final class TerminalScreen {
         moveCursor(row: cursorRow + dRow, col: cursorCol + dCol)
     }
 
+    /// CUP / HVP absolute positioning, honoring DECOM (origin mode). Row and col are 0-based. With
+    /// origin mode the row is relative to the top scroll margin and confined to the scroll region;
+    /// there are no horizontal margins, so the column stays screen-absolute.
+    func cursorPosition(row: Int, col: Int) {
+        guard originMode else { moveCursor(row: row, col: col); return }
+        cursorRow = clamp(scrollTop + row, scrollTop, scrollBottom)
+        cursorCol = clamp(col, 0, cols - 1)
+        pendingWrap = false
+    }
+
+    /// VPA absolute row positioning, honoring DECOM (origin mode); the column is unchanged.
+    func cursorToRow(_ row: Int) {
+        guard originMode else { moveCursorRow(row); return }
+        cursorRow = clamp(scrollTop + row, scrollTop, scrollBottom)
+        pendingWrap = false
+    }
+
+    /// DECOM (origin mode) set/reset. Per the DEC spec, selecting OR clearing it homes the cursor —
+    /// to the scroll-region top when set, the screen top when reset.
+    func setOriginMode(_ on: Bool) {
+        originMode = on
+        moveCursor(row: on ? scrollTop : 0, col: 0)
+    }
+
+    /// REP (`CSI Ps b`) — repeat the last graphic character printed `n` times. A no-op when nothing
+    /// has been printed yet. Repeats route through `print`, so wrap, width, and IRM apply as usual.
+    func repeatLastGraphicChar(_ n: Int) {
+        guard lastGraphicChar != 0 else { return }
+        let scalar = lastGraphicChar
+        for _ in 0 ..< max(1, n) { print(scalar) }
+    }
+
+    /// DECALN (`ESC # 8`) — screen alignment test: fill the whole screen with `E` in the default
+    /// rendition, reset the scroll region to full screen, and home the cursor.
+    func screenAlignmentTest() {
+        fillCells(0, cells.count, with: TerminalGridCell(codepoint: 0x45)) // 'E'
+        for r in 0 ..< rows { rowWrapped[r] = false; rowMarks[r] = nil }
+        clearImages()
+        scrollTop = 0
+        scrollBottom = rows - 1
+        cursorRow = 0
+        cursorCol = 0
+        pendingWrap = false
+        lastGraphicChar = 0x45
+        markFullyDirty()
+    }
+
+    /// DECSTR (`CSI ! p`) — soft terminal reset. Returns the cursor-visibility, insert/replace,
+    /// origin, scroll-region, saved-cursor, and rendition (SGR) state to defaults WITHOUT clearing
+    /// the screen, moving the cursor, or changing autowrap (left at its modern default-on, matching
+    /// xterm — disabling it here would surprise apps that soft-reset mid-draw). Charset and the
+    /// host-facing keyboard modes are reset by the emulator's `softReset`.
+    func softReset() {
+        cursorVisible = true
+        insertMode = false
+        originMode = false
+        scrollTop = 0
+        scrollBottom = rows - 1
+        pen = Pen()
+        savedCursor = nil
+        pendingWrap = false
+    }
+
     // MARK: - Scroll region
 
     /// Set the inclusive scroll region (DECSTBM). 0-based, clamped; resets cursor to home.
@@ -1482,7 +1582,8 @@ final class TerminalScreen {
         guard t < b || isFullScreenReset else { return }
         scrollTop = t
         scrollBottom = b
-        moveCursor(row: 0, col: 0)
+        // DECSTBM homes the cursor — to the region top under origin mode, the screen top otherwise.
+        moveCursor(row: originMode ? t : 0, col: 0)
     }
 
     func scrollUp(_ n: Int) {
@@ -1912,6 +2013,9 @@ final class TerminalScreen {
         pendingWrap = false
         cursorVisible = true
         autowrap = true
+        insertMode = false
+        originMode = false
+        lastGraphicChar = 0
         scrollTop = 0
         scrollBottom = rows - 1
         tabStops = Self.defaultTabStops(cols)
