@@ -79,17 +79,12 @@ final class GitPanelView: NSView {
             queue: .global(qos: .utility)
         )
         source.setEventHandler { [weak self] in
-            self?.watchDebounce?.cancel()
-            let work = DispatchWorkItem { [weak self] in
-                DispatchQueue.main.async {
-                    MainActor.assumeIsolated { [weak self] in
-                        guard let self else { return }
-                        Task { await self.refresh() }
-                    }
+            // Bounce to main immediately — avoid touching @MainActor self from utility queue.
+            DispatchQueue.main.async { [weak self] in
+                MainActor.assumeIsolated {
+                    self?.debouncedRefresh()
                 }
             }
-            self?.watchDebounce = work
-            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 0.5, execute: work)
         }
         source.setCancelHandler { close(fd) }
         source.resume()
@@ -102,6 +97,16 @@ final class GitPanelView: NSView {
         watchDebounce?.cancel()
         watchDebounce = nil
         if watchFd >= 0 { watchFd = -1 }
+    }
+
+    private func debouncedRefresh() {
+        watchDebounce?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            Task { await self.refresh() }
+        }
+        watchDebounce = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)
     }
 
     private func setup() {
