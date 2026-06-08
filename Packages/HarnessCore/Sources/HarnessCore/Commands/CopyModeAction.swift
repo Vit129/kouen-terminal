@@ -1,5 +1,33 @@
 import Foundation
 
+/// The direction/landing of a vi jump-to-char motion (`f`/`F`/`t`/`T`). `forward`/`backward`
+/// land *on* the next/previous occurrence; `toForward`/`toBackward` land just *before*/*after* it.
+public enum CopyModeJumpKind: String, Codable, Sendable, Equatable {
+    case forward, backward, toForward, toBackward
+
+    /// The opposite landing direction, for `jump-reverse` (`,`): a forward jump reverses to a
+    /// backward one of the same on/before flavor, and vice-versa.
+    public var reversed: CopyModeJumpKind {
+        switch self {
+        case .forward: return .backward
+        case .backward: return .forward
+        case .toForward: return .toBackward
+        case .toBackward: return .toForward
+        }
+    }
+}
+
+/// A remembered jump (kind + target char) so `jump-again` (`;`) / `jump-reverse` (`,`) can repeat
+/// it. Not `Codable` — it's transient runtime state, never persisted.
+public struct CopyModeJump: Sendable, Equatable {
+    public var kind: CopyModeJumpKind
+    public var target: Character
+    public init(kind: CopyModeJumpKind, target: Character) {
+        self.kind = kind
+        self.target = target
+    }
+}
+
 /// A copy-mode editing/motion command, dispatched while copy mode is active —
 /// tmux's `copy-mode -X <command>` set. Bindings in the `copy-mode` `KeyTable`
 /// map keys to these, so copy-mode keys are fully rebindable via
@@ -9,6 +37,14 @@ public enum CopyModeAction: Codable, Sendable, Equatable {
     case cursorLeft, cursorRight, cursorUp, cursorDown
     case nextWord, previousWord
     case nextWordEnd                       // end of the next word (vi `e`)
+    /// Jump-to-char (vi `f`/`F`/`t`/`T`). The `String?` is the target character: `nil` is the
+    /// bindable command form (the front-end captures the next keystroke and re-issues it filled
+    /// in); a one-char string performs the jump on the cursor's line.
+    case jump(CopyModeJumpKind, String?)
+    case jumpAgain                         // repeat the last jump (vi `;`)
+    case jumpReverse                       // repeat the last jump, reversed (vi `,`)
+    case otherEnd                          // swap selection anchor and cursor (vi `o`)
+    case gotoLine(Int)                     // jump to a 1-based line number (tmux `goto-line`)
     case startOfLine, endOfLine
     case backToIndentation                 // first non-blank column of the line (vi `^`)
     case top, bottom                       // history-top / history-bottom
@@ -32,6 +68,17 @@ public enum CopyModeAction: Codable, Sendable, Equatable {
         case .nextWord: return "next-word"
         case .previousWord: return "previous-word"
         case .nextWordEnd: return "next-word-end"
+        case let .jump(kind, _):
+            switch kind {
+            case .forward: return "jump-forward"
+            case .backward: return "jump-backward"
+            case .toForward: return "jump-to-forward"
+            case .toBackward: return "jump-to-backward"
+            }
+        case .jumpAgain: return "jump-again"
+        case .jumpReverse: return "jump-reverse"
+        case .otherEnd: return "other-end"
+        case .gotoLine: return "goto-line"
         case .startOfLine: return "start-of-line"
         case .endOfLine: return "end-of-line"
         case .backToIndentation: return "back-to-indentation"
@@ -73,6 +120,22 @@ public enum CopyModeAction: Codable, Sendable, Equatable {
         case "next-word": self = .nextWord
         case "previous-word": self = .previousWord
         case "next-word-end": self = .nextWordEnd
+        // Harness's word motions are whitespace-delimited, so tmux's `next-space` family (vi
+        // big-WORD W/B/E) maps onto the same motions; `word-separators`-aware small-word motions
+        // are a deferred refinement.
+        case "next-space": self = .nextWord
+        case "previous-space": self = .previousWord
+        case "next-space-end": self = .nextWordEnd
+        // Jump-to-char: the bindable form carries no target (front-end captures the next key);
+        // an explicit `argument` (e.g. from a script) fills it in immediately.
+        case "jump-forward": self = .jump(.forward, argument)
+        case "jump-backward": self = .jump(.backward, argument)
+        case "jump-to-forward": self = .jump(.toForward, argument)
+        case "jump-to-backward": self = .jump(.toBackward, argument)
+        case "jump-again": self = .jumpAgain
+        case "jump-reverse": self = .jumpReverse
+        case "other-end": self = .otherEnd
+        case "goto-line": self = .gotoLine(argument.flatMap { Int($0) } ?? 1)
         case "start-of-line": self = .startOfLine
         case "back-to-indentation": self = .backToIndentation
         case "end-of-line": self = .endOfLine

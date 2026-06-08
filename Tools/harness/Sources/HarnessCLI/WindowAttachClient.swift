@@ -202,6 +202,8 @@ private final class WindowSession: @unchecked Sendable {
     private var copyMode: CopyModeState?
     private var copyModeSurface: String?
     private var copyModeSearchEntry: String?
+    /// Set while a jump-to-char motion (`f`/`F`/`t`/`T`) is waiting for its target byte.
+    private var copyModeJumpEntry: CopyModeJumpKind?
     /// `synchronize-panes`: mirror forwarded input to every pane in the window.
     private var synchronize = false
     /// `display-panes`: overlay pane numbers until the next key / timeout.
@@ -288,7 +290,7 @@ private final class WindowSession: @unchecked Sendable {
         // the state fields inline rather than calling exitCopyMode() to avoid a re-entrant relayout;
         // this rebuild already invalidates + composes below.
         if copyMode != nil, let cms = copyModeSurface, !wanted.contains(cms) {
-            copyMode = nil; copyModeSurface = nil; copyModeSearchEntry = nil; copyModePending.removeAll()
+            copyMode = nil; copyModeSurface = nil; copyModeSearchEntry = nil; copyModeJumpEntry = nil; copyModePending.removeAll()
         }
 
         // Create terminals + subscriptions for new panes; resize existing ones.
@@ -940,7 +942,7 @@ private final class WindowSession: @unchecked Sendable {
     }
 
     private func exitCopyMode() {
-        copyMode = nil; copyModeSurface = nil; copyModeSearchEntry = nil; copyModePending.removeAll()
+        copyMode = nil; copyModeSurface = nil; copyModeSearchEntry = nil; copyModeJumpEntry = nil; copyModePending.removeAll()
         relayoutIfStatusBandChanged()
         compositor.invalidate(); composeAndWrite()
     }
@@ -952,6 +954,12 @@ private final class WindowSession: @unchecked Sendable {
 
     private func handleCopyModeByte(_ byte: UInt8) {
         guard copyMode != nil else { return }
+        // A pending jump-to-char (`f`/`F`/`t`/`T`) consumes the next byte as its target (Esc cancels).
+        if let kind = copyModeJumpEntry {
+            copyModeJumpEntry = nil
+            if byte != 0x1b { performCopyMode(.jump(kind, String(Unicode.Scalar(byte)))) } else { composeAndWrite() }
+            return
+        }
         if copyModeSearchEntry != nil { handleCopyModeSearchByte(byte); return }
         copyModePending.append(byte)
         switch copyModeDecode(copyModePending) {
@@ -1026,6 +1034,8 @@ private final class WindowSession: @unchecked Sendable {
             exitCopyMode()
         case .beginSearchEntry:
             copyModeSearchEntry = ""; composeAndWrite()
+        case let .beginJumpEntry(kind):
+            copyModeJumpEntry = kind; composeAndWrite()
         }
     }
 

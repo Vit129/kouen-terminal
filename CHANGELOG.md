@@ -34,6 +34,11 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
   written compactly (still deterministically key-sorted).
 
 ### Added
+- **Copy-mode jump-to-char and friends.** vi `f`/`F`/`t`/`T` jump to a character on the line (the
+  front-end captures the next keystroke as the target), `;`/`,` repeat the jump forward/reversed,
+  `o` swaps the selection's other end, `goto-line N` jumps to a line, and `W`/`B`/`E` are bound as
+  the whitespace-delimited (big-WORD) motions. Previously a bound `jump-forward` (etc.) was a
+  parse-time failure. Works in both the GUI overlay and the `attach-window` compositor.
 - **Kitty graphics protocol: ack, query, transmit-once/place-many, delete.** The decoder was
   display-only; the control protocol is now answered. Commands with an image id/number get an
   `APC G i=<id>;OK ST` ack (or an `EBADF`/`ENOENT` error), gated by quietness (`q=1` silences OK,

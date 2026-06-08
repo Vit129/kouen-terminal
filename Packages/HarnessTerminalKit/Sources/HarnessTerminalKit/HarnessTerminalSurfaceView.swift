@@ -489,6 +489,8 @@ public final class HarnessTerminalSurfaceView: NSView {
     private var copyModeTables: KeyTableSet?
     /// In-progress search query (nil = not entering a search). Shown in the status row.
     private var copyModeSearchEntry: String?
+    /// Set while a jump-to-char motion (`f`/`F`/`t`/`T`) is waiting for its target keystroke.
+    private var copyModeJumpEntry: CopyModeJumpKind?
     /// `mode-keys` option value (`vi` / `emacs`); the host sets it from the daemon option.
     public var copyModeKeys: String = "vi"
     public var isInCopyMode: Bool { copyMode != nil }
@@ -3657,6 +3659,17 @@ public final class HarnessTerminalSurfaceView: NSView {
     }
 
     private func handleCopyModeKey(_ event: NSEvent) {
+        // A pending jump-to-char (`f`/`F`/`t`/`T`) consumes the very next keystroke as its target.
+        if let kind = copyModeJumpEntry {
+            copyModeJumpEntry = nil
+            let chars = event.charactersIgnoringModifiers ?? ""
+            if chars.unicodeScalars.first?.value != 0x1B, let ch = chars.first { // Escape cancels
+                handleCopyModeAction(.jump(kind, String(ch)))
+            } else {
+                scheduleRender()
+            }
+            return
+        }
         // Interactive search-query entry captures raw keys until Enter / Escape.
         if copyModeSearchEntry != nil {
             handleSearchEntryKey(event)
@@ -3692,6 +3705,9 @@ public final class HarnessTerminalSurfaceView: NSView {
             exitCopyMode()
         case .beginSearchEntry:
             copyModeSearchEntry = ""
+            scheduleRender()
+        case let .beginJumpEntry(kind):
+            copyModeJumpEntry = kind
             scheduleRender()
         }
     }
