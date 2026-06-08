@@ -35,6 +35,16 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
   SGR back to defaults); and `ESC # 8` (**DECALN**) fills the screen with `E` for alignment.
   DECSTR/DECALN were being swallowed by the intermediate-byte guards, and REP/IRM/DECOM had no
   handler at all.
+- **DCS device-control strings are now demuxed instead of all being fed to the Sixel decoder.**
+  The parser routed any DCS containing a `q` into the Sixel decoder, so DECRQSS (`DCS $ q …`),
+  XTGETTCAP (`DCS + q …`), and tmux control-mode passthrough (`DCS tmux; …`) decoded as nothing
+  and were silently dropped. DCS is now demuxed by its header (params / intermediate / final):
+  real Sixel still decodes, **DECRQSS** is answered for the settings the engine tracks (cursor
+  style `DECSCUSR`, scroll region `DECSTBM`), **XTGETTCAP** answers the stable capabilities
+  (`TN`, `Co`/`colors`, `RGB`), and tmux passthrough is recognized rather than misread.
+- **Primary device attributes (DA1) now advertise Sixel.** The `CSI c` reply is `CSI ?1;2;4c`
+  (feature code `4` = Sixel), so tools that gate graphics on the DA1 response (`img2sixel`,
+  `chafa`, `timg`) will actually emit Sixel — which the engine decodes.
 - **Format conditionals can now nest an operator in the test.** `#{?#{==:#{pane_current_command},vim},…,…}`
   and friends (a `.tmux.conf` staple) previously evaluated the test only as a bare token, so any
   nested comparison/operator read as unknown → empty → falsy and the else-branch always won. The

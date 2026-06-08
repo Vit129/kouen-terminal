@@ -338,9 +338,102 @@ public final class TerminalEmulator: VTParserHandler {
     }
 
     func parserDCS(_ data: [UInt8]) {
-        // Sixel images arrive as DCS `… q …`. Decode + place (A2/A3).
-        guard data.contains(0x71) /* 'q' */, let image = SixelDecoder.decode(data) else { return }
-        placeImage(image, z: 0)
+        // tmux control-mode passthrough (`DCS tmux; … ST`). Recognized so it is never misread as
+        // Sixel; driving the wrapped sequences is out of scope here (tracked separately).
+        if data.starts(with: Self.tmuxPassthroughPrefix) { return }
+        // Demux the DCS by its header — params (0x30–0x3F), then intermediates (0x20–0x2F), then a
+        // final byte (0x40–0x7E), with the device-control data after the final, mirroring CSI. The
+        // old `data.contains("q")` test sent every DCS that happened to contain a 'q' (DECRQSS `$q`,
+        // XTGETTCAP `+q`, tmux passthrough) into the Sixel decoder, where it decoded as nothing.
+        var i = 0
+        let n = data.count
+        while i < n, (0x30 ... 0x3F).contains(data[i]) { i += 1 } // parameter bytes
+        var intermediate: UInt8?
+        while i < n, (0x20 ... 0x2F).contains(data[i]) { intermediate = data[i]; i += 1 } // intermediates
+        guard i < n else { return } // header with no final byte — malformed, ignore
+        let final = data[i]
+        let payload = Array(data[(i + 1)...])
+        switch (intermediate, final) {
+        case (nil, 0x71): // 'q' — Sixel image (no intermediate)
+            if let image = SixelDecoder.decode(data) { placeImage(image, z: 0) }
+        case (0x24, 0x71): // '$' 'q' — DECRQSS: request the value of a setting
+            handleDECRQSS(payload)
+        case (0x2B, 0x71): // '+' 'q' — XTGETTCAP: terminfo capability query
+            handleXTGETTCAP(payload)
+        default:
+            break // unrecognized device-control string — ignore rather than misroute
+        }
+    }
+
+    /// `DCS tmux;` — the tmux control-mode passthrough introducer.
+    private static let tmuxPassthroughPrefix = Array("tmux;".utf8)
+
+    /// DECRQSS (`DCS $ q Pt ST`) — report the current value of the setting named by `Pt` (the
+    /// intermediate+final of the CSI that sets it). Reply `DCS 1 $ r <value> Pt ST` when we can
+    /// answer, or the "invalid request" form `DCS 0 $ r Pt ST` otherwise. We answer for the
+    /// settings the engine actually tracks: DECSCUSR (`SP q`) and DECSTBM (`r`).
+    private func handleDECRQSS(_ request: [UInt8]) {
+        let pt = String(decoding: request, as: UTF8.self)
+        switch pt {
+        case " q": // DECSCUSR — cursor style
+            respond("\u{1b}P1$r\(current.cursorStylePs) q\u{1b}\\")
+        case "r": // DECSTBM — scroll region (top;bottom, 1-based)
+            let region = current.scrollRegionOneBased
+            respond("\u{1b}P1$r\(region.top);\(region.bottom)r\u{1b}\\")
+        default:
+            respond("\u{1b}P0$r\(pt)\u{1b}\\") // request not recognized
+        }
+    }
+
+    /// XTGETTCAP (`DCS + q Pt ST`) — answer terminfo/termcap capability queries for the handful of
+    /// stable, statically-known capabilities (`TN` terminal name, `Co`/`colors` palette size, `RGB`
+    /// truecolor). Names and values are hex-encoded per the protocol; unknown names get the negative
+    /// `DCS 0 + r <name> ST` reply so a querier doesn't wait.
+    private func handleXTGETTCAP(_ request: [UInt8]) {
+        // The request is one or more `;`-separated hex-encoded capability names.
+        for nameHex in request.split(separator: 0x3B, omittingEmptySubsequences: false) {
+            guard let name = Self.decodeHex(Array(nameHex)) else { continue }
+            let value: String?
+            switch name {
+            case "TN": value = terminalName            // terminal name
+            case "Co", "colors": value = "256"          // palette size
+            case "RGB": value = "8/8/8"                 // 24-bit truecolor (bits per channel)
+            default: value = nil
+            }
+            if let value {
+                respond("\u{1b}P1+r\(Self.encodeHex(name))=\(Self.encodeHex(value))\u{1b}\\")
+            } else {
+                respond("\u{1b}P0+r\(Self.encodeHex(name))\u{1b}\\")
+            }
+        }
+    }
+
+    /// Decode an ASCII hex string (`"5452"` → `"TN"`); nil on odd length or a non-hex digit.
+    private static func decodeHex(_ bytes: [UInt8]) -> String? {
+        guard bytes.count % 2 == 0 else { return nil }
+        var out = [UInt8]()
+        out.reserveCapacity(bytes.count / 2)
+        var idx = bytes.startIndex
+        while idx < bytes.count {
+            guard let hi = hexValue(bytes[idx]), let lo = hexValue(bytes[idx + 1]) else { return nil }
+            out.append(UInt8(hi << 4 | lo))
+            idx += 2
+        }
+        return String(decoding: out, as: UTF8.self)
+    }
+
+    private static func hexValue(_ b: UInt8) -> Int? {
+        switch b {
+        case 0x30 ... 0x39: return Int(b - 0x30)
+        case 0x41 ... 0x46: return Int(b - 0x41 + 10)
+        case 0x61 ... 0x66: return Int(b - 0x61 + 10)
+        default: return nil
+        }
+    }
+
+    /// Hex-encode a string for an XTGETTCAP reply (`"TN"` → `"544e"`).
+    private static func encodeHex(_ s: String) -> String {
+        s.utf8.map { String(format: "%02x", $0) }.joined()
     }
 
     func parserAPC(_ data: [UInt8]) {
@@ -759,8 +852,10 @@ public final class TerminalEmulator: VTParserHandler {
     }
 
     private func deviceAttributes() {
-        // Identify as a VT100 with Advanced Video Option (a safe, widely-accepted reply).
-        respond("\u{1b}[?1;2c")
+        // Identify as a VT100 with Advanced Video Option (`?1;2`) and advertise Sixel graphics
+        // (feature code `4`) — `parserDCS` decodes Sixel, so tools that gate on the DA1 reply
+        // (img2sixel, chafa, timg) will actually emit it.
+        respond("\u{1b}[?1;2;4c")
     }
 
     private func respond(_ s: String) {

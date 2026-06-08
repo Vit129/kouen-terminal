@@ -370,6 +370,23 @@ final class TerminalScreen {
         markRowDirty(cursorRow)   // cursor shape/blink changed → repaint its row
     }
 
+    /// The DECSCUSR parameter (0–6) matching the current cursor shape + blink — for the DECRQSS
+    /// reply to a `DCS $ q SP q ST` query. `.default` reports 0.
+    var cursorStylePs: Int {
+        switch (cursorShape, cursorBlinking) {
+        case (.block, true): return 1
+        case (.block, false): return 2
+        case (.underline, true): return 3
+        case (.underline, false): return 4
+        case (.bar, true): return 5
+        case (.bar, false): return 6
+        default: return 0
+        }
+    }
+
+    /// The DECSTBM scroll region as 1-based inclusive rows — for the DECRQSS reply to `DCS $ q r ST`.
+    var scrollRegionOneBased: (top: Int, bottom: Int) { (scrollTop + 1, scrollBottom + 1) }
+
     /// A snapshot scrolled `offset` lines up into history (0 = the live viewport). The
     /// window spans `rows` lines over the virtual sequence [history ++ viewport]; history
     /// lines are padded/truncated to the current width. The cursor is hidden when scrolled

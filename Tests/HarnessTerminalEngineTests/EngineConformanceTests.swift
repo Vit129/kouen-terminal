@@ -411,7 +411,8 @@ final class EngineConformanceTests: XCTestCase {
         var response = Data()
         emu.onResponse = { response.append($0) }
         emu.feed("\u{1b}[c")
-        XCTAssertEqual(String(data: response, encoding: .utf8), "\u{1b}[?1;2c")
+        // VT100 + Advanced Video Option, now also advertising Sixel (feature code 4).
+        XCTAssertEqual(String(data: response, encoding: .utf8), "\u{1b}[?1;2;4c")
     }
 
     func testSecondaryDeviceAttributesResponse() {
