@@ -55,6 +55,8 @@ All three communicate over Unix-domain sockets using `HarnessCore` IPC:
 
 **ACP** (`HarnessCore/ACP/`) is separate — `Content-Length: N\r\n\r\n{body}` framing (LSP-style) used to pipe agent hook notifications into the daemon via stdin.
 
+> **⚠️ ACP Client is shelved/experimental.** The Agent sidebar tab and Chat toggle in Settings are commented out. Reason: most CLI agents (Claude Code, Codex, Gemini) require separate ACP adapter binaries that aren't widely installed, PATH resolution inside macOS .app bundles is unreliable, and there's no way to control which tools an agent invokes. The underlying code (`ACPClient`, `ACPSession`, `AgentChatPanelView`, `AgentConfig`) remains intact for future re-enablement when the ACP ecosystem matures.
+
 **Remote daemon**: `SSHTunnelManager` opens `ssh -N -L <local>:<remote>` and returns `Endpoint.unix`; the CLI and GUI use the same IPC over the tunnel.
 
 ## Coding constraints
