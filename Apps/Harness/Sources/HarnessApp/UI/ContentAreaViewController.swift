@@ -455,8 +455,8 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         let widthC = panel.widthAnchor.constraint(equalToConstant: initialWidth)
         widthC.priority = .defaultHigh
         NSLayoutConstraint.activate([
-            panel.topAnchor.constraint(equalTo: terminalHost.topAnchor),
-            panel.bottomAnchor.constraint(equalTo: terminalHost.bottomAnchor),
+            panel.topAnchor.constraint(equalTo: tabBarDivider.bottomAnchor, constant: 2),
+            panel.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             panel.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             widthC,
             panel.widthAnchor.constraint(greaterThanOrEqualToConstant: 200),
