@@ -3,8 +3,9 @@
 Harness targets **capability parity** with tmux, not byte-for-byte emulation: Harness is a
 native GUI terminal with a daemon-owned session model, so a handful of tmux concepts are
 *adapted* to that architecture and a few are *rejected* with rationale. This document is
-the single honest ledger. Updated last for the 2026-06 parity close-out series
-(PRs #102–#108); user-facing usage lives in
+the single honest ledger. Updated last for the post-close-out parity roadmap (#114) PRs
+#122 (copy-mode motions) and #123 (`@`-user-options + `set-option` key validation); the
+2026-06 close-out series was PRs #102–#108. User-facing usage lives in
 [HARNESS_TMUX_CAPABILITIES.md](HARNESS_TMUX_CAPABILITIES.md), grammar in
 [COMMANDS.md](COMMANDS.md).
 
@@ -15,11 +16,11 @@ the single honest ledger. Updated last for the 2026-06 parity close-out series
 | Sessions / windows / panes | Full lifecycle: new/kill/rename/select/move/swap/link/unlink/break/join/respawn (pane **and** window), renumber, last-window/pane, rotate, zoom, layouts (incl. main-horizontal/vertical), `synchronize-panes` |
 | **Grouped sessions** | `new-session -t <session>` (CLI: `--group-with`): shared window list, per-member focus (a new member starts on the group's current window); window create/kill propagates group-wide — kill matches by surface overlap, so it still propagates after members' split layouts diverge. Built atop linked windows — see ADAPT below |
 | Targeting | Full `-t` grammar everywhere (`session:window.pane`, `$`/`@`/`%` ids, indexes, `!`, `{last}`, `{top}/{bottom}/{left}/{right}`, `^`/`$`), with `base-index`/`pane-base-index`. STRICT resolution: a named component that doesn't match makes the command `.unresolved` at the one translator choke point, so *every* targeted verb (kill/respawn/send-keys/…) fails loudly in every front-end — never a silent misroute. `swap-pane` takes `-s` too |
-| Copy mode | vi + emacs tables (`copy-mode-vi` accepted as the vi table's name), `-X` action set (motions, selection, rectangle, search, prompt jumps, copy-pipe), mouse, in GUI **and** the `attach-window` compositor |
+| Copy mode | vi + emacs tables (`copy-mode-vi` accepted as the vi table's name), `-X` action set: motions (char/line, word + **word-end**, **visible-window** top/middle/bottom-line, **back-to-indentation**, page/half-page, history top/bottom, prompt jumps), selection, rectangle, search, copy-pipe; mouse; in GUI **and** the `attach-window` compositor |
 | Paste buffers | set/get/list/delete/paste/choose, save/load (CLI), bindable verbs |
-| Options | Scoped store (global/workspace/session/tab/pane + fallback chain), `set`/`setw`/`show` bindable, status-line set, styles, monitoring, `display-time`, `set-titles(+string)`, `detach-on-destroy`, `remain-on-exit`, `repeat-time`, … |
+| Options | Scoped store (global/workspace/session/tab/pane + fallback chain), `set`/`setw`/`show` bindable, status-line set, styles, monitoring, `display-time`, `set-titles(+string)`, `detach-on-destroy`, `remain-on-exit`, `repeat-time`, … **`@`-prefixed user options** (set + read via `#{@name}`). `set-option` **validates the key**: an unknown name errors loudly (no silent persist) — known/recognized options and `@`-options pass |
 | Hooks | `set-hook`/`show-hooks` + full lifecycle events: after-* command events, `session-created/renamed/closed`, `window-renamed/linked/unlinked/layout-changed`, alert-activity/silence/bell, client-attached/detached, pane-exited (+ Harness-only agent events) |
-| Format strings | ~50 `#{…}` variables (pane/session/window/client/server) + operators (`#{?,,}`, `==`, `m:`, `s///`, `e\|op\|`, `=N:` truncation, `time:` strftime). IDs render with target-grammar prefixes so they round-trip into `-t` |
+| Format strings | ~50 `#{…}` variables (pane/session/window/client/server) + **`#{@user-options}`** + operators (`#{?,,}`, `==`, `m:`, `s///`, `e\|op\|`, `=N:` truncation, `time:` strftime). IDs render with target-grammar prefixes so they round-trip into `-t` |
 | Key tables | root/prefix/copy-mode(+emacs)/command + `switch-client -T` modal tables, `bind -r` repeat, tombstoned unbinds |
 | Scripting | `send-keys`, `capture-pane` (+ ranges/escapes), `pipe-pane`, `run-shell`, `if-shell`, `wait-for -S/-L/-U`, `display-message`/`show-messages`, `command-prompt`, `confirm-before`, `source-file` (a `.tmux.conf`'s bind/set/setw/setenv lines parse as-is), choose-tree/session/window/buffer/client, `find-window`, control mode (`-CC`) |
 | Misc | display-popup/menu, clock-mode, lock-client, multi-client smallest-size voting, environment tables (global/session) |
@@ -68,8 +69,10 @@ the single honest ledger. Updated last for the 2026-06 parity close-out series
 
 ## Invariants this ledger protects
 
-1. **No silent misroutes.** An unrecognized or unresolvable `-t` errors loudly in every
-   front-end (parse-time for nonsense, resolve-time for missing names). v1.7.1 policy.
+1. **No silent misroutes or silently-ignored config.** An unrecognized or unresolvable `-t`
+   errors loudly in every front-end (parse-time for nonsense, resolve-time for missing names);
+   likewise `set-option` rejects an unknown option key rather than persisting a value nothing
+   reads (`@`-prefixed user options always pass). v1.7.1 policy, extended for option keys.
 2. **One mechanism for config migration.** `source-file` takes a `.tmux.conf`'s bind/set/
    setw/setenv lines unchanged (`TmuxMigrationTests`).
 3. **Adaptations are documented here before they ship.** If behavior diverges from tmux
