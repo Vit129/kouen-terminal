@@ -8,6 +8,13 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 
 ## [Unreleased]
 
+### Changed
+- **Layout persistence moved off the input-latency path.** The daemon no longer does a full
+  prettyPrinted `layout.json` encode + atomic write under the registry lock on every mutation;
+  writes are now coalesced through a 0.5s debounce and flushed synchronously on graceful
+  shutdown, so a burst of agent activity no longer taxes keystroke latency. `layout.json` is now
+  written compactly (still deterministically key-sorted).
+
 ### Security
 - **Paste-injection hardening.** A clipboard payload that embeds the bracketed-paste end marker
   (`ESC[201~`) can no longer terminate the paste early and run the trailing text as typed input —

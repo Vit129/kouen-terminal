@@ -1301,13 +1301,30 @@ public final class SurfaceRegistry: @unchecked Sendable {
 
     private func commit() {
         let revision = editor.snapshot.revision
-        do {
-            try store.saveImmediately(editor.snapshot)
-        } catch {
-            fputs("HarnessDaemon snapshot save failed: \(error)\n", harnessStderr)
-        }
+        // The revision bump + snapshot-changed fan-out stay synchronous under the registry lock
+        // (callers depend on the post landing before they return). The disk write does NOT: a
+        // full prettyPrinted encode + atomic write on every mutation sat on the input-latency path,
+        // firing several times a second under agent activity. Hand it to the store's existing
+        // 0.5s-debounced, queue-confined `save()` instead, which coalesces a burst of mutations
+        // into one write. A graceful shutdown flushes the last window synchronously via
+        // `flushSnapshot()` (DaemonServer.stop), so the debounce can't drop committed layout.
+        store.save(editor.snapshot)
         NotificationBus.shared.postSnapshotChanged(revision: revision)
         onSnapshotCommitted?(revision)
+    }
+
+    /// Synchronously persist the current layout snapshot, bypassing the debounce. Called on
+    /// graceful daemon shutdown (`DaemonServer.stop`) so the last debounce window of layout
+    /// mutations isn't lost — the snapshot counterpart of `flushAllScrollback()`.
+    public func flushSnapshot() {
+        lock.lock()
+        let snapshot = editor.snapshot
+        lock.unlock()
+        do {
+            try store.saveImmediately(snapshot)
+        } catch {
+            fputs("HarnessDaemon snapshot flush failed: \(error)\n", harnessStderr)
+        }
     }
 
     /// `freshlyCreated` marks a surface the user just asked for (new tab/session/split/
