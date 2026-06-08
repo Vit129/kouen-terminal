@@ -34,6 +34,13 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
   written compactly (still deterministically key-sorted).
 
 ### Added
+- **Kitty graphics protocol: ack, query, transmit-once/place-many, delete.** The decoder was
+  display-only; the control protocol is now answered. Commands with an image id/number get an
+  `APC G i=<id>;OK ST` ack (or an `EBADF`/`ENOENT` error), gated by quietness (`q=1` silences OK,
+  `q=2` silences errors) — so `icat`/`timg`/`chafa`, which gate on the `a=q` query reply, detect
+  support instead of hanging. `a=t` transmits an image for later use and `a=p` places it (the
+  transmit-once / place-many model image plugins rely on), and `a=d` deletes placements (`d=a`
+  all, `d=i` by id) so a redrawing TUI can clear stale images. Animation (`a=a`) stays deferred.
 - **`status-position` is now honored** (tmux `set -g status-position top|bottom`, default bottom).
   The GUI status footer moves to the top or bottom of the window and its `status 2..5` rows
   stack so the main line stays against the terminal; the `attach-window` compositor reserves and

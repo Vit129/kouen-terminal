@@ -94,6 +94,12 @@ public final class TerminalEmulator: VTParserHandler {
     /// a hostile stream can open many distinct ids that each send `m=1` and never finish. Cap the
     /// count of concurrently-reassembling images so the dictionary can't grow without bound.
     private let maxKittyPendingImages = 64
+    /// Transmitted-but-not-yet-placed images, keyed by Kitty image id (`i=`). Populated by `a=t`
+    /// (and `a=T`), consumed by `a=p` (place-many) — the transmit-once/place-many model image
+    /// plugins use. Bounded by count + total bytes; oldest evicted on overflow.
+    private var kittyTransmitted: [(id: Int, image: DecodedImage)] = []
+    private let maxKittyTransmittedImages = 64
+    private var kittyTransmittedBytes = 0
 
     public init(cols: Int, rows: Int) {
         let c = max(1, cols)
@@ -455,8 +461,37 @@ public final class TerminalEmulator: VTParserHandler {
         }
     }
 
-    private func placeImage(_ image: DecodedImage, cols: Int = 0, rows: Int = 0, z: Int = 0) {
-        current.placeImage(image, cols: cols, rows: rows, z: z)
+    private func placeImage(_ image: DecodedImage, cols: Int = 0, rows: Int = 0, z: Int = 0, kittyID: Int? = nil) {
+        current.placeImage(image, cols: cols, rows: rows, z: z, kittyID: kittyID)
+    }
+
+    /// Store a transmitted image for later `a=p` placement, bounded by count + total bytes.
+    private func storeKittyTransmitted(id: Int, image: DecodedImage) {
+        kittyTransmitted.removeAll { existing in
+            if existing.id == id { kittyTransmittedBytes -= existing.image.byteCount; return true }
+            return false
+        }
+        kittyTransmitted.append((id, image))
+        kittyTransmittedBytes += image.byteCount
+        while (kittyTransmitted.count > maxKittyTransmittedImages
+               || kittyTransmittedBytes > ImageLimits.maxBytesPerScreen),
+              !kittyTransmitted.isEmpty {
+            kittyTransmittedBytes -= kittyTransmitted.removeFirst().image.byteCount
+        }
+    }
+
+    private func kittyTransmitted(id: Int) -> DecodedImage? {
+        kittyTransmitted.first { $0.id == id }?.image
+    }
+
+    /// Emit the Kitty graphics ack `APC G <i|I>=<id> ; <message> ST`. Per spec it's sent only when
+    /// the client gave an addressable id (`i=`) or number (`I=`), and is suppressed by quietness:
+    /// `q=1` silences the OK reply, `q=2` silences errors too.
+    private func kittyAck(idKey: String, id: Int, ok: Bool, message: String, quietness: Int) {
+        guard id != 0 else { return }
+        if ok, quietness >= 1 { return }
+        if !ok, quietness >= 2 { return }
+        respond("\u{1b}_G\(idKey)=\(id);\(message)\u{1b}\\")
     }
 
     private func handleKittyGraphics(_ cmd: KittyGraphicsCommand) {
@@ -491,10 +526,61 @@ public final class TerminalEmulator: VTParserHandler {
             base = cmd
             payload = cmd.payload
         }
-        // Only transmit+display / put actions place an image; deletes/queries are ignored.
-        guard base.action == "T" || base.action == "p" else { return }
-        guard let image = base.decode(base64Payload: payload) else { return }
-        placeImage(image, cols: base.cols, rows: base.rows, z: base.z)
+        // Echo whichever handle the client used (`i=` preferred, else `I=`) back in the ack.
+        let echoKey = base.imageID != 0 ? "i" : "I"
+        let echoID = base.imageID != 0 ? base.imageID : base.imageNumber
+
+        switch base.action {
+        case "q":
+            // Query (capability/decodability probe): validate without placing or storing. Answering
+            // this is what gates detection in `icat`/`timg`/`chafa`, so it must reply.
+            let ok = base.decode(base64Payload: payload) != nil
+            kittyAck(idKey: echoKey, id: echoID, ok: ok,
+                     message: ok ? "OK" : "EBADF:could not decode image", quietness: base.quietness)
+
+        case "t", "T":
+            // Transmit (`t`) stores for later place-many; transmit+display (`T`) also places now.
+            guard let image = base.decode(base64Payload: payload) else {
+                kittyAck(idKey: echoKey, id: echoID, ok: false,
+                         message: "EBADF:could not decode image", quietness: base.quietness)
+                return
+            }
+            if base.imageID != 0 { storeKittyTransmitted(id: base.imageID, image: image) }
+            if base.action == "T" {
+                placeImage(image, cols: base.cols, rows: base.rows, z: base.z,
+                           kittyID: base.imageID != 0 ? base.imageID : nil)
+            }
+            kittyAck(idKey: echoKey, id: echoID, ok: true, message: "OK", quietness: base.quietness)
+
+        case "p":
+            // Put/place a previously-transmitted image by id (transmit-once / place-many).
+            guard base.imageID != 0, let image = kittyTransmitted(id: base.imageID) else {
+                kittyAck(idKey: echoKey, id: echoID, ok: false,
+                         message: "ENOENT:image not found", quietness: base.quietness)
+                return
+            }
+            placeImage(image, cols: base.cols, rows: base.rows, z: base.z, kittyID: base.imageID)
+            kittyAck(idKey: echoKey, id: echoID, ok: true, message: "OK", quietness: base.quietness)
+
+        case "d":
+            // Delete placements: `d=i`/`d=I` by image id, otherwise (`d=a`/`d=A`/default) all.
+            switch base.deleteTarget {
+            case "i", "I":
+                if base.imageID != 0 {
+                    current.deleteImages(kittyID: base.imageID)
+                    kittyTransmitted.removeAll { e in
+                        e.id == base.imageID ? { kittyTransmittedBytes -= e.image.byteCount; return true }() : false
+                    }
+                }
+            default:
+                current.deleteImages(kittyID: nil)
+                kittyTransmitted.removeAll(); kittyTransmittedBytes = 0
+            }
+            kittyAck(idKey: echoKey, id: echoID, ok: true, message: "OK", quietness: base.quietness)
+
+        default:
+            break // `a=a` (animation) and any unknown action are deliberately ignored (deferred).
+        }
     }
 
     /// iTerm2 inline image (`OSC 1337 ; File=…:<base64>`). width/height args may be cells (`N`),

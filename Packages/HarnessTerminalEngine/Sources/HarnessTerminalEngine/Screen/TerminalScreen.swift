@@ -30,7 +30,7 @@ final class TerminalScreen {
     /// (the same coordinate space as `bufferLine` and prompt marks), so an image rides scrollback
     /// and reflow with the line it sits on instead of being dropped. Pixels live in `imageStore`
     /// keyed by id.
-    private struct ImagePlacement { var id: Int; var absRow: Int; var col: Int; var cols: Int; var rows: Int; var z: Int }
+    private struct ImagePlacement { var id: Int; var absRow: Int; var col: Int; var cols: Int; var rows: Int; var z: Int; var kittyID: Int? }
     private var placements: [ImagePlacement] = []
     private var imageStore: [Int: DecodedImage] = [:]
     private var nextImageID = 1
@@ -287,19 +287,37 @@ final class TerminalScreen {
 
     /// Place a decoded image at the cursor. `cols`/`rows`, when > 0, override the computed cell
     /// footprint (Kitty `c`/`r`, iTerm2 width/height). Advances the cursor below the image.
-    func placeImage(_ image: DecodedImage, cols: Int = 0, rows: Int = 0, z: Int = 0) {
+    func placeImage(_ image: DecodedImage, cols: Int = 0, rows: Int = 0, z: Int = 0, kittyID: Int? = nil) {
         let fCols = cols > 0 ? cols : max(1, Int((Double(image.pixelWidth) / Double(max(1, cellPixelWidth))).rounded(.up)))
         let fRows = rows > 0 ? rows : max(1, Int((Double(image.pixelHeight) / Double(max(1, cellPixelHeight))).rounded(.up)))
         let id = nextImageID; nextImageID += 1
         imageStore[id] = image
         imageByteTotal += image.byteCount
-        placements.append(ImagePlacement(id: id, absRow: history.count + cursorRow, col: cursorCol, cols: fCols, rows: fRows, z: z))
+        placements.append(ImagePlacement(id: id, absRow: history.count + cursorRow, col: cursorCol, cols: fCols, rows: fRows, z: z, kittyID: kittyID))
         evictImagesIfNeeded()
         // The image overlays the rows it covers from the current cursor row down.
         markRowsDirty(cursorRow ..< (cursorRow + fRows))
         // Move the cursor below the image so following output doesn't overlap it (the placement
         // rides along if these line feeds scroll the screen).
         for _ in 0 ..< fRows { lineFeed() }
+    }
+
+    /// Kitty `a=d` delete. `kittyID == nil` removes every placement (`d=a`); a non-nil value
+    /// removes only placements transmitted/placed under that Kitty image id (`d=i`). Frees the
+    /// pixels and repaints the rows the removed images covered.
+    func deleteImages(kittyID: Int?) {
+        guard !placements.isEmpty else { return }
+        var removedAny = false
+        placements.removeAll { p in
+            guard kittyID == nil || p.kittyID == kittyID else { return false }
+            if let bytes = imageStore.removeValue(forKey: p.id)?.byteCount { imageByteTotal -= bytes }
+            let row = p.absRow - history.count
+            let lo = max(0, row), hi = min(rows, row + p.rows)
+            if lo < hi { markRowsDirty(lo ..< hi) }
+            removedAny = true
+            return true
+        }
+        if removedAny, imageStore.isEmpty { imageByteTotal = 0 } // guard against drift
     }
 
     /// Enforce the per-screen image byte budget by dropping the oldest placements (LRU by age).
