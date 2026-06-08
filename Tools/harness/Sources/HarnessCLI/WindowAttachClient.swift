@@ -260,12 +260,15 @@ private final class WindowSession: @unchecked Sendable {
 
         reservedStatus = reservedStatusRows()
         let contentRows = max(1, rows - reservedStatus) // reserve the status band (status 1..5)
+        // A top status band pushes the pane area down by the reserved row count; a bottom band
+        // leaves it at row 0. Both the solver and the compositor key off the same value.
+        let yOrigin = statusPosition == .top ? reservedStatus : 0
 
         // Compute rects. A zoomed pane takes the whole content area.
         if let zoomed = tab.zoomedPaneID, let leaf = findLeaf(tab.rootPane, paneID: zoomed) {
-            rects = [PaneRect(paneID: leaf.id, surfaceID: leaf.surfaceID, x: 0, y: 0, cols: cols, rows: contentRows)]
+            rects = [PaneRect(paneID: leaf.id, surfaceID: leaf.surfaceID, x: 0, y: yOrigin, cols: cols, rows: contentRows)]
         } else {
-            rects = PaneRectSolver.solve(tab.rootPane, cols: cols, rows: contentRows, paneBorderStatus: paneBorderStatus)
+            rects = PaneRectSolver.solve(tab.rootPane, cols: cols, rows: contentRows, paneBorderStatus: paneBorderStatus, yOrigin: yOrigin)
         }
 
         let wanted = Set(rects.map { $0.surfaceID.uuidString })
@@ -426,7 +429,7 @@ private final class WindowSession: @unchecked Sendable {
                 ))
             }
         }
-        var ansi = compositor.render(panes: panes, statusLines: statusLineSet())
+        var ansi = compositor.render(panes: panes, statusLines: statusLineSet(), statusPosition: statusPosition)
         if showPaneNumbers { ansi += paneNumbersOverlay() }
         writeOut(ansi)
     }
@@ -444,6 +447,12 @@ private final class WindowSession: @unchecked Sendable {
         let count = OptionStore.Value(parsing: statusOptions["status"] ?? "on").statusLineCount
         if count > 0 { return count }
         return (copyMode != nil || statusOverride != nil) ? 1 : 0
+    }
+
+    /// `status-position` (bottom/top), refreshed with the other status options. Drives both
+    /// where the band paints and the pane area's `yOrigin`, so the two always agree.
+    private var statusPosition: StatusPosition {
+        StatusPosition(option: statusOptions["status-position"] ?? "bottom")
     }
 
     private func statusLineSet() -> [[StyledSegment]]? {

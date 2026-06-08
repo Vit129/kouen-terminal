@@ -17,6 +17,29 @@ final class StatusLineView: NSView {
     private static let mainRowHeight: CGFloat = 26
     private static let extraRowHeight: CGFloat = 22
     private var refreshTimer: Timer?
+    /// Vertical row placement for a bottom-anchored footer: main row hugs the bottom, extra
+    /// `status 2..5` rows stack upward. Swapped with `topRowConstraints` by `position`.
+    private var bottomRowConstraints: [NSLayoutConstraint] = []
+    /// Vertical row placement for a top-anchored footer: main row hugs the top, extras stack down.
+    private var topRowConstraints: [NSLayoutConstraint] = []
+
+    /// Which window edge this footer is anchored to (set by the split controller from the
+    /// `status-position` option). Drives the internal row stacking so the main
+    /// (`status-left`/`-right`) line always sits against the terminal: extra rows stack upward
+    /// at the bottom, downward at the top.
+    var position: StatusPosition = .bottom {
+        didSet {
+            guard oldValue != position else { return }
+            switch position {
+            case .bottom:
+                NSLayoutConstraint.deactivate(topRowConstraints)
+                NSLayoutConstraint.activate(bottomRowConstraints)
+            case .top:
+                NSLayoutConstraint.deactivate(bottomRowConstraints)
+                NSLayoutConstraint.activate(topRowConstraints)
+            }
+        }
+    }
 
     init() {
         super.init(frame: .zero)
@@ -44,15 +67,10 @@ final class StatusLineView: NSView {
         centerLabel.alignment = .center
         for label in extraLabels { label.isHidden = true }
 
-        // The main (left/center/right) row is pinned to the bottom `mainRowHeight`
-        // band; extra `status 2..5` rows stack above it. Anchoring the main row to
-        // the bottom (not the view centre) keeps its baseline above the window's
-        // rounded corner regardless of how many rows are visible.
-        let mainCenterY = bottomAnchor.constraint(equalTo: leftLabel.centerYAnchor, constant: Self.mainRowHeight / 2)
         heightConstraint = heightAnchor.constraint(equalToConstant: Self.mainRowHeight)
-        var constraints: [NSLayoutConstraint] = [
+        // Position-independent: horizontal placement, the labels' shared baseline, and height.
+        NSLayoutConstraint.activate([
             leftLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
-            mainCenterY,
             leftLabel.trailingAnchor.constraint(lessThanOrEqualTo: centerLabel.leadingAnchor, constant: -8),
 
             centerLabel.centerXAnchor.constraint(equalTo: centerXAnchor),
@@ -63,16 +81,27 @@ final class StatusLineView: NSView {
             rightLabel.leadingAnchor.constraint(greaterThanOrEqualTo: centerLabel.trailingAnchor, constant: 8),
 
             heightConstraint,
-        ]
-        // Extra row i (0-based) sits in the band centred at
-        // `mainRowHeight + i*extraRowHeight + extraRowHeight/2` above the bottom.
+        ])
+        for label in extraLabels {
+            NSLayoutConstraint.activate([
+                label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
+                label.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
+            ])
+        }
+        // The main (left/center/right) row is pinned to the band edge nearest the terminal;
+        // extra `status 2..5` rows stack away from it. At the bottom the main row hugs the
+        // bottom and extras stack upward (keeping the main baseline above the window's rounded
+        // corner); at the top the main row hugs the top and extras stack downward. Extra row i
+        // (0-based) sits centred at `mainRowHeight + i*extraRowHeight + extraRowHeight/2` from
+        // the anchored edge. `position`'s didSet swaps between the two sets.
+        bottomRowConstraints = [bottomAnchor.constraint(equalTo: leftLabel.centerYAnchor, constant: Self.mainRowHeight / 2)]
+        topRowConstraints = [leftLabel.centerYAnchor.constraint(equalTo: topAnchor, constant: Self.mainRowHeight / 2)]
         for (i, label) in extraLabels.enumerated() {
             let centerOffset = Self.mainRowHeight + CGFloat(i) * Self.extraRowHeight + Self.extraRowHeight / 2
-            constraints.append(label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10))
-            constraints.append(label.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10))
-            constraints.append(bottomAnchor.constraint(equalTo: label.centerYAnchor, constant: centerOffset))
+            bottomRowConstraints.append(bottomAnchor.constraint(equalTo: label.centerYAnchor, constant: centerOffset))
+            topRowConstraints.append(label.centerYAnchor.constraint(equalTo: topAnchor, constant: centerOffset))
         }
-        NSLayoutConstraint.activate(constraints)
+        NSLayoutConstraint.activate(bottomRowConstraints)
         applyChrome()
         NotificationCenter.default.addObserver(
             self,
