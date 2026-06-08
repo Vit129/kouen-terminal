@@ -15,6 +15,12 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
   shutdown, so a burst of agent activity no longer taxes keystroke latency. `layout.json` is now
   written compactly (still deterministically key-sorted).
 
+### Added
+- **Secure Keyboard Entry** (Edit ▸ Secure Keyboard Entry, off by default). When on, Harness takes
+  the process-global `EnableSecureEventInput` lock while it's the active app, so another local
+  process can't keylog keystrokes typed at a sudo / ssh-passphrase prompt. The lock is released
+  whenever Harness is backgrounded or quits (balanced accounting, pinned by test).
+
 ### Security
 - **Paste-injection hardening.** A clipboard payload that embeds the bracketed-paste end marker
   (`ESC[201~`) can no longer terminate the paste early and run the trailing text as typed input —
