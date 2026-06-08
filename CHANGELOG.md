@@ -8,6 +8,13 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 
 ## [Unreleased]
 
+### Fixed
+- **`capture-pane` (plain mode) now strips DCS / charset-designation escapes.** The scrollback
+  ANSI filter behind `capture-pane` (without `-e`) only neutralized CSI and OSC sequences, so a
+  DCS reply (e.g. a DECRQSS/XTGETTCAP answer) leaked its raw payload and a charset-designation
+  escape (`ESC ( B`) leaked a stray byte into the "plain text" capture. It now folds in the full
+  C1 string family (DCS/SOS/PM/APC) and consumes multi-byte escapes (intermediates + final).
+
 ### Changed
 - **Layout persistence moved off the input-latency path.** The daemon no longer does a full
   prettyPrinted `layout.json` encode + atomic write under the registry lock on every mutation;
