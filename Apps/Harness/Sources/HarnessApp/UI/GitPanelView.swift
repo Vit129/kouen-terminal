@@ -118,8 +118,19 @@ final class GitPanelView: NSView {
         changesContainer.translatesAutoresizingMaskIntoConstraints = false
         changesStack.orientation = .vertical; changesStack.alignment = .width; changesStack.spacing = 0
         changesStack.translatesAutoresizingMaskIntoConstraints = false
+        changesStack.detachesHiddenViews = false
 
-        changesScroll.documentView = changesStack
+        let changesFlipped = FlippedView()
+        changesFlipped.translatesAutoresizingMaskIntoConstraints = false
+        changesFlipped.addSubview(changesStack)
+        NSLayoutConstraint.activate([
+            changesStack.topAnchor.constraint(equalTo: changesFlipped.topAnchor),
+            changesStack.leadingAnchor.constraint(equalTo: changesFlipped.leadingAnchor),
+            changesStack.trailingAnchor.constraint(equalTo: changesFlipped.trailingAnchor),
+            changesStack.bottomAnchor.constraint(equalTo: changesFlipped.bottomAnchor),
+        ])
+
+        changesScroll.documentView = changesFlipped
         changesScroll.hasVerticalScroller = true
         changesScroll.drawsBackground = false
         changesScroll.scrollerStyle = .overlay
@@ -132,6 +143,7 @@ final class GitPanelView: NSView {
             changesScroll.leadingAnchor.constraint(equalTo: changesContainer.leadingAnchor),
             changesScroll.trailingAnchor.constraint(equalTo: changesContainer.trailingAnchor),
             changesScroll.bottomAnchor.constraint(equalTo: changesContainer.bottomAnchor),
+            changesFlipped.widthAnchor.constraint(equalTo: changesScroll.contentView.widthAnchor),
         ])
 
         // Stage All button bar
@@ -408,7 +420,13 @@ final class GitPanelView: NSView {
               let hash = card.identifier?.rawValue else { return }
         Task {
             let detail = await runGit(["show", "--stat", "--patch", hash], in: path)
-            presentCommitDetail(detail.isEmpty ? "No details available." : detail, anchor: card)
+            let shortHash = String(hash.prefix(7))
+            let tmpDir = NSTemporaryDirectory() + "harness-diff/"
+            try? FileManager.default.createDirectory(atPath: tmpDir, withIntermediateDirectories: true)
+            let tmpPath = tmpDir + "\(shortHash).diff"
+            try? detail.write(toFile: tmpPath, atomically: true, encoding: .utf8)
+            guard let split = self.window?.contentViewController as? MainSplitViewController else { return }
+            split.contentVC.openFileTab(path: tmpPath)
         }
     }
 
@@ -580,7 +598,7 @@ final class GitPanelView: NSView {
     private func refresh() async {
         guard let path = currentPath else { return }
         let branch = await runGit(["branch", "--show-current"], in: path)
-        let status = await runGit(["diff", "--stat", "--cached", "--numstat"], in: path)
+        let numstat = await runGit(["diff", "--numstat", "HEAD"], in: path)
         let porcelain = await runGit(["status", "--porcelain"], in: path)
         let log = await runGit(["log", "--format=%H|%an|%ar|%s", "-25"], in: path)
 
@@ -589,20 +607,35 @@ final class GitPanelView: NSView {
         let changeCount = porcelain.components(separatedBy: "\n").filter { !$0.isEmpty }.count
         tabSelector.setLabel("Changes (\(changeCount))", forSegment: 0)
 
+        // Map file path -> (additions, deletions) from `git diff --numstat HEAD`
+        var stats: [String: (Int, Int)] = [:]
+        for line in numstat.components(separatedBy: "\n") where !line.isEmpty {
+            let parts = line.components(separatedBy: "\t")
+            guard parts.count >= 3, let added = Int(parts[0]), let deleted = Int(parts[1]) else { continue }
+            stats[parts[2]] = (added, deleted)
+        }
+
         // Changes
         changesStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         if porcelain.isEmpty {
             changesStack.addArrangedSubview(makeLabel("Working tree clean"))
         } else {
             for line in porcelain.components(separatedBy: "\n").prefix(40) where !line.isEmpty {
-                changesStack.addArrangedSubview(makeChangeRow(line))
+                let file = String(line.dropFirst(3))
+                let row = makeChangeRow(line, stats: stats[file])
+                changesStack.addArrangedSubview(row)
+                row.leadingAnchor.constraint(equalTo: changesStack.leadingAnchor).isActive = true
+                row.trailingAnchor.constraint(equalTo: changesStack.trailingAnchor).isActive = true
             }
         }
 
         // History
         historyStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         for line in log.components(separatedBy: "\n").prefix(25) where !line.isEmpty {
-            historyStack.addArrangedSubview(makeHistoryCard(line))
+            let card = makeHistoryCard(line)
+            historyStack.addArrangedSubview(card)
+            card.leadingAnchor.constraint(equalTo: historyStack.leadingAnchor).isActive = true
+            card.trailingAnchor.constraint(equalTo: historyStack.trailingAnchor).isActive = true
         }
 
         await refreshWorktrees()
@@ -617,21 +650,48 @@ final class GitPanelView: NSView {
         let isMain: Bool
     }
 
-    private func makeChangeRow(_ line: String) -> NSView {
+    private func makeStatusBadge(letter: String, color: NSColor) -> NSView {
+        let badge = NSView()
+        badge.wantsLayer = true
+        badge.layer?.backgroundColor = color.withAlphaComponent(0.18).cgColor
+        badge.layer?.cornerRadius = 4
+        badge.translatesAutoresizingMaskIntoConstraints = false
+
+        let label = NSTextField(labelWithString: letter)
+        label.font = .systemFont(ofSize: 10, weight: .semibold)
+        label.textColor = color
+        label.alignment = .center
+        label.translatesAutoresizingMaskIntoConstraints = false
+        badge.addSubview(label)
+
+        NSLayoutConstraint.activate([
+            badge.widthAnchor.constraint(equalToConstant: 18),
+            badge.heightAnchor.constraint(equalToConstant: 18),
+            label.centerXAnchor.constraint(equalTo: badge.centerXAnchor),
+            label.centerYAnchor.constraint(equalTo: badge.centerYAnchor),
+        ])
+        return badge
+    }
+
+    private func makeChangeRow(_ line: String, stats: (Int, Int)?) -> NSView {
         let xy = line.prefix(2)
         let indexStatus = String(xy.first ?? Character(" "))
         let file = String(line.dropFirst(3))
         let isStaged = indexStatus != " " && indexStatus != "?"
         let workTree = String(xy.last ?? Character(" "))
 
+        let statusKey = isStaged ? indexStatus : workTree
         let color: NSColor
-        switch isStaged ? indexStatus : workTree {
-        case "M": color = .systemOrange
-        case "A": color = .systemGreen
-        case "D": color = .systemRed
-        case "?": color = .systemGreen
-        default: color = HarnessDesign.chrome.textSecondary
+        let letter: String
+        switch statusKey {
+        case "M": color = .systemOrange; letter = "M"
+        case "A": color = .systemGreen; letter = "A"
+        case "D": color = .systemRed; letter = "D"
+        case "?": color = .systemGreen; letter = "U"
+        default: color = HarnessDesign.chrome.textSecondary; letter = "M"
         }
+
+        let badge = makeStatusBadge(letter: letter, color: color)
 
         let check = NSButton(checkboxWithTitle: "", target: self, action: #selector(toggleStage(_:)))
         check.state = isStaged ? .on : .off
@@ -642,10 +702,33 @@ final class GitPanelView: NSView {
         name.textColor = color
         name.lineBreakMode = .byTruncatingMiddle
         name.toolTip = file
+        name.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
-        let row = NSStackView(views: [check, name])
-        row.orientation = .horizontal; row.spacing = 4
-        row.edgeInsets = NSEdgeInsets(top: 2, left: 8, bottom: 2, right: 8)
+        var rowViews: [NSView] = [badge, name]
+
+        if let (added, deleted) = stats, added + deleted > 0 {
+            let statsLabel = NSTextField(labelWithString: "")
+            statsLabel.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
+            let attributed = NSMutableAttributedString()
+            if added > 0 {
+                attributed.append(NSAttributedString(string: "+\(added) ", attributes: [.foregroundColor: NSColor.systemGreen]))
+            }
+            if deleted > 0 {
+                attributed.append(NSAttributedString(string: "-\(deleted)", attributes: [.foregroundColor: NSColor.systemRed]))
+            }
+            statsLabel.attributedStringValue = attributed
+            statsLabel.setContentHuggingPriority(.required, for: .horizontal)
+            statsLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+            rowViews.append(statsLabel)
+        }
+
+        check.setContentHuggingPriority(.required, for: .horizontal)
+        rowViews.append(check)
+
+        let row = NSStackView(views: rowViews)
+        row.orientation = .horizontal; row.spacing = 6; row.alignment = .centerY
+        row.distribution = .fill
+        row.edgeInsets = NSEdgeInsets(top: 3, left: 8, bottom: 3, right: 8)
         return row
     }
 
@@ -779,7 +862,12 @@ final class GitPanelView: NSView {
         if entries.isEmpty {
             worktreesStack.addArrangedSubview(makeLabel("No worktrees"))
         } else {
-            entries.forEach { worktreesStack.addArrangedSubview(makeWorktreeRow($0)) }
+            for entry in entries {
+                let row = makeWorktreeRow(entry)
+                worktreesStack.addArrangedSubview(row)
+                row.leadingAnchor.constraint(equalTo: worktreesStack.leadingAnchor).isActive = true
+                row.trailingAnchor.constraint(equalTo: worktreesStack.trailingAnchor).isActive = true
+            }
         }
     }
 

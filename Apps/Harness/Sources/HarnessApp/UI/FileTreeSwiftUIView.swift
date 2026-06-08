@@ -48,17 +48,49 @@ struct FileTreeSwiftUIView: View {
 
     private var taskID: String { "\(sessionID?.uuidString ?? "nil")|\(rootPath)|\(gitBranch ?? "nil")" }
 
+    @State private var searchText: String = ""
+
+    private var filteredNodes: [FileTreeNode] {
+        guard !searchText.isEmpty else { return rootNodes }
+        return rootNodes.filter { matchesSearch($0, query: searchText.lowercased()) }
+    }
+
+    private func matchesSearch(_ node: FileTreeNode, query: String) -> Bool {
+        if node.node.name.lowercased().contains(query) { return true }
+        return node.children?.contains(where: { matchesSearch($0, query: query) }) ?? false
+    }
+
     var body: some View {
-        List {
-            if let gitBranch, !gitBranch.isEmpty {
-                branchChip(gitBranch)
+        VStack(spacing: 0) {
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                TextField("Filter files…", text: $searchText)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 11))
+                if !searchText.isEmpty {
+                    Button { searchText = "" } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
-            ForEach(rootNodes) { node in
-                NodeRow(node: node, rootPath: rootPath, watcher: watcher, gitStatus: currentGitStatus, onPreview: onPreview)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            List {
+                if let gitBranch, !gitBranch.isEmpty {
+                    branchChip(gitBranch)
+                }
+                ForEach(filteredNodes) { node in
+                    NodeRow(node: node, rootPath: rootPath, watcher: watcher, gitStatus: currentGitStatus, onPreview: onPreview)
+                }
             }
+            .listStyle(.sidebar)
+            .scrollContentBackground(.hidden)
         }
-        .listStyle(.sidebar)
-        .scrollContentBackground(.hidden)
         .onAppear { refreshGitBranch() }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("HarnessActiveTabGitBranchDidChange"))) { _ in
             refreshGitBranch()

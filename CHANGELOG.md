@@ -6,6 +6,26 @@ All notable changes to Harness are documented here. The format is based on
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/robzilla1738/harness-terminal/releases).
 
+## [Unreleased]
+
+### Fixed
+- **Git panel "Changes" row layout.** Rows now pin to the full list width instead of
+  sizing to their own content, so checkboxes sit flush left/right consistently instead of
+  drifting based on filename length. Same width-pinning applied to History commit cards
+  and Worktree rows.
+- **File preview rendering.** The text editor pane now draws an explicit dark background
+  and brighter foreground text, fixing a black-screen/invisible-text regression when
+  previewing files.
+
+### Changed
+- **Git "Changes" row redesign.** Each row now shows a colored status badge (M/A/D/U),
+  the filename, `+N -M` insertion/deletion counts (from `git diff --numstat HEAD`), and
+  a right-aligned stage checkbox.
+- **Files sidebar search.** Added an inline filter field above the file tree for
+  fuzzy-matching file names.
+- **File editor panel background** now matches the terminal background (including the
+  user's opacity setting) instead of the sidebar background.
+
 ## [1.8.0] - 2026-06-07
 
 The tmux-parity close-out: every remaining tracked gap is either shipped, adapted with a

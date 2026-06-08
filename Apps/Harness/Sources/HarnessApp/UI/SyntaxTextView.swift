@@ -11,6 +11,11 @@ struct SyntaxDefinitionTarget {
 final class SyntaxTextView: NSView {
     enum DiffLineType { case added, modified, deleted }
 
+    /// Ensure file editor text is always readable on dark background.
+    static func editorTextColor() -> NSColor {
+        return NSColor(white: 0.9, alpha: 1)
+    }
+
     private let scrollView = NSScrollView()
     private let textView = NSTextView()
     private let gutterView = SyntaxLineNumberGutterView()
@@ -143,19 +148,23 @@ final class SyntaxTextView: NSView {
 
         textView.isEditable = false
         textView.isSelectable = true
-        textView.drawsBackground = false
+        textView.drawsBackground = true
+        textView.backgroundColor = NSColor(white: 0.12, alpha: 1)
         textView.textContainerInset = NSSize(width: 8, height: 12)
         textView.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
-        textView.textColor = HarnessDesign.chrome.textPrimary
-        textView.textContainer?.widthTracksTextView = true
+        textView.textColor = Self.editorTextColor()
         textView.isHorizontallyResizable = false
-        textView.autoresizingMask = [.width]
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.isAutomaticTextReplacementEnabled = false
         textView.usesFindBar = true
         textView.isIncrementalSearchingEnabled = true
         scrollView.documentView = textView
+        // Must set after documentView assignment so textContainer exists
+        textView.textContainer?.widthTracksTextView = true
+        textView.autoresizingMask = [.width]
+        textView.minSize = NSSize(width: 0, height: 0)
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
 
         gutterView.translatesAutoresizingMaskIntoConstraints = false
         gutterView.textView = textView
@@ -299,7 +308,7 @@ private final class SyntaxLineNumberGutterView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         guard let textView, let layoutManager = textView.layoutManager, let textContainer = textView.textContainer else { return }
         let c = HarnessDesign.chrome
-        c.sidebarBackground.withAlphaComponent(0.5).setFill()
+        c.sidebarBackground.withAlphaComponent(1.0).setFill()
         dirtyRect.fill()
 
         let visibleRect = textView.enclosingScrollView?.contentView.bounds ?? textView.visibleRect
@@ -352,10 +361,9 @@ private final class SyntaxLineNumberGutterView: NSView {
 enum SyntaxHighlighter {
     static func highlight(_ text: String, fileExtension ext: String) -> NSAttributedString {
         let font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
-        let c = HarnessDesign.chrome
         let attributed = NSMutableAttributedString(string: text, attributes: [
             .font: font,
-            .foregroundColor: c.textPrimary,
+            .foregroundColor: SyntaxTextView.editorTextColor(),
         ])
         let fullRange = NSRange(location: 0, length: attributed.length)
         let comments = commentPattern(for: ext)
@@ -388,6 +396,20 @@ enum SyntaxHighlighter {
         if ["md", "markdown"].contains(ext), let regex = try? NSRegularExpression(pattern: #"^#{1,6}\s+.*$|`[^`]+`|\*\*[^*]+\*\*"#, options: .anchorsMatchLines) {
             regex.matches(in: text, range: fullRange).forEach {
                 attributed.addAttribute(.foregroundColor, value: HarnessDesign.chrome.accent, range: $0.range)
+            }
+        }
+        if ["diff", "patch"].contains(ext) {
+            if let r = try? NSRegularExpression(pattern: #"^\+.*$"#, options: .anchorsMatchLines) {
+                r.matches(in: text, range: fullRange).forEach { attributed.addAttribute(.foregroundColor, value: NSColor.systemGreen, range: $0.range) }
+            }
+            if let r = try? NSRegularExpression(pattern: #"^-.*$"#, options: .anchorsMatchLines) {
+                r.matches(in: text, range: fullRange).forEach { attributed.addAttribute(.foregroundColor, value: NSColor.systemRed, range: $0.range) }
+            }
+            if let r = try? NSRegularExpression(pattern: #"^@@.*@@.*$"#, options: .anchorsMatchLines) {
+                r.matches(in: text, range: fullRange).forEach { attributed.addAttribute(.foregroundColor, value: NSColor.systemPurple, range: $0.range) }
+            }
+            if let r = try? NSRegularExpression(pattern: #"^diff --git.*$"#, options: .anchorsMatchLines) {
+                r.matches(in: text, range: fullRange).forEach { attributed.addAttribute(.foregroundColor, value: NSColor.systemBlue, range: $0.range) }
             }
         }
         return attributed
