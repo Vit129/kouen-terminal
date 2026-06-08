@@ -109,20 +109,70 @@ public enum FormatString {
         }
         // Operators (tmux): equality, regex match, regex substitution, arithmetic.
         if body.hasPrefix("==:") { return operatorEquals(String(body.dropFirst(3)), context: context) }
+        if body.hasPrefix("!=:") { return operatorEquals(String(body.dropFirst(3)), context: context, negate: true) }
+        if body.hasPrefix("||:") { return operatorLogical(String(body.dropFirst(3)), context: context, and: false) }
+        if body.hasPrefix("&&:") { return operatorLogical(String(body.dropFirst(3)), context: context, and: true) }
         if body.hasPrefix("m:") { return operatorMatch(String(body.dropFirst(2)), context: context) }
         if body.hasPrefix("s/") { return operatorSubstitute(body, context: context) }
         if body.hasPrefix("e|") { return operatorMath(body, context: context) }
+        if body.hasPrefix("n:") { return operatorLength(String(body.dropFirst(2)), context: context) }
+        if body.hasPrefix("T:") { return operatorExpandTwice(String(body.dropFirst(2)), context: context) }
+        if body.hasPrefix("a:") { return operatorChar(String(body.dropFirst(2)), context: context) }
+        if let padded = operatorPad(body, context: context) { return padded }
         return resolve(token: body, context: context)
     }
 
     // MARK: - Operators
 
-    private static func operatorEquals(_ body: String, context: FormatContext) -> String {
+    private static func operatorEquals(_ body: String, context: FormatContext, negate: Bool = false) -> String {
         let parts = topLevelSplit(body, on: ",")
         guard parts.count >= 2 else { return "" }
         let a = evaluate(parts[0], context: context)
         let b = evaluate(parts[1], context: context)
-        return a == b ? "1" : ""
+        return (a == b) != negate ? "1" : ""
+    }
+
+    /// `#{||:A,B}` / `#{&&:A,B}` — logical or / and. An operand is "true" when it expands non-empty
+    /// (tmux's truthiness), so these compose with `#{?…}` like comparisons do.
+    private static func operatorLogical(_ body: String, context: FormatContext, and: Bool) -> String {
+        let parts = topLevelSplit(body, on: ",")
+        guard parts.count >= 2 else { return "" }
+        let a = !evaluate(parts[0], context: context).isEmpty
+        let b = !evaluate(parts[1], context: context).isEmpty
+        return (and ? (a && b) : (a || b)) ? "1" : ""
+    }
+
+    // The argument to these modifiers is a *format string* (tmux semantics): bare text is literal
+    // and `#{…}` expands — so we `evaluate` it directly rather than wrapping it as a single token.
+
+    /// `#{n:body}` — the display-column width of the expanded body (tmux's length modifier).
+    private static func operatorLength(_ body: String, context: FormatContext) -> String {
+        String(DisplayWidth.columns(of: evaluate(body, context: context)))
+    }
+
+    /// `#{T:body}` — expand the body, then expand the *result* again as a format string. The
+    /// idiomatic way to store a format in a user-var and render it (`#{T:#{@my_format}}`).
+    private static func operatorExpandTwice(_ body: String, context: FormatContext) -> String {
+        evaluate(evaluate(body, context: context), context: context)
+    }
+
+    /// `#{a:N}` — the character whose decimal Unicode scalar value is N (`#{a:65}` → "A").
+    private static func operatorChar(_ body: String, context: FormatContext) -> String {
+        let arg = evaluate(body, context: context).trimmingCharacters(in: .whitespaces)
+        guard let code = UInt32(arg), let scalar = Unicode.Scalar(code) else { return "" }
+        return String(scalar)
+    }
+
+    /// `#{pN:body}` — pad the expanded body with spaces to at least N display columns
+    /// (left-justified). Returns nil when `body` isn't the `p<digits>:` shape, so tokens that merely
+    /// start with `p` (e.g. `pane_…`) fall through to normal resolution. Never truncates.
+    private static func operatorPad(_ body: String, context: FormatContext) -> String? {
+        guard body.hasPrefix("p"), let colon = body.firstIndex(of: ":") else { return nil }
+        let widthStr = body[body.index(after: body.startIndex)..<colon]
+        guard !widthStr.isEmpty, let width = Int(widthStr), width >= 0 else { return nil }
+        let resolved = evaluate(String(body[body.index(after: colon)...]), context: context)
+        let cols = DisplayWidth.columns(of: resolved)
+        return cols >= width ? resolved : resolved + String(repeating: " ", count: width - cols)
     }
 
     private static func operatorMatch(_ body: String, context: FormatContext) -> String {
