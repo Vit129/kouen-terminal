@@ -8,8 +8,11 @@ import Foundation
 public enum CopyModeAction: Codable, Sendable, Equatable {
     case cursorLeft, cursorRight, cursorUp, cursorDown
     case nextWord, previousWord
+    case nextWordEnd                       // end of the next word (vi `e`)
     case startOfLine, endOfLine
+    case backToIndentation                 // first non-blank column of the line (vi `^`)
     case top, bottom                       // history-top / history-bottom
+    case topLine, middleLine, bottomLine   // top / middle / bottom of the visible window (vi H/M/L)
     case previousPrompt, nextPrompt        // jump between OSC 133 shell-prompt rows
     case pageUp, pageDown, halfPageUp, halfPageDown
     case beginSelection, clearSelection, selectLine, rectangleToggle
@@ -28,10 +31,15 @@ public enum CopyModeAction: Codable, Sendable, Equatable {
         case .cursorDown: return "cursor-down"
         case .nextWord: return "next-word"
         case .previousWord: return "previous-word"
+        case .nextWordEnd: return "next-word-end"
         case .startOfLine: return "start-of-line"
         case .endOfLine: return "end-of-line"
+        case .backToIndentation: return "back-to-indentation"
         case .top: return "history-top"
         case .bottom: return "history-bottom"
+        case .topLine: return "top-line"
+        case .middleLine: return "middle-line"
+        case .bottomLine: return "bottom-line"
         case .previousPrompt: return "previous-prompt"
         case .nextPrompt: return "next-prompt"
         case .pageUp: return "page-up"
@@ -62,12 +70,17 @@ public enum CopyModeAction: Codable, Sendable, Equatable {
         case "cursor-right": self = .cursorRight
         case "cursor-up": self = .cursorUp
         case "cursor-down": self = .cursorDown
-        case "next-word", "next-word-end": self = .nextWord
+        case "next-word": self = .nextWord
         case "previous-word": self = .previousWord
-        case "start-of-line", "back-to-indentation": self = .startOfLine
+        case "next-word-end": self = .nextWordEnd
+        case "start-of-line": self = .startOfLine
+        case "back-to-indentation": self = .backToIndentation
         case "end-of-line": self = .endOfLine
-        case "history-top", "top-line": self = .top
-        case "history-bottom", "bottom-line": self = .bottom
+        case "history-top": self = .top
+        case "history-bottom": self = .bottom
+        case "top-line": self = .topLine
+        case "middle-line": self = .middleLine
+        case "bottom-line": self = .bottomLine
         case "previous-prompt": self = .previousPrompt
         case "next-prompt": self = .nextPrompt
         case "page-up": self = .pageUp
