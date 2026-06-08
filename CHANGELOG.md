@@ -39,6 +39,10 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
   `o` swaps the selection's other end, `goto-line N` jumps to a line, and `W`/`B`/`E` are bound as
   the whitespace-delimited (big-WORD) motions. Previously a bound `jump-forward` (etc.) was a
   parse-time failure. Works in both the GUI overlay and the `attach-window` compositor.
+- **More format operators.** Building on the nested-conditional fix: `#{!=:a,b}` (not-equal),
+  `#{||:a,b}` / `#{&&:a,b}` (logical or/and), `#{n:…}` (display-column length), `#{T:…}` (expand,
+  then expand the result again), `#{a:65}` (character from a code point), and `#{pN:…}` (pad to N
+  columns). Their argument is a format string, matching tmux (bare text is literal, `#{…}` expands).
 - **Kitty graphics protocol: ack, query, transmit-once/place-many, delete.** The decoder was
   display-only; the control protocol is now answered. Commands with an image id/number get an
   `APC G i=<id>;OK ST` ack (or an `EBADF`/`ENOENT` error), gated by quietness (`q=1` silences OK,
