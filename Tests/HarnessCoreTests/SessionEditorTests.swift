@@ -91,81 +91,50 @@ final class SessionEditorTests: XCTestCase {
         XCTAssertNil(editor.paneLocation(forSurfaceKey: UUID().uuidString), "unknown surface → nil")
     }
 
-    func testPaneLeafLegacyDecodeBackfillsSurfaceTabs() throws {
-        let surfaceID = UUID()
-        let json = """
-        {
-          "id": "\(UUID().uuidString)",
-          "surfaceID": "\(surfaceID.uuidString)"
-        }
-        """.data(using: .utf8)!
+    func testSwapPanesExchangesLeavesWithoutCorruption() throws {
+        // Regression: two sequential id-keyed replaceLeaf passes used to destroy one
+        // pane and duplicate the other (the second pass matched both copies of dst.id).
+        var editor = SessionEditor()
+        let ws = try XCTUnwrap(editor.snapshot.activeWorkspace)
+        let tab = try XCTUnwrap(ws.activeTab)
+        let a = try XCTUnwrap(tab.rootPane.allPaneIDs().first)
+        let b = try XCTUnwrap(editor.splitPane(in: ws.id, tabID: tab.id, paneID: a, direction: .horizontal))
+        let surfA = try XCTUnwrap(editor.surfaceID(forPaneID: a))
+        let surfB = try XCTUnwrap(editor.surfaceID(forPaneID: b))
 
-        let leaf = try JSONDecoder().decode(PaneLeaf.self, from: json)
-        XCTAssertEqual(leaf.surfaceID, surfaceID)
-        XCTAssertEqual(leaf.activeSurfaceID, surfaceID)
-        XCTAssertEqual(leaf.surfaces.map(\.id), [surfaceID])
-        XCTAssertEqual(leaf.surfaceIDs, [surfaceID])
+        let before = try XCTUnwrap(editor.snapshot.activeWorkspace?.activeTab)
+        XCTAssertEqual(before.rootPane.allSurfaceIDs(), [surfA, surfB])
+
+        XCTAssertTrue(editor.swapPanes(a, b))
+
+        let after = try XCTUnwrap(editor.snapshot.activeWorkspace?.activeTab)
+        // Both panes survive — no pane destroyed, no id/surface duplicated.
+        XCTAssertEqual(after.rootPane.allPaneIDs().count, 2, "no pane id dropped or duplicated")
+        XCTAssertEqual(Set(after.rootPane.allPaneIDs()), [a, b])
+        XCTAssertEqual(after.rootPane.allSurfaceIDs().count, 2, "no surface id dropped or duplicated")
+        // Positions exchanged: first leaf now carries B's surface, second carries A's.
+        XCTAssertEqual(after.rootPane.allSurfaceIDs(), [surfB, surfA])
     }
 
-    func testPaneSurfaceTabsCanAddAndSelectActiveSurface() throws {
+    func testSwapPanesAcrossTabsExchangesWithoutLoss() throws {
         var editor = SessionEditor()
-        let tab = try XCTUnwrap(editor.snapshot.activeWorkspace?.activeTab)
-        let paneID = try XCTUnwrap(tab.activePaneID)
-        let originalSurface = try XCTUnwrap(editor.surfaceID(forPaneID: paneID))
+        let ws = try XCTUnwrap(editor.snapshot.activeWorkspace)
+        let tab1 = try XCTUnwrap(ws.activeTab)
+        let a = try XCTUnwrap(tab1.rootPane.allPaneIDs().first)
+        let surfA = try XCTUnwrap(editor.surfaceID(forPaneID: a))
+        let tab2ID = try XCTUnwrap(editor.addTab(to: ws.id, cwd: "/tmp"))
+        let tab2 = try XCTUnwrap(editor.snapshot.activeWorkspace?.sessions.flatMap(\.tabs).first { $0.id == tab2ID })
+        let b = try XCTUnwrap(tab2.rootPane.allPaneIDs().first)
+        let surfB = try XCTUnwrap(editor.surfaceID(forPaneID: b))
 
-        let newSurface = try XCTUnwrap(editor.addSurface(tabID: tab.id, paneID: paneID))
-        XCTAssertEqual(editor.surfaceID(forPaneID: paneID), newSurface)
+        XCTAssertTrue(editor.swapPanes(a, b))
 
-        XCTAssertTrue(editor.selectPaneSurface(tabID: tab.id, paneID: paneID, surfaceID: originalSurface))
-        XCTAssertEqual(editor.surfaceID(forPaneID: paneID), originalSurface)
-
-        let updated = try XCTUnwrap(editor.snapshot.activeWorkspace?.activeTab)
-        let leaf = try XCTUnwrap(updated.rootPane.allLeaves().first)
-        XCTAssertEqual(Set(leaf.surfaceIDs), Set([originalSurface, newSurface]))
-    }
-
-    func testPaneSurfaceTabCanSplitOutOfPane() throws {
-        var editor = SessionEditor()
-        let tab = try XCTUnwrap(editor.snapshot.activeWorkspace?.activeTab)
-        let paneID = try XCTUnwrap(tab.activePaneID)
-        let originalSurface = try XCTUnwrap(editor.surfaceID(forPaneID: paneID))
-        let movedSurface = try XCTUnwrap(editor.addSurface(tabID: tab.id, paneID: paneID))
-
-        let newPaneID = try XCTUnwrap(editor.splitPaneSurface(
-            tabID: tab.id,
-            sourcePaneID: paneID,
-            surfaceID: movedSurface,
-            targetPaneID: paneID,
-            direction: .horizontal,
-            beforeTarget: false
-        ))
-
-        XCTAssertEqual(editor.surfaceID(forPaneID: newPaneID), movedSurface)
-        let updated = try XCTUnwrap(editor.snapshot.activeWorkspace?.activeTab)
-        XCTAssertEqual(Set(updated.rootPane.allSurfaceIDs()), Set([originalSurface, movedSurface]))
-        XCTAssertEqual(updated.rootPane.allPaneIDs().count, 2)
-    }
-
-    func testPaneSurfaceTabCanSplitOutOfPaneBeforeTarget() throws {
-        var editor = SessionEditor()
-        let tab = try XCTUnwrap(editor.snapshot.activeWorkspace?.activeTab)
-        let paneID = try XCTUnwrap(tab.activePaneID)
-        let originalSurface = try XCTUnwrap(editor.surfaceID(forPaneID: paneID))
-        let movedSurface = try XCTUnwrap(editor.addSurface(tabID: tab.id, paneID: paneID))
-
-        let newPaneID = try XCTUnwrap(editor.splitPaneSurface(
-            tabID: tab.id,
-            sourcePaneID: paneID,
-            surfaceID: movedSurface,
-            targetPaneID: paneID,
-            direction: .horizontal,
-            beforeTarget: true
-        ))
-
-        XCTAssertEqual(editor.surfaceID(forPaneID: newPaneID), movedSurface)
-        let updated = try XCTUnwrap(editor.snapshot.activeWorkspace?.activeTab)
-        XCTAssertEqual(Set(updated.rootPane.allSurfaceIDs()), Set([originalSurface, movedSurface]))
-        XCTAssertEqual(updated.rootPane.allPaneIDs().count, 2)
+        let tabs = try XCTUnwrap(editor.snapshot.activeWorkspace?.sessions.flatMap(\.tabs))
+        let t1 = try XCTUnwrap(tabs.first { $0.id == tab1.id })
+        let t2 = try XCTUnwrap(tabs.first { $0.id == tab2ID })
+        // A's surface moved to tab2, B's surface moved to tab1 — neither lost or duplicated.
+        XCTAssertEqual(t1.rootPane.allSurfaceIDs(), [surfB])
+        XCTAssertEqual(t2.rootPane.allSurfaceIDs(), [surfA])
     }
 
     /// v2 layout.json had no `activePaneID`/`lastActivePaneID`; decoding must backfill

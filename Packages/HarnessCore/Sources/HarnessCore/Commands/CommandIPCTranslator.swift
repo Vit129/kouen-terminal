@@ -234,12 +234,14 @@ public enum CommandIPCTranslator {
              .showMessages, .refreshClient:
             return .clientLocal(command)
 
-        case let .findWindow(pattern, name, content, title):
-            // Content matching needs a live capture (client-side concern) — hand off.
-            // Name/title resolve from the snapshot here so every front-end agrees.
+        case let .findWindow(pattern, name, content, title, scopeTarget):
+            // Content matching needs a live capture (client-side concern) — hand off (the
+            // client applies the same `-t` scope). Name/title resolve from the snapshot here
+            // so every front-end agrees.
             if content { return .clientLocal(command) }
             let matches = FindWindowMatcher.snapshotMatches(
-                target.snapshot, pattern: pattern, name: name, title: title)
+                target.snapshot, pattern: pattern, name: name, title: title,
+                target: scopeTarget, current: target.session)
             guard let first = matches.first else { return .unresolved }
             // tmux lists multiple matches; Harness focuses the first in snapshot order.
             return .requests([.selectTab(workspaceID: first.workspaceID, tabID: first.tabID)])
@@ -350,12 +352,16 @@ public enum CommandIPCTranslator {
             return .requests([.selectTab(workspaceID: ws.id, tabID: session.tabs[pos].id)])
 
         case let .moveWindow(index):
+            // Honor base-index like .selectWindow: `-t :N` is a window NUMBER, not a 0-based array
+            // position. reorderTab clamps, so a negative is safe. (Without this, move-window lands
+            // one slot off select-window under `base-index 1`.)
             guard let ws = target.workspace, let tab = target.tab else { return .unresolved }
-            return .requests([.reorderTab(workspaceID: ws.id, tabID: tab.id, toIndex: index)])
+            return .requests([.reorderTab(workspaceID: ws.id, tabID: tab.id, toIndex: index - baseIndex)])
 
         case let .swapWindow(index):
+            // Same base-index correction; swapTab guards out-of-range (incl. negative) and no-ops.
             guard let ws = target.workspace, let tab = target.tab else { return .unresolved }
-            return .requests([.swapTab(workspaceID: ws.id, tabID: tab.id, withIndex: index)])
+            return .requests([.swapTab(workspaceID: ws.id, tabID: tab.id, withIndex: index - baseIndex)])
 
         // MARK: Sessions / workspaces
         case let .newSession(name):

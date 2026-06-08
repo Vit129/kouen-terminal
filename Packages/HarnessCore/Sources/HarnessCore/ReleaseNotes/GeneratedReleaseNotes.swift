@@ -1,12 +1,12 @@
-// Generated from the CHANGELOG.md [2.1.0] block by Scripts/generate-release-notes.swift.
+// Generated from the CHANGELOG.md [1.8.0] block by Scripts/generate-release-notes.swift.
 // DO NOT EDIT BY HAND — regenerate in release prep after updating CHANGELOG.md:
 //   swift Scripts/generate-release-notes.swift
 // Drift guards: ReleaseNotesGuardTests (version + changelog digest), package-app.sh.
 
 extension ReleaseNotes {
     public static let current = ReleaseNotes(
-        version: "2.1.0",
-        changelogDigest: "87cd4087bc456a8d",
+        version: "1.8.0",
+        changelogDigest: "72bf72aed313ab9f",
         sections: [
             Section(title: "Added", items: [
                 "First-run welcome tour and post-update \"what's new\" banner",

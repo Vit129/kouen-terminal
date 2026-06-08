@@ -30,6 +30,11 @@ public enum WindowAttachClient {
 
     public struct Configuration {
         public var detachSequence: [UInt8] = [0x01, 0x64] // Ctrl-A d
+        /// True only when the user explicitly passed `--detach-keys`. When false, the default
+        /// detach is the prefix-bound `prefix d` command (which the user may have rebound), so the
+        /// raw `detachSequence` matcher stays OFF to avoid overriding that binding. Set true and it
+        /// becomes an escape sequence matched ahead of the prefix machine.
+        public var detachSequenceExplicit: Bool = false
         public var prefix: UInt8 = 0x01                   // Ctrl-A
         public var label: String = "harness-cli attach-window"
         public init() {}
@@ -271,6 +276,16 @@ private final class WindowSession: @unchecked Sendable {
         for (sid, _) in terminals where !wanted.contains(sid) {
             terminals[sid] = nil
             subscriptions.removeValue(forKey: sid)?.cancel()
+        }
+
+        // If copy mode was active over a pane that just vanished (killed, split-collapsed, zoomed
+        // away, or the tab switched to a window without it), exit it. Otherwise the session is
+        // input-deadlocked: consumeInput routes every key to handleCopyModeByte while copyMode is
+        // set, but performCopyMode bails with no live grid — so even the quit key can't exit. Clear
+        // the state fields inline rather than calling exitCopyMode() to avoid a re-entrant relayout;
+        // this rebuild already invalidates + composes below.
+        if copyMode != nil, let cms = copyModeSurface, !wanted.contains(cms) {
+            copyMode = nil; copyModeSurface = nil; copyModeSearchEntry = nil; copyModePending.removeAll()
         }
 
         // Create terminals + subscriptions for new panes; resize existing ones.
@@ -675,6 +690,9 @@ private final class WindowSession: @unchecked Sendable {
     // Input state, held across reads so split escape/mouse sequences decode correctly.
     private var inPrefix = false
     private var prefixPending: [UInt8] = []
+    /// Count of leading `--detach-keys` bytes matched so far (held, not yet forwarded). Only used
+    /// when `configuration.detachSequenceExplicit` is set. Mirrors `AttachInputBatcher`'s matcher.
+    private var detachMatched = 0
     /// `switch-client -T <table>`: the key table for the next armed key (modal bindings).
     /// One-shot — consulted instead of `.prefix`, then cleared (unless its command switches
     /// again). Like all input/mode state it is touched only on `renderQueue` (consumeInput and
@@ -726,6 +744,36 @@ private final class WindowSession: @unchecked Sendable {
 
     /// Process one input byte: prefix machine → copy mode → SGR mouse → pane forward.
     private func consumeInput(_ byte: UInt8, forward: inout Data) {
+        // A user-supplied `--detach-keys` sequence is matched ahead of the prefix machine so it
+        // actually detaches (the field was previously parsed but never consulted). Gated on
+        // `detachSequenceExplicit` so the default leaves detach to the (rebindable) `prefix d`
+        // command. A broken partial prefix is replayed through the normal path so nothing the user
+        // typed is swallowed — same state machine as the tested `AttachInputBatcher`.
+        let detachSeq = configuration.detachSequence
+        if configuration.detachSequenceExplicit, !detachSeq.isEmpty {
+            if byte == detachSeq[detachMatched] {
+                detachMatched += 1
+                if detachMatched == detachSeq.count {
+                    detachMatched = 0
+                    requestDetach()
+                }
+                return
+            }
+            if detachMatched > 0 {
+                let held = Array(detachSeq.prefix(detachMatched))
+                detachMatched = 0
+                for b in held { consumeInputCore(b, forward: &forward) }
+                // This byte may itself start a fresh match (mirror AttachInputBatcher).
+                if byte == detachSeq[0] {
+                    detachMatched = 1
+                    return
+                }
+            }
+        }
+        consumeInputCore(byte, forward: &forward)
+    }
+
+    private func consumeInputCore(_ byte: UInt8, forward: inout Data) {
         let prefix = configuration.prefix
 
         if inPrefix {
@@ -1247,7 +1295,7 @@ private final class WindowSession: @unchecked Sendable {
             // Loud, like the GUI prompt and control mode: a typo'd `-t` (or a command
             // with no resolvable focus) must never read as a silent success.
             // find-window's no-match reads as a search result, like the -C path.
-            if case let .findWindow(pattern, _, _, _) = command {
+            if case let .findWindow(pattern, _, _, _, _) = command {
                 flashStatus("find-window: no matches for '\(pattern)'")
             } else {
                 flashStatus("no resolvable target for command")
@@ -1326,12 +1374,16 @@ private final class WindowSession: @unchecked Sendable {
             if case let .text(log)? = try? client.request(.showMessages, timeout: 1) {
                 flashStatus(log.isEmpty ? "no messages" : (log.split(separator: "\n").last.map(String.init) ?? log))
             }
-        case let .findWindow(pattern, name, content, title):
+        case let .findWindow(pattern, name, content, title, scopeTarget):
             // Only the -C form reaches here (non-content translated to selectTab upstream).
             _ = content
             let snapshot = latestSnapshot ?? SessionSnapshot()
+            // Resolve a relative/empty `-t` against THIS client's attached window (same
+            // `current` the non-content path uses via the translator's `target.session`), not
+            // the globally-active session — the compositor may be attached elsewhere.
             let match = FindWindowMatcher.firstMatch(
-                snapshot, pattern: pattern, name: name, title: title
+                snapshot, pattern: pattern, name: name, title: title,
+                target: scopeTarget, current: currentTarget().session
             ) { surfaceID in
                 guard case let .text(text)? = try? client.request(
                     .capturePane(surfaceID: surfaceID, includeScrollback: false), timeout: 1) else { return nil }
