@@ -21,8 +21,8 @@ One self-contained app. The terminal engine, daemon, and CLI are all first-party
 │  📐  CMUX (client-side split panes, N-ary)      │
 │  📁  File Tree + Editor (Zed-style)             │
 │  🌿  Git Panel — real-time (Zed-style)          │
-│  🤖  Agent Chat — ACP protocol (Zed-style)      │
-│  🔔  Agent Detection + Notifications            │
+│  🤖  Agent Detection + Notifications            │
+│  🔔  ACP Chat — shelved (code preserved)        │
 └─────────────────────────────────────────────────┘
 ```
 
@@ -96,7 +96,7 @@ harness-cli theme-preview --theme "Harness Default"
 | **File Tree** | FSEvents live-watch, git status colors, click-to-open in editor, context menu |
 | **File Editor** | 20+ language syntax highlighting, vi-mode, find/replace, git diff gutter |
 | **Git Panel** | Stage/unstage, commit (amend/signoff), fetch/pull/push, branch switch, history + diff, worktrees |
-| **Agent Chat** | ACP Client over stdio — spawn Claude/Codex/Gemini/Kiro, stream responses, tool call approvals |
+| **Agent Chat** | ACP Client over stdio — shelved (code preserved, adapters not yet available) |
 | **Agent Detection** | Process-tree scan for 12+ agents, brand colors, desktop notifications, Cmd+Shift+U jump |
 
 ---
@@ -158,10 +158,9 @@ Toggle with `Cmd+\`. Four tabs:
 
 | Tab | What it does |
 |-----|-------------|
-| **Sessions** | Project groups, session cards, drag-reorder, recent projects |
+| **Sessions** | Project groups, session cards (with session ID), drag-reorder, recent projects, CWD grouping |
 | **Files** | File tree with FSEvents auto-refresh, git status colors, right-click menu |
 | **Git** | Changes (stage/commit), History (click→file editor), Worktrees |
-| **Agent** | ACP chat panel — type prompts, stream responses, approve tool calls |
 
 ---
 
@@ -186,11 +185,12 @@ Harness scans process trees and detects: Claude Code, Codex, Cursor, Grok, Pi, H
 - Sidebar bell + `Cmd+Shift+U` jump to waiting agent
 - One-line hook install: `harness-cli install-hooks claude-code`
 
-### ACP Client (active — chat with agents)
+### ACP Client (shelved — code preserved for future)
 - Spawn agent as subprocess via Agent Client Protocol (JSON-RPC 2.0 over stdio)
 - Send prompts, receive streaming text + tool calls
 - Approve/reject file edits and command execution
-- Configure in Settings → Agents → "Add Agent…"
+- Currently disabled: adapters not widely available, PATH issues in .app bundles
+- Re-enable in Settings when ACP ecosystem matures
 
 ---
 
