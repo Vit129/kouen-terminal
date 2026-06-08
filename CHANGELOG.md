@@ -44,6 +44,53 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 - **File editor panel background** now matches the terminal background (including the
   user's opacity setting) instead of the sidebar background.
 
+## [2.1.0] - 2026-06-08
+
+### Added
+- **ACP Client (shelved).** Agent Chat Protocol client with sidebar panel, config UI,
+  and per-agent adapter resolution. Shelved due to ecosystem immaturity (adapter binaries
+  not widely available, PATH unreliable inside .app bundles).
+- **Real-time Git panel refresh.** DispatchSource watcher on `.git` directory with 500ms
+  debounce triggers automatic refresh on commit/stage/checkout.
+- **Git History → file editor.** Clicking a commit in History opens the full diff in the
+  file editor panel with syntax coloring (green/red/blue/purple).
+
+### Fixed
+- **macOS 26 Swift 6 crashes.** Replaced `MainActor.assumeIsolated` inside
+  `DispatchQueue.main.async` with `Task { @MainActor in }` in GitPanelView,
+  SurfaceShellTracker, and DaemonLauncher (CASE-013).
+
+## [2.0.0] - 2026-06-08
+
+### Added
+- **File preview panel.** Constraint-based sibling panel (40% editor / 60% terminal)
+  — never reparents terminal Metal surfaces (CASE-012). Supports syntax highlighting,
+  Quick Look for images/PDFs, vi-like edit mode, and git diff gutter.
+- **CWD tracking via daemon.** `AgentScanner.cwdTimer` polls proc_pidinfo every 500ms,
+  updates sidebar and tab bar in real-time without shell integration.
+- **Session grouping by CWD.** New tabs insert adjacent to tabs with the same working
+  directory.
+
+### Changed
+- **Sidebar polish.** Session ID shown in cards, Agent tab hidden (code preserved),
+  tab reorder persists sortOrder to UserDefaults on every drag.
+
+## [1.9.0] - 2026-06-08
+
+### Added
+- **Git panel: Worktrees tab.** Add/remove worktrees from the sidebar Git panel.
+- **SurfaceShellTracker.** Daemon-side process tree scanning for running agent detection.
+- **Async IPC (P2-async).** `DaemonClientActor` and `SessionCoordinator` for
+  non-blocking daemon communication with snapshot notifications via `NotificationBus`.
+- **Preview/production session isolation.** Preview builds use `.harness-preview/`
+  directory with isolated daemon socket.
+
+### Fixed
+- **DECRQM echo race.** Stop replying to DECRQM 2026/2027 and Kitty keyboard queries
+  to prevent garbled shell output.
+- **File tree performance.** Removed 3s polling (FSEvents sufficient), reconcile nodes
+  in-place to preserve expand/collapse state (CASE-015).
+
 ## [1.8.0] - 2026-06-07
 
 The tmux-parity close-out: every remaining tracked gap is either shipped, adapted with a
