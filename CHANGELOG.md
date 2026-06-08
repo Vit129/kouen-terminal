@@ -16,6 +16,10 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
   written compactly (still deterministically key-sorted).
 
 ### Added
+- **VoiceOver support for the terminal grid.** The Metal-backed surface view now conforms to the
+  AppKit static-text accessibility protocol (role `.textArea`, the scrollback + screen as the
+  accessible value, line/character navigation, cursor as the insertion point), so VoiceOver can
+  read terminal output and navigate it — previously the grid was entirely invisible to it.
 - **Secure Keyboard Entry** (Edit ▸ Secure Keyboard Entry, off by default). When on, Harness takes
   the process-global `EnableSecureEventInput` lock while it's the active app, so another local
   process can't keylog keystrokes typed at a sudo / ssh-passphrase prompt. The lock is released
