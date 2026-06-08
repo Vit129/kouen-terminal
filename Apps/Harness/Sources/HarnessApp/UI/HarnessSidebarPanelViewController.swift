@@ -803,7 +803,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
             if branchChanged {
                 fileTreeView.updateRoot(path: cwd, sessionID: activeSessionID)
             }
-            gitPanelView.updateRoot(path: cwd, force: sessionChanged)
+            gitPanelView.updateRoot(path: cwd)
             lastFileTreeSessionID = activeSessionID
             lastFileTreeGitBranch = gitBranch
             let home = NSHomeDirectory()
@@ -844,7 +844,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
             if branchChanged {
                 fileTreeView.updateRoot(path: cwd, sessionID: activeSessionID)
             }
-            gitPanelView.updateRoot(path: cwd, force: sessionChanged)
+            gitPanelView.updateRoot(path: cwd)
             lastFileTreeSessionID = activeSessionID
             lastFileTreeGitBranch = gitBranch
         } else {
@@ -1139,7 +1139,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
         // This covers the case where snapshotChanged arrived asynchronously before the click.
         if let cwd = session.activeTab?.cwd ?? session.tabs.first?.cwd {
             fileTreeView.updateRoot(path: cwd, sessionID: session.id)
-            gitPanelView.updateRoot(path: cwd, force: true)
+            gitPanelView.updateRoot(path: cwd)
             lastFileTreeSessionID = session.id
             lastFileTreeGitBranch = nil
         }
