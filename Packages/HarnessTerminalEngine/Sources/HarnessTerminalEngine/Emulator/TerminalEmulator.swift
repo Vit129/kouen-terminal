@@ -254,6 +254,11 @@ public final class TerminalEmulator: VTParserHandler {
             if intermediates == [0x28] { g0 = charset } else { g1 = charset }
             return
         }
+        // DECALN — `ESC # 8` (intermediate '#'): screen alignment test, fill the screen with 'E'.
+        if intermediates == [0x23], final == 0x38 {
+            current.screenAlignmentTest()
+            return
+        }
         // Other intermediate sequences are accepted but not acted on.
         guard intermediates.isEmpty else { return }
         switch final {
@@ -289,6 +294,11 @@ public final class TerminalEmulator: VTParserHandler {
             current.setCursorStyle(argRaw(params, 0, 0))
             return
         }
+        // DECSTR — `CSI ! p` (intermediate '!'): soft terminal reset.
+        if intermediates == [0x21], final == 0x70 {
+            softReset()
+            return
+        }
         guard intermediates.isEmpty else { return }
         switch final {
         case 0x41: current.moveCursorRelative(dRow: -arg(params, 0, 1), dCol: 0) // CUU
@@ -298,8 +308,8 @@ public final class TerminalEmulator: VTParserHandler {
         case 0x45: cursorNextLine(arg(params, 0, 1))   // CNL
         case 0x46: cursorPrevLine(arg(params, 0, 1))   // CPL
         case 0x47: current.moveCursorCol(arg(params, 0, 1) - 1) // CHA
-        case 0x48, 0x66: // CUP / HVP
-            current.moveCursor(row: arg(params, 0, 1) - 1, col: arg(params, 1, 1) - 1)
+        case 0x48, 0x66: // CUP / HVP (origin-mode aware)
+            current.cursorPosition(row: arg(params, 0, 1) - 1, col: arg(params, 1, 1) - 1)
         case 0x4A: current.eraseInDisplay(mode: argRaw(params, 0, 0)) // ED
         case 0x4B: current.eraseInLine(mode: argRaw(params, 0, 0))    // EL
         case 0x4C: current.insertLines(arg(params, 0, 1))   // IL
@@ -309,7 +319,10 @@ public final class TerminalEmulator: VTParserHandler {
         case 0x58: current.eraseCharacters(arg(params, 0, 1))  // ECH
         case 0x53: current.scrollUp(arg(params, 0, 1))   // SU
         case 0x54: current.scrollDown(arg(params, 0, 1)) // SD
-        case 0x64: current.moveCursorRow(arg(params, 0, 1) - 1) // VPA
+        case 0x64: current.cursorToRow(arg(params, 0, 1) - 1) // VPA (origin-mode aware)
+        case 0x62: current.repeatLastGraphicChar(arg(params, 0, 1)) // REP — repeat last graphic char
+        case 0x68: setANSIMode(params, true)  // SM — set mode (IRM…)
+        case 0x6C: setANSIMode(params, false) // RM — reset mode
         case 0x6D: current.applySGR(params)            // SGR
         case 0x72: setScrollRegion(params)             // DECSTBM
         case 0x73: current.saveCursor()                // ANSI save cursor
@@ -593,6 +606,26 @@ public final class TerminalEmulator: VTParserHandler {
         current.setScrollRegion(top: top, bottom: bottom)
     }
 
+    /// ANSI SM/RM (`CSI Ps h` / `CSI Ps l`, no private marker). Only IRM (mode 4) is meaningful;
+    /// other ANSI modes (e.g. LNM 20) are not implemented and are ignored.
+    private func setANSIMode(_ params: CSIParams, _ set: Bool) {
+        for g in 0 ..< params.count where params.first(g) == 4 {
+            current.insertMode = set // IRM — insert/replace mode
+        }
+    }
+
+    /// DECSTR (`CSI ! p`) soft terminal reset: return the active screen's state (cursor visibility,
+    /// insert/replace, origin, scroll region, saved cursor, SGR) plus the host-facing keyboard modes
+    /// and charset designations to defaults, without clearing the screen or moving the cursor.
+    private func softReset() {
+        current.softReset()
+        modes.cursorKeysApplication = false
+        modes.keypadApplication = false
+        g0 = .ascii
+        g1 = .ascii
+        glUsesG1 = false
+    }
+
     private func handlePrivateMode(final: UInt8, intermediates: [UInt8], params: [Int], marker: UInt8?) {
         // Kitty keyboard protocol — `CSI u` with a private introducer (push/pop/set/query).
         if final == 0x75, intermediates.isEmpty {
@@ -628,6 +661,7 @@ public final class TerminalEmulator: VTParserHandler {
         guard final == 0x68 || final == 0x6C else { return }
         for p in params {
             switch p {
+            case 6: current.setOriginMode(set)             // DECOM origin mode
             case 7: current.autowrap = set                 // DECAWM autowrap
             case 25: current.cursorVisible = set           // DECTCEM cursor visibility
             case 1000: modes.mouseClick = set              // X10/normal mouse
@@ -651,6 +685,7 @@ public final class TerminalEmulator: VTParserHandler {
     private func reportPrivateMode(_ p: Int) {
         let state: Int
         switch p {
+        case 6: state = current.originMode ? 1 : 2
         case 7: state = current.autowrap ? 1 : 2
         case 25: state = current.cursorVisible ? 1 : 2
         case 1000: state = modes.mouseClick ? 1 : 2
