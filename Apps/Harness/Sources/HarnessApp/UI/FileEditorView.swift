@@ -27,13 +27,18 @@ final class FileEditorView: NSView {
     required init?(coder: NSCoder) { fatalError() }
 
     func load(path: String) {
-        filePath = path
+        var cleanPath = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        if (cleanPath.hasPrefix("'") && cleanPath.hasSuffix("'")) ||
+           (cleanPath.hasPrefix("\"") && cleanPath.hasSuffix("\"")) {
+            cleanPath = String(cleanPath.dropFirst().dropLast())
+        }
+        filePath = cleanPath
         quickLookContainer.isHidden = true
-        let expanded = (path as NSString).expandingTildeInPath
-        let url = URL(fileURLWithPath: expanded)
+        let expanded = (cleanPath as NSString).expandingTildeInPath
+        let url = URL(fileURLWithPath: expanded).resolvingSymlinksInPath()
 
         // Quick Look for images/PDFs
-        let ext = (path as NSString).pathExtension.lowercased()
+        let ext = (cleanPath as NSString).pathExtension.lowercased()
         let imageExts = Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "ico", "bmp", "tiff", "heic"])
         let qlExts = imageExts.union(["pdf", "rtf", "rtfd", "doc", "docx", "pages", "key", "keynote", "numbers"])
         if qlExts.contains(ext) {

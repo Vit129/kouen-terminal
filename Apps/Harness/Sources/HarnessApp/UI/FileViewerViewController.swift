@@ -36,11 +36,16 @@ final class FileViewerViewController: NSViewController {
     /// Reads `path` from disk and displays it. Shows a placeholder message for
     /// binary/oversized files or read failures.
     func load(path: String) {
-        pathLabel.stringValue = (path as NSString).lastPathComponent
-        pathLabel.toolTip = path
+        var cleanPath = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        if (cleanPath.hasPrefix("'") && cleanPath.hasSuffix("'")) ||
+           (cleanPath.hasPrefix("\"") && cleanPath.hasSuffix("\"")) {
+            cleanPath = String(cleanPath.dropFirst().dropLast())
+        }
+        pathLabel.stringValue = (cleanPath as NSString).lastPathComponent
+        pathLabel.toolTip = cleanPath
 
-        let expanded = (path as NSString).expandingTildeInPath
-        let url = URL(fileURLWithPath: expanded)
+        let expanded = (cleanPath as NSString).expandingTildeInPath
+        let url = URL(fileURLWithPath: expanded).resolvingSymlinksInPath()
         let ext = url.pathExtension.lowercased()
 
         if Self.quickLookExtensions.contains(ext) {

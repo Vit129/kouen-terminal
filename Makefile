@@ -25,6 +25,7 @@ preview-stop:
 
 preview-clean:
 	rm -rf .harness-preview
+	-tccutil reset All com.robert.harness.preview 2>/dev/null || true
 
 icon:
 	./Scripts/generate-app-icon.sh
@@ -69,6 +70,7 @@ hotfix-release:
 clean:
 	swift package clean
 	rm -rf Harness.app Harness.dmg Harness-notarize.zip dist .dmg-staging .icon-staging.iconset
+	-tccutil reset All com.robert.harness.preview 2>/dev/null || true
 
 # HyperFrames marketing video (marketing/video — see marketing/README.md)
 video-skills:

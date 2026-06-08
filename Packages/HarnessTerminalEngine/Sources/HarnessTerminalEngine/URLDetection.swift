@@ -39,6 +39,55 @@ public enum URLDetection {
         #endif
     }
 
+    /// Detects if the text at `column` in `line` is a file path (absolute or relative).
+    /// Handles single-quoted or double-quoted paths with spaces, and unquoted paths containing `/`.
+    public static func detectFilePath(in line: String, at column: Int) -> (url: String, columns: Range<Int>)? {
+        let chars = Array(line)
+        guard !line.isEmpty, column >= 0, column < chars.count else { return nil }
+
+        // 1. Check for single-quoted path wrapping the column
+        var lo = column
+        var hi = column
+        while lo > 0, chars[lo] != "'" { lo -= 1 }
+        while hi < chars.count - 1, chars[hi] != "'" { hi += 1 }
+        if lo < hi, chars[lo] == "'", chars[hi] == "'" {
+            let token = String(chars[lo...hi])
+            if token.contains("/") {
+                return (token, lo ..< (hi + 1))
+            }
+        }
+
+        // 2. Check for double-quoted path wrapping the column
+        lo = column
+        hi = column
+        while lo > 0, chars[lo] != "\"" { lo -= 1 }
+        while hi < chars.count - 1, chars[hi] != "\"" { hi += 1 }
+        if lo < hi, chars[lo] == "\"", chars[hi] == "\"" {
+            let token = String(chars[lo...hi])
+            if token.contains("/") {
+                return (token, lo ..< (hi + 1))
+            }
+        }
+
+        // 3. Fallback: Check for unquoted whitespace-delimited token containing "/"
+        func isBoundary(_ c: Character) -> Bool { c == " " || c == "\t" || c == "'" || c == "\"" }
+        if !isBoundary(chars[column]) {
+            lo = column
+            hi = column
+            while lo > 0, !isBoundary(chars[lo - 1]) { lo -= 1 }
+            while hi + 1 < chars.count, !isBoundary(chars[hi + 1]) { hi += 1 }
+            var token = String(chars[lo...hi])
+            while let last = token.last, ").,;:!?'\\\"]>".contains(last) {
+                token.removeLast()
+            }
+            if !token.isEmpty && token.contains("/") && (token.hasPrefix("/") || token.hasPrefix("~") || token.hasPrefix(".")) {
+                return (token, lo ..< (lo + token.count))
+            }
+        }
+
+        return nil
+    }
+
     #if !canImport(Darwin)
     private static func tokenMatch(in line: String, at column: Int) -> (url: String, columns: Range<Int>)? {
         let chars = Array(line)

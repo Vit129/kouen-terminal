@@ -2654,7 +2654,7 @@ public final class HarnessTerminalSurfaceView: NSView {
                 guard let cell = grid.cell(row: row, col: c), cell.width != .spacerTail else { line.append(" "); continue }
                 line.unicodeScalars.append(cell.codepoint == 0 ? " " : (Unicode.Scalar(cell.codepoint) ?? " "))
             }
-            return URLDetection.match(in: line, at: col)
+            return URLDetection.match(in: line, at: col) ?? URLDetection.detectFilePath(in: line, at: col)
         }
     }
 
@@ -2683,11 +2683,27 @@ public final class HarnessTerminalSurfaceView: NSView {
         NSWorkspace.shared.open(url)
     }
 
-    /// Resolve a string to an absolute file path. Handles absolute paths and paths with
-    /// line:col suffixes (e.g. `src/main.swift:42:5`).
     private func resolveFilePath(_ string: String) -> String? {
+        var cleanString = string.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Handle file:// scheme
+        if cleanString.lowercased().hasPrefix("file://") {
+            let rawPath = String(cleanString.dropFirst(7))
+            if let decoded = rawPath.removingPercentEncoding {
+                cleanString = decoded
+            } else {
+                cleanString = rawPath
+            }
+        }
+        
+        // Strip leading/trailing single or double quotes
+        if (cleanString.hasPrefix("'") && cleanString.hasSuffix("'")) ||
+           (cleanString.hasPrefix("\"") && cleanString.hasSuffix("\"")) {
+            cleanString = String(cleanString.dropFirst().dropLast())
+        }
+
         // Strip line:col suffix (e.g. "file.swift:42:5" or "file.swift:42")
-        let stripped = string.replacingOccurrences(of: #":\d+(?::\d+)?$"#, with: "", options: .regularExpression)
+        let stripped = cleanString.replacingOccurrences(of: #":\d+(?::\d+)?$"#, with: "", options: .regularExpression)
         if stripped.hasPrefix("/") {
             return stripped
         }
