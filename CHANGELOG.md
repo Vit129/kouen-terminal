@@ -26,6 +26,15 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
   whenever Harness is backgrounded or quits (balanced accounting, pinned by test).
 
 ### Fixed
+- **VT correctness cluster (REP / IRM / DECOM / DECSTR / DECALN).** Five control functions that
+  were previously dropped now work: `CSI Ps b` (**REP**) repeats the preceding graphic character;
+  `CSI 4 h/l` (**IRM**) toggles insert vs. replace mode so insert-mode editors shift the line
+  instead of overwriting; `CSI ?6 h/l` (**DECOM**, origin mode) makes CUP/HVP/VPA address rows
+  relative to the scroll region and confines the cursor to it; `CSI ! p` (**DECSTR**) performs a
+  soft terminal reset (cursor visibility, insert/replace, origin, scroll region, saved cursor, and
+  SGR back to defaults); and `ESC # 8` (**DECALN**) fills the screen with `E` for alignment.
+  DECSTR/DECALN were being swallowed by the intermediate-byte guards, and REP/IRM/DECOM had no
+  handler at all.
 - **Format conditionals can now nest an operator in the test.** `#{?#{==:#{pane_current_command},vim},…,…}`
   and friends (a `.tmux.conf` staple) previously evaluated the test only as a bare token, so any
   nested comparison/operator read as unknown → empty → falsy and the else-branch always won. The
