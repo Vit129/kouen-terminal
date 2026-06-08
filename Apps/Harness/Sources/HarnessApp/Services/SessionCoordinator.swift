@@ -670,11 +670,10 @@ final class SessionCoordinator: NSObject {
         Task {
             await requestDaemon(.newTab(workspaceID: workspaceID, cwd: cwd ?? activeTabCWD ?? settings.defaultCWD, shell: settings.defaultShell))
             await syncFromDaemon()
-            // The shell will spawn imminently — kick the cwd tracker so the new
-            // tab's path lights up without waiting for the next 500ms tick.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                SurfaceShellTracker.shared.bumpScan()
-            }
+            // Re-sync after the daemon's metadata poll cycle (0.5s) to pick up
+            // the shell's resolved CWD for sidebar/file-tree display.
+            try? await Task.sleep(for: .milliseconds(600))
+            await syncFromDaemon()
         }
     }
 
