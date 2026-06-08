@@ -16,6 +16,10 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
   written compactly (still deterministically key-sorted).
 
 ### Added
+- **`@`-prefixed user options.** `set-option @my_var value` is stored and `#{@my_var}` now renders
+  it (resolved through the scope chain, global preferred) — the mechanism theme/status-line
+  `.tmux.conf` plugins rely on. Previously `@`-options were accepted but `#{@foo}` always read empty.
+
 - **VoiceOver support for the terminal grid.** The Metal-backed surface view now conforms to the
   AppKit static-text accessibility protocol (role `.textArea`, the scrollback + screen as the
   accessible value, line/character navigation, cursor as the insertion point), so VoiceOver can
@@ -51,6 +55,11 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
   row, and `back-to-indentation` went to column 0 ignoring indent (aliased to `start-of-line`).
   Each is now its own motion — plus `middle-line` — and bound to the vi keys `e`, `H`/`M`/`L`,
   and `^` in copy mode.
+- **`set-option` now rejects unknown option names loudly.** A typo or unsupported invention like
+  `set -g moused on` was silently persisted and never read; it now fails with `unknown option: …`
+  in every front-end (CLI, the `:` prompt, `source-file`). Real Harness options, recognized tmux
+  options (accepted for `.tmux.conf` migration even when not yet honored), and `@`-prefixed user
+  options are all still accepted.
 - **Format conditionals can now nest an operator in the test.** `#{?#{==:#{pane_current_command},vim},…,…}`
   and friends (a `.tmux.conf` staple) previously evaluated the test only as a bare token, so any
   nested comparison/operator read as unknown → empty → falsy and the else-branch always won. The

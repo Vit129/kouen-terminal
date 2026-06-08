@@ -923,6 +923,12 @@ public final class SurfaceRegistry: @unchecked Sendable {
             guard !key.contains(":"), !(target?.contains(":") ?? false) else {
                 return .error("Option name/target must not contain ':'")
             }
+            // Reject unknown option names loudly (a `@`-prefixed user option always passes), so a
+            // typo like `moused` fails in every front-end instead of being silently persisted and
+            // never read — the project's no-silent-failure invariant.
+            guard OptionStore.isRecognizedOptionKey(key) else {
+                return .error("unknown option: \(key)")
+            }
             // Scoped reads resolve by exact target and only fall back toward broader scopes —
             // a nil-target non-global option is stored but unreachable by every read path.
             // Reject it (defense in depth behind the CLI's own -T requirement).
@@ -1200,6 +1206,17 @@ public final class SurfaceRegistry: @unchecked Sendable {
         context.sessionGroup = session.flatMap { editor.snapshot.groupName(of: $0) }
         context.sessionAttached = attachedClientCountProvider?()
         context.serverPID = Int(getpid())
+        // User options (`@name`) so `#{@name}` renders. Resolve each distinct `@` key through the
+        // scope chain, preferring this context's tab/session target and falling back to global —
+        // the dominant usage (theme/statusline plugins) is global.
+        var userOptions: [String: String] = [:]
+        for (scopedKey, _) in optionStore.snapshot() where scopedKey.key.hasPrefix("@") && userOptions[scopedKey.key] == nil {
+            let value = optionStore.get(scopedKey.key, scope: .tab, target: tab?.id.uuidString)
+                ?? optionStore.get(scopedKey.key, scope: .session, target: session?.id.uuidString)
+                ?? optionStore.get(scopedKey.key, scope: .global)
+            if let value { userOptions[scopedKey.key] = value.stringValue }
+        }
+        context.userOptions = userOptions
         return context
     }
 
