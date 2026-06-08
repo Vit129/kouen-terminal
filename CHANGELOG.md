@@ -20,6 +20,13 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
   `pid → ppid` map once *per surface*; it now builds it once per tick and shares it across all
   surfaces (O(surfaces × processes) syscalls → O(processes)). The GUI shell-cwd tracker now uses
   that same shared `ProcessScan` primitive instead of its own duplicate. No behavior change.
+- **One key-encoder.** `send-keys` / keybinding tokens are now encoded by the same engine
+  `InputEncoder` that physical keypresses use, instead of a second hand-maintained escape table
+  kept in agreement by hand. Tokens resolve to the engine's `SpecialKey`/`KeyModifiers` and gain a
+  `modes:` seam for mode-correct encoding. Common keys are byte-identical; Option-modified editing
+  keys now match a physical Alt+key (e.g. `send-keys M-Left` emits the readline word-motion `ESC b`
+  rather than the CSI modifier form). The daemon's `send-keys` is mode-blind by design (it's a
+  byte-pipe with no live per-surface emulator) and passes default/normal modes.
 - **Layout persistence moved off the input-latency path.** The daemon no longer does a full
   prettyPrinted `layout.json` encode + atomic write under the registry lock on every mutation;
   writes are now coalesced through a 0.5s debounce and flushed synchronously on graceful

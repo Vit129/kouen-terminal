@@ -5,6 +5,7 @@ import Glibc
 #endif
 import Foundation
 import HarnessCore
+import HarnessTerminalEngine
 import HarnessTheme
 
 @main
