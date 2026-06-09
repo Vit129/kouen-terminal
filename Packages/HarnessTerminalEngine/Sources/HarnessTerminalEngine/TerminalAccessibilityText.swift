@@ -70,7 +70,11 @@ public struct TerminalAccessibilityText: Equatable, Sendable {
 
     /// The substring covered by a UTF-16 range; nil if the range falls outside the value.
     public func string(forRange range: NSRange) -> String? {
-        guard range.location >= 0, range.length >= 0, range.location + range.length <= length else { return nil }
+        // Overflow-safe bounds check: `location + length` could trap on a pathological range
+        // (e.g. location near Int.max), so validate via subtraction once both are known
+        // non-negative and location is within the value.
+        guard range.location >= 0, range.length >= 0,
+              range.location <= length, range.length <= length - range.location else { return nil }
         return (value as NSString).substring(with: range)
     }
 

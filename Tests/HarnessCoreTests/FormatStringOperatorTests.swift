@@ -48,6 +48,18 @@ final class FormatStringOperatorTests: XCTestCase {
         XCTAssertEqual(eval("#{T:#{@fmt}}", ctx), "work", "T: expands the resolved value a second time")
     }
 
+    func testExpandTwiceWithSelfReferenceIsBoundedNotCrashing() {
+        var ctx = context()
+        // A user-var whose value re-invokes T: on itself: a naive double-expand recurses until
+        // the daemon's stack overflows. The depth guard must terminate it (rendering empty),
+        // never crash.
+        ctx.userOptions = ["@loop": "#{T:#{@loop}}"]
+        XCTAssertEqual(eval("#{T:#{@loop}}", ctx), "", "a self-referential T: expansion is bounded, not a stack overflow")
+        // A non-recursive T: still works after the guard is in place.
+        ctx.userOptions["@ok"] = "#{session_name}"
+        XCTAssertEqual(eval("#{T:#{@ok}}", ctx), "work")
+    }
+
     func testCharFromCode() {
         XCTAssertEqual(eval("#{a:65}"), "A")
         XCTAssertEqual(eval("#{a:35}"), "#")

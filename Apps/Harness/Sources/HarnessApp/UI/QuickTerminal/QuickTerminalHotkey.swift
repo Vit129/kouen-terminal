@@ -22,7 +22,15 @@ final class QuickTerminalHotkey {
         if let hotKeyRef { UnregisterEventHotKey(hotKeyRef); self.hotKeyRef = nil }
         guard let parsed = Self.parse(spec) else { return }
         let hotKeyID = EventHotKeyID(signature: Self.signature, id: 1)
-        RegisterEventHotKey(parsed.keyCode, parsed.modifiers, hotKeyID, GetApplicationEventTarget(), 0, &hotKeyRef)
+        let status = RegisterEventHotKey(parsed.keyCode, parsed.modifiers, hotKeyID, GetApplicationEventTarget(), 0, &hotKeyRef)
+        if status != noErr {
+            // Registration can fail — most commonly `eventHotKeyExists` when another app already
+            // owns the combo. The old binding was already unregistered above, so don't leave a
+            // stale/partial ref around, and surface it instead of silently leaving the user with
+            // no working quick-terminal hotkey.
+            hotKeyRef = nil
+            NSLog("Harness: quick-terminal hotkey '\(spec)' could not be registered (OSStatus \(status)); it may already be in use by another app.")
+        }
     }
 
     func unregister() {

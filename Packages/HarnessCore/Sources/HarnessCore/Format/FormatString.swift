@@ -152,8 +152,15 @@ public enum FormatString {
 
     /// `#{T:body}` — expand the body, then expand the *result* again as a format string. The
     /// idiomatic way to store a format in a user-var and render it (`#{T:#{@my_format}}`).
+    private static let maxExpandDepth = 32
     private static func operatorExpandTwice(_ body: String, context: FormatContext) -> String {
-        evaluate(evaluate(body, context: context), context: context)
+        // T: re-expands its own produced output, so a self-referential user option
+        // (`@v = "#{T:#{@v}}"`) would recurse until the daemon's stack overflows. Bound the
+        // re-expansion depth; past the limit, stop expanding (render empty) rather than crash.
+        guard context.expansionDepth < maxExpandDepth else { return "" }
+        var inner = context
+        inner.expansionDepth += 1
+        return evaluate(evaluate(body, context: inner), context: inner)
     }
 
     /// `#{a:N}` — the character whose decimal Unicode scalar value is N (`#{a:65}` → "A").
@@ -495,6 +502,11 @@ public struct FormatContext: Sendable {
     /// Keyed by the full option name *including* the `@`, matching `#{@name}` and the OptionStore
     /// key. The builder fills it from the OptionStore; `#{@unset}` renders empty.
     public var userOptions: [String: String] = [:]
+
+    /// Recursion guard for `#{T:…}` (expand-twice): bounds re-expansion of produced output so a
+    /// self-referential user option (`@v = "#{T:#{@v}}"`) can't recurse until the daemon's stack
+    /// overflows. Internal plumbing — builders never set it (defaults to 0).
+    var expansionDepth: Int = 0
 
     public init(
         paneID: String? = nil,

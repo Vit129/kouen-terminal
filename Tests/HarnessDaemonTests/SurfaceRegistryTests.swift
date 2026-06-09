@@ -182,6 +182,44 @@ final class SurfaceRegistryTests: XCTestCase {
         XCTAssertEqual(registry.surfaceTelemetry.surfaceCount, after.count)
     }
 
+    /// A surface created via `ensureSurface` — the path the quick-terminal dropdown (and any
+    /// host-driven reserved surface) uses — must be LIVE (capturable, counted in `listSurfaces`)
+    /// yet stay entirely OUT of the persisted workspace→session→tab→pane layout, and must NOT
+    /// bump the layout revision. The quick terminal reuses a fixed reserved ID it never attaches
+    /// to a tab; were `ensureSurface` to insert it into the layout it would leak into the sidebar
+    /// and, never attached, never be reaped. (Invariant salvaged from the abandoned pr21b
+    /// explicit-IPC branch, adapted to main's host-internal `ensureSurface` mechanism.)
+    func testEnsureSurfaceCreatesLiveSurfaceOutsideTheLayout() {
+        let registry = SurfaceRegistry()
+        let reserved = "00000000-0000-0000-0000-000000000021"
+        let revisionBefore = registry.revision
+
+        guard case .ok = registry.handle(.ensureSurface(
+            surfaceID: reserved, cwd: "/tmp", shell: nil, rows: 24, cols: 80, scrollbackBytes: nil
+        )) else { return XCTFail("ensureSurface should report ok") }
+
+        // Live: the daemon holds a PTY session for it (capture reads the `sessions` map and
+        // returns text, not "Surface not found"), even though it is absent from the
+        // layout-derived `listSurfaces`/`SurfaceSummary` view.
+        guard case .text = registry.handle(.capturePane(surfaceID: reserved, includeScrollback: false)) else {
+            return XCTFail("the ensured surface must be live/capturable")
+        }
+
+        // Out of layout: it appears in no pane of any workspace/session/tab.
+        let layoutSurfaceIDs = registry.snapshot.workspaces
+            .flatMap(\.sessions)
+            .flatMap(\.tabs)
+            .flatMap { $0.rootPane.allSurfaceIDs() }
+            .map(\.uuidString)
+        XCTAssertFalse(layoutSurfaceIDs.contains(reserved),
+                       "the ensured surface must never enter the persisted layout")
+
+        // A layout-detached ensure is not a layout mutation → it must not bump the revision
+        // (distinguishing it from newTab/newSplit, which do).
+        XCTAssertEqual(registry.revision, revisionBefore,
+                       "ensureSurface of a detached surface must not bump the layout revision")
+    }
+
     func testNewWorkspaceTabAndSelectMutateSnapshotAndBumpRevision() {
         let registry = SurfaceRegistry()
         let startRevision = registry.snapshot.revision
