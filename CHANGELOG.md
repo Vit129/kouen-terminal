@@ -25,6 +25,9 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
   terminal pane.
 - **File path handling.** Strip surrounding quotes and resolve symlinks when opening
   file paths from terminal clicks or sidebar.
+- **Terminal tab bar background.** The terminal tab bar now uses a clear background with a
+  single bottom border, matching the file-editor tab bar instead of the elevated
+  sidebar-tinted backdrop it previously displayed.
 
 ### Added
 - **Draggable file editor divider.** The editor/terminal split can now be resized by
