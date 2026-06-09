@@ -816,18 +816,22 @@ public final class SurfaceRegistry: @unchecked Sendable {
             // Persist the new focus server-side so every client agrees on the active
             // pane (not just the caller). Best-effort: the neighbor is in the same tab.
             if let loc = editor.tab(containingPaneID: neighbor) {
+                let previousFocus = activeSurfaceKeyLocked(workspaceID: loc.workspaceID, tabID: loc.tabID)
                 _ = editor.setActivePane(workspaceID: loc.workspaceID, tabID: loc.tabID, paneID: neighbor)
                 commit()
+                firePaneFocusChangeLocked(previousSurfaceKey: previousFocus, newPaneID: neighbor)
             }
             return .paneID(neighbor)
         case let .selectPane(tabID, paneID):
             guard let loc = editor.tab(containingPaneID: paneID), loc.tabID == tabID else {
                 return .error("Pane not found in tab")
             }
+            let previousFocus = activeSurfaceKeyLocked(workspaceID: loc.workspaceID, tabID: tabID)
             guard editor.setActivePane(workspaceID: loc.workspaceID, tabID: tabID, paneID: paneID) else {
                 return .error("Could not select pane")
             }
             commit()
+            firePaneFocusChangeLocked(previousSurfaceKey: previousFocus, newPaneID: paneID)
             return .ok
         case let .applyLayout(tabID, layout, mainPaneID):
             guard let template = LayoutTemplate(rawValue: layout) else {
@@ -983,11 +987,14 @@ public final class SurfaceRegistry: @unchecked Sendable {
         case .showMessages:
             messageLogLock.lock(); defer { messageLogLock.unlock() }
             return .text(messageLog.joined(separator: "\n"))
-        case let .displayMessage(format):
-            // Render via FormatString using whatever context the daemon can
-            // build right now (active workspace/tab from snapshot). UI clients
-            // observe the notification bus and decide how to surface it.
-            postDisplayMessage(FormatString.evaluate(format, context: buildFormatContext()))
+        case let .displayMessage(format, print):
+            // Render via FormatString using whatever context the daemon can build right now
+            // (active workspace/tab from snapshot).
+            let rendered = FormatString.evaluate(format, context: buildFormatContext())
+            // `-p`: hand the text back for the caller's stdout, without flashing the message.
+            if print { return .text(rendered) }
+            // Otherwise post it; UI clients observe the notification bus and surface it.
+            postDisplayMessage(rendered)
             return .ok
         }
     }
@@ -1237,6 +1244,17 @@ public final class SurfaceRegistry: @unchecked Sendable {
         hookQueue.async { [weak self] in self?.hookRegistry.fire(event, context: resolved) }
     }
 
+    /// Fire the focus/active-pane hooks when the focused pane moves from `previousSurfaceKey` to
+    /// `newPaneID`: `pane-focus-out` (old), `window-pane-changed`, then `pane-focus-in` (new). A
+    /// no-op when focus didn't actually change. Call with the lock held, after `commit()`.
+    private func firePaneFocusChangeLocked(previousSurfaceKey: String?, newPaneID: PaneID) {
+        let newKey = editor.surfaceID(forPaneID: newPaneID)?.uuidString
+        guard newKey != previousSurfaceKey else { return }
+        if let previousSurfaceKey { fireHookLocked(.paneFocusOut, surfaceKey: previousSurfaceKey) }
+        fireHookLocked(.windowPaneChanged, surfaceKey: newKey)
+        fireHookLocked(.paneFocusIn, surfaceKey: newKey)
+    }
+
     /// Client attach/detach originate in `DaemonServer` (which owns FDs), outside the
     /// registry lock — these acquire the lock to build a consistent context.
     public func fireClientAttached(label: String?) {
@@ -1247,6 +1265,20 @@ public final class SurfaceRegistry: @unchecked Sendable {
     public func fireClientDetached(label: String?) {
         lock.lock(); let context = buildFormatContext(clientName: label); lock.unlock()
         hookQueue.async { [weak self] in self?.hookRegistry.fire(.clientDetached, context: context) }
+    }
+
+    /// Fire `command-error` after a command failed to resolve in the daemon executor. The failing
+    /// command text becomes the hook's `#{hook}` subject. Invoked from the hook queue (no registry
+    /// lock held), so it acquires the lock to build a consistent context — like the client hooks.
+    public func fireCommandError(failedCommand: String) {
+        lock.lock()
+        var context = buildFormatContext()
+        lock.unlock()
+        context.hookCommand = failedCommand
+        // Bind an immutable copy for the async capture — Swift 6 strict concurrency rejects
+        // capturing the mutated `var` directly (matches the `let context` sibling hooks above).
+        let resolved = context
+        hookQueue.async { [weak self] in self?.hookRegistry.fire(.commandError, context: resolved) }
     }
 
     // MARK: - Hook target resolution + shell execution
@@ -1272,6 +1304,15 @@ public final class SurfaceRegistry: @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         guard let pane = editor.snapshot.activeWorkspace?.activeTab?.rootPane.allPaneIDs().first else { return nil }
         return editor.surfaceID(forPaneID: pane)?.uuidString
+    }
+
+    /// Surface key of a specific tab's currently-active pane — computed **lock-free** for callers
+    /// already inside `handle()` (which holds `lock`). The locking `activePaneSurfaceKey()` would
+    /// re-enter the non-recursive `lock` and deadlock; it also reads the active *tab's* first leaf,
+    /// not this tab's real active pane, so the focus-change hooks need this exact-pane variant.
+    private func activeSurfaceKeyLocked(workspaceID: WorkspaceID, tabID: TabID) -> String? {
+        editor.activePaneID(workspaceID: workspaceID, tabID: tabID)
+            .flatMap { editor.surfaceID(forPaneID: $0)?.uuidString }
     }
 
     /// Run `command` via `/bin/sh -c` for a `run-shell` hook. Async (fire-and-forget);

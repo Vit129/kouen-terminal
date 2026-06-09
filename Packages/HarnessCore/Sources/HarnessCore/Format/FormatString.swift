@@ -378,6 +378,8 @@ public enum FormatString {
         // User options (`#{@name}`): resolved by the builder into `userOptions`. Unset → empty.
         if token.hasPrefix("@") { return context.userOptions[token] ?? "" }
         switch token {
+        // The command that triggered the current hook (`command-error`'s failing command).
+        case "hook": return context.hookCommand ?? ""
         // tmux renders pane ids as `%id`; the `%` prefix matches the `-t` pane grammar
         // (TargetSpec.parsePaneToken) so a displayed id round-trips straight into a target,
         // exactly like session_id (`$`) and window_id (`@`) below.
@@ -458,6 +460,8 @@ public struct FormatContext: Sendable {
     public var clientName: String?
     /// tmux-style window flags: `Z` zoomed, `*` active, `#` activity, `!` bell, `M` marked.
     public var windowFlags: String?
+    /// The command that triggered the current hook, surfaced as `#{hook}` (set for `command-error`).
+    public var hookCommand: String? = nil
     public var now: Date
     // Extended tmux-parity fields. All optional: a builder fills what its vantage point
     // knows (the daemon has PTY facts, the attach client has tty facts) and the rest

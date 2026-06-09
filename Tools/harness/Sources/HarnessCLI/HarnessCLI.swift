@@ -1506,12 +1506,17 @@ struct HarnessCLI {
 
     static func handleDisplayMessage(_ args: [String], client: DaemonClient) throws {
         // Drop the subcommand at index 0 so it doesn't leak into the format string.
-        let format = args.dropFirst().joined(separator: " ")
+        let rest = Array(args.dropFirst())
+        let printMode = rest.contains("-p") // tmux `-p`: print the rendered text to stdout
+        let format = rest.filter { $0 != "-p" }.joined(separator: " ")
         guard !format.isEmpty else {
-            fputs("Usage: harness-cli display-message <format>\n", harnessStderr)
+            fputs("Usage: harness-cli display-message [-p] <format>\n", harnessStderr)
             exit(1)
         }
-        _ = try checkedRequest(client, .displayMessage(format: format))
+        let response = try checkedRequest(client, .displayMessage(format: format, print: printMode))
+        if printMode, case let .text(rendered) = response {
+            print(rendered)
+        }
     }
 
     static func handleListKeys(_ args: [String]) throws {

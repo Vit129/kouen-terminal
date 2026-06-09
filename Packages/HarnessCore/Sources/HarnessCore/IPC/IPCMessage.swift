@@ -135,7 +135,10 @@ public enum IPCRequest: Codable, Sendable {
     case bindHook(event: String, source: String, condition: String?)
     case unbindHook(id: UUID)
     case listHooks(event: String?)
-    case displayMessage(format: String)
+    /// Render `format` with the daemon's context. `print: true` (CLI `display-message -p`) returns
+    /// the rendered text as `.text(...)` for stdout and does NOT flash the transient message;
+    /// `print: false` posts the transient message (and replies `.ok`).
+    case displayMessage(format: String, print: Bool)
     /// tmux `show-messages`: the daemon's recent display-message log (most recent last).
     case showMessages
 }

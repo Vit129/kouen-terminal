@@ -357,7 +357,8 @@ final class IPCCodecTests: XCTestCase {
         .bindHook(event: "pane-exited", source: "display-message done", condition: nil),
         .unbindHook(id: UUID()),
         .listHooks(event: nil),
-        .displayMessage(format: "#{session_name}"),
+        .displayMessage(format: "#{session_name}", print: false),
+        .displayMessage(format: "#{session_name}", print: true),
         .showMessages,
         // Optional-field variants — exercise both the present and absent branch of the optionals.
         .newTab(workspaceID: UUID(), cwd: nil, shell: nil),

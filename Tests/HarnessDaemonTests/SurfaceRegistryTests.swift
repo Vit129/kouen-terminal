@@ -37,7 +37,7 @@ final class SurfaceRegistryTests: XCTestCase {
         guard case let .text(empty) = registry.handle(.showMessages) else { return XCTFail("expected text") }
         XCTAssertTrue(empty.isEmpty)
         for index in 0 ..< 55 {
-            _ = registry.handle(.displayMessage(format: "msg-\(index)"))
+            _ = registry.handle(.displayMessage(format: "msg-\(index)", print: false))
         }
         guard case let .text(log) = registry.handle(.showMessages) else { return XCTFail("expected text") }
         let lines = log.split(separator: "\n")

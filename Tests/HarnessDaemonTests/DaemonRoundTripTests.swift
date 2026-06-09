@@ -517,7 +517,7 @@ final class DaemonRoundTripTests: XCTestCase {
         // Register via subscription only — exactly how the GUI and attach clients connect.
         let subscription = try client.subscribeSurfaceOutput(surfaceID: target.surfaceID, label: "count-test") { _, _ in }
         defer { subscription.cancel() }
-        _ = try client.request(.displayMessage(format: "\(marker)=#{session_attached}"))
+        _ = try client.request(.displayMessage(format: "\(marker)=#{session_attached}", print: false))
         wait(for: [rendered], timeout: 5)
         XCTAssertEqual(body.value, "\(marker)=1", "subscription client must be counted")
     }
