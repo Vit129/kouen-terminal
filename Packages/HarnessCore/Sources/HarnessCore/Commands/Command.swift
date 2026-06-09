@@ -84,6 +84,7 @@ public indirect enum Command: Codable, Sendable, Equatable {
     case rotateWindow(forward: Bool)               // rotate-window [-D]
     case breakPane                                 // break-pane
     case respawnPane(keepHistory: Bool)            // respawn-pane [-k]
+    case clearHistory                              // clear-history (drop scrollback, keep process)
     case movePane(direction: SplitDirection, source: TargetSpec)  // move-pane -s <src> [-h|-v]
     case renumberWindows                           // move-window -r — renumber tabs contiguously
 
@@ -230,6 +231,7 @@ extension Command {
         case let .rotateWindow(forward): return forward ? "rotate-window" : "rotate-window -D"
         case .breakPane: return "break-pane"
         case let .respawnPane(keep): return keep ? "respawn-pane" : "respawn-pane -k"
+        case .clearHistory: return "clear-history"
         case let .movePane(direction, source):
             return "move-pane -\(direction == .horizontal ? "v" : "h")\(source.raw.isEmpty ? "" : " -s \(source.raw)")"
         case .renumberWindows: return "renumber-windows"
