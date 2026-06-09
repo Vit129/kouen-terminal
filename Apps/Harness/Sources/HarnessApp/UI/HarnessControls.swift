@@ -777,6 +777,12 @@ final class HarnessSelect: NSControl {
             self.setAccessibilityValue(choice)
             if let action { _ = NSApp.sendAction(action, to: self.target, from: self) }
         }
+        // Release the popover (and its `allItems` array) immediately when it closes, rather
+        // than holding it until the next showPopover call.  The [weak self] guard in the
+        // closure prevents a use-after-nil if the control itself is deallocated first.
+        pop.onDismiss = { [weak self] in
+            self?.popover = nil
+        }
         popover = pop
         // The control's rect in screen coordinates; the popover hangs from its bottom edge.
         let screenRect = window.convertToScreen(convert(bounds, to: nil))
@@ -799,6 +805,12 @@ final class HarnessSelectPopover: NSObject {
     private let allItems: [String]
     private let initialSelection: String?
     private let onPick: (String) -> Void
+    /// Called once, after the panel + event monitor have been fully torn down.
+    /// `HarnessSelect` uses this to nil its own `popover` reference so the 490-item
+    /// `allItems` array is released immediately on dismiss rather than held until the
+    /// next popover open.  Not set by default — callers that don't need the callback
+    /// can skip it.
+    var onDismiss: (() -> Void)?
     private var panel: NSPanel?
     private let search = HarnessSearchField()
     private let stack = NSStackView()
@@ -915,6 +927,11 @@ final class HarnessSelectPopover: NSObject {
         if let monitor { NSEvent.removeMonitor(monitor); self.monitor = nil }
         if let panel { panel.parent?.removeChildWindow(panel); panel.orderOut(nil) }
         panel = nil
+        // Notify the owner so it can nil its own reference to this popover.  This releases
+        // the `allItems` array (up to 490 theme names) immediately rather than retaining it
+        // until the next popover open or window close.  The callback is invoked after all
+        // teardown so the owner cannot re-enter dismiss() via its own cleanup.
+        onDismiss?()
     }
 }
 
