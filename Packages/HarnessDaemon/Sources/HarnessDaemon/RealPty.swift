@@ -387,6 +387,21 @@ public final class RealPty: @unchecked Sendable {
         write(data)
     }
 
+    /// Clear the scrollback ring + the persisted file **without** respawning the shell — the tmux
+    /// `clear-history` primitive (distinct from `respawn-pane -k`, which also replaces the process).
+    /// The running process and its visible screen are untouched; only the saved-lines history is
+    /// dropped, so a later reattach won't resurrect it. Callers that want attached clients to clear
+    /// their *local* scrollback too inject an `ESC[3J` afterward.
+    public func clearScrollback() {
+        scrollbackLock.lock()
+        scrollback.removeAll()
+        scrollbackHead = 0
+        scrollbackBytes = 0
+        nextSequence = 1
+        scrollbackLock.unlock()
+        scrollbackFile?.reset()
+    }
+
     /// Terminate the child shell and respawn a new one with the same surface
     /// ID, same env, same cwd. The scrollback is preserved unless
     /// `clearHistory` is true — letting users either keep their context or
@@ -435,15 +450,7 @@ public final class RealPty: @unchecked Sendable {
             sysClose(oldFD)
         }
         if clearHistory {
-            scrollbackLock.lock()
-            scrollback.removeAll()
-            scrollbackHead = 0
-            scrollbackBytes = 0
-            nextSequence = 1
-            scrollbackLock.unlock()
-            // Drop the persisted copy too, so a later restart doesn't resurrect the history the
-            // user just cleared.
-            scrollbackFile?.reset()
+            clearScrollback()
         }
         // Spawn a new shell, reusing the cwd of the previous process when it was still
         // alive to probe, else the caller-supplied last-known tab cwd (a shell that

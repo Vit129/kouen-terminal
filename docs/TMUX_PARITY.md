@@ -18,12 +18,12 @@ the single honest ledger. Updated last for the post-close-out parity roadmap (#1
 | Targeting | Full `-t` grammar everywhere (`session:window.pane`, `$`/`@`/`%` ids, indexes, `!`, `{last}`, `{top}/{bottom}/{left}/{right}`, `^`/`$`), with `base-index`/`pane-base-index`. STRICT resolution: a named component that doesn't match makes the command `.unresolved` at the one translator choke point, so *every* targeted verb (kill/respawn/send-keys/…) fails loudly in every front-end — never a silent misroute. `swap-pane` takes `-s` too |
 | Copy mode | vi + emacs tables (`copy-mode-vi` accepted as the vi table's name), `-X` action set: motions (char/line, word + **word-end**, **jump-to-char** `f`/`F`/`t`/`T` + `;`/`,`, **big-WORD** W/B/E [whitespace-delimited], **other-end**, **goto-line**, visible-window top/middle/bottom-line, back-to-indentation, page/half-page, history top/bottom, prompt jumps), selection, rectangle, search, copy-pipe; mouse; in GUI **and** the `attach-window` compositor |
 | Paste buffers | set/get/list/delete/paste/choose, save/load (CLI), bindable verbs |
-| Options | Scoped store (global/workspace/session/tab/pane + fallback chain), `set`/`setw`/`show` bindable, status-line set, styles, monitoring, `display-time`, `set-titles(+string)`, `detach-on-destroy`, `remain-on-exit`, `repeat-time`, … **`@`-prefixed user options** (set + read via `#{@name}`). `set-option` **validates the key**: an unknown name errors loudly (no silent persist) — known/recognized options and `@`-options pass |
+| Options | Scoped store (global/workspace/session/tab/pane + fallback chain), `set`/`setw`/`show` bindable, status-line set (incl. **`status-interval`** — periodic status redraw so `#{time:…}` ticks, in the GUI footer **and** the `attach-window` compositor, default 15s/`0` disables), styles, monitoring, `display-time`, `set-titles(+string)`, `detach-on-destroy`, `remain-on-exit`, `repeat-time`, … **`@`-prefixed user options** (set + read via `#{@name}`). `set-option` **validates the key**: an unknown name errors loudly (no silent persist) — known/recognized options and `@`-options pass |
 | `status-position` | **Honored** (top/bottom) in both the GUI status footer (the split↔footer constraints swap; extra `status 2..5` rows always stack away from the terminal so the main line sits against it) and the `attach-window` compositor (`PaneRectSolver` reserves the band via `yOrigin`; `GridCompositor` paints it at the matching edge). Live-updates from Settings ▸ Advanced |
 | Hooks | `set-hook`/`show-hooks` + full lifecycle events: after-* command events, `session-created/renamed/closed`, `window-renamed/linked/unlinked/layout-changed`, **`command-error`** (failing command as `#{hook}`), **`pane-focus-in`/`-out`**, **`window-pane-changed`**, alert-activity/silence/bell, client-attached/detached, pane-exited (+ Harness-only agent events) |
 | Format strings | ~50 `#{…}` variables (pane/session/window/client/server) + **`#{@user-options}`** + `#{hook}` + operators (`#{?,,}` with nested tests, `==`/`!=`, `\|\|`/`&&`, `m:`, `s///`, `e\|op\|`, `n:` length, `T:` double-expand, `a:` char-from-code, `=N:` truncation, `pN:` pad, `time:` strftime). IDs render with target-grammar prefixes so they round-trip into `-t` |
 | Key tables | root/prefix/copy-mode(+emacs)/command + `switch-client -T` modal tables, `bind -r` repeat, tombstoned unbinds |
-| Scripting | `send-keys` (incl. bindable `-l` literal / `-H` hex), `capture-pane` (+ ranges/escapes), `pipe-pane`, `run-shell`, `if-shell`, `wait-for -S/-L/-U`, `display-message` (+ `-p` print-to-stdout) / `show-messages`, `command-prompt`, `confirm-before`, `source-file` (a `.tmux.conf`'s bind/set/setw/setenv lines parse as-is), choose-tree/session/window/buffer/client, `find-window`, control mode (`-CC`) |
+| Scripting | `send-keys` (incl. bindable `-l` literal / `-H` hex), `capture-pane` (+ ranges/escapes), **`clear-history`** (drop a pane's scrollback without respawning the shell — distinct from `respawn-pane -k`, which replaces the process), `pipe-pane`, `run-shell`, `if-shell`, `wait-for -S/-L/-U`, `display-message` (+ `-p` print-to-stdout) / `show-messages`, `command-prompt`, `confirm-before`, `source-file` (a `.tmux.conf`'s bind/set/setw/setenv lines parse as-is), choose-tree/session/window/buffer/client, `find-window`, control mode (`-CC`) |
 | Misc | display-popup/menu, clock-mode, lock-client, multi-client smallest-size voting, environment tables (global/session) |
 
 ## Adapted (same capability, Harness-shaped)
@@ -62,11 +62,8 @@ the single honest ledger. Updated last for the post-close-out parity roadmap (#1
 - `window-size` (smallest/largest/latest vote aggregation) + `resize-window` manual override
 - `destroy-unattached` enforcement
 - `word-separators`, `wrap-search` (copy-mode engine plumbing)
-- `status-interval` (status refresh is currently event-driven)
 - `find-window` multi-match picker; `-C` content search from hooks (front-ends only today)
 - `list-*` `-F` format-string output (rows are fixed-shape + `--json`)
-- `clear-history` (clear a pane's scrollback without respawning — today only
-  `respawn-pane -k` clears, and it replaces the process)
 - `show-prompt-history` (command-prompt keeps no input history yet)
 
 ## Invariants this ledger protects

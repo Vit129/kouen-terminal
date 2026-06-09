@@ -58,4 +58,55 @@ final class ScrollbackPersistenceTests: XCTestCase {
             "reattach after restart should replay persisted scrollback, not start blank"
         )
     }
+
+    /// PR-18 `clear-history`: `clearScrollback()` empties the in-memory ring AND resets the
+    /// on-disk file *without* respawning the shell — the gap that previously forced users to
+    /// `respawn-pane -k` (which kills the running process) just to clear their scrollback. The
+    /// reborn-surface assertion proves the clear reached disk, not just memory (a memory-only
+    /// clear would leave the marker to replay on the next daemon run).
+    func testClearScrollbackEmptiesRingAndFileWithoutRespawn() throws {
+        let surfaceID = UUID().uuidString
+        let marker = "HARNESS_CLEAR_MARKER"
+
+        let pty = try makePty(id: surfaceID)
+        let saw = expectation(description: "marker observed in live output")
+        saw.assertForOverFulfill = false
+        let acc = OutputAccumulator()
+        _ = pty.subscribe { data, _ in
+            if acc.appendAndContains(String(decoding: data, as: UTF8.self), marker: marker) { saw.fulfill() }
+        }
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.2) { pty.write("echo \(marker)\n") }
+        wait(for: [saw], timeout: 8)
+        // handleOutput appends to the ring before fanning out to subscribers, so seeing the
+        // marker means it is already in scrollback — no settle needed.
+        XCTAssertTrue(pty.replay(fromSequence: nil).contains(marker), "scrollback should hold the marker before clearing")
+
+        pty.clearScrollback()
+
+        XCTAssertFalse(
+            pty.replay(fromSequence: nil).contains(marker),
+            "clear-history must empty the in-memory scrollback"
+        )
+
+        // The shell is the SAME process (no respawn): it keeps accepting input and streaming.
+        let after = "HARNESS_AFTER_CLEAR"
+        let alive = expectation(description: "same shell still live after clear")
+        alive.assertForOverFulfill = false
+        let acc2 = OutputAccumulator()
+        _ = pty.subscribe { data, _ in
+            if acc2.appendAndContains(String(decoding: data, as: UTF8.self), marker: after) { alive.fulfill() }
+        }
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.2) { pty.write("echo \(after)\n") }
+        wait(for: [alive], timeout: 8)
+        pty.flushScrollback()
+        pty.close()
+
+        // Fresh surface over the same file: the pre-clear marker must be gone from disk too.
+        let reborn = try makePty(id: surfaceID)
+        defer { reborn.close() }
+        XCTAssertFalse(
+            reborn.replay(fromSequence: nil).contains(marker),
+            "clear-history must reset the on-disk scrollback file, not just memory"
+        )
+    }
 }

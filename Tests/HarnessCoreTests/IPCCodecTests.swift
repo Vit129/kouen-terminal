@@ -350,6 +350,7 @@ final class IPCCodecTests: XCTestCase {
         .breakPane(paneID: UUID()),
         .joinPane(sourcePaneID: UUID(), destPaneID: UUID(), direction: .horizontal),
         .respawnPane(surfaceID: "surface-1", keepHistory: false),
+        .clearHistory(surfaceID: "surface-1"),
         .setOption(scope: "global", target: nil, key: "status-position", rawValue: "top"),
         .showOptions(scope: "global"),
         .setEnvironment(sessionID: nil, key: "EDITOR", value: "nvim"),
@@ -438,7 +439,7 @@ final class IPCCodecTests: XCTestCase {
              .replayScrollbackSequenced, .resizeSurface, .detachSurface, .identifyClient,
              .detachClient, .setBuffer, .getBuffer, .deleteBuffer, .pasteBuffer,
              .selectPaneDirectional, .selectPane, .subscribeSnapshot, .applyLayout, .nextLayout,
-             .previousLayout, .rotatePanes, .breakPane, .joinPane, .respawnPane, .setOption,
+             .previousLayout, .rotatePanes, .breakPane, .joinPane, .respawnPane, .clearHistory, .setOption,
              .showOptions, .setEnvironment, .showEnvironment, .bindHook, .unbindHook, .listHooks,
              .displayMessage:
             break
