@@ -226,4 +226,190 @@ final class TerminalProtocolCompatibilityTests: XCTestCase {
         XCTAssertEqual(codepoint(term, row: 0, col: 0), 0x2500)
         XCTAssertEqual(codepoint(term, row: 0, col: 1), UInt32(UnicodeScalar("q").value))
     }
+
+    // MARK: Device attributes (DA1 / DA3)
+
+    func testPrimaryDAReportsVT220ClassWithSixelAndColor() {
+        let term = TerminalEmulator(cols: 20, rows: 4)
+        var replies: [String] = []
+        term.onResponse = { replies.append(String(decoding: $0, as: UTF8.self)) }
+        term.feed("\u{1b}[c")
+        XCTAssertEqual(replies.last, "\u{1b}[?62;4;22c",
+                       "VT220 class (62) + Sixel (4) + ANSI color (22)")
+    }
+
+    func testTertiaryDAReportsUnitID() {
+        let term = TerminalEmulator(cols: 20, rows: 4)
+        var replies: [String] = []
+        term.onResponse = { replies.append(String(decoding: $0, as: UTF8.self)) }
+        term.feed("\u{1b}[=c")
+        XCTAssertEqual(replies.last, "\u{1b}P!|00000000\u{1b}\\", "DECRPTUI with the xterm all-zero unit id")
+    }
+
+    // MARK: DECRQM — ANSI (non-private) form
+
+    func testANSIDECRQMReportsIRMAndUnrecognizedModes() {
+        let term = TerminalEmulator(cols: 20, rows: 4)
+        var replies: [String] = []
+        term.onResponse = { replies.append(String(decoding: $0, as: UTF8.self)) }
+        term.feed("\u{1b}[4$p")
+        XCTAssertEqual(replies.last, "\u{1b}[4;2$y", "IRM defaults reset")
+        term.feed("\u{1b}[4h\u{1b}[4$p")
+        XCTAssertEqual(replies.last, "\u{1b}[4;1$y", "IRM set")
+        term.feed("\u{1b}[4l\u{1b}[4$p")
+        XCTAssertEqual(replies.last, "\u{1b}[4;2$y")
+        // Unrecognized ANSI mode → state 0, the conformance-correct feature-detect answer.
+        term.feed("\u{1b}[999$p")
+        XCTAssertEqual(replies.last, "\u{1b}[999;0$y")
+    }
+
+    // MARK: DECSET 1048 — save/restore cursor
+
+    func testMode1048SavesAndRestoresCursor() {
+        let term = TerminalEmulator(cols: 20, rows: 6)
+        var replies: [String] = []
+        term.onResponse = { replies.append(String(decoding: $0, as: UTF8.self)) }
+        term.feed("\u{1b}[3;5H\u{1b}[?1048h") // park at (3,5), save
+        term.feed("\u{1b}[?1048$p")
+        XCTAssertEqual(replies.last, "\u{1b}[?1048;1$y")
+        term.feed("\u{1b}[1;1H\u{1b}[?1048l") // move away, restore
+        term.feed("\u{1b}[6n")                // DSR-CPR: where is the cursor now?
+        XCTAssertEqual(replies.last, "\u{1b}[3;5R", "1048l must restore the saved position")
+        term.feed("\u{1b}[?1048$p")
+        XCTAssertEqual(replies.last, "\u{1b}[?1048;2$y")
+    }
+
+    // MARK: DECSET 12 — att610 cursor blink
+
+    func testAtt610CursorBlinkModeTogglesAndReports() {
+        let term = TerminalEmulator(cols: 20, rows: 4)
+        var replies: [String] = []
+        term.onResponse = { replies.append(String(decoding: $0, as: UTF8.self)) }
+        XCTAssertNil(term.readGrid().cursor.blinking, "default: user setting decides")
+        term.feed("\u{1b}[?12h")
+        XCTAssertEqual(term.readGrid().cursor.blinking, true)
+        term.feed("\u{1b}[?12$p")
+        XCTAssertEqual(replies.last, "\u{1b}[?12;1$y")
+        term.feed("\u{1b}[?12l")
+        XCTAssertEqual(term.readGrid().cursor.blinking, false)
+        term.feed("\u{1b}[?12$p")
+        XCTAssertEqual(replies.last, "\u{1b}[?12;2$y")
+    }
+
+    // MARK: DECSET 5 — DECSCNM reverse video
+
+    func testDECSCNMTracksReportsAndDirtiesTheScreen() {
+        let term = TerminalEmulator(cols: 20, rows: 4)
+        var replies: [String] = []
+        term.onResponse = { replies.append(String(decoding: $0, as: UTF8.self)) }
+        XCTAssertFalse(term.modes.reverseVideo)
+        term.feed("hello")
+        _ = term.consumeDamage() // drain print damage so the toggle's damage is isolated
+        term.feed("\u{1b}[?5h")
+        XCTAssertTrue(term.modes.reverseVideo)
+        XCTAssertTrue(term.consumeDamage().full, "a whole-screen video swap must repaint everything")
+        term.feed("\u{1b}[?5$p")
+        XCTAssertEqual(replies.last, "\u{1b}[?5;1$y")
+        term.feed("\u{1b}[?5l")
+        XCTAssertFalse(term.modes.reverseVideo)
+        term.feed("\u{1b}[?5$p")
+        XCTAssertEqual(replies.last, "\u{1b}[?5;2$y")
+        // Setting the already-current state must not re-dirty the screen.
+        _ = term.consumeDamage()
+        term.feed("\u{1b}[?5l")
+        XCTAssertFalse(term.consumeDamage().full, "a no-op DECSCNM must not force a repaint")
+    }
+
+    // MARK: DECSET 1016 — SGR-pixel mouse mode flag
+
+    func testMode1016TracksAndReports() {
+        let term = TerminalEmulator(cols: 20, rows: 4)
+        var replies: [String] = []
+        term.onResponse = { replies.append(String(decoding: $0, as: UTF8.self)) }
+        XCTAssertFalse(term.modes.mouseSGRPixel)
+        term.feed("\u{1b}[?1016h")
+        XCTAssertTrue(term.modes.mouseSGRPixel)
+        term.feed("\u{1b}[?1016$p")
+        XCTAssertEqual(replies.last, "\u{1b}[?1016;1$y")
+        term.feed("\u{1b}[?1016l")
+        XCTAssertFalse(term.modes.mouseSGRPixel)
+        term.feed("\u{1b}[?1016$p")
+        XCTAssertEqual(replies.last, "\u{1b}[?1016;2$y")
+    }
+
+    // MARK: DECRQM — alternate-screen modes
+
+    func testDECRQMReportsAlternateScreenModes() {
+        let term = TerminalEmulator(cols: 20, rows: 4)
+        var replies: [String] = []
+        term.onResponse = { replies.append(String(decoding: $0, as: UTF8.self)) }
+        term.feed("\u{1b}[?1049$p")
+        XCTAssertEqual(replies.last, "\u{1b}[?1049;2$y")
+        term.feed("\u{1b}[?1049h")
+        for mode in [47, 1047, 1049] {
+            term.feed("\u{1b}[?\(mode)$p")
+            XCTAssertEqual(replies.last, "\u{1b}[?\(mode);1$y", "mode \(mode) reflects the alt screen")
+        }
+        term.feed("\u{1b}[?1049l\u{1b}[?47$p")
+        XCTAssertEqual(replies.last, "\u{1b}[?47;2$y")
+    }
+
+    // MARK: XTWINOPS (CSI t) — size reports + title stack
+
+    func testWindowOpsSizeReports() {
+        let term = TerminalEmulator(cols: 80, rows: 24)
+        var replies: [String] = []
+        term.onResponse = { replies.append(String(decoding: $0, as: UTF8.self)) }
+        term.feed("\u{1b}[18t")
+        XCTAssertEqual(replies.last, "\u{1b}[8;24;80t", "text area size in characters")
+        // Pixel report derives from the host-supplied cell pixel size (the inline-image
+        // plumb); headless, the screen's synthetic 8×16 default answers — never silence.
+        term.feed("\u{1b}[14t")
+        XCTAssertEqual(replies.last, "\u{1b}[4;\(24 * 16);\(80 * 8)t")
+        term.setCellPixelSize(width: 10, height: 20)
+        term.feed("\u{1b}[14t")
+        XCTAssertEqual(replies.last, "\u{1b}[4;480;800t", "CSI 4 ; height ; width t at real cell metrics")
+    }
+
+    func testWindowOpsTitleStackPushPop() {
+        let term = TerminalEmulator(cols: 20, rows: 4)
+        var titles: [String] = []
+        term.onTitleChange = { titles.append($0) }
+        term.feed("\u{1b}]2;first\u{07}")
+        term.feed("\u{1b}[22;0t")             // push "first"
+        term.feed("\u{1b}]2;second\u{07}")
+        XCTAssertEqual(term.currentTitle, "second")
+        term.feed("\u{1b}[23;0t")             // pop → restore + announce "first"
+        XCTAssertEqual(term.currentTitle, "first")
+        XCTAssertEqual(titles, ["first", "second", "first"])
+
+        // Pop on an empty stack is silent (no spurious title change).
+        term.feed("\u{1b}[23;0t")
+        XCTAssertEqual(titles.count, 3)
+    }
+
+    func testWindowOpsTitleStackIsDepthCapped() {
+        let term = TerminalEmulator(cols: 20, rows: 4)
+        var titles: [String] = []
+        term.onTitleChange = { titles.append($0) }
+        for i in 0 ..< 15 { // push 15 — only the first 10 are retained
+            term.feed("\u{1b}]2;t\(i)\u{07}\u{1b}[22;0t")
+        }
+        titles.removeAll()
+        for _ in 0 ..< 15 { term.feed("\u{1b}[23;0t") }
+        XCTAssertEqual(titles.count, 10, "pushes beyond the cap dropped; pops beyond the stack silent")
+        XCTAssertEqual(titles.first, "t9", "the newest retained push pops first")
+        XCTAssertEqual(titles.last, "t0")
+    }
+
+    func testFullResetClearsTitleStack() {
+        let term = TerminalEmulator(cols: 20, rows: 4)
+        var titles: [String] = []
+        term.onTitleChange = { titles.append($0) }
+        term.feed("\u{1b}]2;kept\u{07}\u{1b}[22;0t")
+        term.feed("\u{1b}c") // RIS
+        titles.removeAll()
+        term.feed("\u{1b}[23;0t") // stack emptied by RIS → silent
+        XCTAssertTrue(titles.isEmpty)
+    }
 }

@@ -8,7 +8,24 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 
 ## [Unreleased]
 
+### Added
+- VT conformance polish (engine): DA1 now identifies as a VT220-class terminal with Sixel
+  and ANSI color (`CSI ?62;4;22c`); DA3 (`CSI = c`) replies with DECRPTUI; DECRQM gains the
+  ANSI (non-private) form (`CSI Ps $ p`) with the conformance-correct state-0 reply for
+  unrecognized modes, and the private form now also reports modes 5/12/47/1047/1048/1049/1016;
+  DECSET 1048 saves/restores the cursor; DECSET/DECRST 12 (att610) controls cursor blink;
+  DECSET 5 (DECSCNM reverse video) and DECSET 1016 (SGR-pixel mouse) are tracked and
+  reported (rendering/encoding land with the kit half); XTWINOPS `CSI 22/23 t` push/pop the
+  title on a depth-capped stack and `CSI 18/14 t` report the text-area size in
+  characters/pixels — the pixel report derives from the same host-supplied cell metrics
+  inline images use (window resize/move remain deliberate non-goals).
+
 ### Fixed
+- A stale scrollback index can no longer crash a shipping build: `HistoryRingBuffer`'s
+  empty-buffer release trap is replaced by a graceful fallback to the most recently
+  appended line (the debug assert stays). The daemon also caps per-connection buffered
+  partial-frame bytes at one max IPC frame + slack, dropping a stream that can never
+  decode instead of buffering it without bound.
 - **Unicode width tables are now derived from the Unicode Character Database** (15.1) instead of
   hand-curated ranges. The old tables missed ~140 East-Asian-Wide codepoints — including the
   emoji every modern CLI prints (⭐ ⚡ ✨ ❌ ✅ ⌚, the U+1F680–6FF transport block 🚀🚗, colored
