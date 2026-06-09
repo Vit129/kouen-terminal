@@ -519,7 +519,9 @@ public final class TerminalHostView: NSView {
     private func showFind() {
         guard findBar == nil else { findBar?.focusField(); return }
         let bar = TerminalFindBar()
-        bar.onQueryChanged = { [weak self] query in self?.nativeView.updateFind(query: query) }
+        bar.onQueryChanged = { [weak self, weak bar] query in
+            self?.nativeView.updateFind(query: query, options: bar?.searchOptions ?? .default)
+        }
         bar.onNext = { [weak self] in self?.nativeView.findNext() }
         bar.onPrevious = { [weak self] in self?.nativeView.findPrevious() }
         bar.onClose = { [weak self] in self?.hideFind() }
