@@ -9,7 +9,10 @@ public final class SurfaceRegistry: @unchecked Sendable {
     private var editor = SessionEditor()
     private let store = SessionStore()
     private let lock = NSLock()
-    private let bufferStore = PasteBufferStore()
+    // Kept non-public: PasteBufferStore mutations are all internal to SurfaceRegistry; external
+    // callers (DaemonServer) reach it only through `handle(_:)`. The `internal` visibility (not
+    // `private`) allows `flushAllStores()` in this same file to reach it.
+    let bufferStore = PasteBufferStore()
     public let optionStore = OptionStore()
     public let environmentStore = EnvironmentStore()
     public let hookRegistry = HookRegistry()
@@ -1382,6 +1385,16 @@ public final class SurfaceRegistry: @unchecked Sendable {
         store.save(editor.snapshot)
         NotificationBus.shared.postSnapshotChanged(revision: revision)
         onSnapshotCommitted?(revision)
+    }
+
+    /// Synchronously flush OptionStore, EnvironmentStore, HookRegistry, and PasteBufferStore to
+    /// disk, bypassing their debounce windows. Called on graceful daemon shutdown alongside
+    /// `flushSnapshot()` so the last mutation in any debounce window is never lost.
+    public func flushAllStores() {
+        optionStore.flush()
+        environmentStore.flush()
+        hookRegistry.flush()
+        bufferStore.flush()
     }
 
     /// Synchronously persist the current layout snapshot, bypassing the debounce. Called on
