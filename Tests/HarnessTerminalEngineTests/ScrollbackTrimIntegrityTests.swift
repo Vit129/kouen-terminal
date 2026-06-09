@@ -13,8 +13,9 @@ import XCTest
 /// `maxHistoryLines`.  With `maxScrollbackLines = 50`:
 ///   `slack = min(1024, 50/4) = min(1024, 12) = 12`
 ///
-/// So the _maximum_ `historyCount` observable at any time is `50 + 12 = 62`.
-/// After the next trim batch it falls back to exactly 50.
+/// So the _maximum_ `historyCount` observable at any time is `50 + 12 = 62`, and the count
+/// observed after an arbitrary feed is phase-dependent within `50 ... 62`; each trim cuts
+/// back to exactly 50.
 ///
 /// **Setup** — every line fed has the form:
 ///   `"line NNN 宽 ESC[31m red ESC[0m tail\r\n"`
@@ -25,7 +26,7 @@ import XCTest
 ///
 /// **Assertions**:
 ///   (a) `historyCount ≤ cap + slack` after overflow.
-///   (b) After fully settling (feed many more lines), `historyCount` is exactly `cap`.
+///   (b) Immediately after a trim, `historyCount` is exactly `cap`.
 ///   (c) The oldest retained line has the correct line index (no off-by-one).
 ///   (d) Attributes (foreground color) survive on the oldest retained line.
 ///   (e) Wide-char head+spacerTail pairing is intact on every retained line.
@@ -91,20 +92,27 @@ final class ScrollbackTrimIntegrityTests: XCTestCase {
 
     // MARK: - (b) historyCount settles to exactly cap after enough overflow
 
-    /// After feeding enough extra lines to guarantee at least one full trim cycle,
-    /// the count must be exactly `cap`.  One trim fires when `count > cap + slack`, so
-    /// feeding `cap + slack + 1` lines past the initial overflow is sufficient.
+    /// Each trim fires when `count > cap + slack` and cuts back to exactly `cap`. The count
+    /// observed after an arbitrary feed is phase-dependent (anywhere in `cap ... cap + slack`),
+    /// so to pin the exact trim-back target we feed one line at a time and check the count the
+    /// moment it *decreases* — immediately after a trim it must be exactly `cap`.
     ///
     /// This is a BEHAVIOR PIN on the exact trim-back target.
     func testHistoryCountExactlyCapAfterSettling() {
         let term = TerminalEmulator(cols: ncol, rows: nrow)
         term.maxScrollbackLines = cap
-        // Feed enough to cross the threshold at least once.
-        let settle = cap + slack + cap + slack + 10
-        for i in 0 ..< settle { term.feed(line(i)) }
-        // After settling, exactly `cap` lines must be retained.
-        XCTAssertEqual(term.historyCount, cap,
-                       "after settling, historyCount must equal cap (\(cap))")
+        var previous = 0
+        var sawTrim = false
+        for i in 0 ..< (cap + slack) * 3 {
+            term.feed(line(i))
+            let count = term.historyCount
+            if count < previous {
+                XCTAssertEqual(count, cap, "a trim must cut history back to exactly cap (\(cap))")
+                sawTrim = true
+            }
+            previous = count
+        }
+        XCTAssertTrue(sawTrim, "feeding \((cap + slack) * 3) lines must trigger at least one trim")
     }
 
     // MARK: - (c) Oldest retained line has the expected index (no off-by-one)
@@ -146,14 +154,16 @@ final class ScrollbackTrimIntegrityTests: XCTestCase {
                 XCTFail("Cannot parse line number from oldest retained line: '\(first)'")
                 return
             }
-            // Expected: totalFed lines fed; nrow=4 in viewport; historyCount = cap (after settle)
-            // The oldest history line index = totalFed - nrow - cap
-            let expected = totalFed - nrow - term.historyCount
+            // Expected: every fed line ends in \r\n, so the cursor sits on a fresh EMPTY
+            // viewport row after the last feed — only nrow-1 fed lines remain in the viewport.
+            // Lines pushed to history = totalFed - (nrow - 1); oldest retained = that - count.
+            let expected = totalFed - (nrow - 1) - term.historyCount
             XCTAssertEqual(capturedLineNum, expected,
                            "oldest retained line should be \(expected), got \(capturedLineNum)")
             return
         }
-        let expected = totalFed - nrow - term.historyCount
+        // See above: the trailing \r\n leaves an empty cursor row in the viewport.
+        let expected = totalFed - (nrow - 1) - term.historyCount
         XCTAssertEqual(snapshotLineNum, expected,
                        "oldest retained snapshot row should be line \(expected), got \(snapshotLineNum)")
     }
@@ -192,20 +202,26 @@ final class ScrollbackTrimIntegrityTests: XCTestCase {
             return
         }
         // Walk the oldest history line via bufferLine(0) (0 = oldest history line).
+        // Locate the consecutive "red" run — filtering for any r/e/d codepoint would also
+        // catch the UNCOLORED 'e' of the leading word "line".
         let cells = term.bufferLine(0)
-        // Find a cell whose codepoint is 'r' and check its foreground.
-        // "red" starts at a known offset after "line NNN 宽  " but we search.
-        let redCells = cells.filter { $0.codepoint == UInt32(UnicodeScalar("r").value) ||
-                                      $0.codepoint == UInt32(UnicodeScalar("e").value) ||
-                                      $0.codepoint == UInt32(UnicodeScalar("d").value) }
-        guard !redCells.isEmpty else {
-            XCTFail("No 'r'/'e'/'d' cells found on oldest history line — attribute test inconclusive")
+        let r = UInt32(UnicodeScalar("r").value)
+        let e = UInt32(UnicodeScalar("e").value)
+        let d = UInt32(UnicodeScalar("d").value)
+        var runStart: Int?
+        for col in 0 ..< max(0, cells.count - 2)
+        where cells[col].codepoint == r && cells[col + 1].codepoint == e && cells[col + 2].codepoint == d {
+            runStart = col
+            break
+        }
+        guard let start = runStart else {
+            XCTFail("No 'red' run found on oldest history line — attribute test inconclusive")
             return
         }
-        // All cells forming the word "red" must carry the red foreground (palette 1).
-        for cell in redCells {
+        // All three cells forming the word "red" must carry the red foreground (palette 1).
+        for cell in cells[start ... start + 2] {
             XCTAssertEqual(cell.foreground, .palette(1),
-                           "cell codepoint \(cell.codepoint) on oldest history line must have red foreground")
+                           "cell codepoint \(cell.codepoint) of the 'red' run must have red foreground")
         }
     }
 
@@ -297,8 +313,9 @@ final class ScrollbackTrimIntegrityTests: XCTestCase {
         term.maxScrollbackLines = 0  // unlimited
         let smallFeed = cap + slack + 20
         for i in 0 ..< smallFeed { term.feed(line(i)) }
-        // Every line that scrolled off must be retained (totalFed - nrow lines).
-        let expectedHistory = smallFeed - nrow
+        // Every line that scrolled off must be retained. The trailing \r\n leaves an empty
+        // cursor row in the viewport, so only nrow-1 fed lines are still on screen.
+        let expectedHistory = smallFeed - (nrow - 1)
         XCTAssertEqual(term.historyCount, expectedHistory,
                        "unlimited scrollback must retain all \(expectedHistory) history lines")
     }

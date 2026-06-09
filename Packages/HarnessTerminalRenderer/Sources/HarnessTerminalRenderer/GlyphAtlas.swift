@@ -218,6 +218,14 @@ final class GlyphAtlas {
         if cache.count + shapedCache.count + clusterCache.count > maxCacheEntries { resetPacker() }
     }
 
+    /// Record a cache hit as a use of the entry's page for the LRU clock. Cached no-ink
+    /// entries (nil) live on no page and never count as a use.
+    private func touchPage(of entry: AtlasEntry?) {
+        guard let page = entry?.pageIndex else { return }
+        useTick &+= 1
+        pageLastUse[page] = useTick
+    }
+
     /// Shape a run for ligatures (delegates to the rasterizer's CoreText shaper).
     func shape(_ text: String, bold: Bool, italic: Bool) -> [GlyphRasterizer.ShapedGlyph] {
         rasterizer.shape(text, bold: bold, italic: italic)

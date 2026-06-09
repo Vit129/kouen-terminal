@@ -653,7 +653,7 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
     /// a second time. Set immediately before `JSONDecoder().decode(…)`, cleared immediately after.
     /// Only valid on the calling thread; `load()` is always called from a single context
     /// (app start / settings save+reload), never concurrently.
-    private static var pendingImportedConfig: ImportedTerminalConfig??
+    nonisolated(unsafe) private static var pendingImportedConfig: ImportedTerminalConfig??
 
     public static func load() -> HarnessSettings {
         let imported = TerminalConfigImporter.load()
