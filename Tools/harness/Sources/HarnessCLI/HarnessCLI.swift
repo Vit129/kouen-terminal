@@ -566,18 +566,18 @@ struct HarnessCLI {
     /// `wait-for [-S|-L|-U] <channel>` — tmux named-channel sync. Plain `wait-for` blocks
     /// until another client `-S` signals it; `-L`/`-U` lock/unlock.
     static func handleWaitFor(_ args: [String], client: DaemonClient) throws {
-        let mode: String
-        if args.contains("-S") { mode = "signal" }
-        else if args.contains("-L") { mode = "lock" }
-        else if args.contains("-U") { mode = "unlock" }
-        else { mode = "wait" }
+        let mode: WaitForMode
+        if args.contains("-S") { mode = .signal }
+        else if args.contains("-L") { mode = .lock }
+        else if args.contains("-U") { mode = .unlock }
+        else { mode = .wait }
         guard let channel = positionalArgs(args, skippingValuesFor: []).first else {
             fputs("Usage: harness-cli wait-for [-S|-L|-U] <channel>\n", harnessStderr)
             exit(1)
         }
         // `wait`/`lock` block until signaled/granted — a generous (≈1 week) timeout, well
         // within the poll's Int32 millisecond range. `signal`/`unlock` return at once.
-        let timeout: TimeInterval = (mode == "wait" || mode == "lock") ? 604_800 : 5
+        let timeout: TimeInterval = (mode == .wait || mode == .lock) ? 604_800 : 5
         _ = try checkedRequest(client, .waitFor(channel: channel, mode: mode), timeout: timeout)
     }
 
