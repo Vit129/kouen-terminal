@@ -92,7 +92,8 @@ final class TerminalScreen {
     private var rowMarks: [SemanticMark?]
     /// Whether this screen accumulates scrollback (primary = true, alternate = false).
     let recordsHistory: Bool
-    /// Cap on retained scrollback lines.
+    /// Cap on retained scrollback lines. `0` means **unlimited** — history grows unbounded and is
+    /// never trimmed (the user opted into unlimited scrollback). Any positive value caps the ring.
     var maxHistoryLines = 10_000
 
     /// Number of scrolled-off lines currently retained.
@@ -734,9 +735,10 @@ final class TerminalScreen {
         } else if boundary < historyCount {
             history.removeLast(historyCount - boundary)
         }
-        // Scrollback cap, exactly as reflow applies it (drop oldest overflow).
-        let trimmedFront = max(0, boundary - maxHistoryLines)
-        if history.count > maxHistoryLines { history.removeFirst(history.count - maxHistoryLines) }
+        // Scrollback cap, exactly as reflow applies it (drop oldest overflow). `maxHistoryLines == 0`
+        // is unlimited: trim nothing and shift no images off the front.
+        let trimmedFront = maxHistoryLines > 0 ? max(0, boundary - maxHistoryLines) : 0
+        if maxHistoryLines > 0, history.count > maxHistoryLines { history.removeFirst(history.count - maxHistoryLines) }
 
         cells = newCells
         rowWrapped = newWrapped
@@ -1085,7 +1087,7 @@ final class TerminalScreen {
         var newHistory: [HistoryLine] = []
         if viewportTop > 0 {
             for i in 0 ..< viewportTop { newHistory.append(HistoryLine(cells: out[i], wrapped: outWrapped[i], mark: outMarks[i])) }
-            if newHistory.count > maxHistoryLines { newHistory.removeFirst(newHistory.count - maxHistoryLines) }
+            if maxHistoryLines > 0, newHistory.count > maxHistoryLines { newHistory.removeFirst(newHistory.count - maxHistoryLines) }
         }
         // Viewport = the next `nr` rows, blank-padded at the bottom if content is shorter.
         var newCells = [TerminalGridCell]()
@@ -1671,9 +1673,10 @@ final class TerminalScreen {
             // terminal at full scrollback pay O(maxHistoryLines) per output line. Amortize: let the
             // buffer overshoot by a bounded slack, then trim back to the cap in one batch (≈O(1)
             // amortized). Readers clamp to `history.count`, so the transient margin just exposes a
-            // little extra scrollback — never less than configured. Slack is 0 when scrollback is off.
+            // little extra scrollback — never less than configured. `maxHistoryLines == 0` is
+            // unlimited: skip the trim entirely so history grows unbounded.
             let slack = min(1024, maxHistoryLines / 4)
-            if history.count > maxHistoryLines + slack {
+            if maxHistoryLines > 0, history.count > maxHistoryLines + slack {
                 dropHistoryHead(history.count - maxHistoryLines)
             }
         }

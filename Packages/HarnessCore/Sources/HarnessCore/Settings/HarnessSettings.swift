@@ -99,7 +99,9 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
     /// Prefix key (default `ctrl-a`). Format: `mod1-mod2-key`,
     /// where mod is `ctrl|cmd|opt|shift`. Set empty string to disable.
     public var prefixKey: String
-    /// Number of lines kept in scrollback per pane (passed to the renderer + RealPty).
+    /// Number of lines kept in scrollback per pane (passed to the renderer + RealPty). `0` means
+    /// **unlimited**: the emulator's line history grows unbounded while the daemon's persisted
+    /// scrollback stays bounded by a large on-disk safety ceiling.
     public var scrollbackLines: Int
     /// Cursor shape: `block`, `bar`, or `underline` (`cursor-style`).
     public var cursorStyle: String
