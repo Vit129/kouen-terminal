@@ -12,6 +12,13 @@ import Dispatch // DispatchTime: a monotonic clock for command-duration timing (
 ///
 /// PTY spawning, scrollback storage, and process lifecycle are NOT here — they are
 /// daemon-owned. The emulator only consumes bytes and renders the viewport.
+///
+/// **Threading contract:** this type is not thread-safe. `feed`, the screen it mutates, and the
+/// `onResponse`/`onBell`/… callbacks must all be driven from a single serialized context — the
+/// GUI confines each surface's emulator to one serial queue (`SurfaceEmulatorState` in
+/// HarnessTerminalKit). The underlying `VTParser` hands borrowed buffer views to the handler that
+/// are only valid within the synchronous `feed` call, so concurrent or reentrant feeds would be a
+/// use-after-free; `VTParser` carries a debug-only tripwire that traps on violations.
 public final class TerminalEmulator: VTParserHandler {
     private var parser: VTParser!
     private let primary: TerminalScreen
