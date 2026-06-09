@@ -8,6 +8,20 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 
 ## [Unreleased]
 
+### Added
+- **`clear-history` — clear a pane's scrollback without respawning the shell.** Previously the
+  only way to clear scrollback was `respawn-pane -k`, which *kills the running process*.
+  `clear-history` (alias `clearhist`) resets the in-memory ring **and** the persisted scrollback
+  file in place and pushes `ESC[3J` to attached clients, leaving the shell untouched — so
+  `bind C-k clear-history` is now real muscle memory. Takes the universal `-t` like every other
+  per-pane verb (a missing target fails loudly, never clears the focused pane); CLI:
+  `harness-cli clear-history --surface <id>`.
+- **`status-interval` is now honored** (tmux: seconds between status-line redraws, default 15,
+  `0` disables). The GUI status footer and the `attach-window` compositor both re-render the
+  status band on this cadence so `#{time:%H:%M}` and other time tokens advance without an
+  unrelated event; a runtime `set-option status-interval N` re-arms both in step. (The GUI
+  previously hard-coded a 1s tick; it now follows the option like the compositor.)
+
 ### Fixed
 - **`capture-pane` (plain mode) now strips DCS / charset-designation escapes.** The scrollback
   ANSI filter behind `capture-pane` (without `-e`) only neutralized CSI and OSC sequences, so a

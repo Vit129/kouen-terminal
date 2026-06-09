@@ -922,6 +922,14 @@ public final class SurfaceRegistry: @unchecked Sendable {
                 return .error("Could not respawn surface")
             }
             return .ok
+        case let .clearHistory(surfaceID):
+            guard let session = sessions[surfaceID] else { return .error("Surface not found") }
+            session.clearScrollback()
+            // Tell attached clients to drop their local scrollback too (their emulators hold the
+            // history we just cleared server-side). `ESC[3J` clears the saved-lines buffer; the
+            // visible screen and the running process are untouched.
+            session.injectSyntheticOutput(Data("\u{1b}[3J".utf8))
+            return .ok
         case let .setOption(scopeRaw, target, key, raw):
             guard let scope = OptionStore.Scope(rawValue: scopeRaw) else {
                 return .error("Unknown option scope: \(scopeRaw)")

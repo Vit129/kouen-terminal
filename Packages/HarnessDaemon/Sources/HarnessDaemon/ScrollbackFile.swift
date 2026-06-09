@@ -117,11 +117,13 @@ final class ScrollbackFile: @unchecked Sendable {
         queue.sync { self.flushPending() }
     }
 
-    /// Drop all persisted history (used by `respawn(clearHistory: true)` — the user asked to
-    /// start clean). The file may be written to again afterwards.
+    /// Drop all persisted history (used by `respawn(clearHistory: true)` and `clear-history` — the
+    /// user asked to start clean). The file may be written to again afterwards. **Synchronous** (like
+    /// `delete()`): the caller — `clear-history` / a respawn — must know the on-disk log is gone
+    /// before it returns, so a daemon restart or a reattach that races the clear can't replay the
+    /// stale scrollback, and a previously-armed debounced flush can't resurrect it.
     func reset() {
-        queue.async { [weak self] in
-            guard let self else { return }
+        queue.sync {
             self.pendingFlush?.cancel()
             self.flushDeadline = nil
             self.pending.removeAll(keepingCapacity: true)

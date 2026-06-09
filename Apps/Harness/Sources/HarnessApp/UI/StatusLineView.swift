@@ -17,6 +17,9 @@ final class StatusLineView: NSView {
     private static let mainRowHeight: CGFloat = 26
     private static let extraRowHeight: CGFloat = 22
     private var refreshTimer: Timer?
+    /// Interval (seconds) `refreshTimer` is currently armed at; -1 = never armed. Lets
+    /// `reconcileTimer` skip churning the timer when `status-interval` is unchanged.
+    private var statusIntervalSeconds = -1
     /// Vertical row placement for a bottom-anchored footer: main row hugs the bottom, extra
     /// `status 2..5` rows stack upward. Swapped with `topRowConstraints` by `position`.
     private var bottomRowConstraints: [NSLayoutConstraint] = []
@@ -109,7 +112,7 @@ final class StatusLineView: NSView {
             name: NotificationBus.shared.snapshotChanged,
             object: nil
         )
-        startTimer()
+        reconcileTimer()
         refresh()
     }
 
@@ -142,14 +145,26 @@ final class StatusLineView: NSView {
     }
 
     @objc private func snapshotChanged(_ note: Notification) {
+        // A daemon push also lands on `set-option status-interval`, so reconcile the timer cadence
+        // before refreshing (idempotent when unchanged).
+        reconcileTimer()
         refresh()
     }
 
-    private func startTimer() {
+    /// Arm/re-arm the periodic refresh from `status-interval` (tmux: seconds between status-line
+    /// redraws, default 15; `0` disables). Drives `#{time:%H:%M}` ticking without per-second
+    /// snapshot churn — a refresh is just an attributed-string set. Idempotent: a no-op when the
+    /// interval is unchanged, so reconciling on every snapshot/option change stays cheap. The
+    /// compositor (`WindowAttachClient`) honors the same option with the same default, so the GUI
+    /// and attached clients tick in lockstep.
+    private func reconcileTimer() {
+        let seconds = HarnessOptions.shared.get("status-interval", scope: .global)?.intValue ?? 15
+        guard seconds != statusIntervalSeconds else { return }
+        statusIntervalSeconds = seconds
         refreshTimer?.invalidate()
-        // 1s tick so `#{time:%H:%M}` updates without us needing per-second
-        // snapshot changes. Cheap — just an attributed-string set.
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+        refreshTimer = nil
+        guard seconds > 0 else { return }
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: TimeInterval(seconds), repeats: true) { [weak self] _ in
             Task { @MainActor in self?.refresh() }
         }
     }

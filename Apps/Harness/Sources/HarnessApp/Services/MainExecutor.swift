@@ -259,6 +259,9 @@ final class MainExecutor: CommandExecutor {
         case .respawnPane(let keepHistory):
             guard let sid = coordinator.activeSurfaceID else { throw CommandExecutionError.noActiveSurface }
             coordinator.requestDaemon(.respawnPane(surfaceID: sid.uuidString, keepHistory: keepHistory))
+        case .clearHistory:
+            guard let sid = coordinator.activeSurfaceID else { throw CommandExecutionError.noActiveSurface }
+            coordinator.requestDaemon(.clearHistory(surfaceID: sid.uuidString))
         case let .movePane(direction, source):
             try runViaTranslator(.movePane(direction: direction, source: source), coordinator: coordinator)
         case .renumberWindows:

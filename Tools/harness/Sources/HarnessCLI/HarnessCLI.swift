@@ -231,6 +231,8 @@ struct HarnessCLI {
                 try handleRenumberWindows(args, client: client)
             case "respawn-pane":
                 try handleRespawnPane(args, client: client)
+            case "clear-history", "clearhist":
+                try handleClearHistory(args, client: client)
             case "select-pane":
                 try handleSelectPane(args, client: client)
             case "set-option":
@@ -1229,6 +1231,17 @@ struct HarnessCLI {
         _ = try checkedRequest(client, .respawnPane(surfaceID: surface, keepHistory: keepHistory))
     }
 
+    /// `clear-history`: drop a surface's scrollback WITHOUT respawning the shell (unlike
+    /// `respawn-pane -k`, which kills the running process). The daemon also pushes `ESC[3J` to
+    /// attached clients so their on-screen scrollback clears in step with the server's ring.
+    static func handleClearHistory(_ args: [String], client: DaemonClient) throws {
+        guard let surface = flagValue(args, flag: "--surface") else {
+            fputs("Usage: harness-cli clear-history --surface <id>\n", harnessStderr)
+            exit(1)
+        }
+        _ = try checkedRequest(client, .clearHistory(surfaceID: surface))
+    }
+
     static func handleSelectPane(_ args: [String], client: DaemonClient) throws {
         guard let paneStr = flagValue(args, flag: "--pane"), let paneID = UUID(uuidString: paneStr) else {
             fputs("Usage: harness-cli select-pane --pane <uuid> --dir L|R|U|D\n", harnessStderr)
@@ -1821,6 +1834,7 @@ struct HarnessCLI {
           break-pane --pane <uuid>
           join-pane --src <uuid> --dst <uuid> --direction horizontal|vertical
           respawn-pane --surface <id> [--clear-history|-k]
+          clear-history --surface <id>
           select-pane --pane <uuid> --dir L|R|U|D
           set-option [-g|-w|-s|-t|-p] [-T target] <key> <value>
           setw <key> <value>   (window option for the calling pane's tab; -T overrides)

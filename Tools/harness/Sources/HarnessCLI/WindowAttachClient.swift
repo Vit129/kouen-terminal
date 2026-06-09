@@ -221,6 +221,11 @@ private final class WindowSession: @unchecked Sendable {
     private var sigwinch: DispatchSourceSignal?
     private var sigterm: DispatchSourceSignal?
     private var snapshotSubscription: DaemonSubscription?
+    /// Periodic status redraw so time/clock tokens advance (tmux `status-interval`). Re-armed by
+    /// `refreshStatusOptions`; `statusIntervalSeconds` caches the armed value (-1 = never armed) so
+    /// re-arming is a no-op unless the interval actually changed.
+    private var statusTimer: DispatchSourceTimer?
+    private var statusIntervalSeconds = -1
 
     init(client: DaemonClient, tab: Tab, workspaceID: WorkspaceID?, sessionID: SessionID, configuration: WindowAttachClient.Configuration) {
         self.client = client
@@ -671,6 +676,30 @@ private final class WindowSession: @unchecked Sendable {
         }
         for entry in entries where entry.key == "set-titles-string" { setTitlesString = entry.value }
         applyOuterTitle()
+        refreshStatusIntervalTimer()
+    }
+
+    /// (Re)arm the periodic status redraw from `status-interval` (tmux: seconds between status-line
+    /// redraws, default 15; `0` disables). Without it, time/clock tokens (`#{time:…}`) in the status
+    /// bar would only advance on some other event. Idempotent — a no-op when the interval is
+    /// unchanged — so the per-push option refresh doesn't churn the timer. Runs on `renderQueue`.
+    private func refreshStatusIntervalTimer() {
+        let seconds = statusOptions["status-interval"].flatMap { Int($0) } ?? 15
+        guard seconds != statusIntervalSeconds else { return }
+        statusIntervalSeconds = seconds
+        statusTimer?.cancel()
+        statusTimer = nil
+        guard seconds > 0 else { return }
+        let timer = DispatchSource.makeTimerSource(queue: renderQueue)
+        timer.schedule(deadline: .now() + .seconds(seconds), repeating: .seconds(seconds), leeway: .milliseconds(200))
+        timer.setEventHandler { [weak self] in
+            guard let self, !self.tornDown else { return }
+            // Recompose so time/clock tokens pick up a fresh `now`; the compositor diff emits only
+            // the cells that actually changed, so an unchanged status line costs nothing on the wire.
+            self.composeAndWrite()
+        }
+        timer.resume()
+        statusTimer = timer
     }
 
     /// OSC 2 to the outer terminal when `set-titles` is on (tmux behavior); restores an
@@ -1551,6 +1580,7 @@ private final class WindowSession: @unchecked Sendable {
         snapshotSubscription?.cancel()
         sigwinch?.cancel()
         sigterm?.cancel()
+        statusTimer?.cancel()
         for sub in subscriptions.values { sub.cancel() }
         for sid in terminals.keys {
             _ = try? client.request(.detachSurface(surfaceID: sid), timeout: 1)

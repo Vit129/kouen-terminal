@@ -126,6 +126,8 @@ public enum IPCRequest: Codable, Sendable {
     case breakPane(paneID: UUID)
     case joinPane(sourcePaneID: UUID, destPaneID: UUID, direction: SplitDirection)
     case respawnPane(surfaceID: String, keepHistory: Bool)
+    /// tmux `clear-history`: drop the surface's scrollback without respawning the process.
+    case clearHistory(surfaceID: String)
     // Phase 6: options + hooks + display
     case setOption(scope: String, target: String?, key: String, rawValue: String)
     case showOptions(scope: String?)
