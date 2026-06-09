@@ -33,6 +33,13 @@ public enum HookEvent: String, Codable, Sendable, CaseIterable {
     case windowLinked = "window-linked"
     case windowUnlinked = "window-unlinked"
     case windowLayoutChanged = "window-layout-changed"
+    // `command-error` fires when a command fails loudly (an `.error` from the command path).
+    // `pane-focus-in`/`-out` fire when the active pane gains/loses focus; `window-pane-changed`
+    // fires when a tab's active pane changes (select-pane / directional nav / split focus).
+    case commandError = "command-error"
+    case paneFocusIn = "pane-focus-in"
+    case paneFocusOut = "pane-focus-out"
+    case windowPaneChanged = "window-pane-changed"
 }
 
 /// One binding: event → command (with an optional `if` condition format).
