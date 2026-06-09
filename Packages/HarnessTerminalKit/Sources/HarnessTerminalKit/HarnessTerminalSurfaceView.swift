@@ -2947,15 +2947,16 @@ public final class HarnessTerminalSurfaceView: NSView {
         scheduleRender()
     }
 
-    /// Run/refresh the search for `query` (incremental as the user types). Empty clears matches.
-    public func updateFind(query: String) {
+    /// Run/refresh the search for `query` (incremental as the user types), honoring the find bar's
+    /// match mode (`options`). Empty clears matches.
+    public func updateFind(query: String, options: TerminalBufferSearchOptions = .default) {
         findActive = true
         if query.isEmpty {
             findMatches = []
             findCurrentIndex = 0
         } else {
             findMatches = emulatorSync { emulator in
-                TerminalBufferSearch.matches(query: query, lineCount: emulator.bufferLineCount) { emulator.bufferLine($0) }
+                TerminalBufferSearch.matches(query: query, options: options, lineCount: emulator.bufferLineCount) { emulator.bufferLine($0) }
             }
             findCurrentIndex = 0
             if !findMatches.isEmpty { scrollToCurrentMatch() }

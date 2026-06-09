@@ -519,7 +519,9 @@ public final class TerminalHostView: NSView {
     private func showFind() {
         guard findBar == nil else { findBar?.focusField(); return }
         let bar = TerminalFindBar()
-        bar.onQueryChanged = { [weak self] query in self?.nativeView.updateFind(query: query) }
+        bar.onQueryChanged = { [weak self, weak bar] query in
+            self?.nativeView.updateFind(query: query, options: bar?.searchOptions ?? .default)
+        }
         bar.onNext = { [weak self] in self?.nativeView.findNext() }
         bar.onPrevious = { [weak self] in self?.nativeView.findPrevious() }
         bar.onClose = { [weak self] in self?.hideFind() }
@@ -649,6 +651,13 @@ public final class TerminalHostView: NSView {
 
     /// Returns true iff the daemon acknowledged the surface (`.ok`). Reconnect gates resubscribe on
     /// this so it never subscribes to a surface the (still-restarting) daemon hasn't recreated yet.
+    /// Convert the line-based `scrollbackLines` setting into the daemon's byte budget. `0`
+    /// (unlimited) is passed through as the sentinel the daemon maps to its on-disk safety ceiling;
+    /// any positive count is sized at ~160 bytes/line.
+    private static func scrollbackBytes(forLines lines: Int) -> Int {
+        lines == 0 ? 0 : lines * 160
+    }
+
     @discardableResult
     private func ensureDaemonSurface(cwd: String?, shell: String, settings: HarnessSettings?) -> Bool {
         do {
@@ -658,7 +667,7 @@ public final class TerminalHostView: NSView {
                 shell: shell,
                 rows: 24,
                 cols: 80,
-                scrollbackBytes: (settings?.scrollbackLines ?? 10_000) * 160
+                scrollbackBytes: Self.scrollbackBytes(forLines: settings?.scrollbackLines ?? 10_000)
             )) {
                 return true
             }
@@ -766,7 +775,7 @@ public final class TerminalHostView: NSView {
         let sid = surfaceID.uuidString
         let cwd = cachedCwd ?? FileManager.default.homeDirectoryForCurrentUser.path
         let shell = cachedShell
-        let scrollbackBytes = (cachedSettings?.scrollbackLines ?? 10_000) * 160
+        let scrollbackBytes = Self.scrollbackBytes(forLines: cachedSettings?.scrollbackLines ?? 10_000)
         let onData = makeOutputDataHandler()
         let onEnd = makeOutputEndHandler()
         // The view touches are built on main as `@Sendable` closures capturing `[weak self]`, so the

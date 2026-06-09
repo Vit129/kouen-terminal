@@ -118,7 +118,8 @@ public final class TerminalEmulator: VTParserHandler {
     /// has no scrollback to scroll.
     public var isAlternateScreenActive: Bool { onAlternateScreen }
 
-    /// Cap on retained primary-screen scrollback.
+    /// Cap on retained primary-screen scrollback. `0` means **unlimited** (history is never
+    /// trimmed); any positive value caps the ring. Negative inputs clamp to `0` (unlimited).
     public var maxScrollbackLines: Int {
         get { primary.maxHistoryLines }
         set { primary.maxHistoryLines = max(0, newValue) }

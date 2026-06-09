@@ -116,6 +116,8 @@ final class SettingsViewController: NSViewController, NSFontChanging {
     private var agentIconViews: [AgentKind: NSImageView] = [:]
     private var colorBindings: [ColorBinding] = []
     private var keyRecorder: KeyRecorderView!
+    private let quickTerminalToggle = HarnessToggle(title: "Enable quick terminal (global dropdown)")
+    private var quickTerminalHotkeyRecorder: KeyRecorderView!
     /// Live "Installed ✓ / Install hooks" buttons keyed by agent (Agents page).
     private var hookButtons: [AgentKind: NSButton] = [:]
 
@@ -501,6 +503,16 @@ final class SettingsViewController: NSViewController, NSFontChanging {
             SessionCoordinator.shared.settings.prefixKey = value
             try? SessionCoordinator.shared.settings.save()
             PrefixKeymap.shared.rebuildFromSettings()
+        }
+
+        quickTerminalToggle.state = settings.quickTerminalEnabled ? .on : .off
+        quickTerminalToggle.target = self
+        quickTerminalToggle.action = #selector(appearanceTextDidCommit)
+        quickTerminalHotkeyRecorder = KeyRecorderView(initial: settings.quickTerminalHotkey)
+        quickTerminalHotkeyRecorder.onChange = { value in
+            SessionCoordinator.shared.settings.quickTerminalHotkey = value
+            try? SessionCoordinator.shared.settings.save()
+            QuickTerminalController.shared.rebuildFromSettings()
         }
 
         updateFontReadout()
@@ -1000,7 +1012,13 @@ final class SettingsViewController: NSViewController, NSFontChanging {
             settingsRow("Prefix key", keyRecorder, hint: "Click to record a new shortcut. Esc cancels."),
         ])
 
-        let stack = NSStackView(views: [header, prefixGroup])
+        let quickTerminalGroup = settingsGroup("Quick Terminal", [
+            settingsToggleRow("Enable", quickTerminalToggle),
+            settingsRow("Hotkey", quickTerminalHotkeyRecorder,
+                        hint: "Global shortcut that drops a terminal down from the top of the screen, even when Harness is in the background."),
+        ])
+
+        let stack = NSStackView(views: [header, prefixGroup, quickTerminalGroup])
         stack.orientation = .vertical
         stack.alignment = .width
         stack.spacing = 18
@@ -2322,6 +2340,7 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         scrollMultiplierSlider.doubleValue = settings.scrollMultiplier
         updateScrollMultiplierLabel()
         mouseHideToggle.state = settings.mouseHideWhileTyping ? .on : .off
+        quickTerminalToggle.state = settings.quickTerminalEnabled ? .on : .off
         pasteProtectionToggle.state = settings.pasteProtection ? .on : .off
         boldIsBrightToggle.state = settings.boldIsBright ? .on : .off
         for (event, toggle) in eventToggles {
@@ -2425,7 +2444,9 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         coordinator.settings.fontFamily = fontFamilyField.stringValue
         coordinator.settings.defaultShell = shellField.stringValue
         coordinator.settings.defaultCWD = cwdField.stringValue
-        coordinator.settings.scrollbackLines = max(100, Int(scrollbackField.stringValue) ?? 10_000)
+        // `0` is the unlimited sentinel (kept verbatim); any other value is floored at 100 lines.
+        let enteredScrollback = Int(scrollbackField.stringValue) ?? 10_000
+        coordinator.settings.scrollbackLines = enteredScrollback == 0 ? 0 : max(100, enteredScrollback)
         coordinator.settings.cursorStyle = cursorStyleValue(cursorStyleSegment.titleOfSelectedItem)
         coordinator.settings.cursorBlink = cursorBlinkToggle.state == .on
         coordinator.settings.copyOnSelect = copyOnSelectToggle.state == .on
@@ -2445,6 +2466,7 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         coordinator.settings.bellMode = bellModeValue(bellSegment.titleOfSelectedItem)
         coordinator.settings.scrollMultiplier = HarnessSettings.clampedScrollMultiplier(scrollMultiplierSlider.doubleValue)
         coordinator.settings.mouseHideWhileTyping = mouseHideToggle.state == .on
+        coordinator.settings.quickTerminalEnabled = quickTerminalToggle.state == .on
         coordinator.settings.windowPaddingBalance = paddingBalanceToggle.state == .on
         coordinator.settings.minimumContrast = HarnessSettings.clampedContrast(minContrastSlider.doubleValue)
         coordinator.settings.pasteProtection = pasteProtectionToggle.state == .on
@@ -2471,6 +2493,7 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         // setTheme IPC. Persistence is the caller's job (`flushAndApply` saves; drag ticks don't).
         coordinator.applySettingsToHosts()
         NotchPanelController.shared.refreshVisibility()
+        QuickTerminalController.shared.rebuildFromSettings()
         updateFontReadout()
     }
 
