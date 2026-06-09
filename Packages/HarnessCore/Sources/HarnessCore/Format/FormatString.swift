@@ -10,6 +10,68 @@ import Foundation
 /// Unknown tokens evaluate to the empty string rather than throwing so a
 /// user-customized status line with a typo still renders.
 public enum FormatString {
+    // MARK: - Process-lifetime caches
+
+    // DateFormatter is expensive to construct (~0.3 ms per call) and the status line re-evaluates
+    // every 750 ms, so creating one per `#{time:…}` evaluation wastes significant CPU. Cache by
+    // ICU format string — the ICU pattern (not the raw strftime pattern) is the key because that
+    // is the stable post-translation form.
+    //
+    // `nonisolated(unsafe)`: `@unchecked Sendable` / actor isolation can't be applied to a static
+    // on an enum; the companion NSLock serializes all reads and writes, matching the pattern in
+    // `AgentDetector` (same codebase). The cache is bounded to 32 entries to prevent an adversarial
+    // status format from growing it without limit.
+    private static let dateFormatterLock = NSLock()
+    nonisolated(unsafe) private static var dateFormatterCache: [String: DateFormatter] = [:]
+    private static let dateFormatterCacheLimit = 32
+
+    // `ProcessInfo.hostName` and `NSUserName()` are stable for the lifetime of the process (a
+    // hostname change requires a network-stack restart, and the logged-in user never changes mid-
+    // session). Per-process caching matches tmux's behaviour and avoids a gethostbyname/getpwuid
+    // round-trip on every 750 ms status-line tick.
+    private static let processIdentityLock = NSLock()
+    nonisolated(unsafe) private static var cachedHostName: String? = nil
+    nonisolated(unsafe) private static var cachedUserName: String? = nil
+
+    /// Cached hostname — resolved once per process lifetime (matches tmux behaviour).
+    private static func hostName() -> String {
+        processIdentityLock.lock()
+        defer { processIdentityLock.unlock() }
+        if let cached = cachedHostName { return cached }
+        let name = ProcessInfo.processInfo.hostName
+        cachedHostName = name
+        return name
+    }
+
+    /// Cached username — resolved once per process lifetime.
+    private static func userName() -> String {
+        processIdentityLock.lock()
+        defer { processIdentityLock.unlock() }
+        if let cached = cachedUserName { return cached }
+        let name = NSUserName()
+        cachedUserName = name
+        return name
+    }
+
+    /// Return (creating if absent) a `DateFormatter` for the given ICU `format` string. Thread-safe;
+    /// bounded to `dateFormatterCacheLimit` entries (oldest-insertion eviction: a real LRU would need
+    /// an ordered dict; given ≤a few distinct time formats in any one config the ordering is fine).
+    private static func dateFormatter(icuFormat: String) -> DateFormatter {
+        dateFormatterLock.lock()
+        defer { dateFormatterLock.unlock() }
+        if let cached = dateFormatterCache[icuFormat] { return cached }
+        let formatter = DateFormatter()
+        formatter.dateFormat = icuFormat
+        // Evict one arbitrary entry once the cap is hit, keeping memory bounded.
+        if dateFormatterCache.count >= dateFormatterCacheLimit,
+           let evictKey = dateFormatterCache.keys.first
+        {
+            dateFormatterCache.removeValue(forKey: evictKey)
+        }
+        dateFormatterCache[icuFormat] = formatter
+        return formatter
+    }
+
     public static func evaluate(_ source: String, context: FormatContext) -> String {
         evaluateStyled(source, context: context).map(\.text).joined()
     }
@@ -101,10 +163,14 @@ public enum FormatString {
         // M=month-in-year) — visibly wrong. We translate strftime to ICU here
         // so the user-facing syntax matches the standard strftime / date(1)
         // format the docstring promises.
+        //
+        // The formatter is retrieved from the process-lifetime cache (keyed on the ICU form)
+        // rather than allocated fresh on every tick — the status line re-evaluates at 750 ms
+        // and DateFormatter construction costs ~0.3 ms, which is the dominant work per frame.
         if body.hasPrefix("time:") {
             let format = String(body.dropFirst("time:".count))
-            let formatter = DateFormatter()
-            formatter.dateFormat = strftimeToICU(format)
+            let icu = strftimeToICU(format)
+            let formatter = dateFormatter(icuFormat: icu)
             return formatter.string(from: context.now)
         }
         // Operators (tmux): equality, regex match, regex substitution, arithmetic.
@@ -438,11 +504,13 @@ public enum FormatString {
         case "pid": return context.serverPID.map(String.init) ?? ""
         case "socket_path": return HarnessPaths.socketURL.path
         case "version": return HarnessVersion.short
-        case "host", "hostname": return ProcessInfo.processInfo.hostName
+        // Resolved once per process — hostname/username are stable for the process lifetime
+        // (a hostname change needs a network-stack restart; user never changes mid-session).
+        case "host", "hostname": return hostName()
         case "host_short":
-            let host = ProcessInfo.processInfo.hostName
+            let host = hostName()
             return host.split(separator: ".").first.map(String.init) ?? host
-        case "user", "username": return NSUserName()
+        case "user", "username": return userName()
         default: return ""
         }
     }
