@@ -8,6 +8,65 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 
 ## [Unreleased]
 
+### Fixed
+- **Unicode width tables are now derived from the Unicode Character Database** (15.1) instead of
+  hand-curated ranges. The old tables missed ~140 East-Asian-Wide codepoints — including the
+  emoji every modern CLI prints (⭐ ⚡ ✨ ❌ ✅ ⌚, the U+1F680–6FF transport block 🚀🚗, colored
+  shapes 🟠🟢, and U+1FA70+ extended pictographs 🫠🫶) — which Harness measured width-1 while the
+  child process's `wcwidth` counted 2, desyncing the cursor and overlapping glyphs in npm/vitest/
+  cargo/agent-CLI output. The zero-width side gains the full combining repertoire (Devanagari
+  virama, Hebrew/Arabic/Syriac/Indic/Lao/Tibetan marks, bidi isolates). Deliberate deviations are
+  documented in `CharacterWidth.swift` (soft hyphen narrow; Hangul conjoining jamo V/T narrow
+  until the grapheme layer composes syllables; regional indicators narrow per scalar).
+- The Xcode scheme now runs ten test targets instead of four — engine conformance, reflow
+  goldens, renderer parity, theme, onboarding, and compositor-parity suites were silently
+  skipped in Product → Test (CI's `swift test` covered them; local Xcode runs did not).
+- Sparkle is pinned to the same version (2.9.2, up-to-next-minor) in all three manifests
+  (`Package.swift`, `project.yml`, `project.pbxproj`); they had drifted (2.6.0 in the Xcode
+  path), letting SPM and Xcode builds ship different versions of the auto-update framework.
+  A new CI `manifest-lint` job asserts the three stay in agreement.
+- The stale-daemon PID-file identity check compares the exact executable basename instead of a
+  spoofable substring match; the daemon's control socket is created under `umask(0o177)` so it
+  never exists with broader permissions, even momentarily.
+- Scrollback persistence is fsync'd: appends reach stable storage before the debounce window
+  closes, and compaction syncs the replacement file before the atomic rename — a daemon crash
+  can no longer lose the last ~2 s of scrollback or leave a truncated log.
+- `wait-for` channels cap concurrent waiters (1 024) instead of accumulating blocked fds without
+  bound; the agent scanner skips a tick when the previous scan is still running instead of
+  queuing scans behind each other under load.
+- The onboarding installer and the in-app "Install CLI" flow no longer run `launchctl` and
+  version probes on the main thread (up to ~8 s of beachball on first run); the menu-bar menu
+  no longer performs a blocking daemon round-trip inside `menuNeedsUpdate`.
+- Structure changes in background tabs (e.g. a `harness-cli split` against an unfocused tab)
+  now bump the structure revision — the fingerprint covers all live surfaces, not just the
+  active tab.
+- Store writes (options, hooks, environment, paste buffers) are debounced (150 ms) instead of
+  hitting the disk synchronously under lock on every mutation; a graceful shutdown flushes all
+  debounce windows. `source-file`-style bursts of `set-option` no longer serialize on disk I/O.
+- Option/buffer save failures and remote-host lock degradation are logged to stderr instead of
+  being silently swallowed.
+
+### Performance
+- The PTY-output and keystroke IPC read loops consume frames in O(1) amortized via an
+  offset-tracking read buffer (`IPCReadBuffer`) instead of `Data.removeFirst`'s O(remaining)
+  byte shift per frame — quadratic under flood on both the app's subscription loop and the
+  daemon's per-client loop. Keystroke writes no longer copy the payload an extra time
+  (`writeFrame` writes straight from the frame's storage).
+- The status line no longer constructs a `DateFormatter` per `#{time:…}` evaluation (cached by
+  format, ~0.3 ms per 750 ms tick) nor re-resolves `#{host}`/`#{user}` via syscalls each tick;
+  the daemon logger reuses one ISO-8601 formatter.
+- On Linux, post-fork fd cleanup uses `close_range(2)` (kernel 5.9+, loop fallback) instead of
+  up to 65 k `close` syscalls per shell spawn.
+- The benchmark suite is now enforceable: `Scripts/benchmarks/compare_benchmarks.py` plus
+  `make bench-record` / `make bench-check` gate hot-path regressions (>15 %) against a
+  committed baseline (`benchmark-baselines.json`, recorded deliberately on real hardware).
+
+### Removed
+- Two dead empty-bodied functions that ran O(hosts × tabs) scans on every daemon sync
+  (`syncWaitingRings`, `PaneContainerView.refreshChrome`), the stale `video-*` Makefile
+  targets, and the 300 ms timing kick after tab/session creation (replaced by the
+  notification-driven cwd scan).
+
 ## [1.9.0] - 2026-06-09
 
 ### Added
