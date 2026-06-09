@@ -30,9 +30,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         let coordinator = SessionCoordinator.shared
         // Build from the snapshot that is already in memory.  The coordinator's snapshot is
-        // kept current by `snapshotChangedNotification` (daemon push) and the 2-second
-        // metadata refresh loop in `startMetadataRefresh`, so this will always reflect
-        // recent state without a blocking socket round-trip on the menu-delegate path.
+        // kept current by the daemon's snapshot-push subscription (plus the 30 s safety
+        // poll), so this will always reflect recent state without a blocking socket
+        // round-trip on the menu-delegate path.
         //
         // We also kick a deferred refresh so the *next* open gets fresher data if the app
         // was idle past the refresh cadence. NOTE: syncFromDaemon is main-actor-bound, so
