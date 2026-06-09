@@ -85,6 +85,7 @@ final class SettingsViewController: NSViewController, NSFontChanging {
     // auto light/dark (T6), paste protection (E).
     private let resizeOverlaySegment = HarnessSegmented(frame: .zero)
     private let resizeOverlayPositionSegment = HarnessSegmented(frame: .zero)
+    private let bellSegment = HarnessSegmented(frame: .zero)
     private let paddingBalanceToggle = HarnessToggle(title: "Center grid (distribute padding evenly)")
     private let autoThemeToggle = HarnessToggle(title: "Match the macOS light/dark appearance")
     private let lightThemePopup = HarnessSelect(frame: .zero)
@@ -423,6 +424,10 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         resizeOverlayPositionSegment.selectItem(withTitle: resizeOverlayPositionTitle(settings.resizeOverlayPosition))
         resizeOverlayPositionSegment.target = self
         resizeOverlayPositionSegment.action = #selector(appearanceTextDidCommit)
+        bellSegment.setSegments(["Off", "Audible", "Visual", "Both"])
+        bellSegment.selectItem(withTitle: bellModeTitle(settings.bellMode))
+        bellSegment.target = self
+        bellSegment.action = #selector(appearanceTextDidCommit)
         // Balanced padding (T2)
         paddingBalanceToggle.state = settings.windowPaddingBalance ? .on : .off
         paddingBalanceToggle.target = self
@@ -781,6 +786,8 @@ final class SettingsViewController: NSViewController, NSFontChanging {
                         hint: "Show the grid size while resizing the window."),
             settingsRow("Overlay position", resizeOverlayPositionSegment,
                         hint: "Where the resize overlay is drawn within the surface."),
+            settingsRow("Bell", bellSegment,
+                        hint: "Feedback when a program rings the bell (\\a). Visual = a brief flash."),
             settingsToggleRow("Transparent title bar", transparentTitlebarToggle),
             settingsToggleRow("Status line", showStatusLineToggle),
             settingsToggleRow("Sidebar", sidebarVisibleToggle),
@@ -1931,6 +1938,24 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         }
     }
 
+    private func bellModeTitle(_ mode: BellMode) -> String {
+        switch mode {
+        case .off: return "Off"
+        case .audible: return "Audible"
+        case .visual: return "Visual"
+        case .both: return "Both"
+        }
+    }
+
+    private func bellModeValue(_ title: String?) -> BellMode {
+        switch title {
+        case "Off": return .off
+        case "Audible": return .audible
+        case "Both": return .both
+        default: return .visual
+        }
+    }
+
     private func updateMinContrastLabel() {
         let value = minContrastSlider.doubleValue
         minContrastLabel.stringValue = value <= 1.01 ? "Off" : String(format: "%.1f:1", value)
@@ -2255,6 +2280,7 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         liveResizeReflowToggle.state = settings.liveResizeReflow ? .on : .off
         resizeOverlaySegment.selectItem(withTitle: resizeOverlayTitle(settings.resizeOverlay))
         resizeOverlayPositionSegment.selectItem(withTitle: resizeOverlayPositionTitle(settings.resizeOverlayPosition))
+        bellSegment.selectItem(withTitle: bellModeTitle(settings.bellMode))
         paddingBalanceToggle.state = settings.windowPaddingBalance ? .on : .off
         minContrastSlider.doubleValue = settings.minimumContrast
         updateMinContrastLabel()
@@ -2378,6 +2404,7 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         coordinator.settings.liveResizeReflow = liveResizeReflowToggle.state == .on
         coordinator.settings.resizeOverlay = resizeOverlayValue(resizeOverlaySegment.titleOfSelectedItem)
         coordinator.settings.resizeOverlayPosition = resizeOverlayPositionValue(resizeOverlayPositionSegment.titleOfSelectedItem)
+        coordinator.settings.bellMode = bellModeValue(bellSegment.titleOfSelectedItem)
         coordinator.settings.windowPaddingBalance = paddingBalanceToggle.state == .on
         coordinator.settings.minimumContrast = HarnessSettings.clampedContrast(minContrastSlider.doubleValue)
         coordinator.settings.pasteProtection = pasteProtectionToggle.state == .on

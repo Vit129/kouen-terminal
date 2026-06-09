@@ -497,6 +497,12 @@ public final class TerminalHostView: NSView {
         hostDelegate?.terminalHostDidChangeFocus(true, surfaceID: surfaceID)
     }
 
+    /// Visual bell — flash the surface (the `visual` channel of the bell feedback). The decision of
+    /// *whether* to flash lives in `SessionCoordinator` (settings + tmux options); this just paints.
+    public func flashBell() {
+        nativeView.flashBell()
+    }
+
     // MARK: - Find (Cmd+F)
 
     private var findBar: TerminalFindBar?

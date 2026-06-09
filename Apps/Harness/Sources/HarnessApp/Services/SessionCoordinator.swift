@@ -1631,6 +1631,17 @@ extension SessionCoordinator: TerminalHostDelegate {
     }
 
     func terminalHostDidRingBell(surfaceID: SurfaceID) {
+        // In-app feedback for the ringing surface, honored on every BEL regardless of focus
+        // (a focused bell was previously silent). The GUI `bellMode` setting decides, with the
+        // tmux `visual-bell`/`bell-action` options bridging in via the shared resolver.
+        let visualBell = HarnessOptions.shared.get("visual-bell", scope: .global)?.stringValue
+        let bellAction = HarnessOptions.shared.get("bell-action", scope: .global)?.stringValue
+        let effect = BellFeedback.resolve(mode: settings.bellMode, visualBell: visualBell, bellAction: bellAction)
+        if effect.audible { NSSound.beep() }
+        if effect.visual { terminalHosts.host(for: surfaceID)?.flashBell() }
+        // tmux `bell-action off`/`none` silences the alert path too; otherwise keep the existing
+        // tab bell-flag + (unfocused) OS-banner notification.
+        if bellAction == "off" || bellAction == "none" { return }
         handleNotification(for: surfaceID, event: .bell, title: "Terminal", body: "Bell")
     }
 

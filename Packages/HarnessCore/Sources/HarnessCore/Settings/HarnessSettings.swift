@@ -55,6 +55,17 @@ public enum ResizeOverlayPosition: String, Codable, Sendable, CaseIterable {
     case bottomRight = "bottom-right"
 }
 
+/// Feedback for a terminal bell (`\a` / BEL) on the *focused* surface. The unfocused path always
+/// posts the OS notification / tab bell-flag regardless of this. Default `.visual` — a brief,
+/// non-jarring flash — gives feedback (today a focused bell is silent) without the annoyance of a
+/// beep on every completion bell; users who want the classic beep choose `.audible` or `.both`.
+public enum BellMode: String, Codable, Sendable, CaseIterable {
+    case off
+    case audible
+    case visual
+    case both
+}
+
 private enum LegacyHarnessSettingsCodingKeys: String, CodingKey {
     case tmuxControlsEnabled
     /// Removed in favor of the per-event `notificationEvents` map; still read here to migrate
@@ -229,6 +240,9 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
     public var resizeOverlay: ResizeOverlayMode
     /// Where the resize overlay is positioned within the surface.
     public var resizeOverlayPosition: ResizeOverlayPosition
+    /// Feedback for a bell on the focused surface (off/audible/visual/both). The tmux
+    /// `visual-bell`/`bell-action` options bridge into this via `BellFeedback.resolve`.
+    public var bellMode: BellMode
     /// Distribute the leftover sub-cell space evenly so the grid is centered, instead of parking
     /// the remainder at the bottom-right edge (Ghostty's `window-padding-balance`).
     public var windowPaddingBalance: Bool
@@ -348,6 +362,7 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         statusLineEnabled: Bool? = nil,
         resizeOverlay: ResizeOverlayMode = .afterFirst,
         resizeOverlayPosition: ResizeOverlayPosition = .center,
+        bellMode: BellMode = .visual,
         windowPaddingBalance: Bool = true,
         minimumContrast: Double = 1,
         lightThemeName: String? = nil,
@@ -411,6 +426,7 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         self.statusLineEnabled = statusLineEnabled
         self.resizeOverlay = resizeOverlay
         self.resizeOverlayPosition = resizeOverlayPosition
+        self.bellMode = bellMode
         self.windowPaddingBalance = windowPaddingBalance
         self.minimumContrast = HarnessSettings.clampedContrast(minimumContrast)
         self.lightThemeName = lightThemeName
@@ -581,6 +597,7 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         statusLineEnabled = try container.decodeIfPresent(Bool.self, forKey: .statusLineEnabled)
         resizeOverlay = try container.decodeIfPresent(ResizeOverlayMode.self, forKey: .resizeOverlay) ?? fallback.resizeOverlay
         resizeOverlayPosition = try container.decodeIfPresent(ResizeOverlayPosition.self, forKey: .resizeOverlayPosition) ?? fallback.resizeOverlayPosition
+        bellMode = try container.decodeIfPresent(BellMode.self, forKey: .bellMode) ?? fallback.bellMode
         windowPaddingBalance = try container.decodeIfPresent(Bool.self, forKey: .windowPaddingBalance) ?? fallback.windowPaddingBalance
         minimumContrast = HarnessSettings.clampedContrast(
             try container.decodeIfPresent(Double.self, forKey: .minimumContrast) ?? fallback.minimumContrast)
