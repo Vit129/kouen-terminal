@@ -235,7 +235,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         let displayNode = zoomedNode(for: tab) ?? tab.rootPane
         let key = "\(coordinator.structureRevision)|\(workspace.id)|\(tab.id)|\(tab.zoomedPaneID?.uuidString ?? "all")|\(paneKey(displayNode))"
         guard force || key != lastStructureKey else {
-            paneContainer?.refreshChrome(snapshot: coordinator.snapshot)
+            // No per-pane chrome work needed on the fast path (structure unchanged).
             return
         }
         lastStructureKey = key
@@ -310,26 +310,10 @@ final class PaneContainerView: NSView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    func refreshChrome(snapshot: SessionSnapshot) {
-        guard let tab = snapshot.activeWorkspace?.activeTab else { return }
-        for surfaceID in tab.rootPane.allSurfaceIDs() {
-            if let match = tabFor(surfaceID: surfaceID, in: snapshot),
-               let host = TerminalPaneRegistryAccess.host(for: surfaceID)
-            {
-            }
-        }
-    }
-
-    private func tabFor(surfaceID: SurfaceID, in snapshot: SessionSnapshot) -> Tab? {
-        for workspace in snapshot.workspaces {
-            for session in workspace.sessions {
-                for tab in session.tabs where tab.rootPane.allSurfaceIDs().contains(surfaceID) {
-                    return tab
-                }
-            }
-        }
-        return nil
-    }
+    // refreshChrome(snapshot:) was removed: its `if let match, let host` body was completely
+    // empty — the loop did nothing.  See the comment above reloadIfNeeded for context.
+    //
+    // tabFor(surfaceID:in:) was also removed: it was only used by refreshChrome.
 
     private func build(node: PaneNode, cwd: String, into parent: NSView) {
         switch node {
@@ -343,8 +327,6 @@ final class PaneContainerView: NSView {
                 host.trailingAnchor.constraint(equalTo: parent.trailingAnchor),
                 host.bottomAnchor.constraint(equalTo: parent.bottomAnchor),
             ])
-            if let tab = coordinator.snapshot.activeWorkspace?.activeTab {
-            }
         case let .branch(direction, ratio, firstNode, secondNode):
             let split = HarnessSplitView()
             split.dividerStyle = .thin
