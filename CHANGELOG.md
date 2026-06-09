@@ -11,11 +11,11 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [1.9.0] - 2026-06-09
 
 ### Added
-- **Quick terminal — a Quake-style global-hotkey dropdown.** A global shortcut (Settings ▸ Keys ▸
+- **Quick terminal: a Quake-style global-hotkey dropdown.** A global shortcut (Settings ▸ Keys ▸
   Quick Terminal; default ⌘⌥`) drops a terminal down from the top of the active screen and toggles
-  it away again — even when Harness is in the background. It floats above other windows, appears on
-  every Space, and hosts its own dedicated session. Built on Carbon `RegisterEventHotKey`, so it
-  needs no Accessibility permission; off by default.
+  it away again, even when Harness is in the background. It floats above other windows, shows on
+  every Space, and hosts its own session. It's built on Carbon `RegisterEventHotKey`, so it needs
+  no Accessibility permission. Off by default.
 - **Find bar: regular-expression and case-sensitivity toggles.** The find bar (⌘F) gains two
   latching buttons next to the search field: **Aa** (match case) and **{}** (regular expression).
   Search was previously substring-only and always case-insensitive; regex mode runs an
@@ -112,6 +112,26 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
   written compactly (still deterministically key-sorted).
 
 ### Fixed
+- **The window-edge border now hugs the rounded corners.** The hairline border (Settings ▸
+  Appearance) drew its corner with a fixed 10 pt radius read from the wrong layer. On macOS 26 the
+  window server rounds corners at 16 pt, so that 10 pt arc fell outside the window's clip and
+  disappeared, leaving the border on the straight edges only. It now reads the real corner radius
+  and follows the system's continuous-curve corner, so the perimeter stays unbroken.
+- **The agent notch opens and closes as one motion.** Closing faded the content out in about
+  0.1 s while the shape took 0.45 s to collapse, so the pill emptied and then shrank. The content
+  now fades on the same spring as the shape, the open/close springs are gentler, and the panel no
+  longer re-asserts its frame and window level on every metadata tick, which had been interrupting
+  the animation mid-flight.
+- **The notch no longer shows one agent as both waiting and working.** A single Claude Code
+  instance waiting on input could read "1 waiting" and "1 working" at the same time: a lingering
+  OSC 9;4 progress signal promoted the waiting agent to working, and the two counts were tallied
+  independently. Waiting now supersedes working wherever a count is derived.
+- **The agent-update peek clears the notch.** On a notched Mac the peek's single line sat at the
+  top of the card, partly behind the camera housing, so its title was clipped. Its content now
+  sits below the notch reserve, the way the full dropdown already did.
+- **Clicking a notch row restores a minimized window.** Before, it brought the window forward when
+  it was in the background but did nothing when it was minimized to the Dock. It now deminiaturizes
+  (and unhides) the target window before bringing it to the front.
 - **`capture-pane` (plain mode) now strips DCS / charset-designation escapes.** The scrollback
   ANSI filter behind `capture-pane` (without `-e`) only neutralized CSI and OSC sequences, so a
   DCS reply (e.g. a DECRQSS/XTGETTCAP answer) leaked its raw payload and a charset-designation

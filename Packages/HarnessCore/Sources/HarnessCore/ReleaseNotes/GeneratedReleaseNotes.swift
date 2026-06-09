@@ -6,10 +6,10 @@
 extension ReleaseNotes {
     public static let current = ReleaseNotes(
         version: "1.9.0",
-        changelogDigest: "a5303d810df82d39",
+        changelogDigest: "ce68ecd240073370",
         sections: [
             Section(title: "Added", items: [
-                "Quick terminal — a Quake-style global-hotkey dropdown",
+                "Quick terminal: a Quake-style global-hotkey dropdown",
                 "Find bar: regular-expression and case-sensitivity toggles",
                 "Unlimited scrollback",
                 "Four Ghostty-style quality-of-life features",
@@ -31,6 +31,11 @@ extension ReleaseNotes {
                 "Layout persistence moved off the input-latency path",
             ]),
             Section(title: "Fixed", items: [
+                "The window-edge border now hugs the rounded corners",
+                "The agent notch opens and closes as one motion",
+                "The notch no longer shows one agent as both waiting and working",
+                "The agent-update peek clears the notch",
+                "Clicking a notch row restores a minimized window",
                 "capture-pane (plain mode) now strips DCS / charset-designation escapes",
                 "VT correctness cluster (REP / IRM / DECOM / DECSTR / DECALN)",
                 "DCS device-control strings are now demuxed instead of all being fed to the Sixel decoder",
