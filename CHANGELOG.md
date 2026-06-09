@@ -47,6 +47,14 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
   being silently swallowed.
 
 ### Performance
+- Idle-efficiency bundle: the cursor-blink timer now exists only while its pane is
+  effectively focused and un-occluded (unfocused panes used to tick a 0.53 s timer forever
+  just to early-out — 20 background panes ≈ 40 pointless main-runloop wakeups/s); the
+  daemon's 500 ms monitor tick skips the registry lock and option reads entirely when no
+  fresh output/bell arrived and silence monitoring is disarmed (the orphan sweep is
+  preserved — racing-read entries are born flagged); and the shell cwd tracker parks its
+  2 Hz process-tree scan while the app is inactive, relaxes to 0.5 Hz after ~5 s of no cwd
+  movement, and snaps back on tab/pane creation, focus change, or any observed change.
 - The PTY-output and keystroke IPC read loops consume frames in O(1) amortized via an
   offset-tracking read buffer (`IPCReadBuffer`) instead of `Data.removeFirst`'s O(remaining)
   byte shift per frame — quadratic under flood on both the app's subscription loop and the
