@@ -270,10 +270,17 @@ public enum CommandParser {
                     return .copyModeCommand(action)
                 }
             }
-            return .sendKeys(keys: tokens.filter { !$0.hasPrefix("-") })
+            let positional = tokens.filter { !$0.hasPrefix("-") }
+            // `-l` sends the literal text verbatim; `-H` sends raw bytes from hex tokens. Both
+            // bypass key-token interpretation (previously the flags were dropped and the words
+            // were token-parsed, so a bound `send-keys -l` silently lost its literal meaning).
+            if tokens.contains("-H") { return .sendKeysHex(hex: positional) }
+            if tokens.contains("-l") { return .sendKeysLiteral(text: positional.joined(separator: " ")) }
+            return .sendKeys(keys: positional)
         case "display-message":
             let format = tokens.first { !$0.hasPrefix("-") } ?? ""
-            return .displayMessage(format: format)
+            // `-p` prints the rendered format to stdout (scripting) instead of flashing it.
+            return tokens.contains("-p") ? .displayMessagePrint(format: format) : .displayMessage(format: format)
         case "run-shell":
             guard let cmd = tokens.first(where: { !$0.hasPrefix("-") }) else {
                 throw CommandParseError.missingArgument("run-shell requires a command string")

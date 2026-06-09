@@ -34,6 +34,13 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
   written compactly (still deterministically key-sorted).
 
 ### Added
+- **Bindable `send-keys -l`/`-H`, `display-message -p`, and four more hooks.** `send-keys -l <text>`
+  (literal) and `-H <hex…>` (raw bytes) now work from keybindings / the `:` prompt / hooks, not just
+  the CLI (previously the flags were dropped and the words were token-parsed). `display-message -p`
+  prints the rendered format to stdout for scripting. New hook events: `command-error` (fires when a
+  server-executed command can't resolve, with the failing command as `#{hook}`), `pane-focus-in` /
+  `pane-focus-out`, and `window-pane-changed` (active-pane change). A list-driven test now forces
+  every hook event to have a firing test.
 - **Copy-mode jump-to-char and friends.** vi `f`/`F`/`t`/`T` jump to a character on the line (the
   front-end captures the next keystroke as the target), `;`/`,` repeat the jump forward/reversed,
   `o` swaps the selection's other end, `goto-line N` jumps to a line, and `W`/`B`/`E` are bound as

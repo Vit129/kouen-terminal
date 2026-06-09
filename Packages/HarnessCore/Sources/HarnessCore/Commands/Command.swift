@@ -53,7 +53,14 @@ public indirect enum Command: Codable, Sendable, Equatable {
 
     // MARK: Scripting
     case sendKeys(keys: [String])
+    /// `send-keys -l <text>` — send the literal text verbatim (no key-token interpretation).
+    case sendKeysLiteral(text: String)
+    /// `send-keys -H <hex…>` — send raw bytes parsed from hex tokens (`1b 5b 41`).
+    case sendKeysHex(hex: [String])
     case displayMessage(format: String)
+    /// `display-message -p <format>` — render the format and print it to the client's stdout
+    /// (for scripting), instead of flashing it as a transient status message.
+    case displayMessagePrint(format: String)
     case runShell(shellCommand: String, captureToBuffer: Bool)
     case ifShell(condition: String, then: Command, otherwise: Command?)   // if-shell
 
@@ -203,7 +210,10 @@ extension Command {
         case .jumpToPreviousPrompt: return "jump-previous-prompt"
         case .jumpToNextPrompt: return "jump-next-prompt"
         case let .sendKeys(keys): return "send-keys \(keys.joined(separator: " "))"
+        case let .sendKeysLiteral(text): return "send-keys -l \(text)"
+        case let .sendKeysHex(hex): return "send-keys -H \(hex.joined(separator: " "))"
         case let .displayMessage(format): return "display-message \(format)"
+        case let .displayMessagePrint(format): return "display-message -p \(format)"
         case let .runShell(cmd, capture): return "run-shell \(capture ? "-b " : "")'\(cmd)'"
         case let .ifShell(condition, then, otherwise):
             return "if-shell '\(condition)' '\(then.shortDescription)'" + (otherwise.map { " '\($0.shortDescription)'" } ?? "")

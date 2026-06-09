@@ -1335,6 +1335,10 @@ private final class WindowSession: @unchecked Sendable {
             flashStatus(set ? "marked pane" : "marked pane cleared")
         case let .displayMessage(format):
             flashStatus(FormatString.evaluate(format, context: formatContext(target: target)))
+        case let .displayMessagePrint(format):
+            // The attach client owns the tty, so it can't cleanly print to stdout mid-render —
+            // surface `-p` as a status flash like display-message (the CLI subcommand path prints).
+            flashStatus(FormatString.evaluate(format, context: formatContext(target: target)))
         case .sendPrefix:
             if let active = activeSurface {
                 _ = try? client.request(.sendData(surfaceID: active, data: Data([configuration.prefix])), timeout: 1)
