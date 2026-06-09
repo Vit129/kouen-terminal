@@ -88,8 +88,34 @@ public final class DaemonServer: @unchecked Sendable {
     public func start() throws {
         try HarnessPaths.ensureDirectories()
         if FileManager.default.fileExists(atPath: HarnessPaths.socketURL.path) {
-            if case .pong = try? DaemonClient().request(.ping, timeout: 0.2) {
-                throw DaemonError.alreadyRunning
+            // Stale-socket recovery ordering: consult the PID file FIRST. If it names a dead
+            // or non-HarnessDaemon process the socket is definitively stale — remove it without
+            // spending the 200 ms ping timeout. Only fall back to the ping when the PID file is
+            // absent, unparsable, or names a live HarnessDaemon (the ping is the authoritative
+            // two-daemon guard for that last case, as documented in DaemonLifecycle).
+            var socketIsClearlyStale = false
+            if let raw = try? String(contentsOf: HarnessPaths.daemonPIDURL, encoding: .utf8),
+               let priorPID = pid_t(raw.trimmingCharacters(in: .whitespacesAndNewlines)) {
+                let decision = DaemonLifecycle.priorInstanceDecision(
+                    priorPID: priorPID,
+                    ownPID: getpid(),
+                    isAlive: DaemonLifecycle.processIsAlive,
+                    executablePath: DaemonLifecycle.executablePath(of:)
+                )
+                if decision == .stale {
+                    // Dead or recycled PID — the socket is leftover from a crashed/killed daemon;
+                    // no need to ping it.
+                    socketIsClearlyStale = true
+                }
+                // .refuse here means a live HarnessDaemon owns the PID: fall through to the
+                // ping, which is the authoritative "is it really serving?" check.
+                // .proceed means the PID file was written by us (re-exec path): also fall through.
+            }
+            // Ping only when the PID file didn't already tell us the socket is stale.
+            if !socketIsClearlyStale {
+                if case .pong = try? DaemonClient().request(.ping, timeout: 0.2) {
+                    throw DaemonError.alreadyRunning
+                }
             }
             try FileManager.default.removeItem(at: HarnessPaths.socketURL)
         }
