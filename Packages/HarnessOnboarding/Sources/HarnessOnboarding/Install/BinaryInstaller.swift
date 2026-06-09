@@ -235,8 +235,8 @@ enum BinaryInstaller {
     /// unresponsive. The probe runs off the main thread (see `performInstall` + the
     /// `Task.detached` in `SetupStepView`), so this bound is the maximum extra latency
     /// the install step can add per binary before giving up and proceeding on the
-    /// no-build fallback path.
-    static let probeTimeout: TimeInterval = 3
+    /// no-build fallback path. `nonisolated` so the Sendable probe closure below can read it.
+    nonisolated static let probeTimeout: TimeInterval = 3
 
     /// The actual build-number probe implementation.  `nonisolated` + `let` so
     /// `performInstall` can access it safely from a detached task without touching the

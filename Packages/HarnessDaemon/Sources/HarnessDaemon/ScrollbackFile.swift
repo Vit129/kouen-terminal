@@ -234,7 +234,9 @@ final class ScrollbackFile: @unchecked Sendable {
                 _ = fsync(tmpHandle.fileDescriptor)
                 try? tmpHandle.close()
             }
-            try FileManager.default.replaceItem(at: url, withItemAt: tmp, backupItemName: nil, resultingItemURL: nil)
+            // replaceItemAt (not replaceItem(at:...resultingItemURL:)) — the latter is
+            // unavailable in swift-corelibs-foundation on Linux.
+            _ = try FileManager.default.replaceItemAt(url, withItemAt: tmp)
             fileBytes = tail.count
         } catch {
             fputs("HarnessDaemon scrollback: compaction failed for \(url.lastPathComponent): \(error)\n", harnessStderr)
