@@ -590,12 +590,50 @@ public final class RealPty: @unchecked Sendable {
     }
 
     private static func closeInheritedFileDescriptors(except keep: Int32, alreadyClosed: Int32? = nil, upperBound: Int32) {
+        // POST-FORK SAFETY: only async-signal-safe calls allowed here. Both paths below
+        // (harness_close_fds_from and the sysClose loop) satisfy that requirement.
         guard upperBound > 3 else { return }
+
+        #if canImport(Glibc)
+        // close_range(2) is the O(1) way to close a range of fds in a post-fork child. On
+        // Linux 5.9+ the C shim calls the syscall directly; on older kernels it falls back
+        // to a getdtablesize() loop — both paths are async-signal-safe. We close everything
+        // from fd 3 upward via the shim and then selectively reopen `keep` if the shim
+        // closed it (which it will have done when `keep` >= 3). `alreadyClosed` was the
+        // master fd, closed by the child before calling us; close_range on an already-closed
+        // fd returns EBADF (or silently skips it on newer kernels), both are harmless.
+        //
+        // If close_range closed `keep`, reopen it via dup2 from the master (already gone) —
+        // but we can't reopen a closed slave. Instead, skip the range that contains `keep`
+        // by issuing two close_range calls: [3, keep-1] and [keep+1, ∞). Because the shim
+        // always does close-all-from-lowfd, we simulate the two-range approach with one call
+        // from 3 up to keep, then one call from keep+1 up. Use the loop for simplicity when
+        // keep is in the range; fall back to the shim for everything else.
+        if keep >= 3 {
+            // Close [3, keep-1] via the shim (skipping keep itself by closing up to keep).
+            var fd: Int32 = 3
+            while fd < keep {
+                if fd != alreadyClosed { _ = sysClose(fd) }
+                fd += 1
+            }
+            // Close [keep+1, ∞) via the shim — fast on modern kernels.
+            if keep + 1 > 0 { // guard against overflow; keep is a small fd in practice
+                harness_close_fds_from(keep + 1)
+            }
+        } else {
+            // keep < 3 (e.g. slave was duped onto 0/1/2): close everything from 3 upward.
+            harness_close_fds_from(3)
+        }
+        #else
+        // Darwin: iterate the explicit upper bound (forkpty is used on Darwin; this
+        // path is only compiled for Linux, but the function is referenced by the Linux
+        // branch of spawnOnPTY so it must also compile on Darwin — keep the loop).
         var fd: Int32 = 3
         while fd < upperBound {
             if fd != keep, fd != alreadyClosed { _ = sysClose(fd) }
             fd += 1
         }
+        #endif
     }
 
     /// Replace the (just-forked child) process image with the shell. Binds the buffer base addresses
