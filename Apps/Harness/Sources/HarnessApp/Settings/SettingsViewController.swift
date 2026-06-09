@@ -92,6 +92,9 @@ final class SettingsViewController: NSViewController, NSFontChanging {
     private let darkThemePopup = HarnessSelect(frame: .zero)
     private let minContrastSlider = HarnessSlider(frame: .zero)
     private let minContrastLabel = NSTextField(labelWithString: "")
+    private let scrollMultiplierSlider = HarnessSlider(frame: .zero)
+    private let scrollMultiplierLabel = NSTextField(labelWithString: "")
+    private let mouseHideToggle = HarnessToggle(title: "Hide the mouse cursor while typing")
     private let pasteProtectionToggle = HarnessToggle(title: "Confirm risky pastes (multi-line or control characters)")
     private let boldIsBrightToggle = HarnessToggle(title: "Bold uses bright colors")
     private let notificationTestButton = NSButton(title: "Send Test Notification", target: nil, action: nil)
@@ -441,6 +444,19 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         minContrastSlider.action = #selector(minContrastChanged)
         minContrastSlider.onCommit = { [weak self] in self?.flushAndApply() }
         updateMinContrastLabel()
+
+        scrollMultiplierSlider.minValue = 0.1
+        scrollMultiplierSlider.maxValue = 10
+        scrollMultiplierSlider.doubleValue = settings.scrollMultiplier
+        scrollMultiplierSlider.isContinuous = true
+        scrollMultiplierSlider.target = self
+        scrollMultiplierSlider.action = #selector(scrollMultiplierChanged)
+        scrollMultiplierSlider.onCommit = { [weak self] in self?.flushAndApply() }
+        updateScrollMultiplierLabel()
+
+        mouseHideToggle.state = settings.mouseHideWhileTyping ? .on : .off
+        mouseHideToggle.target = self
+        mouseHideToggle.action = #selector(appearanceTextDidCommit)
         // Paste protection (E)
         pasteProtectionToggle.state = settings.pasteProtection ? .on : .off
         pasteProtectionToggle.target = self
@@ -925,12 +941,21 @@ final class SettingsViewController: NSViewController, NSFontChanging {
             leadingRow(defaultTerminalButton),
             defaultTerminalStatusField,
         ])
+        let scrollMultiplierRow = NSStackView(views: [scrollMultiplierSlider, scrollMultiplierLabel])
+        scrollMultiplierRow.orientation = .horizontal
+        scrollMultiplierRow.spacing = 12
+        scrollMultiplierSlider.widthAnchor.constraint(equalToConstant: 260).isActive = true
+        scrollMultiplierLabel.widthAnchor.constraint(equalToConstant: 84).isActive = true
+        scrollMultiplierLabel.alignment = .right
         let behaviorGroup = settingsGroup("Behavior", [
             settingsRow("Cursor style", cursorStyleSegment),
             settingsRow("Scrollback", scrollbackField),
             settingsToggleRow("Blink cursor", cursorBlinkToggle),
             settingsToggleRow("Copy on select", copyOnSelectToggle),
             settingsToggleRow("Paste protection", pasteProtectionToggle),
+            settingsRow("Scroll speed", scrollMultiplierRow,
+                        hint: "Mouse-wheel / trackpad scroll multiplier (1× = native)."),
+            settingsToggleRow("Hide cursor while typing", mouseHideToggle),
             settingsToggleRow("Keep sessions running", keepSessionsToggle),
         ])
 
@@ -1966,6 +1991,16 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         applySettingsLive()
     }
 
+    private func updateScrollMultiplierLabel() {
+        let value = scrollMultiplierSlider.doubleValue
+        scrollMultiplierLabel.stringValue = abs(value - 1) < 0.05 ? "1.0× (native)" : String(format: "%.1f×", value)
+    }
+
+    @objc private func scrollMultiplierChanged() {
+        updateScrollMultiplierLabel()
+        applySettingsLive()
+    }
+
     /// Enable/disable auto light/dark and apply it. Both theme names are set together (seeding from
     /// the current theme when unset); clearing either turns the feature off.
     @objc private func autoThemeChanged() {
@@ -2284,6 +2319,9 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         paddingBalanceToggle.state = settings.windowPaddingBalance ? .on : .off
         minContrastSlider.doubleValue = settings.minimumContrast
         updateMinContrastLabel()
+        scrollMultiplierSlider.doubleValue = settings.scrollMultiplier
+        updateScrollMultiplierLabel()
+        mouseHideToggle.state = settings.mouseHideWhileTyping ? .on : .off
         pasteProtectionToggle.state = settings.pasteProtection ? .on : .off
         boldIsBrightToggle.state = settings.boldIsBright ? .on : .off
         for (event, toggle) in eventToggles {
@@ -2405,6 +2443,8 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         coordinator.settings.resizeOverlay = resizeOverlayValue(resizeOverlaySegment.titleOfSelectedItem)
         coordinator.settings.resizeOverlayPosition = resizeOverlayPositionValue(resizeOverlayPositionSegment.titleOfSelectedItem)
         coordinator.settings.bellMode = bellModeValue(bellSegment.titleOfSelectedItem)
+        coordinator.settings.scrollMultiplier = HarnessSettings.clampedScrollMultiplier(scrollMultiplierSlider.doubleValue)
+        coordinator.settings.mouseHideWhileTyping = mouseHideToggle.state == .on
         coordinator.settings.windowPaddingBalance = paddingBalanceToggle.state == .on
         coordinator.settings.minimumContrast = HarnessSettings.clampedContrast(minContrastSlider.doubleValue)
         coordinator.settings.pasteProtection = pasteProtectionToggle.state == .on

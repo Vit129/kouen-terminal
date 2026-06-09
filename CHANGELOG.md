@@ -9,6 +9,16 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [Unreleased]
 
 ### Added
+- **Four Ghostty-style quality-of-life features.**
+  - **Scroll speed multiplier** (Settings ▸ Terminal ▸ Behavior, or `scrollMultiplier`): scale
+    mouse-wheel / trackpad scroll distance (1× = native). Previously a fixed 3-lines-per-notch.
+  - **Hide cursor while typing**: the mouse cursor hides until the mouse next moves on a keystroke
+    (off by default, matching Ghostty's `mouse-hide-while-typing`).
+  - **Config reload-on-save**: editing `settings.json` or `keybindings.json` outside the app (a
+    text editor, a dotfile sync, `harness-cli`) now applies live — no relaunch. The app's own saves
+    are no-ops (it compares the reloaded values), and the watch survives atomic saves.
+  - **Triple-click selects the logical line** across soft wraps (Ghostty/iTerm2/kitty), not just the
+    one display row — driven by the engine's wrap flags.
 - **Terminal bell feedback (audible / visual).** A bell (`\a` / BEL) on the *focused* surface
   previously produced no feedback at all — only a tmux window-flag + background notification. A
   new **Bell** setting (Settings ▸ Appearance: off / audible / visual / both, default **visual**)

@@ -202,6 +202,13 @@ public final class TerminalEmulator: VTParserHandler {
     /// joins soft-wrapped physical rows into their logical line.
     public func captureLines(joinWrapped: Bool) -> [String] { current.captureLines(joinWrapped: joinWrapped) }
 
+    /// Virtual-line span `[first, last]` of the logical (soft-wrapped) line containing virtual
+    /// `line` (space: `[history ++ viewport]`, 0 = oldest). Drives triple-click logical-line
+    /// selection — a hard-ended line returns just itself.
+    public func logicalLineRowSpan(virtualLine line: Int) -> ClosedRange<Int> {
+        current.logicalLineSpan(containing: line)
+    }
+
     // MARK: - VTParserHandler
 
     func parserPrint(_ scalar: UInt32) {

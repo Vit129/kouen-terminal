@@ -60,6 +60,9 @@ final class HarnessSettingsTests: XCTestCase {
         s.experienceMode = .full
         s.notchVisibilityMode = .on
         s.resizeOverlay = .always
+        s.bellMode = .both
+        s.scrollMultiplier = 2.5
+        s.mouseHideWhileTyping = true
 
         let d = try JSONDecoder().decode(HarnessSettings.self, from: JSONEncoder().encode(s))
 
@@ -104,6 +107,22 @@ final class HarnessSettingsTests: XCTestCase {
         XCTAssertEqual(d.experienceMode, .full)
         XCTAssertEqual(d.notchVisibilityMode, .on)
         XCTAssertEqual(d.resizeOverlay, .always)
+        XCTAssertEqual(d.bellMode, .both)
+        XCTAssertEqual(d.scrollMultiplier, 2.5)
+        XCTAssertEqual(d.mouseHideWhileTyping, true)
+    }
+
+    func testScrollMultiplierAndMouseHideDefaults() {
+        let s = HarnessSettings()
+        XCTAssertEqual(s.scrollMultiplier, 1, "native scroll speed by default")
+        XCTAssertFalse(s.mouseHideWhileTyping, "off by default (matching Ghostty)")
+    }
+
+    func testScrollMultiplierClampsToSaneRange() {
+        XCTAssertEqual(HarnessSettings.clampedScrollMultiplier(0), 0.1, "0 would freeze scrolling")
+        XCTAssertEqual(HarnessSettings.clampedScrollMultiplier(-3), 0.1)
+        XCTAssertEqual(HarnessSettings.clampedScrollMultiplier(999), 10, "cap pages-per-notch")
+        XCTAssertEqual(HarnessSettings.clampedScrollMultiplier(2.5), 2.5, "in-range passes through")
     }
 
     /// An empty object must decode without throwing — guards against a field decoded with the

@@ -25,6 +25,9 @@ final class SessionCoordinator: NSObject {
     /// working→idle→working mid-task can't spam "stopped" pings.
     private var lastStopNotifyAt: [String: Date] = [:]
     var settings = HarnessSettings.load()
+    /// Hot-reload watchers for `settings.json` / `keybindings.json` (Ghostty config-reload-on-save).
+    /// Held for the coordinator's lifetime.
+    private var configWatchers: [FileWatcher] = []
     /// Which daemon the GUI currently drives: the local one, or a remote daemon over an SSH tunnel.
     /// New terminal panes are bound to this endpoint, and `daemon` (session/layout IPC) tracks it.
     private(set) var activeEndpoint: Endpoint = .localControlSocket
@@ -79,6 +82,31 @@ final class SessionCoordinator: NSObject {
         // hydration the moment the daemon answers — after the window is on screen.
         observeNotifications()
         startMetadataRefresh()
+        startConfigWatchers()
+    }
+
+    /// Watch the on-disk config so an external edit (a text editor, `harness-cli set-option`, a
+    /// dotfile sync) applies live — Ghostty's config-reload-on-save. The `fresh != settings` guard
+    /// makes the app's OWN saves a no-op: it already updated the in-memory `settings` before writing,
+    /// so the reload loads identical values and does nothing. `FileWatcher` delivers on the main
+    /// queue, so `assumeIsolated` is safe (and hop-free) for this @MainActor coordinator.
+    private func startConfigWatchers() {
+        let settingsWatcher = FileWatcher(url: HarnessPaths.settingsURL) { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                let fresh = HarnessSettings.load()
+                guard fresh != self.settings else { return }
+                self.settings = fresh
+                self.applySettingsToHosts()
+            }
+        }
+        let keybindingsWatcher = FileWatcher(url: KeybindingsStore.fileURL) { [weak self] in
+            MainActor.assumeIsolated {
+                guard self != nil else { return }
+                KeybindingsService.shared.reload()
+            }
+        }
+        configWatchers = [settingsWatcher, keybindingsWatcher]
     }
 
     private func observeNotifications() {
