@@ -33,6 +33,12 @@ public final class OptionStore: @unchecked Sendable {
     private var values: [String: Value] = [:]
     private let url: URL
     private let lock = NSLock()
+    // Debounced write — mirrors SessionStore.scheduleSave. Mutations mark dirty by enqueuing a
+    // coalesced write; only the last mutation in a burst actually hits the disk. `saveQueue`
+    // serializes disk writes independently of `lock` so the mutation path never blocks on I/O.
+    private let saveQueue = DispatchQueue(label: "com.robert.harness.option-store-save")
+    private var pendingSave: DispatchWorkItem?
+    private let debounceInterval: TimeInterval = 0.15
 
     public init(url: URL? = nil) {
         self.url = url ?? HarnessPaths.applicationSupport.appendingPathComponent("options.json")
@@ -265,17 +271,51 @@ public final class OptionStore: @unchecked Sendable {
     // MARK: Persistence
 
     private func save() {
-        // Snapshot under the lock — encoding `values` while another thread mutates it is a
-        // torn read of the dictionary (the store is `@unchecked Sendable` and the daemon both
-        // sets options and serves `show-options` concurrently).
+        // Snapshot under the lock — encoding `values` while another thread mutates it is a torn
+        // read of the dictionary (the store is `@unchecked Sendable`; the daemon sets options and
+        // serves `show-options` concurrently). The snapshot is captured HERE (on the caller's
+        // thread, still under the conceptual mutation context) so the debounced write on `saveQueue`
+        // sees a consistent picture of the state at the time of the last mutation in the burst.
         lock.lock()
         let snapshot = values
         lock.unlock()
+        saveQueue.async { [weak self] in
+            self?.scheduleSave(snapshot)
+        }
+    }
+
+    /// Synchronously write the current values to disk, bypassing the debounce. Called on daemon
+    /// shutdown (via `SurfaceRegistry.flushSnapshot`'s companion) so the last options write in the
+    /// debounce window is never lost.
+    public func flush() {
+        // Cancel any pending debounced write, then persist synchronously on `saveQueue` — the
+        // same serialisation point all debounced writes use, so we never race a concurrent write.
+        saveQueue.sync { [weak self] in
+            guard let self else { return }
+            pendingSave?.cancel()
+            pendingSave = nil
+            lock.lock()
+            let snapshot = values
+            lock.unlock()
+            writeToDisk(snapshot)
+        }
+    }
+
+    private func scheduleSave(_ snapshot: [String: Value]) {
+        // Cancel the previous pending write and replace it, so a burst of mutations coalesces
+        // into one disk write — identical in shape to SessionStore.scheduleSave.
+        pendingSave?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.writeToDisk(snapshot) }
+        pendingSave = work
+        saveQueue.asyncAfter(deadline: .now() + debounceInterval, execute: work)
+    }
+
+    private func writeToDisk(_ snapshot: [String: Value]) {
         try? HarnessPaths.ensureDirectories()
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         guard let data = try? encoder.encode(snapshot) else { return }
-        HarnessPaths.atomicWrite(data, to: url, label: "HarnessDaemon") // temp + rename, logs on failure
+        HarnessPaths.atomicWrite(data, to: url, label: "HarnessDaemon")
     }
 
     private static func load(url: URL) -> [String: Value] {
