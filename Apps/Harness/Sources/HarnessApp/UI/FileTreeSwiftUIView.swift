@@ -194,6 +194,30 @@ struct FileTreeSwiftUIView: View {
         }
     }
 
+    private func getCurrentBranch() async -> String? {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+                process.arguments = ["rev-parse", "--abbrev-ref", "HEAD"]
+                process.currentDirectoryURL = URL(fileURLWithPath: rootPath)
+                let pipe = Pipe()
+                process.standardOutput = pipe
+                process.standardError = Pipe()
+                do {
+                    try process.run()
+                    process.waitUntilExit()
+                    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                    let output = String(data: data, encoding: .utf8) ?? ""
+                    let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
+                    continuation.resume(returning: trimmed.isEmpty ? nil : trimmed)
+                } catch {
+                    continuation.resume(returning: nil)
+                }
+            }
+        }
+    }
+
     private func refreshGitBranch() {
         gitBranch = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.gitBranch
     }
@@ -231,6 +255,11 @@ struct FileTreeSwiftUIView: View {
             }
         }
         rootNodes = reconciled
+
+        let branch = await getCurrentBranch()
+        if gitBranch != branch {
+            gitBranch = branch
+        }
     }
 }
 
