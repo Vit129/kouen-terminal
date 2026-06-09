@@ -108,6 +108,9 @@ private struct EncodedRowInstances {
     /// per-cell `column`/`row` × cell pixels, NOT `frame.columns`, so a same-index row with
     /// identical significant content is byte-identical across widths).
     var contentKey: UInt64 = 0
+    /// Whether any cell in this row carries SGR blink — a phase flip re-encodes exactly the
+    /// rows with this set (everything else is untouched).
+    var hasBlink = false
 }
 
 /// Per-frame metadata for one `buildFrameInstances` pass. The instance data itself lives in the
@@ -172,6 +175,9 @@ private struct RowInstanceCache {
     var cellPixelHeight = 0
     var rowInstances: [EncodedRowInstances?] = []
     var previousCursor: CursorCacheKey?
+    /// The SGR blink phase the cached rows were encoded under; a mismatch with the
+    /// renderer's current phase dirties exactly the `hasBlink` rows.
+    var textBlinkHidden = false
 }
 
 private struct PromptGutterUploadKey: Equatable {
@@ -248,6 +254,10 @@ public final class TerminalMetalRenderer {
     public let cellPixelHeight: Int
     public private(set) var stats = TerminalRenderStats()
     public var glyphAtlasStats: GlyphAtlasStats { atlas.stats }
+    /// SGR blink phase, driven by the host's blink timer: `true` hides blinking cells'
+    /// glyphs + decorations (backgrounds stay). A flip re-encodes exactly the rows whose
+    /// cached instances contain blink cells — see `buildFrameInstances`.
+    public var textBlinkHidden = false
 
     private let commandQueue: MTLCommandQueue
     private let bgPipeline: MTLRenderPipelineState
@@ -968,7 +978,8 @@ public final class TerminalMetalRenderer {
                 cellPixelWidth: cellPixelWidth,
                 cellPixelHeight: cellPixelHeight,
                 rowInstances: salvaged ?? Array(repeating: nil, count: frame.rows),
-                previousCursor: nil
+                previousCursor: nil,
+                textBlinkHidden: textBlinkHidden
             )
             if let salvaged {
                 dirtyRows = IndexSet(
@@ -986,6 +997,17 @@ public final class TerminalMetalRenderer {
             if cursorKey.invertsGlyph {
                 insert(row: cursorKey.row, into: &dirtyRows, rowCount: frame.rows)
             }
+        }
+
+        // SGR blink phase flip: cached rows containing blink cells were encoded under the
+        // other phase — re-encode exactly those rows. Everything else is untouched, so a
+        // blink tick costs O(blink rows), the same shape as a cursor-row re-encode.
+        if rowInstanceCache.textBlinkHidden != textBlinkHidden {
+            for row in 0 ..< frame.rows where rowInstanceCache.rowInstances.indices.contains(row)
+                && rowInstanceCache.rowInstances[row]?.hasBlink == true {
+                insert(row: row, into: &dirtyRows, rowCount: frame.rows)
+            }
+            rowInstanceCache.textBlinkHidden = textBlinkHidden
         }
 
         let atlasResetsBefore = atlas.stats.resets
@@ -1012,7 +1034,7 @@ public final class TerminalMetalRenderer {
                 )
                 fresh.contentKey = (cursorKey.invertsGlyph && cursorKey.row == row)
                     ? 0
-                    : Self.rowContentKey(frame, row: row)
+                    : Self.rowContentKey(frame, row: row, blinkHidden: textBlinkHidden)
                 let old = rowSeg[row]
                 let oldStats = rowInstanceCache.rowInstances[row]
                 flatBgSpans += fresh.bgSpans - (oldStats?.bgSpans ?? 0)
@@ -1085,7 +1107,7 @@ public final class TerminalMetalRenderer {
                     // color, so they are NOT a pure function of the row content alone.
                     fresh.contentKey = (cursorKey.invertsGlyph && cursorKey.row == row)
                         ? 0
-                        : Self.rowContentKey(frame, row: row)
+                        : Self.rowContentKey(frame, row: row, blinkHidden: textBlinkHidden)
                     rowInstances = fresh
                     rowInstanceCache.rowInstances[row] = rowInstances
                     encoded.encodedRows += 1
@@ -1241,7 +1263,7 @@ public final class TerminalMetalRenderer {
     /// MUST cover every field `encodeRowInstances`/`emit*Glyphs`/`appendDecorations` read from a
     /// cell — a missed field is a silent wrong-pixel cache. Pinned per-field by
     /// `MetalRendererTests.testContentKeyCoversEveryRenderedField`.
-    static func rowContentKey(_ frame: TerminalFrame, row: Int) -> UInt64 {
+    static func rowContentKey(_ frame: TerminalFrame, row: Int, blinkHidden: Bool = false) -> UInt64 {
         let start = row * frame.columns
         var end = start + frame.columns
         while end > start {
@@ -1253,8 +1275,10 @@ public final class TerminalMetalRenderer {
             end -= 1
         }
         var h: UInt64 = 0xCBF2_9CE4_8422_2325 // FNV-64 offset basis
+        var rowHasBlink = false
         for i in start ..< end {
             let c = frame.cells[i]
+            if c.blink { rowHasBlink = true }
             mixContentKey(&h, UInt64(c.codepoint) | (UInt64(c.combining0) << 32))
             mixContentKey(&h, UInt64(c.combining1))
             mixContentKey(&h, UInt64(c.foreground.red.bitPattern) | (UInt64(c.foreground.green.bitPattern) << 32))
@@ -1284,9 +1308,14 @@ public final class TerminalMetalRenderer {
                 | (c.italic ? 1 << 7 : 0)
                 | (c.strikethrough ? 1 << 8 : 0)
                 | (c.overline ? 1 << 9 : 0)
-                | (c.drawBackground ? 1 << 10 : 0))
+                | (c.drawBackground ? 1 << 10 : 0)
+                | (c.blink ? 1 << 11 : 0))
         }
         mixContentKey(&h, UInt64(end - start)) // significant length, so prefixes can't alias
+        // Fold the blink PHASE into rows that contain blink cells (and only those): the same
+        // content encoded under the other phase produces different instances, so it must not
+        // salvage/re-bind across a phase flip. Blink-free rows stay phase-independent.
+        if rowHasBlink, blinkHidden { mixContentKey(&h, 0xB11_4B17) }
         return h
     }
 
@@ -1317,7 +1346,7 @@ public final class TerminalMetalRenderer {
             if let previous = cache.previousCursor, previous.invertsGlyph, previous.row == row { continue }
             if cursorKey.invertsGlyph, cursorKey.row == row { continue }
             guard let cached = cache.rowInstances[row], cached.contentKey != 0,
-                  cached.contentKey == Self.rowContentKey(frame, row: row)
+                  cached.contentKey == Self.rowContentKey(frame, row: row, blinkHidden: textBlinkHidden)
             else { continue }
             salvaged[row] = cached
             hits += 1
@@ -1382,6 +1411,7 @@ public final class TerminalMetalRenderer {
         let start = row * frame.columns
         let end = start + frame.columns
         for cell in frame.cells[start ..< end] {
+            if cell.blink { encoded.hasBlink = true }
             let originX = ox + Float(cell.column * cellPixelWidth)
             let originY = oy + Float(cell.row * cellPixelHeight)
             let blockRects = Self.blockElementRects(cell.codepoint)
@@ -1412,11 +1442,15 @@ public final class TerminalMetalRenderer {
                 appendCellBackground(cell, originX: originX, originY: originY)
             }
 
-            appendDecorations(cell, originX: originX, originY: originY,
-                              cellSize: cellSize,
-                              thickness: thickness, underlineY: underlineY,
-                              strikeY: strikeY, overlineY: overlineY,
-                              into: &encoded.decorations)
+            // A blinking cell's decorations follow its glyph through the phase (the
+            // background quad above stays).
+            if !(cell.blink && textBlinkHidden) {
+                appendDecorations(cell, originX: originX, originY: originY,
+                                  cellSize: cellSize,
+                                  thickness: thickness, underlineY: underlineY,
+                                  strikeY: strikeY, overlineY: overlineY,
+                                  into: &encoded.decorations)
+            }
         }
         flushPendingBgSpan()
 
@@ -1614,6 +1648,8 @@ public final class TerminalMetalRenderer {
             // Render when there's a base glyph OR a combining mark — a mark stacked on a space
             // (hasGlyph == false for 0x20) must still draw, matching what copy/search/capture see.
             guard cell.hasGlyph || cell.combining0 != 0, !Self.isBlockElement(cell.codepoint) else { continue }
+            // SGR blink off-phase: the glyph disappears; the background quad stays.
+            if cell.blink, textBlinkHidden { continue }
             // A cell carrying combining marks composes as one CoreText cluster bitmap; otherwise the
             // plain per-codepoint atlas entry (unchanged for ASCII/CJK).
             let entry = cell.combining0 != 0
@@ -1644,6 +1680,11 @@ public final class TerminalMetalRenderer {
         while col < cols {
             guard let cell = frame.cell(row: row, column: col), cell.hasGlyph || cell.combining0 != 0,
                   !Self.isBlockElement(cell.codepoint) else {
+                col += 1
+                continue
+            }
+            // SGR blink off-phase: the glyph disappears; the background quad stays.
+            if cell.blink, textBlinkHidden {
                 col += 1
                 continue
             }

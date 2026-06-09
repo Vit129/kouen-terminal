@@ -495,4 +495,15 @@ final class FrameBuilderTests: XCTestCase {
         let f = b.build(term.readGrid()!)
         XCTAssertTrue(f.promptGutter.isEmpty, "no gutter when disabled")
     }
+
+    /// SGR 5/25 blink rides the grid cell into `RenderCell.blink` (the renderer's phase
+    /// driver keys on it); plain cells stay `blink == false`.
+    func testBlinkAttributeReachesRenderCells() {
+        let term = HarnessGridTerminal(cols: 10, rows: 1)!
+        term.feed("a\u{1b}[5mb\u{1b}[25mc")
+        let f = builder.build(term.readGrid()!)
+        XCTAssertFalse(f.cell(row: 0, column: 0)!.blink)
+        XCTAssertTrue(f.cell(row: 0, column: 1)!.blink, "SGR 5 marks the cell as blinking")
+        XCTAssertFalse(f.cell(row: 0, column: 2)!.blink, "SGR 25 clears blink")
+    }
 }
