@@ -1675,9 +1675,11 @@ final class TerminalScreen {
             // amortized). Readers clamp to `history.count`, so the transient margin just exposes a
             // little extra scrollback — never less than configured. `maxHistoryLines == 0` is
             // unlimited: skip the trim entirely so history grows unbounded.
-            let slack = min(1024, maxHistoryLines / 4)
-            if maxHistoryLines > 0, history.count > maxHistoryLines + slack {
-                dropHistoryHead(history.count - maxHistoryLines)
+            if maxHistoryLines > 0 {
+                let slack = min(1024, maxHistoryLines / 4)
+                if history.count > maxHistoryLines + slack {
+                    dropHistoryHead(history.count - maxHistoryLines)
+                }
             }
         }
 

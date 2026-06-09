@@ -3,8 +3,9 @@ import HarnessCore
 import HarnessTerminalKit
 
 /// Owns the quick terminal: a Quake-style dropdown panel hosting a dedicated daemon-backed terminal
-/// surface, summoned by a global hotkey. Mirrors `NotchPanelController`'s singleton lifecycle and the
-/// `display-popup` surface-creation path (`Phase67UI.presentPopup`).
+/// surface, summoned by a global hotkey. Mirrors `NotchPanelController`'s singleton lifecycle; the
+/// surface is keyed by a fixed ID (see `surfaceID`) and reattached via `TerminalHostView`'s own
+/// idempotent `.ensureSurface`, so one surface is reused for the app's lifetime.
 @MainActor
 final class QuickTerminalController: NSObject {
     static let shared = QuickTerminalController()
@@ -13,6 +14,13 @@ final class QuickTerminalController: NSObject {
     private var host: TerminalHostView?
     private var started = false
     private lazy var hotkey = QuickTerminalHotkey { [weak self] in self?.toggle() }
+
+    /// A fixed, reserved surface ID so the quick terminal reuses ONE daemon surface for the app's
+    /// lifetime (and across launches) rather than minting a new one each time. The surface is never
+    /// part of any tab layout, so a fresh-per-launch one would never be reaped — its PTY and
+    /// scrollback file would accumulate. `TerminalHostView` issues an idempotent `.ensureSurface`
+    /// for this ID itself (create-if-absent, reattach-if-present), so no explicit `createSurface`.
+    private static let surfaceID = SurfaceID(uuidString: "00000000-0000-0000-0000-000000000021")!
 
     private override init() { super.init() }
 
@@ -46,7 +54,7 @@ final class QuickTerminalController: NSObject {
     }
 
     private func show() {
-        guard let panel = ensurePanel() else { return }
+        let panel = ensurePanel()
         panel.setFrame(Self.topFrame(for: NSScreen.main ?? NSScreen.screens.first), display: true)
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
@@ -57,17 +65,14 @@ final class QuickTerminalController: NSObject {
         panel?.orderOut(nil)
     }
 
-    /// Create the panel + its dedicated surface on first use; reuse them thereafter. Returns nil if
-    /// the daemon can't mint a surface, so a later toggle can retry.
-    private func ensurePanel() -> QuickTerminalPanel? {
+    /// Create the panel + its dedicated surface on first use; reuse them thereafter. The host
+    /// constructs (or reattaches to) the fixed-ID daemon surface itself, so this never fails — if
+    /// the daemon is still starting, the host shows a reconnecting state and recovers.
+    private func ensurePanel() -> QuickTerminalPanel {
         if let panel { return panel }
         let coordinator = SessionCoordinator.shared
         let cwd = coordinator.settings.defaultCWD
-        guard case let .surfaceID(sid)? = coordinator.requestDaemon(
-                  .createSurface(cwd: cwd, shell: coordinator.settings.defaultShell)),
-              let uuid = SurfaceID(uuidString: sid)
-        else { return nil }
-        let host = coordinator.terminalHost(for: uuid, cwd: cwd)
+        let host = coordinator.terminalHost(for: Self.surfaceID, cwd: cwd)
         self.host = host
 
         let frame = Self.topFrame(for: NSScreen.main ?? NSScreen.screens.first)
