@@ -140,12 +140,12 @@ final class MainSplitViewController: NSViewController {
             HarnessDesign.makeClear(sidebarContainer)
         }
         edgeDivider.layer?.backgroundColor = resolvedDividerColor().cgColor
-        // Tell the window controller to repaint the window bg with the (possibly
-        // new) chrome color × opacity.
-        (view.window?.windowController as? MainWindowController)?.applyTransparency()
         sidebar.applyChromeColors()
         content.applyChrome()
         statusLine.applyChrome()
+        // Tell the window controller to repaint the window bg with the (possibly new)
+        // chrome color × opacity.  Called once, after all child views have adopted the
+        // new palette, so the window compositor sees the final resolved colors in one pass.
         (view.window?.windowController as? MainWindowController)?.applyTransparency()
     }
 
