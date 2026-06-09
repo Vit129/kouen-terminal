@@ -108,6 +108,7 @@ final class TerminalTabBarView: NSView {
 
         let height = heightAnchor.constraint(equalToConstant: HarnessDesign.tabBarHeight)
         height.priority = .defaultHigh
+        height.isActive = true
     }
 
     override var mouseDownCanMoveWindow: Bool { true }
