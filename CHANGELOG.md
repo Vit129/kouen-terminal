@@ -47,6 +47,13 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
   being silently swallowed.
 
 ### Performance
+- Frame building with the find bar open no longer scans every search match per cell
+  (O(matches × cells) — hundreds of matches over a 19 K-cell viewport while scrolling):
+  highlights are bucketed once per build into per-row sorted merged column intervals that
+  `appendRow` consumes with a monotonic cursor. The baked (`build`) and overlay
+  (`applyHighlights`) paths share the one index, so they remain byte-identical by
+  construction; pinned by randomized differential tests and a new
+  `build_frame_search_highlights_160x48` benchmark (~200 hits).
 - The PTY-output and keystroke IPC read loops consume frames in O(1) amortized via an
   offset-tracking read buffer (`IPCReadBuffer`) instead of `Data.removeFirst`'s O(remaining)
   byte shift per frame — quadratic under flood on both the app's subscription loop and the
