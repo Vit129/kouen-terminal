@@ -417,17 +417,20 @@ final class MouseReportingTests: XCTestCase {
     func testUnsupportedModeIsNoOp() {
         let term = TerminalEmulator(cols: 40, rows: 10)
 
-        // None of these should crash or enable anything.
+        // The legacy encodings (UTF-8 1005, urxvt 1015) stay unsupported no-ops; SGR-pixel
+        // (1016) is now a recognized encoding mode — but, like 1006, it is an *encoding*,
+        // never a tracking tier.
         term.feed("\u{1b}[?1005h")
         term.feed("\u{1b}[?1015h")
         term.feed("\u{1b}[?1016h")
 
         XCTAssertFalse(term.modes.mouseSGR,
                        "modes 1005/1015/1016 must not enable mouseSGR (mode 1006)")
+        XCTAssertTrue(term.modes.mouseSGRPixel, "1016 is supported (ships with the VT polish cluster)")
         XCTAssertFalse(term.modes.mouseTrackingEnabled,
-                       "unsupported modes must not enable any tracking tier")
+                       "encoding modes must not enable any tracking tier")
 
-        // DECRQM for unrecognized modes: state=0.
+        // DECRQM: the unrecognized legacy modes report state=0; 1016 reports its real state.
         var responses: [String] = []
         term.onResponse = { data in
             if let s = String(data: data, encoding: .utf8) { responses.append(s) }
@@ -435,7 +438,7 @@ final class MouseReportingTests: XCTestCase {
         term.feed("\u{1b}[?1005$p")
         term.feed("\u{1b}[?1015$p")
         term.feed("\u{1b}[?1016$p")
-        XCTAssertEqual(responses, ["\u{1b}[?1005;0$y", "\u{1b}[?1015;0$y", "\u{1b}[?1016;0$y"],
-                       "unrecognized modes → state=0 in DECRQM reply")
+        XCTAssertEqual(responses, ["\u{1b}[?1005;0$y", "\u{1b}[?1015;0$y", "\u{1b}[?1016;1$y"],
+                       "legacy modes → state=0; 1016 → its tracked state")
     }
 }
