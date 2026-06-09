@@ -827,6 +827,12 @@ final class PerformanceBenchmarks: XCTestCase {
     /// the GPU encode + drawable/vsync wait, which need a real `CAMetalLayer` (measured headfully /
     /// via the `os_signpost` "frame" track); a tiny number here with laggy typing localizes the
     /// latency to that downstream present path rather than the engine.
+    ///
+    /// Scope note: this benchmark measures *engine-side echo* — the path from byte ingestion
+    /// through VT parse, grid mutation, damage accumulation, and incremental frame construction.
+    /// It does NOT measure end-to-end PTY round-trip latency (keystroke → kernel → shell → pty
+    /// read → parse), which depends on the OS scheduler, PTY buffer flush policy, and the running
+    /// program, and cannot be driven deterministically in a unit benchmark.
     func testLocalEchoLatency() throws {
         try skipUnlessEnabled()
         let cols = 120, rows = 40
