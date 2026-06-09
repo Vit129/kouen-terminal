@@ -152,7 +152,7 @@ Effort: **S** < ~1 day · **M** a few days · **L** larger.
 - *Approach:* `scrollMultiplier: Double` multiplied into `consumeWheelLines`/`continuousWheelLines`. `mouseHideWhileTyping`: `NSCursor.setHiddenUntilMouseMoves(true)` in `keyDown` gated on a setting. Config reload: `DispatchSource.makeFileSystemObjectSource` on settings/keybindings → debounce → existing `applySettings`. Triple-click: walk the existing `rowWrapped` flags up/down from the clicked row.
 - *Files:* `HarnessTerminalSurfaceView.swift`, `HarnessSettings.swift`, `HarnessApp`.
 
-**PR-21 · Quick terminal (global-hotkey dropdown), find-bar regex, unlimited scrollback** · ux · M–L · `[F40,F48,F49]`
+**PR-21 · Quick terminal (global-hotkey dropdown), find-bar regex, unlimited scrollback** · ux · M–L · `[F40,F48,F49]` · ✅ **Shipped**
 - *Why:* Quick terminal (Quake dropdown) is an explicit backlog item (medium). Find bar is substring-only (no regex/case toggle). Scrollback is a fixed bounded count with no unlimited option.
 - *Approach:* Quick terminal: an `NSPanel` (`.nonactivatingPanel`, `canJoinAllSpaces`, `.floating`) hosting a dedicated daemon-backed surface, summoned by a global hotkey (`RegisterEventHotKey`/CGEvent monitor), behind a setting. Find: optional `NSRegularExpression` mode + case toggle in `TerminalBufferSearch` + two `TerminalFindBar` buttons. Scrollback: treat `scrollbackLines == 0` as unbounded in `OptionStore` + `ScrollbackFile` (verify the file can grow safely / byte-cap).
 - *Files:* `HarnessApp` (panel), `TerminalBufferSearch.swift`, `TerminalFindBar.swift`, `HarnessSettings.swift`, `ScrollbackFile.swift`.
