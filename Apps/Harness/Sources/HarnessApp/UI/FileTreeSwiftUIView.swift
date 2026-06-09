@@ -9,6 +9,7 @@ final class FileTreeNode: Identifiable {
     let id: String
     let node: FileNode
     var children: [FileTreeNode]?
+    var isExpanded: Bool = false
 
     init(node: FileNode) {
         self.id = node.id
@@ -243,20 +244,19 @@ private struct NodeRow: View {
     let watcher: FileTreeWatcher
     let gitStatus: [String: GitStatusType]
     let onPreview: (FileNode) -> Void
-    @State private var isExpanded = false
 
     var body: some View {
         if node.node.isDirectory {
-            DisclosureGroup(isExpanded: $isExpanded) {
+            DisclosureGroup(isExpanded: Binding(get: { node.isExpanded }, set: { node.isExpanded = $0 })) {
                 ForEach(node.children ?? []) { child in
                     NodeRow(node: child, rootPath: rootPath, watcher: watcher, gitStatus: gitStatus, onPreview: onPreview)
                 }
             } label: {
                 rowLabel(systemImage: "folder")
                     .contentShape(Rectangle())
-                    .onTapGesture { isExpanded.toggle() }
+                    .onTapGesture { node.isExpanded.toggle() }
             }
-            .onChange(of: isExpanded) { _, expanded in
+            .onChange(of: node.isExpanded) { _, expanded in
                 if expanded {
                     Task { await loadChildren() }
                 } else {

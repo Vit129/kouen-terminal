@@ -50,7 +50,7 @@ public actor FileTreeWatcher {
 
     // nonisolated(unsafe) is safe here: SourceBox is only ever touched from
     // within the actor's executor (startWatching / stopWatching).
-    private nonisolated(unsafe) var watchBox: SourceBox?
+    private nonisolated(unsafe) var watchBoxes: [SourceBox] = []
     private nonisolated(unsafe) var debounceItem: DispatchWorkItem?
 
     /// Start watching `rootPath` for filesystem changes (branch switch, file
@@ -66,47 +66,52 @@ public actor FileTreeWatcher {
     public func startWatching(rootPath: String, onChange: @MainActor @escaping () -> Void) {
         stopWatching()
 
-        // Prefer .git dir so branch switches fire without root noise.
+        var pathsToWatch = [rootPath]
         let gitDir = rootPath + "/.git"
-        let isGitRepo = fileManager.fileExists(atPath: gitDir)
-        let watchPath = isGitRepo ? gitDir : rootPath
+        if fileManager.fileExists(atPath: gitDir) {
+            pathsToWatch.append(gitDir)
+        }
 
-        let fd = open(watchPath, O_EVTONLY)
-        guard fd >= 0 else { return }
+        for watchPath in pathsToWatch {
+            let fd = open(watchPath, O_EVTONLY)
+            guard fd >= 0 else { continue }
 
-        let source = DispatchSource.makeFileSystemObjectSource(
-            fileDescriptor: fd,
-            eventMask: [.write, .rename, .delete, .extend],
-            queue: DispatchQueue.global(qos: .utility)
-        )
+            let source = DispatchSource.makeFileSystemObjectSource(
+                fileDescriptor: fd,
+                eventMask: [.write, .rename, .delete, .extend],
+                queue: DispatchQueue.global(qos: .utility)
+            )
 
-        let box = SourceBox(source: source, fd: fd)
-        watchBox = box
+            let box = SourceBox(source: source, fd: fd)
+            watchBoxes.append(box)
 
-        source.setEventHandler { [weak self] in
-            guard let self else { return }
-            // Cancel previous pending bounce and schedule a new one.
-            self.debounceItem?.cancel()
-            let work = DispatchWorkItem {
-                Task { @MainActor in onChange() }
+            source.setEventHandler { [weak self] in
+                guard let self else { return }
+                // Cancel previous pending bounce and schedule a new one.
+                self.debounceItem?.cancel()
+                let work = DispatchWorkItem {
+                    Task { @MainActor in onChange() }
+                }
+                self.debounceItem = work
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)
             }
-            self.debounceItem = work
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)
-        }
 
-        source.setCancelHandler {
-            close(fd)
-        }
+            source.setCancelHandler {
+                close(fd)
+            }
 
-        source.resume()
+            source.resume()
+        }
     }
 
     /// Stop the active filesystem watcher and release its file descriptor.
     public func stopWatching() {
         debounceItem?.cancel()
         debounceItem = nil
-        watchBox?.source.cancel()
-        watchBox = nil
+        for box in watchBoxes {
+            box.source.cancel()
+        }
+        watchBoxes.removeAll()
     }
 
     // MARK: - Private
