@@ -105,8 +105,9 @@ final class RealPtyLifecycleTests: XCTestCase {
         XCTAssertEqual(exits.value, 0, "respawn must not fire onExit for the replaced shell")
     }
 
-    /// A child that traps (ignores) SIGTERM+SIGHUP would leave `watchForExit`'s blocking
-    /// `waitpid(pid, …, 0)` stuck forever, leaking that thread for the daemon's lifetime.
+    /// A child that traps (ignores) SIGTERM+SIGHUP never exits on its own — its exit event
+    /// would never arrive (Darwin: the kqueue process source never fires; Linux: the blocking
+    /// `waitpid(pid, …, 0)` stays stuck, leaking its thread for the daemon's lifetime).
     /// `close()` must escalate to SIGKILL after its grace and the child must be reaped.
     func testCloseEscalatesToSIGKILLForTermIgnoringChild() throws {
         let pty = try makePty()

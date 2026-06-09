@@ -64,10 +64,11 @@ public final class RealPty: @unchecked Sendable {
     /// `onExit` for — the child that replaced it. The previous code let the old
     /// exit-watcher's `close()` kill the freshly respawned shell.
     private var generation: UInt64 = 0
-    /// Exit status the `waitpid` watcher reaped, tagged with its child's generation. The EOF
-    /// path usually wins the `isClosed` race but cannot reap the zombie (the watcher's blocked
-    /// `waitpid` claims it) — it reads this record to still deliver a real status to `onExit`.
-    /// Guarded by `lifecycleLock`.
+    /// Exit status the exit watcher reaped, tagged with its child's generation. When the EOF
+    /// path wins the `isClosed` race it usually arrives without a status — it reads this record
+    /// (with a bounded poll + its own WNOHANG attempt) to still deliver a real status to
+    /// `onExit`. Either side may win the reap; the kernel hands the status to exactly one
+    /// `waitpid`, and both record/lookup through here. Guarded by `lifecycleLock`.
     private var reapedExit: (generation: UInt64, status: Int32?)?
     /// Generations whose `waitpid` watcher has already returned (i.e. that child has been reaped
     /// and its PID may now be recycled to an unrelated process). `reapedExit` is a SINGLE slot
@@ -590,12 +591,50 @@ public final class RealPty: @unchecked Sendable {
     }
 
     private static func closeInheritedFileDescriptors(except keep: Int32, alreadyClosed: Int32? = nil, upperBound: Int32) {
+        // POST-FORK SAFETY: only async-signal-safe calls allowed here. Both paths below
+        // (harness_close_fds_from and the sysClose loop) satisfy that requirement.
         guard upperBound > 3 else { return }
+
+        #if canImport(Glibc)
+        // close_range(2) is the O(1) way to close a range of fds in a post-fork child. On
+        // Linux 5.9+ the C shim calls the syscall directly; on older kernels it falls back
+        // to a getdtablesize() loop — both paths are async-signal-safe. We close everything
+        // from fd 3 upward via the shim and then selectively reopen `keep` if the shim
+        // closed it (which it will have done when `keep` >= 3). `alreadyClosed` was the
+        // master fd, closed by the child before calling us; close_range on an already-closed
+        // fd returns EBADF (or silently skips it on newer kernels), both are harmless.
+        //
+        // If close_range closed `keep`, reopen it via dup2 from the master (already gone) —
+        // but we can't reopen a closed slave. Instead, skip the range that contains `keep`
+        // by issuing two close_range calls: [3, keep-1] and [keep+1, ∞). Because the shim
+        // always does close-all-from-lowfd, we simulate the two-range approach with one call
+        // from 3 up to keep, then one call from keep+1 up. Use the loop for simplicity when
+        // keep is in the range; fall back to the shim for everything else.
+        if keep >= 3 {
+            // Close [3, keep-1] via the shim (skipping keep itself by closing up to keep).
+            var fd: Int32 = 3
+            while fd < keep {
+                if fd != alreadyClosed { _ = sysClose(fd) }
+                fd += 1
+            }
+            // Close [keep+1, ∞) via the shim — fast on modern kernels.
+            if keep + 1 > 0 { // guard against overflow; keep is a small fd in practice
+                harness_close_fds_from(keep + 1)
+            }
+        } else {
+            // keep < 3 (e.g. slave was duped onto 0/1/2): close everything from 3 upward.
+            harness_close_fds_from(3)
+        }
+        #else
+        // Darwin: iterate the explicit upper bound (forkpty is used on Darwin; this
+        // path is only compiled for Linux, but the function is referenced by the Linux
+        // branch of spawnOnPTY so it must also compile on Darwin — keep the loop).
         var fd: Int32 = 3
         while fd < upperBound {
             if fd != keep, fd != alreadyClosed { _ = sysClose(fd) }
             fd += 1
         }
+        #endif
     }
 
     /// Replace the (just-forked child) process image with the shell. Binds the buffer base addresses
@@ -702,19 +741,20 @@ public final class RealPty: @unchecked Sendable {
         return scrollbackBytes
     }
 
-    /// After SIGTERM, a child that traps/ignores TERM+HUP never exits, so the `watchForExit`
-    /// `waitpid(pid, …, 0)` blocks forever and that thread leaks for the daemon's lifetime
-    /// (and accumulates across repeated close/respawn). Escalate to SIGKILL after a grace.
+    /// After SIGTERM, a child that traps/ignores TERM+HUP never exits — its exit event never
+    /// arrives (Darwin: the process source never fires; Linux fallback: the blocked
+    /// `waitpid(pid, …, 0)` leaks its thread for the daemon's lifetime, accumulating across
+    /// repeated close/respawn). Escalate to SIGKILL after a grace.
     ///
     /// `dyingGeneration` is the generation the SIGTERM'd child was tagged with — i.e. the value
     /// captured *before* close()/respawn() bumped `generation`. We only deliver SIGKILL when that
-    /// child is still the not-yet-reaped one: if `watchForExit` already recorded a reap for that
+    /// child is still the not-yet-reaped one: if the exit watcher already recorded a reap for that
     /// generation, the PID may have been recycled, so we must not signal it. We consult the
     /// `reapedGenerations` SET — not the single-slot `reapedExit`, which a later generation's reap
     /// overwrites, leaving a stale `dyingGeneration` mismatch that would wrongly fall through to
-    /// `kill(pid, …)` on a possibly-recycled PID. `watchForExit` stays the SOLE reaper — we never
-    /// `waitpid` here; SIGKILL just unblocks its pending `waitpid(…,0)`, which then returns and
-    /// reaps the zombie.
+    /// `kill(pid, …)` on a possibly-recycled PID. We never `waitpid` here — the watcher owns the
+    /// reap; SIGKILL just makes the exit event fire (the source delivers / the blocked `waitpid`
+    /// returns), which then reaps the zombie.
     private func scheduleKillEscalation(pid: pid_t, dyingGeneration: UInt64) {
         guard pid > 0 else { return }
         // Mark this generation as having a live escalation BEFORE arming the timer, so the reap
@@ -1084,8 +1124,60 @@ public final class RealPty: @unchecked Sendable {
     }
 
     private func watchForExit(pid: pid_t, generation gen: UInt64) {
+        guard pid > 0 else { return }
+        #if canImport(Darwin)
+        // Event-driven exit watching (kqueue EVFILT_PROC/NOTE_EXIT via DispatchSourceProcess)
+        // instead of one thread blocked in `waitpid(pid, …, 0)` per live child. The blocking
+        // design pinned a global-pool thread for every session's whole lifetime — the daemon's
+        // only real scalability ceiling (50 persistent sessions = 50 parked threads). A process
+        // source costs a kevent registration and zero threads; the handler reaps with WNOHANG
+        // when the kernel says the child exited.
+        //
+        // The source is one-shot and SELF-RETAINING: its handler captures it strongly, so the
+        // source stays registered with no external bookkeeping until the cancel() in the handler
+        // (or in `reapAndRecord`'s arm-check success path) breaks the cycle. Deliberately NOT
+        // stored on `self` and NOT cancelled by `close()`/`deinit`: a dying child must still be
+        // reaped after the surface is torn down (exactly like the old blocked thread, which also
+        // outlived `close()`), or it would zombie until daemon exit. If the surface is gone when
+        // the event fires, the handler still reaps — only the bookkeeping is skipped.
+        //
+        // Known kqueue race: a process source armed AFTER the child already exited may never
+        // fire (registration against an exited pid is not reliably delivered). The child can't
+        // have been *reaped* yet — we are the only parent and the only reaper — but it can be a
+        // zombie before `resume()`. The arm-check below closes the gap: one WNOHANG attempt
+        // right after arming. Either the source registered in time (arm-check sees the child
+        // alive, returns, source fires later) or the child beat us (arm-check reaps + cancels).
+        // Both paths funnel through `reapAndRecord`, whose generation guard under
+        // `lifecycleLock` makes the duplicate call a no-op — the kernel only ever hands the
+        // status to one `waitpid`.
+        let source = DispatchSource.makeProcessSource(identifier: pid, eventMask: .exit, queue: .global())
+        source.setEventHandler { [weak self] in
+            // Break the self-retain cycle first (idempotent); the source has done its job.
+            source.cancel()
+            guard let self else {
+                // Surface deallocated while the child was still dying: reap the zombie anyway
+                // (the whole point of keeping the watcher alive past teardown). No bookkeeping
+                // remains to update.
+                var status: Int32 = 0
+                _ = waitpid(pid, &status, WNOHANG)
+                return
+            }
+            self.reapAndRecord(pid: pid, generation: gen, cancelling: nil)
+        }
+        source.resume()
+        // Arm-check (see above): catch a child that exited before the source registered.
+        // Synchronous and non-blocking (WNOHANG) — watchForExit's callers (start/respawn on the
+        // registry path) tolerate a single syscall, and keeping it inline avoids capturing the
+        // source existential in a @Sendable async closure (setEventHandler's closure is the one
+        // place the source may be captured; that pattern is already used by DaemonServer).
+        reapAndRecord(pid: pid, generation: gen, cancelling: source)
+        #else
+        // Linux fallback: the original one-blocked-thread-per-child design. Correct and simple;
+        // the event-driven equivalent (pidfd + epoll, kernel 5.3+) is a future refinement —
+        // headless daemons host far fewer concurrent sessions than the desktop app, so the
+        // thread cost is acceptable there for now.
         DispatchQueue.global().async { [weak self] in
-            guard let self, pid > 0 else { return }
+            guard let self else { return }
             var status: Int32 = 0
             let reaped = waitpid(pid, &status, 0)
             let decoded = reaped == pid ? Self.decodeWaitStatus(status) : nil
@@ -1098,7 +1190,48 @@ public final class RealPty: @unchecked Sendable {
             self.lifecycleLock.unlock()
             self.childEnded(generation: gen, exitStatus: decoded)
         }
+        #endif
     }
+
+    #if canImport(Darwin)
+    /// Reap `pid` (non-blocking) and record the result for generation `gen` — the shared body of
+    /// the process-source event handler and its post-arm race check. Exactly one caller wins:
+    /// the kernel hands the wait status to a single `waitpid`, and the `reapedGenerations` guard
+    /// under `lifecycleLock` makes the loser's call (and any later duplicate) a no-op.
+    ///
+    /// `cancelling` is the still-armed source to tear down IF this call observed the exit — the
+    /// arm-check passes it so a child that died before registration doesn't leave a source that
+    /// will never fire (and would otherwise self-retain forever). When the child is still alive
+    /// (`waitpid` returns 0) the source must stay armed, so it is deliberately NOT cancelled.
+    /// The event-handler path passes nil (it already cancelled itself).
+    ///
+    /// Mirrors the recording contract of the old blocking watcher verbatim: `reapedExit` +
+    /// `recordReapedGenerationLocked` BEFORE `childEnded`, so the EOF path's bounded poll and
+    /// the SIGKILL escalation's recycled-PID guard observe the reap exactly as before.
+    private func reapAndRecord(pid: pid_t, generation gen: UInt64, cancelling source: DispatchSourceProcess?) {
+        var status: Int32 = 0
+        let reaped = waitpid(pid, &status, WNOHANG)
+        lifecycleLock.lock()
+        if reapedGenerations.contains(gen) {
+            // The other path (handler vs arm-check) already handled this generation.
+            lifecycleLock.unlock()
+            return
+        }
+        guard reaped == pid else {
+            // Still running (arm-check before exit) — leave the source armed to fire later.
+            // A -1/ECHILD here means the EOF path's WNOHANG won a self-exit race; it delivers
+            // the status itself and no escalation is live in that flow (see childEnded).
+            lifecycleLock.unlock()
+            return
+        }
+        let decoded = Self.decodeWaitStatus(status)
+        reapedExit = (gen, decoded)
+        recordReapedGenerationLocked(gen)
+        lifecycleLock.unlock()
+        source?.cancel()
+        childEnded(generation: gen, exitStatus: decoded)
+    }
+    #endif
 
     /// Mark `gen`'s child as reaped (its `waitpid` watcher returned), pruning to a bound. Caller
     /// holds `lifecycleLock`. Generations are monotonic and only those with a live kill-escalation

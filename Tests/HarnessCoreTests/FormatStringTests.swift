@@ -178,6 +178,7 @@ final class OptionStoreTests: XCTestCase {
         let writer = OptionStore(url: url)
         let custom = " custom · #{session_name} "
         writer.set(.string(custom), key: "status-left", scope: .global)
+        writer.flush()  // saves are debounced; force the write before reloading
 
         let reader = OptionStore(url: url)
         XCTAssertEqual(reader.get("status-left", scope: .global)?.stringValue, custom)
