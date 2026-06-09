@@ -30,6 +30,12 @@
 | 15 | File preview: brighter syntax colors + chrome bg | ✅ Done |
 | 16 | Sidebar session card: icon scans all tabs + title always tracks live folder (matches tab bar) | ✅ Done |
 | 17 | P6 — File editor opacity parity with terminal (refreshEditorPanelFill) | ✅ Done |
+| 18 | File tree FSEvents recursive watcher (CASE-016) | ✅ Done |
+| 19 | Folder expand state persist in @Observable model (CASE-017) | ✅ Done |
+| 20 | File preview drag-to-select text (CASE-018) | ✅ Done |
+| 21 | Terminal selection highlight visible (CASE-019) | ✅ Done |
+| 22 | Branch chip real-time via git rev-parse in loadRoot() (CASE-020) | ✅ Done |
+| 23 | Git Changes FSEvents recursive watcher on rootPath (CASE-021) | ✅ Done |
 
 ### Recent_Lessons
 
@@ -39,6 +45,10 @@
 - **RL-004:** Never reparent Metal terminal surfaces for file preview split — causes 1-2s black screen (CASE-003). Use constraint-based sibling panel instead.
 - **RL-005:** DispatchSource on .main queue directly (not .global with async hop) for Swift 6 MainActor isolation.
 - **RL-006:** AppKit panels alongside Metal surfaces must apply opacity explicitly to their CALayer (`terminalBackground × opacity`). Metal handles its own alpha; AppKit panels don't. `HarnessSettings.clampedOpacity` returns `Float` — cast to `CGFloat` for `withAlphaComponent`. Hook into `applyChrome()` + panel-creation site. (CASE-011)
+- **RL-007:** DispatchSource.makeFileSystemObjectSource on a directory is non-recursive — only detects root-level changes. Use FSEventStreamCreate with kFSEventStreamCreateFlagFileEvents for recursive watching. (CASE-016, CASE-021)
+- **RL-008:** Swift actor + FSEvents C callback: use WatcherContext class (@unchecked Sendable) + Unmanaged.passRetained to pass onChange closure via FSEventStreamContext.info. Release in stopWatching via Unmanaged.fromOpaque().release(). (CASE-016)
+- **RL-009:** SwiftUI @State in list rows resets on every view reconciliation. State that must survive tree refresh belongs in the @Observable model, not the View. (CASE-017)
+- **RL-010:** NSView wrapping NSTextView must forward mouseDown/mouseDragged/mouseUp to the inner textView explicitly — super.mouseDown doesn't cascade to child views. (CASE-018)
 
 ### Decisions_In_Force
 
@@ -62,7 +72,7 @@
 - Sidebar: `HarnessSidebarPanelViewController` — tabs (Sessions/Files/Git) via NSSegmentedControl (Agent tab hidden)
 - Sidebar position: `MainSplitViewController.updateSidebarPlacement()` — reorders NSSplitView subviews
 - File tree: `WorkspaceFileTreeView` → `FileTreeSwiftUIView` (SwiftUI) with `FileTreeWatcher` (FSEvents)
-- Git panel: `GitPanelView` — changes/history/worktrees; DispatchSource watcher on .git (main queue)
+- Git panel: `GitPanelView` — changes/history/worktrees; FSEvents recursive watcher on rootPath (utility queue, 500ms debounce)
 - Split panes: `PaneContainerView` builds from `PaneNode` binary tree; `HarnessSplitView` per branch node
 - Sessions: `SessionCoordinator.shared` — async IPC, snapshot notifications via `NotificationBus.shared.snapshotChanged`
 - File preview: `ContentAreaViewController.showFileEditorSplit()` — constraint-based sibling panel (40% editor / 60% terminal), never reparents terminal views
