@@ -9,6 +9,19 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [Unreleased]
 
 ### Added
+- **Quick terminal — a Quake-style global-hotkey dropdown.** A global shortcut (Settings ▸ Keys ▸
+  Quick Terminal; default ⌘⌥`) drops a terminal down from the top of the active screen and toggles
+  it away again — even when Harness is in the background. It floats above other windows, appears on
+  every Space, and hosts its own dedicated session. Built on Carbon `RegisterEventHotKey`, so it
+  needs no Accessibility permission; off by default.
+- **Find bar: regular-expression and case-sensitivity toggles.** The find bar (⌘F) gains two
+  latching buttons next to the search field: **Aa** (match case) and **{}** (regular expression).
+  Search was previously substring-only and always case-insensitive; regex mode runs an
+  `NSRegularExpression` over each scrollback line (an invalid pattern simply shows no results).
+- **Unlimited scrollback.** Setting the scrollback line count to **0** (Settings ▸ Terminal ▸
+  Behavior, or `scrollbackLines`) now means *unlimited* — the live history grows unbounded instead
+  of trimming the oldest lines. Persisted (on-disk) scrollback is still capped by a large safety
+  ceiling so a runaway process can't fill the disk.
 - **Four Ghostty-style quality-of-life features.**
   - **Scroll speed multiplier** (Settings ▸ Terminal ▸ Behavior, or `scrollMultiplier`): scale
     mouse-wheel / trackpad scroll distance (1× = native). Previously a fixed 3-lines-per-notch.
