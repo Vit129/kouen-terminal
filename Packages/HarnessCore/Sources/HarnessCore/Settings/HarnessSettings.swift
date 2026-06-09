@@ -243,6 +243,12 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
     /// Feedback for a bell on the focused surface (off/audible/visual/both). The tmux
     /// `visual-bell`/`bell-action` options bridge into this via `BellFeedback.resolve`.
     public var bellMode: BellMode
+    /// Multiplier applied to mouse-wheel / trackpad scroll distance (Ghostty `mouse-scroll-
+    /// multiplier`). 1 = native; >1 faster, <1 slower. Clamped to a sane range on read.
+    public var scrollMultiplier: Double
+    /// Hide the mouse cursor while typing until the mouse next moves (Ghostty
+    /// `mouse-hide-while-typing`). Off by default (matching Ghostty).
+    public var mouseHideWhileTyping: Bool
     /// Distribute the leftover sub-cell space evenly so the grid is centered, instead of parking
     /// the remainder at the bottom-right edge (Ghostty's `window-padding-balance`).
     public var windowPaddingBalance: Bool
@@ -363,6 +369,8 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         resizeOverlay: ResizeOverlayMode = .afterFirst,
         resizeOverlayPosition: ResizeOverlayPosition = .center,
         bellMode: BellMode = .visual,
+        scrollMultiplier: Double = 1,
+        mouseHideWhileTyping: Bool = false,
         windowPaddingBalance: Bool = true,
         minimumContrast: Double = 1,
         lightThemeName: String? = nil,
@@ -427,6 +435,8 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         self.resizeOverlay = resizeOverlay
         self.resizeOverlayPosition = resizeOverlayPosition
         self.bellMode = bellMode
+        self.scrollMultiplier = scrollMultiplier
+        self.mouseHideWhileTyping = mouseHideWhileTyping
         self.windowPaddingBalance = windowPaddingBalance
         self.minimumContrast = HarnessSettings.clampedContrast(minimumContrast)
         self.lightThemeName = lightThemeName
@@ -598,6 +608,8 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         resizeOverlay = try container.decodeIfPresent(ResizeOverlayMode.self, forKey: .resizeOverlay) ?? fallback.resizeOverlay
         resizeOverlayPosition = try container.decodeIfPresent(ResizeOverlayPosition.self, forKey: .resizeOverlayPosition) ?? fallback.resizeOverlayPosition
         bellMode = try container.decodeIfPresent(BellMode.self, forKey: .bellMode) ?? fallback.bellMode
+        scrollMultiplier = try container.decodeIfPresent(Double.self, forKey: .scrollMultiplier) ?? fallback.scrollMultiplier
+        mouseHideWhileTyping = try container.decodeIfPresent(Bool.self, forKey: .mouseHideWhileTyping) ?? fallback.mouseHideWhileTyping
         windowPaddingBalance = try container.decodeIfPresent(Bool.self, forKey: .windowPaddingBalance) ?? fallback.windowPaddingBalance
         minimumContrast = HarnessSettings.clampedContrast(
             try container.decodeIfPresent(Double.self, forKey: .minimumContrast) ?? fallback.minimumContrast)
@@ -727,6 +739,12 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
     /// Minimum-contrast WCAG ratio bounds. 1 = off (no adjustment); 21 = maximum (black on white).
     public static func clampedContrast(_ value: Double) -> Double {
         max(1, min(21, value))
+    }
+
+    /// Scroll-speed multiplier bounds. 0 (or negative) would freeze or invert scrolling; a huge
+    /// value would jump pages per notch. Keep it usefully adjustable but sane.
+    public static func clampedScrollMultiplier(_ value: Double) -> Double {
+        max(0.1, min(10, value))
     }
 
     /// Font-size bounds (points), matching the Cmd+/- zoom policy in `SessionCoordinator.applyFontSize`.
