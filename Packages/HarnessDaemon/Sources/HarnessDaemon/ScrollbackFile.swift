@@ -1,3 +1,8 @@
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
 import Foundation
 import HarnessCore
 
@@ -169,6 +174,10 @@ final class ScrollbackFile: @unchecked Sendable {
     }
 
     private func appendToDisk(_ data: Data) -> Bool {
+        // Concurrency note: `appendToDisk` is only ever called from `flushPending()`, which
+        // is only ever dispatched onto `queue` (the serial DispatchQueue this type owns).
+        // All appends are therefore serialized — the seekToEnd + write pair below is NOT
+        // racy (no other writer can interleave between the two calls). pwrite is not needed.
         let fm = FileManager.default
         if !fm.fileExists(atPath: url.path) {
             // First write: create the (owner-only) directory + file in one shot.
@@ -190,6 +199,13 @@ final class ScrollbackFile: @unchecked Sendable {
         do {
             try handle.seekToEnd()
             try handle.write(contentsOf: data)
+            // fsync so the appended bytes reach stable storage before we return. Using
+            // plain fsync (not F_FULLFSYNC) — the extra journal-barrier cost of F_FULLFSYNC
+            // is disproportionate for scrollback: the goal is crash durability (surviving a
+            // daemon kill), not power-loss durability (surviving an immediate power cut).
+            // fdatasync on Glibc is equivalent to fsync for our use (we don't care about
+            // metadata timestamps); fsync is available on both Darwin and Glibc.
+            _ = fsync(handle.fileDescriptor)
             return true
         } catch {
             fputs("HarnessDaemon scrollback: append failed for \(url.lastPathComponent): \(error)\n", harnessStderr)
@@ -198,12 +214,31 @@ final class ScrollbackFile: @unchecked Sendable {
     }
 
     /// Trim the log back to the retention cap by rewriting just its tail. Atomic (temp + rename)
-    /// so a crash mid-compaction leaves the previous complete log intact.
+    /// so a crash mid-compaction leaves the previous complete log intact. The temp file is
+    /// fsynced before the rename so a crash during or immediately after compaction never leaves
+    /// a zero-length or partial new file — if the rename didn't complete the old log survives,
+    /// and if it did the new file is fully durable.
     private func compact() {
         guard let data = try? Data(contentsOf: url), data.count > retentionCap else { return }
-        let tail = data.suffix(retentionCap)
-        if HarnessPaths.atomicWrite(Data(tail), to: url, label: "HarnessDaemon scrollback") {
+        let tail = Data(data.suffix(retentionCap))
+        // Write to a temp file alongside the log, fsync it, then rename atomically.
+        // `HarnessPaths.atomicWrite` (Data.write(options: .atomic)) does the temp+rename
+        // but does not fsync the temp before renaming, so a crash in the write window
+        // could leave a renamed-in file with no durable content. Do it manually here.
+        let tmp = url.appendingPathExtension("compact-tmp")
+        do {
+            try tail.write(to: tmp)
+            // fsync the temp file so its content is durable before we replace the log.
+            // See the comment in appendToDisk for the fsync vs F_FULLFSYNC choice.
+            if let tmpHandle = try? FileHandle(forReadingFrom: tmp) {
+                _ = fsync(tmpHandle.fileDescriptor)
+                try? tmpHandle.close()
+            }
+            try FileManager.default.replaceItem(at: url, withItemAt: tmp, backupItemName: nil, resultingItemURL: nil)
             fileBytes = tail.count
+        } catch {
+            fputs("HarnessDaemon scrollback: compaction failed for \(url.lastPathComponent): \(error)\n", harnessStderr)
+            try? FileManager.default.removeItem(at: tmp)
         }
     }
 }
