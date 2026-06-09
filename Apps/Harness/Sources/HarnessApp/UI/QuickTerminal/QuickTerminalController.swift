@@ -11,7 +11,6 @@ final class QuickTerminalController: NSObject {
 
     private var panel: QuickTerminalPanel?
     private var host: TerminalHostView?
-    private var surfaceID: String?
     private var started = false
     private lazy var hotkey = QuickTerminalHotkey { [weak self] in self?.toggle() }
 
@@ -68,7 +67,6 @@ final class QuickTerminalController: NSObject {
                   .createSurface(cwd: cwd, shell: coordinator.settings.defaultShell)),
               let uuid = SurfaceID(uuidString: sid)
         else { return nil }
-        surfaceID = sid
         let host = coordinator.terminalHost(for: uuid, cwd: cwd)
         self.host = host
 
