@@ -537,7 +537,10 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let legacyContainer = try decoder.container(keyedBy: LegacyHarnessSettingsCodingKeys.self)
-        let imported = TerminalConfigImporter.load()
+        // Consume the cached import result when decode is called from load() — that caller
+        // already ran TerminalConfigImporter.load() and stashed the result here so we don't
+        // invoke the importer twice on every first-run or migration path.
+        let imported = HarnessSettings.pendingImportedConfig ?? TerminalConfigImporter.load()
         let fallback = HarnessSettings.makeDefaults(imported: imported)
 
         fontSize = HarnessSettings.clampedFontSize(
@@ -645,10 +648,21 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         secureKeyboardEntry = try container.decodeIfPresent(Bool.self, forKey: .secureKeyboardEntry) ?? fallback.secureKeyboardEntry
     }
 
+    /// Thread-unsafe scratch slot used exclusively within `load()` to pass the already-computed
+    /// import result into `init(from decoder:)` without running `TerminalConfigImporter.load()`
+    /// a second time. Set immediately before `JSONDecoder().decode(…)`, cleared immediately after.
+    /// Only valid on the calling thread; `load()` is always called from a single context
+    /// (app start / settings save+reload), never concurrently.
+    private static var pendingImportedConfig: ImportedTerminalConfig??
+
     public static func load() -> HarnessSettings {
         let imported = TerminalConfigImporter.load()
         let url = HarnessPaths.settingsURL
         if FileManager.default.fileExists(atPath: url.path), let data = try? Data(contentsOf: url) {
+            // Stash the already-loaded import result so init(from:) can reuse it rather than
+            // calling TerminalConfigImporter.load() a second time.
+            pendingImportedConfig = imported
+            defer { pendingImportedConfig = nil }
             guard var settings = try? JSONDecoder().decode(HarnessSettings.self, from: data) else {
                 // Present but unreadable: preserve it as `.corrupt` for recovery rather than
                 // silently overwriting it with defaults (which would discard the user's settings).
