@@ -98,6 +98,10 @@ final class SessionCoordinator: NSObject {
                 guard fresh != self.settings else { return }
                 self.settings = fresh
                 self.applySettingsToHosts()
+                // An external toggle of `secureKeyboardEntry` must re-sync the process-global
+                // secure-input lock, exactly as `setSecureKeyboardEntry` does — otherwise the
+                // lock can stay held after the setting is turned off via an editor / harness-cli.
+                SecureKeyboardEntry.shared.settingChanged()
             }
         }
         let keybindingsWatcher = FileWatcher(url: KeybindingsStore.fileURL) { [weak self] in

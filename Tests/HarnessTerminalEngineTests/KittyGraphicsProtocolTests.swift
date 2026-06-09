@@ -92,4 +92,22 @@ final class KittyGraphicsProtocolTests: XCTestCase {
         term.feed("\u{1b}_Ga=d,d=i,i=1\u{1b}\\")
         XCTAssertEqual(placementCount(term), 1, "d=i removes only the matching image id")
     }
+
+    /// RIS (`ESC c`, full reset) must clear the transmitted-image cache, not just placements —
+    /// otherwise transmit-once images survive a reset and keep occupying the per-screen byte
+    /// budget. Regression for `fullReset()` clearing `kittyPending` but leaking `kittyTransmitted`.
+    func testFullResetClearsTransmittedImageCache() {
+        let (term, responses) = makeTerm()
+        term.feed("\u{1b}_Ga=t,f=32,s=1,v=1,i=9;\(pixel)\u{1b}\\") // transmit (store) i=9
+        term.feed("\u{1b}_Ga=p,i=9\u{1b}\\")                       // place it → succeeds
+        XCTAssertEqual(placementCount(term), 1)
+
+        term.feed("\u{1b}c") // RIS — full reset
+
+        XCTAssertEqual(placementCount(term), 0, "RIS clears placements")
+        term.feed("\u{1b}_Ga=p,i=9\u{1b}\\") // the cached image must be gone now
+        let r = responses().joined()
+        XCTAssertTrue(r.contains("\u{1b}_Gi=9;") && r.contains("ENOENT"),
+                      "RIS must clear the transmitted-image cache, so placing i=9 afterward is not found")
+    }
 }

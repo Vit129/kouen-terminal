@@ -58,6 +58,16 @@ final class TerminalAccessibilityTextTests: XCTestCase {
         XCTAssertEqual(a.line(forCharacterIndex: 6), 1)
     }
 
+    func testStringForRangeRejectsOverflowingRangeWithoutTrapping() {
+        let a = TerminalAccessibilityText(lines: ["abc", "de", "f"])
+        // A pathological range where location+length would overflow Int must be rejected via the
+        // overflow-safe bounds check, not trap on the addition. (AppKit supplies valid ranges, but
+        // the guard must never crash on a hostile/corrupt one.)
+        XCTAssertNil(a.string(forRange: NSRange(location: Int.max, length: 1)))
+        XCTAssertNil(a.string(forRange: NSRange(location: 0, length: Int.max)))
+        XCTAssertNil(a.string(forRange: NSRange(location: 5, length: Int.max)))
+    }
+
     func testEmptyIsSafe() {
         let a = TerminalAccessibilityText(lines: [])
         XCTAssertEqual(a.value, "")

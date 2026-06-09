@@ -989,6 +989,12 @@ public final class TerminalEmulator: VTParserHandler {
         g1 = .ascii
         glUsesG1 = false
         kittyPending.removeAll()
+        // RIS returns the terminal to its initial state, so the transmitted-image cache
+        // (transmit-once / place-many storage) must reset too — same cleanup as `d=a`
+        // delete-all — otherwise images survive a full reset and keep occupying the
+        // per-screen byte budget.
+        kittyTransmitted.removeAll()
+        kittyTransmittedBytes = 0
         pointerShape = nil
         hyperlinks.removeAll()
         hyperlinkKeys.removeAll()

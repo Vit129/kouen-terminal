@@ -1,7 +1,7 @@
 # Harness — Full Audit & Parity Roadmap
 
-> **Status:** Planning document / work queue. Generated 2026-06-08 from an exhaustive read-only audit.
-> Execute the PRs below in priority order (P0 → P5), one focused themed PR at a time (impl + tests + green CI, merged on review). Finding IDs in `[...]` map to the appendix table at the bottom.
+> **Status:** ✅ **PR-1 → PR-21 are all merged & shipped to `main`** (PRs #115–#138; per-PR markers below) — bundled into the **v1.9.0** release. Only the **P5 tail (PR-22 / PR-23 / PR-24)** remains open. Originally generated 2026-06-08 from an exhaustive read-only audit; shipped state reconciled 2026-06-09.
+> Execute remaining PRs in priority order, one focused themed PR at a time (impl + tests + green CI, merged on review). Finding IDs in `[...]` map to the appendix table at the bottom.
 
 ## Context
 
@@ -44,115 +44,115 @@ Effort: **S** < ~1 day · **M** a few days · **L** larger.
 
 ### P0 — Ship-blockers & top-tier (do first)
 
-**PR-1 · Paste & escape-injection hardening** · safety · S · `[F21 + critic OSC 7/8]`
+**PR-1 · Paste & escape-injection hardening** · safety · S · `[F21 + critic OSC 7/8]` · ✅ **Shipped (#115)**
 - *Why:* A clipboard payload containing `ESC[201~` terminates bracketed paste early; everything after is delivered as typed input → command execution on paste, the exact attack bracketed paste exists to prevent. ghostty/kitty/foot all neutralize it. **Verified:** `encodePaste` (`InputEncoder.swift:244-247`) does zero stripping. Same threat class: OSC 7 cwd (`TerminalEmulator.swift:735-746`) feeds any `file://` path straight through with no validation, and OSC 8 hyperlink URIs aren't scheme-checked before the GUI opens them.
 - *Approach:* In `encodePaste`, before wrapping, strip every `ESC[201~` (6-byte) and the 8-bit C1 ST `0x9C` from the body (delete, like kitty). Validate OSC 7 (`handleWorkingDirectoryOSC`) — require `file://`, reject non-absolute/non-existent paths before emitting `onWorkingDirectoryChange`. Scheme-allowlist OSC 8 / clicked-URL open paths (`http/https/file/mailto/ssh`; never `javascript:`/`data:`), confirm-before-open for unusual schemes.
 - *Files:* `InputEncoder.swift`, `TerminalEmulator.swift`, `URLDetection.swift`, `HarnessTerminalSurfaceView.swift`. *Tests:* paste `a\e[201~b` → marker gone from inner payload; OSC 7 with a bogus/relative/`http` path → rejected; OSC 8 `javascript:` → not opened.
 
-**PR-2 · Move layout.json off the synchronous critical path** · performance · M · `[F79]`
+**PR-2 · Move layout.json off the synchronous critical path** · performance · M · `[F79]` · ✅ **Shipped (#116)**
 - *Why:* `commit()` (`SurfaceRegistry.swift:1302-1305`) calls `store.saveImmediately()` — full-snapshot **prettyPrinted** JSON encode + synchronous atomic disk write — **under the registry lock on every mutation**, on the input-latency path, multiple times/sec under agent activity (`commit()` fires on agent-activity transitions, `:1047`). **Verified:** `SessionStore` already has a 0.5s-debounced `save()` confined to its own queue (`SessionStore.swift:37-56`) that `commit()` simply doesn't use, and a shutdown flush path already exists (`:1691`).
 - *Approach:* Keep the revision bump + NotificationBus post under the lock; switch `commit()` from `saveImmediately()` to the existing debounced `save()`. Ensure the daemon-teardown / SIGTERM flush calls `saveImmediately`. Drop `.prettyPrinted` from the on-disk encoder (keep `.sortedKeys` for determinism). **Reuse the existing queue-confined debounce — no new infrastructure** (see Non-goals).
 - *Files:* `SurfaceRegistry.swift`, `SessionStore.swift`. *Tests:* N rapid mutations → one debounced write; teardown flushes last state; round-trip after compacted encode.
 
-**PR-3 · Secure keyboard entry** · security · S–M · `[critic HIGH]`
+**PR-3 · Secure keyboard entry** · security · S–M · `[critic HIGH]` · ✅ **Shipped (#117)**
 - *Why:* **Verified absent everywhere** in Packages+Apps (0 refs). Without `EnableSecureEventInput`, any local process can keylog keystrokes typed at sudo/ssh-passphrase prompts inside Harness. Terminal.app and iTerm2 both ship this. Amplified by the app being unsandboxed.
 - *Approach:* Add a "Secure Keyboard Entry" setting + menu toggle. Call `EnableSecureEventInput()`/`DisableSecureEventInput()` paired with window key/active state (must be balanced — disable on resign-active/terminate to avoid leaking the global lock). Persist the toggle in `HarnessSettings`.
 - *Files:* `HarnessApp` (app delegate / window controller), `HarnessSettings.swift`, menu. *Tests:* unit-test the enable/disable balance accounting; manual verify via Activity Monitor / a keylogger probe.
 
-**PR-4 · VoiceOver accessibility for the terminal grid** · accessibility · L · `[critic HIGH]`
+**PR-4 · VoiceOver accessibility for the terminal grid** · accessibility · L · `[critic HIGH]` · ✅ **Shipped (#118)**
 - *Why:* **Verified:** `HarnessTerminalSurfaceView.swift` (3946 lines) has **zero** accessibility API (no `isAccessibilityElement`, `accessibilityValue`, AXTextArea role, line/char navigation). VoiceOver users cannot read terminal output at all — a categorical exclusion from the product's core surface. Terminal.app and iTerm2 implement the NSAccessibility text protocols.
 - *Approach:* Conform the surface view to `NSAccessibilityNavigableStaticText` / text-area semantics: expose `accessibilityRole = .textArea`, `accessibilityValue` = visible (or full scrollback) text, line-for-index / range-for-line / string-for-range, and cursor as the insertion point / selected range. Drive announcements off the existing damage stream. Map copy-mode selection to `accessibilitySelectedText`. Build incrementally: read-only value + line nav → cursor + selection → live-output announcements.
 - *Files:* new `HarnessTerminalSurfaceView+Accessibility.swift`, engine `captureLines` (exists). *Tests:* unit-test the text-protocol math against a known grid; manual VoiceOver pass.
 
 ### P1 — Genuine correctness gaps (parity that's actually wrong/missing today)
 
-**PR-5 · VT correctness cluster: DECSTR, REP, IRM, DECOM, DECALN** · ghostty-parity · L · `[F0,F1,F2,F3,F5,F94,F95]`
+**PR-5 · VT correctness cluster: DECSTR, REP, IRM, DECOM, DECALN** · ghostty-parity · L · `[F0,F1,F2,F3,F5,F94,F95]` · ✅ **Shipped (#120)**
 - *Why:* Standard control functions with **no handler routed at all** (verified at `TerminalEmulator.swift:294-322` / `:630-644`). REP (`CSI b`) — ncurses `rep`/output optimizers → missing character runs. IRM (`CSI 4h`) insert mode → overwrite-on-type corruption in line editors. DECOM (mode 6) → region-relative addressing wrong, cursor escapes region. DECSTR (`CSI ! p`) → TUI cleanup soft-reset is a no-op (stale modes/margins leak). DECALN (`ESC # 8`) → vttest alignment blank.
 - *Approach:* Add a **non-private** `CSI h/l` path (`setANSIMode`) for IRM (insert shifts line right) + LNM. Track last-printed scalar → REP repeats through the normal print path honoring wrap. Add `originMode` flag (DECSET 6): offset CUP/HVP/VPA by `scrollTop`, clamp to region, home on set/reset; a valid DECSTBM homes the cursor. Add `softReset()` (DECSTR: home, default pen, DECAWM on, DECTCEM on, origin off, IRM off, full region, ASCII charset — **not** clearing cells/history) on `intermediates==[0x21] && final=='p'`. Add `screenAlignmentTest()` for `ESC # 8`.
 - *Files:* `TerminalEmulator.swift`, `TerminalScreen.swift`. *Tests:* one `EngineConformanceTests` golden each (esctest-derived where possible).
 
-**PR-6 · DCS demux + DA1 Sixel advertisement** · ghostty-parity · M · `[F15,F16]`
+**PR-6 · DCS demux + DA1 Sixel advertisement** · ghostty-parity · M · `[F15,F16]` · ✅ **Shipped (#121)**
 - *Why:* **Verified:** `parserDCS` (`TerminalEmulator.swift:329`) does `guard data.contains(0x71)` — everything containing `q` (incl. DECRQSS, whose `$q` payload literally contains `q`) is misrouted into Sixel decode and dropped. vim/neovim/tmux probe DECRQSS for SGR/DECSTBM/DECSCUSR; no reply → conservative/wrong fallbacks. DA1 doesn't advertise `;4`, so the **working** Sixel decoder is unreachable to capability-gating tools (img2sixel/lsix).
 - *Approach:* Branch in `parserDCS` **before** Sixel: leading `$q` → DECRQSS (reply `DCS 1$r<data>ST` for DECSCUSR/SGR/DECSTBM, `DCS 0$r ST` on failure); leading `+q` → XTGETTCAP (reply Co/RGB/Tc); `tmux;` → unescape + re-feed. Gate the Sixel branch on a real introducer (optional `P1;P2;P3` then `q` at the **start**), not `q` anywhere. Add `;4` to DA1 when Sixel is enabled; add a minimal XTSMGRAPHICS responder.
 - *Files:* `TerminalEmulator.swift`. *Tests:* DECRQSS round-trips for DECSCUSR/SGR; `tmux;` passthrough re-feeds; Sixel still decodes; DA1 advertises `;4`.
 
-**PR-7 · Format engine: nest operators in conditional test + delete dead `wrapInline`** · tmux-parity · S · `[F66,F76]`
+**PR-7 · Format engine: nest operators in conditional test + delete dead `wrapInline`** · tmux-parity · S · `[F66,F76]` · ✅ **Shipped (#119)**
 - *Why:* `.tmux.conf` routinely writes `#{?#{==:#{pane_current_command},vim},...,...}`. **Verified:** `evaluateConditional` resolves the test via `resolve(token:)` (bare-token switch, `FormatString.swift:242`) → any operator/comparison test is "unknown" and always falsy; the else-branch always wins. The then/else branches already evaluate operators. `wrapInline` (`:249-254`) is a literal identical-branch no-op (`part.contains("#{") ? part : part`).
 - *Approach:* Evaluate the test as a full expression (through `evaluate`/`evaluateToken`, not `resolve(token:)`). Delete `wrapInline`; use `parts[i]` at the two call sites.
 - *Files:* `FormatString.swift`. *Tests:* `#{?#{==:a,a},Y,N}` → `Y`; `#{?#{m:foo,foobar},Y,N}` → `Y`.
 
-**PR-8 · Copy-mode: correct the three wrong tmux action aliases** · tmux-parity · M · `[F62,F63]`
+**PR-8 · Copy-mode: correct the three wrong tmux action aliases** · tmux-parity · M · `[F62,F63]` · ✅ **Shipped (#122)**
 - *Why:* Correctness bugs shipping today (verified in `CopyModeAction.swift`): `next-word-end` aliased to `.nextWord` (lands on word **start**), `top-line`/`bottom-line` aliased to history-top/bottom (jumps to scrollback **extent**, not the visible row), `back-to-indentation` aliased to `.startOfLine` (col 0, ignoring indent). Any vi user binding `e`/`H`/`L`/`^` gets wrong behavior. **Caveat: diff the intended `back-to-indentation`/`top/bottom-line` semantics against tmux source before shipping the behavior change.**
 - *Approach:* Add distinct reducer cases `nextWordEnd`, `topLine`/`middleLine`/`bottomLine` (cursor = viewTop / viewTop+rows/2 / viewTop+rows-1), `backToIndentation` (first non-blank col). Unalias in `CopyModeAction`. Bind `e`, `H`/`M`/`L`, `^`.
 - *Files:* `CopyModeAction.swift`, `CopyModeReducer.swift`. *Tests:* per-motion reducer tests incl. wide-char columns.
 
-**PR-9 · set-option key validation + @user-options** · tmux-parity · M · `[F50,F51]`
+**PR-9 · set-option key validation + @user-options** · tmux-parity · M · `[F50,F51]` · ✅ **Shipped (#123)**
 - *Why:* Directly violates the project's own STRICT no-silent-failure invariant. **Verified:** `setOption` checks scope + colon-safety but **not** the key name, so `set -g moused on` is silently persisted and never read. Separately, `@`-prefixed user-options (heavily used by theme/statusline `.tmux.conf` plugins) are accepted but `#{@foo}` always reads empty.
 - *Approach:* Build a known-option vocabulary from `OptionStore.builtinDefaults` keys + the documented set; reject unknown keys in the IPC `setOption` handler with `.error("unknown option: <key>")` so every front-end inherits the loud failure — but **always accept** `@`-prefixed keys. Give `FormatContext` access to `OptionStore`; add a `#{@name}` branch reading via the scope chain.
 - *Files:* `SurfaceRegistry.swift`, `OptionStore.swift`, `FormatString.swift`, `HarnessCLI.swift`. *Tests:* unknown key → error in CLI + `:` + source-file; `@foo` set then `#{@foo}` renders.
 
-**PR-10 · status-position: honor the option or remove the dead toggle** · tmux-parity · M · `[F53,F69]`
+**PR-10 · status-position: honor the option or remove the dead toggle** · tmux-parity · M · `[F53,F69]` · ✅ **Shipped (#125)**
 - *Why:* **Verified:** `status-position` is in `OptionStore` defaults and a Settings segment (bottom/top), but nothing in the layout (MainSplitViewController/StatusLineView/compositor) reads it. Toggling it does nothing — a present-but-ignored option is worse than absent.
 - *Approach:* Anchor top vs bottom from `options.get("status-position")` in the GUI split controller (re-layout on the option-change snapshot nudge the registry already pushes) and mirror in the compositor's `PaneRectSolver` + `GridCompositor`. If top is out of scope, **remove** it from Settings and document the divergence in `TMUX_PARITY.md` — don't ship a dead toggle.
 - *Files:* `MainSplitViewController.swift`, `StatusLineView.swift`, `WindowAttachClient.swift`, `GridCompositor.swift`.
 
 ### P2 — Test hardening & performance
 
-**PR-11 · Wire-protocol + option-resolution + capture-pane tests** · tests · M · `[F90,F91,F92,F87]`
+**PR-11 · Wire-protocol + option-resolution + capture-pane tests** · tests · M · `[F90,F91,F92,F87]` · ✅ **Shipped (#126)**
 - *Why:* **Verified** 124 IPC cases but the round-trip test covers ~25 requests / ~15 responses — the entire targeting/options/hooks/layout/grouped-session surface never round-trips (memory notes prior IPC version-skew breakage). `OptionStore`'s scope-fallback (the heart of tmux option semantics) and `capture-pane -e/-S/-E` (hand-rolled `stripANSI`) have no direct test. The 64-property hand-written `HarnessSettings` decoder silently drops a new setting whose decode line is missing.
 - *Approach:* Drive the existing round-trip loop from a static `allCases`-style `[IPCRequest]/[IPCResponse]` fixture so a new enum case forces a sample (encode→decode→re-encode byte-stability). Add `OptionStoreTests` (per-scope set + most-specific get, top-down unset fallthrough, set/save/reload, builtinDefaults, keyAliases). Add `RealPty` tests for `stripANSI` (SGR/OSC-BEL/OSC-ST/truncated-CSI-at-EOF/DCS blob) and `captureRange`. Add a settings-decoder guard test: every-key-absent fixture → all defaults apply.
 - *Files:* `IPCCodecTests.swift`, `OptionStoreTests.swift`, `RealPtyCaptureTests.swift`, settings guard test.
 
-**PR-12 · Daemon perf: single per-tick process-tree snapshot** · performance · M · `[F80,F81]`
+**PR-12 · Daemon perf: single per-tick process-tree snapshot** · performance · M · `[F80,F81]` · ✅ **Shipped (#127)**
 - *Why:* The system-wide PID enumeration is invariant within a tick but recomputed for each surface (cwd walks + agent walks), scaling O(surfaces × system_processes); the GUI `SurfaceShellTracker` runs another full scan every 500ms for the same map. tmux/iTerm2 build a `pid→ppid` map once per refresh and reuse it. **Caveat: the "3× per tick" multiplier is unverified — re-measure (counter/Instruments) before committing; the direction is sound regardless.**
 - *Approach:* Build the `pid→ppid` table once per tick in the daemon, thread it into both the cwd and agent walks (collapse 2N scans → 1). In the GUI, consume cwd from the daemon snapshot (daemon owns session truth) and retire the `SurfaceShellTracker` poll — or, if a transitional poll stays, slow it to 1.5s and drop the per-descendant `KERN_PROCARGS2` env read.
 - *Files:* `SurfaceRegistry.swift`, `RealPty.swift`, `AgentDetector.swift`, `SurfaceShellTracker.swift`.
 
-**PR-13 · Unify special-key encoding (mode-aware send-keys)** · tech-debt+correctness · M · `[F84]`
+**PR-13 · Unify special-key encoding (mode-aware send-keys)** · tech-debt+correctness · M · `[F84]` · ✅ **Shipped (#128)**
 - *Why:* Two independent escape-sequence encoders for the same domain (arrows, F-keys, Home/End, PgUp/Dn) hand-kept in agreement — and the keybinding/send-keys path uses the **mode-unaware** one. A key injected into a full-screen app that enabled DECCKM (vim/less) or Kitty mode gets the wrong bytes — a real correctness gap. tmux `send-keys` consults the target pane's cursor-key mode.
 - *Approach:* Make `KeyTokenParser` parse tokens into the engine's `SpecialKey`/`KeyModifiers` vocabulary and delegate byte encoding to `InputEncoder`, threaded with the target surface's current `TerminalModes` (the daemon already owns the per-surface emulator). Collapses two encoders into one; pairs with PR-17's bindable send-keys.
 - *Files:* `KeyTokenParser.swift`, `InputEncoder.swift`, `SurfaceRegistry.swift`, `HarnessCLI.swift`.
 
 ### P3 — Parity completion (features)
 
-**PR-14 · Kitty graphics: ack, query (`a=q`), delete (`a=d`), transmit-once/place-many (`i=`)** · ghostty-parity · L · `[F23,F24,F25]` (+ `[F28]` iTerm2 px/% sizing)
+**PR-14 · Kitty graphics: ack, query (`a=q`), delete (`a=d`), transmit-once/place-many (`i=`)** · ghostty-parity · L · `[F23,F24,F25]` (+ `[F28]` iTerm2 px/% sizing) · ✅ **Shipped (#129)**
 - *Why:* The decoder is solid but the protocol is display-only. No ack → probing tools (kitty icat, timg, chafa) hang or retransmit; `a=q` capability detection fails; no `a=d` → TUIs that redraw images leave stale ones; ignoring `i=` makes the idiomatic transmit-once/place-many model (basis of the unicode-placeholder protocol tmux/neovim image plugins use) impossible.
 - *Approach:* (a) emit `ESC_Gi=<id>;OK ST` (or error) via `respond()` for any command not `q=2` — answer `a=q` first since detection gates everything; (b) maintain a transmitted-image table keyed by `i=`/`I=`, handle `a=t` (store w/o placing) and `a=p` (look up + place), keeping internal placement id separate; (c) add a delete path parsing `d=` (`d=a` all, `d=i` by id). **Animation (`a=a`) stays deferred** (`[F29]`).
 - *Files:* `TerminalEmulator.swift`, `TerminalScreen.swift`, `Images/KittyGraphicsProtocol.swift`.
 
-**PR-15 · Copy-mode motions: jump-to-char family, word-end, big-WORD, other-end, goto-line** · tmux-parity · M · `[F61,F64,F65,F93]`
+**PR-15 · Copy-mode motions: jump-to-char family, word-end, big-WORD, other-end, goto-line** · tmux-parity · M · `[F61,F64,F65,F93]` · ✅ **Shipped (#130)**
 - *Why:* None of tmux's six jump commands (f/F/t/T + `;`/`,`) exist — a bound `jump-forward` is a parse-time failure. Plus big-WORD (W/B/E), `other-end` (`o`), and goto-line. Builds on PR-8's alias fixes.
 - *Approach:* Add `jumpForward/Backward/ToForward/ToBackward` (+jump-again/reverse) carrying the pending target char (front-end captures the next keystroke like search entry); single-line char search in the reducer. Add whitespace-delimited W/B/E + `nextWordEnd`. Add `otherEnd` (swap anchor/cursor) and `gotoLine(Int)`. Wire `tmuxName` + init aliases + the `copy-mode-vi` key table.
 - *Files:* `CopyModeAction.swift`, `CopyModeReducer.swift`. *Tests:* per-motion.
 
-**PR-16 · Format engine operators: `!=`, `\|\|`, `&&`, `n:` then `T:`/`a:`/`p<N>:`** · tmux-parity · M · `[F67,F77]`
+**PR-16 · Format engine operators: `!=`, `\|\|`, `&&`, `n:` then `T:`/`a:`/`p<N>:`** · tmux-parity · M · `[F67,F77]` · ✅ **Shipped (#131)**
 - *Why:* After PR-7's nested-condition fix, these are the remaining high-frequency operators in real `.tmux.conf`. Each is a small dispatch branch; `n:` reuses `DisplayWidth`.
 - *Approach:* Prioritize `!=:`, `||:`, `&&:`, `n:` (length); then `T:` (expand twice), `a:` (char from code), `p<N>:` (padding), `f[N]` float precision. *(Loop modifiers `#{W:/P:/S:}` `[F68]` + centre window-list `[F70]` are larger/lower priority given the native GUI tab bar — see Long-tail.)*
 - *Files:* `FormatString.swift`. *Tests:* per-operator.
 
-**PR-17 · Bindable send-keys `-l`/`-H`, display-message `-p`, missing hooks + lifecycle hook tests** · tmux-parity · M · `[F55,F52,F71,F98]`
+**PR-17 · Bindable send-keys `-l`/`-H`, display-message `-p`, missing hooks + lifecycle hook tests** · tmux-parity · M · `[F55,F52,F71,F98]` · ✅ **Shipped (#132)**
 - *Why:* `send-keys -l/-H` work from the CLI but are silently dropped from bind/`:`/hooks/source-file. `display-message -p` (print rendered format to stdout) is the dominant scripted use and is impossible. `pane-focus-in/out` hooks can wire off the existing focus-reporting path; `command-error` fires from the executor's error path. Hook firing is fragile (memory notes a deeper-than-reported context bug) and several events lack a firing test.
 - *Approach:* Carry literal/hex mode on `Command.sendKeys` (enum), parse `-l/-H` in the bindable parser routing to the existing `sendData` byte path (unifies the two send-keys paths — pairs with PR-13). Add `-p` to `display-message`. Add `pane-focus-in/out`, `command-error`, `window-pane-changed` to `HookRegistry`. Extend `HookFiringTests` with one firing assertion per remaining event, driven from a list so new events force a test.
 - *Files:* `CommandParser.swift`, `HarnessCLI.swift`, `HookRegistry.swift`, `HookFiringTests.swift`.
 
-**PR-18 · clear-history (off the deferred ledger) + status-interval** · tmux-parity · S–M · `[F59,F73]`
+**PR-18 · clear-history (off the deferred ledger) + status-interval** · tmux-parity · S–M · `[F59,F73]` · ✅ **Shipped (#133)**
 - *Why:* `clear-history` is one-keystroke muscle memory (`bind C-k clear-history`) and Harness can currently **only** clear by respawning the shell (kills the process). The file-clear primitive (`ScrollbackFile.clear`) already exists; the missing piece is a non-respawn path + verb. `status-interval` (a repeating status-refresh timer) is a cheap bundled add.
 - *Approach:* Add a `clear-history` verb routing to `ScrollbackFile.clear` + an emulator scrollback reset **without** respawning (distinct from `respawn-pane -k`); wire through `CommandParser` + IPC + CLI. Add a `status-interval`-gated repeating timer in `WindowAttachClient` + the GUI status strip. Update `TMUX_PARITY.md`. Keep `resize-window`/`window-size`/`list -F` deferred; re-confirm the ledger.
 - *Files:* `SurfaceRegistry.swift`, `RealPty.swift`, `CommandParser.swift`, `WindowAttachClient.swift`, `docs/TMUX_PARITY.md`.
 
 ### P4 — UX backlog (ghostty + CLAUDE.md)
 
-**PR-19 · Audible + visual bell** · ux · M · `[F34,F41,F74]`
+**PR-19 · Audible + visual bell** · ux · M · `[F34,F41,F74]` · ✅ **Shipped (#136)**
 - *Why:* A focused-window `\a` produces **no** feedback today — only a tmux window-flag + background notification. The plumbing exists end-to-end (`onBell` → host delegate → coordinator); only the focused-path action is missing. Baseline terminal expectation + explicit CLAUDE.md backlog.
 - *Approach:* Add a bell setting (off/audible/visual/both) honored on every BEL regardless of `NSApp.isActive`: audible = `NSSound.beep()`; visual = a one-shot inverse/flash overlay on the ringing surface. Keep the unfocused-notification path. Also wire the tmux `visual-bell`/`visual-activity`/`visual-silence` + `*-action` knobs through the existing alert path.
 - *Files:* `SessionCoordinator.swift`, `HarnessTerminalSurfaceView.swift`, `HarnessSettings.swift`.
 
-**PR-20 · Ghostty UX quick wins: scroll-multiplier, mouse-hide-while-typing, config reload-on-save, triple-click logical line** · ux · M · `[F45,F46,F42,F47]`
+**PR-20 · Ghostty UX quick wins: scroll-multiplier, mouse-hide-while-typing, config reload-on-save, triple-click logical line** · ux · M · `[F45,F46,F42,F47]` · ✅ **Shipped (#135)**
 - *Why:* Four small, self-contained, high-recognition ghostty features on the backlog. Scroll speed is a fixed 3-lines/tick constant; the cursor never hides on type; `settings.json` isn't watched; triple-click selects only the display row, not the soft-wrapped logical line (the wrap model already exists for reflow + `capture-pane -J`).
 - *Approach:* `scrollMultiplier: Double` multiplied into `consumeWheelLines`/`continuousWheelLines`. `mouseHideWhileTyping`: `NSCursor.setHiddenUntilMouseMoves(true)` in `keyDown` gated on a setting. Config reload: `DispatchSource.makeFileSystemObjectSource` on settings/keybindings → debounce → existing `applySettings`. Triple-click: walk the existing `rowWrapped` flags up/down from the clicked row.
 - *Files:* `HarnessTerminalSurfaceView.swift`, `HarnessSettings.swift`, `HarnessApp`.
 
-**PR-21 · Quick terminal (global-hotkey dropdown), find-bar regex, unlimited scrollback** · ux · M–L · `[F40,F48,F49]` · ✅ **Shipped**
+**PR-21 · Quick terminal (global-hotkey dropdown), find-bar regex, unlimited scrollback** · ux · M–L · `[F40,F48,F49]` · ✅ **Shipped (#138)**
 - *Why:* Quick terminal (Quake dropdown) is an explicit backlog item (medium). Find bar is substring-only (no regex/case toggle). Scrollback is a fixed bounded count with no unlimited option.
 - *Approach:* Quick terminal: an `NSPanel` (`.nonactivatingPanel`, `canJoinAllSpaces`, `.floating`) hosting a dedicated daemon-backed surface, summoned by a global hotkey (`RegisterEventHotKey`/CGEvent monitor), behind a setting. Find: optional `NSRegularExpression` mode + case toggle in `TerminalBufferSearch` + two `TerminalFindBar` buttons. Scrollback: treat `scrollbackLines == 0` as unbounded in `OptionStore` + `ScrollbackFile` (verify the file can grow safely / byte-cap).
 - *Files:* `HarnessApp` (panel), `TerminalBufferSearch.swift`, `TerminalFindBar.swift`, `HarnessSettings.swift`, `ScrollbackFile.swift`.

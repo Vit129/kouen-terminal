@@ -620,7 +620,8 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         resizeOverlay = try container.decodeIfPresent(ResizeOverlayMode.self, forKey: .resizeOverlay) ?? fallback.resizeOverlay
         resizeOverlayPosition = try container.decodeIfPresent(ResizeOverlayPosition.self, forKey: .resizeOverlayPosition) ?? fallback.resizeOverlayPosition
         bellMode = try container.decodeIfPresent(BellMode.self, forKey: .bellMode) ?? fallback.bellMode
-        scrollMultiplier = try container.decodeIfPresent(Double.self, forKey: .scrollMultiplier) ?? fallback.scrollMultiplier
+        scrollMultiplier = HarnessSettings.clampedScrollMultiplier(
+            try container.decodeIfPresent(Double.self, forKey: .scrollMultiplier) ?? fallback.scrollMultiplier)
         mouseHideWhileTyping = try container.decodeIfPresent(Bool.self, forKey: .mouseHideWhileTyping) ?? fallback.mouseHideWhileTyping
         quickTerminalEnabled = try container.decodeIfPresent(Bool.self, forKey: .quickTerminalEnabled) ?? fallback.quickTerminalEnabled
         quickTerminalHotkey = try container.decodeIfPresent(String.self, forKey: .quickTerminalHotkey) ?? fallback.quickTerminalHotkey

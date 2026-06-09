@@ -17,6 +17,22 @@ final class HarnessSettingsTests: XCTestCase {
     // hex values are normalized to uppercase on decode — so `decode(encode(x)) == x` is not a
     // machine-independent invariant. Asserting the explicitly-set fields (present in the JSON, hex
     // uppercased) is immune to both and still proves each decode line carries its value.
+    /// `scrollMultiplier` is documented as "clamped to a sane range on read" — the `init(from:)`
+    /// decoder must apply `clampedScrollMultiplier` (like `minimumContrast` does), so a hand-edited
+    /// settings.json with an out-of-range value can't reach the renderer and freeze/invert scrolling.
+    func testScrollMultiplierIsClampedOnDecode() throws {
+        func decoded(_ raw: Double) throws -> Double {
+            var s = HarnessSettings()
+            s.scrollMultiplier = raw
+            let data = try JSONEncoder().encode(s)
+            return try JSONDecoder().decode(HarnessSettings.self, from: data).scrollMultiplier
+        }
+        XCTAssertEqual(try decoded(999), 10, accuracy: 1e-9, "a huge hand-edited value clamps to the max on read")
+        XCTAssertEqual(try decoded(-5), 0.1, accuracy: 1e-9, "a negative value clamps to the min")
+        XCTAssertEqual(try decoded(0), 0.1, accuracy: 1e-9, "zero clamps to the min")
+        XCTAssertEqual(try decoded(2.5), 2.5, accuracy: 1e-9, "an in-range value is preserved")
+    }
+
     func testEveryFieldTypeSurvivesACodingRoundTrip() throws {
         var s = HarnessSettings()
         s.fontSize = 19.5
