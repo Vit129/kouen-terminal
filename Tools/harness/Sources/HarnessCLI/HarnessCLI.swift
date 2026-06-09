@@ -1112,7 +1112,17 @@ struct HarnessCLI {
             throw DaemonClientError.unexpectedResponse
         }
         let expanded = (path as NSString).expandingTildeInPath
-        try data.write(to: URL(fileURLWithPath: expanded))
+        // Canonicalize via URL to resolve symlinks, remove redundant separators, and collapse
+        // any '.'/'..' components left after tilde expansion. Reject paths that still contain
+        // '..' after standardization — a traversal-by-confusion attempt (e.g. "~/../../../etc").
+        // We do NOT restrict to the home directory: users may legitimately save anywhere; we
+        // only neutralize confusing relative-prefix tricks.
+        let canonical = URL(fileURLWithPath: expanded).standardizedFileURL.path
+        guard !canonical.components(separatedBy: "/").contains("..") else {
+            fputs("harness-cli save-buffer: path contains '..' after expansion — refusing\n", harnessStderr)
+            exit(1)
+        }
+        try data.write(to: URL(fileURLWithPath: canonical))
     }
 
     /// `load-buffer [--name <name>] <path>` — read a file into a new paste buffer.
@@ -1123,7 +1133,13 @@ struct HarnessCLI {
             exit(1)
         }
         let expanded = (path as NSString).expandingTildeInPath
-        let data = try Data(contentsOf: URL(fileURLWithPath: expanded))
+        // Same canonicalization and traversal guard as save-buffer (see comment there).
+        let canonical = URL(fileURLWithPath: expanded).standardizedFileURL.path
+        guard !canonical.components(separatedBy: "/").contains("..") else {
+            fputs("harness-cli load-buffer: path contains '..' after expansion — refusing\n", harnessStderr)
+            exit(1)
+        }
+        let data = try Data(contentsOf: URL(fileURLWithPath: canonical))
         let response = try checkedRequest(client, .setBuffer(name: name, data: data))
         if case let .text(final) = response { print(final) }
     }
