@@ -9,6 +9,13 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [Unreleased]
 
 ### Added
+- **Terminal bell feedback (audible / visual).** A bell (`\a` / BEL) on the *focused* surface
+  previously produced no feedback at all — only a tmux window-flag + background notification. A
+  new **Bell** setting (Settings ▸ Appearance: off / audible / visual / both, default **visual**)
+  is honored on every bell regardless of focus: audible rings the system beep; visual flashes the
+  ringing surface briefly. The tmux `visual-bell` / `bell-action` options bridge in — `bell-action
+  off`/`none` silences everything (feedback and notification); `visual-bell on`/`off`/`both`
+  overrides the audible/visual split. The unfocused OS-notification path is unchanged.
 - **`clear-history` — clear a pane's scrollback without respawning the shell.** Previously the
   only way to clear scrollback was `respawn-pane -k`, which *kills the running process*.
   `clear-history` (alias `clearhist`) resets the in-memory ring **and** the persisted scrollback

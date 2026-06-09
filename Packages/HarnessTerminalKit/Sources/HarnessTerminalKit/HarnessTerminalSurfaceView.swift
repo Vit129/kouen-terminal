@@ -512,6 +512,12 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// Underline drawn beneath the hovered link. A sublayer of the Metal layer so it composites
     /// above the terminal content without intercepting clicks (a subview would eat the ⌘-click).
     private let linkUnderlineLayer = CALayer()
+    /// Visual-bell flash: a full-surface translucent layer composited above the terminal content,
+    /// faded out in one shot by `flashBell()`. Hidden at rest so it never affects normal rendering.
+    private let bellFlashLayer = CALayer()
+    /// Bumped per `flashBell()` so a flash that restarts mid-fade doesn't get hidden by the older
+    /// animation's completion block.
+    private var bellFlashGeneration: UInt64 = 0
     private var trackingArea: NSTrackingArea?
 
     public init(
@@ -1017,6 +1023,46 @@ public final class HarnessTerminalSurfaceView: NSView {
         linkUnderlineLayer.isHidden = true
         linkUnderlineLayer.backgroundColor = NSColor.linkColor.cgColor
         metalLayer.addSublayer(linkUnderlineLayer)
+        // Visual-bell flash: a full-surface sublayer above the content, hidden at rest.
+        bellFlashLayer.isHidden = true
+        bellFlashLayer.opacity = 0
+        metalLayer.addSublayer(bellFlashLayer)
+    }
+
+    /// Visual bell — a brief theme-foreground flash over the surface (the `visual` channel of the
+    /// `bellMode` setting / tmux `visual-bell`). Composites a translucent sublayer above the Metal
+    /// content and fades it out; the terminal content underneath is untouched. Re-entrant safe: a
+    /// second bell mid-fade just restarts the animation. Must be called on the main thread.
+    public func flashBell() {
+        let c = canvasForeground
+        let flash = CGColor(srgbRed: CGFloat(c.red) / 255, green: CGFloat(c.green) / 255,
+                            blue: CGFloat(c.blue) / 255, alpha: 1)
+        // Set geometry + color with implicit animation disabled, then run one explicit fade so a
+        // resize-driven implicit bounds animation can't blur the flash.
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        bellFlashLayer.frame = bounds
+        bellFlashLayer.backgroundColor = flash
+        bellFlashLayer.isHidden = false
+        CATransaction.commit()
+
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = 0.28 // peak: visible but not a jarring full-white blink
+        fade.toValue = 0
+        fade.duration = 0.16
+        fade.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        fade.isRemovedOnCompletion = true
+        let token = bellFlashGeneration &+ 1
+        bellFlashGeneration = token
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { [weak self] in
+            // Only hide if no newer flash superseded this one (avoid hiding mid-restart).
+            guard let self, self.bellFlashGeneration == token else { return }
+            self.bellFlashLayer.isHidden = true
+        }
+        bellFlashLayer.opacity = 0
+        bellFlashLayer.add(fade, forKey: "bellFlash")
+        CATransaction.commit()
     }
 
     private var layerColorSpaceName: CFString {
