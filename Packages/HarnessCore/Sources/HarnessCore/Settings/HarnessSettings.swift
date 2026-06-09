@@ -251,6 +251,12 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
     /// Hide the mouse cursor while typing until the mouse next moves (Ghostty
     /// `mouse-hide-while-typing`). Off by default (matching Ghostty).
     public var mouseHideWhileTyping: Bool
+    /// Enable the quick terminal: a Quake-style dropdown surface summoned by a global hotkey from
+    /// anywhere, even when Harness is in the background. Off by default.
+    public var quickTerminalEnabled: Bool
+    /// Global hotkey that toggles the quick terminal, in the `mod-mod-key` form used by `prefixKey`
+    /// (default ⌘⌥`). Requires at least one modifier; only honored while `quickTerminalEnabled` is set.
+    public var quickTerminalHotkey: String
     /// Distribute the leftover sub-cell space evenly so the grid is centered, instead of parking
     /// the remainder at the bottom-right edge (Ghostty's `window-padding-balance`).
     public var windowPaddingBalance: Bool
@@ -373,6 +379,8 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         bellMode: BellMode = .visual,
         scrollMultiplier: Double = 1,
         mouseHideWhileTyping: Bool = false,
+        quickTerminalEnabled: Bool = false,
+        quickTerminalHotkey: String = "cmd-opt-`",
         windowPaddingBalance: Bool = true,
         minimumContrast: Double = 1,
         lightThemeName: String? = nil,
@@ -439,6 +447,8 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         self.bellMode = bellMode
         self.scrollMultiplier = scrollMultiplier
         self.mouseHideWhileTyping = mouseHideWhileTyping
+        self.quickTerminalEnabled = quickTerminalEnabled
+        self.quickTerminalHotkey = quickTerminalHotkey
         self.windowPaddingBalance = windowPaddingBalance
         self.minimumContrast = HarnessSettings.clampedContrast(minimumContrast)
         self.lightThemeName = lightThemeName
@@ -612,6 +622,8 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         bellMode = try container.decodeIfPresent(BellMode.self, forKey: .bellMode) ?? fallback.bellMode
         scrollMultiplier = try container.decodeIfPresent(Double.self, forKey: .scrollMultiplier) ?? fallback.scrollMultiplier
         mouseHideWhileTyping = try container.decodeIfPresent(Bool.self, forKey: .mouseHideWhileTyping) ?? fallback.mouseHideWhileTyping
+        quickTerminalEnabled = try container.decodeIfPresent(Bool.self, forKey: .quickTerminalEnabled) ?? fallback.quickTerminalEnabled
+        quickTerminalHotkey = try container.decodeIfPresent(String.self, forKey: .quickTerminalHotkey) ?? fallback.quickTerminalHotkey
         windowPaddingBalance = try container.decodeIfPresent(Bool.self, forKey: .windowPaddingBalance) ?? fallback.windowPaddingBalance
         minimumContrast = HarnessSettings.clampedContrast(
             try container.decodeIfPresent(Double.self, forKey: .minimumContrast) ?? fallback.minimumContrast)
