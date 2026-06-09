@@ -117,6 +117,155 @@ final class IPCCodecTests: XCTestCase {
         XCTAssertTrue(buffer.isEmpty, "buffer fully consumed")
     }
 
+    // MARK: - IPCReadBuffer parity (the streaming read loops' O(1)-consume path)
+
+    /// The `IPCReadBuffer` overloads must decode byte-identically to the `inout Data` originals —
+    /// same frames, same order, same buffer-fully-consumed end state — including across arbitrary
+    /// chunk splits (a frame header torn across two `read(2)`s) and interleaved JSON/binary frames.
+    func testReadBufferDecodesIdenticallyToDataPath() throws {
+        // Mixed stream: JSON reply, output frames (incl. empty + magic-bytes payloads), JSON reply.
+        var stream = Data()
+        stream.append(try IPCCodec.encode(IPCReply(response: .ok)))
+        stream.append(try IPCCodec.encodeOutputFrame(Data([0xF5, 0xF6, 0x00, 0x01]), sequence: 7))
+        stream.append(try IPCCodec.encodeOutputFrame(Data(), sequence: 8))
+        stream.append(try IPCCodec.encodeOutputFrame(Data(Array("héllo wörld\r\n".utf8)), sequence: 9))
+        stream.append(try IPCCodec.encode(IPCReply(response: .pong)))
+
+        // Reference: the Data path, whole stream at once.
+        var reference: [String] = []
+        var dataBuf = stream
+        while let frame = try IPCCodec.decodeReplyOrData(from: &dataBuf) {
+            reference.append(describe(frame))
+        }
+        XCTAssertTrue(dataBuf.isEmpty)
+        XCTAssertEqual(reference.count, 5)
+
+        // IPCReadBuffer path, fed in every chunk size from 1 (max byte-tearing) to whole-stream.
+        for chunk in [1, 2, 3, 5, 7, 16, 64, stream.count] {
+            var buf = IPCReadBuffer()
+            var got: [String] = []
+            var i = 0
+            let bytes = [UInt8](stream)
+            while i < bytes.count {
+                let n = min(chunk, bytes.count - i)
+                buf.append(Array(bytes[i ..< i + n]), count: n)
+                i += n
+                while let frame = try IPCCodec.decodeReplyOrData(from: &buf) {
+                    got.append(describe(frame))
+                }
+            }
+            XCTAssertEqual(got, reference, "chunk size \(chunk) diverged from Data path")
+            XCTAssertEqual(buf.count, 0, "buffer fully consumed at chunk size \(chunk)")
+        }
+    }
+
+    /// Same parity for the request/input direction (the daemon's per-client read loop).
+    func testReadBufferRequestPathMatchesDataPath() throws {
+        var stream = Data()
+        stream.append(try IPCCodec.encode(IPCEnvelope(request: .ping)))
+        stream.append(try IPCCodec.encodeInputFrame(surfaceID: "surf-1", payload: Data("ls\r".utf8)))
+        stream.append(try IPCCodec.encode(IPCEnvelope(request: .resizeSurface(surfaceID: "surf-1", rows: 24, cols: 80))))
+        stream.append(try IPCCodec.encodeInputFrame(surfaceID: "surf-1", payload: Data([0xF6, 0x00])))
+
+        var dataBuf = stream
+        var reference: [String] = []
+        while let frame = try IPCCodec.decodeRequestOrInput(from: &dataBuf) {
+            reference.append(describe(frame))
+        }
+        XCTAssertEqual(reference.count, 4)
+
+        for chunk in [1, 3, 9, stream.count] {
+            var buf = IPCReadBuffer()
+            var got: [String] = []
+            var i = 0
+            let bytes = [UInt8](stream)
+            while i < bytes.count {
+                let n = min(chunk, bytes.count - i)
+                buf.append(Array(bytes[i ..< i + n]), count: n)
+                i += n
+                while let frame = try IPCCodec.decodeRequestOrInput(from: &buf) {
+                    got.append(describe(frame))
+                }
+            }
+            XCTAssertEqual(got, reference, "chunk size \(chunk) diverged from Data path")
+            XCTAssertEqual(buf.count, 0)
+        }
+    }
+
+    /// The tooLarge / undecodable error contract carries over: an oversized declared length throws
+    /// (connection-fatal) and a well-framed-but-garbage JSON frame throws after consuming the frame.
+    func testReadBufferErrorContractMatchesDataPath() throws {
+        // Oversized binary length.
+        var tooBig = IPCReadBuffer()
+        var frame: [UInt8] = [0xF5]
+        let badLen = UInt32(IPCCodec.maxPayloadLength + 1)
+        frame += [UInt8(badLen >> 24 & 0xFF), UInt8(badLen >> 16 & 0xFF), UInt8(badLen >> 8 & 0xFF), UInt8(badLen & 0xFF)]
+        tooBig.append(frame, count: frame.count)
+        XCTAssertThrowsError(try IPCCodec.decodeReplyOrData(from: &tooBig)) { error in
+            guard case IPCCodec.FrameError.tooLarge = error else {
+                return XCTFail("expected tooLarge, got \(error)")
+            }
+        }
+
+        // Well-framed garbage JSON: consumed + undecodable, and the NEXT frame still decodes —
+        // the in-sync-stream recovery contract the daemon's error-reply path depends on.
+        let garbage = Data("not json at all".utf8)
+        var lengthPrefixed = Data()
+        var len = UInt32(garbage.count).bigEndian
+        lengthPrefixed.append(Data(bytes: &len, count: 4))
+        lengthPrefixed.append(garbage)
+        lengthPrefixed.append(try IPCCodec.encode(IPCEnvelope(request: .ping)))
+        var buf = IPCReadBuffer()
+        buf.append(lengthPrefixed)
+        XCTAssertThrowsError(try IPCCodec.decodeRequestOrInput(from: &buf)) { error in
+            guard case IPCCodec.FrameError.undecodable = error else {
+                return XCTFail("expected undecodable, got \(error)")
+            }
+        }
+        guard case .request(.ping)? = try IPCCodec.decodeRequestOrInput(from: &buf) else {
+            return XCTFail("stream must stay in sync after an undecodable frame")
+        }
+        XCTAssertEqual(buf.count, 0)
+    }
+
+    /// Compaction stress: a long stream of frames must never leave stale bytes behind or corrupt
+    /// later frames when the internal compaction threshold (64 KiB dead prefix) trips mid-stream.
+    func testReadBufferCompactionPreservesStream() throws {
+        var buf = IPCReadBuffer()
+        let payload = Data(repeating: 0x42, count: 8_192)
+        var expected: UInt64 = 0
+        // ~24 MiB total through the buffer; interleave appends and decodes so the offset walks
+        // far past the compaction floor many times.
+        for batch in 0 ..< 100 {
+            for k in 0 ..< 30 {
+                let frame = try IPCCodec.encodeOutputFrame(payload, sequence: UInt64(batch * 30 + k))
+                buf.append(frame)
+            }
+            while let decoded = try IPCCodec.decodeReplyOrData(from: &buf) {
+                guard case let .output(data, sequence) = decoded else { return XCTFail("expected output") }
+                XCTAssertEqual(data, payload)
+                XCTAssertEqual(sequence, expected)
+                expected += 1
+            }
+        }
+        XCTAssertEqual(expected, 3_000)
+        XCTAssertEqual(buf.count, 0)
+    }
+
+    private func describe(_ frame: IPCCodec.DecodedReplyFrame) -> String {
+        switch frame {
+        case let .reply(response): return "reply:\(response)"
+        case let .output(data, sequence): return "output:\(sequence):\(data.map { String($0) }.joined(separator: ","))"
+        }
+    }
+
+    private func describe(_ frame: IPCCodec.DecodedRequestFrame) -> String {
+        switch frame {
+        case let .request(request): return "request:\(String(describing: request))"
+        case let .input(surfaceID, payload): return "input:\(surfaceID):\(payload.map { String($0) }.joined(separator: ","))"
+        }
+    }
+
     func testMixedInputFramesAndJSONResizeRequestsDecodeSequentially() throws {
         // A live attach connection interleaves binary input frames (keystrokes) with JSON
         // `.resizeSurface` requests (SIGWINCH votes — deliberately JSON, not a new binary magic,
@@ -312,7 +461,7 @@ final class IPCCodecTests: XCTestCase {
         .capturePane(surfaceID: "surface-1", includeScrollback: true),
         .capturePaneRange(surfaceID: "surface-1", start: -100, end: 0, escapeSequences: true, joinWrapped: false),
         .pipePane(surfaceID: "surface-1", shellCommand: "cat >> /tmp/log"),
-        .waitFor(channel: "build-done", mode: "wait"),
+        .waitFor(channel: "build-done", mode: .wait),
         .linkWindow(tabID: UUID(), targetSessionID: UUID()),
         .unlinkWindow(tabID: UUID()),
         .killPane(paneID: UUID()),

@@ -67,7 +67,7 @@ public enum IPCRequest: Codable, Sendable {
     /// synchronization. `wait`/`lock` may defer the reply (block the client) until a
     /// `signal`/`unlock`. Intercepted at the `DaemonServer` socket layer, never under the
     /// registry lock.
-    case waitFor(channel: String, mode: String)
+    case waitFor(channel: String, mode: WaitForMode)
     /// `link-window`: make `tabID`'s panes appear as a new linked tab in another
     /// session (shared surfaces). `unlinkWindow` removes the linked copy.
     case linkWindow(tabID: UUID, targetSessionID: UUID)
@@ -143,6 +143,17 @@ public enum IPCRequest: Codable, Sendable {
     case displayMessage(format: String, print: Bool)
     /// tmux `show-messages`: the daemon's recent display-message log (most recent last).
     case showMessages
+}
+
+/// The mode argument for `wait-for`. `String` raw values are wire-identical to the previous
+/// plain-`String` associated value — a `String`-raw enum encodes/decodes as its raw string, so
+/// existing daemons and clients that already speak `"wait"/"signal"/"lock"/"unlock"` continue to
+/// interoperate without change. (This is the same codec contract as `SplitDirection`.)
+public enum WaitForMode: String, Codable, Sendable {
+    case wait
+    case signal
+    case lock
+    case unlock
 }
 
 public enum DirectionalAxis: String, Codable, Sendable {

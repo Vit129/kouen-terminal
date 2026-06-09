@@ -224,7 +224,6 @@ final class SessionCoordinator: NSObject {
         if !metadataOnly {
             applyThemeToAllHosts()
         }
-        syncWaitingRings()
         updateDockBadge(from: remote)
         reflectRemoteActivePane()
         NotificationCenter.default.post(
@@ -252,29 +251,37 @@ final class SessionCoordinator: NSObject {
         fputs("Harness: closeEphemeralSessions did not confirm before quit\n", harnessStderr)
     }
 
-    private func structureFingerprint(_ snap: SessionSnapshot) -> String {
-        guard let ws = snap.activeWorkspace, let session = ws.activeSession, let tab = session.activeTab else { return "" }
-        let surfaces = tab.rootPane.allSurfaceIDs().map(\.uuidString).sorted().joined(separator: ",")
-        return "\(ws.id)|\(session.id)|\(tab.id)|\(surfaces)"
+    private func structureFingerprint(_ snap: SessionSnapshot) -> Int {
+        var hasher = Hasher()
+        // Include the active workspace/session/tab identity so intra-tab focus changes
+        // and tab switches still bump structureRevision (same behaviour as before).
+        if let ws = snap.activeWorkspace {
+            hasher.combine(ws.id)
+            if let session = ws.activeSession {
+                hasher.combine(session.id)
+                if let tab = session.activeTab { hasher.combine(tab.id) }
+            }
+        }
+        // Walk *all* workspaces/sessions/tabs so a split added to a background tab (e.g.
+        // via the CLI) bumps structureRevision even when that tab isn't active.  This mirrors
+        // the prune pass at syncFromDaemon which also walks the full set.
+        for ws in snap.workspaces {
+            for session in ws.sessions {
+                for tab in session.tabs {
+                    for surface in tab.rootPane.allSurfaceIDs() {
+                        hasher.combine(surface)
+                    }
+                }
+            }
+        }
+        return hasher.finalize()
     }
 
     private func applyThemeToAllHosts() {
-        HarnessChrome.update(
-            themeName: snapshot.themeName,
-            opacity: CGFloat(settings.backgroundOpacity),
-            blur: settings.backgroundBlur,
-            backgroundHex: settings.customBackgroundHex,
-            foregroundHex: settings.customForegroundHex,
-            cursorHex: settings.customCursorHex
-        )
-        let allowClipboard = HarnessOptions.shared.get("set-clipboard")?.boolValue ?? true
-        for host in terminalHosts.allHosts() {
-            host.applyTheme(named: snapshot.themeName)
-            host.applySettings(settings)
-            host.allowProgramClipboardAccess = allowClipboard
-            applyTerminalIdentity(to: host)
-            pushBorderColors(to: host)
-        }
+        updateChromeAndHosts()
+        // applyThemeToAllHosts is called after a full snapshot sync and needs to adopt
+        // any synchronize-panes changes that arrived with the snapshot, rebuild the sibling
+        // lists for input mirroring, and re-assert the marked-pane border.
         adoptSynchronizeOptions()
         refreshSyncSiblings()
         reassertMarkedPane()
@@ -297,14 +304,14 @@ final class SessionCoordinator: NSObject {
         )
     }
 
-    private func syncWaitingRings() {
-        for host in terminalHosts.allHosts() {
-            if let match = snapshot.workspaces.flatMap({ workspace in workspace.sessions.flatMap { $0.tabs } }).first(where: { tab in
-                tab.rootPane.allSurfaceIDs().contains(host.surfaceID)
-            }) {
-            }
-        }
-    }
+    // syncWaitingRings() was removed: the function iterated all hosts × all tabs with a
+    // completely empty `if let match` body — it found the owning tab for each host but then
+    // did nothing with it.  Searching the codebase for "waiting ring", "waitingRing", and
+    // "ring" found no TerminalHostView API to call (the border colours are pushed once via
+    // pushBorderColors; there is no per-tab waiting-ring toggle on the host).  The only live
+    // call site was in syncFromDaemon, which is updated below to remove the call.  If a
+    // per-host waiting indicator is needed in the future, add an `applyWaiting(_:)` API to
+    // TerminalHostView and re-introduce the loop at that point.
 
     private func pushNewRemoteNotifications(from snapshot: SessionSnapshot) {
         for workspace in snapshot.workspaces {
@@ -430,6 +437,27 @@ final class SessionCoordinator: NSObject {
 
     /// Push the current `settings` to every live terminal host and refresh chrome.
     func applySettingsToHosts() {
+        updateChromeAndHosts()
+        // applySettingsToHosts does NOT call adoptSynchronizeOptions / refreshSyncSiblings /
+        // reassertMarkedPane because it runs on pure settings changes (font, opacity, colours)
+        // that cannot affect the synchronize-panes or marked-pane state.  A post below notifies
+        // chrome consumers (window, sidebar, status line) so they repaint with the new palette.
+        NotificationCenter.default.post(
+            name: NotificationBus.shared.snapshotChanged,
+            object: nil,
+            userInfo: [
+                "revision": snapshot.revision,
+                "structureChanged": false,
+                "chromeChanged": true,
+            ]
+        )
+    }
+
+    /// Shared per-host update loop: refresh the global chrome palette and push the current
+    /// theme + settings + identity + border colours to every live terminal host.
+    /// Called by both `applyThemeToAllHosts` and `applySettingsToHosts`; each caller adds
+    /// its own divergent extras after this returns.
+    private func updateChromeAndHosts() {
         HarnessChrome.update(
             themeName: snapshot.themeName,
             opacity: CGFloat(settings.backgroundOpacity),
@@ -446,15 +474,6 @@ final class SessionCoordinator: NSObject {
             applyTerminalIdentity(to: host)
             pushBorderColors(to: host)
         }
-        NotificationCenter.default.post(
-            name: NotificationBus.shared.snapshotChanged,
-            object: nil,
-            userInfo: [
-                "revision": snapshot.revision,
-                "structureChanged": false,
-                "chromeChanged": true,
-            ]
-        )
     }
 
     /// The live `FormatString` context for the active workspace/session/tab/pane.
@@ -585,19 +604,22 @@ final class SessionCoordinator: NSObject {
     func addSession(to workspaceID: WorkspaceID, cwd: String? = nil, name: String? = nil) {
         requestDaemon(.newSession(workspaceID: workspaceID, cwd: cwd ?? activeTabCWD ?? settings.defaultCWD, name: name, shell: settings.defaultShell))
         syncFromDaemon()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            SurfaceShellTracker.shared.bumpScan()
-        }
+        // Kick the cwd tracker immediately after session creation so the shell's working
+        // directory lights up as early as possible.  A second kick follows the daemon's next
+        // snapshotChanged notification (which arrives once the PTY/surface is live), so there
+        // is no fixed timing dependency — the notification-driven path handles the "shell not
+        // yet spawned" window without a magic timeout.
+        SurfaceShellTracker.shared.bumpScan()
     }
 
     func addTab(to workspaceID: WorkspaceID, cwd: String? = nil) {
         requestDaemon(.newTab(workspaceID: workspaceID, cwd: cwd ?? activeTabCWD ?? settings.defaultCWD, shell: settings.defaultShell))
         syncFromDaemon()
-        // The shell will spawn imminently — kick the cwd tracker so the new
-        // tab's path lights up without waiting for the next 500ms tick.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            SurfaceShellTracker.shared.bumpScan()
-        }
+        // Kick the cwd tracker immediately so the new tab's path lights up without waiting
+        // for the next 500ms tick.  When the daemon posts snapshotChanged for the new PTY
+        // surface, syncFromDaemon is called again and SurfaceShellTracker's next tick picks
+        // up the final cwd — removing the need for an additional 300ms delayed kick.
+        SurfaceShellTracker.shared.bumpScan()
     }
 
     func openDefaultTerminalLaunch(_ launch: DefaultTerminalLaunchRequest) {
@@ -740,9 +762,9 @@ final class SessionCoordinator: NSObject {
             setActiveSurface(surfaceID)
             terminalHosts.host(for: surfaceID)?.focusTerminal()
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            SurfaceShellTracker.shared.bumpScan()
-        }
+        // Same rationale as addTab: kick immediately, rely on the daemon's snapshotChanged
+        // for any follow-up scan once the new PTY surface is live.
+        SurfaceShellTracker.shared.bumpScan()
     }
 
     /// Toggle the find bar (⌘F) on the active pane's terminal surface.
@@ -1734,7 +1756,11 @@ enum DesktopNotifier {
 
     static func show(title: String, body: String, withSound: Bool = true) {
         let center = UNUserNotificationCenter.current()
-        center.delegate = ForegroundPresenter.shared
+        // The delegate is set once in `requestAuthorizationIfNeeded` (called at app launch
+        // before any notification can fire) and in `requestOrOpenSettings` / `sendTest`.
+        // Re-setting it here on every banner delivery was redundant and slightly wasteful
+        // (UNUserNotificationCenter retains the delegate strongly per Apple docs, so it can
+        // never be nil'd between those bootstrap calls and this point).
         center.getNotificationSettings { settings in
             switch settings.authorizationStatus {
             case .authorized, .provisional, .ephemeral:

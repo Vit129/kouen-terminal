@@ -51,6 +51,12 @@ final class SurfaceShellTracker {
     }
 
     private func tick() {
+        // `scanning` is read and written here on the main actor (the class is @MainActor),
+        // so the guard + assignment below are an atomic check-and-set from the actor's
+        // perspective: no second tick() — from the timer *or* bumpScan() — can slip through
+        // between the guard and the assignment. This is what makes the flag safe without
+        // an additional lock: both tick() call sites run on the main actor before the async
+        // dispatch hands work to scanQueue.
         guard !scanning else { return }
         scanning = true
         Self.scanQueue.async { [weak self] in

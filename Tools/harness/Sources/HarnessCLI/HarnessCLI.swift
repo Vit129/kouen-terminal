@@ -566,18 +566,18 @@ struct HarnessCLI {
     /// `wait-for [-S|-L|-U] <channel>` — tmux named-channel sync. Plain `wait-for` blocks
     /// until another client `-S` signals it; `-L`/`-U` lock/unlock.
     static func handleWaitFor(_ args: [String], client: DaemonClient) throws {
-        let mode: String
-        if args.contains("-S") { mode = "signal" }
-        else if args.contains("-L") { mode = "lock" }
-        else if args.contains("-U") { mode = "unlock" }
-        else { mode = "wait" }
+        let mode: WaitForMode
+        if args.contains("-S") { mode = .signal }
+        else if args.contains("-L") { mode = .lock }
+        else if args.contains("-U") { mode = .unlock }
+        else { mode = .wait }
         guard let channel = positionalArgs(args, skippingValuesFor: []).first else {
             fputs("Usage: harness-cli wait-for [-S|-L|-U] <channel>\n", harnessStderr)
             exit(1)
         }
         // `wait`/`lock` block until signaled/granted — a generous (≈1 week) timeout, well
         // within the poll's Int32 millisecond range. `signal`/`unlock` return at once.
-        let timeout: TimeInterval = (mode == "wait" || mode == "lock") ? 604_800 : 5
+        let timeout: TimeInterval = (mode == .wait || mode == .lock) ? 604_800 : 5
         _ = try checkedRequest(client, .waitFor(channel: channel, mode: mode), timeout: timeout)
     }
 
@@ -1112,7 +1112,17 @@ struct HarnessCLI {
             throw DaemonClientError.unexpectedResponse
         }
         let expanded = (path as NSString).expandingTildeInPath
-        try data.write(to: URL(fileURLWithPath: expanded))
+        // Canonicalize via URL to resolve symlinks, remove redundant separators, and collapse
+        // any '.'/'..' components left after tilde expansion. Reject paths that still contain
+        // '..' after standardization — a traversal-by-confusion attempt (e.g. "~/../../../etc").
+        // We do NOT restrict to the home directory: users may legitimately save anywhere; we
+        // only neutralize confusing relative-prefix tricks.
+        let canonical = URL(fileURLWithPath: expanded).standardizedFileURL.path
+        guard !canonical.components(separatedBy: "/").contains("..") else {
+            fputs("harness-cli save-buffer: path contains '..' after expansion — refusing\n", harnessStderr)
+            exit(1)
+        }
+        try data.write(to: URL(fileURLWithPath: canonical))
     }
 
     /// `load-buffer [--name <name>] <path>` — read a file into a new paste buffer.
@@ -1123,7 +1133,13 @@ struct HarnessCLI {
             exit(1)
         }
         let expanded = (path as NSString).expandingTildeInPath
-        let data = try Data(contentsOf: URL(fileURLWithPath: expanded))
+        // Same canonicalization and traversal guard as save-buffer (see comment there).
+        let canonical = URL(fileURLWithPath: expanded).standardizedFileURL.path
+        guard !canonical.components(separatedBy: "/").contains("..") else {
+            fputs("harness-cli load-buffer: path contains '..' after expansion — refusing\n", harnessStderr)
+            exit(1)
+        }
+        let data = try Data(contentsOf: URL(fileURLWithPath: canonical))
         let response = try checkedRequest(client, .setBuffer(name: name, data: data))
         if case let .text(final) = response { print(final) }
     }
