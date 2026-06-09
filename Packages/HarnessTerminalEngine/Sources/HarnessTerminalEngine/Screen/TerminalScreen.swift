@@ -98,6 +98,29 @@ final class TerminalScreen {
     /// Number of scrolled-off lines currently retained.
     var historyCount: Int { history.count }
 
+    /// Whether virtual line `index` (0 = oldest history; `historyCount` = first active row) soft-
+    /// wraps into the next line. Out-of-range → `false` (treated as a hard line end).
+    func isLineWrapped(_ index: Int) -> Bool {
+        guard index >= 0 else { return false }
+        if index < history.count { return history[index].wrapped }
+        let r = index - history.count
+        return r >= 0 && r < rowWrapped.count ? rowWrapped[r] : false
+    }
+
+    /// The virtual-line span `[first, last]` of the logical (soft-wrapped) line containing `line` —
+    /// the maximal run of physical lines joined by soft wraps. Drives triple-click logical-line
+    /// selection. A hard-wrapped (unwrapped) line returns just itself.
+    func logicalLineSpan(containing line: Int) -> ClosedRange<Int> {
+        let total = history.count + rows
+        guard total > 0 else { return 0 ... 0 }
+        let clamped = max(0, min(line, total - 1))
+        var first = clamped
+        while first > 0, isLineWrapped(first - 1) { first -= 1 }
+        var last = clamped
+        while last < total - 1, isLineWrapped(last) { last += 1 }
+        return first ... last
+    }
+
     // MARK: - Dirty-row damage
     /// Viewport rows whose cell content changed since the last `consumeDamage()`. Cursor
     /// *position* moves are tracked separately (`lastPresentedCursorRow`) so a pure cursor

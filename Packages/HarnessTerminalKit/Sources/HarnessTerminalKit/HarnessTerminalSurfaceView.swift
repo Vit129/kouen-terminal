@@ -406,6 +406,11 @@ public final class HarnessTerminalSurfaceView: NSView {
     private var copyOnSelect = false
     /// Confirm before pasting risky (multi-line / control-char) text when bracketed paste is off.
     private var pasteProtection = true
+    /// Mouse-wheel / trackpad scroll-distance multiplier (Ghostty `mouse-scroll-multiplier`).
+    /// 1 = native. Set from `HarnessSettings.scrollMultiplier` (already clamped).
+    var scrollMultiplier: CGFloat = 1
+    /// Hide the cursor while typing until the mouse next moves (Ghostty `mouse-hide-while-typing`).
+    var mouseHideWhileTyping = false
     /// Scrollback offset in lines (0 = live bottom; >0 = scrolled up into history).
     private var scrollOffset = 0
     /// Smooth-scroll sub-line position. The continuous scrollback position is
@@ -2578,10 +2583,10 @@ public final class HarnessTerminalSurfaceView: NSView {
     private func unitColumnRange(viewportRow row: Int, column: Int) -> ClosedRange<Int> {
         switch selectionGranularity {
         case .character: return column ... column
-        // Line selection covers the DISPLAY row, consistent with copy mode's line ops.
-        // Most terminals (Ghostty/iTerm2/kitty) triple-click the LOGICAL line across
-        // soft wraps — that needs wrap-flag plumbing through the selection region;
-        // tracked in the release-audit backlog.
+        // Per-row column extent for `.line` granularity is the full display row. Triple-click's
+        // LOGICAL-line span (across soft wraps, Ghostty/iTerm2/kitty) is handled at mouse-down by
+        // anchoring the selection across the wrapped viewport rows (see `logicalLineViewportRowSpan`);
+        // the multi-row linear region then fills each row to full width here.
         case .line: return 0 ... max(0, columns - 1)
         case .word:
             return emulatorSync { emu in
@@ -2666,9 +2671,31 @@ public final class HarnessTerminalSurfaceView: NSView {
         default: selectionGranularity = .character
         }
         selectionRectangular = event.modifierFlags.contains(.option)
-        selectionAnchor = pos
-        selectionHead = pos
+        if event.clickCount >= 3, !selectionRectangular {
+            // Triple-click selects the whole LOGICAL line across soft wraps (Ghostty/iTerm2/kitty),
+            // not just the display row. Span the wrapped viewport rows; `.line` granularity then
+            // fills each to full width and the multi-row linear region covers the logical line.
+            let span = logicalLineViewportRowSpan(at: pos.row)
+            selectionAnchor = (row: span.lowerBound, column: 0)
+            selectionHead = (row: span.upperBound, column: max(0, columns - 1))
+        } else {
+            selectionAnchor = pos
+            selectionHead = pos
+        }
         scheduleRender()
+    }
+
+    /// The viewport-row span of the logical (soft-wrapped) line at viewport `row`, clamped to the
+    /// visible viewport — the rows a triple-click selects. Maps the viewport row into virtual-line
+    /// space (history + scroll offset), asks the emulator for the wrapped-line span, and maps back.
+    private func logicalLineViewportRowSpan(at row: Int) -> ClosedRange<Int> {
+        emulatorSync { emu in
+            let base = emu.historyCount - scrollOffset // virtual-line index of viewport row 0
+            let span = emu.logicalLineRowSpan(virtualLine: base + row)
+            let first = max(0, span.lowerBound - base)
+            let last = min(rows - 1, span.upperBound - base)
+            return first ... Swift.max(first, last)
+        }
     }
 
     /// The clickable URL at a grid cell (OSC 8 hyperlink first, else an auto-detected URL).
@@ -3045,9 +3072,9 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// notch is the expected feel; only the trackpad scrolls by pixels.
     private func continuousWheelLines(_ event: NSEvent, cellHeight: CGFloat) -> CGFloat {
         let delta = event.scrollingDeltaY
-        if event.hasPreciseScrollingDeltas { return delta / cellHeight }
+        if event.hasPreciseScrollingDeltas { return delta / cellHeight * scrollMultiplier }
         let ticks = delta > 0 ? max(delta, 1) : min(delta, -1)
-        return ticks * Self.mouseWheelLinesPerTick
+        return ticks * Self.mouseWheelLinesPerTick * scrollMultiplier
     }
 
     /// Convert a wheel/trackpad event into a signed whole-line scroll count, carrying the
@@ -3059,13 +3086,13 @@ public final class HarnessTerminalSurfaceView: NSView {
     private func consumeWheelLines(_ event: NSEvent, cellHeight: CGFloat) -> Int {
         let delta = event.scrollingDeltaY
         if event.hasPreciseScrollingDeltas {
-            wheelLineRemainder += delta / cellHeight
+            wheelLineRemainder += delta / cellHeight * scrollMultiplier
         } else {
             // macOS simulates acceleration on non-precise wheels by ramping the delta from 0.1
             // upward — a slow single notch would otherwise accumulate 0.3 lines and do nothing
             // until the fourth click. Clamp a notch to at least one full tick (Ghostty parity).
             let ticks = delta > 0 ? max(delta, 1) : min(delta, -1)
-            wheelLineRemainder += ticks * Self.mouseWheelLinesPerTick
+            wheelLineRemainder += ticks * Self.mouseWheelLinesPerTick * scrollMultiplier
         }
         let whole = wheelLineRemainder < 0 ? wheelLineRemainder.rounded(.up) : wheelLineRemainder.rounded(.down)
         wheelLineRemainder -= whole
@@ -3476,6 +3503,12 @@ public final class HarnessTerminalSurfaceView: NSView {
     }
 
     public override func keyDown(with event: NSEvent) {
+        // Mouse-hide-while-typing (Ghostty): a typing keystroke hides the cursor until the mouse
+        // next moves. Skip bare ⌘-shortcuts — those are app commands, not text input. AppKit
+        // auto-restores the cursor on the next mouse move, so this is self-correcting.
+        if mouseHideWhileTyping, !event.modifierFlags.contains(.command) {
+            NSCursor.setHiddenUntilMouseMoves(true)
+        }
         // Copy mode is modal: it consumes every key (motions, search entry, copy/cancel)
         // and nothing reaches the PTY. ⌘ shortcuts still fall through to the app.
         if copyMode != nil, !event.modifierFlags.contains(.command) {
