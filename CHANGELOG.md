@@ -8,6 +8,15 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 
 ## [Unreleased]
 
+### Added
+- `Scripts/scorecard.sh` + `docs/SCORECARD.md`: the Harness-vs-Ghostty comparative
+  scorecard — cold start (per-phase from `startup.log` vs wall-clock-to-window),
+  sustained PTY throughput (the cross-terminal stress runner, including the issue #27
+  re-measure set), idle power (`powermetrics`, app + daemon summed), long-session memory,
+  and Harness-side input-to-photon percentiles. Orchestration + reporting only — no
+  production code; numbers are receipts, never CI gates; probe asymmetries are stated in
+  the report itself.
+
 ### Fixed
 - **Unicode width tables are now derived from the Unicode Character Database** (15.1) instead of
   hand-curated ranges. The old tables missed ~140 East-Asian-Wide codepoints — including the
