@@ -12,7 +12,7 @@ public final class DaemonServer: @unchecked Sendable {
     public let registry: SurfaceRegistry
     private var listener: DispatchSourceRead?
     private let queue = DispatchQueue(label: "com.robert.harness.daemon")
-    private var clientBuffers: [Int32: Data] = [:]
+    private var clientBuffers: [Int32: IPCReadBuffer] = [:]
     private var clientSources: [Int32: DispatchSourceRead] = [:]
     /// Unsent reply bytes per client, flushed by a writable `DispatchSource` when the socket
     /// was full. Client FDs are non-blocking, so a slow/stuck client buffers here instead of
@@ -112,19 +112,38 @@ public final class DaemonServer: @unchecked Sendable {
             }
         }
         let size = socklen_t(MemoryLayout<sockaddr_un>.size)
+
+        // Close the creation-time permission window: set umask(0o177) so bind() creates
+        // the socket file with exactly 0o600 permissions (rw-------), not whatever the
+        // process umask happens to be. This is listener setup on the daemon's single-
+        // threaded startup path — signal handlers and DispatchSource event handlers are
+        // not yet running, so umask is safe to change briefly here.
+        //
+        // Parent directory is 0o700 (ensureDirectories above), so this is defense-in-depth:
+        // even a relaxed umask wouldn't grant access via the parent, but belt-and-suspenders
+        // is correct for a control socket that can spawn PTYs. The chmod below stays as the
+        // second layer in case some platform creates AF_UNIX sockets without obeying umask.
+        let prevUmask = umask(0o177)
         let bindResult = withUnsafePointer(to: &addr) {
             $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
                 bind(fd, $0, size)
             }
         }
+        // Restore umask immediately after bind so we don't affect any other file
+        // creation in the process lifetime. bind() is the only call that needs
+        // the restricted mask.
+        umask(prevUmask)
+
         guard bindResult == 0 else {
             close(fd)
             throw DaemonError.bindFailed
         }
-        // Restrict the control socket to the owner. A world- or group-writable
-        // control socket would let any local process drive the daemon (spawn PTYs,
-        // read pane output, run hook shell commands). 0o600 means only our UID can
-        // even connect; the peer-credential check on accept is the second layer.
+        // Belt-and-suspenders: explicitly restrict the socket to owner-only even
+        // though the umask above should have produced 0o600 at bind time. A world-
+        // or group-writable control socket would let any local process drive the
+        // daemon (spawn PTYs, read pane output, run hook shell commands). 0o600 means
+        // only our UID can even connect; the peer-credential check on accept is the
+        // second layer.
         if chmod(HarnessPaths.socketURL.path, 0o600) != 0 {
             close(fd)
             throw DaemonError.bindFailed
@@ -164,7 +183,7 @@ public final class DaemonServer: @unchecked Sendable {
         setNoSigPipe(clientFD)
         // Non-blocking so a slow/stuck client never blocks `write` on the serial queue.
         _ = harness_set_nonblocking(clientFD)
-        clientBuffers[clientFD] = Data()
+        clientBuffers[clientFD] = IPCReadBuffer()
         // Don't auto-register the connection as a client — `DaemonClient.request`
         // opens a fresh socket per call, and bookkeeping every one of those would
         // make `list-clients` useless. Clients announce themselves with
@@ -202,8 +221,8 @@ public final class DaemonServer: @unchecked Sendable {
             source.cancel()
             return
         }
-        var data = clientBuffers[fd] ?? Data()
-        data.append(contentsOf: buffer.prefix(count))
+        var data = clientBuffers[fd] ?? IPCReadBuffer()
+        data.append(buffer, count: count)
         clientBuffers[fd] = data
 
         while true {
@@ -219,7 +238,7 @@ public final class DaemonServer: @unchecked Sendable {
                 continue
             } catch {
                 // Oversized/garbage frame — the stream can't be re-synced. Drop the client.
-                clientBuffers[fd] = Data()
+                clientBuffers[fd] = IPCReadBuffer()
                 source.cancel()
                 return
             }
@@ -289,20 +308,26 @@ public final class DaemonServer: @unchecked Sendable {
     /// `wait-for`: register/wake fds on a named channel. `wait`/`lock` defer the reply (the
     /// client's socket read blocks) until a `signal`/`unlock` from another connection sends
     /// it. All on the serial queue — no blocking here, no registry lock.
-    private func handleWaitFor(channel: String, mode: String, fd: Int32) {
+    private func handleWaitFor(channel: String, mode: WaitForMode, fd: Int32) {
         switch mode {
-        case "signal":
+        case .signal:
             for waiter in waitForRegistry.signal(channel: channel) { send(.ok, to: waiter) }
             send(.ok, to: fd)
-        case "lock":
+        case .lock:
             if waitForRegistry.lock(channel: channel, fd: fd) { send(.ok, to: fd) }
             // else: held — reply deferred until `unlock` grants it.
-        case "unlock":
+        case .unlock:
             if let granted = waitForRegistry.unlock(channel: channel) { send(.ok, to: granted) }
             send(.ok, to: fd)
-        default: // "wait"
-            waitForRegistry.wait(channel: channel, fd: fd)
-            // reply deferred until a `signal`.
+        case .wait:
+            // wait() returns false when the per-channel waiter cap is reached. In that
+            // case reply immediately with an error so the client's socket unblocks rather
+            // than hanging forever waiting for a signal that might never arrive (too many
+            // concurrent waiters on the same channel is a scripting error).
+            if !waitForRegistry.wait(channel: channel, fd: fd) {
+                send(.error("wait-for channel '\(channel)' has too many waiters"), to: fd)
+            }
+            // On true: reply deferred until a `signal`.
         }
     }
 
@@ -603,6 +628,9 @@ public final class DaemonServer: @unchecked Sendable {
         // instead of losing the last debounce window of either.
         registry.flushAllScrollback()
         registry.flushSnapshot()
+        // Flush the debounced stores (options / environment / hooks / paste buffers) so the last
+        // mutation in any burst's debounce window is never silently discarded on shutdown.
+        registry.flushAllStores()
         queue.sync {
             listener?.cancel() // cancel handler closes the listener fd
             listener = nil
