@@ -27,8 +27,8 @@ done
 
 # --- Build ---
 if [[ $NO_BUILD -eq 0 ]]; then
-  echo "==> Building release..."
-  make build
+  echo "==> Building release (optimized)..."
+  swift build -c release --product Harness --product HarnessDaemon --product harness-cli
   echo "==> Packaging..."
   Scripts/package-app.sh release
   echo "==> Ad-hoc signing..."
