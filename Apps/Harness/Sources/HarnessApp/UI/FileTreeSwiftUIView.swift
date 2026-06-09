@@ -95,6 +95,9 @@ struct FileTreeSwiftUIView: View {
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("HarnessActiveTabGitBranchDidChange"))) { _ in
             refreshGitBranch()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .fileTreeDidChange)) { _ in
+            Task { await loadRoot() }
+        }
         // React to both path and session changes — different sessions may be on
         // different branches sharing the same rootPath.
         .task(id: taskID) { await loadRoot() }
@@ -374,6 +377,7 @@ private struct NodeRow: View {
         let url = URL(fileURLWithPath: path)
         do {
             try FileManager.default.trashItem(at: url, resultingItemURL: nil)
+            Self.notifyTreeDidChange()
         } catch {
             NSSound.beep()
         }
@@ -383,6 +387,7 @@ private struct NodeRow: View {
         let dir = node.isDirectory ? node.path : (node.path as NSString).deletingLastPathComponent
         let path = uniquePath(base: dir, name: "untitled", ext: "")
         FileManager.default.createFile(atPath: path, contents: nil)
+        Self.notifyTreeDidChange()
         renameItem(path: path)
     }
 
@@ -390,11 +395,11 @@ private struct NodeRow: View {
         let dir = node.isDirectory ? node.path : (node.path as NSString).deletingLastPathComponent
         let path = uniquePath(base: dir, name: "untitled folder", ext: "")
         try? FileManager.default.createDirectory(atPath: path, withIntermediateDirectories: false)
+        Self.notifyTreeDidChange()
     }
 
     private func renameItem(path: String) {
         let url = URL(fileURLWithPath: path)
-        // Use NSWorkspace rename via Finder AppleScript is heavy — use simple alert
         let alert = NSAlert()
         alert.messageText = "Rename"
         alert.informativeText = (path as NSString).lastPathComponent
@@ -408,6 +413,7 @@ private struct NodeRow: View {
         guard !newName.isEmpty else { return }
         let newPath = ((path as NSString).deletingLastPathComponent as NSString).appendingPathComponent(newName)
         try? FileManager.default.moveItem(at: url, to: URL(fileURLWithPath: newPath))
+        Self.notifyTreeDidChange()
     }
 
     private func duplicateItem(path: String) {
@@ -418,6 +424,11 @@ private struct NodeRow: View {
         let newName = ext.isEmpty ? "\(name) copy" : "\(name) copy.\(ext)"
         let dest = (dir as NSString).appendingPathComponent(newName)
         try? FileManager.default.copyItem(atPath: path, toPath: dest)
+        Self.notifyTreeDidChange()
+    }
+
+    private static func notifyTreeDidChange() {
+        NotificationCenter.default.post(name: .fileTreeDidChange, object: nil)
     }
 
     private func uniquePath(base dir: String, name: String, ext: String) -> String {
@@ -474,4 +485,10 @@ final class BranchSwitchHelper: NSObject {
             }
         }
     }
+}
+
+// MARK: - Notification for manual file-tree refresh
+
+extension Notification.Name {
+    static let fileTreeDidChange = Notification.Name("HarnessFileTreeDidChange")
 }
