@@ -69,6 +69,9 @@ public struct RenderCell: Equatable, Sendable {
     public var underline: TerminalGridUnderline
     public var strikethrough: Bool
     public var overline: Bool
+    /// SGR 5/6 blink: the renderer hides the glyph (and its decorations) on the off-phase;
+    /// the background quad stays. Part of `Equatable`, so a blink-attribute change repaints.
+    public var blink: Bool = false
     public var width: TerminalCellWidth
     /// Whether the renderer must paint this cell's background quad. `false` for cells whose
     /// resolved background is the default canvas color (which the target is already cleared to),
@@ -603,6 +606,7 @@ public struct FrameBuilder {
                 underline: cell.underline,
                 strikethrough: cell.strikethrough,
                 overline: cell.overline,
+                blink: cell.blink,
                 width: cell.width,
                 drawBackground: drawBackground
             ))

@@ -19,6 +19,16 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
   title on a depth-capped stack and `CSI 18/14 t` report the text-area size in
   characters/pixels — the pixel report derives from the same host-supplied cell metrics
   inline images use (window resize/move remain deliberate non-goals).
+- VT polish, kit/renderer half: any-event mouse tracking (DECSET 1003) now reports
+  button-less pointer motion (deduped per cell), and SGR-pixel mouse (DECSET 1016) encodes
+  pixel coordinates — taking precedence over 1006, degrading to cell coordinates when the
+  host can't supply pixels; DECSCNM reverse video actually renders (the screen's default
+  fg/bg swap, in every pipeline including resize previews and copy mode — explicit SGR
+  colors keep their values); SGR blink (`SGR 5`) renders — blinking cells' glyphs hide on
+  the off-phase, driven by a timer that exists only while blinking content is visible, and
+  a phase flip re-encodes exactly the rows containing blink cells; dotted/dashed/undercurl
+  underline patterns keep a continuous phase across cells instead of restarting at every
+  cell boundary.
 
 ### Fixed
 - A stale scrollback index can no longer crash a shipping build: `HistoryRingBuffer`'s
