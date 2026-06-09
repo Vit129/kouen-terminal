@@ -63,6 +63,8 @@ final class HarnessSettingsTests: XCTestCase {
         s.bellMode = .both
         s.scrollMultiplier = 2.5
         s.mouseHideWhileTyping = true
+        s.quickTerminalEnabled = true
+        s.quickTerminalHotkey = "ctrl-opt-k"
 
         let d = try JSONDecoder().decode(HarnessSettings.self, from: JSONEncoder().encode(s))
 
@@ -110,6 +112,8 @@ final class HarnessSettingsTests: XCTestCase {
         XCTAssertEqual(d.bellMode, .both)
         XCTAssertEqual(d.scrollMultiplier, 2.5)
         XCTAssertEqual(d.mouseHideWhileTyping, true)
+        XCTAssertEqual(d.quickTerminalEnabled, true)
+        XCTAssertEqual(d.quickTerminalHotkey, "ctrl-opt-k")
     }
 
     func testScrollMultiplierAndMouseHideDefaults() {

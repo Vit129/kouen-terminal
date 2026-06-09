@@ -232,9 +232,15 @@ public final class RealPty: @unchecked Sendable {
         self.id = id
         self.termProgram = termProgram
         self.termProgramVersion = termProgramVersion
+        // `scrollbackBytes == 0` requests unlimited scrollback. Bound the daemon's in-memory replay
+        // ring (and the on-disk log it sizes) to a large safety ceiling so a runaway producer can't
+        // OOM the session-authority daemon or fill the disk; the GUI emulator keeps the truly
+        // unbounded line history. Mapping the sentinel here keeps the eviction loop + `loadTail`
+        // (which would otherwise treat a 0 `maxBytes` as "keep nothing") working unchanged.
+        let requestedScrollbackBytes = scrollbackBytes == 0 ? ScrollbackFile.unlimitedSafetyCap : scrollbackBytes
         self.maxScrollbackBytes = scrollbackURL == nil
-            ? scrollbackBytes
-            : max(scrollbackBytes, ScrollbackFile.minimumRetentionCap)
+            ? requestedScrollbackBytes
+            : max(requestedScrollbackBytes, ScrollbackFile.minimumRetentionCap)
         self.extraEnvironment = extraEnvironment
         self.shell = shell
 
