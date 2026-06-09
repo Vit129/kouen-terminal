@@ -351,7 +351,13 @@ final class PaneContainerView: NSView {
             // at ~final bounds instead of resizing (and re-sizing its PTY) twice.
             build(node: firstNode, cwd: cwd, into: first)
             build(node: secondNode, cwd: cwd, into: second)
-            DispatchQueue.main.async {
+            // [weak split]: rapid tab switching can tear down this PaneContainerView before the
+            // async fires, leaving `split` pointing at a detached view with stale bounds — a
+            // no-op setPosition call that can confuse AppKit's divider accounting on the new
+            // container. The explicit bounds check below guards the case where layout hasn't
+            // run yet (zero-size container), which would force the divider to one edge.
+            DispatchQueue.main.async { [weak split] in
+                guard let split, split.bounds.width > 1, split.bounds.height > 1 else { return }
                 let position = (direction == .horizontal ? split.frame.width : split.frame.height) * ratio
                 if position > 50 {
                     split.setPosition(position, ofDividerAt: 0)
