@@ -42,11 +42,15 @@ final class QuickTerminalHotkey {
     private static let signature: OSType = Array("HQTk".utf8).reduce(0) { ($0 << 8) | OSType($1) }
 
     // Carbon delivers hot-key events on the main run loop, so we're already main-isolated when this
-    // fires — `assumeIsolated` bridges into the @MainActor instance without an async hop.
+    // fires — `assumeIsolated` bridges into the @MainActor instance without an async hop. The raw
+    // `context` pointer is passed across the isolation boundary as its (Sendable) bit pattern and
+    // rebuilt inside, so the concurrency checker sees nothing non-Sendable cross over.
     private static let handler: EventHandlerUPP = { _, _, context in
         guard let context else { return noErr }
+        let pointerBits = Int(bitPattern: context)
         MainActor.assumeIsolated {
-            Unmanaged<QuickTerminalHotkey>.fromOpaque(context).takeUnretainedValue().fire()
+            guard let pointer = UnsafeMutableRawPointer(bitPattern: pointerBits) else { return }
+            Unmanaged<QuickTerminalHotkey>.fromOpaque(pointer).takeUnretainedValue().fire()
         }
         return noErr
     }
