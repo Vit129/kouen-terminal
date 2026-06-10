@@ -506,4 +506,19 @@ final class FrameBuilderTests: XCTestCase {
         XCTAssertTrue(f.cell(row: 0, column: 1)!.blink, "SGR 5 marks the cell as blinking")
         XCTAssertFalse(f.cell(row: 0, column: 2)!.blink, "SGR 25 clears blink")
     }
+
+    /// `TerminalFrame.hasBlink` is computed once at build so the view's blink-timer
+    /// decision is a field read, not a per-present O(cells) scan on the main thread.
+    func testFrameHasBlinkComputedAtBuild() {
+        let term = HarnessGridTerminal(cols: 10, rows: 2)!
+        term.feed("plain")
+        XCTAssertFalse(builder.build(term.readGrid()!).hasBlink)
+        term.feed("\u{1b}[5mB\u{1b}[25m")
+        XCTAssertTrue(builder.build(term.readGrid()!).hasBlink)
+        // The shifted fast path computes it from its assembled rows too.
+        let snap = term.readGrid()!
+        if let shifted = builder.buildShifted(snap, reusing: builder.build(snap), shift: 1) {
+            XCTAssertTrue(shifted.hasBlink)
+        }
+    }
 }
