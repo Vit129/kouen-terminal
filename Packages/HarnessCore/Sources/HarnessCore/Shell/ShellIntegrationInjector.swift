@@ -101,6 +101,7 @@ public enum ShellIntegrationInjector {
     /// process lifetime — one short-lived `bash -c printf` per distinct shell path, run
     /// with the same trust as spawning the pane itself. Non-absolute paths and probe
     /// failures return nil (the caller then skips injection).
+    /// The cache means a mid-run bash upgrade needs a daemon restart to be re-probed.
     public static func probeBashVersion(at shellPath: String) -> (major: Int, minor: Int)? {
         guard shellPath.hasPrefix("/") else { return nil }
         if let cached = bashVersionCache.value(for: shellPath) { return cached.version }
@@ -117,8 +118,17 @@ public enum ShellIntegrationInjector {
         process.standardOutput = pipe
         process.standardError = Pipe()
         do {
+            let exited = DispatchSemaphore(value: 0)
+            process.terminationHandler = { _ in exited.signal() }
             try process.run()
-            process.waitUntilExit()
+            // The probe runs inside the daemon's spawn path: a pathological "bash" that
+            // never exits must not wedge pane creation. 2s is generous for a `printf`;
+            // on expiry kill it and skip injection (the nil result is cached too).
+            if exited.wait(timeout: .now() + 2) == .timedOut {
+                kill(process.processIdentifier, SIGKILL)
+                process.waitUntilExit() // immediate after SIGKILL; reaps the child
+                return nil
+            }
             guard process.terminationStatus == 0 else { return nil }
             let output = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
             let parts = output.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: ".")
