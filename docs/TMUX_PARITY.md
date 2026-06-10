@@ -3,9 +3,12 @@
 Harness targets **capability parity** with tmux, not byte-for-byte emulation: Harness is a
 native GUI terminal with a daemon-owned session model, so a handful of tmux concepts are
 *adapted* to that architecture and a few are *rejected* with rationale. This document is
-the single honest ledger. Updated last for the post-close-out parity roadmap (#114) PRs
-#122 (copy-mode motions) and #123 (`@`-user-options + `set-option` key validation); the
-2026-06 close-out series was PRs #102–#108. User-facing usage lives in
+the single honest ledger. Updated last for v1.9.0 (the #114 roadmap's full run, #115–#138,
+plus #139): quick terminal, bell feedback with `visual-bell`/`bell-action` bridging,
+unlimited scrollback (`scrollback 0` → disk-capped), `clear-history`, `status-interval`/
+`status-position`, bindable `send-keys -l`/`-H`, `display-message -p`, copy-mode jump-to-char,
+and the Kitty graphics control protocol (ack/query/transmit-once/delete). The 2026-06
+close-out series was PRs #102–#108. User-facing usage lives in
 [HARNESS_TMUX_CAPABILITIES.md](HARNESS_TMUX_CAPABILITIES.md), grammar in
 [COMMANDS.md](COMMANDS.md).
 

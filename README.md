@@ -40,9 +40,12 @@ New installs start in Plain. Moving over from another setup? See [docs/MIGRATION
 
 - GPU-accelerated rendering by Harness's own terminal engine — accurate sRGB output by default, opt-in converted Display-P3 vivid color, a themed translucent canvas, and program output left untouched unless you opt into theme recoloring; damage-driven redraws keep selection drags, find highlights, IME composition, and streaming output cheap, full-rate on ProMotion displays, and covered or minimized windows stop rendering entirely
 - Mainstream-GPU-terminal polish: live re-wrap while resizing (with a grid-size overlay), word / line / block selection, middle-click paste, alternate-screen wheel scrolling, focus reporting, hollow unfocused cursor, minimum contrast, auto light/dark themes, bold-is-bright control, and paste protection
+- Quick terminal: a Quake-style dropdown on a global hotkey (Settings ▸ Keys), sliding over whatever app is frontmost and persisting like any other session
+- Terminal bell (`\a`): audible and/or visual feedback on the focused surface, a bell badge on background tabs, and tmux `visual-bell`/`bell-action` bridging
+- Find bar (⌘F) with regular-expression and case-sensitivity toggles; matches highlight across scrollback
 - Sidebar sessions, per-session tabs, and horizontal / vertical splits — group sessions with shared window lists
 - Session layout persists across quits (daemon-owned, attach from the CLI or over SSH); if the daemon restarts under a pane, a quiet "Reconnecting…" chip rides the ~1-minute automatic backoff before the click-to-re-grab overlay takes over
-- Persistent scrollback: a pane's history is written to disk per surface and restored when the daemon restarts
+- Persistent scrollback: a pane's history is written to disk per surface and restored when the daemon restarts — set the scrollback limit to 0 for unlimited history (disk-capped only)
 - Remote & headless daemon: run `HarnessDaemon` on a headless or remote box (Linux included) and drive it with `harness-cli --host <name>` over an SSH tunnel — register hosts with `harness-cli remote add`
 - `harness-cli` for automation and agent hooks
 - Color/theme diagnostics from the CLI: `harness-cli color-check` and `harness-cli theme-preview --theme <name>` print deterministic SGR pages for eyeballing fidelity in Harness itself
