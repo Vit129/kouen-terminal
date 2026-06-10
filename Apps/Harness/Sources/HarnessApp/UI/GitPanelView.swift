@@ -5,6 +5,9 @@ import CoreServices
 @MainActor
 final class GitPanelView: NSView {
     private var currentPath: String?
+    /// Bumped on every `refresh()` call so a slower, stale refresh can detect
+    /// that a newer one has superseded it and discard its results.
+    private var refreshGeneration = 0
     private nonisolated(unsafe) var watchStream: FSEventStreamRef?
     private nonisolated(unsafe) var contextPointer: UnsafeMutableRawPointer?
     private nonisolated(unsafe) var watchDebounce: DispatchWorkItem?
@@ -639,10 +642,18 @@ final class GitPanelView: NSView {
 
     private func refresh() async {
         guard let path = currentPath else { return }
+        refreshGeneration += 1
+        let generation = refreshGeneration
+
         let branch = await runGit(["branch", "--show-current"], in: path)
         let numstat = await runGit(["diff", "--numstat", "HEAD"], in: path)
         let porcelain = await runGit(["status", "--porcelain"], in: path)
         let log = await runGit(["log", "--format=%H|%an|%ar|%s", "-25"], in: path)
+
+        // A newer refresh started while these git calls were in flight — its
+        // result will supersede ours, so discard this stale snapshot instead
+        // of overwriting the UI with out-of-date staged/changed state.
+        guard generation == refreshGeneration else { return }
 
         branchLabel.stringValue = "⎇ " + (branch.isEmpty ? "detached" : branch)
 
@@ -680,7 +691,7 @@ final class GitPanelView: NSView {
             card.trailingAnchor.constraint(equalTo: historyStack.trailingAnchor).isActive = true
         }
 
-        await refreshWorktrees()
+        await refreshWorktrees(generation: generation)
     }
 
     // MARK: - Row builders
@@ -883,9 +894,10 @@ final class GitPanelView: NSView {
         return l
     }
 
-    private func refreshWorktrees() async {
+    private func refreshWorktrees(generation: Int) async {
         guard let path = currentPath else { return }
         let output = await runGit(["worktree", "list", "--porcelain"], in: path)
+        guard generation == refreshGeneration else { return }
 
         worktreesStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
 
