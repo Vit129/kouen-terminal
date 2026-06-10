@@ -205,8 +205,10 @@ final class SessionCoordinator: NSObject {
         daemon.switchEndpoint(endpoint)
         terminalHosts.prune(keeping: [])
         // Re-point the push channel: the old subscription is pinned to the old daemon
-        // (its onEnd is invalidated by the generation bump inside).
+        // (its onEnd is invalidated by the generation bump inside). A failed attempt has
+        // no onEnd to retry from, so back off explicitly.
         startSnapshotSubscription()
+        if snapshotSubscription == nil { scheduleSnapshotResubscribe() }
         _ = syncFromDaemon()
     }
 
@@ -224,6 +226,9 @@ final class SessionCoordinator: NSObject {
         }
         StartupMetrics.shared.mark(.firstSnapshot) // idempotent: records the first hydration only
         let structureChanged = structureFingerprint(remote) != structureFingerprint(snapshot)
+        // A CLI-driven theme change arrives by push (metadata-only), so it must force the
+        // chrome path itself — recurring syncs otherwise never rebuild renderers.
+        let themeChanged = remote.themeName != snapshot.themeName
         snapshot = remote
         lastRevision = remote.revision
         // The daemon answered: bring up the push channel if it isn't already, and reconcile
@@ -246,7 +251,7 @@ final class SessionCoordinator: NSObject {
         }
         pushNewRemoteNotifications(from: remote)
         pushAgentActivityNotifications(from: remote)
-        if !metadataOnly {
+        if !metadataOnly || themeChanged {
             applyThemeToAllHosts()
         }
         updateDockBadge(from: remote)
@@ -257,7 +262,7 @@ final class SessionCoordinator: NSObject {
             userInfo: [
                 "revision": remote.revision,
                 "structureChanged": structureChanged,
-                "chromeChanged": !metadataOnly,
+                "chromeChanged": !metadataOnly || themeChanged,
                 "metadataOnly": metadataOnly,
             ]
         )
@@ -1623,9 +1628,15 @@ final class SessionCoordinator: NSObject {
     private func startSnapshotSubscriptionIfNeeded() {
         guard snapshotSubscription == nil else { return }
         startSnapshotSubscription()
-        guard snapshotSubscription != nil else { return }
+        guard snapshotSubscription != nil else {
+            // The subscribe attempt failed (daemon briefly down): without this, recovery
+            // would degrade to the 30 s safety poll — onEnd never fires for a channel
+            // that never came up.
+            scheduleSnapshotResubscribe()
+            return
+        }
         DispatchQueue.main.async { [weak self] in
-            MainActor.assumeIsolated { _ = self?.syncFromDaemon() }
+            MainActor.assumeIsolated { _ = self?.syncFromDaemon(metadataOnly: true) }
         }
     }
 
@@ -1658,9 +1669,13 @@ final class SessionCoordinator: NSObject {
 
     private func handlePushedRevision(_ revision: Int) {
         // Echo guard: our own mutations sync synchronously, so the push for a revision we
-        // already hold must not trigger a second full fetch.
+        // already hold must not trigger a second fetch.
         guard revision != lastRevision else { return }
-        syncFromDaemon()
+        // metadataOnly: a pushed revision must never rebuild every pane's renderer — the
+        // daemon commits at ~1.5 s cadence while an agent streams. Structure changes still
+        // remount (structureChanged is computed independently) and a CLI theme change still
+        // applies (themeChanged forces the chrome path inside syncFromDaemon).
+        syncFromDaemon(metadataOnly: true)
     }
 
     /// The daemon went away (restart, backlog eviction, socket death): retry with capped
@@ -1674,7 +1689,7 @@ final class SessionCoordinator: NSObject {
                 guard let self, self.snapshotSubscription == nil else { return }
                 self.startSnapshotSubscription()
                 if self.snapshotSubscription != nil {
-                    self.syncFromDaemon()
+                    self.syncFromDaemon(metadataOnly: true)
                 } else {
                     self.scheduleSnapshotResubscribe()
                 }
@@ -1685,7 +1700,7 @@ final class SessionCoordinator: NSObject {
     private func startSafetyPoll() {
         safetyPollTimer?.invalidate()
         let timer = Timer(timeInterval: 30, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.syncFromDaemon() }
+            Task { @MainActor in self?.syncFromDaemon(metadataOnly: true) }
         }
         timer.tolerance = 5
         RunLoop.main.add(timer, forMode: .common)
