@@ -9,18 +9,24 @@ import HarnessCore
 /// loop rather than fixed sleeps; "nothing fired" assertions use a short bounded window.
 @MainActor
 final class GitBranchMonitorTests: XCTestCase {
-    private var root: URL!
-    private var monitor: GitBranchMonitor!
-    private var changes: [(workspaceID: WorkspaceID, tabID: TabID, branch: String?)] = []
+    // XCTest runs this class's synchronous lifecycle + test methods on the main thread, but
+    // the setUp/tearDown overrides are nonisolated by signature, so the class-level
+    // @MainActor can't reach them — `nonisolated(unsafe)` under that single-threaded
+    // contract, with the @MainActor monitor constructed inside `assumeIsolated`.
+    nonisolated(unsafe) private var root: URL!
+    nonisolated(unsafe) private var monitor: GitBranchMonitor!
+    nonisolated(unsafe) private var changes: [(workspaceID: WorkspaceID, tabID: TabID, branch: String?)] = []
 
     override func setUpWithError() throws {
         root = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("git-branch-monitor-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         changes = []
-        monitor = GitBranchMonitor()
-        monitor.onBranchChange = { [weak self] workspaceID, tabID, branch in
-            self?.changes.append((workspaceID, tabID, branch))
+        MainActor.assumeIsolated {
+            monitor = GitBranchMonitor()
+            monitor.onBranchChange = { [weak self] workspaceID, tabID, branch in
+                self?.changes.append((workspaceID, tabID, branch))
+            }
         }
     }
 
