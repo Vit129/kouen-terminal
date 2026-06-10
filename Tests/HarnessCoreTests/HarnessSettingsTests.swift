@@ -656,4 +656,13 @@ final class HarnessSettingsTests: XCTestCase {
         }
         try body()
     }
+
+    func testWindowInheritCWDDefaultsOnAndDecodesExplicitOff() throws {
+        XCTAssertTrue(HarnessSettings().windowInheritCWD, "inherit is the shipped behavior — default on")
+        let legacy = try JSONDecoder().decode(HarnessSettings.self, from: Data("{}".utf8))
+        XCTAssertTrue(legacy.windowInheritCWD, "older settings files keep inheriting")
+        let off = try JSONDecoder().decode(
+            HarnessSettings.self, from: Data(#"{ "windowInheritCWD": false }"#.utf8))
+        XCTAssertFalse(off.windowInheritCWD)
+    }
 }

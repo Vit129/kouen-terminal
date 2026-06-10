@@ -226,4 +226,62 @@ final class TerminalProtocolCompatibilityTests: XCTestCase {
         XCTAssertEqual(codepoint(term, row: 0, col: 0), 0x2500)
         XCTAssertEqual(codepoint(term, row: 0, col: 1), UInt32(UnicodeScalar("q").value))
     }
+
+    // MARK: OSC 1337 — CurrentDir= / SetUserVar= (F20)
+
+    func testOSC1337CurrentDirReportsAbsolutePathsOnly() {
+        let term = TerminalEmulator(cols: 20, rows: 4)
+        var paths: [String] = []
+        term.onWorkingDirectoryChange = { paths.append($0) }
+        term.feed("\u{1b}]1337;CurrentDir=/Users/me/project\u{07}")
+        XCTAssertEqual(paths, ["/Users/me/project"])
+        // Same trust policy as OSC 7: hostile output must not steer the inherited cwd.
+        term.feed("\u{1b}]1337;CurrentDir=relative/path\u{07}")
+        term.feed("\u{1b}]1337;CurrentDir=\u{07}")
+        XCTAssertEqual(paths, ["/Users/me/project"], "non-absolute paths are ignored")
+    }
+
+    func testOSC1337SetUserVarDecodesValidatesAndCaps() {
+        let term = TerminalEmulator(cols: 20, rows: 4)
+        var seen: [(String, String)] = []
+        term.onUserVariableChange = { seen.append(($0, $1)) }
+
+        // "hello" base64 = aGVsbG8=
+        term.feed("\u{1b}]1337;SetUserVar=status=aGVsbG8=\u{07}")
+        XCTAssertEqual(term.userVariables["status"], "hello")
+        XCTAssertEqual(seen.count, 1)
+
+        // Updates overwrite; names are shape-validated; junk base64 is ignored.
+        term.feed("\u{1b}]1337;SetUserVar=status=d29ybGQ=\u{07}") // "world"
+        XCTAssertEqual(term.userVariables["status"], "world")
+        term.feed("\u{1b}]1337;SetUserVar=bad name=aGVsbG8=\u{07}")
+        term.feed("\u{1b}]1337;SetUserVar=ok=!!!not-base64!!!\u{07}")
+        term.feed("\u{1b}]1337;SetUserVar=noequals\u{07}")
+        XCTAssertEqual(term.userVariables.count, 1, "invalid sets are dropped")
+
+        // Population cap: new names rejected past 64; existing stay updatable.
+        for i in 0 ..< 100 {
+            let value = Data("v\(i)".utf8).base64EncodedString()
+            term.feed("\u{1b}]1337;SetUserVar=var\(i)=\(value)\u{07}")
+        }
+        XCTAssertLessThanOrEqual(term.userVariables.count, 64)
+        term.feed("\u{1b}]1337;SetUserVar=status=YWdhaW4=\u{07}") // "again"
+        XCTAssertEqual(term.userVariables["status"], "again", "existing names stay updatable at the cap")
+    }
+
+    func testOSC1337FileStillRoutesToImageHandler() {
+        // The new demux must not break inline images: junk File= payloads are ignored
+        // exactly as before (no crash, no user-var side effects).
+        let term = TerminalEmulator(cols: 20, rows: 4)
+        term.feed("\u{1b}]1337;File=inline=1:notreallyanimage\u{07}")
+        XCTAssertTrue(term.userVariables.isEmpty)
+    }
+
+    func testFullResetClearsUserVariables() {
+        let term = TerminalEmulator(cols: 20, rows: 4)
+        term.feed("\u{1b}]1337;SetUserVar=keep=aGVsbG8=\u{07}")
+        XCTAssertFalse(term.userVariables.isEmpty)
+        term.feed("\u{1b}c") // RIS
+        XCTAssertTrue(term.userVariables.isEmpty)
+    }
 }

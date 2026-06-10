@@ -54,7 +54,10 @@ final class SessionCoordinator: NSObject {
     /// used as the default for new tabs/sessions so they open where the user is
     /// working — matching Terminal.app / iTerm. `nil` when unknown.
     private var activeTabCWD: String? {
-        guard let cwd = snapshot.activeWorkspace?.activeTab?.cwd, !cwd.isEmpty else { return nil }
+        // `window-inherit-cwd` (default on): off pins new tabs/sessions to `defaultCWD`
+        // by making the inherited value resolve to nil at every consumer.
+        guard settings.windowInheritCWD,
+              let cwd = snapshot.activeWorkspace?.activeTab?.cwd, !cwd.isEmpty else { return nil }
         return cwd
     }
 
@@ -1649,6 +1652,14 @@ extension SessionCoordinator: TerminalHostDelegate {
     func terminalHostDidChangeWorkingDirectory(_ path: String, surfaceID: SurfaceID) {
         logIfFailed(.updateTabCwd(surfaceID: surfaceID.uuidString, path: path))
         syncFromDaemon(metadataOnly: true)
+    }
+
+    /// OSC 1337 `SetUserVar=` → a pane-scoped `@name` user option, so `#{@name}` format
+    /// tokens (status line, pane borders, hooks) read it like any other user option. The
+    /// engine already validated and bounded the name/value; `@`-options always pass the
+    /// daemon's key validation.
+    func terminalHostDidSetUserVariable(_ name: String, value: String, surfaceID: SurfaceID) {
+        requestDaemon(.setOption(scope: "pane", target: surfaceID.uuidString, key: "@\(name)", rawValue: value))
     }
 
     /// Called by `SurfaceShellTracker` when a polled cwd changes (the OSC 7
