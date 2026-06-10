@@ -13,8 +13,10 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
   success/failure gutter, and jump-to-prompt work out of the box with no
   `install-shell-integration` step. zsh rides a `ZDOTDIR` shim that restores your real
   `ZDOTDIR` and chains to your own `.zshenv`; fish rides an `XDG_DATA_DIRS` vendor dir;
-  bash uses the `--posix` + `$ENV` technique (kitty/Ghostty lineage) — **known caveat:
-  `shopt -q login_shell` reports off inside Harness bash panes** (the shim replays the
+  bash uses the `--posix` + `$ENV` technique (kitty/Ghostty lineage) and **requires
+  bash ≥ 4.4** — older bash (notably the stock macOS 3.2, which never reads `$ENV` under
+  `--posix`) spawns untouched, the same floor Ghostty ships; **known caveat:
+  `shopt -q login_shell` reports off inside injected bash panes** (the shim replays the
   login startup files itself). Idempotent alongside a manual install; never active for
   non-interactive shells; opt out with `set-option shell-integration off` (applies to
   subsequently spawned panes). User `set-environment` values always win over the

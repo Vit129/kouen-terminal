@@ -46,7 +46,8 @@ final class ShellIntegrationInjectorTests: XCTestCase {
 
     func testBashPlanSwapsLoginForPosixAndReplaysStartup() throws {
         let plan = try XCTUnwrap(ShellIntegrationInjector.plan(
-            shellPath: "/bin/bash", baseEnvironment: [:], home: home))
+            shellPath: "/bin/bash", baseEnvironment: [:], home: home,
+            bashVersionProbe: { _ in (5, 2) }))
         XCTAssertEqual(plan.argumentsOverride, ["--posix"],
                        "POSIX-mode interactive bash reads exactly $ENV — the injection vehicle")
         XCTAssertEqual(plan.environment["HARNESS_BASH_LOGIN"], "1")
@@ -81,6 +82,24 @@ final class ShellIntegrationInjectorTests: XCTestCase {
     func testUnknownShellGetsNoPlan() {
         XCTAssertNil(ShellIntegrationInjector.plan(shellPath: "/usr/bin/nu", baseEnvironment: [:], home: home))
         XCTAssertNil(ShellIntegrationInjector.plan(shellPath: "", baseEnvironment: [:], home: home))
+    }
+
+    /// Old bash (the stock macOS 3.2) doesn't read `$ENV` under `--posix` when invoked as
+    /// `bash` — half-injecting would strip the user's startup files. No plan below 4.4;
+    /// 4.4 itself is the floor (the Ghostty policy).
+    func testBashBelowFloorGetsNoPlan() {
+        XCTAssertNil(ShellIntegrationInjector.plan(
+            shellPath: "/bin/bash", baseEnvironment: [:], home: home,
+            bashVersionProbe: { _ in (3, 2) }))
+        XCTAssertNil(ShellIntegrationInjector.plan(
+            shellPath: "/bin/bash", baseEnvironment: [:], home: home,
+            bashVersionProbe: { _ in (4, 3) }))
+        XCTAssertNil(ShellIntegrationInjector.plan(
+            shellPath: "/bin/bash", baseEnvironment: [:], home: home,
+            bashVersionProbe: { _ in nil }))
+        XCTAssertNotNil(ShellIntegrationInjector.plan(
+            shellPath: "/bin/bash", baseEnvironment: [:], home: home,
+            bashVersionProbe: { _ in (4, 4) }))
     }
 
     func testPlanIsIdempotentOnDisk() throws {

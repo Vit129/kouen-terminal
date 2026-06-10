@@ -30,8 +30,12 @@ final class ShellIntegrationInjectionTests: XCTestCase {
     /// Spawn a RealPty through the injection plan with a controlled $HOME and collect output.
     private func spawnInjectedBash(userHome: URL) throws -> (RealPty, OutputAccumulator) {
         let bash = try bashPath()
-        let plan = try XCTUnwrap(ShellIntegrationInjector.plan(
-            shellPath: bash, baseEnvironment: [:], home: home))
+        guard let plan = ShellIntegrationInjector.plan(
+            shellPath: bash, baseEnvironment: [:], home: home) else {
+            // The stock macOS /bin/bash is 3.2, below the injection floor — the gate working
+            // as designed. The Linux CI container (bash 5.x) runs the full end-to-end.
+            throw XCTSkip("bash at \(bash) is below the 4.4 injection floor")
+        }
         var env = plan.environment
         env["HOME"] = userHome.path
         env["HARNESS"] = "test" // the snippets gate on $HARNESS

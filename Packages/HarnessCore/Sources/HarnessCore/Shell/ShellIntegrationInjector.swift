@@ -21,6 +21,12 @@ import Foundation
 /// fish replaces same-named event functions). Never active for non-interactive shells —
 /// each vehicle is interactive-gated by construction AND the shims re-check. Opt out with
 /// `set-option shell-integration off` (applies to subsequently spawned panes).
+///
+/// Bash requires **bash ≥ 4.4**: older bash (notably the stock macOS 3.2) does not read
+/// `$ENV` under `--posix` when invoked as `bash`, which would leave the pane in posix mode
+/// with NO startup files at all — strictly worse than no injection. The version is probed
+/// once per shell path (cached); too-old or unprobeable bash spawns untouched, exactly the
+/// Ghostty policy (their automatic bash integration carries the same floor).
 public enum ShellIntegrationInjector {
     /// What a spawn must change to carry the injection. `environment` merges over the
     /// inherited process env (and under the user's `set-environment` table, which always
@@ -38,7 +44,8 @@ public enum ShellIntegrationInjector {
     public static func plan(
         shellPath: String,
         baseEnvironment: [String: String],
-        home: URL = HarnessPaths.applicationSupport
+        home: URL = HarnessPaths.applicationSupport,
+        bashVersionProbe: (String) -> (major: Int, minor: Int)? = ShellIntegrationInjector.probeBashVersion
     ) -> Plan? {
         guard let shell = ShellIntegration.Shell.detect(from: shellPath) else { return nil }
         let root = home.appendingPathComponent("shell-integration", isDirectory: true)
@@ -54,6 +61,11 @@ public enum ShellIntegrationInjector {
                 }
                 return Plan(environment: env, argumentsOverride: nil)
             case .bash:
+                // The --posix + $ENV vehicle needs bash >= 4.4 (see the type doc). Older or
+                // unprobeable bash spawns untouched — never half-inject.
+                guard let version = bashVersionProbe(shellPath),
+                      version.major > 4 || (version.major == 4 && version.minor >= 4)
+                else { return nil }
                 let script = try writeIntegrationScript(.bash, root: root)
                 let shim = root.appendingPathComponent("bash-shim.sh")
                 try writeIfChanged(bashShim(scriptPath: script.path), to: shim)
@@ -81,6 +93,52 @@ public enum ShellIntegrationInjector {
             return nil
         }
     }
+
+    /// Probe a bash binary's version (`BASH_VERSINFO`), cached per absolute path for the
+    /// process lifetime — one short-lived `bash -c printf` per distinct shell path, run
+    /// with the same trust as spawning the pane itself. Non-absolute paths and probe
+    /// failures return nil (the caller then skips injection).
+    public static func probeBashVersion(at shellPath: String) -> (major: Int, minor: Int)? {
+        guard shellPath.hasPrefix("/") else { return nil }
+        if let cached = bashVersionCache.value(for: shellPath) { return cached.version }
+        let probed = runBashVersionProbe(shellPath)
+        bashVersionCache.store(probed, for: shellPath)
+        return probed
+    }
+
+    private static func runBashVersionProbe(_ shellPath: String) -> (major: Int, minor: Int)? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: shellPath)
+        process.arguments = ["-c", "printf %s \"${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}\""]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = Pipe()
+        do {
+            try process.run()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0 else { return nil }
+            let output = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+            let parts = output.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: ".")
+            guard parts.count >= 2, let major = Int(parts[0]), let minor = Int(parts[1]) else { return nil }
+            return (major, minor)
+        } catch {
+            return nil
+        }
+    }
+
+    /// Lock-guarded probe cache (nil results cached too — a broken bash is broken all run).
+    private final class BashVersionCache: @unchecked Sendable {
+        private let lock = NSLock()
+        private var values: [String: (version: (major: Int, minor: Int)?, probed: Bool)] = [:]
+        func value(for path: String) -> (version: (major: Int, minor: Int)?, probed: Bool)? {
+            lock.lock(); defer { lock.unlock() }
+            return values[path]
+        }
+        func store(_ version: (major: Int, minor: Int)?, for path: String) {
+            lock.lock(); values[path] = (version, true); lock.unlock()
+        }
+    }
+    private static let bashVersionCache = BashVersionCache()
 
     /// The canonical integration script on disk (same location the manual installer
     /// uses, so both paths share one file).
