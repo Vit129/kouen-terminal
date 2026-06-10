@@ -178,6 +178,50 @@ final class GitBranchMonitorTests: XCTestCase {
         XCTAssertEqual(fixture.recorder.changes.first?.branch, "away")
     }
 
+    func testResumeReSendsBranchTheDaemonNeverEchoed() throws {
+        let fixture = try makeFixture()
+        let repo = try makeRepository(in: fixture.root, named: "repo", branch: "main")
+        let tab = record(cwd: repo.path, snapshotBranch: nil)
+        fixture.monitor.update(tabs: [tab])
+        waitUntil("first push") { fixture.recorder.changes.count == 1 }
+
+        // The send's IPC failed (daemon down at send time): the snapshot never echoes
+        // "main" back, so `snapshotBranch` stays nil and the in-flight suppression alone
+        // would block every future identical read. Pause/resume (app re-activate) must
+        // self-heal by re-sending.
+        fixture.recorder.changes = []
+        fixture.monitor.pause()
+        fixture.monitor.resume()
+        waitUntil("resume re-sends the never-echoed branch") { !fixture.recorder.changes.isEmpty }
+        XCTAssertEqual(fixture.recorder.changes.first?.tabID, tab.tabID)
+        XCTAssertEqual(fixture.recorder.changes.first?.branch, "main")
+    }
+
+    func testNewTabIntoNegativeCachedDirectoryReChecks() throws {
+        let fixture = try makeFixture()
+        let dir = fixture.root.appendingPathComponent("becomes-repo", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+
+        // First tab visits: cached as not-a-repository. It stays open so the negative
+        // entry survives the prune pass.
+        let first = record(cwd: dir.path)
+        fixture.monitor.update(tabs: [first])
+        assertNoChanges(fixture.recorder, within: 0.5, "non-repo with nil snapshot stays silent")
+
+        // The directory becomes a repository, then a *brand-new* tab opens into it.
+        let gitDir = dir.appendingPathComponent(".git", isDirectory: true)
+        try FileManager.default.createDirectory(at: gitDir, withIntermediateDirectories: true)
+        try "ref: refs/heads/fresh\n"
+            .write(to: gitDir.appendingPathComponent("HEAD"), atomically: true, encoding: .utf8)
+        let second = record(cwd: dir.path)
+        fixture.monitor.update(tabs: [first, second])
+        waitUntil(
+            "new tab re-resolves the negative-cached cwd; changes \(fixture.recorder.changes)"
+        ) { fixture.recorder.changes.contains { $0.tabID == second.tabID } }
+        let change = try XCTUnwrap(fixture.recorder.changes.first { $0.tabID == second.tabID })
+        XCTAssertEqual(change.branch, "fresh")
+    }
+
     func testCwdMoveIntoFreshRepositoryReChecksNegativeCache() throws {
         let fixture = try makeFixture()
         let dir = fixture.root.appendingPathComponent("becomes-repo", isDirectory: true)

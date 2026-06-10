@@ -38,8 +38,8 @@ final class GitBranchMonitor {
     private var tabs: [TabID: TabRecord] = [:]
     /// cwd → resolved repository (`value == nil`: checked, not in a repository — the
     /// negative cache). Pruned to live cwds on every reconcile; negative entries are
-    /// additionally dropped when a tab *moves into* the directory (it may have just been
-    /// `git init`-ed) and wholesale on `refreshAll` (app re-activate).
+    /// additionally dropped when a tab is first seen in — or moves into — the directory
+    /// (it may have just been `git init`-ed) and wholesale on `refreshAll` (app re-activate).
     private var repoByCwd: [String: Cached<GitHEADReader.Repository?>] = [:]
     /// Resolved-`HEAD` path → live watcher.
     private var watchers: [String: FileWatcher] = [:]
@@ -67,9 +67,10 @@ final class GitBranchMonitor {
     func update(tabs newTabs: [TabRecord]) {
         var next: [TabID: TabRecord] = [:]
         for record in newTabs {
-            // A tab that moved into a directory previously cached as "not a repository"
-            // re-checks it: the user may have just created the repo and cd-ed in.
-            if let previous = tabs[record.tabID], previous.cwd != record.cwd,
+            // A tab first seen in — or moved into — a directory previously cached as "not
+            // a repository" re-checks it: the user may have just created the repo and
+            // cd-ed in. (`tabs[record.tabID]` nil ⇒ new tab ⇒ the `!=` holds.)
+            if tabs[record.tabID]?.cwd != record.cwd,
                let cached = repoByCwd[record.cwd], cached.value == nil {
                 repoByCwd.removeValue(forKey: record.cwd)
             }
@@ -113,6 +114,10 @@ final class GitBranchMonitor {
         branchByHead.removeAll()
         watchers.removeAll()
         rereadRequested.removeAll()
+        // Also forget what we *sent*: if the IPC behind a send failed, the snapshot never
+        // echoes it back and the suppression would wedge that label forever — re-activate
+        // is the self-heal point, so re-send is the safe direction.
+        lastSent.removeAll()
         for record in tabs.values { evaluate(record) }
     }
 
