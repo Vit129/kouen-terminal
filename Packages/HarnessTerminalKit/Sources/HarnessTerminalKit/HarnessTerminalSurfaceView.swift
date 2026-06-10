@@ -3668,8 +3668,13 @@ public final class HarnessTerminalSurfaceView: NSView {
         // also carry `.numericPad`; the keycode table only claims true keypad codes and
         // everything else falls through to the character switch below. In numeric mode the
         // encoder emits the same plain byte the text path used to, so nothing changes until
-        // a program enables application keypad (`ESC =`).
-        if event.modifierFlags.contains(.numericPad), let keypad = keypadKey(forKeyCode: event.keyCode) {
+        // a program enables application keypad (`ESC =`). Only the UNMODIFIED key is claimed
+        // (Shift/NumLock aside): `keypadLegacy` ignores modifiers, so claiming Ctrl/Option
+        // combos here would drop the control collapse / ESC meta prefix the text path applies
+        // — modified keypad keys keep their pre-keypad byte output in both keypad modes.
+        if event.modifierFlags.contains(.numericPad),
+           event.modifierFlags.isDisjoint(with: [.control, .option, .command]),
+           let keypad = keypadKey(forKeyCode: event.keyCode) {
             return keypad
         }
         guard let scalar = event.charactersIgnoringModifiers?.unicodeScalars.first else { return nil }
