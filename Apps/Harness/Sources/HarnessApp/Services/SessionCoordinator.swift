@@ -1600,6 +1600,19 @@ final class SessionCoordinator: NSObject {
 
     private var lastDaemonErrorNotice: Date?
 
+    // MARK: OSC 1337 user variables (coalesced daemon push)
+
+    /// Pending `SetUserVar` pushes, coalesced per (surface, name): a flood of sequences
+    /// becomes at most one synchronous daemon `setOption` per name per flush window,
+    /// instead of one main-thread IPC round trip (plus a snapshot-subscriber broadcast)
+    /// per escape sequence.
+    private var pendingUserVariables: [SurfaceID: [String: String]] = [:]
+    /// Names already pushed to the daemon per surface — the per-surface population cap
+    /// (mirroring the engine's per-epoch cap) and the set a RIS must reset.
+    private var pushedUserVariableNames: [SurfaceID: Set<String>] = [:]
+    private var userVariableFlushScheduled = false
+    private static let maxUserVariablesPerSurface = 64
+
     @discardableResult
     func requestDaemon(_ request: IPCRequest) -> IPCResponse? {
         do {
@@ -1657,9 +1670,48 @@ extension SessionCoordinator: TerminalHostDelegate {
     /// OSC 1337 `SetUserVar=` → a pane-scoped `@name` user option, so `#{@name}` format
     /// tokens (status line, pane borders, hooks) read it like any other user option. The
     /// engine already validated and bounded the name/value; `@`-options always pass the
-    /// daemon's key validation.
+    /// daemon's key validation. Pushes are coalesced (see `pendingUserVariables`) — the
+    /// engine dedupes same-value rewrites, this bounds genuinely-changing floods.
     func terminalHostDidSetUserVariable(_ name: String, value: String, surfaceID: SurfaceID) {
-        requestDaemon(.setOption(scope: "pane", target: surfaceID.uuidString, key: "@\(name)", rawValue: value))
+        var names = pushedUserVariableNames[surfaceID, default: []]
+        if !names.contains(name) {
+            // Per-surface name cap, mirroring the engine's: defense in depth so a hostile
+            // stream can't grow options.json even if the engine's own bound regresses.
+            guard names.count < Self.maxUserVariablesPerSurface else { return }
+            names.insert(name)
+            pushedUserVariableNames[surfaceID] = names
+        }
+        pendingUserVariables[surfaceID, default: [:]][name] = value
+        scheduleUserVariableFlush()
+    }
+
+    /// RIS dropped the engine's user variables — reset the daemon mirror so `#{@name}`
+    /// stops serving pre-reset values. There is no unset IPC, so each pushed name is set
+    /// to "" (renders as empty in formats) via the same coalesced path; the bookkeeping
+    /// is forgotten so the name cap re-arms for the post-reset epoch.
+    func terminalHostDidClearUserVariables(surfaceID: SurfaceID) {
+        guard let names = pushedUserVariableNames.removeValue(forKey: surfaceID), !names.isEmpty else { return }
+        for name in names { pendingUserVariables[surfaceID, default: [:]][name] = "" }
+        scheduleUserVariableFlush()
+    }
+
+    /// One short debounce window shared by all surfaces: `SetUserVar` can arrive in bursts
+    /// (a status updater in a shell loop) and each daemon round trip is synchronous on main.
+    private func scheduleUserVariableFlush() {
+        guard !userVariableFlushScheduled else { return }
+        userVariableFlushScheduled = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            guard let self else { return }
+            self.userVariableFlushScheduled = false
+            let pending = self.pendingUserVariables
+            self.pendingUserVariables = [:]
+            for (surfaceID, variables) in pending {
+                for (name, value) in variables {
+                    self.requestDaemon(.setOption(
+                        scope: "pane", target: surfaceID.uuidString, key: "@\(name)", rawValue: value))
+                }
+            }
+        }
     }
 
     /// Called by `SurfaceShellTracker` when a polled cwd changes (the OSC 7

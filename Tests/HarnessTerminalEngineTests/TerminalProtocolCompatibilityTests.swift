@@ -269,6 +269,61 @@ final class TerminalProtocolCompatibilityTests: XCTestCase {
         XCTAssertEqual(term.userVariables["status"], "again", "existing names stay updatable at the cap")
     }
 
+    /// Same-name-same-value rewrites must not re-fire the host callback — each fire
+    /// becomes a GUI→daemon push, so an output loop re-asserting one variable would
+    /// otherwise amplify into an IPC flood.
+    func testOSC1337SetUserVarSameValueRewriteDoesNotRefire() {
+        let term = TerminalEmulator(cols: 20, rows: 4)
+        var fired = 0
+        term.onUserVariableChange = { _, _ in fired += 1 }
+        for _ in 0 ..< 5 {
+            term.feed("\u{1b}]1337;SetUserVar=status=aGVsbG8=\u{07}") // "hello", unchanged
+        }
+        XCTAssertEqual(fired, 1, "rewrites of an unchanged value are deduped")
+        term.feed("\u{1b}]1337;SetUserVar=status=d29ybGQ=\u{07}") // "world" — a real change
+        XCTAssertEqual(fired, 2)
+    }
+
+    /// Name validation is ASCII-tight: Unicode letters/digits (`café`, `½`) must not
+    /// slip through `isLetter`/`isNumber`.
+    func testOSC1337SetUserVarRejectsNonASCIINames() {
+        let term = TerminalEmulator(cols: 20, rows: 4)
+        term.feed("\u{1b}]1337;SetUserVar=caf\u{e9}=aGVsbG8=\u{07}")
+        term.feed("\u{1b}]1337;SetUserVar=\u{bd}=aGVsbG8=\u{07}")
+        XCTAssertTrue(term.userVariables.isEmpty)
+    }
+
+    /// The base64 TEXT is bounded before decoding (4096 bytes ≈ 5464 chars with padding):
+    /// a hostile multi-MiB payload is rejected without ever reaching the decoder, while
+    /// the 4096-byte boundary value still lands.
+    func testOSC1337SetUserVarBoundsBase64TextBeforeDecoding() {
+        let term = TerminalEmulator(cols: 20, rows: 4)
+        let maxValue = String(repeating: "a", count: 4096) // encodes to exactly 5464 chars
+        term.feed("\u{1b}]1337;SetUserVar=max=\(Data(maxValue.utf8).base64EncodedString())\u{07}")
+        XCTAssertEqual(term.userVariables["max"], maxValue)
+        let oversized = Data(repeating: 0x61, count: 65536).base64EncodedString()
+        XCTAssertGreaterThan(oversized.count, 5464)
+        term.feed("\u{1b}]1337;SetUserVar=big=\(oversized)\u{07}")
+        XCTAssertNil(term.userVariables["big"])
+    }
+
+    /// Decoded values carrying C0 controls, DEL, or C1 are rejected outright — they get
+    /// format-expanded into status lines and other clients' TTYs later, where a raw ESC
+    /// is escape injection.
+    func testOSC1337SetUserVarRejectsControlCharacterValues() {
+        let term = TerminalEmulator(cols: 20, rows: 4)
+        func feedValue(_ name: String, _ raw: String) {
+            term.feed("\u{1b}]1337;SetUserVar=\(name)=\(Data(raw.utf8).base64EncodedString())\u{07}")
+        }
+        feedValue("esc", "evil\u{1b}[31m") // C0 (ESC)
+        feedValue("nul", "a\u{0}b")        // C0 (NUL)
+        feedValue("del", "a\u{7f}b")       // DEL
+        feedValue("nel", "a\u{85}b")       // C1 (NEL)
+        XCTAssertTrue(term.userVariables.isEmpty)
+        feedValue("ok", "plain text, punctuation: 100%")
+        XCTAssertEqual(term.userVariables["ok"], "plain text, punctuation: 100%")
+    }
+
     func testOSC1337FileStillRoutesToImageHandler() {
         // The new demux must not break inline images: junk File= payloads are ignored
         // exactly as before (no crash, no user-var side effects).
@@ -282,6 +337,21 @@ final class TerminalProtocolCompatibilityTests: XCTestCase {
         term.feed("\u{1b}]1337;SetUserVar=keep=aGVsbG8=\u{07}")
         XCTAssertFalse(term.userVariables.isEmpty)
         term.feed("\u{1b}c") // RIS
+        XCTAssertTrue(term.userVariables.isEmpty)
+    }
+
+    /// RIS reports the clear so hosts can drop their mirrored copies (the pane-scoped
+    /// `@` options) — silently clearing engine state left `#{@name}` serving stale
+    /// pre-reset values forever. No-clear resets stay silent.
+    func testFullResetFiresUserVariablesClearedCallback() {
+        let term = TerminalEmulator(cols: 20, rows: 4)
+        var cleared = 0
+        term.onUserVariablesCleared = { cleared += 1 }
+        term.feed("\u{1b}c") // nothing to clear → no callback
+        XCTAssertEqual(cleared, 0)
+        term.feed("\u{1b}]1337;SetUserVar=keep=aGVsbG8=\u{07}")
+        term.feed("\u{1b}c")
+        XCTAssertEqual(cleared, 1)
         XCTAssertTrue(term.userVariables.isEmpty)
     }
 }

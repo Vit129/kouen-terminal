@@ -287,6 +287,9 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// OSC 1337 `SetUserVar=` (decoded + validated by the engine) — the host surfaces these
     /// as pane-scoped `@name` user options so format strings can read them.
     public var onUserVar: ((_ name: String, _ value: String) -> Void)?
+    /// RIS dropped every user variable — the host clears the `@` options it pushed for
+    /// this surface so `#{@name}` doesn't keep serving pre-reset values.
+    public var onUserVarsCleared: (() -> Void)?
     /// Terminal bell (BEL) — the host forwards this to its delegate.
     public var onBell: (() -> Void)?
     /// A shell command finished (OSC 133), with its run duration + exit code — the host forwards
@@ -1115,6 +1118,13 @@ public final class HarnessTerminalSurfaceView: NSView {
                 self?.onUserVar?(name, value)
             } else {
                 DispatchQueue.main.async { [weak self] in self?.onUserVar?(name, value) }
+            }
+        }
+        emulator.onUserVariablesCleared = { [weak self] in
+            if Thread.isMainThread {
+                self?.onUserVarsCleared?()
+            } else {
+                DispatchQueue.main.async { [weak self] in self?.onUserVarsCleared?() }
             }
         }
         emulator.onBell = { [weak self] in
