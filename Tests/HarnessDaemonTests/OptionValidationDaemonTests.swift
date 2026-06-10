@@ -46,4 +46,26 @@ final class OptionValidationDaemonTests: XCTestCase {
         XCTAssertEqual(context.userOptions["@theme"], "dracula")
         XCTAssertEqual(FormatString.evaluate("#{@theme}", context: context), "dracula")
     }
+
+    /// End-to-end for the GUI's OSC 1337 `SetUserVar` path: the GUI stores user variables
+    /// PANE-scoped, targeted by SURFACE key (the exact IPC shape `SessionCoordinator`
+    /// sends). `#{@name}` must resolve them pane-first for that surface's context — the
+    /// tab/session/global chain alone can never reach a pane-scoped value (broader-scope
+    /// fallbacks only walk nil targets).
+    func testPaneScopedUserOptionRendersForItsSurface() throws {
+        let registry = SurfaceRegistry()
+        let tab = try XCTUnwrap(registry.snapshot.activeWorkspace?.activeTab)
+        let surfaceKey = try XCTUnwrap(tab.rootPane.allSurfaceIDs().first).uuidString
+        guard case .ok = registry.handle(
+            .setOption(scope: "pane", target: surfaceKey, key: "@deploy", rawValue: "staging")
+        ) else {
+            return XCTFail("a pane-scoped @user-option must be accepted")
+        }
+        let context = registry.buildFormatContext(surfaceKey: surfaceKey)
+        XCTAssertEqual(context.userOptions["@deploy"], "staging")
+        XCTAssertEqual(FormatString.evaluate("#{@deploy}", context: context), "staging")
+        // The surface is the active pane, so the surfaceless context (status line,
+        // display-message with no target) resolves it too.
+        XCTAssertEqual(FormatString.evaluate("#{@deploy}", context: registry.buildFormatContext()), "staging")
+    }
 }

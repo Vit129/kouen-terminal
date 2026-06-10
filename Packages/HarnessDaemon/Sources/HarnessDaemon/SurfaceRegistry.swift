@@ -1230,11 +1230,16 @@ public final class SurfaceRegistry: @unchecked Sendable {
         context.sessionAttached = attachedClientCountProvider?()
         context.serverPID = Int(getpid())
         // User options (`@name`) so `#{@name}` renders. Resolve each distinct `@` key through the
-        // scope chain, preferring this context's tab/session target and falling back to global —
-        // the dominant usage (theme/statusline plugins) is global.
+        // scope chain, preferring this context's pane — the GUI stores OSC 1337 `SetUserVar`
+        // values pane-scoped under the SURFACE key, which the broader-scope lookups (nil-target
+        // fallback only) can never reach — then tab/session, falling back to global (the dominant
+        // usage for theme/statusline plugins). A context with no named surface uses the active
+        // pane, so the status line still renders the focused pane's user variables.
         var userOptions: [String: String] = [:]
+        let paneKey = surfaceKey ?? activeSurfaceKey
         for (scopedKey, _) in optionStore.snapshot() where scopedKey.key.hasPrefix("@") && userOptions[scopedKey.key] == nil {
-            let value = optionStore.get(scopedKey.key, scope: .tab, target: tab?.id.uuidString)
+            let value = paneKey.flatMap { optionStore.get(scopedKey.key, scope: .pane, target: $0) }
+                ?? optionStore.get(scopedKey.key, scope: .tab, target: tab?.id.uuidString)
                 ?? optionStore.get(scopedKey.key, scope: .session, target: session?.id.uuidString)
                 ?? optionStore.get(scopedKey.key, scope: .global)
             if let value { userOptions[scopedKey.key] = value.stringValue }
