@@ -97,6 +97,26 @@ public final class SurfaceRegistry: @unchecked Sendable {
     private var monitors: [String: SurfaceMonitor] = [:]
     private let monitorLock = NSLock()
     private var monitorTimer: DispatchSourceTimer?
+    /// Cached "is silence monitoring armed" (`monitor-silence` > 0), refreshed from the
+    /// `setOption` path and at startup. Lets a quiet monitor tick skip the registry lock +
+    /// option reads entirely: gating on the *other* option values is useless (`monitor-bell`
+    /// defaults true), but silence is the only alert that needs evaluating with no fresh
+    /// output — activity/bell both require a flag the precheck already sees under
+    /// `monitorLock`. Lock-guarded mirror (same pattern as `DaemonServer.CountBox`) because
+    /// the tick reads it without the registry lock.
+    private let silenceArmed = FlagBox()
+    private final class FlagBox: @unchecked Sendable {
+        private let lock = NSLock()
+        private var value = false
+        func update(_ flag: Bool) { lock.lock(); value = flag; lock.unlock() }
+        func read() -> Bool { lock.lock(); defer { lock.unlock() }; return value }
+    }
+    /// Test-only: counts full `processMonitors` passes (the ones that take the registry
+    /// lock), so a test can prove a quiet tick skipped it.
+    private var monitorFullPasses = 0
+    var monitorFullPassCountForTesting: Int {
+        monitorLock.lock(); defer { monitorLock.unlock() }; return monitorFullPasses
+    }
 
     public init(enableVersionBanner: Bool = false) {
         let defaultShell = HarnessSettings.load().defaultShell
@@ -143,7 +163,24 @@ public final class SurfaceRegistry: @unchecked Sendable {
         hookRegistry.setExecutor { command, context in
             executor.execute(command, context: context)
         }
+        refreshSilenceArmedCache() // seed from the on-disk option store before the timer runs
         startMonitorTimer()
+    }
+
+    /// Mirror `monitor-silence > 0` into `silenceArmed` — the exact read `processMonitors`
+    /// performs (global resolve). Called at startup and whenever `setOption` touches the key.
+    private func refreshSilenceArmedCache() {
+        silenceArmed.update((optionStore.get("monitor-silence")?.intValue ?? 0) > 0)
+    }
+
+    // MARK: Monitor test seams (deterministic ticks — call `stopMonitoring()` first)
+
+    func processMonitorsForTesting() { processMonitors() }
+    func noteSurfaceOutputForTesting(surfaceKey: String, data: Data) {
+        noteSurfaceOutput(surfaceKey: surfaceKey, data: data)
+    }
+    var monitorEntryKeysForTesting: [String] {
+        monitorLock.lock(); defer { monitorLock.unlock() }; return Array(monitors.keys)
     }
 
     // MARK: - Output monitoring (activity / silence / bell)
@@ -182,6 +219,21 @@ public final class SurfaceRegistry: @unchecked Sendable {
     /// `#{window_flags}`) and fires the hook — both only on a real transition.
     private func processMonitors() {
         monitorLock.lock()
+        // Idle precheck (monitorLock only): with no fresh output/bell this tick and silence
+        // monitoring disarmed, there is nothing to evaluate — skip the drain, the registry
+        // lock and the option reads (this timer fires twice a second forever; monitor
+        // entries persist per-surface after any output, so `drained.isEmpty` alone never
+        // gates a session that has ever produced output). Correctness is preserved:
+        // activity/bell alerts need a fresh flag by definition; silence needs per-tick idle
+        // evaluation only while armed (cached via `silenceArmed`); and the orphan sweep
+        // below still runs in time, because an entry recreated by a racing PTY read is born
+        // with `sawOutput = true` (orderly closes evict their entries eagerly).
+        let hasFreshFlags = monitors.contains { $0.value.sawOutput || $0.value.sawBell }
+        if !hasFreshFlags, !silenceArmed.read() {
+            monitorLock.unlock()
+            return
+        }
+        monitorFullPasses += 1
         let now = Date()
         var drained: [String: (sawOutput: Bool, sawBell: Bool, idle: TimeInterval)] = [:]
         for (key, m) in monitors {
@@ -579,8 +631,12 @@ public final class SurfaceRegistry: @unchecked Sendable {
             }
             return .ok
         case let .updateTabGitBranch(workspaceID, tabID, branch):
-            editor.updateTabMetadata(workspaceID: workspaceID, tabID: tabID, gitBranch: branch, cwd: nil)
-            commit()
+            // `setTabGitBranch` (not `updateTabMetadata`) so `nil` clears a stale label when a
+            // tab leaves a repository. Commit only on real change — an idempotent re-send must
+            // not bump the revision and wake every snapshot subscriber.
+            if editor.setTabGitBranch(workspaceID: workspaceID, tabID: tabID, branch: branch) {
+                commit()
+            }
             return .ok
         case .getSnapshot:
             return .snapshot(editor.snapshot)
@@ -956,6 +1012,8 @@ public final class SurfaceRegistry: @unchecked Sendable {
                 return .error("\(scopeRaw) scope requires a target")
             }
             optionStore.set(.init(parsing: raw), key: key, scope: scope, target: target)
+            // Keep the monitor tick's lock-free precheck honest: silence arming changed.
+            if key == "monitor-silence" { refreshSilenceArmedCache() }
             // Nudge snapshot subscribers (the attach-window compositor) so a runtime option
             // change — status-*, mouse, pane-style, mode-keys — reaches attached clients instead
             // of being stuck at their startup values. Re-uses the snapshot push as a generic
