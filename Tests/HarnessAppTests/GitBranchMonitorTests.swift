@@ -110,9 +110,10 @@ final class GitBranchMonitorTests: XCTestCase {
         waitUntil(
             "clear push for non-repo cwd; resolver sees \(String(describing: GitHEADReader.resolveRepository(startingAt: plain.path))); changes \(fixture.recorder.changes)"
         ) { !fixture.recorder.changes.isEmpty }
-        XCTAssertEqual(fixture.recorder.changes.first?.tabID, tab.tabID)
+        let change = try XCTUnwrap(fixture.recorder.changes.first)
+        XCTAssertEqual(change.tabID, tab.tabID)
         XCTAssertEqual(fixture.recorder.changes.count, 1)
-        XCTAssertNil(fixture.recorder.changes[0].branch)
+        XCTAssertNil(change.branch)
     }
 
     func testDuplicateSendIsSuppressedWhileSnapshotLags() throws {
