@@ -217,6 +217,10 @@ public final class RealPty: @unchecked Sendable {
     /// respawn, so an identity change applies to newly-created panes (like `TERM`).
     private let termProgram: String
     private let termProgramVersion: String
+    /// Replaces `ShellLaunchProfile`'s default arguments when non-nil (shell-integration
+    /// injection: bash swaps `-l` for `--posix`). Reused verbatim on respawn — a respawned
+    /// shell keeps the injection decision its surface was created with.
+    private let launchArgumentsOverride: [String]?
 
     public init(
         id: DaemonSurfaceID,
@@ -228,9 +232,11 @@ public final class RealPty: @unchecked Sendable {
         extraEnvironment: [String: String] = [:],
         termProgram: String = "",
         termProgramVersion: String = "",
-        scrollbackURL: URL? = nil
+        scrollbackURL: URL? = nil,
+        launchArgumentsOverride: [String]? = nil
     ) throws {
         self.id = id
+        self.launchArgumentsOverride = launchArgumentsOverride
         self.termProgram = termProgram
         self.termProgramVersion = termProgramVersion
         // `scrollbackBytes == 0` requests unlimited scrollback. Bound the daemon's in-memory replay
@@ -277,7 +283,8 @@ public final class RealPty: @unchecked Sendable {
         // `setenv`/`strdup` do. We build argv + a full envp here (parent side) and the
         // child only calls `chdir` + `execve`, both async-signal-safe. (Doing this in
         // the child is what made the PTY fragile under heavily-threaded callers.)
-        let argvStrings = ShellLaunchProfile.make(shell: shell).argv
+        let argvStrings = launchArgumentsOverride.map { [shell] + $0 }
+            ?? ShellLaunchProfile.make(shell: shell).argv
         let argv: [UnsafeMutablePointer<CChar>?] = argvStrings.map { strdup($0) } + [nil]
 
         var environment = ProcessInfo.processInfo.environment
@@ -354,6 +361,7 @@ public final class RealPty: @unchecked Sendable {
         self.extraEnvironment = [:]
         self.shell = "/bin/sh"
         self.scrollbackFile = nil
+        self.launchArgumentsOverride = nil
     }
 
     public func write(_ data: Data) {
@@ -480,7 +488,8 @@ public final class RealPty: @unchecked Sendable {
     }
 
     private func restartChild(cwd: String, shell: String, rows: UInt16, cols: UInt16) throws {
-        let argvStrings = ShellLaunchProfile.make(shell: shell).argv
+        let argvStrings = launchArgumentsOverride.map { [shell] + $0 }
+            ?? ShellLaunchProfile.make(shell: shell).argv
         let argv: [UnsafeMutablePointer<CChar>?] = argvStrings.map { strdup($0) } + [nil]
 
         var environment = ProcessInfo.processInfo.environment

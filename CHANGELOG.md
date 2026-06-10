@@ -9,6 +9,22 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [Unreleased]
 
 ### Added
+- **Shell integration is auto-injected at spawn** (zsh / bash / fish): prompt marks, the
+  success/failure gutter, and jump-to-prompt work out of the box with no
+  `install-shell-integration` step. zsh rides a `ZDOTDIR` shim that restores your real
+  `ZDOTDIR` and chains to your own `.zshenv` — the integration loads from `.zshenv`
+  (before `.zshrc`), so an rc that overwrites `precmd_functions=(…)` wholesale removes
+  the marks (same as kitty/Ghostty); fish rides an `XDG_DATA_DIRS` vendor dir;
+  bash uses the `--posix` + `$ENV` technique (kitty/Ghostty lineage) and **requires
+  bash ≥ 4.4** — older bash (notably the stock macOS 3.2, which never reads `$ENV` under
+  `--posix`) spawns untouched, the same floor Ghostty ships; **known caveats:
+  `shopt -q login_shell` reports off inside injected bash panes** (the shim replays the
+  login startup files itself) **and `~/.bash_logout` does not run on pane exit** (the
+  shell is not a login shell under the injected vehicle). Idempotent alongside a manual
+  install; never active for non-interactive shells; opt out with
+  `set-option shell-integration off` (applies to subsequently spawned panes). User
+  `set-environment` values always win: a collision with any of the injection's variables
+  drops the whole injection for that pane (spawn untouched).
 - Parity long tail (engine/core half): the numeric keypad honors DECKPAM/DECKPNM —
   application mode emits the xterm SS3 forms, numeric mode stays byte-identical to plain
   typing, and the kitty protocol reports the functional KP codepoints; OSC 1337

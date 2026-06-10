@@ -27,7 +27,7 @@ close-out series was PRs #102–#108. User-facing usage lives in
 | Format strings | ~50 `#{…}` variables (pane/session/window/client/server) + **`#{@user-options}`** + `#{hook}` + operators (`#{?,,}` with nested tests, `==`/`!=`, `\|\|`/`&&`, `m:`, `s///`, `e\|op\|`, `n:` length, `T:` double-expand, `a:` char-from-code, `=N:` truncation, `pN:` pad, `time:` strftime). IDs render with target-grammar prefixes so they round-trip into `-t` |
 | Key tables | root/prefix/copy-mode(+emacs)/command + `switch-client -T` modal tables, `bind -r` repeat, tombstoned unbinds |
 | Scripting | `send-keys` (incl. bindable `-l` literal / `-H` hex), `capture-pane` (+ ranges/escapes), **`clear-history`** (drop a pane's scrollback without respawning the shell — distinct from `respawn-pane -k`, which replaces the process), `pipe-pane`, `run-shell`, `if-shell`, `wait-for -S/-L/-U`, `display-message` (+ `-p` print-to-stdout) / `show-messages`, `command-prompt`, `confirm-before`, `source-file` (a `.tmux.conf`'s bind/set/setw/setenv lines parse as-is), choose-tree/session/window/buffer/client, `find-window`, control mode (`-CC`) |
-| Misc | display-popup/menu, clock-mode, lock-client, multi-client smallest-size voting, environment tables (global/session) |
+| Misc | display-popup/menu, clock-mode, lock-client, multi-client smallest-size voting, environment tables (global/session), auto-injected OSC 133 shell integration at spawn (`shell-integration` option to opt out; bash needs ≥ 4.4 — stock macOS 3.2 spawns untouched — and injected bash panes report `login_shell` off and skip `~/.bash_logout` on exit, the documented costs of the `--posix`+`$ENV` vehicle) |
 
 ## Adapted (same capability, Harness-shaped)
 

@@ -1403,6 +1403,25 @@ public final class SurfaceRegistry: @unchecked Sendable {
             let persistScrollback = resolvedPersistScrollback(forSurfaceKey: surfaceID)
             let scrollbackURL = HarnessPaths.scrollbackFileURL(forSurfaceID: surfaceID)
             if !persistScrollback { try? FileManager.default.removeItem(at: scrollbackURL) }
+            // Shell-integration auto-inject (opt-out via `shell-integration off`): prompt
+            // marks work out of the box. The user's `set-environment` table always wins,
+            // and the plan is ALL-or-nothing: if any of its env keys would lose that merge,
+            // a partial apply (e.g. bash `--posix` with the USER's $ENV) would corrupt the
+            // spawn — drop the whole plan instead. Best-effort: a nil plan spawns untouched.
+            var spawnEnvironment = extraEnvironment(forSurfaceKey: surfaceID)
+            var integrationPlan: ShellIntegrationInjector.Plan? =
+                (optionStore.get("shell-integration")?.boolValue ?? true)
+                    ? ShellIntegrationInjector.plan(
+                        shellPath: shellPath,
+                        baseEnvironment: ProcessInfo.processInfo.environment)
+                    : nil
+            if let plan = integrationPlan {
+                if plan.environment.keys.allSatisfy({ spawnEnvironment[$0] == nil }) {
+                    for (key, value) in plan.environment { spawnEnvironment[key] = value }
+                } else {
+                    integrationPlan = nil
+                }
+            }
             let session = try RealPty(
                 id: surfaceID,
                 cwd: workDir,
@@ -1410,10 +1429,11 @@ public final class SurfaceRegistry: @unchecked Sendable {
                 rows: rows,
                 cols: cols,
                 scrollbackBytes: scrollbackBytes ?? 1024 * 1024,
-                extraEnvironment: extraEnvironment(forSurfaceKey: surfaceID),
+                extraEnvironment: spawnEnvironment,
                 termProgram: identity.name,
                 termProgramVersion: identity.version,
-                scrollbackURL: scrollbackURL
+                scrollbackURL: scrollbackURL,
+                launchArgumentsOverride: integrationPlan?.argumentsOverride
             )
             if !persistScrollback { session.setScrollbackPersistence(enabled: false) }
             session.onExit = { [weak self, weak session] exitStatus in
