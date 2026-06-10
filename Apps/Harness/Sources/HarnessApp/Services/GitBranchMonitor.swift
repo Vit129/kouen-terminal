@@ -50,6 +50,10 @@ final class GitBranchMonitor {
     /// snapshot catches up.
     private var lastSent: [TabID: Cached<String?>] = [:]
     private var resolvesInFlight: Set<String> = []
+    /// cwds whose cache was invalidated while a resolve was already mid-flight (a `git
+    /// init` racing the I/O queue): the in-flight result is stale by definition, so the
+    /// completion re-resolves instead of caching it. Mirror of `rereadRequested`.
+    private var reresolveRequested: Set<String> = []
     private var readsInFlight: Set<String> = []
     /// `HEAD` paths whose watcher fired while a read was already in flight — re-read on
     /// completion so the final state on disk always wins.
@@ -118,6 +122,7 @@ final class GitBranchMonitor {
         let liveCwds = Set(tabs.values.map(\.cwd))
         let staleCwds = repoByCwd.keys.filter { !liveCwds.contains($0) }
         for cwd in staleCwds { repoByCwd.removeValue(forKey: cwd) }
+        reresolveRequested.formIntersection(liveCwds)
         let liveHeads = Set(repoByCwd.values.compactMap { $0.value?.headFileURL.path })
         let staleHeads = watchers.keys.filter { !liveHeads.contains($0) }
         for head in staleHeads {
@@ -148,7 +153,14 @@ final class GitBranchMonitor {
     }
 
     private func scheduleResolve(cwd: String) {
-        guard resolvesInFlight.insert(cwd).inserted else { return }
+        guard resolvesInFlight.insert(cwd).inserted else {
+            // A resolve for this cwd is mid-flight against possibly-stale disk state (the
+            // negative-cache invalidation lands here when a `git init` raced the I/O
+            // queue). Have the completion re-run rather than trust — and cache — a result
+            // read before the world changed.
+            reresolveRequested.insert(cwd)
+            return
+        }
         ioQueue.async { [weak self] in
             let repository = GitHEADReader.resolveRepository(startingAt: cwd)
             DispatchQueue.main.async {
@@ -156,6 +168,11 @@ final class GitBranchMonitor {
                     guard let self else { return }
                     self.resolvesInFlight.remove(cwd)
                     guard !self.paused else { return }
+                    if self.reresolveRequested.remove(cwd) != nil {
+                        // Invalidated mid-flight — this result may predate the change.
+                        self.scheduleResolve(cwd: cwd)
+                        return
+                    }
                     // Only cache while a live tab still cares; otherwise the entry would
                     // sit until the next prune with nothing to invalidate it.
                     guard self.tabs.values.contains(where: { $0.cwd == cwd }) else { return }
