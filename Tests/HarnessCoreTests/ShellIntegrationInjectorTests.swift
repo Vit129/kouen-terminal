@@ -70,6 +70,10 @@ final class ShellIntegrationInjectorTests: XCTestCase {
         let vendored = URL(fileURLWithPath: base).appendingPathComponent("fish/vendor_conf.d/harness.fish")
         let script = try String(contentsOf: vendored, encoding: .utf8)
         XCTAssertTrue(script.contains("133;A"))
+        // vendor_conf.d runs for EVERY fish (scripts, `fish -c`) — the snippet must gate
+        // itself; `exit` in a sourced file skips the rest of the file.
+        XCTAssertTrue(script.contains("status is-interactive; or exit"),
+                      "fish snippet must be interactive-gated")
     }
 
     func testFishPlanUsesXDGSpecDefaultWhenUnset() throws {
