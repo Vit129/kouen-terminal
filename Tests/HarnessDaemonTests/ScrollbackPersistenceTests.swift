@@ -109,4 +109,89 @@ final class ScrollbackPersistenceTests: XCTestCase {
             "clear-history must reset the on-disk scrollback file, not just memory"
         )
     }
+
+    // MARK: - `persist-scrollback` opt-out (PR-36: secrets at rest)
+
+    /// Disabling persistence at runtime must WIPE the on-disk log synchronously (the user's
+    /// intent is "no scrollback at rest", not "no new writes"), keep it gone under further
+    /// output, and resume persisting after re-enable.
+    func testSuspendingPersistenceWipesDiskAndResumeRepersists() throws {
+        let pty = try makePty(id: UUID().uuidString)
+        defer { pty.close() }
+
+        let acc = OutputAccumulator()
+        _ = pty.subscribe { data, _ in _ = acc.appendAndContains(String(decoding: data, as: UTF8.self), marker: "") }
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.2) { pty.write("echo BEFORE_SUSPEND_MARK\n") }
+        XCTAssertTrue(waitUntil { acc.contains("BEFORE_SUSPEND_MARK") }, "live output must arrive")
+        pty.flushScrollback()
+        XCTAssertTrue(FileManager.default.fileExists(atPath: scrollbackURL.path), "persisted before suspend")
+
+        pty.setScrollbackPersistence(enabled: false) // synchronous wipe
+        XCTAssertFalse(FileManager.default.fileExists(atPath: scrollbackURL.path), "suspend wipes the log")
+
+        pty.write("echo WHILE_SUSPENDED_MARK\n")
+        XCTAssertTrue(waitUntil { acc.contains("WHILE_SUSPENDED_MARK") })
+        pty.flushScrollback()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: scrollbackURL.path),
+                       "output while suspended must never reach disk")
+
+        pty.setScrollbackPersistence(enabled: true)
+        pty.write("echo AFTER_RESUME_MARK\n")
+        XCTAssertTrue(waitUntil { acc.contains("AFTER_RESUME_MARK") })
+        pty.flushScrollback()
+        let resumed = (try? String(contentsOf: scrollbackURL, encoding: .utf8)) ?? ""
+        XCTAssertTrue(resumed.contains("AFTER_RESUME_MARK"), "re-enable resumes persistence")
+        XCTAssertFalse(resumed.contains("WHILE_SUSPENDED_MARK"),
+                       "suspended-window output stays memory-only by design")
+    }
+
+    /// The registry end of the option: spawning with `persist-scrollback off` (global scope)
+    /// creates no scrollback file and removes a stale one from an earlier persisted run; the
+    /// runtime `set-option` path wipes a live surface's log.
+    func testRegistryHonorsPersistScrollbackOption() throws {
+        let previousHome = getenv("HARNESS_HOME").map { String(cString: $0) }
+        let dir = URL(fileURLWithPath: "/tmp/hps-\(UUID().uuidString.prefix(8))", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        setenv("HARNESS_HOME", dir.path, 1)
+        defer {
+            if let previousHome { setenv("HARNESS_HOME", previousHome, 1) } else { unsetenv("HARNESS_HOME") }
+            try? FileManager.default.removeItem(at: dir)
+        }
+        try HarnessPaths.ensureDirectories()
+
+        let registry = SurfaceRegistry()
+        guard case let .surfaces(initial) = registry.handle(.listSurfaces), let seeded = initial.first else {
+            return XCTFail("expected a seeded surface")
+        }
+        let seededURL = HarnessPaths.scrollbackFileURL(forSurfaceID: seeded.surfaceID)
+
+        // Default-on: output reaches the seeded surface's log.
+        _ = registry.handle(.sendData(surfaceID: seeded.surfaceID, data: Data("echo PERSIST_DEFAULT_ON\n".utf8)))
+        XCTAssertTrue(waitUntil { FileManager.default.fileExists(atPath: seededURL.path) },
+                      "default persistence must write a scrollback file")
+
+        // Runtime opt-out (pane-scoped) wipes the live surface's log and keeps it gone.
+        guard case .ok = registry.handle(.setOption(
+            scope: "pane", target: seeded.surfaceID, key: "persist-scrollback", rawValue: "off"
+        )) else { return XCTFail("setOption failed") }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: seededURL.path), "opt-out wipes the log now")
+
+        // Spawn-time opt-out: with the global option off, a new surface starts with no file
+        // and a leftover log from a previously-persisted run is removed.
+        guard case .ok = registry.handle(.setOption(
+            scope: "global", target: nil, key: "persist-scrollback", rawValue: "off"
+        )) else { return XCTFail("setOption failed") }
+        let newSurface = UUID().uuidString
+        let staleURL = HarnessPaths.scrollbackFileURL(forSurfaceID: newSurface)
+        try Data("stale log".utf8).write(to: staleURL)
+        guard case .ok = registry.handle(.ensureSurface(
+            surfaceID: newSurface, cwd: NSTemporaryDirectory(), shell: nil, rows: 24, cols: 80, scrollbackBytes: nil
+        )) else { return XCTFail("ensureSurface failed") }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: staleURL.path),
+                       "spawn with persistence off removes a stale log")
+        _ = registry.handle(.sendData(surfaceID: newSurface, data: Data("echo NEVER_ON_DISK\n".utf8)))
+        usleep(700_000) // bounded absence window: give a (buggy) write time to land
+        XCTAssertFalse(FileManager.default.fileExists(atPath: staleURL.path),
+                       "a persistence-off surface never writes scrollback to disk")
+    }
 }

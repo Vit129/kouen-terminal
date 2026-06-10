@@ -59,6 +59,8 @@ final class ScrollbackFile: @unchecked Sendable {
     /// Set once the surface is gone for good; stops a late debounced flush from resurrecting a file
     /// we just deleted.
     private var closed = false
+    /// `persist-scrollback off`: drop appends instead of writing them (queue-confined).
+    private var suspended = false
     /// Current on-disk size, seeded from the existing file so compaction accounting survives a
     /// restart that loaded a pre-existing log.
     private var fileBytes: Int
@@ -98,7 +100,7 @@ final class ScrollbackFile: @unchecked Sendable {
     func append(_ data: Data) {
         guard !data.isEmpty else { return }
         queue.async { [weak self] in
-            guard let self, !self.closed else { return }
+            guard let self, !self.closed, !self.suspended else { return }
             self.pending.append(data)
             // Bound RAM under a sustained flood: once buffered output crosses the cap, flush
             // synchronously rather than re-arming the debounce (which a gapless stream would
@@ -124,6 +126,25 @@ final class ScrollbackFile: @unchecked Sendable {
         let work = DispatchWorkItem { [weak self] in self?.flushPending() }
         pendingFlush = work
         queue.asyncAfter(deadline: deadline, execute: work)
+    }
+
+    /// Persistence opt-out (`persist-scrollback off`): stop accepting writes AND wipe what
+    /// is already on disk — the intent is "no scrollback at rest for this surface", so a
+    /// half-measure that stops future writes but keeps the old log would be a lie.
+    /// Synchronous (like `reset`/`delete`) so the caller knows the log is gone before the
+    /// option set returns, and a previously-armed debounced flush can't resurrect it.
+    /// Re-enabling resumes persistence from that point; output produced while suspended is
+    /// memory-only by design.
+    func setSuspended(_ suspended: Bool) {
+        queue.sync {
+            self.suspended = suspended
+            guard suspended else { return }
+            self.pendingFlush?.cancel()
+            self.flushDeadline = nil
+            self.pending.removeAll(keepingCapacity: false)
+            try? FileManager.default.removeItem(at: self.url)
+            self.fileBytes = 0
+        }
     }
 
     /// Synchronously persist any buffered output. Called on graceful shutdown so the last

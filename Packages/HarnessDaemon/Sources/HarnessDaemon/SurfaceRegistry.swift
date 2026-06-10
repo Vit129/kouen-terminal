@@ -235,6 +235,22 @@ public final class SurfaceRegistry: @unchecked Sendable {
         }
     }
 
+    /// Re-resolve `persist-scrollback` for the live surfaces a `set-option` can affect (an
+    /// exact pane target hits one; broader scopes re-resolve all) and push the result into
+    /// each surface's scrollback file. Runs under the registry lock (called from `handle`).
+    private func applyScrollbackPersistenceOption(scope: OptionStore.Scope, target: String?) {
+        let affected: [String]
+        if scope == .pane, let target {
+            affected = sessions[target] != nil ? [target] : []
+        } else {
+            affected = Array(sessions.keys)
+        }
+        for key in affected {
+            let enabled = optionStore.get("persist-scrollback", scope: .pane, target: key)?.boolValue ?? true
+            sessions[key]?.setScrollbackPersistence(enabled: enabled)
+        }
+    }
+
     public var snapshot: SessionSnapshot {
         lock.lock()
         defer { lock.unlock() }
@@ -956,6 +972,12 @@ public final class SurfaceRegistry: @unchecked Sendable {
                 return .error("\(scopeRaw) scope requires a target")
             }
             optionStore.set(.init(parsing: raw), key: key, scope: scope, target: target)
+            // Apply the secrets-at-rest toggle to live surfaces immediately: disabling wipes
+            // the on-disk log synchronously (the user's intent is "gone now", not "gone at
+            // the next spawn"); re-enabling resumes persistence for surfaces that were
+            // spawned with a file (a surface spawned with persistence off stays memory-only
+            // until its next spawn/respawn — documented in docs/SECURITY-POSTURE.md).
+            if key == "persist-scrollback" { applyScrollbackPersistenceOption(scope: scope, target: target) }
             // Nudge snapshot subscribers (the attach-window compositor) so a runtime option
             // change — status-*, mouse, pane-style, mode-keys — reaches attached clients instead
             // of being stuck at their startup values. Re-uses the snapshot push as a generic
@@ -1442,6 +1464,12 @@ public final class SurfaceRegistry: @unchecked Sendable {
             // `terminal-identity` option the GUI/CLI sets; the app reads the same value for its
             // XTVERSION reply.
             let identity = TerminalIdentity.spec(forOption: optionStore.get(TerminalIdentity.optionKey)?.stringValue)
+            // `persist-scrollback off` (pane-scoped, falling back to global): spawn without a
+            // scrollback file AND remove any log a previously-persisted run left behind — the
+            // opt-out means no scrollback at rest, not just no new writes.
+            let persistScrollback = optionStore.get("persist-scrollback", scope: .pane, target: surfaceID)?.boolValue ?? true
+            let scrollbackURL = HarnessPaths.scrollbackFileURL(forSurfaceID: surfaceID)
+            if !persistScrollback { try? FileManager.default.removeItem(at: scrollbackURL) }
             let session = try RealPty(
                 id: surfaceID,
                 cwd: workDir,
@@ -1452,7 +1480,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
                 extraEnvironment: extraEnvironment(forSurfaceKey: surfaceID),
                 termProgram: identity.name,
                 termProgramVersion: identity.version,
-                scrollbackURL: HarnessPaths.scrollbackFileURL(forSurfaceID: surfaceID)
+                scrollbackURL: persistScrollback ? scrollbackURL : nil
             )
             session.onExit = { [weak self, weak session] exitStatus in
                 self?.removeSurfaceIfCurrent(surfaceID: surfaceID, session: session, exitStatus: exitStatus)

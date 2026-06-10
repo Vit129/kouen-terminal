@@ -8,6 +8,13 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 
 ## [Unreleased]
 
+### Added
+- `persist-scrollback` option (default on, per-pane with global fallback): turning it off
+  stops writing a surface's scrollback to disk AND synchronously wipes what's already
+  there — the secrets-at-rest control documented in the new `docs/SECURITY-POSTURE.md`
+  (which also records the no-sandbox rationale, the hardened-runtime/notarization and
+  Sparkle EdDSA/HTTPS audit, the Services surface, and the control-socket posture).
+
 ### Fixed
 - **Unicode width tables are now derived from the Unicode Character Database** (15.1) instead of
   hand-curated ranges. The old tables missed ~140 East-Asian-Wide codepoints — including the
