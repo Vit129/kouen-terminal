@@ -23,7 +23,7 @@
     "benchmark": "build_frame_search_highlights_160x48",
     "cells": 7680,
     "hits": 216,
-    "nanos": 267167
+    "nanos": 253167
   },
   "cell_scroll_region_160x48": {
     "benchmark": "cell_scroll_region_160x48",
@@ -45,7 +45,7 @@
     "mainGapP95Nanos": 583,
     "mainHops": 1025,
     "mbps": 8.407,
-    "nanos": 498889292
+    "nanos": 494575834
   },
   "consume_latency_under_load_65536": {
     "benchmark": "consume_latency_under_load_65536",
@@ -56,7 +56,7 @@
     "mainGapP95Nanos": 625,
     "mainHops": 65,
     "mbps": 8.711,
-    "nanos": 481499250
+    "nanos": 487237917
   },
   "consumer_ansi_sgr": {
     "benchmark": "consumer_ansi_sgr",
@@ -64,7 +64,7 @@
     "feedNanos": 115417250,
     "frameBuildNanos": 180667,
     "mbps": 9.071,
-    "nanos": 115598125
+    "nanos": 114774000
   },
   "consumer_attributes": {
     "benchmark": "consumer_attributes",
@@ -72,7 +72,7 @@
     "feedNanos": 122373708,
     "frameBuildNanos": 238166,
     "mbps": 8.552,
-    "nanos": 122612834
+    "nanos": 121589834
   },
   "consumer_plain_ascii": {
     "benchmark": "consumer_plain_ascii",
@@ -88,7 +88,7 @@
     "feedNanos": 16100167,
     "frameBuildNanos": 194917,
     "mbps": 151.166,
-    "nanos": 16295375
+    "nanos": 16301458
   },
   "consumer_scrollback": {
     "benchmark": "consumer_scrollback",
@@ -104,7 +104,7 @@
     "feedNanos": 12344708,
     "frameBuildNanos": 190667,
     "mbps": 71.769,
-    "nanos": 12536084
+    "nanos": 12533125
   },
   "consumer_unicode_mixed": {
     "benchmark": "consumer_unicode_mixed",
@@ -116,13 +116,13 @@
   },
   "data_frame_json_base64": {
     "benchmark": "data_frame_json_base64",
-    "nanos": 1650458,
+    "nanos": 1605792,
     "payload": 65536,
     "wire": 88806
   },
   "echo_latency_local_p50": {
     "benchmark": "echo_latency_local_p50",
-    "nanos": 17792
+    "nanos": 17625
   },
   "echo_latency_local_p95": {
     "benchmark": "echo_latency_local_p95",
@@ -161,42 +161,42 @@
     "bytes": 1048626,
     "chunkBytes": 65536,
     "mbps": 8.986,
-    "nanos": 116697041
+    "nanos": 115263166
   },
   "ipc_consumer_attributes_4096": {
     "benchmark": "ipc_consumer_attributes_4096",
     "bytes": 1048618,
     "chunkBytes": 4096,
     "mbps": 8.382,
-    "nanos": 125103875
+    "nanos": 124657292
   },
   "ipc_consumer_attributes_65536": {
     "benchmark": "ipc_consumer_attributes_65536",
     "bytes": 1048618,
     "chunkBytes": 65536,
     "mbps": 8.404,
-    "nanos": 124782833
+    "nanos": 124033333
   },
   "ipc_consumer_plain_ascii_4096": {
     "benchmark": "ipc_consumer_plain_ascii_4096",
     "bytes": 1048600,
     "chunkBytes": 4096,
     "mbps": 6.534,
-    "nanos": 160488917
+    "nanos": 159340166
   },
   "ipc_consumer_plain_ascii_65536": {
     "benchmark": "ipc_consumer_plain_ascii_65536",
     "bytes": 1048600,
     "chunkBytes": 65536,
     "mbps": 6.57,
-    "nanos": 159606667
+    "nanos": 159109458
   },
   "ipc_consumer_redraw_4096": {
     "benchmark": "ipc_consumer_redraw_4096",
     "bytes": 2463300,
     "chunkBytes": 4096,
     "mbps": 146.528,
-    "nanos": 16811167
+    "nanos": 17342208
   },
   "ipc_consumer_redraw_65536": {
     "benchmark": "ipc_consumer_redraw_65536",
@@ -210,21 +210,21 @@
     "bytes": 1280000,
     "chunkBytes": 4096,
     "mbps": 7.546,
-    "nanos": 169629166
+    "nanos": 170172666
   },
   "ipc_consumer_scrollback_65536": {
     "benchmark": "ipc_consumer_scrollback_65536",
     "bytes": 1280000,
     "chunkBytes": 65536,
     "mbps": 7.345,
-    "nanos": 174257042
+    "nanos": 172291375
   },
   "ipc_consumer_truecolor_gradient_4096": {
     "benchmark": "ipc_consumer_truecolor_gradient_4096",
     "bytes": 899700,
     "chunkBytes": 4096,
     "mbps": 69.863,
-    "nanos": 12878125
+    "nanos": 12795583
   },
   "ipc_consumer_truecolor_gradient_65536": {
     "benchmark": "ipc_consumer_truecolor_gradient_65536",
@@ -238,14 +238,14 @@
     "bytes": 1048619,
     "chunkBytes": 4096,
     "mbps": 14.818,
-    "nanos": 70764917
+    "nanos": 71089083
   },
   "ipc_consumer_unicode_mixed_65536": {
     "benchmark": "ipc_consumer_unicode_mixed_65536",
     "bytes": 1048619,
     "chunkBytes": 65536,
     "mbps": 14.56,
-    "nanos": 72022834
+    "nanos": 72328958
   },
   "output_scroll_full_resolve": {
     "benchmark": "output_scroll_full_resolve",
@@ -262,27 +262,27 @@
     "benchmark": "preview_reflow_cost",
     "fromCols": 200,
     "historyLines": 50000,
-    "nanos": 55333,
+    "nanos": 57667,
     "toCols": 80
   },
   "read_grid_snapshot_full_screen": {
     "benchmark": "read_grid_snapshot_full_screen",
     "cells": 480000,
-    "nanos": 7291
+    "nanos": 6958
   },
   "reflow_cost_height": {
     "benchmark": "reflow_cost_height",
     "cols": 120,
     "fromRows": 24,
     "historyLines": 50000,
-    "nanos": 39292,
+    "nanos": 39416,
     "toRows": 60
   },
   "reflow_cost_width": {
     "benchmark": "reflow_cost_width",
     "fromCols": 200,
     "historyLines": 50000,
-    "nanos": 78837417,
+    "nanos": 75660209,
     "toCols": 80
   },
   "render_encode_incremental_damage_160x48": {
@@ -322,7 +322,7 @@
   },
   "scroll_tick_full_rebuild": {
     "benchmark": "scroll_tick_full_rebuild",
-    "nanos": 54341417,
+    "nanos": 52887584,
     "ticks": 200
   },
   "scrollback_steady_state_at_cap": {
@@ -332,7 +332,7 @@
   },
   "selection_drag_baked_rebuild": {
     "benchmark": "selection_drag_baked_rebuild",
-    "nanos": 56540542,
+    "nanos": 54293125,
     "ticks": 200
   },
   "surface_main_thread_stall_4mib": {
@@ -342,13 +342,13 @@
     "feedNanos": 89763584,
     "frameBuildNanos": 183375,
     "historyLines": 0,
-    "nanos": 89947459
+    "nanos": 89392292
   },
   "surface_off_main_thread_stall_4mib": {
     "benchmark": "surface_off_main_thread_stall_4mib",
     "bytes": 4194334,
     "cells": 7680,
-    "nanos": 3583,
+    "nanos": 3042,
     "workerDrainNanos": 87541041
   },
   "transport_output_frame_encode": {
@@ -360,7 +360,7 @@
   "vt_parse_ansi_colored_ascii_256kib": {
     "benchmark": "vt_parse_ansi_colored_ascii_256kib",
     "bytes": 262148,
-    "nanos": 33829500
+    "nanos": 30397916
   },
   "vt_parse_plain_ascii_256kib": {
     "benchmark": "vt_parse_plain_ascii_256kib",
@@ -370,7 +370,7 @@
   "vt_parse_run_path_print_heavy_ascii": {
     "benchmark": "vt_parse_run_path_print_heavy_ascii",
     "bytes": 1048630,
-    "nanos": 14427292
+    "nanos": 14213417
   },
   "vt_parse_scalar_baseline_print_heavy_ascii": {
     "benchmark": "vt_parse_scalar_baseline_print_heavy_ascii",
@@ -380,7 +380,7 @@
   "vt_parse_sgr_attribute_storm_512kib": {
     "benchmark": "vt_parse_sgr_attribute_storm_512kib",
     "bytes": 524348,
-    "nanos": 42410459
+    "nanos": 42066709
   },
   "vt_parse_throughput_256kib": {
     "benchmark": "vt_parse_throughput_256kib",
@@ -390,7 +390,7 @@
   "vt_parse_unicode_mixed_512kib": {
     "benchmark": "vt_parse_unicode_mixed_512kib",
     "bytes": 524290,
-    "nanos": 27257833
+    "nanos": 26555750
   },
   "width_reflow_10k_cjk": {
     "benchmark": "width_reflow_10k_cjk",
@@ -402,6 +402,6 @@
     "benchmark": "width_reflow_10k_prose",
     "iterations": 10,
     "lines": 10000,
-    "nanos": 8833912
+    "nanos": 8738220
   }
 }
