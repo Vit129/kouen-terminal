@@ -8,6 +8,12 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 
 ## [Unreleased]
 
+### Added
+- `persist-scrollback` option (default on, per-pane with global fallback): turning it off
+  stops writing a surface's scrollback to disk AND synchronously wipes what's already
+  there — the secrets-at-rest control documented in the new `docs/SECURITY-POSTURE.md`
+  (which also records the no-sandbox rationale, the hardened-runtime/notarization and
+  Sparkle EdDSA/HTTPS audit, the Services surface, and the control-socket posture).
 ### Changed
 - Mechanical decomposition (renderer): the Metal renderer's CPU-side instance/cache value
   types (GPU instance layouts, per-row encode caches, upload-cache keys) moved to

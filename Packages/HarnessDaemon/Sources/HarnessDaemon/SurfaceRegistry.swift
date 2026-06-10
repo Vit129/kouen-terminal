@@ -108,6 +108,61 @@ public final class SurfaceRegistry: @unchecked Sendable {
         startMonitorTimer()
     }
 
+    /// Re-resolve `persist-scrollback` for the live surfaces a `set-option` can affect (an
+    /// exact pane target hits one; broader scopes re-resolve all) and push the result into
+    /// each surface's scrollback file. Runs under the registry lock (called from `handle`).
+    private func applyScrollbackPersistenceOption(scope: OptionStore.Scope, target: String?) {
+        let affected: [String]
+        if scope == .pane, let target {
+            // Pane targets arrive in TWO spellings: `-T <surface-id>` names the surface
+            // directly, while both front-ends' no-target forms (CLI `callingPaneTarget`,
+            // GUI `CommandIPCTranslator`) send the owning `PaneLeaf.id` — an independent
+            // UUID. Accept either; a target matching neither names no live pane (the
+            // spawn-time read still picks the stored value up for a later revive).
+            let surfaceKey = sessions[target] != nil ? target : surfaceKey(forPaneID: target)
+            affected = surfaceKey.map { [$0] } ?? []
+        } else {
+            affected = Array(sessions.keys)
+        }
+        for key in affected {
+            sessions[key]?.setScrollbackPersistence(enabled: resolvedPersistScrollback(forSurfaceKey: key))
+        }
+    }
+
+    /// The surface backing the pane leaf whose `PaneLeaf.id` is `paneID`, from the layout
+    /// snapshot. Needed because pane-scoped option targets sent by the front-ends are
+    /// PaneIDs, while the registry's sessions are keyed by surface ID.
+    private func surfaceKey(forPaneID paneID: String) -> String? {
+        for workspace in editor.snapshot.workspaces {
+            for session in workspace.sessions {
+                for tab in session.tabs {
+                    if let leaf = tab.rootPane.allLeaves().first(where: { $0.id.uuidString == paneID }) {
+                        return leaf.surfaceID.uuidString
+                    }
+                }
+            }
+        }
+        return nil
+    }
+
+    /// Effective `persist-scrollback` for a surface. Pane-scoped values live under EITHER
+    /// the surface id (`-T <surface-id>`) or the owning `PaneLeaf.id` (what both front-ends
+    /// send for `-p` without `-T`) — two independent UUIDs for the same pane — so the read
+    /// must consult both exact targets before the global fallback. Exact-match reads (not
+    /// `OptionStore.get`, whose miss falls through to global) so a pane-level value under
+    /// the second spelling isn't shadowed by the global default.
+    private func resolvedPersistScrollback(forSurfaceKey surfaceID: String) -> Bool {
+        let paneID = editor.paneLocation(forSurfaceKey: surfaceID)?.paneID.uuidString
+        for target in [surfaceID, paneID] {
+            guard let target else { continue }
+            if let value = optionStore.snapshot(scope: .pane)
+                .first(where: { $0.0.key == "persist-scrollback" && $0.0.target == target })?.1 {
+                return value.boolValue
+            }
+        }
+        return optionStore.get("persist-scrollback")?.boolValue ?? true
+    }
+
     public var snapshot: SessionSnapshot {
         lock.lock()
         defer { lock.unlock() }
@@ -832,9 +887,22 @@ public final class SurfaceRegistry: @unchecked Sendable {
             guard scope == .global || target != nil else {
                 return .error("\(scopeRaw) scope requires a target")
             }
+            // `persist-scrollback` is read per pane (with global fallback) only — a tab/
+            // session/workspace-scoped value would be stored but unreachable by every read
+            // path (the OptionStore fallback widens with nil targets only): a silent no-op
+            // on a security control. Reject loudly instead.
+            if key == "persist-scrollback", scope != .pane, scope != .global {
+                return .error("persist-scrollback is pane- or global-scoped")
+            }
             optionStore.set(.init(parsing: raw), key: key, scope: scope, target: target)
             // Keep the monitor tick's lock-free precheck honest: silence arming changed.
             if key == "monitor-silence" { refreshSilenceArmedCache() }
+            // Apply the secrets-at-rest toggle to live surfaces immediately: disabling wipes
+            // the on-disk log synchronously (the user's intent is "gone now", not "gone at
+            // the next spawn"); re-enabling resumes persistence from that point — including
+            // for surfaces spawned while the option was off (they carry a suspended log
+            // writer) — documented in docs/SECURITY-POSTURE.md.
+            if key == "persist-scrollback" { applyScrollbackPersistenceOption(scope: scope, target: target) }
             // Nudge snapshot subscribers (the attach-window compositor) so a runtime option
             // change — status-*, mouse, pane-style, mode-keys — reaches attached clients instead
             // of being stuck at their startup values. Re-uses the snapshot push as a generic
@@ -1321,6 +1389,15 @@ public final class SurfaceRegistry: @unchecked Sendable {
             // `terminal-identity` option the GUI/CLI sets; the app reads the same value for its
             // XTVERSION reply.
             let identity = TerminalIdentity.spec(forOption: optionStore.get(TerminalIdentity.optionKey)?.stringValue)
+            // `persist-scrollback off` (pane-scoped — either target spelling — falling back
+            // to global): spawn with the scrollback file suspended AND remove any log a
+            // previously-persisted run left behind — the opt-out means no scrollback at
+            // rest, not just no new writes. The file is attached-but-suspended (not absent)
+            // so a later `persist-scrollback on` resumes on-disk persistence for this live
+            // surface — including across a live `respawn-pane` — without RealPty surgery.
+            let persistScrollback = resolvedPersistScrollback(forSurfaceKey: surfaceID)
+            let scrollbackURL = HarnessPaths.scrollbackFileURL(forSurfaceID: surfaceID)
+            if !persistScrollback { try? FileManager.default.removeItem(at: scrollbackURL) }
             let session = try RealPty(
                 id: surfaceID,
                 cwd: workDir,
@@ -1331,8 +1408,9 @@ public final class SurfaceRegistry: @unchecked Sendable {
                 extraEnvironment: extraEnvironment(forSurfaceKey: surfaceID),
                 termProgram: identity.name,
                 termProgramVersion: identity.version,
-                scrollbackURL: HarnessPaths.scrollbackFileURL(forSurfaceID: surfaceID)
+                scrollbackURL: scrollbackURL
             )
+            if !persistScrollback { session.setScrollbackPersistence(enabled: false) }
             session.onExit = { [weak self, weak session] exitStatus in
                 self?.removeSurfaceIfCurrent(surfaceID: surfaceID, session: session, exitStatus: exitStatus)
             }

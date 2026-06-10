@@ -59,6 +59,8 @@ final class ScrollbackFile: @unchecked Sendable {
     /// Set once the surface is gone for good; stops a late debounced flush from resurrecting a file
     /// we just deleted.
     private var closed = false
+    /// `persist-scrollback off`: drop appends instead of writing them (queue-confined).
+    private var suspended = false
     /// Current on-disk size, seeded from the existing file so compaction accounting survives a
     /// restart that loaded a pre-existing log.
     private var fileBytes: Int
@@ -71,6 +73,18 @@ final class ScrollbackFile: @unchecked Sendable {
             ? Self.unlimitedSafetyCap
             : max(retentionCap, Self.minimumRetentionCap)
         self.fileBytes = Self.compactExistingLogIfNeeded(url: url, retentionCap: self.retentionCap)
+        // Re-assert owner-only on a pre-existing log too, so files created by builds that
+        // predate the permission tightening are fixed on the first load after an upgrade.
+        Self.restrictToOwner(url)
+    }
+
+    /// `.scroll` logs hold raw PTY output — potentially echoed secrets — so they are
+    /// owner-only (0600), making SECURITY-POSTURE.md's at-rest claim literal rather than
+    /// relying on the 0700 parent directory alone. Re-applied after every creation path
+    /// because atomic writes (temp + rename) mint a fresh inode with default (0644)
+    /// permissions; in-place appends inherit whatever the file was created with.
+    private static func restrictToOwner(_ url: URL) {
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
     }
 
     /// Read the persisted tail (at most `maxBytes`) for seeding `RealPty`'s in-memory ring on
@@ -98,7 +112,7 @@ final class ScrollbackFile: @unchecked Sendable {
     func append(_ data: Data) {
         guard !data.isEmpty else { return }
         queue.async { [weak self] in
-            guard let self, !self.closed else { return }
+            guard let self, !self.closed, !self.suspended else { return }
             self.pending.append(data)
             // Bound RAM under a sustained flood: once buffered output crosses the cap, flush
             // synchronously rather than re-arming the debounce (which a gapless stream would
@@ -124,6 +138,25 @@ final class ScrollbackFile: @unchecked Sendable {
         let work = DispatchWorkItem { [weak self] in self?.flushPending() }
         pendingFlush = work
         queue.asyncAfter(deadline: deadline, execute: work)
+    }
+
+    /// Persistence opt-out (`persist-scrollback off`): stop accepting writes AND wipe what
+    /// is already on disk — the intent is "no scrollback at rest for this surface", so a
+    /// half-measure that stops future writes but keeps the old log would be a lie.
+    /// Synchronous (like `reset`/`delete`) so the caller knows the log is gone before the
+    /// option set returns, and a previously-armed debounced flush can't resurrect it.
+    /// Re-enabling resumes persistence from that point; output produced while suspended is
+    /// memory-only by design.
+    func setSuspended(_ suspended: Bool) {
+        queue.sync {
+            self.suspended = suspended
+            guard suspended else { return }
+            self.pendingFlush?.cancel()
+            self.flushDeadline = nil
+            self.pending.removeAll(keepingCapacity: false)
+            try? FileManager.default.removeItem(at: self.url)
+            self.fileBytes = 0
+        }
     }
 
     /// Synchronously persist any buffered output. Called on graceful shutdown so the last
@@ -182,7 +215,9 @@ final class ScrollbackFile: @unchecked Sendable {
         if !fm.fileExists(atPath: url.path) {
             // First write: create the (owner-only) directory + file in one shot.
             try? HarnessPaths.ensureDirectories()
-            return HarnessPaths.atomicWrite(data, to: url, label: "HarnessDaemon scrollback")
+            guard HarnessPaths.atomicWrite(data, to: url, label: "HarnessDaemon scrollback") else { return false }
+            Self.restrictToOwner(url)
+            return true
         }
         guard let handle = try? FileHandle(forWritingTo: url) else {
             // Fall back to a full rewrite if we somehow can't open for append. The rewrite
@@ -193,7 +228,9 @@ final class ScrollbackFile: @unchecked Sendable {
                 fputs("HarnessDaemon scrollback: append-open and read both failed for \(url.lastPathComponent); dropping flush\n", harnessStderr)
                 return false
             }
-            return HarnessPaths.atomicWrite(existing + data, to: url, label: "HarnessDaemon scrollback")
+            guard HarnessPaths.atomicWrite(existing + data, to: url, label: "HarnessDaemon scrollback") else { return false }
+            Self.restrictToOwner(url)
+            return true
         }
         defer { try? handle.close() }
         do {
@@ -228,6 +265,8 @@ final class ScrollbackFile: @unchecked Sendable {
         let tmp = url.appendingPathExtension("compact-tmp")
         do {
             try tail.write(to: tmp)
+            // Owner-only BEFORE the rename, so the log is never visible with loose perms.
+            Self.restrictToOwner(tmp)
             // fsync the temp file so its content is durable before we replace the log.
             // See the comment in appendToDisk for the fsync vs F_FULLFSYNC choice.
             if let tmpHandle = try? FileHandle(forReadingFrom: tmp) {
