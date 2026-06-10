@@ -63,7 +63,7 @@ final class GitBranchMonitorTests: XCTestCase {
     /// main, so the loop must turn for them to land). Fails the test on deadline.
     private func waitUntil(
         timeout: TimeInterval = 5,
-        _ message: String,
+        _ message: @autoclosure () -> String,
         condition: () -> Bool
     ) {
         let deadline = Date().addingTimeInterval(timeout)
@@ -71,7 +71,7 @@ final class GitBranchMonitorTests: XCTestCase {
             if condition() { return }
             RunLoop.main.run(until: Date().addingTimeInterval(0.02))
         }
-        XCTFail("timed out waiting for: \(message)")
+        XCTFail("timed out waiting for: \(message())")
     }
 
     /// Give async work a bounded window to (wrongly) fire, then assert it didn't.
@@ -107,7 +107,9 @@ final class GitBranchMonitorTests: XCTestCase {
         try FileManager.default.createDirectory(at: plain, withIntermediateDirectories: true)
         let tab = record(cwd: plain.path, snapshotBranch: "main")
         fixture.monitor.update(tabs: [tab])
-        waitUntil("clear push for non-repo cwd") { !fixture.recorder.changes.isEmpty }
+        waitUntil(
+            "clear push for non-repo cwd; resolver sees \(String(describing: GitHEADReader.resolveRepository(startingAt: plain.path))); changes \(fixture.recorder.changes)"
+        ) { !fixture.recorder.changes.isEmpty }
         XCTAssertEqual(fixture.recorder.changes.first?.tabID, tab.tabID)
         XCTAssertEqual(fixture.recorder.changes.count, 1)
         XCTAssertNil(fixture.recorder.changes[0].branch)
@@ -197,7 +199,9 @@ final class GitBranchMonitorTests: XCTestCase {
 
         // …and moving back in re-resolves instead of trusting the stale negative entry.
         fixture.monitor.update(tabs: [record(workspaceID: workspaceID, tabID: tabID, cwd: dir.path)])
-        waitUntil("re-check after cwd moves into a fresh repo") { !fixture.recorder.changes.isEmpty }
+        waitUntil(
+            "re-check after cwd moves into a fresh repo; resolver sees \(String(describing: GitHEADReader.resolveRepository(startingAt: dir.path))); changes \(fixture.recorder.changes)"
+        ) { !fixture.recorder.changes.isEmpty }
         XCTAssertEqual(fixture.recorder.changes.first?.branch, "fresh")
     }
 }
