@@ -8,6 +8,11 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 
 ## [Unreleased]
 
+### Changed
+- Mechanical decomposition (renderer): the Metal renderer's CPU-side instance/cache value
+  types (GPU instance layouts, per-row encode caches, upload-cache keys) moved to
+  `TerminalRenderInstances.swift` — same definitions, zero logic change.
+
 ### Added
 - VT conformance polish (engine): DA1 now identifies as a VT220-class terminal with Sixel
   and ANSI color (`CSI ?62;4;22c`); DA3 (`CSI = c`) replies with DECRPTUI; DECRQM gains the
