@@ -97,6 +97,15 @@ final class GitHEADReaderTests: XCTestCase {
         XCTAssertNil(GitHEADReader.resolveRepository(startingAt: ""))
     }
 
+    /// Regression: Darwin's `URL.deletingLastPathComponent()` maps "/" to "/..", which made
+    /// the upward walk non-terminating for any path outside a repository (it wedged the
+    /// monitor's I/O queue in production). Returning at all is the assertion here; the
+    /// value depends on whether the host's root happens to be a repository, so it isn't
+    /// pinned. `testNonRepositoryResolvesNil` covers the value for a real non-repo path.
+    func testWalkTerminatesAtFilesystemRoot() {
+        _ = GitHEADReader.resolveRepository(startingAt: "/")
+    }
+
     func testGitDirectoryWithoutHeadResolvesNil() throws {
         let workTree = root.appendingPathComponent("broken", isDirectory: true)
         let gitDir = workTree.appendingPathComponent(".git", isDirectory: true)

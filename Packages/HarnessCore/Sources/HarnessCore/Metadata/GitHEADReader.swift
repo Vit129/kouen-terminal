@@ -34,16 +34,21 @@ public enum GitHEADReader {
     /// show", never an error to surface).
     public static func resolveRepository(startingAt path: String) -> Repository? {
         guard !path.isEmpty else { return nil }
-        var directory = URL(fileURLWithPath: path).standardizedFileURL
+        // The walk is string-based: Darwin's `URL.deletingLastPathComponent()` maps "/" to
+        // "/.." (and then "/../.." …), so a URL-based walk never terminates for a path
+        // outside any repository. `NSString.deletingLastPathComponent` maps "/" to "/" on
+        // every platform, making the reached-the-root guard actually fire.
+        var directoryPath = URL(fileURLWithPath: path).standardizedFileURL.path
         while true {
+            let directory = URL(fileURLWithPath: directoryPath, isDirectory: true)
             if let gitDir = gitDirectory(for: directory) {
                 let head = gitDir.appendingPathComponent("HEAD")
                 guard FileManager.default.fileExists(atPath: head.path) else { return nil }
                 return Repository(workTree: directory.path, headFileURL: head)
             }
-            let parent = directory.deletingLastPathComponent()
-            guard parent.path != directory.path else { return nil } // reached "/"
-            directory = parent
+            let parent = (directoryPath as NSString).deletingLastPathComponent
+            guard !parent.isEmpty, parent != directoryPath else { return nil } // reached the root
+            directoryPath = parent
         }
     }
 
