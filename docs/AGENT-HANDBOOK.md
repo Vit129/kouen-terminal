@@ -621,7 +621,8 @@ Global menu shortcuts are defined in `MainMenuBuilder`, not `KeyTableSet.root` (
 | Not true black | Hex stripped or missing | Fix importer; re-import terminal config |
 | Blue sidebar | Wrong material | `.underWindowBackground` / glass |
 | Tab shows `Shell` | cwd not updating | `SurfaceShellTracker`, `displayTitle` |
-| cwd in daemon, stale UI | No metadata refresh | `refreshMetadata()` |
+| cwd in daemon, stale UI | Snapshot push not arriving (subscription dead) | `SessionCoordinator` snapshot subscription + 30 s safety poll; check daemon `subscribeSnapshot` |
+| Stale/missing git branch label | `HEAD` watcher not armed for the repo | `GitBranchMonitor` (one `FileWatcher` per resolved `HEAD`); `GitHEADReader` for parsing |
 | `+` dead | Button bezel | `isBordered = false` |
 | All tabs waiting | `markWaiting` bug | Filter by surface key |
 | Terminal colors wrong | Stale hex or import path | Re-import terminal config; check `ThemeManager.resolvedCanvas` + `applyNativeAppearance` |

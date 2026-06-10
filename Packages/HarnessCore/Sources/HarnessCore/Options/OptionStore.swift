@@ -134,6 +134,21 @@ public final class OptionStore: @unchecked Sendable {
         save()
     }
 
+    /// Remove every option stored at exactly (`scope`, `target`) — the teardown GC for
+    /// target-scoped values (pane options die with their surface, etc.); without it the
+    /// store grows without bound as targets churn. No-op (no save) when nothing matches.
+    public func removeAll(scope: Scope, target: String?) {
+        lock.lock()
+        let before = values.count
+        values = values.filter { id, _ in
+            guard let key = Self.decodeKey(id) else { return true }
+            return key.scope != scope || key.target != target
+        }
+        let changed = values.count != before
+        lock.unlock()
+        if changed { save() }
+    }
+
     public func snapshot(scope: Scope? = nil) -> [(ScopedKey, Value)] {
         lock.lock(); defer { lock.unlock() }
         return values.compactMap { id, value in
@@ -196,6 +211,10 @@ public final class OptionStore: @unchecked Sendable {
         // keeps a pane's dead leaf so `respawn-pane` can revive it; off closes the pane (or
         // its tab when last) when the shell exits — read in the daemon's PTY-exit handler.
         "remain-on-exit": .bool(true),
+        // Per-surface secrets-at-rest control: when off, the surface's scrollback is never
+        // written to disk (and anything already written is removed). Pane-scoped reads fall
+        // back to global, so `set-option persist-scrollback off` covers everything.
+        "persist-scrollback": .bool(true),
         // Auto-injected OSC 133 shell integration at spawn (zsh/bash/fish). Off = panes
         // spawn untouched; the manual `install-shell-integration` path still works.
         "shell-integration": .bool(true),

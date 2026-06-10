@@ -412,6 +412,13 @@ final class TerminalScreen {
         markRowDirty(cursorRow)   // cursor shape/blink changed → repaint its row
     }
 
+    /// att610 (DECSET/DECRST 12): program-controlled cursor blink — drives the same flag
+    /// DECSCUSR's odd/even Ps values do, leaving the shape untouched.
+    func setCursorBlink(_ on: Bool) {
+        cursorBlinking = on
+        markRowDirty(cursorRow)
+    }
+
     /// The DECSCUSR parameter (0–6) matching the current cursor shape + blink — for the DECRQSS
     /// reply to a `DCS $ q SP q ST` query. `.default` reports 0.
     var cursorStylePs: Int {
