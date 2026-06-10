@@ -1135,6 +1135,34 @@ final class PerformanceBenchmarks: XCTestCase {
         }
     }
 
+    /// Combining-mark-heavy frame build (roadmap PR-37 prerequisite): Thai script stacks a
+    /// vowel + tone on most bases, so every such cell carries `combining0/1` and the
+    /// renderer's cluster path allocates a `String` per glyph encode. This pins the cost so
+    /// the candidate optimization (cluster-allocation avoidance) is measurable — per the
+    /// micro-pass rule, that change lands only if THIS number moves beyond noise.
+    func testBuildFrameCombiningHeavy160x48() throws {
+        try skipUnlessEnabled()
+        let cols = 160, rows = 48
+        let term = HarnessGridTerminal(cols: cols, rows: rows)!
+        // Thai cells with combining marks: บ + ◌ี (U+0E35) + ◌้ (U+0E49), repeated.
+        let cluster = "\u{0E1A}\u{0E35}\u{0E49}"
+        var stream = "\u{1b}[?25l"
+        for row in 0 ..< rows {
+            stream += "\u{1b}[\(row + 1);1H" + String(repeating: cluster, count: cols / 2)
+        }
+        term.feed(stream)
+        let snapshot = term.readGrid()!
+        let builder = FrameBuilder(theme: HarnessThemeCatalog.theme(named: "Dracula")!)
+        let nanos = timedNanos {
+            _ = builder.build(snapshot)
+        }
+        printBenchmark("build_frame_combining_heavy_160x48", nanos: nanos,
+                       fields: [("cells", "\(cols * rows)")])
+        measure {
+            _ = builder.build(snapshot)
+        }
+    }
+
     func testRenderEncodeStats160x48() throws {
         try skipUnlessEnabled()
         let device = try makeMetalDevice()
