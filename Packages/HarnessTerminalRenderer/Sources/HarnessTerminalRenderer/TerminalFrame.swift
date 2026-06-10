@@ -209,6 +209,69 @@ private func renderCursorStyle(userStyle: CursorStyle, programShape: TerminalCur
     }
 }
 
+/// Per-row sorted, **merged** column intervals decomposed from the search highlights,
+/// computed once per `build`/`applyHighlights` pass. `appendRow` consumes its row's
+/// intervals with a monotonic cursor (columns ascend), so shading a frame costs
+/// O(highlights + cells) instead of the old per-cell `contains` scan over every match —
+/// O(matches × cells), which was real pain scrolling with a few hundred hits in view.
+///
+/// The decomposition mirrors `TerminalSelection.contains` exactly (single row →
+/// `[startColumn…endColumn]`; first row → `[startColumn…cols-1]`; last → `[0…endColumn]`;
+/// middle → full row), clamped to the viewport; merging preserves the union, and the old
+/// predicate was precisely "column ∈ union of the row's intervals" — so consumers stay
+/// byte-identical by construction. Both `build` and `applyHighlights` share this one type,
+/// keeping the #85 cell-overlay pass in lockstep with full builds.
+struct SearchHighlightIndex {
+    private let byRow: [Int: [ClosedRange<Int>]]
+
+    init(_ highlights: [TerminalSelection], rows: Int, cols: Int) {
+        guard !highlights.isEmpty, rows > 0, cols > 0 else {
+            byRow = [:]
+            return
+        }
+        var raw: [Int: [ClosedRange<Int>]] = [:]
+        for highlight in highlights {
+            let firstRow = max(highlight.startRow, 0)
+            let lastRow = min(highlight.endRow, rows - 1)
+            guard firstRow <= lastRow else { continue }
+            for row in firstRow ... lastRow {
+                let lower = max(row == highlight.startRow ? highlight.startColumn : 0, 0)
+                let upper = min(row == highlight.endRow ? highlight.endColumn : cols - 1, cols - 1)
+                guard lower <= upper else { continue }
+                raw[row, default: []].append(lower ... upper)
+            }
+        }
+        byRow = raw.mapValues { intervals in
+            let sorted = intervals.sorted { $0.lowerBound < $1.lowerBound }
+            var merged: [ClosedRange<Int>] = []
+            merged.reserveCapacity(sorted.count)
+            for interval in sorted {
+                if let last = merged.last, interval.lowerBound <= last.upperBound + 1 {
+                    if interval.upperBound > last.upperBound {
+                        merged[merged.count - 1] = last.lowerBound ... interval.upperBound
+                    }
+                } else {
+                    merged.append(interval)
+                }
+            }
+            return merged
+        }
+    }
+
+    var isEmpty: Bool { byRow.isEmpty }
+
+    /// The row's disjoint, ascending column intervals (empty for unhighlighted rows).
+    func intervals(forRow row: Int) -> [ClosedRange<Int>] { byRow[row] ?? [] }
+
+    /// Whether the cell is highlighted — the indexed equivalent of
+    /// `highlights.contains { $0.contains(row:column:) }`. Used by the differential tests;
+    /// `appendRow` walks `intervals(forRow:)` with a cursor instead.
+    func contains(row: Int, column: Int) -> Bool {
+        guard let intervals = byRow[row] else { return false }
+        return intervals.contains { $0.contains(column) }
+    }
+}
+
 /// A linear (line-wrapping) text selection over the grid, normalized so `start` is at or
 /// before `end` in reading order. Bounds are inclusive cell coordinates.
 public struct TerminalSelection: Equatable, Sendable {
@@ -414,17 +477,22 @@ public struct FrameBuilder {
             && !(damage?.full ?? true)
             && previous?.columns == cols && previous?.rows == snapshot.rows
             && previous?.cells.count == cols * snapshot.rows
+        // Bucket the highlights into per-row intervals ONCE per build; `appendRow` consumes
+        // its row's list with a cursor instead of scanning every match per cell.
+        let searchIndex = SearchHighlightIndex(searchHighlights, rows: snapshot.rows, cols: cols)
         if canReuse, let previous, let damage {
             for row in 0 ..< snapshot.rows {
                 if damage.rows.contains(row) {
-                    appendRow(row, snapshot: snapshot, region: region, searchHighlights: searchHighlights, into: &cells)
+                    appendRow(row, snapshot: snapshot, region: region,
+                              searchIntervals: searchIndex.intervals(forRow: row), into: &cells)
                 } else {
                     cells.append(contentsOf: previous.cells[(row * cols) ..< ((row + 1) * cols)])
                 }
             }
         } else {
             for row in 0 ..< snapshot.rows {
-                appendRow(row, snapshot: snapshot, region: region, searchHighlights: searchHighlights, into: &cells)
+                appendRow(row, snapshot: snapshot, region: region,
+                          searchIntervals: searchIndex.intervals(forRow: row), into: &cells)
             }
         }
         // The copy-mode cursor overrides the program cursor's position and forces it visible
@@ -499,7 +567,7 @@ public struct FrameBuilder {
                 cells.append(contentsOf: previous.cells[(sourceRow * cols) ..< ((sourceRow + 1) * cols)])
                 for i in base ..< cells.count { cells[i].row = row } // fix the baked row index
             } else {
-                appendRow(row, snapshot: snapshot, region: nil, searchHighlights: [], into: &cells)
+                appendRow(row, snapshot: snapshot, region: nil, searchIntervals: [], into: &cells)
             }
         }
         // Cursor and prompt gutter come fresh from the snapshot (both are cheap): the cursor is
@@ -532,12 +600,15 @@ public struct FrameBuilder {
         guard region != nil || !searchHighlights.isEmpty else { return }
         let cols = snapshot.cols
         guard frame.columns == cols, frame.cells.count >= cols * min(frame.rows, snapshot.rows) else { return }
+        // The same per-row bucketing `build` performs — sharing the index keeps this overlay
+        // pass byte-identical-by-construction with full builds (the #85 invariant).
+        let searchIndex = SearchHighlightIndex(searchHighlights, rows: snapshot.rows, cols: cols)
         var rowCells = [RenderCell]()
         rowCells.reserveCapacity(cols)
         for row in rows where row >= 0 && row < min(frame.rows, snapshot.rows) {
             rowCells.removeAll(keepingCapacity: true)
-            appendRow(row, snapshot: snapshot, region: region, searchHighlights: searchHighlights,
-                      into: &rowCells)
+            appendRow(row, snapshot: snapshot, region: region,
+                      searchIntervals: searchIndex.intervals(forRow: row), into: &rowCells)
             frame.cells.replaceSubrange((row * cols) ..< ((row + 1) * cols), with: rowCells)
         }
     }
@@ -546,8 +617,14 @@ public struct FrameBuilder {
     /// depend only on its snapshot cells plus selection/search shading — the cursor overlay is
     /// applied later by the renderer — so this is the unit of incremental reuse in `build`.
     private func appendRow(_ row: Int, snapshot: TerminalGridSnapshot,
-                           region: SelectionRegion?, searchHighlights: [TerminalSelection],
+                           region: SelectionRegion?, searchIntervals: [ClosedRange<Int>],
                            into cells: inout [RenderCell]) {
+        // Monotonic cursor over the row's disjoint, ascending search intervals: columns only
+        // grow, so each interval is passed at most once per row — O(1) amortized per cell.
+        // The no-search case is hoisted out of the per-cell work entirely: the cursor
+        // bookkeeping measurably taxes the plain build path (~6ns/cell) if left inline.
+        var intervalCursor = 0
+        let hasSearchIntervals = !searchIntervals.isEmpty
         for column in 0 ..< snapshot.cols {
             let cell = snapshot.cell(row: row, col: column) ?? .blank
             let colors = resolver.resolve(cell)
@@ -559,8 +636,17 @@ public struct FrameBuilder {
             let isCanvasBackground = cell.background == .none && !cell.inverse
             // Precedence: primary selection (opaque) > search hit > normal.
             let selected = region?.contains(row: row, column: column) ?? false
-            let isSearchHit = !selected && !searchHighlights.isEmpty
-                && searchHighlights.contains { $0.contains(row: row, column: column) }
+            let isSearchHit: Bool
+            if hasSearchIntervals {
+                while intervalCursor < searchIntervals.count,
+                      searchIntervals[intervalCursor].upperBound < column {
+                    intervalCursor += 1
+                }
+                isSearchHit = !selected && intervalCursor < searchIntervals.count
+                    && searchIntervals[intervalCursor].lowerBound <= column
+            } else {
+                isSearchHit = false
+            }
             let foreground: RenderColor
             let background: RenderColor
             // Skip the cell's background fill only when it resolves to the default canvas
