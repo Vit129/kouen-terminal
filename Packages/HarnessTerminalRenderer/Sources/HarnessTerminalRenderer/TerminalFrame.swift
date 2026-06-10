@@ -140,15 +140,20 @@ public struct TerminalFrame: Equatable, Sendable {
     /// in the left margin of a shell-prompt row (green = exit 0, red = non-zero, neutral =
     /// prompt with no exit yet). Empty without shell integration, so the gutter is a no-op then.
     public var promptGutter: [Int: RenderColor]
+    /// Whether any cell carries SGR blink — computed once at build so the per-present
+    /// blink-timer decision is a field read, not an O(cells) scan on the main thread.
+    public var hasBlink: Bool
 
     public init(columns: Int, rows: Int, cells: [RenderCell], cursor: CursorRender,
-                images: [FrameImage] = [], promptGutter: [Int: RenderColor] = [:]) {
+                images: [FrameImage] = [], promptGutter: [Int: RenderColor] = [:],
+                hasBlink: Bool = false) {
         self.columns = columns
         self.rows = rows
         self.cells = cells
         self.cursor = cursor
         self.images = images
         self.promptGutter = promptGutter
+        self.hasBlink = hasBlink
     }
 
     public func cell(row: Int, column: Int) -> RenderCell? {
@@ -460,7 +465,8 @@ public struct FrameBuilder {
         // entirely when the user hasn't opted in (the default), so no stripe is drawn.
         let promptGutter = promptGutterEnabled ? resolvePromptGutter(snapshot.marks) : [:]
         return TerminalFrame(columns: snapshot.cols, rows: snapshot.rows, cells: cells,
-                             cursor: cursor, images: images, promptGutter: promptGutter)
+                             cursor: cursor, images: images, promptGutter: promptGutter,
+                             hasBlink: cells.contains { $0.blink })
     }
 
     /// Scroll-delta rebuild: the viewport's content moved by `shift` rows (a pure scrollback
@@ -515,7 +521,8 @@ public struct FrameBuilder {
         )
         let promptGutter = promptGutterEnabled ? resolvePromptGutter(snapshot.marks) : [:]
         return TerminalFrame(columns: cols, rows: rows, cells: cells,
-                             cursor: cursor, images: [], promptGutter: promptGutter)
+                             cursor: cursor, images: [], promptGutter: promptGutter,
+                             hasBlink: cells.contains { $0.blink })
     }
 
     /// Re-shade `rows` of an already-built **plain** frame with selection/search highlights —

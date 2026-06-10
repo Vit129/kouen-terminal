@@ -1827,7 +1827,7 @@ public final class HarnessTerminalSurfaceView: NSView {
         )
         if didPresent {
             onRenderStats?(renderer.stats)
-            updateTextBlinkTimer(frameHasBlink: frame.cells.contains { $0.blink })
+            updateTextBlinkTimer(frameHasBlink: frame.hasBlink)
         } else { scheduleRender() } // transient encode/present failure — retry next tick
         StartupMetrics.shared.mark(.firstDrawablePresented) // idempotent: only the first present counts
         // Retain only a plain frame for row reuse; a selection/scrollback/preedit frame would
@@ -2155,7 +2155,7 @@ public final class HarnessTerminalSurfaceView: NSView {
             // could not distinguish from a normal full encode).
             lastPresentedResultIsRendererCoherent = renderer.stats.rowCacheCoherent
             onRenderStats?(renderer.stats)
-            updateTextBlinkTimer(frameHasBlink: result.frame.cells.contains { $0.blink })
+            updateTextBlinkTimer(frameHasBlink: result.frame.hasBlink)
         } else {
             // A genuine drop: nothing reached the glass this turn (repaintLastFrame failures
             // don't count — their callers fall back to another present in the same turn).
@@ -2739,6 +2739,9 @@ public final class HarnessTerminalSurfaceView: NSView {
 
     public override func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self)
+        // A press starts a drag-coded sequence; forget the hover-motion dedupe cell so the
+        // first post-release move back into it isn't swallowed as a duplicate.
+        lastReportedMotionCell = nil
         if copyMode != nil { return } // copy mode is keyboard-driven; ignore clicks
         // ⌘-click opens an OSC 8 hyperlink or an auto-detected URL.
         // ⌘ overrides mouse reporting, the same way Shift overrides it for selection.
