@@ -206,4 +206,62 @@ final class InputEncoderTests: XCTestCase {
         XCTAssertEqual(encoder.encodeMouse(button: .left, kind: .press, column: 0, row: 0, modes: modes),
                        [0x1B, 0x5B, 0x4D, 32, 33, 33])
     }
+
+    // MARK: Numeric keypad (F30: DECKPAM/DECKPNM)
+
+    private var appKeypad: TerminalModes {
+        var m = TerminalModes()
+        m.keypadApplication = true
+        return m
+    }
+
+    /// Numeric (default) mode: keypad keys emit the same plain bytes the text path used to
+    /// produce — byte-identical until a program enables application keypad.
+    func testKeypadNumericModeEmitsPlainBytes() {
+        XCTAssertEqual(encoder.encode(.keypad0), bytes("0"))
+        XCTAssertEqual(encoder.encode(.keypad9), bytes("9"))
+        XCTAssertEqual(encoder.encode(.keypadDecimal), bytes("."))
+        XCTAssertEqual(encoder.encode(.keypadPlus), bytes("+"))
+        XCTAssertEqual(encoder.encode(.keypadMinus), bytes("-"))
+        XCTAssertEqual(encoder.encode(.keypadMultiply), bytes("*"))
+        XCTAssertEqual(encoder.encode(.keypadDivide), bytes("/"))
+        XCTAssertEqual(encoder.encode(.keypadEquals), bytes("="))
+        XCTAssertEqual(encoder.encode(.keypadEnter), [0x0D])
+    }
+
+    /// DECKPAM: the xterm SS3 application forms (`SS3 p`…`SS3 y`, operators per the VT220 table).
+    func testKeypadApplicationModeEmitsSS3() {
+        XCTAssertEqual(encoder.encode(.keypad0, modes: appKeypad), bytes("\u{1b}Op"))
+        XCTAssertEqual(encoder.encode(.keypad1, modes: appKeypad), bytes("\u{1b}Oq"))
+        XCTAssertEqual(encoder.encode(.keypad5, modes: appKeypad), bytes("\u{1b}Ou"))
+        XCTAssertEqual(encoder.encode(.keypad9, modes: appKeypad), bytes("\u{1b}Oy"))
+        XCTAssertEqual(encoder.encode(.keypadDecimal, modes: appKeypad), bytes("\u{1b}On"))
+        XCTAssertEqual(encoder.encode(.keypadDivide, modes: appKeypad), bytes("\u{1b}Oo"))
+        XCTAssertEqual(encoder.encode(.keypadMultiply, modes: appKeypad), bytes("\u{1b}Oj"))
+        XCTAssertEqual(encoder.encode(.keypadMinus, modes: appKeypad), bytes("\u{1b}Om"))
+        XCTAssertEqual(encoder.encode(.keypadPlus, modes: appKeypad), bytes("\u{1b}Ok"))
+        XCTAssertEqual(encoder.encode(.keypadEnter, modes: appKeypad), bytes("\u{1b}OM"))
+        XCTAssertEqual(encoder.encode(.keypadEquals, modes: appKeypad), bytes("\u{1b}OX"))
+    }
+
+    /// The emulator end of F30: `ESC =` / `ESC >` flip the flag the encoder consults, and
+    /// DECSTR resets it.
+    func testDECKPAMTogglesKeypadApplicationFlag() {
+        let term = TerminalEmulator(cols: 10, rows: 2)
+        XCTAssertFalse(term.modes.keypadApplication)
+        term.feed("\u{1b}=")
+        XCTAssertTrue(term.modes.keypadApplication)
+        term.feed("\u{1b}>")
+        XCTAssertFalse(term.modes.keypadApplication)
+        term.feed("\u{1b}=\u{1b}[!p") // DECSTR resets keyboard modes
+        XCTAssertFalse(term.modes.keypadApplication)
+    }
+
+    /// Kitty active: keypad keys report their functional codepoints (`CSI <cp> u`).
+    func testKeypadUnderKittyReportsFunctionalCodepoints() {
+        var m = TerminalModes()
+        m.kittyKeyboardStack = [0b1]
+        XCTAssertEqual(encoder.encode(.keypad0, modes: m), bytes("\u{1b}[57399u"))
+        XCTAssertEqual(encoder.encode(.keypadEnter, modes: m), bytes("\u{1b}[57414u"))
+    }
 }

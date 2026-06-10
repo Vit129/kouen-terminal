@@ -86,6 +86,16 @@ public final class TerminalEmulator: VTParserHandler {
     public var onProgress: ((TerminalProgressReport) -> Void)?
     /// Mouse pointer shape requested via OSC 22 (e.g. `text`, `pointer`, `default`); nil clears.
     public var onPointerShapeChange: ((String?) -> Void)?
+    /// iTerm2 `OSC 1337 ; SetUserVar=name=<base64>` landed (already decoded + validated).
+    /// The host surfaces these to format strings as pane-scoped `@name` user options.
+    public var onUserVariableChange: ((_ name: String, _ value: String) -> Void)?
+    /// RIS dropped every user variable — hosts that mirrored them (pane-scoped `@` options)
+    /// must clear their copies too, or `#{@name}` keeps serving pre-reset values. Fired only
+    /// when there was something to clear.
+    public var onUserVariablesCleared: (() -> Void)?
+    /// User variables set via OSC 1337 `SetUserVar=` (count- and size-capped; RIS clears).
+    public private(set) var userVariables: [String: String] = [:]
+    private static let maxUserVariables = 64
     /// Last OSC-22 pointer shape (nil = terminal default). Surfaced for hosts that prefer polling.
     public private(set) var pointerShape: String?
     /// When the current command started running (OSC 133 `C`/`B`), for command-duration timing.
@@ -617,6 +627,46 @@ public final class TerminalEmulator: VTParserHandler {
     /// iTerm2 inline image (`OSC 1337 ; File=…:<base64>`). width/height args may be cells (`N`),
     /// pixels (`Npx`), or percent (`N%`); only plain cell counts are honored here — pixel/percent
     /// fall back to the footprint computed from the image's pixels.
+    /// The OSC 1337 family beyond inline images (F20): `CurrentDir=` reports the cwd with
+    /// the same trust policy as OSC 7 (absolute paths only — hostile output must not steer
+    /// the inherited cwd), and `SetUserVar=name=<base64>` stores a per-surface user variable
+    /// (surfaced to format strings by the host as a pane-scoped `@name` option). Anything
+    /// else falls through to the image handler, which ignores what it can't parse.
+    private func handleITerm2OSC(_ payload: String) {
+        if payload.hasPrefix("CurrentDir=") {
+            let path = String(payload.dropFirst("CurrentDir=".count))
+            guard path.hasPrefix("/") else { return }
+            onWorkingDirectoryChange?(path)
+            return
+        }
+        if payload.hasPrefix("SetUserVar=") {
+            let body = String(payload.dropFirst("SetUserVar=".count))
+            guard let eq = body.firstIndex(of: "=") else { return }
+            let name = String(body[..<eq])
+            let encoded = String(body[body.index(after: eq)...])
+            // Bound everything a hostile stream controls: name shape + length (ASCII only —
+            // Unicode `isLetter`/`isNumber` would admit lookalikes like `½`), the base64 TEXT
+            // before decoding (4096 bytes ≈ 5464 base64 chars with padding, so a multi-MiB
+            // payload is never decoded), decoded value size + content (no C0/DEL/C1 — values
+            // are later format-expanded into status lines and other clients' TTYs, where a
+            // control byte is escape injection), and the variable-table population (new names
+            // rejected past the cap; existing names stay updatable).
+            guard !name.isEmpty, name.count <= 64,
+                  name.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "_" || $0 == "-") }),
+                  encoded.utf8.count <= 5464,
+                  let data = Data(base64Encoded: encoded), data.count <= 4096,
+                  let value = String(data: data, encoding: .utf8),
+                  value.unicodeScalars.allSatisfy({ $0.value >= 0x20 && $0.value != 0x7F && !(0x80 ... 0x9F).contains($0.value) })
+            else { return }
+            if userVariables[name] == value { return } // same-value rewrite: no host round trip
+            if userVariables[name] == nil, userVariables.count >= Self.maxUserVariables { return }
+            userVariables[name] = value
+            onUserVariableChange?(name, value)
+            return
+        }
+        handleITerm2Image(payload)
+    }
+
     private func handleITerm2Image(_ payload: String) {
         guard let parsed = ITerm2InlineImage.parse(Array(payload.utf8)) else { return }
         func cells(_ s: String?) -> Int {
@@ -646,7 +696,7 @@ public final class TerminalEmulator: VTParserHandler {
         case "777": handleNotify777(payload)               // OSC 777 ; notify ; <title> ; <body>
         case "22": setPointerShape(payload)                // OSC 22 ; <shape> — mouse cursor shape
         case "133": handleSemanticPrompt(payload)          // OSC 133 ; A/B/C/D — shell integration
-        case "1337": handleITerm2Image(payload)            // iTerm2 inline image (File=…)
+        case "1337": handleITerm2OSC(payload)              // iTerm2 family (File=/CurrentDir=/SetUserVar=)
         default: break
         }
     }
@@ -1087,6 +1137,10 @@ public final class TerminalEmulator: VTParserHandler {
         kittyTransmitted.removeAll()
         kittyTransmittedBytes = 0
         pointerShape = nil
+        if !userVariables.isEmpty {
+            userVariables.removeAll()
+            onUserVariablesCleared?()
+        }
         hyperlinks.removeAll()
         hyperlinkKeys.removeAll()
         nextHyperlinkID = 1

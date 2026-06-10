@@ -239,6 +239,23 @@ final class OptionStoreTests: XCTestCase {
         XCTAssertTrue(OptionStore.isRecognizedOptionKey("status-interval"))
         XCTAssertNil(store.get("status-interval"), "unseeded option with no default reads nil")
     }
+
+    /// `removeAll(scope:target:)` — the surface-teardown GC — clears every key stored at
+    /// exactly that (scope, target) and leaves other targets and scopes alone.
+    func testRemoveAllClearsOnlyTheNamedTarget() {
+        let store = OptionStore(url: tmpURL())
+        store.set(.string("a"), key: "@one", scope: .pane, target: "pane-1")
+        store.set(.string("b"), key: "@two", scope: .pane, target: "pane-1")
+        store.set(.string("c"), key: "@one", scope: .pane, target: "pane-2")
+        store.set(.string("d"), key: "@one", scope: .tab, target: "tab-1")
+        store.removeAll(scope: .pane, target: "pane-1")
+        XCTAssertNil(store.get("@one", scope: .pane, target: "pane-1"))
+        XCTAssertNil(store.get("@two", scope: .pane, target: "pane-1"))
+        XCTAssertEqual(store.get("@one", scope: .pane, target: "pane-2")?.stringValue, "c",
+                       "a sibling target's values survive")
+        XCTAssertEqual(store.get("@one", scope: .tab, target: "tab-1")?.stringValue, "d",
+                       "another scope's values survive")
+    }
 }
 
 final class FormatStringExtendedVariableTests: XCTestCase {

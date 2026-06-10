@@ -9,6 +9,15 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [Unreleased]
 
 ### Added
+- Parity long tail (engine/core half): the numeric keypad honors DECKPAM/DECKPNM —
+  application mode emits the xterm SS3 forms, numeric mode stays byte-identical to plain
+  typing, and the kitty protocol reports the functional KP codepoints; OSC 1337
+  `CurrentDir=` reports the cwd (absolute paths only, the OSC 7 trust policy) and
+  `SetUserVar=` stores per-surface user variables (base64-decoded, name/size/population
+  bounded, cleared by RIS) that the GUI surfaces as pane-scoped `@name` user options —
+  readable from `#{@name}` format tokens; new `windowInheritCWD` setting (default **on**,
+  matching the shipped behavior and Ghostty's default) lets new tabs/windows be pinned to
+  `defaultCWD` instead of inheriting the focused pane's directory.
 - `persist-scrollback` option (default on, per-pane with global fallback): turning it off
   stops writing a surface's scrollback to disk AND synchronously wipes what's already
   there — the secrets-at-rest control documented in the new `docs/SECURITY-POSTURE.md`
