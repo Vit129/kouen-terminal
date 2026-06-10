@@ -833,6 +833,9 @@ public final class TerminalEmulator: VTParserHandler {
         current.softReset()
         modes.cursorKeysApplication = false
         modes.keypadApplication = false
+        // The screen's softReset() discards savedCursor — DECRQM ?1048 must not keep
+        // reporting "set" for a save that no longer exists.
+        mode1048Saved = false
         g0 = .ascii
         g1 = .ascii
         glUsesG1 = false

@@ -19,8 +19,9 @@ import XCTest
 /// Legacy X10: `ESC [ M` + three raw bytes (each offset by 32); coordinates clamped
 ///             to 223 (the max that fits in one byte without wrapping past 255).
 ///
-/// Modes 1005, 1015, and 1016 are NOT implemented; tests for those are omitted
-/// intentionally (see `testUnsupportedModeIsNoOp`).
+/// SGR-pixel (mode 1016): the 1006 framing with pixel coordinates supplied by the host;
+/// takes precedence over 1006 when both are set. Legacy modes 1005 and 1015 remain
+/// unimplemented (see `testUnsupportedModeIsNoOp`).
 final class MouseReportingTests: XCTestCase {
 
     private let encoder = InputEncoder()
@@ -440,5 +441,56 @@ final class MouseReportingTests: XCTestCase {
         term.feed("\u{1b}[?1016$p")
         XCTAssertEqual(responses, ["\u{1b}[?1005;0$y", "\u{1b}[?1015;0$y", "\u{1b}[?1016;1$y"],
                        "legacy modes → state=0; 1016 → its tracked state")
+    }
+
+    // MARK: - Any-event motion (1003: kind .move)
+
+    /// Button-less motion encodes the "no button" base (3) + motion bit (32) = 35; SGR
+    /// motion uses the 'M' final (only releases use 'm').
+    func testMoveEncodesNoButtonPlusMotion() {
+        var m = modes(any: true, sgr: true)
+        XCTAssertEqual(encoder.encodeMouse(button: .left, kind: .move, column: 4, row: 2, modes: m),
+                       bytes("\u{1b}[<35;5;3M"), "button is ignored for motion — base is 3")
+
+        // Modifiers stack on the motion code (shift +4 → 39).
+        XCTAssertEqual(encoder.encodeMouse(button: .left, kind: .move, column: 0, row: 0,
+                                           modifiers: [.shift], modes: m),
+                       bytes("\u{1b}[<39;1;1M"))
+
+        // Legacy encoding: Cb = 35 + 32 = 67 ('C').
+        m = modes(any: true)
+        XCTAssertEqual(encoder.encodeMouse(button: .left, kind: .move, column: 0, row: 0, modes: m),
+                       [0x1B, 0x5B, 0x4D, 67, 33, 33])
+    }
+
+    // MARK: - SGR-pixel (1016)
+
+    func testSGRPixelEncodesPixelCoordinatesAndPrecedence() {
+        var m = modes(any: true, sgr: true)
+        m.mouseSGRPixel = true
+        // Pixel coordinates (0-based in, 1-based on the wire), 1016 wins over 1006.
+        XCTAssertEqual(encoder.encodeMouse(button: .left, kind: .press, column: 4, row: 2,
+                                           pixelPosition: (x: 47, y: 31), modes: m),
+                       bytes("\u{1b}[<0;48;32M"))
+        XCTAssertEqual(encoder.encodeMouse(button: .left, kind: .release, column: 4, row: 2,
+                                           pixelPosition: (x: 47, y: 31), modes: m),
+                       bytes("\u{1b}[<0;48;32m"))
+        // Motion in pixel mode.
+        XCTAssertEqual(encoder.encodeMouse(button: .left, kind: .move, column: 4, row: 2,
+                                           pixelPosition: (x: 9, y: 9), modes: m),
+                       bytes("\u{1b}[<35;10;10M"))
+    }
+
+    func testSGRPixelWithoutHostPixelsDegradesToCells() {
+        var m = modes(click: true, sgr: true)
+        m.mouseSGRPixel = true
+        // A headless host can't produce pixels: fall back to 1006 cells, never silence.
+        XCTAssertEqual(encoder.encodeMouse(button: .left, kind: .press, column: 4, row: 2, modes: m),
+                       bytes("\u{1b}[<0;5;3M"))
+        // …and without 1006 either, to legacy X10 cells.
+        var legacy = modes(click: true)
+        legacy.mouseSGRPixel = true
+        XCTAssertEqual(encoder.encodeMouse(button: .left, kind: .press, column: 0, row: 0, modes: legacy),
+                       [0x1B, 0x5B, 0x4D, 32, 33, 33])
     }
 }
