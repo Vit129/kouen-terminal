@@ -25,6 +25,24 @@ public enum TerminalColorGamut: String, Codable, Sendable {
     }
 }
 
+public enum HarnessAppearanceMode: String, Codable, Sendable, CaseIterable {
+    case theme
+    case macOSSystem = "macos-system"
+}
+
+public enum HarnessSystemAppearance: String, Codable, Sendable {
+    case light
+    case dark
+}
+
+public enum HarnessEffectiveAppearanceRefreshPolicy {
+    public static func shouldRefreshOnEffectiveAppearanceChange(
+        appearanceMode: HarnessAppearanceMode
+    ) -> Bool {
+        appearanceMode == .macOSSystem
+    }
+}
+
 public enum TerminalTextRenderingMode: String, Codable, Sendable {
     case native
     case crisp
@@ -71,6 +89,8 @@ private enum LegacyHarnessSettingsCodingKeys: String, CodingKey {
     /// Removed in favor of the per-event `notificationEvents` map; still read here to migrate
     /// an existing on/off choice into `notificationEvents[.commandFinished]`.
     case commandFinishedNotifications
+    case lightThemeName
+    case darkThemeName
 }
 
 public struct HarnessSettings: Codable, Sendable, Equatable {
@@ -88,6 +108,13 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
     public var backgroundBlur: Int
     public var windowPaddingX: Float
     public var windowPaddingY: Float
+    /// Harness appearance policy. `.theme` uses the selected Harness theme; `.macOSSystem`
+    /// resolves Harness-owned light/dark palettes from the current macOS appearance.
+    public var appearanceMode: HarnessAppearanceMode
+    /// Named themes used only by `.macOSSystem` resolution. `.theme` mode ignores these
+    /// fields and continues to render `themeName` exactly as before.
+    public var systemLightThemeName: String
+    public var systemDarkThemeName: String
     /// Custom hex (`#rrggbb`) overrides imported from terminal config when present.
     /// `nil` means "use the active theme color".
     public var customBackgroundHex: String?
@@ -263,10 +290,6 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
     /// Minimum WCAG contrast ratio (1…21) forced between a cell's foreground and its background.
     /// 1 = off (no adjustment). Imported from a terminal config's `minimum-contrast`.
     public var minimumContrast: Double
-    /// When both are set, the active theme follows the macOS system appearance: `lightThemeName`
-    /// under Light, `darkThemeName` under Dark. nil = off (the single `themeName` is used).
-    public var lightThemeName: String?
-    public var darkThemeName: String?
     /// Confirm before pasting text containing newlines / control characters when the program has
     /// not enabled bracketed paste — guards against blind multi-line command execution.
     public var pasteProtection: Bool
@@ -334,6 +357,9 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         backgroundBlur: Int = 16,
         windowPaddingX: Float = 14,
         windowPaddingY: Float = 14,
+        appearanceMode: HarnessAppearanceMode = .theme,
+        systemLightThemeName: String = "Zenwritten Light",
+        systemDarkThemeName: String = "Harness Default",
         customBackgroundHex: String? = nil,
         customForegroundHex: String? = nil,
         customCursorHex: String? = nil,
@@ -387,8 +413,6 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         quickTerminalHotkey: String = "cmd-opt-`",
         windowPaddingBalance: Bool = true,
         minimumContrast: Double = 1,
-        lightThemeName: String? = nil,
-        darkThemeName: String? = nil,
         pasteProtection: Bool = true,
         commandFinishedThresholdSeconds: Int = 10,
         notificationEvents: [String: Bool] = [:],
@@ -407,6 +431,9 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         self.backgroundBlur = backgroundBlur
         self.windowPaddingX = HarnessSettings.clampedPadding(windowPaddingX)
         self.windowPaddingY = HarnessSettings.clampedPadding(windowPaddingY)
+        self.appearanceMode = appearanceMode
+        self.systemLightThemeName = systemLightThemeName
+        self.systemDarkThemeName = systemDarkThemeName
         self.customBackgroundHex = customBackgroundHex
         self.customForegroundHex = customForegroundHex
         self.customCursorHex = customCursorHex
@@ -456,8 +483,6 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         self.quickTerminalHotkey = quickTerminalHotkey
         self.windowPaddingBalance = windowPaddingBalance
         self.minimumContrast = HarnessSettings.clampedContrast(minimumContrast)
-        self.lightThemeName = lightThemeName
-        self.darkThemeName = darkThemeName
         self.pasteProtection = pasteProtection
         self.commandFinishedThresholdSeconds = max(0, commandFinishedThresholdSeconds)
         self.notificationEvents = notificationEvents
@@ -507,6 +532,19 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         notificationEvents[event.rawValue] = enabled
     }
 
+    public mutating func clearThemeColorOverrides() {
+        customBackgroundHex = nil
+        customForegroundHex = nil
+        customCursorHex = nil
+        selectionBackgroundHex = nil
+        selectionForegroundHex = nil
+        boldColorHex = nil
+        cursorTextHex = nil
+        paletteHex = Array(repeating: nil, count: 16)
+        dividerHex = nil
+        statusLineHex = nil
+    }
+
     /// Reset visual fields to either the user's imported terminal config or the source terminal's
     /// stock baseline. Preserves shell, cwd, sidebar/titlebar chrome, prefix key, and
     /// agent color overrides so selecting "Default" changes appearance, not behavior.
@@ -516,6 +554,15 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         let defaults = HarnessSettings()
         backgroundOpacity = imported?.backgroundOpacity ?? defaults.backgroundOpacity
         backgroundBlur = imported?.backgroundBlur ?? defaults.backgroundBlur
+        if let light = imported?.systemLightThemeName, let dark = imported?.systemDarkThemeName {
+            appearanceMode = .macOSSystem
+            systemLightThemeName = light
+            systemDarkThemeName = dark
+        } else {
+            appearanceMode = defaults.appearanceMode
+            systemLightThemeName = defaults.systemLightThemeName
+            systemDarkThemeName = defaults.systemDarkThemeName
+        }
         customBackgroundHex = imported?.backgroundHex
         customForegroundHex = imported?.foregroundHex
         customCursorHex = imported?.cursorColorHex
@@ -578,6 +625,33 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         backgroundBlur = try fields.decode(.backgroundBlur, \.backgroundBlur)
         windowPaddingX = HarnessSettings.clampedPadding(try fields.decode(.windowPaddingX, \.windowPaddingX))
         windowPaddingY = HarnessSettings.clampedPadding(try fields.decode(.windowPaddingY, \.windowPaddingY))
+        // Hand-written (migration semantics, deliberately NOT FieldDecoder): a settings file
+        // written before `appearanceMode` existed may carry the legacy auto light/dark pair
+        // (`lightThemeName`/`darkThemeName`, shipped since v1.1.x). Those users opted into
+        // following the macOS appearance — migrate them to `.macOSSystem` and seed the system
+        // theme names from their legacy choice so the feature survives the update. The
+        // fallback for the appearance fields is the plain memberwise default (`.theme`), not
+        // the import-influenced `fallback`: an existing settings.json must never flip modes
+        // because the *source terminal's* config changed — imports only land via the consented
+        // backfill in `load()`.
+        let decodedAppearanceMode = try container.decodeIfPresent(HarnessAppearanceMode.self, forKey: .appearanceMode)
+        let legacyLightThemeName = try legacyContainer.decodeIfPresent(String.self, forKey: .lightThemeName)
+        let legacyDarkThemeName = try legacyContainer.decodeIfPresent(String.self, forKey: .darkThemeName)
+        let defaultSettings = HarnessSettings()
+        if decodedAppearanceMode == nil,
+           let legacyLightThemeName,
+           let legacyDarkThemeName,
+           !legacyLightThemeName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           !legacyDarkThemeName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        {
+            appearanceMode = .macOSSystem
+            systemLightThemeName = legacyLightThemeName
+            systemDarkThemeName = legacyDarkThemeName
+        } else {
+            appearanceMode = decodedAppearanceMode ?? defaultSettings.appearanceMode
+            systemLightThemeName = try container.decodeIfPresent(String.self, forKey: .systemLightThemeName) ?? defaultSettings.systemLightThemeName
+            systemDarkThemeName = try container.decodeIfPresent(String.self, forKey: .systemDarkThemeName) ?? defaultSettings.systemDarkThemeName
+        }
         customBackgroundHex = try fields.decode(.customBackgroundHex, \.customBackgroundHex)
         customForegroundHex = try fields.decode(.customForegroundHex, \.customForegroundHex)
         customCursorHex = try fields.decode(.customCursorHex, \.customCursorHex)
@@ -649,8 +723,8 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         quickTerminalHotkey = try fields.decode(.quickTerminalHotkey, \.quickTerminalHotkey)
         windowPaddingBalance = try fields.decode(.windowPaddingBalance, \.windowPaddingBalance)
         minimumContrast = HarnessSettings.clampedContrast(try fields.decode(.minimumContrast, \.minimumContrast))
-        lightThemeName = try container.decodeIfPresent(String.self, forKey: .lightThemeName)
-        darkThemeName = try container.decodeIfPresent(String.self, forKey: .darkThemeName)
+        // `lightThemeName`/`darkThemeName` are no longer stored fields — the legacy pair is
+        // consumed by the `appearanceMode` migration above (via LegacyHarnessSettingsCodingKeys).
         pasteProtection = try fields.decode(.pasteProtection, \.pasteProtection)
         commandFinishedThresholdSeconds =
             try fields.decode(.commandFinishedThresholdSeconds, \.commandFinishedThresholdSeconds)
@@ -674,8 +748,9 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
     /// (app start / settings save+reload), never concurrently.
     nonisolated(unsafe) private static var pendingImportedConfig: ImportedTerminalConfig??
 
-    public static func load() -> HarnessSettings {
-        let imported = TerminalConfigImporter.load()
+    /// `imported` defaults to the live terminal-config import; tests inject a fixture so
+    /// migration behavior doesn't depend on the machine's source-terminal config.
+    public static func load(imported: ImportedTerminalConfig? = TerminalConfigImporter.load()) -> HarnessSettings {
         let url = HarnessPaths.settingsURL
         if FileManager.default.fileExists(atPath: url.path), let data = try? Data(contentsOf: url) {
             // Stash the already-loaded import result so init(from:) can reuse it rather than
@@ -690,6 +765,7 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
                 return HarnessSettings.makeDefaults(imported: imported)
             }
             let hasStoredColorChoice = settingsDataContainsColorChoice(data)
+            let hasStoredImportOwnedVisualChoice = settingsDataContainsImportOwnedVisualChoice(data)
             // Track whether any migration below actually changed something, so a no-op launch never
             // rewrites settings.json (a needless write — and a corruption window — on every start).
             var didMutate = false
@@ -701,7 +777,7 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
             // via Settings / `source-config` / prefix `r` (the consented path). Either way we record
             // the new signature so we don't re-evaluate this every launch.
             if let imported, settings.importedConfigSignature != imported.signature {
-                if settings.hasUserVisualCustomizations {
+                if settings.hasUserVisualCustomizations || hasStoredImportOwnedVisualChoice {
                     settings.importedConfigSignature = imported.signature
                 } else {
                     settings.applyImportedDefaults(imported)
@@ -768,6 +844,16 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
             || object[CodingKeys.colorRendering.stringValue] != nil
     }
 
+    private static func settingsDataContainsImportOwnedVisualChoice(_ data: Data) -> Bool {
+        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return false
+        }
+        return object[CodingKeys.backgroundOpacity.stringValue] != nil
+            || object[CodingKeys.backgroundBlur.stringValue] != nil
+            || object[CodingKeys.windowPaddingX.stringValue] != nil
+            || object[CodingKeys.windowPaddingY.stringValue] != nil
+    }
+
     /// Opacity bounds. The user can pick any value from fully transparent to
     /// solid — that's an intentional product choice for power users who want
     /// extreme translucency. The 0.05 floor stays just to make sure dragging
@@ -826,6 +912,11 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         if let value = imported.backgroundBlur { settings.backgroundBlur = value }
         if let value = imported.windowPaddingX { settings.windowPaddingX = value }
         if let value = imported.windowPaddingY { settings.windowPaddingY = value }
+        if let light = imported.systemLightThemeName, let dark = imported.systemDarkThemeName {
+            settings.appearanceMode = .macOSSystem
+            settings.systemLightThemeName = light
+            settings.systemDarkThemeName = dark
+        }
         if let value = imported.backgroundHex { settings.customBackgroundHex = value }
         if let value = imported.foregroundHex { settings.customForegroundHex = value }
         if let value = imported.cursorColorHex { settings.customCursorHex = value }
@@ -834,11 +925,6 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         if let value = imported.copyOnSelect { settings.copyOnSelect = value }
         if let value = imported.minimumContrast { settings.minimumContrast = HarnessSettings.clampedContrast(value) }
         if let value = imported.boldIsBright { settings.boldIsBright = value }
-        // Ghostty `theme = light:X,dark:Y` → Harness auto light/dark pair.
-        if let light = imported.lightThemeName, let dark = imported.darkThemeName {
-            settings.lightThemeName = light
-            settings.darkThemeName = dark
-        }
         settings.selectionBackgroundHex = imported.selectionBackgroundHex
         settings.selectionForegroundHex = imported.selectionForegroundHex
         settings.boldColorHex = imported.boldColorHex
@@ -856,6 +942,11 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         if let value = imported.backgroundBlur { backgroundBlur = value }
         if let value = imported.windowPaddingX { windowPaddingX = value }
         if let value = imported.windowPaddingY { windowPaddingY = value }
+        if let light = imported.systemLightThemeName, let dark = imported.systemDarkThemeName {
+            appearanceMode = .macOSSystem
+            systemLightThemeName = light
+            systemDarkThemeName = dark
+        }
         if let value = imported.backgroundHex { customBackgroundHex = value }
         if let value = imported.foregroundHex { customForegroundHex = value }
         if let value = imported.cursorColorHex { customCursorHex = value }
@@ -864,10 +955,6 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         if let value = imported.copyOnSelect { copyOnSelect = value }
         if let value = imported.minimumContrast { minimumContrast = HarnessSettings.clampedContrast(value) }
         if let value = imported.boldIsBright { boldIsBright = value }
-        if let light = imported.lightThemeName, let dark = imported.darkThemeName {
-            lightThemeName = light
-            darkThemeName = dark
-        }
         selectionBackgroundHex = imported.selectionBackgroundHex
         selectionForegroundHex = imported.selectionForegroundHex
         boldColorHex = imported.boldColorHex

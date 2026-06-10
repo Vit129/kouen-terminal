@@ -320,6 +320,45 @@ final class SessionCoordinator: NSObject {
         reassertMarkedPane()
     }
 
+    private func refreshChromePalette(systemAppearance: HarnessSystemAppearance? = nil) {
+        HarnessChrome.update(
+            themeName: snapshot.themeName,
+            opacity: CGFloat(settings.backgroundOpacity),
+            blur: settings.backgroundBlur,
+            appearanceMode: settings.appearanceMode,
+            systemAppearance: systemAppearance,
+            systemLightThemeName: settings.systemLightThemeName,
+            systemDarkThemeName: settings.systemDarkThemeName,
+            backgroundHex: settings.customBackgroundHex,
+            foregroundHex: settings.customForegroundHex,
+            cursorHex: settings.customCursorHex
+        )
+    }
+
+    @discardableResult
+    func refreshChromeForEffectiveAppearanceChange(systemAppearance: HarnessSystemAppearance? = nil) -> Bool {
+        guard HarnessEffectiveAppearanceRefreshPolicy.shouldRefreshOnEffectiveAppearanceChange(
+            appearanceMode: settings.appearanceMode
+        ) else {
+            return false
+        }
+        refreshChromePalette(systemAppearance: systemAppearance)
+        for host in terminalHosts.allHosts() {
+            pushBorderColors(to: host)
+        }
+        NotificationCenter.default.post(
+            name: NotificationBus.shared.snapshotChanged,
+            object: nil,
+            userInfo: [
+                "revision": snapshot.revision,
+                "structureChanged": false,
+                "chromeChanged": true,
+                "metadataOnly": true,
+            ]
+        )
+        return true
+    }
+
     /// Push the current `terminal-identity` option to a host so its XTVERSION / secondary-DA
     /// replies match the `TERM_PROGRAM` the daemon exports (single source: `options.json`).
     private func applyTerminalIdentity(to host: TerminalHostView) {
@@ -489,16 +528,10 @@ final class SessionCoordinator: NSObject {
     /// Shared per-host update loop: refresh the global chrome palette and push the current
     /// theme + settings + identity + border colours to every live terminal host.
     /// Called by both `applyThemeToAllHosts` and `applySettingsToHosts`; each caller adds
-    /// its own divergent extras after this returns.
+    /// its own divergent extras after this returns. Chrome goes through the appearance-aware
+    /// `refreshChromePalette()` so `.macOSSystem` resolution applies on every path.
     private func updateChromeAndHosts() {
-        HarnessChrome.update(
-            themeName: snapshot.themeName,
-            opacity: CGFloat(settings.backgroundOpacity),
-            blur: settings.backgroundBlur,
-            backgroundHex: settings.customBackgroundHex,
-            foregroundHex: settings.customForegroundHex,
-            cursorHex: settings.customCursorHex
-        )
+        refreshChromePalette()
         let allowClipboard = HarnessOptions.shared.get("set-clipboard")?.boolValue ?? true
         for host in terminalHosts.allHosts() {
             host.applyTheme(named: snapshot.themeName)
@@ -554,18 +587,7 @@ final class SessionCoordinator: NSObject {
     /// config re-import, where the imported config colors must win).
     func setTheme(_ name: String, seedColors: Bool = true) {
         if seedColors {
-            let preset = ThemeManager.presetColors(themeName: name)
-            settings.customBackgroundHex = preset.backgroundHex
-            settings.customForegroundHex = preset.foregroundHex
-            settings.customCursorHex = preset.cursorHex
-            settings.cursorTextHex = preset.cursorTextHex
-            settings.selectionBackgroundHex = preset.selectionBackgroundHex
-            settings.selectionForegroundHex = preset.selectionForegroundHex
-            settings.boldColorHex = preset.boldHex
-            settings.paletteHex = HarnessSettings.normalizedPalette(preset.paletteHex)
-            // Chrome accents re-derive from the new theme unless re-set by the user.
-            settings.dividerHex = nil
-            settings.statusLineHex = nil
+            settings.clearThemeColorOverrides()
             try? settings.save()
         }
         requestDaemon(.setTheme(name: name))
@@ -616,17 +638,6 @@ final class SessionCoordinator: NSObject {
         try? settings.save()
         requestDaemon(.setTheme(name: document.name))
         syncFromDaemon()
-    }
-
-    /// When auto light/dark is configured (both `lightThemeName` + `darkThemeName` set), switch the
-    /// active theme to the one matching the current macOS system appearance. No-op when auto is off
-    /// or already on the matching theme. Called at startup and on every system appearance change.
-    func applyAutoThemeForCurrentAppearance() {
-        guard let light = settings.lightThemeName, let dark = settings.darkThemeName else { return }
-        let isDark = NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-        let target = isDark ? dark : light
-        guard target != snapshot.themeName else { return }
-        setTheme(target, seedColors: true)
     }
 
     func addWorkspace(name: String) {
@@ -1374,14 +1385,11 @@ final class SessionCoordinator: NSObject {
             try? settings.save()
             // Colors were just seeded from the imported terminal config above;
             // don't let the theme preset overwrite the user's explicit config.
-            if let theme = imported.themeName {
-                setTheme(theme, seedColors: false)
+            if let displayTheme = imported.themeName ?? imported.systemDarkThemeName {
+                setTheme(displayTheme, seedColors: false)
             } else {
                 setTheme(ThemeManager.defaultDisplayName, seedColors: false)
             }
-            // A dual `theme = light:X,dark:Y` import seeds the auto light/dark pair;
-            // immediately resolve it for the current system appearance (no-op otherwise).
-            applyAutoThemeForCurrentAppearance()
             applySettingsToHosts()
         }
     }

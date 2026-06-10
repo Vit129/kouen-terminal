@@ -46,13 +46,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Secure keyboard entry: take the process-global keylogging lock while frontmost iff the
         // user enabled it. Observes app-active transitions and releases the lock on resign/terminate.
         SecureKeyboardEntry.shared.start()
-        // Follow the macOS system appearance for auto light/dark theme switching. The startup
-        // application happens post-daemon-sync below (so the theme change reaches a ready daemon);
-        // this observer handles every later Light/Dark flip.
+        // Follow the macOS system appearance so the effective theme and chrome refresh together.
         appearanceObservation = NSApp.observe(\.effectiveAppearance, options: [.new]) { [weak self] _, _ in
             MainActor.assumeIsolated {
-                SessionCoordinator.shared.applyAutoThemeForCurrentAppearance()
-                self?.mainWindowController?.applyChrome()
+                self?.mainWindowController?.effectiveAppearanceDidChange()
             }
         }
         // Request notification authorization once at launch instead of on every
@@ -68,10 +65,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if !ok || !synced {
                 SessionCoordinator.shared.noteDaemonError(DaemonClientError.timeout)
             }
-            // Apply the auto light/dark theme now that the daemon is hydrated (so the theme change
-            // lands), then refresh the window chrome to match.
-            SessionCoordinator.shared.applyAutoThemeForCurrentAppearance()
-            self.mainWindowController?.applyChrome()
+            // Refresh the window chrome after the daemon is hydrated so it matches the effective theme.
+            self.mainWindowController?.effectiveAppearanceDidChange()
             Self.reconcileSessionPersistenceWithMode()
             OnboardingController.presentIfNeeded()
             self.externalOpenReady = true
