@@ -84,7 +84,7 @@ final class DCSDemuxTests: XCTestCase {
     func testPrimaryDeviceAttributesAdvertisesSixel() {
         let (term, reply) = make()
         term.feed("\u{1b}[c")
-        XCTAssertEqual(reply(), "\u{1b}[?1;2;4c")
+        XCTAssertEqual(reply(), "\u{1b}[?62;4;22c")
         XCTAssertTrue(reply().contains("4"), "DA1 advertises Sixel via feature code 4")
     }
 }

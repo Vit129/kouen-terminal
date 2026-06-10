@@ -415,7 +415,7 @@ PaneNode tree ──PaneRectSolver──▶ [PaneRect] ────┤
 | `prefixKey` | Prefix binding (`ctrl-a`; empty disables); edited via `KeyRecorderView` in Settings |
 | `experienceMode` | `ExperienceMode` (plain/persistent/tmux/agent). Gates chrome + default persistence on the one daemon core. Fresh installs → `.plain`; pre-modes files migrate → `.tmux`. See [docs/MODES.md](docs/MODES.md) |
 | `tmuxControlsEnabled` | `Bool?` override for tmux chrome; nil derives from mode. `showsTmuxChrome` (mode default ⊕ override) is the single gate `PrefixKeymap`/`StatusLineView`/onboarding consult; `effectivePrefixKey` is nil when chrome is hidden or the key is blank |
-| `scrollbackLines` | Scrollback size |
+| `scrollbackLines` | Scrollback size; **0 = unlimited** (the daemon ring stays small — the GUI emulator owns unbounded history, and the on-disk scrollback file uses `ScrollbackFile.unlimitedSafetyCap`) |
 | `cursorStyle`, `cursorBlink`, `copyOnSelect` | Terminal behavior |
 | `dividerHex`, `statusLineHex` | Chrome accents (nil → derive from theme) |
 | `selection*Hex`, `boldColorHex`, `cursorTextHex`, `paletteHex[16]` | Terminal colors; seeded by theme preset, applied by the native renderer |
@@ -461,6 +461,8 @@ Per-agent guides: [docs/agent-hooks/](docs/agent-hooks/). Daemon hooks (`hooks.j
 **UI:** `SessionCardRowView`, `TabPillView`, **`AgentChipView`** in sidebar/session rows when agent kind is detected or inferred (static chip, not activity-gated), `NotificationBellButton` / `NotificationDropdownPanelView`, `Cmd+Shift+U` jump to notification (skips still-`working` agents). OS banners gated per-event by `notificationEvents` then by `systemNotificationsEnabled`, and presented even in-foreground via `DesktopNotifier`'s `ForegroundPresenter` (`UNUserNotificationCenterDelegate`).
 
 **Agent Notch HUD:** `NotchPanelController` + `AgentNotchRootView` (`UI/Notch/`) show at-a-glance agent rows on Macs with a notch; data from `AgentNotchProjection` in `HarnessCore/Notch/`. Click a row → `SessionCoordinator` focuses that session/tab.
+
+**Quick terminal (v1.9):** `QuickTerminalController` — a Quake-style dropdown panel on a global hotkey (`quickTerminalEnabled`/`quickTerminalHotkey` settings); slides over the frontmost app, hosts a normal daemon-owned session, hides on focus loss. **Bell feedback (v1.9):** `terminalHostDidRingBell` → `BellFeedback` (audible/visual per `bellMode`), tab badge for background bells, bridged to tmux `visual-bell`/`bell-action` options.
 
 **Notification delivery (one path):** `SessionCoordinator.deliverAgentAlert(event:title:body:)` is the single sink. It first gates on the per-event "which events notify me" choice (`settings.isEventEnabled(event)`, backed by `notificationEvents`), then honors the two delivery toggles — banner (`systemNotificationsEnabled`) and chime (`notificationSoundEnabled`). The `NotificationEvent` cases and their sites: `.agentWaiting` — the explicit `harness-cli notify` path (`pushNewRemoteNotifications`, rich message, owns `.waiting` tabs) plus `terminalHostDidRequestDesktopNotification`; `.agentFinished` — the **hook-independent** `pushAgentActivityNotifications` path firing on the agent-activity `working → idle/awaiting` edge (the AI stopped producing output), so a ping lands for **any detected agent under any shell** with no hook install; `.bell` — `terminalHostDidRingBell`; `.commandFinished` — `terminalHostDidFinishCommand`. The activity path skips `.waiting` tabs (so the two never double-fire), skips the pane you're actively watching, and has a 30s per-surface cooldown so a streaming agent can't spam. Only the OS banner is gated by these settings — the in-app sidebar ring/waiting state (`requestDaemon(.notify)`) is independent.
 
@@ -619,7 +621,8 @@ Global menu shortcuts are defined in `MainMenuBuilder`, not `KeyTableSet.root` (
 | Not true black | Hex stripped or missing | Fix importer; re-import terminal config |
 | Blue sidebar | Wrong material | `.underWindowBackground` / glass |
 | Tab shows `Shell` | cwd not updating | `SurfaceShellTracker`, `displayTitle` |
-| cwd in daemon, stale UI | No metadata refresh | `refreshMetadata()` |
+| cwd in daemon, stale UI | Snapshot push not arriving (subscription dead) | `SessionCoordinator` snapshot subscription + 30 s safety poll; check daemon `subscribeSnapshot` |
+| Stale/missing git branch label | `HEAD` watcher not armed for the repo | `GitBranchMonitor` (one `FileWatcher` per resolved `HEAD`); `GitHEADReader` for parsing |
 | `+` dead | Button bezel | `isBordered = false` |
 | All tabs waiting | `markWaiting` bug | Filter by surface key |
 | Terminal colors wrong | Stale hex or import path | Re-import terminal config; check `ThemeManager.resolvedCanvas` + `applyNativeAppearance` |

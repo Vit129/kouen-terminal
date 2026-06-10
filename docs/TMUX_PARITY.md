@@ -3,9 +3,12 @@
 Harness targets **capability parity** with tmux, not byte-for-byte emulation: Harness is a
 native GUI terminal with a daemon-owned session model, so a handful of tmux concepts are
 *adapted* to that architecture and a few are *rejected* with rationale. This document is
-the single honest ledger. Updated last for the post-close-out parity roadmap (#114) PRs
-#122 (copy-mode motions) and #123 (`@`-user-options + `set-option` key validation); the
-2026-06 close-out series was PRs #102–#108. User-facing usage lives in
+the single honest ledger. Updated last for v1.9.0 (the #114 roadmap's full run, #115–#138,
+plus #139): quick terminal, bell feedback with `visual-bell`/`bell-action` bridging,
+unlimited scrollback (`scrollback 0` → disk-capped), `clear-history`, `status-interval`/
+`status-position`, bindable `send-keys -l`/`-H`, `display-message -p`, copy-mode jump-to-char,
+and the Kitty graphics control protocol (ack/query/transmit-once/delete). The 2026-06
+close-out series was PRs #102–#108. User-facing usage lives in
 [HARNESS_TMUX_CAPABILITIES.md](HARNESS_TMUX_CAPABILITIES.md), grammar in
 [COMMANDS.md](COMMANDS.md).
 
@@ -18,13 +21,13 @@ the single honest ledger. Updated last for the post-close-out parity roadmap (#1
 | Targeting | Full `-t` grammar everywhere (`session:window.pane`, `$`/`@`/`%` ids, indexes, `!`, `{last}`, `{top}/{bottom}/{left}/{right}`, `^`/`$`), with `base-index`/`pane-base-index`. STRICT resolution: a named component that doesn't match makes the command `.unresolved` at the one translator choke point, so *every* targeted verb (kill/respawn/send-keys/…) fails loudly in every front-end — never a silent misroute. `swap-pane` takes `-s` too |
 | Copy mode | vi + emacs tables (`copy-mode-vi` accepted as the vi table's name), `-X` action set: motions (char/line, word + **word-end**, **jump-to-char** `f`/`F`/`t`/`T` + `;`/`,`, **big-WORD** W/B/E [whitespace-delimited], **other-end**, **goto-line**, visible-window top/middle/bottom-line, back-to-indentation, page/half-page, history top/bottom, prompt jumps), selection, rectangle, search, copy-pipe; mouse; in GUI **and** the `attach-window` compositor |
 | Paste buffers | set/get/list/delete/paste/choose, save/load (CLI), bindable verbs |
-| Options | Scoped store (global/workspace/session/tab/pane + fallback chain), `set`/`setw`/`show` bindable, status-line set (incl. **`status-interval`** — periodic status redraw so `#{time:…}` ticks, in the GUI footer **and** the `attach-window` compositor, default 15s/`0` disables), styles, monitoring, **`visual-bell`/`bell-action`** (bridged to the GUI bell — `bell-action off`/`none` silences it, `visual-bell on/off/both` overrides the audible/visual split), `display-time`, `set-titles(+string)`, `detach-on-destroy`, `remain-on-exit`, `repeat-time`, … **`@`-prefixed user options** (set + read via `#{@name}`). `set-option` **validates the key**: an unknown name errors loudly (no silent persist) — known/recognized options and `@`-options pass |
+| Options | Scoped store (global/workspace/session/tab/pane + fallback chain), `set`/`setw`/`show` bindable, status-line set (incl. **`status-interval`** — periodic status redraw so `#{time:…}` ticks, in the GUI footer **and** the `attach-window` compositor, default 15s/`0` disables), styles, monitoring, **`visual-bell`/`bell-action`** (bridged to the GUI bell — `bell-action off`/`none` silences it, `visual-bell on/off/both` overrides the audible/visual split), `display-time`, `set-titles(+string)`, `detach-on-destroy`, `remain-on-exit`, `repeat-time`, **`persist-scrollback`** (per-pane secrets-at-rest control — see [SECURITY-POSTURE.md](SECURITY-POSTURE.md)), … **`@`-prefixed user options** (set + read via `#{@name}`). `set-option` **validates the key**: an unknown name errors loudly (no silent persist) — known/recognized options and `@`-options pass |
 | `status-position` | **Honored** (top/bottom) in both the GUI status footer (the split↔footer constraints swap; extra `status 2..5` rows always stack away from the terminal so the main line sits against it) and the `attach-window` compositor (`PaneRectSolver` reserves the band via `yOrigin`; `GridCompositor` paints it at the matching edge). Live-updates from Settings ▸ Advanced |
 | Hooks | `set-hook`/`show-hooks` + full lifecycle events: after-* command events, `session-created/renamed/closed`, `window-renamed/linked/unlinked/layout-changed`, **`command-error`** (failing command as `#{hook}`), **`pane-focus-in`/`-out`**, **`window-pane-changed`**, alert-activity/silence/bell, client-attached/detached, pane-exited (+ Harness-only agent events) |
 | Format strings | ~50 `#{…}` variables (pane/session/window/client/server) + **`#{@user-options}`** + `#{hook}` + operators (`#{?,,}` with nested tests, `==`/`!=`, `\|\|`/`&&`, `m:`, `s///`, `e\|op\|`, `n:` length, `T:` double-expand, `a:` char-from-code, `=N:` truncation, `pN:` pad, `time:` strftime). IDs render with target-grammar prefixes so they round-trip into `-t` |
 | Key tables | root/prefix/copy-mode(+emacs)/command + `switch-client -T` modal tables, `bind -r` repeat, tombstoned unbinds |
 | Scripting | `send-keys` (incl. bindable `-l` literal / `-H` hex), `capture-pane` (+ ranges/escapes), **`clear-history`** (drop a pane's scrollback without respawning the shell — distinct from `respawn-pane -k`, which replaces the process), `pipe-pane`, `run-shell`, `if-shell`, `wait-for -S/-L/-U`, `display-message` (+ `-p` print-to-stdout) / `show-messages`, `command-prompt`, `confirm-before`, `source-file` (a `.tmux.conf`'s bind/set/setw/setenv lines parse as-is), choose-tree/session/window/buffer/client, `find-window`, control mode (`-CC`) |
-| Misc | display-popup/menu, clock-mode, lock-client, multi-client smallest-size voting, environment tables (global/session) |
+| Misc | display-popup/menu, clock-mode, lock-client, multi-client smallest-size voting, environment tables (global/session), auto-injected OSC 133 shell integration at spawn (`shell-integration` option to opt out; bash needs ≥ 4.4 — stock macOS 3.2 spawns untouched — and injected bash panes report `login_shell` off and skip `~/.bash_logout` on exit, the documented costs of the `--posix`+`$ENV` vehicle) |
 
 ## Adapted (same capability, Harness-shaped)
 

@@ -63,6 +63,15 @@ public final class TerminalEmulator: VTParserHandler {
     public var terminalVersion: String = ""
     /// Numeric firmware field of the secondary-DA reply (`CSI > 1 ; n ; 0 c`).
     public var secondaryDAVersion: Int = 0
+    /// Title as last set by OSC 0/2 (the value XTWINOPS 22/23 push and pop).
+    public private(set) var currentTitle = ""
+    /// XTWINOPS title stack (`CSI 22 t` push / `CSI 23 t` pop). Depth-capped like xterm's;
+    /// pushes beyond the cap are dropped (a runaway program can't grow it without bound).
+    private var titleStack: [String] = []
+    private static let titleStackLimit = 10
+    /// DECSET 1048 state for DECRPM: xterm tracks save/restore-cursor as a mode bit (set on
+    /// `h`, cleared on `l`) even though the observable effect is the save/restore action.
+    private var mode1048Saved = false
     /// Resolves the terminal's current colors so the engine can answer OSC 10/11/12/4 *queries*
     /// (e.g. a TUI reading the background to pick a light/dark theme). The host supplies it from
     /// the resolved theme; nil roles get no reply.
@@ -77,6 +86,16 @@ public final class TerminalEmulator: VTParserHandler {
     public var onProgress: ((TerminalProgressReport) -> Void)?
     /// Mouse pointer shape requested via OSC 22 (e.g. `text`, `pointer`, `default`); nil clears.
     public var onPointerShapeChange: ((String?) -> Void)?
+    /// iTerm2 `OSC 1337 ; SetUserVar=name=<base64>` landed (already decoded + validated).
+    /// The host surfaces these to format strings as pane-scoped `@name` user options.
+    public var onUserVariableChange: ((_ name: String, _ value: String) -> Void)?
+    /// RIS dropped every user variable — hosts that mirrored them (pane-scoped `@` options)
+    /// must clear their copies too, or `#{@name}` keeps serving pre-reset values. Fired only
+    /// when there was something to clear.
+    public var onUserVariablesCleared: (() -> Void)?
+    /// User variables set via OSC 1337 `SetUserVar=` (count- and size-capped; RIS clears).
+    public private(set) var userVariables: [String: String] = [:]
+    private static let maxUserVariables = 64
     /// Last OSC-22 pointer shape (nil = terminal default). Surfaced for hosts that prefer polling.
     public private(set) var pointerShape: String?
     /// When the current command started running (OSC 133 `C`/`B`), for command-duration timing.
@@ -320,6 +339,12 @@ public final class TerminalEmulator: VTParserHandler {
             softReset()
             return
         }
+        // DECRQM, ANSI form — `CSI Ps $ p` (no private marker): report a non-private mode's
+        // state. The private form (`CSI ? Ps $ p`) routes through `handlePrivateMode`.
+        if intermediates == [0x24], final == 0x70 {
+            for g in 0 ..< params.count { reportANSIMode(params.first(g)) }
+            return
+        }
         guard intermediates.isEmpty else { return }
         switch final {
         case 0x41: current.moveCursorRelative(dRow: -arg(params, 0, 1), dCol: 0) // CUU
@@ -354,6 +379,7 @@ public final class TerminalEmulator: VTParserHandler {
             argRaw(params, 0, 0) == 3 ? current.clearAllTabStops() : current.clearTabStop()
         case 0x49: current.cursorForwardTabs(arg(params, 0, 1))  // CHT — forward N tab stops
         case 0x5A: current.cursorBackwardTabs(arg(params, 0, 1)) // CBT — back N tab stops
+        case 0x74: handleWindowOps(params)             // XTWINOPS (title stack + size reports)
         default: break
         }
     }
@@ -601,6 +627,46 @@ public final class TerminalEmulator: VTParserHandler {
     /// iTerm2 inline image (`OSC 1337 ; File=…:<base64>`). width/height args may be cells (`N`),
     /// pixels (`Npx`), or percent (`N%`); only plain cell counts are honored here — pixel/percent
     /// fall back to the footprint computed from the image's pixels.
+    /// The OSC 1337 family beyond inline images (F20): `CurrentDir=` reports the cwd with
+    /// the same trust policy as OSC 7 (absolute paths only — hostile output must not steer
+    /// the inherited cwd), and `SetUserVar=name=<base64>` stores a per-surface user variable
+    /// (surfaced to format strings by the host as a pane-scoped `@name` option). Anything
+    /// else falls through to the image handler, which ignores what it can't parse.
+    private func handleITerm2OSC(_ payload: String) {
+        if payload.hasPrefix("CurrentDir=") {
+            let path = String(payload.dropFirst("CurrentDir=".count))
+            guard path.hasPrefix("/") else { return }
+            onWorkingDirectoryChange?(path)
+            return
+        }
+        if payload.hasPrefix("SetUserVar=") {
+            let body = String(payload.dropFirst("SetUserVar=".count))
+            guard let eq = body.firstIndex(of: "=") else { return }
+            let name = String(body[..<eq])
+            let encoded = String(body[body.index(after: eq)...])
+            // Bound everything a hostile stream controls: name shape + length (ASCII only —
+            // Unicode `isLetter`/`isNumber` would admit lookalikes like `½`), the base64 TEXT
+            // before decoding (4096 bytes ≈ 5464 base64 chars with padding, so a multi-MiB
+            // payload is never decoded), decoded value size + content (no C0/DEL/C1 — values
+            // are later format-expanded into status lines and other clients' TTYs, where a
+            // control byte is escape injection), and the variable-table population (new names
+            // rejected past the cap; existing names stay updatable).
+            guard !name.isEmpty, name.count <= 64,
+                  name.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "_" || $0 == "-") }),
+                  encoded.utf8.count <= 5464,
+                  let data = Data(base64Encoded: encoded), data.count <= 4096,
+                  let value = String(data: data, encoding: .utf8),
+                  value.unicodeScalars.allSatisfy({ $0.value >= 0x20 && $0.value != 0x7F && !(0x80 ... 0x9F).contains($0.value) })
+            else { return }
+            if userVariables[name] == value { return } // same-value rewrite: no host round trip
+            if userVariables[name] == nil, userVariables.count >= Self.maxUserVariables { return }
+            userVariables[name] = value
+            onUserVariableChange?(name, value)
+            return
+        }
+        handleITerm2Image(payload)
+    }
+
     private func handleITerm2Image(_ payload: String) {
         guard let parsed = ITerm2InlineImage.parse(Array(payload.utf8)) else { return }
         func cells(_ s: String?) -> Int {
@@ -616,7 +682,9 @@ public final class TerminalEmulator: VTParserHandler {
         let code = String(text[text.startIndex ..< semi])
         let payload = String(text[text.index(after: semi)...])
         switch code {
-        case "0", "2": onTitleChange?(payload)            // icon+title / title
+        case "0", "2": // icon+title / title (tracked so XTWINOPS 22/23 can push/pop it)
+            currentTitle = payload
+            onTitleChange?(payload)
         case "7": handleWorkingDirectoryOSC(payload)       // cwd as file:// URL
         case "8": handleHyperlinkOSC(payload)              // OSC 8 hyperlinks
         case "10": handleColorQuery(code: "10", role: .foreground, payload: payload)
@@ -628,7 +696,7 @@ public final class TerminalEmulator: VTParserHandler {
         case "777": handleNotify777(payload)               // OSC 777 ; notify ; <title> ; <body>
         case "22": setPointerShape(payload)                // OSC 22 ; <shape> — mouse cursor shape
         case "133": handleSemanticPrompt(payload)          // OSC 133 ; A/B/C/D — shell integration
-        case "1337": handleITerm2Image(payload)            // iTerm2 inline image (File=…)
+        case "1337": handleITerm2OSC(payload)              // iTerm2 family (File=/CurrentDir=/SetUserVar=)
         default: break
         }
     }
@@ -815,6 +883,9 @@ public final class TerminalEmulator: VTParserHandler {
         current.softReset()
         modes.cursorKeysApplication = false
         modes.keypadApplication = false
+        // The screen's softReset() discards savedCursor — DECRQM ?1048 must not keep
+        // reporting "set" for a save that no longer exists.
+        mode1048Saved = false
         g0 = .ascii
         g1 = .ascii
         glUsesG1 = false
@@ -846,6 +917,12 @@ public final class TerminalEmulator: VTParserHandler {
             respond("\u{1b}[>1;\(secondaryDAVersion);0c")
             return
         }
+        // Tertiary DA — `CSI = c`: reply DECRPTUI (`DCS ! | <8-hex-digit unit id> ST`). The
+        // all-zero site/serial is what xterm reports; tools only check that a reply arrives.
+        if final == 0x63, marker == 0x3D, intermediates.isEmpty {
+            respond("\u{1b}P!|00000000\u{1b}\\")
+            return
+        }
         // DECRQM: `CSI ? Ps $ p` — report a private mode's current state.
         if final == 0x70, intermediates == [0x24] { // '$' then 'p'
             for p in params { reportPrivateMode(p) }
@@ -855,19 +932,29 @@ public final class TerminalEmulator: VTParserHandler {
         guard final == 0x68 || final == 0x6C else { return }
         for p in params {
             switch p {
+            case 5: // DECSCNM reverse video — whole-screen fg/bg swap (resolved at render)
+                if modes.reverseVideo != set {
+                    modes.reverseVideo = set
+                    current.markFullyDirty()
+                }
             case 6: current.setOriginMode(set)             // DECOM origin mode
             case 7: current.autowrap = set                 // DECAWM autowrap
+            case 12: current.setCursorBlink(set)           // att610 cursor blink
             case 25: current.cursorVisible = set           // DECTCEM cursor visibility
             case 1000: modes.mouseClick = set              // X10/normal mouse
             case 1002: modes.mouseDrag = set               // button-event tracking
             case 1003: modes.mouseAny = set                // any-event tracking
             case 1006: modes.mouseSGR = set                // SGR extended coordinates
+            case 1016: modes.mouseSGRPixel = set           // SGR-pixel extended coordinates
             case 1004: modes.focusReporting = set          // focus in/out reporting
             case 1007: modes.alternateScroll = set         // wheel → arrows on alt screen
             case 2004: modes.bracketedPaste = set          // bracketed paste
             case 2026: modes.synchronizedOutput = set      // synchronized output (no tearing)
             case 1: modes.cursorKeysApplication = set      // DECCKM
             case 47, 1047: switchAlternate(set, clearOnEnter: true, saveCursor: false)
+            case 1048: // save (h) / restore (l) cursor without the screen switch
+                mode1048Saved = set
+                set ? current.saveCursor() : current.restoreCursor()
             case 1049: switchAlternate(set, clearOnEnter: true, saveCursor: true)
             default: break
             }
@@ -879,21 +966,63 @@ public final class TerminalEmulator: VTParserHandler {
     private func reportPrivateMode(_ p: Int) {
         let state: Int
         switch p {
+        case 5: state = modes.reverseVideo ? 1 : 2
         case 6: state = current.originMode ? 1 : 2
         case 7: state = current.autowrap ? 1 : 2
+        case 12: state = current.cursorBlinking == true ? 1 : 2 // nil = user default → "reset"
         case 25: state = current.cursorVisible ? 1 : 2
         case 1000: state = modes.mouseClick ? 1 : 2
         case 1002: state = modes.mouseDrag ? 1 : 2
         case 1003: state = modes.mouseAny ? 1 : 2
         case 1006: state = modes.mouseSGR ? 1 : 2
+        case 1016: state = modes.mouseSGRPixel ? 1 : 2
         case 1004: state = modes.focusReporting ? 1 : 2
         case 1007: state = modes.alternateScroll ? 1 : 2
         case 2004: state = modes.bracketedPaste ? 1 : 2
         case 2026: state = modes.synchronizedOutput ? 1 : 2
         case 1: state = modes.cursorKeysApplication ? 1 : 2
+        case 47, 1047, 1049: state = onAlternateScreen ? 1 : 2
+        case 1048: state = mode1048Saved ? 1 : 2 // xterm tracks save/restore as a mode bit
         default: state = 0 // not recognized
         }
         respond("\u{1b}[?\(p);\(state)$y")
+    }
+
+    /// DECRPM reply for the ANSI (non-private) DECRQM form: `CSI Ps ; Pm $ y`. Only IRM
+    /// (mode 4) is implemented; every other ANSI mode reports 0 (not recognized) — the
+    /// conformance-correct answer, letting programs feature-detect instead of assuming.
+    private func reportANSIMode(_ p: Int) {
+        let state: Int
+        switch p {
+        case 4: state = current.insertMode ? 1 : 2
+        default: state = 0 // not recognized
+        }
+        respond("\u{1b}[\(p);\(state)$y")
+    }
+
+    /// XTWINOPS (`CSI Ps ; … t`). Implemented: the title stack (22 push / 23 pop) and the
+    /// size *reports* (18 chars / 14 pixels). Resize/move/iconify remain deliberate
+    /// non-goals — the window belongs to the user — and unknown Ps are ignored.
+    private func handleWindowOps(_ params: CSIParams) {
+        switch argRaw(params, 0, 0) {
+        case 14: // text area size in pixels → CSI 4 ; height ; width t
+            // Derived from the cell pixel size the host already supplies for inline images
+            // (`setCellPixelSize`, kept current on every font/scale change) — one source of
+            // truth, and the same space SGR-pixel (1016) mouse coordinates use. A headless
+            // consumer reports the screen's synthetic 8×16 default rather than silence, so
+            // a querying program never hangs.
+            respond("\u{1b}[4;\(rows * current.cellPixelHeight);\(cols * current.cellPixelWidth)t")
+        case 18: // text area size in characters → CSI 8 ; rows ; cols t
+            respond("\u{1b}[8;\(rows);\(cols)t")
+        case 22: // push title (Ps2 0/1/2 — icon and window title are one value here)
+            if titleStack.count < Self.titleStackLimit { titleStack.append(currentTitle) }
+        case 23: // pop title — restores (and re-announces) the saved title
+            if let restored = titleStack.popLast() {
+                currentTitle = restored
+                onTitleChange?(restored)
+            }
+        default: break
+        }
     }
 
     /// Kitty keyboard protocol control, dispatched by the private introducer:
@@ -953,10 +1082,12 @@ public final class TerminalEmulator: VTParserHandler {
     }
 
     private func deviceAttributes() {
-        // Identify as a VT100 with Advanced Video Option (`?1;2`) and advertise Sixel graphics
-        // (feature code `4`) — `parserDCS` decodes Sixel, so tools that gate on the DA1 reply
-        // (img2sixel, chafa, timg) will actually emit it.
-        respond("\u{1b}[?1;2;4c")
+        // Identify as a VT220-class terminal (62) with Sixel graphics (4) and ANSI color (22) —
+        // the same class Ghostty/xterm report. `parserDCS` decodes Sixel, so tools that gate on
+        // the DA1 feature list (img2sixel, chafa, timg) will actually emit it; the 62 class is
+        // what makes capability-probing TUIs try VT220-level sequences we do implement (DECRQM,
+        // DA3, the title stack) instead of degrading to VT100.
+        respond("\u{1b}[?62;4;22c")
     }
 
     private func respond(_ s: String) {
@@ -995,6 +1126,9 @@ public final class TerminalEmulator: VTParserHandler {
         g0 = .ascii
         g1 = .ascii
         glUsesG1 = false
+        // RIS empties the XTWINOPS title stack (xterm behavior); the title itself persists.
+        titleStack.removeAll()
+        mode1048Saved = false
         kittyPending.removeAll()
         // RIS returns the terminal to its initial state, so the transmitted-image cache
         // (transmit-once / place-many storage) must reset too — same cleanup as `d=a`
@@ -1003,6 +1137,10 @@ public final class TerminalEmulator: VTParserHandler {
         kittyTransmitted.removeAll()
         kittyTransmittedBytes = 0
         pointerShape = nil
+        if !userVariables.isEmpty {
+            userVariables.removeAll()
+            onUserVariablesCleared?()
+        }
         hyperlinks.removeAll()
         hyperlinkKeys.removeAll()
         nextHyperlinkID = 1
@@ -1028,6 +1166,12 @@ public struct TerminalModes: Sendable, Equatable {
     public var mouseDrag = false
     public var mouseAny = false
     public var mouseSGR = false
+    /// DECSET 1016: SGR-pixel mouse reporting — same `CSI < … M/m` framing as 1006 but with
+    /// pixel coordinates. Takes precedence over 1006 when both are set (xterm semantics).
+    public var mouseSGRPixel = false
+    /// DECSET 5 (DECSCNM): whole-screen reverse video. Resolved at render time (the renderer
+    /// swaps default fg/bg), so the engine only tracks the flag and dirties the screen.
+    public var reverseVideo = false
     /// DEC private mode 2026 (synchronized output): while set, the program is mid-frame and the
     /// renderer should hold the last presented frame rather than paint partial updates — no
     /// tearing in TUIs (vim, fzf, btop, …). Cleared by the program (or a renderer-side timeout).
