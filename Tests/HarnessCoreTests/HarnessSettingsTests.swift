@@ -667,14 +667,19 @@ final class HarnessSettingsTests: XCTestCase {
         """.utf8)
         let decoded = try JSONDecoder().decode(HarnessSettings.self, from: futuristic)
         XCTAssertEqual(decoded.fontSize, 17)
-        XCTAssertEqual(decoded.fontFamily, HarnessSettings().fontFamily, "absent keys fall back to defaults")
+        let fallback = HarnessSettings.makeDefaults(imported: TerminalConfigImporter.load())
+        XCTAssertEqual(decoded.fontFamily, fallback.fontFamily, "absent keys fall back to defaults")
     }
 
-    /// Every key absent → every field equals the default instance (the single source the
-    /// FieldDecoder funnels through). Spot-checks a representative spread of field types.
+    /// Every key absent → every field equals the fallback instance the decoder funnels
+    /// through. That fallback is `makeDefaults(imported:)`, NOT `HarnessSettings()`: on a
+    /// machine with an importable terminal config (Ghostty/iTerm2) the defaults are
+    /// import-aware (shell, opacity, font), so comparing against the plain initializer
+    /// only passes on machines with nothing to import (like CI). Spot-checks a
+    /// representative spread of field types.
     func testMissingKeysDecodeToDefaultInstanceValues() throws {
         let decoded = try JSONDecoder().decode(HarnessSettings.self, from: Data("{}".utf8))
-        let defaults = HarnessSettings()
+        let defaults = HarnessSettings.makeDefaults(imported: TerminalConfigImporter.load())
         XCTAssertEqual(decoded.defaultShell, defaults.defaultShell)
         XCTAssertEqual(decoded.backgroundOpacity, defaults.backgroundOpacity)
         XCTAssertEqual(decoded.scrollbackLines, defaults.scrollbackLines)
