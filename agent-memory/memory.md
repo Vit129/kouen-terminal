@@ -29,7 +29,7 @@
 | 14 | File preview: no-reparent constraint split (40/60) | ✅ Done |
 | 15 | File preview: brighter syntax colors + chrome bg | ✅ Done |
 | 16 | Sidebar session card: icon scans all tabs + title always tracks live folder (matches tab bar) | ✅ Done |
-| 17 | P6 — File editor opacity parity with terminal (refreshEditorPanelFill) | ✅ Done |
+| 17 | P6 — File editor opacity parity with terminal (compensated refreshEditorPanelFill) | ✅ Done |
 
 ### Recent_Lessons
 
@@ -38,7 +38,7 @@
 - **RL-003:** sortOrder must persist to UserDefaults on every drag, not just on quit
 - **RL-004:** Never reparent Metal terminal surfaces for file preview split — causes 1-2s black screen (CASE-003). Use constraint-based sibling panel instead.
 - **RL-005:** DispatchSource on .main queue directly (not .global with async hop) for Swift 6 MainActor isolation.
-- **RL-006:** AppKit panels alongside Metal surfaces must apply opacity explicitly to their CALayer (`terminalBackground × opacity`). Metal handles its own alpha; AppKit panels don't. `HarnessSettings.clampedOpacity` returns `Float` — cast to `CGFloat` for `withAlphaComponent`. Hook into `applyChrome()` + panel-creation site. (CASE-011)
+- **RL-006:** AppKit panels alongside Metal surfaces must apply opacity explicitly to their CALayer, but file editor/preview panels need a denser compensated alpha (`opacity + (1 - opacity) * 0.55`) rather than raw opacity. Metal handles terminal canvas alpha and terminal programs may paint opaque cell backgrounds, while preview text sits over mostly transparent AppKit canvas; raw parity can look too transparent. Hook into `applyChrome()` + panel-creation site. (CASE-011)
 
 ### Decisions_In_Force
 
@@ -65,7 +65,7 @@
 - Git panel: `GitPanelView` — changes/history/worktrees; DispatchSource watcher on .git (main queue)
 - Split panes: `PaneContainerView` builds from `PaneNode` binary tree; `HarnessSplitView` per branch node
 - Sessions: `SessionCoordinator.shared` — async IPC, snapshot notifications via `NotificationBus.shared.snapshotChanged`
-- File preview: `ContentAreaViewController.showFileEditorSplit()` — constraint-based sibling panel (40% editor / 60% terminal), never reparents terminal views
+- File preview: `ContentAreaViewController.showFileEditorSplit()` — constraint-based sibling panel (40% editor / 60% terminal), never reparents terminal views; `refreshEditorPanelFill()` uses compensated opacity so editor preview visually matches terminal density
 - CWD tracking: `AgentScanner.cwdTimer` (500ms) → `SurfaceRegistry.refreshCwdOnly()` (proc_pidinfo) → `snapshotChanged` → sidebar reload
 - ACP Client: SHELVED — code intact (`ACPClient`, `ACPSession`, `AgentChatPanelView`, `AgentConfig`)
 - Preview uses `.harness-preview/` — socket path max 103 bytes (use `/tmp/hp` symlink for worktree)

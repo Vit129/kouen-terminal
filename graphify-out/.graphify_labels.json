@@ -520,11 +520,9 @@
   "518": "Harness CLI: HarnessCLI",
   "519": "HarnessCore: ACP / ACPClient",
   "520": "Release Notes: CHANGELOG",
-  "521": "Tests: HarnessCoreTests / LaunchAgentInstallerTests",
   "522": "Daemon: HarnessDaemon / SurfaceRegistry",
   "523": "Release Notes: CHANGELOG",
   "524": "Release Notes: CHANGELOG",
-  "525": "Harness App: UI / HarnessSidebarPanelViewController",
   "526": "Harness App: UI / HarnessSidebarPanelViewController",
   "527": "Release Notes: CHANGELOG",
   "528": "Harness CLI: HarnessCLI / AgentHookInstaller",
@@ -535,8 +533,8 @@
   "533": "Release Notes: CHANGELOG",
   "534": "Release Notes: CHANGELOG",
   "535": "Release Notes: CHANGELOG",
-  "536": "Release Notes: CHANGELOG",
   "537": "Release Notes: CHANGELOG",
   "538": "Release Notes: CHANGELOG",
-  "539": "Scripts: install-app.sh"
+  "539": "Scripts: install-app.sh",
+  "541": "Community 541"
 }
