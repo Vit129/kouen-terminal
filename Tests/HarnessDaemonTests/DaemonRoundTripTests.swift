@@ -455,6 +455,34 @@ final class DaemonRoundTripTests: XCTestCase {
         XCTAssertGreaterThan(seen.value, 0)
     }
 
+    /// `updateTabGitBranch` semantics on the wire: setting commits (revision bump → push
+    /// fan-out), an identical re-send is absorbed WITHOUT a commit (the revision is the
+    /// deterministic proxy — `pushSnapshotRevision` fires exactly once per commit), and
+    /// `nil` CLEARS the label. The event-driven branch monitor relies on all three (zero
+    /// subscriber fan-out at steady state; no stale label after leaving a repo).
+    func testUpdateTabGitBranchDedupsAndNilClears() throws {
+        let client = DaemonClient()
+        guard case let .snapshot(initial) = try client.request(.getSnapshot),
+              let ws = initial.activeWorkspace, let tab = ws.activeTab
+        else { return XCTFail("no default tab") }
+
+        _ = try client.request(.updateTabGitBranch(workspaceID: ws.id, tabID: tab.id, branch: "main"))
+        guard case let .snapshot(afterSet) = try client.request(.getSnapshot) else { return XCTFail() }
+        XCTAssertEqual(afterSet.activeWorkspace?.activeTab?.gitBranch, "main")
+        XCTAssertGreaterThan(afterSet.revision, initial.revision, "a real change must commit")
+
+        // Identical re-send: absorbed, no commit, no revision bump.
+        _ = try client.request(.updateTabGitBranch(workspaceID: ws.id, tabID: tab.id, branch: "main"))
+        guard case let .snapshot(afterDup) = try client.request(.getSnapshot) else { return XCTFail() }
+        XCTAssertEqual(afterDup.revision, afterSet.revision, "idempotent re-send must not commit")
+
+        // `nil` clears the stale label.
+        _ = try client.request(.updateTabGitBranch(workspaceID: ws.id, tabID: tab.id, branch: nil))
+        guard case let .snapshot(afterClear) = try client.request(.getSnapshot) else { return XCTFail() }
+        XCTAssertNil(afterClear.activeWorkspace?.activeTab?.gitBranch)
+        XCTAssertGreaterThan(afterClear.revision, afterSet.revision)
+    }
+
     /// Hook symmetry for long-lived subscription clients: registering a subscription must fire
     /// `client-attached`, and its disconnect must fire `client-detached`. Regression for the
     /// attach hook only firing on explicit `identifyClient` — every real client (GUI, attach,
