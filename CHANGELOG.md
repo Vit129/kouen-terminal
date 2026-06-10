@@ -20,6 +20,16 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
   characters/pixels — the pixel report derives from the same host-supplied cell metrics
   inline images use (window resize/move remain deliberate non-goals).
 
+### Changed
+- Mechanical decomposition (daemon + core): `SurfaceRegistry`'s output monitoring and the
+  version-banner one-shot moved to extension files (same members, same locks — the
+  single-lock serialization is untouched); `SessionEditor`'s split-tree algebra (the pure
+  `PaneNode` walks/rewrites) moved to `SessionEditor+SplitTree.swift`; and
+  `HarnessSettings.init(from:)`'s 35 uniform hand-written `decodeIfPresent ?? fallback`
+  lines now funnel through a default-instance-driven keypath decoder — the typo class
+  where a line decodes one key but falls back to a different field's default can no longer
+  be written (migrations and deliberate non-default fallbacks stay hand-written).
+
 ### Fixed
 - A stale scrollback index can no longer crash a shipping build: `HistoryRingBuffer`'s
   empty-buffer release trap is replaced by a graceful fallback to the most recently
