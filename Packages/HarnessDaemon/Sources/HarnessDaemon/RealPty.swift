@@ -817,6 +817,14 @@ public final class RealPty: @unchecked Sendable {
         return scrollbackBytes
     }
 
+    /// `persist-scrollback` runtime toggle: `false` stops on-disk persistence and wipes the
+    /// existing log (see `ScrollbackFile.setSuspended`); `true` resumes from that point. The
+    /// in-memory replay ring is untouched — the option is about secrets at REST. No-op for a
+    /// surface spawned without persistence (nothing on disk to gate).
+    public func setScrollbackPersistence(enabled: Bool) {
+        scrollbackFile?.setSuspended(!enabled)
+    }
+
     /// Synchronously persist any buffered scrollback. Called on graceful daemon shutdown so the
     /// last debounce window isn't lost. No-op when the surface isn't persisted.
     public func flushScrollback() {
