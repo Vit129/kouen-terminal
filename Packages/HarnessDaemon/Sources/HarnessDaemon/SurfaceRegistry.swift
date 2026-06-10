@@ -1443,19 +1443,22 @@ public final class SurfaceRegistry: @unchecked Sendable {
             // XTVERSION reply.
             let identity = TerminalIdentity.spec(forOption: optionStore.get(TerminalIdentity.optionKey)?.stringValue)
             // Shell-integration auto-inject (opt-out via `shell-integration off`): prompt
-            // marks work out of the box. Injection env merges UNDER the session
-            // `set-environment` table (the user always wins) and the plan may swap the
-            // launch arguments (bash). Best-effort: a nil plan spawns untouched.
-            let integrationPlan: ShellIntegrationInjector.Plan? =
+            // marks work out of the box. The user's `set-environment` table always wins,
+            // and the plan is ALL-or-nothing: if any of its env keys would lose that merge,
+            // a partial apply (e.g. bash `--posix` with the USER's $ENV) would corrupt the
+            // spawn — drop the whole plan instead. Best-effort: a nil plan spawns untouched.
+            var spawnEnvironment = extraEnvironment(forSurfaceKey: surfaceID)
+            var integrationPlan: ShellIntegrationInjector.Plan? =
                 (optionStore.get("shell-integration")?.boolValue ?? true)
                     ? ShellIntegrationInjector.plan(
                         shellPath: shellPath,
                         baseEnvironment: ProcessInfo.processInfo.environment)
                     : nil
-            var spawnEnvironment = extraEnvironment(forSurfaceKey: surfaceID)
             if let plan = integrationPlan {
-                for (key, value) in plan.environment where spawnEnvironment[key] == nil {
-                    spawnEnvironment[key] = value
+                if plan.environment.keys.allSatisfy({ spawnEnvironment[$0] == nil }) {
+                    for (key, value) in plan.environment { spawnEnvironment[key] = value }
+                } else {
+                    integrationPlan = nil
                 }
             }
             let session = try RealPty(

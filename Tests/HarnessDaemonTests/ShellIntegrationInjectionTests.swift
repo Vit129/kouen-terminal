@@ -79,6 +79,40 @@ final class ShellIntegrationInjectionTests: XCTestCase {
                       "shim must clean up ENV/HARNESS_BASH_LOGIN after itself")
     }
 
+    /// A user `set-environment` for any of the plan's keys must drop the ENTIRE plan:
+    /// applying `--posix` with the USER's `$ENV` would leave the pane stuck in posix mode
+    /// with no login replay. The pane spawns untouched instead — default `-l` argv,
+    /// posix off, the user's `$ENV` delivered intact.
+    func testUserEnvCollisionDropsEntirePlan() throws {
+        let previousHome = getenv("HARNESS_HOME").map { String(cString: $0) }
+        setenv("HARNESS_HOME", home.path, 1)
+        defer {
+            if let previousHome { setenv("HARNESS_HOME", previousHome, 1) } else { unsetenv("HARNESS_HOME") }
+        }
+        try HarnessPaths.ensureDirectories()
+
+        let registry = SurfaceRegistry()
+        guard case .ok = registry.handle(.setEnvironment(
+            sessionID: nil, key: "ENV", value: "/tmp/their-env-file"
+        )) else { return XCTFail("setEnvironment failed") }
+
+        let surfaceID = UUID().uuidString
+        guard case .ok = registry.handle(.ensureSurface(
+            surfaceID: surfaceID, cwd: NSTemporaryDirectory(), shell: try bashPath(),
+            rows: 24, cols: 80, scrollbackBytes: nil
+        )) else { return XCTFail("ensureSurface failed") }
+
+        _ = registry.handle(.sendData(surfaceID: surfaceID, data: Data(
+            "echo MODE=login:$(shopt -q login_shell && echo yes || echo no),posix:$(shopt -oq posix && echo on || echo off),env:[$ENV]\n".utf8)))
+        let sawUntouched = waitUntil {
+            guard case let .text(text) = registry.handle(.capturePane(surfaceID: surfaceID, includeScrollback: true))
+            else { return false }
+            return text.contains("MODE=login:yes,posix:off,env:[/tmp/their-env-file]")
+        }
+        XCTAssertTrue(sawUntouched,
+                      "user ENV collision must drop the whole plan: -l argv (login shell), posix off, user $ENV intact")
+    }
+
     func testRegistryOptionOffSpawnsUntouched() throws {
         let previousHome = getenv("HARNESS_HOME").map { String(cString: $0) }
         setenv("HARNESS_HOME", home.path, 1)
