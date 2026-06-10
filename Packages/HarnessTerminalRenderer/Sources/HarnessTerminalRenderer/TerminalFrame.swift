@@ -621,7 +621,10 @@ public struct FrameBuilder {
                            into cells: inout [RenderCell]) {
         // Monotonic cursor over the row's disjoint, ascending search intervals: columns only
         // grow, so each interval is passed at most once per row — O(1) amortized per cell.
+        // The no-search case is hoisted out of the per-cell work entirely: the cursor
+        // bookkeeping measurably taxes the plain build path (~6ns/cell) if left inline.
         var intervalCursor = 0
+        let hasSearchIntervals = !searchIntervals.isEmpty
         for column in 0 ..< snapshot.cols {
             let cell = snapshot.cell(row: row, col: column) ?? .blank
             let colors = resolver.resolve(cell)
@@ -633,12 +636,17 @@ public struct FrameBuilder {
             let isCanvasBackground = cell.background == .none && !cell.inverse
             // Precedence: primary selection (opaque) > search hit > normal.
             let selected = region?.contains(row: row, column: column) ?? false
-            while intervalCursor < searchIntervals.count,
-                  searchIntervals[intervalCursor].upperBound < column {
-                intervalCursor += 1
+            let isSearchHit: Bool
+            if hasSearchIntervals {
+                while intervalCursor < searchIntervals.count,
+                      searchIntervals[intervalCursor].upperBound < column {
+                    intervalCursor += 1
+                }
+                isSearchHit = !selected && intervalCursor < searchIntervals.count
+                    && searchIntervals[intervalCursor].lowerBound <= column
+            } else {
+                isSearchHit = false
             }
-            let isSearchHit = !selected && intervalCursor < searchIntervals.count
-                && searchIntervals[intervalCursor].lowerBound <= column
             let foreground: RenderColor
             let background: RenderColor
             // Skip the cell's background fill only when it resolves to the default canvas
