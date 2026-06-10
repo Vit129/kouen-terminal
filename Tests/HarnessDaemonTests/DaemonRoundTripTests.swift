@@ -37,11 +37,11 @@ final class DaemonRoundTripTests: XCTestCase {
 
     private func waitForDaemonReady() throws {
         let client = DaemonClient()
-        for _ in 0 ..< 50 {
-            if case .pong = (try? client.request(.ping, timeout: 0.4)) { return }
-            usleep(100_000)
+        let ready = waitUntil(timeout: 10) {
+            if case .pong = (try? client.request(.ping, timeout: 0.4)) { return true }
+            return false
         }
-        XCTFail("daemon did not become ready")
+        if !ready { XCTFail("daemon did not become ready") }
     }
 
     func testControlSocketIsOwnerOnly() throws {
@@ -193,11 +193,7 @@ final class DaemonRoundTripTests: XCTestCase {
         defer { subscription.cancel() }
 
         // Wait for the burst to finish and the stream to settle.
-        let deadline = Date().addingTimeInterval(15)
-        while Date() < deadline {
-            if burstDone.value == true, combined.contains(marker(total - 1)) { break }
-            usleep(50_000)
-        }
+        waitUntil(timeout: 15) { burstDone.value == true && combined.contains(marker(total - 1)) }
         usleep(400_000) // let any trailing frames flush before the authoritative re-replay
 
         // Ground truth: a full re-replay AFTER everything settled is exactly what the surface holds.
