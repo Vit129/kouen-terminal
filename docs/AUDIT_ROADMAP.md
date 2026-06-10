@@ -1,6 +1,6 @@
 # Harness — Full Audit & Parity Roadmap
 
-> **Status:** ✅ **PR-1 → PR-21 are all merged & shipped to `main`** (PRs #115–#138; per-PR markers below) — bundled into the **v1.9.0** release. Only the **P5 tail (PR-22 / PR-23 / PR-24)** remains open. Originally generated 2026-06-08 from an exhaustive read-only audit; shipped state reconciled 2026-06-09.
+> **Status:** ✅ **PR-1 → PR-21 are all merged & shipped to `main`** (PRs #115–#138; per-PR markers below) — bundled into the **v1.9.0** release. The **P5 tail (PR-22 / PR-23 / PR-24)** is **superseded by [docs/V1_10_ROADMAP.md](V1_10_ROADMAP.md)** (as PR-30/31/32, PR-29, and PR-36 respectively) — execute it there, not here. Originally generated 2026-06-08 from an exhaustive read-only audit; shipped state reconciled 2026-06-09.
 > Execute remaining PRs in priority order, one focused themed PR at a time (impl + tests + green CI, merged on review). Finding IDs in `[...]` map to the appendix table at the bottom.
 
 ## Context
@@ -159,17 +159,17 @@ Effort: **S** < ~1 day · **M** a few days · **L** larger.
 
 ### P5 — Tech debt & polish
 
-**PR-22 · Decompose oversized files (mechanical, zero behavior change)** · tech-debt · L · `[F85,F86,F87,F88,F89]`
+**PR-22 · Decompose oversized files (mechanical, zero behavior change)** · tech-debt · L · `[F85,F86,F87,F88,F89]` · ➡️ **Superseded by [V1_10_ROADMAP.md](V1_10_ROADMAP.md) PR-30/PR-31/PR-32**
 - *Why:* The only structural debt in an otherwise healthy codebase. The 3946-line `HarnessTerminalSurfaceView` mixes 8+ responsibilities; the 1776-line `SurfaceRegistry` is a God object (124-case switch + PTY lifecycle + monitoring + hooks + banner); the 64-property hand-written `HarnessSettings` decoder is a forward-compat hazard. These are merge-conflict magnets.
 - *Approach:* Split the surface view along existing `MARK` seams into **same-class extension files** (`+Selection/+Find/+CopyMode/+Input/+IME/+LinkHover`) — zero behavior change. Extract `SurfaceMonitor` + the version-banner one-shot out of `SurfaceRegistry` **behind the same lock seam** (the single-lock serialization is a documented correctness invariant — **do not redesign it**). Replace the hand-written settings decoder with a default-instance-driven decode helper (or, cheapest, the guard test from PR-11). Add a `TerminalRenderInstances.swift` extraction; extract `SessionEditor` split-tree algebra into `+SplitTree.swift`. **Strictly mechanical.**
 - *Files:* `HarnessTerminalSurfaceView.swift`, `SurfaceRegistry.swift`, `HarnessSettings.swift`, `TerminalMetalRenderer.swift`, `SessionEditor.swift`.
 
-**PR-23 · VT polish + safety hardening cluster** · ghostty-parity+safety · M · `[F8,F9,F10,F12,F14,F33,F82,F83,F4,F100,F22,F36,F6]`
+**PR-23 · VT polish + safety hardening cluster** · ghostty-parity+safety · M · `[F8,F9,F10,F12,F14,F33,F82,F83,F4,F100,F22,F36,F6]` · ➡️ **Superseded by [V1_10_ROADMAP.md](V1_10_ROADMAP.md) PR-29**
 - *Why:* A tail of small correctness/polish items worth batching: richer DA1 (`?62;22c`), DA3 reply, non-private DECRQM, mode 1048 save/restore cursor, att610 cursor-blink (mode 12), CSI t title-stack push/pop (22/23) + size reports (18/14), underline-pattern continuous phase, DECSET 1003 any-event motion, SGR blink rendering (off-phase dim via the existing cursor-blink timer), DECSCNM reverse-video (mode 5), `HistoryRingBuffer`'s release-shipping `precondition` that defeats its own graceful-degradation intent, and a per-connection partial-frame cap in `DaemonServer`.
 - *Approach:* Batch the trivial emulator replies; phase underline decorations on absolute grid X + widen undercurl period; report 1003 motion in `mouseMoved` when `mouseAny` set; fold a blink-phase bit into the row content key so only blink rows re-encode; add `reverseScreen` swap in `CellColorResolver`; drop the release-shipping `precondition` in `HistoryRingBuffer` subscript (keep the assert); add the partial-buffer ceiling. Add the DECRQM-unrecognized-mode (state 0) conformance test.
 - *Files:* `TerminalEmulator.swift`, `TerminalMetalRenderer.swift`, `CellColorResolver.swift`, `HistoryRingBuffer.swift`, `DaemonServer.swift`.
 
-**PR-24 · Security posture review (investigation + decisions, not a feature)** · security · S–M · `[critic MED/LOW]`
+**PR-24 · Security posture review (investigation + decisions, not a feature)** · security · S–M · `[critic MED/LOW]` · ➡️ **Superseded by [V1_10_ROADMAP.md](V1_10_ROADMAP.md) PR-36**
 - *Why:* Named in the brief ("packaging/update path") but unaudited: app ships `app-sandbox=false` + Sparkle auto-update + a Services provider; hardened-runtime/library-validation/notarization posture never assessed. Scrollback persists raw PTY output (echoed secrets, `env` dumps, key material) to disk — owner-only `0o700` (good) but **no do-not-persist/redaction** per sensitive surface. IME depth (dead keys, CJK candidate commit timing, wide marked-text width) never systematically audited beyond the preedit overlay.
 - *Approach:* Audit `Harness.entitlements` + hardened-runtime flags; document the rationale for no-sandbox and confirm notarization/library-validation. Add a per-surface "don't persist scrollback" option (and document the secrets-at-rest decision even if "won't redact"). Run a focused IME pass (dead-key compose, CJK candidate commit, wide marked-text width). Output: a short security/posture doc + any small fixes that fall out.
 - *Files:* `Harness.entitlements`, `ScrollbackFile.swift`, `HarnessSettings.swift`, IME path in `HarnessTerminalSurfaceView.swift`.

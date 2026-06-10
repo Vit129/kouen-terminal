@@ -54,6 +54,9 @@ public enum MouseEventKind: Sendable {
     case press
     case release
     case drag
+    /// Pointer motion with NO button held — reported only under any-event tracking
+    /// (DECSET 1003). Encodes as the "no button" code (3) plus the motion bit (32).
+    case move
 }
 
 /// Encodes keyboard input into the bytes a terminal application expects, honoring the
@@ -212,19 +215,32 @@ public struct InputEncoder: Sendable {
         kind: MouseEventKind,
         column: Int,
         row: Int,
+        pixelPosition: (x: Int, y: Int)? = nil,
         modifiers: KeyModifiers = [],
         modes: TerminalModes
     ) -> [UInt8] {
         guard modes.mouseTrackingEnabled else { return [] }
         // Base button + xterm mouse modifier bits (shift 4, meta/alt 8, control 16) +
-        // motion bit (32) for drags.
-        var code = button.rawValue
+        // motion bit (32) for drags and button-less motion. Motion with no button held
+        // (any-event tracking, 1003) reports the "no button" base code 3.
+        var code = (kind == .move) ? 3 : button.rawValue
         if modifiers.contains(.shift) { code += 4 }
         if modifiers.contains(.option) { code += 8 }
         if modifiers.contains(.control) { code += 16 }
-        if kind == .drag { code += 32 }
+        if kind == .drag || kind == .move { code += 32 }
         let col = column + 1
         let line = row + 1
+
+        // SGR-pixel (DECSET 1016): the 1006 framing with pixel coordinates, taking precedence
+        // over 1006 when both are set (xterm semantics). The host supplies the pointer's
+        // 0-based pixel position within the text area — the same space the XTWINOPS `CSI 14 t`
+        // report uses — so programs can divide consistently. A 1016-only client whose host
+        // can't produce pixels (headless) degrades to the cell-based forms below rather than
+        // going silent.
+        if modes.mouseSGRPixel, let pixel = pixelPosition {
+            let final: Character = (kind == .release) ? "m" : "M"
+            return esc("[<\(code);\(max(1, pixel.x + 1));\(max(1, pixel.y + 1))\(final)")
+        }
 
         if modes.mouseSGR {
             let final: Character = (kind == .release) ? "m" : "M"
