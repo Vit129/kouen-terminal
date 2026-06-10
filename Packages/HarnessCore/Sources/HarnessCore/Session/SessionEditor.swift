@@ -581,20 +581,24 @@ public struct SessionEditor: Sendable {
         return sess.activeTabID == tabID
     }
 
-    public mutating func updateTabMetadata(
+    /// Set — or with `nil`, **clear** — the tab's git-branch label (`nil` must clear:
+    /// a tab whose directory leaves a repository drops its stale label). Returns whether
+    /// the value actually changed (and the revision was bumped), so callers can skip the
+    /// commit + subscriber push for an idempotent re-send.
+    @discardableResult
+    public mutating func setTabGitBranch(
         workspaceID: WorkspaceID,
         tabID: TabID,
-        gitBranch: String?,
-        cwd: String?
-    ) {
-        guard let match = tabIndex(workspaceID: workspaceID, tabID: tabID) else { return }
-        if let gitBranch {
-            snapshot.workspaces[match.workspaceIndex].sessions[match.sessionIndex].tabs[match.tabIndex].gitBranch = gitBranch
-        }
-        if let cwd {
-            snapshot.workspaces[match.workspaceIndex].sessions[match.sessionIndex].tabs[match.tabIndex].cwd = cwd
-        }
+        branch: String?
+    ) -> Bool {
+        guard let match = tabIndex(workspaceID: workspaceID, tabID: tabID),
+              snapshot.workspaces[match.workspaceIndex].sessions[match.sessionIndex]
+                  .tabs[match.tabIndex].gitBranch != branch
+        else { return false }
+        snapshot.workspaces[match.workspaceIndex].sessions[match.sessionIndex]
+            .tabs[match.tabIndex].gitBranch = branch
         bumpRevision()
+        return true
     }
 
     public mutating func updateTabTitle(surfaceID: SurfaceID, title: String) {

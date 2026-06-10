@@ -1104,6 +1104,37 @@ final class PerformanceBenchmarks: XCTestCase {
         try runFrameBuildBenchmark(name: "build_frame_240x80", cols: 240, rows: 80)
     }
 
+    /// Frame build with the find bar open: ~200 search hits spread over the viewport — the
+    /// scrolling-with-search-active workload. Pins the per-row interval index (used to be a
+    /// per-cell O(matches) `contains` scan: matches × cells per build).
+    func testBuildFrameSearchHighlights160x48() throws {
+        try skipUnlessEnabled()
+        let cols = 160, rows = 48
+        let snapshot = filledSnapshot(cols: cols, rows: rows)
+        let theme = HarnessThemeCatalog.theme(named: "Dracula")!
+        let builder = FrameBuilder(
+            theme: theme,
+            searchBackground: RGBColor(red: 200, green: 180, blue: 40)
+        )
+        // ~200 short hits, 4–5 per row, deterministic layout (no RNG → stable benchmark).
+        var highlights: [TerminalSelection] = []
+        for row in 0 ..< rows {
+            for slot in 0 ..< 4 + (row % 2) {
+                let start = (slot * 37 + row * 11) % (cols - 6)
+                highlights.append(TerminalSelection((row, start), (row, start + 5)))
+            }
+        }
+        let nanos = timedNanos {
+            _ = builder.build(snapshot, region: nil, searchHighlights: highlights)
+        }
+        printBenchmark("build_frame_search_highlights_160x48",
+                       nanos: nanos,
+                       fields: [("cells", "\(cols * rows)"), ("hits", "\(highlights.count)")])
+        measure {
+            _ = builder.build(snapshot, region: nil, searchHighlights: highlights)
+        }
+    }
+
     func testRenderEncodeStats160x48() throws {
         try skipUnlessEnabled()
         let device = try makeMetalDevice()

@@ -756,4 +756,70 @@ final class SurfaceRegistryTests: XCTestCase {
         // union — the property that protects a failed-to-spawn surface (in layout, not in sessions).
         XCTAssertTrue(registry.scrollbackLiveSurfaceKeys().contains(referencedSurface.uuidString))
     }
+
+    // MARK: - Monitor tick idle precheck (idle efficiency)
+
+    /// A quiet monitor tick (no fresh output/bell, silence disarmed) must skip the full pass —
+    /// no registry lock, no option reads. Ticks are driven by hand after cancelling the real
+    /// timer; counts are compared relatively so an in-flight timer tick can't skew them (it
+    /// would be a quiet tick itself and is skipped identically).
+    func testQuietMonitorTickSkipsFullPass() throws {
+        let registry = SurfaceRegistry()
+        registry.stopMonitoring()
+        guard case let .surfaces(initial) = registry.handle(.listSurfaces),
+              let target = initial.first else { return XCTFail("expected a default surface") }
+
+        // Fresh output: the tick takes the full pass (drain + registry lock).
+        registry.noteSurfaceOutputForTesting(surfaceKey: target.surfaceID, data: Data("hello".utf8))
+        registry.processMonitorsForTesting()
+        let afterFresh = registry.monitorFullPassCountForTesting
+        XCTAssertGreaterThanOrEqual(afterFresh, 1, "a tick with fresh output must process")
+
+        // Quiet ticks: skipped entirely, even though the monitor entry persists.
+        registry.processMonitorsForTesting()
+        registry.processMonitorsForTesting()
+        XCTAssertEqual(registry.monitorFullPassCountForTesting, afterFresh,
+                       "quiet ticks must not take the full pass")
+        XCTAssertTrue(registry.monitorEntryKeysForTesting.contains(target.surfaceID),
+                      "the persistent per-surface entry alone must not force full passes")
+    }
+
+    /// Arming `monitor-silence` via the real `setOption` path must restore per-tick full
+    /// passes (silence needs idle evaluation with no fresh output); disarming stops them.
+    func testSilenceArmedTransitionGatesFullPasses() throws {
+        let registry = SurfaceRegistry()
+        registry.stopMonitoring()
+        guard case let .surfaces(initial) = registry.handle(.listSurfaces),
+              initial.first != nil else { return XCTFail("expected a default surface") }
+
+        registry.processMonitorsForTesting()
+        let base = registry.monitorFullPassCountForTesting
+
+        guard case .ok = registry.handle(.setOption(scope: "global", target: nil, key: "monitor-silence", rawValue: "5"))
+        else { return XCTFail("setOption failed") }
+        registry.processMonitorsForTesting()
+        XCTAssertEqual(registry.monitorFullPassCountForTesting, base + 1,
+                       "an armed silence monitor needs the full pass every tick")
+
+        guard case .ok = registry.handle(.setOption(scope: "global", target: nil, key: "monitor-silence", rawValue: "0"))
+        else { return XCTFail("setOption failed") }
+        registry.processMonitorsForTesting()
+        XCTAssertEqual(registry.monitorFullPassCountForTesting, base + 1,
+                       "disarming must return quiet ticks to the skip path")
+    }
+
+    /// The orphan sweep survives the precheck: an entry recreated by a PTY read racing a
+    /// close is born with `sawOutput = true`, so the very next tick takes the full pass and
+    /// evicts it — `monitors` can't accumulate dead-surface keys.
+    func testOrphanMonitorEntryIsSweptDespitePrecheck() throws {
+        let registry = SurfaceRegistry()
+        registry.stopMonitoring()
+        let deadKey = UUID().uuidString // no tab anywhere for this key
+        registry.noteSurfaceOutputForTesting(surfaceKey: deadKey, data: Data("x".utf8))
+        XCTAssertTrue(registry.monitorEntryKeysForTesting.contains(deadKey))
+
+        registry.processMonitorsForTesting() // fresh flag → full pass → sweep
+        XCTAssertFalse(registry.monitorEntryKeysForTesting.contains(deadKey),
+                       "the racing-read orphan must be evicted on the next tick")
+    }
 }
