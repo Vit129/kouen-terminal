@@ -10,6 +10,8 @@ public protocol TerminalHostDelegate: AnyObject {
     func terminalHostDidChangeWorkingDirectory(_ path: String, surfaceID: SurfaceID)
     /// OSC 1337 `SetUserVar=` — optional: hosts that don't surface user variables ignore it.
     func terminalHostDidSetUserVariable(_ name: String, value: String, surfaceID: SurfaceID)
+    /// RIS dropped the engine's user variables — optional: hosts that mirrored them clear their copies.
+    func terminalHostDidClearUserVariables(surfaceID: SurfaceID)
     func terminalHostDidChangeFocus(_ focused: Bool, surfaceID: SurfaceID)
     func terminalHostDidRingBell(surfaceID: SurfaceID)
     /// A shell command finished (OSC 133) after running `duration` seconds, with `exitCode`.
@@ -24,6 +26,8 @@ public protocol TerminalHostDelegate: AnyObject {
 extension TerminalHostDelegate {
     /// Default no-op — only the GUI surfaces user variables (as pane-scoped `@` options).
     public func terminalHostDidSetUserVariable(_ name: String, value: String, surfaceID: SurfaceID) {}
+    /// Default no-op — only the GUI mirrors user variables, so only it has copies to clear.
+    public func terminalHostDidClearUserVariables(surfaceID: SurfaceID) {}
     /// Default no-op so non-GUI conformers (e.g. the compositor) need not handle command timing.
     public func terminalHostDidFinishCommand(duration: TimeInterval, exitCode: Int?, surfaceID: SurfaceID) {}
     /// Default no-op — only the GUI tab strip renders progress.
@@ -223,6 +227,10 @@ public final class TerminalHostView: NSView {
         native.onUserVar = { [weak self] name, value in
             guard let self else { return }
             self.hostDelegate?.terminalHostDidSetUserVariable(name, value: value, surfaceID: self.surfaceID)
+        }
+        native.onUserVarsCleared = { [weak self] in
+            guard let self else { return }
+            self.hostDelegate?.terminalHostDidClearUserVariables(surfaceID: self.surfaceID)
         }
         native.onBell = { [weak self] in
             guard let self else { return }
