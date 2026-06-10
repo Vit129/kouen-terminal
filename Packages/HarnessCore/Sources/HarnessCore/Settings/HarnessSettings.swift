@@ -533,6 +533,23 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         importedConfigSignature = imported?.signature
     }
 
+    /// Forward-compat field decode driven by the default instance: `decode(.key, \\.field)`
+    /// reads the key when present and otherwise returns `fallback[keyPath:]` — one place
+    /// owns every fallback (`makeDefaults`), and the typo class where a line decodes one
+    /// key but falls back to a DIFFERENT field's default can no longer be written. Fields
+    /// with non-default semantics (legacy migrations, deliberate `?? true` upgrades,
+    /// clamps with their own comments) stay hand-written below, on purpose.
+    /// (Generic over the key type because the compiler-synthesized `CodingKeys` cannot be
+    /// named in a nested type's signature; inference binds it at the use site in `init(from:)`.)
+    private struct FieldDecoder<Keys: CodingKey> {
+        let container: KeyedDecodingContainer<Keys>
+        let fallback: HarnessSettings
+
+        func decode<T: Decodable>(_ key: Keys, _ field: KeyPath<HarnessSettings, T>) throws -> T {
+            try container.decodeIfPresent(T.self, forKey: key) ?? fallback[keyPath: field]
+        }
+    }
+
     /// Decoder that gracefully accepts older settings files missing the newer fields.
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -542,42 +559,39 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         // invoke the importer twice on every first-run or migration path.
         let imported = HarnessSettings.pendingImportedConfig ?? TerminalConfigImporter.load()
         let fallback = HarnessSettings.makeDefaults(imported: imported)
+        let fields = FieldDecoder(container: container, fallback: fallback)
 
-        fontSize = HarnessSettings.clampedFontSize(
-            try container.decodeIfPresent(Float.self, forKey: .fontSize) ?? fallback.fontSize)
-        fontFamily = try container.decodeIfPresent(String.self, forKey: .fontFamily) ?? fallback.fontFamily
-        defaultShell = try container.decodeIfPresent(String.self, forKey: .defaultShell) ?? fallback.defaultShell
-        defaultCWD = try container.decodeIfPresent(String.self, forKey: .defaultCWD) ?? fallback.defaultCWD
-        transparentTitlebar = try container.decodeIfPresent(Bool.self, forKey: .transparentTitlebar) ?? fallback.transparentTitlebar
-        sidebarVisible = try container.decodeIfPresent(Bool.self, forKey: .sidebarVisible) ?? fallback.sidebarVisible
-        restoreWindowSize = try container.decodeIfPresent(Bool.self, forKey: .restoreWindowSize) ?? fallback.restoreWindowSize
-        backgroundOpacity = try container.decodeIfPresent(Float.self, forKey: .backgroundOpacity) ?? fallback.backgroundOpacity
-        backgroundBlur = try container.decodeIfPresent(Int.self, forKey: .backgroundBlur) ?? fallback.backgroundBlur
-        windowPaddingX = HarnessSettings.clampedPadding(
-            try container.decodeIfPresent(Float.self, forKey: .windowPaddingX) ?? fallback.windowPaddingX)
-        windowPaddingY = HarnessSettings.clampedPadding(
-            try container.decodeIfPresent(Float.self, forKey: .windowPaddingY) ?? fallback.windowPaddingY)
-        customBackgroundHex = try container.decodeIfPresent(String.self, forKey: .customBackgroundHex) ?? fallback.customBackgroundHex
-        customForegroundHex = try container.decodeIfPresent(String.self, forKey: .customForegroundHex) ?? fallback.customForegroundHex
-        customCursorHex = try container.decodeIfPresent(String.self, forKey: .customCursorHex) ?? fallback.customCursorHex
+        fontSize = HarnessSettings.clampedFontSize(try fields.decode(.fontSize, \.fontSize))
+        fontFamily = try fields.decode(.fontFamily, \.fontFamily)
+        defaultShell = try fields.decode(.defaultShell, \.defaultShell)
+        defaultCWD = try fields.decode(.defaultCWD, \.defaultCWD)
+        transparentTitlebar = try fields.decode(.transparentTitlebar, \.transparentTitlebar)
+        sidebarVisible = try fields.decode(.sidebarVisible, \.sidebarVisible)
+        restoreWindowSize = try fields.decode(.restoreWindowSize, \.restoreWindowSize)
+        backgroundOpacity = try fields.decode(.backgroundOpacity, \.backgroundOpacity)
+        backgroundBlur = try fields.decode(.backgroundBlur, \.backgroundBlur)
+        windowPaddingX = HarnessSettings.clampedPadding(try fields.decode(.windowPaddingX, \.windowPaddingX))
+        windowPaddingY = HarnessSettings.clampedPadding(try fields.decode(.windowPaddingY, \.windowPaddingY))
+        customBackgroundHex = try fields.decode(.customBackgroundHex, \.customBackgroundHex)
+        customForegroundHex = try fields.decode(.customForegroundHex, \.customForegroundHex)
+        customCursorHex = try fields.decode(.customCursorHex, \.customCursorHex)
         importedConfigSignature = try container.decodeIfPresent(String.self, forKey: .importedConfigSignature)
-        prefixKey = try container.decodeIfPresent(String.self, forKey: .prefixKey) ?? fallback.prefixKey
-        scrollbackLines = try container.decodeIfPresent(Int.self, forKey: .scrollbackLines) ?? fallback.scrollbackLines
-        cursorStyle = try container.decodeIfPresent(String.self, forKey: .cursorStyle) ?? fallback.cursorStyle
-        cursorBlink = try container.decodeIfPresent(Bool.self, forKey: .cursorBlink) ?? fallback.cursorBlink
-        copyOnSelect = try container.decodeIfPresent(Bool.self, forKey: .copyOnSelect) ?? fallback.copyOnSelect
-        selectionBackgroundHex = try container.decodeIfPresent(String.self, forKey: .selectionBackgroundHex) ?? fallback.selectionBackgroundHex
-        selectionForegroundHex = try container.decodeIfPresent(String.self, forKey: .selectionForegroundHex) ?? fallback.selectionForegroundHex
-        boldColorHex = try container.decodeIfPresent(String.self, forKey: .boldColorHex) ?? fallback.boldColorHex
-        cursorTextHex = try container.decodeIfPresent(String.self, forKey: .cursorTextHex) ?? fallback.cursorTextHex
-        paletteHex = HarnessSettings.normalizedPalette(try container.decodeIfPresent([String?].self, forKey: .paletteHex) ?? fallback.paletteHex)
+        prefixKey = try fields.decode(.prefixKey, \.prefixKey)
+        scrollbackLines = try fields.decode(.scrollbackLines, \.scrollbackLines)
+        cursorStyle = try fields.decode(.cursorStyle, \.cursorStyle)
+        cursorBlink = try fields.decode(.cursorBlink, \.cursorBlink)
+        copyOnSelect = try fields.decode(.copyOnSelect, \.copyOnSelect)
+        selectionBackgroundHex = try fields.decode(.selectionBackgroundHex, \.selectionBackgroundHex)
+        selectionForegroundHex = try fields.decode(.selectionForegroundHex, \.selectionForegroundHex)
+        boldColorHex = try fields.decode(.boldColorHex, \.boldColorHex)
+        cursorTextHex = try fields.decode(.cursorTextHex, \.cursorTextHex)
+        paletteHex = HarnessSettings.normalizedPalette(try fields.decode(.paletteHex, \.paletteHex))
         let agentColors = try container.decodeIfPresent([String: String].self, forKey: .agentColorOverrides) ?? fallback.agentColorOverrides
         agentColorOverrides = HarnessSettings.normalizedAgentColorOverrides(agentColors)
         dividerHex = try container.decodeIfPresent(String.self, forKey: .dividerHex)
         statusLineHex = try container.decodeIfPresent(String.self, forKey: .statusLineHex)
         windowBorderHex = try container.decodeIfPresent(String.self, forKey: .windowBorderHex)
-        windowBorderOpacity = max(0, min(1,
-            try container.decodeIfPresent(Float.self, forKey: .windowBorderOpacity) ?? fallback.windowBorderOpacity))
+        windowBorderOpacity = max(0, min(1, try fields.decode(.windowBorderOpacity, \.windowBorderOpacity)))
         systemNotificationsEnabled = try container.decodeIfPresent(Bool.self, forKey: .systemNotificationsEnabled) ?? true
         notificationSoundEnabled = try container.decodeIfPresent(Bool.self, forKey: .notificationSoundEnabled) ?? true
         notchVisibilityMode = try container.decodeIfPresent(NotchVisibilityMode.self, forKey: .notchVisibilityMode) ?? .automatic
@@ -587,7 +601,7 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         let resolvedColorRendering = decodedColorRendering
             ?? ((legacyVivid ?? fallback.vividColors) ? .vivid : fallback.colorRendering)
         colorRendering = resolvedColorRendering
-        colorGamut = try container.decodeIfPresent(TerminalColorGamut.self, forKey: .colorGamut) ?? fallback.colorGamut
+        colorGamut = try fields.decode(.colorGamut, \.colorGamut)
 
         let legacyLinear = try container.decodeIfPresent(Bool.self, forKey: .linearBlending)
         let decodedTextRendering = try container.decodeIfPresent(TerminalTextRenderingMode.self, forKey: .textRendering)
@@ -596,16 +610,16 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         textRendering = resolvedTextRendering
         vividColors = resolvedColorRendering == .vivid
         linearBlending = resolvedTextRendering == .crisp
-        applyThemeToTerminalOutput = try container.decodeIfPresent(Bool.self, forKey: .applyThemeToTerminalOutput) ?? fallback.applyThemeToTerminalOutput
-        ligatures = try container.decodeIfPresent(Bool.self, forKey: .ligatures) ?? fallback.ligatures
+        applyThemeToTerminalOutput = try fields.decode(.applyThemeToTerminalOutput, \.applyThemeToTerminalOutput)
+        ligatures = try fields.decode(.ligatures, \.ligatures)
         // Default on when the key is absent (existing installs get the fast path); an explicitly
         // stored `false` is honored as an opt-out.
         offMainParserFramePipeline = try container.decodeIfPresent(Bool.self, forKey: .offMainParserFramePipeline) ?? true
         // Default on when the key is absent (existing installs get real-time resize); an explicitly
         // stored `false` is honored as an opt-out to the legacy defer-to-release behavior.
         liveResizeReflow = try container.decodeIfPresent(Bool.self, forKey: .liveResizeReflow) ?? true
-        showPromptGutter = try container.decodeIfPresent(Bool.self, forKey: .showPromptGutter) ?? fallback.showPromptGutter
-        showStatusLine = try container.decodeIfPresent(Bool.self, forKey: .showStatusLine) ?? fallback.showStatusLine
+        showPromptGutter = try fields.decode(.showPromptGutter, \.showPromptGutter)
+        showStatusLine = try fields.decode(.showStatusLine, \.showStatusLine)
         // Behavior-preserving migration: a settings file that predates modes was written by a
         // user who already had the prefix + status line, i.e. the full Harness experience.
         // Default the absent key to `.full` (NOT the fresh-install `.plain`) so upgrading never
@@ -620,22 +634,20 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         // exactly as before until the user touches a finer toggle.
         prefixKeyEnabled = try container.decodeIfPresent(Bool.self, forKey: .prefixKeyEnabled)
         statusLineEnabled = try container.decodeIfPresent(Bool.self, forKey: .statusLineEnabled)
-        resizeOverlay = try container.decodeIfPresent(ResizeOverlayMode.self, forKey: .resizeOverlay) ?? fallback.resizeOverlay
-        resizeOverlayPosition = try container.decodeIfPresent(ResizeOverlayPosition.self, forKey: .resizeOverlayPosition) ?? fallback.resizeOverlayPosition
-        bellMode = try container.decodeIfPresent(BellMode.self, forKey: .bellMode) ?? fallback.bellMode
-        scrollMultiplier = HarnessSettings.clampedScrollMultiplier(
-            try container.decodeIfPresent(Double.self, forKey: .scrollMultiplier) ?? fallback.scrollMultiplier)
-        mouseHideWhileTyping = try container.decodeIfPresent(Bool.self, forKey: .mouseHideWhileTyping) ?? fallback.mouseHideWhileTyping
-        quickTerminalEnabled = try container.decodeIfPresent(Bool.self, forKey: .quickTerminalEnabled) ?? fallback.quickTerminalEnabled
-        quickTerminalHotkey = try container.decodeIfPresent(String.self, forKey: .quickTerminalHotkey) ?? fallback.quickTerminalHotkey
-        windowPaddingBalance = try container.decodeIfPresent(Bool.self, forKey: .windowPaddingBalance) ?? fallback.windowPaddingBalance
-        minimumContrast = HarnessSettings.clampedContrast(
-            try container.decodeIfPresent(Double.self, forKey: .minimumContrast) ?? fallback.minimumContrast)
+        resizeOverlay = try fields.decode(.resizeOverlay, \.resizeOverlay)
+        resizeOverlayPosition = try fields.decode(.resizeOverlayPosition, \.resizeOverlayPosition)
+        bellMode = try fields.decode(.bellMode, \.bellMode)
+        scrollMultiplier = HarnessSettings.clampedScrollMultiplier(try fields.decode(.scrollMultiplier, \.scrollMultiplier))
+        mouseHideWhileTyping = try fields.decode(.mouseHideWhileTyping, \.mouseHideWhileTyping)
+        quickTerminalEnabled = try fields.decode(.quickTerminalEnabled, \.quickTerminalEnabled)
+        quickTerminalHotkey = try fields.decode(.quickTerminalHotkey, \.quickTerminalHotkey)
+        windowPaddingBalance = try fields.decode(.windowPaddingBalance, \.windowPaddingBalance)
+        minimumContrast = HarnessSettings.clampedContrast(try fields.decode(.minimumContrast, \.minimumContrast))
         lightThemeName = try container.decodeIfPresent(String.self, forKey: .lightThemeName)
         darkThemeName = try container.decodeIfPresent(String.self, forKey: .darkThemeName)
-        pasteProtection = try container.decodeIfPresent(Bool.self, forKey: .pasteProtection) ?? fallback.pasteProtection
+        pasteProtection = try fields.decode(.pasteProtection, \.pasteProtection)
         commandFinishedThresholdSeconds =
-            try container.decodeIfPresent(Int.self, forKey: .commandFinishedThresholdSeconds) ?? fallback.commandFinishedThresholdSeconds
+            try fields.decode(.commandFinishedThresholdSeconds, \.commandFinishedThresholdSeconds)
         var decodedEvents = try container.decodeIfPresent([String: Bool].self, forKey: .notificationEvents) ?? [:]
         // One-time migration: fold the legacy standalone `commandFinishedNotifications` bool into the
         // per-event map, unless the map already carries an explicit choice for it.
@@ -644,8 +656,8 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
             decodedEvents[NotificationEvent.commandFinished.rawValue] = legacyCommandFinished
         }
         notificationEvents = decodedEvents
-        boldIsBright = try container.decodeIfPresent(Bool.self, forKey: .boldIsBright) ?? fallback.boldIsBright
-        secureKeyboardEntry = try container.decodeIfPresent(Bool.self, forKey: .secureKeyboardEntry) ?? fallback.secureKeyboardEntry
+        boldIsBright = try fields.decode(.boldIsBright, \.boldIsBright)
+        secureKeyboardEntry = try fields.decode(.secureKeyboardEntry, \.secureKeyboardEntry)
     }
 
     /// Thread-unsafe scratch slot used exclusively within `load()` to pass the already-computed
