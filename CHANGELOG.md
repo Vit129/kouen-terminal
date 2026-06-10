@@ -8,6 +8,11 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 
 ## [Unreleased]
 
+### Changed
+- Mechanical decomposition (renderer): the Metal renderer's CPU-side instance/cache value
+  types (GPU instance layouts, per-row encode caches, upload-cache keys) moved to
+  `TerminalRenderInstances.swift` — same definitions, zero logic change.
+
 ### Added
 - `Scripts/scorecard.sh` + `docs/SCORECARD.md`: the Harness-vs-Ghostty comparative
   scorecard — cold start (per-phase from `startup.log` vs wall-clock-to-window),
