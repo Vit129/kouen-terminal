@@ -23,8 +23,12 @@ private struct SurfaceFrameBuildConfiguration: Sendable {
     var selectionForeground: RGBColor?
     var promptGutterEnabled: Bool
 
-    func makeBuilder() -> FrameBuilder {
-        FrameBuilder(
+    /// `reverseVideo` is per-build state (DECSET 5 can flip any time), not configuration —
+    /// it rides the resolver copy so a build stays a pure function of (config, modes).
+    func makeBuilder(reverseVideo: Bool = false) -> FrameBuilder {
+        var resolver = self.resolver
+        resolver.reverseVideo = reverseVideo
+        return FrameBuilder(
             resolver: resolver,
             cursorColor: cursorColor,
             cursorTextColor: cursorTextColor,
@@ -379,6 +383,14 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// Blink phase: false hides the cursor on the off-beat. Reset to true on activity.
     private var cursorBlinkVisible = true
     private var blinkTimer: Timer?
+    /// SGR text blink (`SGR 5`): phase driver for blinking CELLS, independent of the cursor
+    /// timer (cursor blink follows focus; text blink follows content + visibility). Exists
+    /// only while the last presented frame contained blink cells and the pane is visible.
+    private var textBlinkTimer: Timer?
+    private var textBlinkHidden = false
+    /// Whether the most recently presented frame contained SGR-blink cells — drives
+    /// `updateTextBlinkTimer` across occlusion changes without rescanning a frame.
+    private var lastFrameHadBlink = false
     /// First-responder state — the cursor only blinks while focused.
     private var focused = false
     /// Whether the host window is key. Combined with `focused` for the user-visible focus
@@ -755,15 +767,17 @@ public final class HarnessTerminalSurfaceView: NSView {
     func testingPresentResizePreview(cols: Int, rows: Int, token: UInt64) -> Bool {
         let config = frameBuildConfiguration
         let bg = canvasBackground
+        let fg = canvasForeground
         let opacity = canvasOpacity
         let generation = renderGeneration
         let result: SurfaceFrameBuildResult? = emulatorState.sync { emulator in
             guard let preview = emulator.previewViewportReflow(cols: cols, rows: rows) else { return nil }
-            let builder = config.makeBuilder()
+            let reverseVideo = emulator.modes.reverseVideo
+            let builder = config.makeBuilder(reverseVideo: reverseVideo)
             let frame = builder.build(preview, region: nil, imageProvider: { emulator.image(for: $0) })
             return SurfaceFrameBuildResult(
                 generation: generation, frame: frame, damage: nil,
-                frameBuildNanos: 0, clearColor: builder.renderColor(bg, alpha: opacity)
+                frameBuildNanos: 0, clearColor: builder.renderColor(reverseVideo ? fg : bg, alpha: opacity)
             )
         }
         guard let result else { return false }
@@ -1216,6 +1230,7 @@ public final class HarnessTerminalSurfaceView: NSView {
         // advancement match what the renderer draws.
         if let renderer {
             emulatorSync { $0.setCellPixelSize(width: renderer.cellPixelWidth, height: renderer.cellPixelHeight) }
+            renderer.textBlinkHidden = textBlinkHidden // a fresh renderer adopts the current phase
         }
         invalidateRenderGeneration()
     }
@@ -1237,11 +1252,13 @@ public final class HarnessTerminalSurfaceView: NSView {
             buildRenderer() // pick up the real backing scale
             startDisplayLink()
             updateGridSize()
-            restartBlinkTimer()
             scheduleRender()
             // Track the window's key state: focus (hollow cursor, blink, DECSET 1004
             // reports) means "first responder in the key window", not just first responder.
+            // Refresh it BEFORE arming the blink timer — the timer only schedules while
+            // `effectivelyFocused`, which reads this flag.
             windowIsKey = window.isKeyWindow
+            restartBlinkTimer()
             let nc = NotificationCenter.default
             windowKeyObservers.append(nc.addObserver(
                 forName: NSWindow.didBecomeKeyNotification, object: window, queue: .main
@@ -1279,11 +1296,15 @@ public final class HarnessTerminalSurfaceView: NSView {
             window.makeFirstResponder(self)
             focusStateChanged()
         } else {
-            // Removed from the window (pane closed / re-mounted): stop the blink timer so
-            // it doesn't keep the run loop (and a dangling render) alive. The timer holds
+            // Removed from the window (pane closed / re-mounted): stop the blink timers so
+            // they don't keep the run loop (and a dangling render) alive. The timers hold
             // `[weak self]`, so this is the teardown hook (no retain cycle either way).
             blinkTimer?.invalidate()
             blinkTimer = nil
+            textBlinkTimer?.invalidate()
+            textBlinkTimer = nil
+            textBlinkHidden = false
+            renderer?.textBlinkHidden = false
             stopDisplayLink()
             invalidateRenderGeneration()
             // A view can leave the window MID-DRAG (tab close / pane remount during a live
@@ -1350,6 +1371,10 @@ public final class HarnessTerminalSurfaceView: NSView {
     private func setWindowOccluded(_ occluded: Bool) {
         guard occluded != scheduler.isOccluded else { return }
         scheduler.setOccluded(occluded)
+        // Blink timers follow visibility (idle efficiency): a covered/minimized pane has
+        // nothing to blink — stop the wakeups; re-arm when it can show again.
+        restartBlinkTimer()
+        updateTextBlinkTimer(frameHasBlink: lastFrameHadBlink)
         if !occluded { scheduleRender() }
     }
 
@@ -1754,16 +1779,20 @@ public final class HarnessTerminalSurfaceView: NSView {
             : []
         let selectionRegion = currentSelectionRegion
         let plain = scrollOffset == 0 && selectionRegion == nil && markedText.isEmpty && findHits.isEmpty
+        // DECSCNM: a flip arrives with full-screen damage (the engine dirties on real change),
+        // so the swapped build repaints everything and the plain-frame cache rebuilds.
+        let reverseVideo = emulator.modes.reverseVideo
+        let builder = reverseVideo ? frameBuildConfiguration.makeBuilder(reverseVideo: true) : frameBuilder
         let frameBuildStart = DispatchTime.now().uptimeNanoseconds
         var frame: TerminalFrame
         if plain {
-            frame = frameBuilder.build(grid, region: nil,
-                                       imageProvider: { emulator.image(for: $0) },
-                                       reusing: lastPlainFrame, damage: damage)
+            frame = builder.build(grid, region: nil,
+                                  imageProvider: { emulator.image(for: $0) },
+                                  reusing: lastPlainFrame, damage: damage)
         } else {
-            frame = frameBuilder.build(grid, region: selectionRegion,
-                                       searchHighlights: findHits,
-                                       imageProvider: { emulator.image(for: $0) })
+            frame = builder.build(grid, region: selectionRegion,
+                                  searchHighlights: findHits,
+                                  imageProvider: { emulator.image(for: $0) })
         }
         let frameBuildNanos = DispatchTime.now().uptimeNanoseconds &- frameBuildStart
         // IME preedit: draw the in-progress composition over the grid at the cursor.
@@ -1792,7 +1821,7 @@ public final class HarnessTerminalSurfaceView: NSView {
         let didPresent = renderer.present(
             frame,
             to: drawable,
-            clearColor: frameBuilder.renderColor(canvasBackground, alpha: canvasOpacity),
+            clearColor: builder.renderColor(reverseVideo ? canvasForeground : canvasBackground, alpha: canvasOpacity),
             origin: (originOffsetX, originOffsetY),
             gamma: glyphGamma,
             ligatures: ligaturesEnabled,
@@ -1800,8 +1829,10 @@ public final class HarnessTerminalSurfaceView: NSView {
             frameBuildNanos: frameBuildNanos,
             synchronizedWithTransaction: metalLayer.presentsWithTransaction
         )
-        if didPresent { onRenderStats?(renderer.stats) }
-        else { scheduleRender() } // transient encode/present failure — retry next tick
+        if didPresent {
+            onRenderStats?(renderer.stats)
+            updateTextBlinkTimer(frameHasBlink: frame.hasBlink)
+        } else { scheduleRender() } // transient encode/present failure — retry next tick
         StartupMetrics.shared.mark(.firstDrawablePresented) // idempotent: only the first present counts
         // Retain only a plain frame for row reuse; a selection/scrollback/preedit frame would
         // poison the cache with overlay-baked cells, so drop it. (`plain` already excludes IME.)
@@ -1879,7 +1910,10 @@ public final class HarnessTerminalSurfaceView: NSView {
                 state.lastViewportFrame = nil
                 state.lastOverlayKeys = [:]
             }
-            let builder = config.makeBuilder()
+            // DECSCNM: read on the emulator's queue (serialized with the feed that set it);
+            // a flip arrives with full-screen damage, so the swap repaints everything.
+            let reverseVideo = emulator.modes.reverseVideo
+            let builder = config.makeBuilder(reverseVideo: reverseVideo)
             let frameBuildStart = DispatchTime.now().uptimeNanoseconds
             var frame: TerminalFrame
             var renderDamage: TerminalDamage?
@@ -2070,7 +2104,7 @@ public final class HarnessTerminalSurfaceView: NSView {
                 scrollShift: scrollShift,
                 hasPeekRow: peekRow,
                 frameBuildNanos: DispatchTime.now().uptimeNanoseconds &- frameBuildStart,
-                clearColor: builder.renderColor(bg, alpha: opacity)
+                clearColor: builder.renderColor(reverseVideo ? fg : bg, alpha: opacity)
             )
         }
 
@@ -2125,6 +2159,7 @@ public final class HarnessTerminalSurfaceView: NSView {
             // could not distinguish from a normal full encode).
             lastPresentedResultIsRendererCoherent = renderer.stats.rowCacheCoherent
             onRenderStats?(renderer.stats)
+            updateTextBlinkTimer(frameHasBlink: result.frame.hasBlink)
         } else {
             // A genuine drop: nothing reached the glass this turn (repaintLastFrame failures
             // don't count — their callers fall back to another present in the same turn).
@@ -2304,6 +2339,7 @@ public final class HarnessTerminalSurfaceView: NSView {
               markedText.isEmpty, !findActive else { return }
         let config = frameBuildConfiguration
         let bg = canvasBackground
+        let fg = canvasForeground
         let opacity = canvasOpacity
         let isFocused = effectivelyFocused
         let generation = renderGeneration
@@ -2317,7 +2353,8 @@ public final class HarnessTerminalSurfaceView: NSView {
             guard state.isLatestPreviewToken(token) else { return }
             guard let preview = emulator.previewViewportReflow(cols: nc, rows: nr) else { return }
             let buildStart = DispatchTime.now().uptimeNanoseconds
-            let builder = config.makeBuilder()
+            let reverseVideo = emulator.modes.reverseVideo
+            let builder = config.makeBuilder(reverseVideo: reverseVideo)
             var frame = FrameSignposter.shared.interval("frameBuild") {
                 builder.build(preview, region: nil, imageProvider: { emulator.image(for: $0) })
             }
@@ -2327,7 +2364,7 @@ public final class HarnessTerminalSurfaceView: NSView {
             let result = SurfaceFrameBuildResult(
                 generation: generation, frame: frame, damage: nil,
                 frameBuildNanos: DispatchTime.now().uptimeNanoseconds &- buildStart,
-                clearColor: builder.renderColor(bg, alpha: opacity)
+                clearColor: builder.renderColor(reverseVideo ? fg : bg, alpha: opacity)
             )
             DispatchQueue.main.async { [weak self] in
                 self?.presentResizePreview(result, cols: nc, rows: nr, token: token)
@@ -2368,14 +2405,23 @@ public final class HarnessTerminalSurfaceView: NSView {
     // block cursor's glyph inversion re-encodes exactly its own row (`previousCursor` key diff),
     // so each toggle costs ≤1 encoded row + one present — never a grid rebuild. Pinned by
     // `testCursorBlinkReencodesAtMostTheCursorRow`.
+    //
+    // The timer exists only while a blink can actually show: focused (first responder in the
+    // key window), un-occluded, and in a window. Focus + occlusion transitions re-enter here,
+    // so an unfocused/covered pane costs ZERO runloop wakeups instead of ticking forever just
+    // to early-out (20 background panes used to wake the main runloop ~40×/s for nothing).
     private func restartBlinkTimer() {
         blinkTimer?.invalidate()
         blinkTimer = nil
+        // Solid on stop: the unfocused hollow cursor renders steady, and a pane must never
+        // strand mid-off-beat (invisible cursor) when its timer goes away.
         cursorBlinkVisible = true
-        guard cursorBlinkEnabled else { return }
+        guard cursorBlinkEnabled, effectivelyFocused, !scheduler.isOccluded else { return }
         let timer = Timer(timeInterval: 0.53, repeats: true) { [weak self] _ in
             guard let self else { return }
             MainActor.assumeIsolated {
+                // Belt-and-braces: transitions stop the timer synchronously, but a tick already
+                // queued on the runloop when focus flips must still not toggle.
                 guard self.effectivelyFocused else { return }
                 self.cursorBlinkVisible.toggle()
                 self.scheduleRender()
@@ -2385,12 +2431,51 @@ public final class HarnessTerminalSurfaceView: NSView {
         blinkTimer = timer
     }
 
+    /// Test seam: whether the blink timer is currently scheduled (the idle-efficiency
+    /// contract — no timer while unfocused or occluded).
+    func testingBlinkTimerIsScheduled() -> Bool { blinkTimer != nil }
+
     /// Reset the cursor to solid after activity (typing/output), matching common terminals.
     private func wakeCursor() {
         guard cursorBlinkEnabled else { return }
         if !cursorBlinkVisible {
             cursorBlinkVisible = true
             scheduleRender()
+        }
+    }
+
+    // MARK: - SGR text blink (blinking cells)
+
+    /// Start/stop the text-blink phase driver. Called with every presented frame's blink
+    /// state and on occlusion changes: the timer exists only while blinking content is
+    /// actually visible (no idle wakeups for the overwhelmingly common no-blink case), and
+    /// parking always lands on the VISIBLE phase so text can never strand invisible.
+    /// Each tick flips the renderer's phase and schedules a render; only rows containing
+    /// blink cells re-encode (the renderer dirties exactly its `hasBlink` rows on a phase
+    /// mismatch), so a tick costs O(blink rows) — same shape as a cursor blink toggle.
+    private func updateTextBlinkTimer(frameHasBlink: Bool) {
+        lastFrameHadBlink = frameHasBlink
+        let shouldRun = frameHasBlink && !scheduler.isOccluded
+        if shouldRun {
+            guard textBlinkTimer == nil else { return }
+            let timer = Timer(timeInterval: 0.53, repeats: true) { [weak self] _ in
+                guard let self else { return }
+                MainActor.assumeIsolated {
+                    self.textBlinkHidden.toggle()
+                    self.renderer?.textBlinkHidden = self.textBlinkHidden
+                    self.scheduleRender()
+                }
+            }
+            RunLoop.main.add(timer, forMode: .common)
+            textBlinkTimer = timer
+        } else if textBlinkTimer != nil {
+            textBlinkTimer?.invalidate()
+            textBlinkTimer = nil
+            if textBlinkHidden {
+                textBlinkHidden = false
+                renderer?.textBlinkHidden = false
+                scheduleRender()
+            }
         }
     }
 
@@ -2645,12 +2730,35 @@ public final class HarnessTerminalSurfaceView: NSView {
         emit(inputEncoder.encodeMouse(
             button: button, kind: kind,
             column: pos.column, row: pos.row,
+            pixelPosition: modes.mouseSGRPixel ? textAreaPixelPosition(of: event) : nil,
             modifiers: mouseModifiers(event), modes: modes
         ))
     }
 
+    /// Pointer position within the text area in DEVICE pixels (0-based) — the coordinate
+    /// space of SGR-pixel mouse reporting (DECSET 1016), consistent with the engine's
+    /// `CSI 14 t` report (grid cells × renderer cell pixel size). Clamped into the grid box.
+    private func textAreaPixelPosition(of event: NSEvent) -> (x: Int, y: Int)? {
+        guard let renderer, columns > 0, rows > 0 else { return nil }
+        let scale = window?.backingScaleFactor ?? 2.0
+        let cellH = CGFloat(renderer.cellPixelHeight) / scale
+        let p = convert(event.locationInWindow, from: nil)
+        // Same mapping as `cell(at:)`, kept un-rounded: points from the grid origin, with the
+        // smooth-scroll translate added back so the reported pixel matches what's on screen.
+        let xPoints = p.x - gridOriginPointsX
+        let yPointsFromTop = bounds.height - p.y - gridOriginPointsY + scrollFraction * cellH
+        let maxX = columns * renderer.cellPixelWidth - 1
+        let maxY = rows * renderer.cellPixelHeight - 1
+        let x = min(max(0, Int((xPoints * scale).rounded(.down))), max(0, maxX))
+        let y = min(max(0, Int((yPointsFromTop * scale).rounded(.down))), max(0, maxY))
+        return (x: x, y: y)
+    }
+
     public override func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self)
+        // A press starts a drag-coded sequence; forget the hover-motion dedupe cell so the
+        // first post-release move back into it isn't swallowed as a duplicate.
+        lastReportedMotionCell = nil
         if copyMode != nil { return } // copy mode is keyboard-driven; ignore clicks
         // ⌘-click opens an OSC 8 hyperlink or an auto-detected URL.
         // ⌘ overrides mouse reporting, the same way Shift overrides it for selection.
@@ -2838,11 +2946,30 @@ public final class HarnessTerminalSurfaceView: NSView {
     public override func mouseMoved(with event: NSEvent) {
         super.mouseMoved(with: event)
         updateLinkHover(at: event.locationInWindow, modifiers: event.modifierFlags)
+        reportAnyEventMotionIfArmed(event)
     }
 
     public override func mouseExited(with event: NSEvent) {
         super.mouseExited(with: event)
         clearLinkHover()
+        lastReportedMotionCell = nil
+    }
+
+    /// Last grid cell reported for button-less motion, deduping any-event tracking to one
+    /// report per cell crossed — AppKit delivers `mouseMoved` at event rate, and per-cell is
+    /// the protocol's resolution (kept even in SGR-pixel mode so a wiggle inside one cell
+    /// can't flood the PTY).
+    private var lastReportedMotionCell: (row: Int, column: Int)?
+
+    /// DECSET 1003 any-event tracking: report pointer MOTION with no button held. Shift
+    /// keeps its standard local-override meaning, and copy mode owns the surface.
+    private func reportAnyEventMotionIfArmed(_ event: NSEvent) {
+        guard copyMode == nil, inputModes().mouseAny,
+              !event.modifierFlags.contains(.shift) else { return }
+        guard let pos = cell(at: event.locationInWindow) else { return }
+        if let last = lastReportedMotionCell, last == pos { return }
+        lastReportedMotionCell = pos
+        reportMouse(event, button: .left, kind: .move) // button is ignored for .move (base code 3)
     }
 
     public override func flagsChanged(with event: NSEvent) {
@@ -3499,6 +3626,9 @@ public final class HarnessTerminalSurfaceView: NSView {
             if inputModes().focusReporting {
                 emit([0x1B, 0x5B, now ? 0x49 : 0x4F]) // ESC [ I / ESC [ O
             }
+            // Blink timer lives only while focused (idle efficiency): start on focus-in,
+            // stop (cursor solid) on focus-out — see `restartBlinkTimer`.
+            restartBlinkTimer()
         }
         scheduleRender()
     }
@@ -3903,16 +4033,18 @@ public final class HarnessTerminalSurfaceView: NSView {
         let hits = cm.viewportSearchHits(rows: rows).map { m in
             TerminalSelection((m.line, m.startColumn), (m.line, max(m.startColumn, m.endColumn - 1)))
         }
+        let reverseVideo = emulator.modes.reverseVideo
+        let builder = reverseVideo ? frameBuildConfiguration.makeBuilder(reverseVideo: true) : frameBuilder
         let frameBuildStart = DispatchTime.now().uptimeNanoseconds
-        var frame = frameBuilder.build(grid, region: region, searchHighlights: hits,
-                                       copyModeCursor: cm.viewportCursor(rows: rows),
-                                       imageProvider: { emulator.image(for: $0) })
+        var frame = builder.build(grid, region: region, searchHighlights: hits,
+                                  copyModeCursor: cm.viewportCursor(rows: rows),
+                                  imageProvider: { emulator.image(for: $0) })
         let frameBuildNanos = DispatchTime.now().uptimeNanoseconds &- frameBuildStart
         let statusText = copyModeSearchEntry.map { (cm.search.reverse ? "?" : "/") + $0 } ?? cm.statusLine()
         overlayCopyModeStatus(into: &frame, text: statusText)
         let didPresent = renderer.present(
             frame, to: drawable,
-            clearColor: frameBuilder.renderColor(canvasBackground, alpha: canvasOpacity),
+            clearColor: builder.renderColor(reverseVideo ? canvasForeground : canvasBackground, alpha: canvasOpacity),
             origin: (originOffsetX, originOffsetY), gamma: glyphGamma, ligatures: ligaturesEnabled,
             frameBuildNanos: frameBuildNanos,
             synchronizedWithTransaction: metalLayer.presentsWithTransaction

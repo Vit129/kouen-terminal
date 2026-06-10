@@ -33,6 +33,12 @@ public final class DaemonServer: @unchecked Sendable {
     /// Drop a client whose backlog grows past this — it isn't draining; buffering more would
     /// be an unbounded memory sink. Sized for a couple of large captures in flight.
     private let maxWriteBacklog = 32 * 1024 * 1024
+    /// Per-connection cap on buffered bytes that have not yet decoded into a frame. A legit
+    /// frame buffers at most `IPCCodec.maxPayloadLength` + framing overhead while it trickles
+    /// in; the codec rejects larger declared lengths outright, so unconsumed bytes beyond this
+    /// can never complete into a frame — defense in depth against codec drift or a misbehaving
+    /// peer turning `clientBuffers` into a per-connection memory sink.
+    private let maxPartialFrameBytes = IPCCodec.maxPayloadLength + 4096
     private var outputSubscriptions: [Int32: [(surfaceID: String, token: UUID)]] = [:]
     /// FDs subscribed to layout-change pushes (`subscribeSnapshot`).
     private var snapshotSubscribers: Set<Int32> = []
@@ -329,6 +335,14 @@ public final class DaemonServer: @unchecked Sendable {
             send(response, to: fd)
         }
         clientBuffers[fd] = data
+        // Partial-frame cap: bytes still buffered after the decode loop are an incomplete
+        // frame. More than one max-size frame's worth can never decode (the codec rejects
+        // larger declared lengths as soon as the header arrives), so the stream is broken
+        // or abusive — drop it instead of buffering without bound.
+        if data.count > maxPartialFrameBytes {
+            clientBuffers[fd] = IPCReadBuffer()
+            source.cancel()
+        }
     }
 
     /// `wait-for`: register/wake fds on a named channel. `wait`/`lock` defer the reply (the
