@@ -1442,6 +1442,22 @@ public final class SurfaceRegistry: @unchecked Sendable {
             // `terminal-identity` option the GUI/CLI sets; the app reads the same value for its
             // XTVERSION reply.
             let identity = TerminalIdentity.spec(forOption: optionStore.get(TerminalIdentity.optionKey)?.stringValue)
+            // Shell-integration auto-inject (opt-out via `shell-integration off`): prompt
+            // marks work out of the box. Injection env merges UNDER the session
+            // `set-environment` table (the user always wins) and the plan may swap the
+            // launch arguments (bash). Best-effort: a nil plan spawns untouched.
+            let integrationPlan: ShellIntegrationInjector.Plan? =
+                (optionStore.get("shell-integration")?.boolValue ?? true)
+                    ? ShellIntegrationInjector.plan(
+                        shellPath: shellPath,
+                        baseEnvironment: ProcessInfo.processInfo.environment)
+                    : nil
+            var spawnEnvironment = extraEnvironment(forSurfaceKey: surfaceID)
+            if let plan = integrationPlan {
+                for (key, value) in plan.environment where spawnEnvironment[key] == nil {
+                    spawnEnvironment[key] = value
+                }
+            }
             let session = try RealPty(
                 id: surfaceID,
                 cwd: workDir,
@@ -1449,10 +1465,11 @@ public final class SurfaceRegistry: @unchecked Sendable {
                 rows: rows,
                 cols: cols,
                 scrollbackBytes: scrollbackBytes ?? 1024 * 1024,
-                extraEnvironment: extraEnvironment(forSurfaceKey: surfaceID),
+                extraEnvironment: spawnEnvironment,
                 termProgram: identity.name,
                 termProgramVersion: identity.version,
-                scrollbackURL: HarnessPaths.scrollbackFileURL(forSurfaceID: surfaceID)
+                scrollbackURL: HarnessPaths.scrollbackFileURL(forSurfaceID: surfaceID),
+                launchArgumentsOverride: integrationPlan?.argumentsOverride
             )
             session.onExit = { [weak self, weak session] exitStatus in
                 self?.removeSurfaceIfCurrent(surfaceID: surfaceID, session: session, exitStatus: exitStatus)

@@ -196,6 +196,9 @@ public final class OptionStore: @unchecked Sendable {
         // keeps a pane's dead leaf so `respawn-pane` can revive it; off closes the pane (or
         // its tab when last) when the shell exits — read in the daemon's PTY-exit handler.
         "remain-on-exit": .bool(true),
+        // Auto-injected OSC 133 shell integration at spawn (zsh/bash/fish). Off = panes
+        // spawn untouched; the manual `install-shell-integration` path still works.
+        "shell-integration": .bool(true),
         // `repeat-time` (ms): how long the prefix stays armed after a repeatable binding
         // (`bind -r`) so the key repeats without re-pressing the prefix. Read by `PrefixKeymap`.
         "repeat-time": .int(500),

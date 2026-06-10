@@ -8,6 +8,18 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 
 ## [Unreleased]
 
+### Added
+- **Shell integration is auto-injected at spawn** (zsh / bash / fish): prompt marks, the
+  success/failure gutter, and jump-to-prompt work out of the box with no
+  `install-shell-integration` step. zsh rides a `ZDOTDIR` shim that restores your real
+  `ZDOTDIR` and chains to your own `.zshenv`; fish rides an `XDG_DATA_DIRS` vendor dir;
+  bash uses the `--posix` + `$ENV` technique (kitty/Ghostty lineage) — **known caveat:
+  `shopt -q login_shell` reports off inside Harness bash panes** (the shim replays the
+  login startup files itself). Idempotent alongside a manual install; never active for
+  non-interactive shells; opt out with `set-option shell-integration off` (applies to
+  subsequently spawned panes). User `set-environment` values always win over the
+  injection's variables.
+
 ### Fixed
 - **Unicode width tables are now derived from the Unicode Character Database** (15.1) instead of
   hand-curated ranges. The old tables missed ~140 East-Asian-Wide codepoints — including the
