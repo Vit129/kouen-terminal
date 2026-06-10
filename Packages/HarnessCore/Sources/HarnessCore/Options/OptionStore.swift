@@ -211,6 +211,10 @@ public final class OptionStore: @unchecked Sendable {
         // keeps a pane's dead leaf so `respawn-pane` can revive it; off closes the pane (or
         // its tab when last) when the shell exits — read in the daemon's PTY-exit handler.
         "remain-on-exit": .bool(true),
+        // Per-surface secrets-at-rest control: when off, the surface's scrollback is never
+        // written to disk (and anything already written is removed). Pane-scoped reads fall
+        // back to global, so `set-option persist-scrollback off` covers everything.
+        "persist-scrollback": .bool(true),
         // `repeat-time` (ms): how long the prefix stays armed after a repeatable binding
         // (`bind -r`) so the key repeats without re-pressing the prefix. Read by `PrefixKeymap`.
         "repeat-time": .int(500),

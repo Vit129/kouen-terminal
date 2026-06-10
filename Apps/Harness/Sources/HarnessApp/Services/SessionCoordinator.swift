@@ -14,7 +14,23 @@ final class SessionCoordinator: NSObject {
     private(set) var snapshot = SessionSnapshot()
     private var lastRevision = -1
     private let terminalHosts = TerminalPaneRegistry()
-    private var metadataTask: Task<Void, Never>?
+    /// Event-driven branch labels: watches each repository's `HEAD` and pushes
+    /// `updateTabGitBranch` only on real change (replaced the 2 s git-subprocess poll).
+    private let gitBranchMonitor = GitBranchMonitor()
+    /// Long-lived push channel: the daemon sends every committed revision, the handler
+    /// syncs when it differs from `lastRevision`. This is how external structure changes
+    /// (`harness-cli split-pane` against a GUI session) reach the app now that the
+    /// 2 s metadata poll is gone.
+    private var snapshotSubscription: DaemonSubscription?
+    /// Invalidates stale subscription callbacks: bumped on every (re)subscribe, checked by
+    /// the previous subscription's `onEnd` (its `cancel()` fires `onEnd` too — without the
+    /// guard, replacing a subscription would schedule a duplicate resubscribe).
+    private var snapshotSubscriptionGeneration = 0
+    private var snapshotResubscribeDelay: TimeInterval = 1
+    /// Push-loss insurance, not the mechanism: the daemon drops subscribers whose write
+    /// backlog exceeds its cap, and a dropped fd silently stops pushes. Runs only while
+    /// the app is active.
+    private var safetyPollTimer: Timer?
     private var pushedNotificationKeys: Set<String> = []
     /// Last-seen agent activity per surface key, so we can fire a notification the
     /// moment an agent transitions out of `working` (i.e. stopped producing output —
@@ -84,7 +100,9 @@ final class SessionCoordinator: NSObject {
         // `DaemonLauncher.ensureRunning` callback in AppDelegate performs the first
         // hydration the moment the daemon answers — after the window is on screen.
         observeNotifications()
-        startMetadataRefresh()
+        configureGitBranchMonitor()
+        observeAppActivation()
+        startSafetyPoll()
         startConfigWatchers()
     }
 
@@ -189,6 +207,11 @@ final class SessionCoordinator: NSObject {
         activeEndpoint = endpoint
         daemon.switchEndpoint(endpoint)
         terminalHosts.prune(keeping: [])
+        // Re-point the push channel: the old subscription is pinned to the old daemon
+        // (its onEnd is invalidated by the generation bump inside). A failed attempt has
+        // no onEnd to retry from, so back off explicitly.
+        startSnapshotSubscription()
+        if snapshotSubscription == nil { scheduleSnapshotResubscribe() }
         _ = syncFromDaemon()
     }
 
@@ -206,8 +229,15 @@ final class SessionCoordinator: NSObject {
         }
         StartupMetrics.shared.mark(.firstSnapshot) // idempotent: records the first hydration only
         let structureChanged = structureFingerprint(remote) != structureFingerprint(snapshot)
+        // A CLI-driven theme change arrives by push (metadata-only), so it must force the
+        // chrome path itself — recurring syncs otherwise never rebuild renderers.
+        let themeChanged = remote.themeName != snapshot.themeName
         snapshot = remote
         lastRevision = remote.revision
+        // The daemon answered: bring up the push channel if it isn't already, and reconcile
+        // the branch watchers against the fresh tab set (cheap when nothing moved).
+        startSnapshotSubscriptionIfNeeded()
+        gitBranchMonitor.update(tabs: gitBranchRecords(from: remote))
         if structureChanged {
             structureRevision += 1
             // Drop hosts for surfaces the daemon no longer knows: killPane / remote closes remount
@@ -224,7 +254,7 @@ final class SessionCoordinator: NSObject {
         }
         pushNewRemoteNotifications(from: remote)
         pushAgentActivityNotifications(from: remote)
-        if !metadataOnly {
+        if !metadataOnly || themeChanged {
             applyThemeToAllHosts()
         }
         updateDockBadge(from: remote)
@@ -235,7 +265,7 @@ final class SessionCoordinator: NSObject {
             userInfo: [
                 "revision": remote.revision,
                 "structureChanged": structureChanged,
-                "chromeChanged": !metadataOnly,
+                "chromeChanged": !metadataOnly || themeChanged,
                 "metadataOnly": metadataOnly,
             ]
         )
@@ -960,6 +990,9 @@ final class SessionCoordinator: NSObject {
             lastActiveSurfaceID = old
         }
         activeSurfaceID = surfaceID
+        // Focus changed: snap the cwd tracker back to its responsive cadence (it relaxes
+        // while nothing moves) — interaction predicts cwd changes.
+        SurfaceShellTracker.shared.noteUserInteraction()
         // Refresh `window-style`/`pane-style` before the border toggle so each host has the
         // current base before it re-resolves active vs inactive on the focus change.
         refreshPaneStyles()
@@ -1568,34 +1601,144 @@ final class SessionCoordinator: NSObject {
         SecureKeyboardEntry.shared.settingChanged()
     }
 
-    private func startMetadataRefresh() {
-        metadataTask?.cancel()
-        metadataTask = Task { [weak self] in
-            let git = GitMetadataProvider()
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 2_000_000_000)
-                let work = await MainActor.run { () -> [(WorkspaceID, Tab)] in
-                    guard let self, let workspace = self.snapshot.activeWorkspace else { return [] }
-                    return workspace.sessions.flatMap { $0.tabs }.map { (workspace.id, $0) }
-                }
-                let updates = work.compactMap { workspaceID, tab -> (WorkspaceID, TabID, String?)? in
-                    let updated = git.refresh(tab: tab)
-                    guard updated.gitBranch != tab.gitBranch else { return nil }
-                    return (workspaceID, tab.id, updated.gitBranch)
-                }
-                await MainActor.run {
-                    guard let self else { return }
-                    for update in updates {
-                        self.logIfFailed(.updateTabGitBranch(
-                            workspaceID: update.0,
-                            tabID: update.1,
-                            branch: update.2
-                        ))
+    // MARK: Event-driven metadata + snapshot pushes
+    // (replaced the 2 s loop that spawned `git rev-parse` per tab per tick and blind-synced
+    // a full snapshot at 0.5 Hz forever)
+
+    private func configureGitBranchMonitor() {
+        gitBranchMonitor.onBranchChange = { [weak self] workspaceID, tabID, branch in
+            // The daemon commit pushes back through the snapshot subscription, which is
+            // what refreshes the visible label — no manual re-sync here.
+            self?.logIfFailed(.updateTabGitBranch(workspaceID: workspaceID, tabID: tabID, branch: branch))
+        }
+    }
+
+    /// The active workspace's tabs, shaped for the branch monitor. Matches the old poll's
+    /// scope: background workspaces refresh when they become active.
+    private func gitBranchRecords(from snapshot: SessionSnapshot) -> [GitBranchMonitor.TabRecord] {
+        guard let workspace = snapshot.activeWorkspace else { return [] }
+        return workspace.sessions.flatMap(\.tabs).map { tab in
+            GitBranchMonitor.TabRecord(
+                workspaceID: workspace.id,
+                tabID: tab.id,
+                cwd: tab.cwd,
+                snapshotBranch: tab.gitBranch
+            )
+        }
+    }
+
+    /// Subscribe to the daemon's snapshot pushes if not already subscribed. Called after
+    /// every successful sync, so the channel comes up as soon as the daemon answers; the
+    /// follow-up async sync closes the fetch→subscribe race (a revision committed between
+    /// the snapshot we just fetched and the subscription registering).
+    private func startSnapshotSubscriptionIfNeeded() {
+        guard snapshotSubscription == nil else { return }
+        startSnapshotSubscription()
+        guard snapshotSubscription != nil else {
+            // The subscribe attempt failed (daemon briefly down): without this, recovery
+            // would degrade to the 30 s safety poll — onEnd never fires for a channel
+            // that never came up.
+            scheduleSnapshotResubscribe()
+            return
+        }
+        DispatchQueue.main.async { [weak self] in
+            MainActor.assumeIsolated { _ = self?.syncFromDaemon(metadataOnly: true) }
+        }
+    }
+
+    private func startSnapshotSubscription() {
+        snapshotSubscriptionGeneration += 1
+        let generation = snapshotSubscriptionGeneration
+        snapshotSubscription?.cancel()
+        snapshotSubscription = try? daemon.subscribeSnapshot(
+            label: "harness-app",
+            onRevision: { [weak self] revision in
+                DispatchQueue.main.async {
+                    MainActor.assumeIsolated {
+                        guard let self, generation == self.snapshotSubscriptionGeneration else { return }
+                        self.handlePushedRevision(revision)
                     }
+                }
+            },
+            onEnd: { [weak self] in
+                DispatchQueue.main.async {
+                    MainActor.assumeIsolated {
+                        guard let self, generation == self.snapshotSubscriptionGeneration else { return }
+                        self.snapshotSubscription = nil
+                        self.scheduleSnapshotResubscribe()
+                    }
+                }
+            }
+        )
+        if snapshotSubscription != nil { snapshotResubscribeDelay = 1 }
+    }
+
+    private func handlePushedRevision(_ revision: Int) {
+        // Echo guard: our own mutations sync synchronously, so the push for a revision we
+        // already hold must not trigger a second fetch.
+        guard revision != lastRevision else { return }
+        // metadataOnly: a pushed revision must never rebuild every pane's renderer — the
+        // daemon commits at ~1.5 s cadence while an agent streams. Structure changes still
+        // remount (structureChanged is computed independently) and a CLI theme change still
+        // applies (themeChanged forces the chrome path inside syncFromDaemon).
+        syncFromDaemon(metadataOnly: true)
+    }
+
+    /// The daemon went away (restart, backlog eviction, socket death): retry with capped
+    /// backoff until it answers. On success, sync immediately — revisions pushed during
+    /// the gap were lost with the socket.
+    private func scheduleSnapshotResubscribe() {
+        let delay = snapshotResubscribeDelay
+        snapshotResubscribeDelay = min(delay * 2, 8)
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, self.snapshotSubscription == nil else { return }
+                self.startSnapshotSubscription()
+                if self.snapshotSubscription != nil {
                     self.syncFromDaemon(metadataOnly: true)
+                } else {
+                    self.scheduleSnapshotResubscribe()
                 }
             }
         }
+    }
+
+    private func startSafetyPoll() {
+        safetyPollTimer?.invalidate()
+        let timer = Timer(timeInterval: 30, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.syncFromDaemon(metadataOnly: true) }
+        }
+        timer.tolerance = 5
+        RunLoop.main.add(timer, forMode: .common)
+        safetyPollTimer = timer
+    }
+
+    private func observeAppActivation() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(appDidBecomeActive),
+            name: NSApplication.didBecomeActiveNotification,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(appDidResignActive),
+            name: NSApplication.didResignActiveNotification,
+            object: nil
+        )
+    }
+
+    @objc private func appDidBecomeActive() {
+        // Any number of external `git` operations may have happened while the watchers
+        // were paused — resume re-resolves and re-reads everything.
+        gitBranchMonitor.resume()
+        startSafetyPoll()
+    }
+
+    @objc private func appDidResignActive() {
+        gitBranchMonitor.pause()
+        safetyPollTimer?.invalidate()
+        safetyPollTimer = nil
     }
 
     private var lastDaemonErrorNotice: Date?

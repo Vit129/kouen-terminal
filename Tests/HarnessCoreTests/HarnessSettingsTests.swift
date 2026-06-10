@@ -657,6 +657,39 @@ final class HarnessSettingsTests: XCTestCase {
         try body()
     }
 
+    // MARK: - Forward-compat decode (the FieldDecoder seam, PR-31)
+
+    /// Unknown keys in a NEWER settings file must be ignored — a downgrade (or a file
+    /// shared from a newer build) decodes cleanly instead of failing the whole load.
+    func testUnknownKeysAreIgnoredOnDecode() throws {
+        let futuristic = Data("""
+        { "fontSize": 17, "someFieldFromTheFuture": { "nested": [1, 2, 3] }, "anotherUnknown": "x" }
+        """.utf8)
+        let decoded = try JSONDecoder().decode(HarnessSettings.self, from: futuristic)
+        XCTAssertEqual(decoded.fontSize, 17)
+        let fallback = HarnessSettings.makeDefaults(imported: TerminalConfigImporter.load())
+        XCTAssertEqual(decoded.fontFamily, fallback.fontFamily, "absent keys fall back to defaults")
+    }
+
+    /// Every key absent → every field equals the fallback instance the decoder funnels
+    /// through. That fallback is `makeDefaults(imported:)`, NOT `HarnessSettings()`: on a
+    /// machine with an importable terminal config (Ghostty/iTerm2) the defaults are
+    /// import-aware (shell, opacity, font), so comparing against the plain initializer
+    /// only passes on machines with nothing to import (like CI). Spot-checks a
+    /// representative spread of field types.
+    func testMissingKeysDecodeToDefaultInstanceValues() throws {
+        let decoded = try JSONDecoder().decode(HarnessSettings.self, from: Data("{}".utf8))
+        let defaults = HarnessSettings.makeDefaults(imported: TerminalConfigImporter.load())
+        XCTAssertEqual(decoded.defaultShell, defaults.defaultShell)
+        XCTAssertEqual(decoded.backgroundOpacity, defaults.backgroundOpacity)
+        XCTAssertEqual(decoded.scrollbackLines, defaults.scrollbackLines)
+        XCTAssertEqual(decoded.bellMode, defaults.bellMode)
+        XCTAssertEqual(decoded.quickTerminalHotkey, defaults.quickTerminalHotkey)
+        XCTAssertEqual(decoded.agentColorOverrides, defaults.agentColorOverrides)
+        XCTAssertEqual(decoded.boldIsBright, defaults.boldIsBright)
+        XCTAssertEqual(decoded.resizeOverlayPosition, defaults.resizeOverlayPosition)
+    }
+
     func testWindowInheritCWDDefaultsOnAndDecodesExplicitOff() throws {
         XCTAssertTrue(HarnessSettings().windowInheritCWD, "inherit is the shipped behavior — default on")
         let legacy = try JSONDecoder().decode(HarnessSettings.self, from: Data("{}".utf8))
