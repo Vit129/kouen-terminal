@@ -1237,11 +1237,13 @@ public final class HarnessTerminalSurfaceView: NSView {
             buildRenderer() // pick up the real backing scale
             startDisplayLink()
             updateGridSize()
-            restartBlinkTimer()
             scheduleRender()
             // Track the window's key state: focus (hollow cursor, blink, DECSET 1004
             // reports) means "first responder in the key window", not just first responder.
+            // Refresh it BEFORE arming the blink timer — the timer only schedules while
+            // `effectivelyFocused`, which reads this flag.
             windowIsKey = window.isKeyWindow
+            restartBlinkTimer()
             let nc = NotificationCenter.default
             windowKeyObservers.append(nc.addObserver(
                 forName: NSWindow.didBecomeKeyNotification, object: window, queue: .main
@@ -1350,6 +1352,9 @@ public final class HarnessTerminalSurfaceView: NSView {
     private func setWindowOccluded(_ occluded: Bool) {
         guard occluded != scheduler.isOccluded else { return }
         scheduler.setOccluded(occluded)
+        // Blink timer follows visibility (idle efficiency): a covered/minimized pane has
+        // nothing to blink — stop the wakeups; re-arm when it can show again.
+        restartBlinkTimer()
         if !occluded { scheduleRender() }
     }
 
@@ -2368,14 +2373,23 @@ public final class HarnessTerminalSurfaceView: NSView {
     // block cursor's glyph inversion re-encodes exactly its own row (`previousCursor` key diff),
     // so each toggle costs ≤1 encoded row + one present — never a grid rebuild. Pinned by
     // `testCursorBlinkReencodesAtMostTheCursorRow`.
+    //
+    // The timer exists only while a blink can actually show: focused (first responder in the
+    // key window), un-occluded, and in a window. Focus + occlusion transitions re-enter here,
+    // so an unfocused/covered pane costs ZERO runloop wakeups instead of ticking forever just
+    // to early-out (20 background panes used to wake the main runloop ~40×/s for nothing).
     private func restartBlinkTimer() {
         blinkTimer?.invalidate()
         blinkTimer = nil
+        // Solid on stop: the unfocused hollow cursor renders steady, and a pane must never
+        // strand mid-off-beat (invisible cursor) when its timer goes away.
         cursorBlinkVisible = true
-        guard cursorBlinkEnabled else { return }
+        guard cursorBlinkEnabled, effectivelyFocused, !scheduler.isOccluded else { return }
         let timer = Timer(timeInterval: 0.53, repeats: true) { [weak self] _ in
             guard let self else { return }
             MainActor.assumeIsolated {
+                // Belt-and-braces: transitions stop the timer synchronously, but a tick already
+                // queued on the runloop when focus flips must still not toggle.
                 guard self.effectivelyFocused else { return }
                 self.cursorBlinkVisible.toggle()
                 self.scheduleRender()
@@ -2384,6 +2398,10 @@ public final class HarnessTerminalSurfaceView: NSView {
         RunLoop.main.add(timer, forMode: .common)
         blinkTimer = timer
     }
+
+    /// Test seam: whether the blink timer is currently scheduled (the idle-efficiency
+    /// contract — no timer while unfocused or occluded).
+    func testingBlinkTimerIsScheduled() -> Bool { blinkTimer != nil }
 
     /// Reset the cursor to solid after activity (typing/output), matching common terminals.
     private func wakeCursor() {
@@ -3499,6 +3517,9 @@ public final class HarnessTerminalSurfaceView: NSView {
             if inputModes().focusReporting {
                 emit([0x1B, 0x5B, now ? 0x49 : 0x4F]) // ESC [ I / ESC [ O
             }
+            // Blink timer lives only while focused (idle efficiency): start on focus-in,
+            // stop (cursor solid) on focus-out — see `restartBlinkTimer`.
+            restartBlinkTimer()
         }
         scheduleRender()
     }

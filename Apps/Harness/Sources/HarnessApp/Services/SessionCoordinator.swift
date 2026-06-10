@@ -987,6 +987,9 @@ final class SessionCoordinator: NSObject {
             lastActiveSurfaceID = old
         }
         activeSurfaceID = surfaceID
+        // Focus changed: snap the cwd tracker back to its responsive cadence (it relaxes
+        // while nothing moves) — interaction predicts cwd changes.
+        SurfaceShellTracker.shared.noteUserInteraction()
         // Refresh `window-style`/`pane-style` before the border toggle so each host has the
         // current base before it re-resolves active vs inactive on the focus change.
         refreshPaneStyles()
