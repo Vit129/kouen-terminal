@@ -579,8 +579,12 @@ public final class SurfaceRegistry: @unchecked Sendable {
             }
             return .ok
         case let .updateTabGitBranch(workspaceID, tabID, branch):
-            editor.updateTabMetadata(workspaceID: workspaceID, tabID: tabID, gitBranch: branch, cwd: nil)
-            commit()
+            // `setTabGitBranch` (not `updateTabMetadata`) so `nil` clears a stale label when a
+            // tab leaves a repository. Commit only on real change — an idempotent re-send must
+            // not bump the revision and wake every snapshot subscriber.
+            if editor.setTabGitBranch(workspaceID: workspaceID, tabID: tabID, branch: branch) {
+                commit()
+            }
             return .ok
         case .getSnapshot:
             return .snapshot(editor.snapshot)
