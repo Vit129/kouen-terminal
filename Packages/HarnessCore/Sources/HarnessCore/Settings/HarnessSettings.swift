@@ -286,6 +286,10 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
     /// active app, so another local process can't keylog passphrases typed at sudo/ssh prompts.
     /// Off by default — opt-in, matching Terminal.app / iTerm2 shipping it off.
     public var secureKeyboardEntry: Bool
+    /// New tabs/windows open in the focused pane's working directory (Ghostty
+    /// `window-inherit-working-directory`, default on — the shipped Harness behavior).
+    /// Off pins new tabs to `defaultCWD`.
+    public var windowInheritCWD: Bool
 
     /// Whether the *umbrella* Harness controls are on (prefix or status line). Kept for onboarding
     /// copy and tests; the prefix and status line each resolve independently via the effective
@@ -389,7 +393,8 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         commandFinishedThresholdSeconds: Int = 10,
         notificationEvents: [String: Bool] = [:],
         boldIsBright: Bool = true,
-        secureKeyboardEntry: Bool = false
+        secureKeyboardEntry: Bool = false,
+        windowInheritCWD: Bool = true
     ) {
         self.fontSize = HarnessSettings.clampedFontSize(fontSize)
         self.fontFamily = fontFamily
@@ -458,6 +463,7 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         self.notificationEvents = notificationEvents
         self.boldIsBright = boldIsBright
         self.secureKeyboardEntry = secureKeyboardEntry
+        self.windowInheritCWD = windowInheritCWD
     }
 
     /// Ensure the palette always has exactly 16 slots so index access is safe even if a
@@ -646,6 +652,7 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         notificationEvents = decodedEvents
         boldIsBright = try container.decodeIfPresent(Bool.self, forKey: .boldIsBright) ?? fallback.boldIsBright
         secureKeyboardEntry = try container.decodeIfPresent(Bool.self, forKey: .secureKeyboardEntry) ?? fallback.secureKeyboardEntry
+        windowInheritCWD = try container.decodeIfPresent(Bool.self, forKey: .windowInheritCWD) ?? fallback.windowInheritCWD
     }
 
     /// Thread-unsafe scratch slot used exclusively within `load()` to pass the already-computed

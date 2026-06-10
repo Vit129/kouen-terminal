@@ -284,6 +284,9 @@ public final class HarnessTerminalSurfaceView: NSView {
     public var onProgress: ((TerminalProgressReport) -> Void)?
     /// Reported working directory (OSC 7) — the host forwards this to its delegate.
     public var onPwd: ((String) -> Void)?
+    /// OSC 1337 `SetUserVar=` (decoded + validated by the engine) — the host surfaces these
+    /// as pane-scoped `@name` user options so format strings can read them.
+    public var onUserVar: ((_ name: String, _ value: String) -> Void)?
     /// Terminal bell (BEL) — the host forwards this to its delegate.
     public var onBell: (() -> Void)?
     /// A shell command finished (OSC 133), with its run duration + exit code — the host forwards
@@ -1105,6 +1108,13 @@ public final class HarnessTerminalSurfaceView: NSView {
                 self?.onPwd?(path)
             } else {
                 DispatchQueue.main.async { [weak self] in self?.onPwd?(path) }
+            }
+        }
+        emulator.onUserVariableChange = { [weak self] name, value in
+            if Thread.isMainThread {
+                self?.onUserVar?(name, value)
+            } else {
+                DispatchQueue.main.async { [weak self] in self?.onUserVar?(name, value) }
             }
         }
         emulator.onBell = { [weak self] in
@@ -3653,6 +3663,15 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// Map an NSEvent to a SpecialKey using the AppKit function-key unicode values.
     /// `internal` (not `private`) so the NSEvent→SpecialKey seam can be unit-tested.
     static func specialKey(for event: NSEvent) -> SpecialKey? {
+        // Numeric-keypad keys (F30, DECKPAM): the character alone can't distinguish keypad
+        // '7' from top-row '7', so key off `.numericPad` + the hardware keycode. Arrow keys
+        // also carry `.numericPad`; the keycode table only claims true keypad codes and
+        // everything else falls through to the character switch below. In numeric mode the
+        // encoder emits the same plain byte the text path used to, so nothing changes until
+        // a program enables application keypad (`ESC =`).
+        if event.modifierFlags.contains(.numericPad), let keypad = keypadKey(forKeyCode: event.keyCode) {
+            return keypad
+        }
         guard let scalar = event.charactersIgnoringModifiers?.unicodeScalars.first else { return nil }
         switch Int(scalar.value) {
         case NSUpArrowFunctionKey: return .up
@@ -3693,6 +3712,30 @@ public final class HarnessTerminalSurfaceView: NSView {
         case 0x7F: return .backspace          // delete (backspace) key
         case 0x1B: return .escape
         case 0x09, 0x19: return .tab  // 0x19 = NSBackTabCharacter (Shift-Tab); encoder emits ESC[Z
+        default: return nil
+        }
+    }
+
+    /// ANSI keypad hardware keycodes (kVK_ANSI_Keypad*) → encoder keys.
+    private static func keypadKey(forKeyCode keyCode: UInt16) -> SpecialKey? {
+        switch keyCode {
+        case 82: return .keypad0
+        case 83: return .keypad1
+        case 84: return .keypad2
+        case 85: return .keypad3
+        case 86: return .keypad4
+        case 87: return .keypad5
+        case 88: return .keypad6
+        case 89: return .keypad7
+        case 91: return .keypad8
+        case 92: return .keypad9
+        case 65: return .keypadDecimal
+        case 75: return .keypadDivide
+        case 67: return .keypadMultiply
+        case 78: return .keypadMinus
+        case 69: return .keypadPlus
+        case 76: return .keypadEnter
+        case 81: return .keypadEquals
         default: return nil
         }
     }
