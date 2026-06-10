@@ -1,7 +1,10 @@
-.PHONY: run install install-no-build build bench preview preview-stop preview-clean release release-notes package dmg smoke-dmg sign appcast finalize hotfix-release icon clean video-skills video-dev video-check video-render video-doctor
+.PHONY: run start install install-no-build build bench preview preview-stop preview-clean release release-notes package dmg smoke-dmg sign appcast finalize hotfix-release icon clean video-skills video-dev video-check video-render video-doctor
 
 run:
 	./Scripts/run.sh app
+
+start:
+	./Scripts/start.sh
 
 install:
 	./Scripts/install-app.sh
