@@ -83,30 +83,51 @@ harness_home() { echo "${HARNESS_HOME:-$HOME/Library/Application Support/Harness
 
 find_harness_app() {
     local candidates=(
-        "$REPO_ROOT/.harness-preview/Harness.app"
+        "$REPO_ROOT/.harness-preview/HarnessPreview.app"
         "/Applications/Harness.app"
     )
     for c in "${candidates[@]}"; do
         [ -d "$c" ] && { echo "$c"; return; }
     done
-    die "no Harness.app found (run 'make preview' or install the release app)"
+    die "no Harness app found (run 'make preview' or install the release app)"
 }
+
+# The app and its HARNESS_HOME must be derived together: the preview's Info.plist points it
+# at .harness-preview/, so its startup.log lives there — watching the release home for a
+# preview launch (or vice versa) reads the wrong log.
+home_for_app() {
+    case "$1" in
+        "$REPO_ROOT/.harness-preview/"*) echo "$REPO_ROOT/.harness-preview" ;;
+        *) harness_home ;;
+    esac
+}
+
+# Target processes by bundle path, never by app name: `tell application "Harness" to quit`
+# resolves by NAME and can kill the user's live terminal instead of the launched instance.
+app_running() { pgrep -f "$1/Contents/MacOS/" >/dev/null 2>&1; }
+quit_app() { pkill -f "$1/Contents/MacOS/" 2>/dev/null || true; }
 
 cold_start() {
     [ "$(uname)" = "Darwin" ] || die "cold-start runs on macOS only"
     mkdir -p "$OUT_DIR"
     local app log result
     app="$(find_harness_app)"
-    log="$(harness_home)/logs/startup.log"
+    log="$(home_for_app "$app")/logs/startup.log"
     result="$OUT_DIR/cold-start-harness.txt"
+    # Never launch-and-quit a bundle that already has a live instance — quitting would take
+    # the user's terminal sessions with it.
+    app_running "$app" && die "cold-start: $app is already running — quit it first (refusing to kill live sessions)"
     : > "$result"
     note "cold start: $LAUNCHES launches of $app (phase deltas from $log)"
     for i in $(seq 1 "$LAUNCHES"); do
         rm -f "$log"
-        HARNESS_STARTUP_METRICS=1 open -n "$app"
-        # Wait for the first present mark (the user-visible 'window has pixels' moment).
+        # `open` strips the caller's environment (see Scripts/preview.sh) — the flag must
+        # travel via --env or StartupMetrics never arms and the log never appears.
+        open -n "$app" --env HARNESS_STARTUP_METRICS=1
+        # Wait for the LAST phase (firstSnapshot) so the daemonConnected/firstSnapshot
+        # medians aren't dropped by parsing right after the first present.
         for _ in $(seq 1 100); do
-            [ -f "$log" ] && grep -q firstDrawablePresented "$log" && break
+            [ -f "$log" ] && grep -q firstSnapshot "$log" && break
             sleep 0.1
         done
         if [ -f "$log" ]; then
@@ -114,14 +135,16 @@ cold_start() {
         else
             echo "run$i	MISSING	startup.log never appeared" >> "$result"
         fi
-        osascript -e 'tell application "Harness" to quit' >/dev/null 2>&1 || true
+        quit_app "$app"
         sleep 1
     done
     note "harness cold-start phases -> $result"
 
     # Ghostty: no phase instrumentation we can read — measure wall clock from `open` to the
     # first on-screen window (a DIFFERENT, coarser clock; the asymmetry is part of the report).
-    if [ -d "/Applications/Ghostty.app" ]; then
+    if [ -d "/Applications/Ghostty.app" ] && app_running "/Applications/Ghostty.app"; then
+        note "Ghostty is already running — skipping its cold-start half (refusing to quit your live instance)"
+    elif [ -d "/Applications/Ghostty.app" ]; then
         local gresult="$OUT_DIR/cold-start-ghostty.txt"
         : > "$gresult"
         note "cold start: $LAUNCHES launches of Ghostty (wall clock to first window)"
@@ -208,6 +231,7 @@ PY
 
 input_latency() {
     [ "$(uname)" = "Darwin" ] || die "input-latency runs on macOS only"
+    mkdir -p "$OUT_DIR"
     note "input-to-photon: Harness-side FrameSignposter percentiles (PREVIEW_SIGNPOSTS=1 make preview first)"
     note "Ghostty exposes no equivalent probe — use a camera/typometer for a cross-terminal number."
     "$REPO_ROOT/Scripts/measure-fluidity.sh" "${1:-4}" | tee "$OUT_DIR/input-latency-harness.txt"
