@@ -29,8 +29,11 @@ import Foundation
 /// Ghostty policy (their automatic bash integration carries the same floor).
 public enum ShellIntegrationInjector {
     /// What a spawn must change to carry the injection. `environment` merges over the
-    /// inherited process env (and under the user's `set-environment` table, which always
-    /// wins); `argumentsOverride` replaces the shell's launch arguments when non-nil.
+    /// inherited process env; `argumentsOverride` replaces the shell's launch arguments
+    /// when non-nil. The plan is ALL-or-nothing: a caller whose user `set-environment`
+    /// table already defines any of these keys must drop the entire plan — applying
+    /// `argumentsOverride` with a foreign value for a plan variable (e.g. bash `--posix`
+    /// with the user's own `$ENV`) corrupts the spawn.
     public struct Plan: Sendable, Equatable {
         public var environment: [String: String]
         public var argumentsOverride: [String]?
