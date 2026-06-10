@@ -123,9 +123,12 @@ final class RealPtyLifecycleTests: XCTestCase {
             }
         }
         // Shell-start: probe-based wait instead of a fixed delay; the TRAP_ARMED
-        // expectation below is the authoritative readiness signal.
+        // expectation below is the authoritative readiness signal. The marker is SPLIT in
+        // the typed text ('AR''MED') so the kernel's PTY echo of the command line cannot
+        // fulfill the expectation before the shell has actually executed `trap` — the echo
+        // race the old fixed sleep happened to mask.
         waitUntil { pty.probeWorkingDirectory() != nil }
-        pty.write("trap '' TERM HUP; echo TRAP_ARMED; while true; do sleep 1; done\n")
+        pty.write("trap '' TERM HUP; echo TRAP_'AR'MED; while true; do sleep 1; done\n")
         wait(for: [armed], timeout: 8)
 
         let childPID = pty.childPIDForTesting
@@ -155,8 +158,9 @@ final class RealPtyLifecycleTests: XCTestCase {
                 armed.fulfill()
             }
         }
-        waitUntil { pty.probeWorkingDirectory() != nil } // shell-start, probe-based
-        pty.write("trap '' TERM HUP; echo TRAP_ARMED; while true; do sleep 1; done\n")
+        // Shell-start probe wait + echo-proof split marker (see the close-escalation test).
+        waitUntil { pty.probeWorkingDirectory() != nil }
+        pty.write("trap '' TERM HUP; echo TRAP_'AR'MED; while true; do sleep 1; done\n")
         wait(for: [armed], timeout: 8)
 
         let oldPID = pty.childPIDForTesting
