@@ -9,6 +9,13 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [Unreleased]
 
 ### Added
+- `Scripts/scorecard.sh` + `docs/SCORECARD.md`: the Harness-vs-Ghostty comparative
+  scorecard — cold start (per-phase from `startup.log` vs wall-clock-to-window),
+  sustained PTY throughput (the cross-terminal stress runner, including the issue #27
+  re-measure set), idle power (`powermetrics`, app + daemon summed), long-session memory,
+  and Harness-side input-to-photon percentiles. Orchestration + reporting only — no
+  production code; numbers are receipts, never CI gates; probe asymmetries are stated in
+  the report itself.
 - VT conformance polish (engine): DA1 now identifies as a VT220-class terminal with Sixel
   and ANSI color (`CSI ?62;4;22c`); DA3 (`CSI = c`) replies with DECRPTUI; DECRQM gains the
   ANSI (non-private) form (`CSI Ps $ p`) with the conformance-correct state-0 reply for
