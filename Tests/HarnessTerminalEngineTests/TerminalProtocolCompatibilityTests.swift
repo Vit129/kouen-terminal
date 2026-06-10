@@ -279,6 +279,17 @@ final class TerminalProtocolCompatibilityTests: XCTestCase {
         XCTAssertEqual(replies.last, "\u{1b}[?1048;2$y")
     }
 
+    func testSoftResetClearsMode1048SavedBit() {
+        let term = TerminalEmulator(cols: 20, rows: 6)
+        var replies: [String] = []
+        term.onResponse = { replies.append(String(decoding: $0, as: UTF8.self)) }
+        term.feed("\u{1b}[?1048h\u{1b}[?1048$p")
+        XCTAssertEqual(replies.last, "\u{1b}[?1048;1$y")
+        // DECSTR discards the saved cursor; the mode bit must follow it.
+        term.feed("\u{1b}[!p\u{1b}[?1048$p")
+        XCTAssertEqual(replies.last, "\u{1b}[?1048;2$y", "DECSTR must clear the 1048 save bit")
+    }
+
     // MARK: DECSET 12 — att610 cursor blink
 
     func testAtt610CursorBlinkModeTogglesAndReports() {
