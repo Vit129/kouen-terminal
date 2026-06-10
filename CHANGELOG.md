@@ -47,6 +47,14 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
   being silently swallowed.
 
 ### Performance
+- Idle-efficiency bundle: the cursor-blink timer now exists only while its pane is
+  effectively focused and un-occluded (unfocused panes used to tick a 0.53 s timer forever
+  just to early-out — 20 background panes ≈ 40 pointless main-runloop wakeups/s); the
+  daemon's 500 ms monitor tick skips the registry lock and option reads entirely when no
+  fresh output/bell arrived and silence monitoring is disarmed (the orphan sweep is
+  preserved — racing-read entries are born flagged); and the shell cwd tracker parks its
+  2 Hz process-tree scan while the app is inactive, relaxes to 0.5 Hz after ~5 s of no cwd
+  movement, and snaps back on tab/pane creation, focus change, or any observed change.
 - Git branch labels are event-driven instead of polled: the app watches each repository's
   resolved `HEAD` file (one watcher per repo/worktree, shared by all its tabs) and reads the
   branch in-process — no more `git rev-parse` subprocess per tab every 2 seconds, and labels
