@@ -73,12 +73,8 @@ final class SurfaceRegistryTests: XCTestCase {
         // Let the shell come up, then exit with a known code.
         usleep(400_000)
         _ = registry.handle(.sendData(surfaceID: sid, data: Data("exit 3\n".utf8)))
-        var deadTab: Tab?
-        for _ in 0 ..< 100 {
-            if let candidate = tab(), candidate.exitStatus != nil { deadTab = candidate; break }
-            usleep(100_000)
-        }
-        let dead = try XCTUnwrap(deadTab, "retained pane should record an exit status")
+        waitUntil(timeout: 12) { tab()?.exitStatus != nil }
+        let dead = try XCTUnwrap(tab(), "retained pane should record an exit status")
         XCTAssertEqual(dead.exitStatus, 3)
         XCTAssertEqual(dead.status, .idle, "waiting status must not survive the pane's death")
         XCTAssertNil(dead.notificationText, "notification must not survive the pane's death")
@@ -109,11 +105,7 @@ final class SurfaceRegistryTests: XCTestCase {
         func killAndAwaitDeath() -> Bool {
             usleep(400_000)
             _ = registry.handle(.sendData(surfaceID: sid, data: Data("exit 5\n".utf8)))
-            for _ in 0 ..< 100 {
-                if tab()?.exitStatus != nil { return true }
-                usleep(100_000)
-            }
-            return false
+            return waitUntil(timeout: 12) { tab()?.exitStatus != nil }
         }
 
         XCTAssertTrue(killAndAwaitDeath(), "the pane must be retained with an exit status")
@@ -659,11 +651,9 @@ final class SurfaceRegistryTests: XCTestCase {
         // "(A Document Being Saved By …)" — spaces and parens are a bash syntax error unquoted.
         _ = registry.handle(.sendData(surfaceID: sid, data: Data("cd '\(canonicalDest)'\n".utf8)))
 
-        var updated = false
-        for _ in 0 ..< 50 {
+        let updated = waitUntil(timeout: 10) {
             registry.refreshSurfaceMetadata()
-            if tabCwd().map({ ($0 as NSString).resolvingSymlinksInPath }) == canonicalDest { updated = true; break }
-            usleep(100_000)
+            return tabCwd().map { ($0 as NSString).resolvingSymlinksInPath } == canonicalDest
         }
         XCTAssertTrue(updated, "off-lock refresh must still propagate the live shell's cwd to the tab")
     }
