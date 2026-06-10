@@ -46,4 +46,50 @@ final class OptionValidationDaemonTests: XCTestCase {
         XCTAssertEqual(context.userOptions["@theme"], "dracula")
         XCTAssertEqual(FormatString.evaluate("#{@theme}", context: context), "dracula")
     }
+
+    /// End-to-end for the GUI's OSC 1337 `SetUserVar` path: the GUI stores user variables
+    /// PANE-scoped, targeted by SURFACE key (the exact IPC shape `SessionCoordinator`
+    /// sends). `#{@name}` must resolve them pane-first for that surface's context — the
+    /// tab/session/global chain alone can never reach a pane-scoped value (broader-scope
+    /// fallbacks only walk nil targets).
+    func testPaneScopedUserOptionRendersForItsSurface() throws {
+        let registry = SurfaceRegistry()
+        let tab = try XCTUnwrap(registry.snapshot.activeWorkspace?.activeTab)
+        let surfaceKey = try XCTUnwrap(tab.rootPane.allSurfaceIDs().first).uuidString
+        guard case .ok = registry.handle(
+            .setOption(scope: "pane", target: surfaceKey, key: "@deploy", rawValue: "staging")
+        ) else {
+            return XCTFail("a pane-scoped @user-option must be accepted")
+        }
+        let context = registry.buildFormatContext(surfaceKey: surfaceKey)
+        XCTAssertEqual(context.userOptions["@deploy"], "staging")
+        XCTAssertEqual(FormatString.evaluate("#{@deploy}", context: context), "staging")
+        // The surface is the active pane, so the surfaceless context (status line,
+        // display-message with no target) resolves it too.
+        XCTAssertEqual(FormatString.evaluate("#{@deploy}", context: registry.buildFormatContext()), "staging")
+    }
+
+    /// Closing a surface for good GCs its pane-scoped options — without this, a loop of
+    /// fresh user-variable names plus pane churn grows options.json without bound, and
+    /// `#{@name}` would keep serving values for surfaces that no longer exist.
+    func testClosingATabRemovesItsSurfacesPaneScopedOptions() throws {
+        let registry = SurfaceRegistry()
+        let wsID = try XCTUnwrap(registry.snapshot.activeWorkspaceID)
+        guard case let .tabID(tabID) = registry.handle(.newTab(workspaceID: wsID, cwd: "/tmp")) else {
+            return XCTFail("expected tabID from newTab")
+        }
+        let tab = try XCTUnwrap(
+            registry.snapshot.workspaces.flatMap(\.sessions).flatMap(\.tabs).first { $0.id == tabID }
+        )
+        let surfaceKey = try XCTUnwrap(tab.rootPane.allSurfaceIDs().first).uuidString
+        _ = registry.handle(.setOption(scope: "pane", target: surfaceKey, key: "@status", rawValue: "up"))
+        XCTAssertEqual(registry.optionStore.get("@status", scope: .pane, target: surfaceKey)?.stringValue, "up")
+        guard case .ok = registry.handle(.closeTab(tabID: tabID)) else {
+            return XCTFail("closeTab must succeed")
+        }
+        XCTAssertNil(
+            registry.optionStore.get("@status", scope: .pane, target: surfaceKey),
+            "pane-scoped options must die with their surface"
+        )
+    }
 }
