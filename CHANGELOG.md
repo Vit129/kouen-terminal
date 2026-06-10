@@ -9,6 +9,7 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [Unreleased]
 
 ### Added
+
 - **Shell integration is auto-injected at spawn** (zsh / bash / fish): prompt marks, the
   success/failure gutter, and jump-to-prompt work out of the box with no
   `install-shell-integration` step. zsh rides a `ZDOTDIR` shim that restores your real
@@ -39,12 +40,6 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
   there — the secrets-at-rest control documented in the new `docs/SECURITY-POSTURE.md`
   (which also records the no-sandbox rationale, the hardened-runtime/notarization and
   Sparkle EdDSA/HTTPS audit, the Services surface, and the control-socket posture).
-### Changed
-- Mechanical decomposition (renderer): the Metal renderer's CPU-side instance/cache value
-  types (GPU instance layouts, per-row encode caches, upload-cache keys) moved to
-  `TerminalRenderInstances.swift` — same definitions, zero logic change.
-
-### Added
 - `Scripts/scorecard.sh` + `docs/SCORECARD.md`: the Harness-vs-Ghostty comparative
   scorecard — cold start (per-phase from `startup.log` vs wall-clock-to-window),
   sustained PTY throughput (the cross-terminal stress runner, including the issue #27
@@ -74,6 +69,11 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
   cell boundary.
 
 ### Changed
+
+- Mechanical decomposition (renderer): the Metal renderer's CPU-side instance/cache value
+  types (GPU instance layouts, per-row encode caches, upload-cache keys) moved to
+  `TerminalRenderInstances.swift` — same definitions, zero logic change.
+
 - Mechanical decomposition (daemon + core): `SurfaceRegistry`'s output monitoring and the
   version-banner one-shot moved to extension files (same members, same locks — the
   single-lock serialization is untouched); `SessionEditor`'s split-tree algebra (the pure
@@ -84,6 +84,7 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
   be written (migrations and deliberate non-default fallbacks stay hand-written).
 
 ### Fixed
+
 - A stale scrollback index can no longer crash a shipping build: `HistoryRingBuffer`'s
   empty-buffer release trap is replaced by a graceful fallback to the most recently
   appended line (the debug assert stays). The daemon also caps per-connection buffered
@@ -127,6 +128,7 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
   being silently swallowed.
 
 ### Performance
+
 - Frame building with the find bar open no longer scans every search match per cell
   (O(matches × cells) — hundreds of matches over a 19 K-cell viewport while scrolling):
   highlights are bucketed once per build into per-row sorted merged column intervals that
@@ -170,6 +172,7 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
   committed baseline (`benchmark-baselines.json`, recorded deliberately on real hardware).
 
 ### Removed
+
 - Two dead empty-bodied functions that ran O(hosts × tabs) scans on every daemon sync
   (`syncWaitingRings`, `PaneContainerView.refreshChrome`), the stale `video-*` Makefile
   targets, and the 300 ms timing kick after tab/session creation (replaced by the
