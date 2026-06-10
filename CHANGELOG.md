@@ -55,6 +55,19 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
   preserved — racing-read entries are born flagged); and the shell cwd tracker parks its
   2 Hz process-tree scan while the app is inactive, relaxes to 0.5 Hz after ~5 s of no cwd
   movement, and snaps back on tab/pane creation, focus change, or any observed change.
+- Git branch labels are event-driven instead of polled: the app watches each repository's
+  resolved `HEAD` file (one watcher per repo/worktree, shared by all its tabs) and reads the
+  branch in-process — no more `git rev-parse` subprocess per tab every 2 seconds, and labels
+  update instantly on checkout instead of up to 2 s late. A tab that leaves a repository now
+  clears its stale branch label (previously it stuck forever), and an identical branch
+  re-send no longer bumps the snapshot revision or wakes subscribers.
+- The GUI subscribes to the daemon's snapshot-push channel (the same one `attach-window`
+  uses), so external structure changes (`harness-cli split-pane` against a GUI session)
+  arrive instantly via push instead of being discovered by the old 0.5 Hz blind full-snapshot
+  poll — which is gone, along with its forever-ticking fetch+decode even while idle and
+  inactive. A 30 s app-active-only safety poll remains purely as push-loss insurance
+  (the daemon drops subscribers whose write backlog exceeds its cap). Branch watchers and
+  the safety poll pause while the app is inactive and refresh on re-activate.
 - The PTY-output and keystroke IPC read loops consume frames in O(1) amortized via an
   offset-tracking read buffer (`IPCReadBuffer`) instead of `Data.removeFirst`'s O(remaining)
   byte shift per frame — quadratic under flood on both the app's subscription loop and the
