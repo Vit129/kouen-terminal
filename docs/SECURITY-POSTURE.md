@@ -68,14 +68,16 @@ and document types (`.command`/`.tool`, ssh/telnet) route through the same
 
 ## Scrollback at rest (`persist-scrollback`)
 
-Scrollback is raw PTY output, persisted per surface (owner-only file permissions, under
-the `0o700` Harness home) so history survives daemon restarts. Raw PTY output can contain
+Scrollback is raw PTY output, persisted per surface (owner-only `0600` files, under the
+`0o700` Harness home) so history survives daemon restarts. Raw PTY output can contain
 echoed secrets — that's inherent to what a terminal sees, and Harness **will not redact**
 (any redaction heuristic is a false promise; the honest control is whether bytes reach
 disk at all).
 
 The control: `persist-scrollback` (default **on**), readable per pane with global
-fallback.
+fallback. It is pane- or global-scoped only; a tab/session/workspace-scoped set is
+rejected loudly (no read path could ever reach it — accepting it would be a silent no-op
+on a security control).
 
 ```sh
 harness-cli set-option -p -T <surface-id> persist-scrollback off   # one pane
@@ -88,11 +90,14 @@ Semantics (pinned by `ScrollbackPersistenceTests`):
   scrollback at rest", not "no new writes". Output produced while off never reaches disk.
 - The in-memory replay ring is unaffected (the option is about bytes at rest; RAM history
   is the terminal working as designed).
-- Turning it back on resumes persistence from that point for surfaces spawned with
-  persistence; a surface *spawned* while the option was off stays memory-only until its
-  next spawn/respawn.
+- Turning it back on resumes persistence from that point for every live surface —
+  including one *spawned* while the option was off (it carries a suspended log writer),
+  and across a live `respawn-pane`. Output produced during the off window stays
+  memory-only.
 - At spawn, a surface whose resolved option is off also removes any log a
   previously-persisted run left behind.
+- Copy-mode copies are independent of this option: an explicit copy persists to
+  `buffers.json` (user-initiated, by design) regardless of `persist-scrollback`.
 
 ## IME audit (deferred, tracked)
 

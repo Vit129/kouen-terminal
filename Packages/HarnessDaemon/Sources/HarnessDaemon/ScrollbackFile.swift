@@ -73,6 +73,18 @@ final class ScrollbackFile: @unchecked Sendable {
             ? Self.unlimitedSafetyCap
             : max(retentionCap, Self.minimumRetentionCap)
         self.fileBytes = Self.compactExistingLogIfNeeded(url: url, retentionCap: self.retentionCap)
+        // Re-assert owner-only on a pre-existing log too, so files created by builds that
+        // predate the permission tightening are fixed on the first load after an upgrade.
+        Self.restrictToOwner(url)
+    }
+
+    /// `.scroll` logs hold raw PTY output — potentially echoed secrets — so they are
+    /// owner-only (0600), making SECURITY-POSTURE.md's at-rest claim literal rather than
+    /// relying on the 0700 parent directory alone. Re-applied after every creation path
+    /// because atomic writes (temp + rename) mint a fresh inode with default (0644)
+    /// permissions; in-place appends inherit whatever the file was created with.
+    private static func restrictToOwner(_ url: URL) {
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
     }
 
     /// Read the persisted tail (at most `maxBytes`) for seeding `RealPty`'s in-memory ring on
@@ -203,7 +215,9 @@ final class ScrollbackFile: @unchecked Sendable {
         if !fm.fileExists(atPath: url.path) {
             // First write: create the (owner-only) directory + file in one shot.
             try? HarnessPaths.ensureDirectories()
-            return HarnessPaths.atomicWrite(data, to: url, label: "HarnessDaemon scrollback")
+            guard HarnessPaths.atomicWrite(data, to: url, label: "HarnessDaemon scrollback") else { return false }
+            Self.restrictToOwner(url)
+            return true
         }
         guard let handle = try? FileHandle(forWritingTo: url) else {
             // Fall back to a full rewrite if we somehow can't open for append. The rewrite
@@ -214,7 +228,9 @@ final class ScrollbackFile: @unchecked Sendable {
                 fputs("HarnessDaemon scrollback: append-open and read both failed for \(url.lastPathComponent); dropping flush\n", harnessStderr)
                 return false
             }
-            return HarnessPaths.atomicWrite(existing + data, to: url, label: "HarnessDaemon scrollback")
+            guard HarnessPaths.atomicWrite(existing + data, to: url, label: "HarnessDaemon scrollback") else { return false }
+            Self.restrictToOwner(url)
+            return true
         }
         defer { try? handle.close() }
         do {
@@ -249,6 +265,8 @@ final class ScrollbackFile: @unchecked Sendable {
         let tmp = url.appendingPathExtension("compact-tmp")
         do {
             try tail.write(to: tmp)
+            // Owner-only BEFORE the rename, so the log is never visible with loose perms.
+            Self.restrictToOwner(tmp)
             // fsync the temp file so its content is durable before we replace the log.
             // See the comment in appendToDisk for the fsync vs F_FULLFSYNC choice.
             if let tmpHandle = try? FileHandle(forReadingFrom: tmp) {
