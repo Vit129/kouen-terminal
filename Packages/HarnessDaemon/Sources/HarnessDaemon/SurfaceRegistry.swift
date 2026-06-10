@@ -1634,6 +1634,10 @@ public final class SurfaceRegistry: @unchecked Sendable {
             stopPipe(surfaceID: surfaceID)
             // Drop the output monitor too, else it leaks across tab/session/pane churn.
             monitorLock.lock(); monitors.removeValue(forKey: surfaceID); monitorLock.unlock()
+            // GC the surface's pane-scoped options (OSC 1337 user variables, per-pane
+            // overrides): the surface key is gone for good, so they would otherwise sit
+            // in options.json forever — unbounded growth under name churn.
+            optionStore.removeAll(scope: .pane, target: surfaceID)
         }
     }
 

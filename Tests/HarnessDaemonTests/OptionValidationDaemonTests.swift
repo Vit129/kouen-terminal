@@ -68,4 +68,28 @@ final class OptionValidationDaemonTests: XCTestCase {
         // display-message with no target) resolves it too.
         XCTAssertEqual(FormatString.evaluate("#{@deploy}", context: registry.buildFormatContext()), "staging")
     }
+
+    /// Closing a surface for good GCs its pane-scoped options — without this, a loop of
+    /// fresh user-variable names plus pane churn grows options.json without bound, and
+    /// `#{@name}` would keep serving values for surfaces that no longer exist.
+    func testClosingATabRemovesItsSurfacesPaneScopedOptions() throws {
+        let registry = SurfaceRegistry()
+        let wsID = try XCTUnwrap(registry.snapshot.activeWorkspaceID)
+        guard case let .tabID(tabID) = registry.handle(.newTab(workspaceID: wsID, cwd: "/tmp")) else {
+            return XCTFail("expected tabID from newTab")
+        }
+        let tab = try XCTUnwrap(
+            registry.snapshot.workspaces.flatMap(\.sessions).flatMap(\.tabs).first { $0.id == tabID }
+        )
+        let surfaceKey = try XCTUnwrap(tab.rootPane.allSurfaceIDs().first).uuidString
+        _ = registry.handle(.setOption(scope: "pane", target: surfaceKey, key: "@status", rawValue: "up"))
+        XCTAssertEqual(registry.optionStore.get("@status", scope: .pane, target: surfaceKey)?.stringValue, "up")
+        guard case .ok = registry.handle(.closeTab(tabID: tabID)) else {
+            return XCTFail("closeTab must succeed")
+        }
+        XCTAssertNil(
+            registry.optionStore.get("@status", scope: .pane, target: surfaceKey),
+            "pane-scoped options must die with their surface"
+        )
+    }
 }
