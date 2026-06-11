@@ -1182,6 +1182,10 @@ public final class HarnessTerminalSurfaceView: NSView {
         if let window {
             StartupMetrics.shared.mark(.firstSurfaceAttached) // idempotent: first surface in a window
             buildRenderer() // pick up the real backing scale
+            // Always stop+start so the display link is bound to the correct window/screen
+            // even if viewDidMoveToSuperview already created it (CASE-003 race: view can be
+            // added to a superview before the window attaches, leaving the link unstarted).
+            stopDisplayLink()
             startDisplayLink()
             updateGridSize()
             restartBlinkTimer()
@@ -1335,6 +1339,7 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// to an unbounded main-thread wait if the GPU wedges.
     public override func viewWillStartLiveResize() {
         super.viewWillStartLiveResize()
+        emulatorState.async { $0.isLiveResizing = true }
         metalLayer.presentsWithTransaction = true
         // Transaction-mode presents hand their drawable to the window server until the CA commit
         // completes, so with the steady-state pool of 2 (kept for keystroke echo latency) the
@@ -1351,6 +1356,7 @@ public final class HarnessTerminalSurfaceView: NSView {
 
     public override func viewDidEndLiveResize() {
         super.viewDidEndLiveResize()
+        emulatorState.async { $0.isLiveResizing = false }
         metalLayer.presentsWithTransaction = false
         metalLayer.maximumDrawableCount = 2 // restore the low-latency echo pool (see configureLayer)
         // Invalidate any in-flight preview build UNCONDITIONALLY. A live commit's generation bump
