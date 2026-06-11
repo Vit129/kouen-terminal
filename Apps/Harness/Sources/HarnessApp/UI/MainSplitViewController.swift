@@ -97,6 +97,12 @@ final class MainSplitViewController: NSViewController {
             guard let self else { return }
             let settings = SessionCoordinator.shared.settings
             if settings.sidebarCollapsedOnLaunch {
+                // Keep `sidebarVisible` in sync with the forced-collapsed state so the
+                // first `toggleSidebar()` (e.g. user expanding the sidebar after launch)
+                // computes `!false -> true` and actually shows it. Without this, a stale
+                // `sidebarVisible == true` from a previous session makes the first toggle
+                // collapse (no-op) instead of expand.
+                SessionCoordinator.shared.settings.sidebarVisible = false
                 self.applySidebarVisibility(false, animated: false)
             } else {
                 self.applySidebarVisibility(settings.sidebarVisible, animated: false)
