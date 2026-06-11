@@ -5,7 +5,7 @@
 - **Fork:** Vit129/harness-terminal (fork of robzilla1738/harness-terminal)
 - **Working branch:** `main`
 - **Preview:** `make preview` (uses `.harness-preview/` dir)
-- **Latest release:** v2.1.0
+- **Latest release:** v2.2.4
 
 ## Current Sprint — Post-v2.1.0 Polish & Shelving
 
@@ -39,6 +39,7 @@
 | 24 | File preview live reload via single-file DispatchSource watcher (CASE-022) | ✅ Done |
 | 25 | Sidebar collapse-then-expand fix: sync sidebarVisible on forced launch collapse (CASE-024) | ✅ Done |
 | 26 | Terminal rendering corruption fix: don't clear synchronizedOutput on shell-prompt reset (CASE-023) | ✅ Done |
+| 27 | v2.2.4 release prep: CHANGELOG Fixed entries, version bump (build 125), release notes regen, graphify refresh, tag | ✅ Done |
 
 ### Recent_Lessons
 

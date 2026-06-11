@@ -1,21 +1,19 @@
-// Generated from the CHANGELOG.md [2.2.2] block by Scripts/generate-release-notes.swift.
+// Generated from the CHANGELOG.md [2.2.4] block by Scripts/generate-release-notes.swift.
 // DO NOT EDIT BY HAND — regenerate in release prep after updating CHANGELOG.md:
 //   swift Scripts/generate-release-notes.swift
 // Drift guards: ReleaseNotesGuardTests (version + changelog digest), package-app.sh.
 
 extension ReleaseNotes {
     public static let current = ReleaseNotes(
-        version: "2.2.2",
-        changelogDigest: "8767a2f5deba56e3",
+        version: "2.2.4",
+        changelogDigest: "9fb8fc77e84d5057",
         sections: [
-            Section(title: "Fixed", items: [
-                "File preview text rendering",
-                "File preview background matches terminal",
-                "File path handling",
-            ]),
             Section(title: "Added", items: [
-                "Draggable file editor divider",
-                "Cmd-click file paths in terminal",
+                "File preview live reload",
+            ]),
+            Section(title: "Fixed", items: [
+                "Terminal rendering corruption from interleaved status messages",
+                "Sidebar disappears after collapse-then-expand with \"Always collapse sidebar on launch\" enabled",
             ]),
         ]
     )
