@@ -1389,7 +1389,13 @@ public final class HarnessTerminalSurfaceView: NSView {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         let needsFirstPaint = !hasSizedGrid
+        let oldBounds = bounds
         updateGridSize()
+        let sizeChanged = bounds.size != oldBounds.size
+        let needsTempSync = sizeChanged && !metalLayer.presentsWithTransaction
+        if needsTempSync {
+            metalLayer.presentsWithTransaction = true
+        }
         if needsFirstPaint {
             // First real layout: `updateGridSize` already committed the grid; build + present the
             // true frame synchronously so the terminal opens correct with no flash.
@@ -1401,6 +1407,9 @@ public final class HarnessTerminalSurfaceView: NSView {
             // a full synchronous build only when there's no valid cached frame (e.g. generation just
             // changed via a font/theme/reflow invalidation).
             scheduler.forceRender()
+        }
+        if needsTempSync {
+            metalLayer.presentsWithTransaction = false
         }
         CATransaction.commit()
     }
