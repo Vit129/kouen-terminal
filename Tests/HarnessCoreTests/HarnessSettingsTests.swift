@@ -16,6 +16,36 @@ final class HarnessSettingsTests: XCTestCase {
         }
     }
 
+    func testSidebarVisibleDefaultsToFalse() {
+        XCTAssertFalse(HarnessSettings().sidebarVisible)
+        XCTAssertFalse(HarnessSettings.makeDefaults(imported: nil).sidebarVisible)
+    }
+
+    func testSidebarVisibleLoadPreservesTrue() throws {
+        try withTemporaryHarnessHome { root in
+            try HarnessPaths.ensureDirectories()
+            try Data("""
+            { "fontSize": 14, "sidebarVisible": true }
+            """.utf8).write(to: root.appendingPathComponent("settings.json"))
+
+            let settings = HarnessSettings.load()
+            XCTAssertTrue(settings.sidebarVisible)
+        }
+    }
+
+    func testSidebarVisibleLoadPreservesFalse() throws {
+        try withTemporaryHarnessHome { root in
+            try HarnessPaths.ensureDirectories()
+            try Data("""
+            { "fontSize": 14, "sidebarVisible": false }
+            """.utf8).write(to: root.appendingPathComponent("settings.json"))
+
+            let settings = HarnessSettings.load()
+            XCTAssertFalse(settings.sidebarVisible)
+        }
+    }
+
+
     func testOldSettingsWithCustomHexDoNotSilentlyOverrideThemes() throws {
         let data = Data("""
         {
