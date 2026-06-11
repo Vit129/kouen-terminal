@@ -40,7 +40,7 @@ final class FileEditorView: NSView {
         // Quick Look for images/PDFs
         let ext = (cleanPath as NSString).pathExtension.lowercased()
         let imageExts = Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "ico", "bmp", "tiff", "heic"])
-        let qlExts = imageExts.union(["pdf", "rtf", "rtfd", "doc", "docx", "pages", "key", "keynote", "numbers"])
+        let qlExts = imageExts.union(["pdf", "rtf", "rtfd", "doc", "docx", "pages", "key", "keynote", "numbers", "xlsx", "xls", "csv"])
         if qlExts.contains(ext) {
             showQuickLook(url: url)
             return
