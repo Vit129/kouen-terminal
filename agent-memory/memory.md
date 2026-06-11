@@ -37,6 +37,8 @@
 | 22 | Branch chip real-time via git rev-parse in loadRoot() (CASE-020) | ✅ Done |
 | 23 | Git Changes FSEvents recursive watcher on rootPath (CASE-021) | ✅ Done |
 | 24 | File preview live reload via single-file DispatchSource watcher (CASE-022) | ✅ Done |
+| 25 | Sidebar collapse-then-expand fix: sync sidebarVisible on forced launch collapse (CASE-024) | ✅ Done |
+| 26 | Terminal rendering corruption fix: don't clear synchronizedOutput on shell-prompt reset (CASE-023) | ✅ Done |
 
 ### Recent_Lessons
 
@@ -51,6 +53,8 @@
 - **RL-009:** SwiftUI @State in list rows resets on every view reconciliation. State that must survive tree refresh belongs in the @Observable model, not the View. (CASE-017)
 - **RL-010:** NSView wrapping NSTextView must forward mouseDown/mouseDragged/mouseUp to the inner textView explicitly — super.mouseDown doesn't cascade to child views. (CASE-018)
 - **RL-011:** For watching a single file (not a directory), plain `DispatchSource.makeFileSystemObjectSource(O_EVTONLY)` is sufficient — no need for FSEvents recursion (RL-007 only applies to directories). Re-arm by reopening the path on every reload to survive atomic-save-by-rename. For a reused `QLPreviewView`, call `refreshPreviewItem()` instead of re-setting an unchanged `previewItem` (QuickLook caches by URL). (CASE-022)
+- **RL-012:** When a forced visual state on launch (e.g. collapse) diverges from the persisted toggle-state field, sync the persisted field too — otherwise the first user toggle computes against stale state and is a no-op. (CASE-024)
+- **RL-013:** `TerminalModes.resetForShellPrompt()` (OSC 133;D) must only reset *input* modes (mouse tracking, bracketed paste, kitty keyboard, etc.), never `synchronizedOutput` — a sub-command's 133;D can fire mid-batch inside an outer TUI's `?2026h`/`?2026l` redraw, and clearing it there causes the renderer to present a half-applied frame (interleaved garbled rows). The 150ms sync-timeout in `HarnessTerminalSurfaceView` already handles a program that never sends `?2026l`. (CASE-023)
 
 ### Decisions_In_Force
 
