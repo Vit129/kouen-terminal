@@ -80,6 +80,10 @@ final class CommandFinishedTests: XCTestCase {
 
         term.feed("\u{1b}]133;D;0\u{07}")
 
-        XCTAssertEqual(term.modes, TerminalModes())
+        var expected = TerminalModes()
+        // Deliberately NOT reset by 133;D — see resetForShellPrompt() doc comment: an outer TUI's
+        // ?2026h redraw batch can still be open when a sub-command's 133;D fires.
+        expected.synchronizedOutput = true
+        XCTAssertEqual(term.modes, expected)
     }
 }

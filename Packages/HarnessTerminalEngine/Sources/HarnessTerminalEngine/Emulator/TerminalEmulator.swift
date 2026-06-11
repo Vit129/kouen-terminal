@@ -812,6 +812,13 @@ public struct TerminalModes: Sendable, Equatable {
 
     /// Return terminal-private input modes to their normal shell-prompt state. This mirrors the
     /// practical part of a DECSTR-style soft reset without clearing visible screen contents.
+    ///
+    /// Deliberately leaves `synchronizedOutput` untouched: OSC 133;D (command-finished) can fire
+    /// from a sub-command's shell integration while an outer TUI's `?2026h` redraw batch is still
+    /// open (e.g. an agentic CLI rendering its status box around a tool's shell output). Forcing
+    /// it false here would make the renderer present that batch mid-update — splicing fragments
+    /// of two unrelated frames into the same rows. The renderer's own sync timeout already
+    /// recovers if a program leaves `?2026h` set forever.
     public mutating func resetForShellPrompt() {
         cursorKeysApplication = false
         keypadApplication = false
@@ -823,7 +830,6 @@ public struct TerminalModes: Sendable, Equatable {
         mouseAny = false
         mouseUTF8 = false
         mouseSGR = false
-        synchronizedOutput = false
         kittyKeyboardStack.removeAll()
         modifyOtherKeys = 0
     }
