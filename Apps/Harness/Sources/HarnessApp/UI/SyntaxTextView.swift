@@ -399,6 +399,29 @@ enum SyntaxHighlighter {
                 attributed.addAttribute(.foregroundColor, value: HarnessDesign.chrome.accent, range: $0.range)
             }
         }
+        // Diff/patch: color +lines green, -lines red, @@hunk headers cyan, diff headers bold
+        if ["diff", "patch"].contains(ext) {
+            if let regex = try? NSRegularExpression(pattern: #"^\+(?!\+\+).*$"#, options: .anchorsMatchLines) {
+                regex.matches(in: text, range: fullRange).forEach {
+                    attributed.addAttribute(.foregroundColor, value: NSColor.systemGreen, range: $0.range)
+                }
+            }
+            if let regex = try? NSRegularExpression(pattern: #"^-(?!--).*$"#, options: .anchorsMatchLines) {
+                regex.matches(in: text, range: fullRange).forEach {
+                    attributed.addAttribute(.foregroundColor, value: NSColor.systemRed, range: $0.range)
+                }
+            }
+            if let regex = try? NSRegularExpression(pattern: #"^@@.*@@.*$"#, options: .anchorsMatchLines) {
+                regex.matches(in: text, range: fullRange).forEach {
+                    attributed.addAttribute(.foregroundColor, value: NSColor.systemCyan, range: $0.range)
+                }
+            }
+            if let regex = try? NSRegularExpression(pattern: #"^(diff --git|---|\+\+\+|index ).*$"#, options: .anchorsMatchLines) {
+                regex.matches(in: text, range: fullRange).forEach {
+                    attributed.addAttributes([.foregroundColor: NSColor.white, .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .bold)], range: $0.range)
+                }
+            }
+        }
         return attributed
     }
 

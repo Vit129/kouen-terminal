@@ -459,9 +459,15 @@ final class GitPanelView: NSView {
         }
     }
 
-    @objc private func showCommitDetail(_ sender: NSClickGestureRecognizer) {
+    @objc private func showCommitDetail(_ sender: Any) {
+        let card: NSView?
+        if let gesture = sender as? NSClickGestureRecognizer {
+            card = gesture.view
+        } else if let menuItem = sender as? NSMenuItem {
+            card = menuItem.representedObject as? NSView
+        } else { return }
         guard let path = currentPath,
-              let card = sender.view,
+              let card,
               let hash = card.identifier?.rawValue else { return }
         Task {
             let detail = await runGit(["show", "--stat", "--patch", hash], in: path)
@@ -473,6 +479,24 @@ final class GitPanelView: NSView {
             guard let split = self.window?.contentViewController as? MainSplitViewController else { return }
             split.contentVC.openFileTab(path: tmpPath)
         }
+    }
+
+    @objc private func copyCommitID(_ sender: NSMenuItem) {
+        guard let hash = sender.representedObject as? String else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(hash, forType: .string)
+    }
+
+    @objc private func copyCommitMessage(_ sender: NSMenuItem) {
+        guard let msg = sender.representedObject as? String else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(msg, forType: .string)
+    }
+
+    @objc private func copyCommitSummary(_ sender: NSMenuItem) {
+        guard let summary = sender.representedObject as? String else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(summary, forType: .string)
     }
 
     private func presentCommitDetail(_ text: String, anchor: NSView) {
@@ -784,7 +808,27 @@ final class GitPanelView: NSView {
         row.orientation = .horizontal; row.spacing = 6; row.alignment = .centerY
         row.distribution = .fill
         row.edgeInsets = NSEdgeInsets(top: 3, left: 8, bottom: 3, right: 8)
+        row.identifier = NSUserInterfaceItemIdentifier(file)
+        row.addGestureRecognizer(NSClickGestureRecognizer(target: self, action: #selector(showChangedFileDiff(_:))))
         return row
+    }
+
+    @objc private func showChangedFileDiff(_ sender: NSClickGestureRecognizer) {
+        guard let path = currentPath,
+              let row = sender.view,
+              let file = row.identifier?.rawValue else { return }
+        Task {
+            let diff = await runGit(["diff", "HEAD", "--", file], in: path)
+            let content = diff.isEmpty ? (try? String(contentsOfFile: path + "/" + file, encoding: .utf8)) ?? "" : diff
+            let tmpDir = NSTemporaryDirectory() + "harness-diff/"
+            try? FileManager.default.createDirectory(atPath: tmpDir, withIntermediateDirectories: true)
+            let safeName = file.replacingOccurrences(of: "/", with: "_")
+            let ext = diff.isEmpty ? (file as NSString).pathExtension : "diff"
+            let tmpPath = tmpDir + "\(safeName).\(ext)"
+            try? content.write(toFile: tmpPath, atomically: true, encoding: .utf8)
+            guard let split = self.window?.contentViewController as? MainSplitViewController else { return }
+            split.contentVC.openFileTab(path: tmpPath)
+        }
     }
 
     private func makeHistoryCard(_ line: String) -> NSView {
@@ -801,6 +845,19 @@ final class GitPanelView: NSView {
         card.translatesAutoresizingMaskIntoConstraints = false
         card.identifier = NSUserInterfaceItemIdentifier(fullHash)
         card.addGestureRecognizer(NSClickGestureRecognizer(target: self, action: #selector(showCommitDetail(_:))))
+
+        // Right-click context menu
+        let menu = NSMenu()
+        menu.addItem(withTitle: "Copy Commit ID", action: #selector(copyCommitID(_:)), keyEquivalent: "").representedObject = fullHash
+        menu.addItem(withTitle: "Copy Commit Message", action: #selector(copyCommitMessage(_:)), keyEquivalent: "").representedObject = subject
+        menu.addItem(NSMenuItem.separator())
+        menu.addItem(withTitle: "Copy \(hash) — \(subject)", action: #selector(copyCommitSummary(_:)), keyEquivalent: "").representedObject = "\(hash) \(subject)"
+        menu.addItem(NSMenuItem.separator())
+        menu.addItem(withTitle: "Show Diff", action: #selector(showCommitDetail(_:)), keyEquivalent: "").representedObject = card
+        menu.items.forEach { $0.target = self }
+        // Fix: showCommitDetail needs the card view via representedObject for menu path
+        menu.items.last?.representedObject = card
+        card.menu = menu
 
         // Subject line
         let subjectLabel = NSTextField(labelWithString: subject)

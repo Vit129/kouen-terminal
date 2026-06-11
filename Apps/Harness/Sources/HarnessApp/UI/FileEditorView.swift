@@ -122,6 +122,22 @@ final class FileEditorView: NSView {
 
     // MARK: - Git Diff Gutter
 
+    /// For .diff/.patch files: parse `+`/`-` line prefixes directly from the content.
+    private func loadDiffContentGutter(_ text: String) {
+        var result: [Int: SyntaxTextView.DiffLineType] = [:]
+        for (i, line) in text.components(separatedBy: "\n").enumerated() {
+            let lineNum = i + 1
+            if line.hasPrefix("+") && !line.hasPrefix("+++") {
+                result[lineNum] = .added
+            } else if line.hasPrefix("-") && !line.hasPrefix("---") {
+                result[lineNum] = .deleted
+            } else if line.hasPrefix("@@") {
+                result[lineNum] = .modified
+            }
+        }
+        syntaxView.setDiffLines(result)
+    }
+
     private func loadGitDiff() {
         let path = filePath
         Task.detached(priority: .utility) {
@@ -214,7 +230,11 @@ final class FileEditorView: NSView {
         quickLookContainer.isHidden = true
 
         syntaxView.load(text: text, fileExtension: ext)
-        loadGitDiff()
+        if ["diff", "patch"].contains(ext) {
+            loadDiffContentGutter(text)
+        } else {
+            loadGitDiff()
+        }
         // lspSession.open(url: URL(fileURLWithPath: filePath), text: text, fileExtension: ext)
     }
 
