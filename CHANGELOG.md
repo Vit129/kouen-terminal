@@ -14,6 +14,21 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
   externally — including QuickLook previews (images, PDFs, Office docs, Excel, CSV),
   which now call `refreshPreviewItem()` so they don't show a stale cached render.
 
+### Fixed
+- **Terminal rendering corruption from interleaved status messages.** OSC 133;D
+  (command-finished) was clearing DEC 2026 synchronized-output mode, even when a
+  sub-command's shell integration fired it while an outer TUI's `?2026h` redraw batch
+  was still open (e.g. an agentic CLI's status box around a tool's shell output). This
+  made the renderer present a half-applied frame, splicing fragments of two unrelated
+  redraws into the same rows. `resetForShellPrompt()` no longer touches
+  `synchronizedOutput`; the existing sync-timeout safety valve still recovers from a
+  program that never clears `?2026h`.
+- **Sidebar disappears after collapse-then-expand with "Always collapse sidebar on
+  launch" enabled.** Forcing the sidebar closed on launch left the persisted
+  `sidebarVisible` setting stale (`true`), so the first expand toggle computed
+  `!true -> false` and was a no-op. The forced-collapse path now syncs
+  `sidebarVisible` to `false` so the next toggle correctly expands.
+
 ## [2.2.3] - 2026-06-09
 
 ### Fixed
