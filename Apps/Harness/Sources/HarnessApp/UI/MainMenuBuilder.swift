@@ -371,7 +371,11 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
 
     /// ⌘1–9 switch to the session (workspace) at that position in the sidebar.
     @objc func selectSessionNumber(_ sender: NSMenuItem) {
-        SessionCoordinator.shared.selectWorkspace(byIndex: sender.tag - 1)
+        let index = sender.tag - 1
+        let coordinator = SessionCoordinator.shared
+        guard let workspace = coordinator.snapshot.activeWorkspace,
+              index >= 0, index < workspace.sessions.count else { return }
+        coordinator.selectSession(workspaceID: workspace.id, sessionID: workspace.sessions[index].id)
     }
 
     /// ⌘1–9 switch to the tab at that position in the active session.
