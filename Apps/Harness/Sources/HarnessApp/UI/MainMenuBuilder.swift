@@ -139,6 +139,10 @@ enum MainMenuBuilder {
         promptItem.keyEquivalentModifierMask = [.command]
         promptItem.target = MenuTarget.shared
         view.submenu?.addItem(promptItem)
+        let searchHistoryItem = NSMenuItem(title: "Search Command History...", action: #selector(MenuTarget.searchCommandHistory), keyEquivalent: "r")
+        searchHistoryItem.keyEquivalentModifierMask = [.control]
+        searchHistoryItem.target = MenuTarget.shared
+        view.submenu?.addItem(searchHistoryItem)
         let findItem = NSMenuItem(title: "Find…", action: #selector(MenuTarget.find), keyEquivalent: "f")
         findItem.keyEquivalentModifierMask = [.command]
         findItem.target = MenuTarget.shared
@@ -408,6 +412,10 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
 
     @objc func commandPrompt() {
         CommandPromptController.shared.present()
+    }
+
+    @objc func searchCommandHistory() {
+        CommandHistorySearchController.shared.present()
     }
 
     @objc func openSettings() {
