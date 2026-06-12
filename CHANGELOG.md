@@ -8,6 +8,8 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 
 ## [Unreleased]
 
+## [2.5.1] - 2026-06-12
+
 ### Fixed
 - **Translucent window legibility.** Window background now uses the theme color at the current opacity instead of pure `.clear` when translucent. At any opacity below 100 %, the terminal background colour acts as a tint layer behind the CGS blur, so text remains readable regardless of what is displayed behind the window — matching the semi-opaque tinted glass behaviour Apple introduced in iOS/macOS 27.
 
