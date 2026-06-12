@@ -4,7 +4,7 @@
 
 | File | Domain | Tags | Score A/P | Summary |
 |------|--------|------|-----------|---------|
-| appkit-metal.md | AppKit/Metal | CADisplayLink, zPosition, overlay, lifecycle, opacity, layer, preview | 4/0 | Metal surface lifecycle, overlay compositing, and compensated NSView preview opacity parity pattern |
+| appkit-metal.md | AppKit/Metal | CADisplayLink, zPosition, overlay, lifecycle, opacity, layer, preview, transparency, tint, legibility, liquid-glass | 4/0 | Metal surface lifecycle, overlay compositing, compensated NSView preview opacity parity, and window background tint for translucent legibility (CASE-027) |
 | ipc-architecture.md | IPC/Daemon | socket, codec, binary-frame, security | 1/0 | Unix socket IPC design: framing, hot-path binary frames, security model |
 | split-panes.md | AppKit/UI | NSSplitView, ratio, recursion, reorder | 3/0 | Split pane management: ratio persistence, infinite-recursion guards, subview reorder |
 | acp-client.md | ACP/Agent | JSON-RPC, stdio, shelved, adapter | 0/0 | ACP protocol integration — shelved due to adapter ecosystem immaturity |
