@@ -124,7 +124,8 @@ public enum CommandParser {
         "set-environment", "show-environment",
         "set-buffer", "paste-buffer", "delete-buffer", "list-buffers", "show-buffer",
         "set-hook", "show-hooks", "unbind-hook", "find-window",
-        "refresh-client", "respawn-window", "show-messages", "clear-history",
+        "refresh-client", "respawn-window", "show-messages", "clear-history", "show-prompt-history",
+        "resize-window", "list-sessions", "list-windows", "list-panes", "list-clients",
     ]
 
     private static func buildCommand(name rawName: String, tokens: [String]) throws -> Command {
@@ -508,6 +509,20 @@ public enum CommandParser {
             return .respawnWindow(keepHistory: keep)
         case "show-messages":
             return .showMessages
+        case "show-prompt-history":
+            return .showPromptHistory
+        case "resize-window":
+            let cols = stringValue(for: "-x", in: tokens).flatMap(Int.init)
+            let rows = stringValue(for: "-y", in: tokens).flatMap(Int.init)
+            return .resizeWindow(rows: rows, cols: cols)
+        case "list-sessions":
+            return .listSessions(format: stringValue(for: "-F", in: tokens))
+        case "list-windows":
+            return .listWindows(format: stringValue(for: "-F", in: tokens))
+        case "list-panes":
+            return .listPanes(format: stringValue(for: "-F", in: tokens))
+        case "list-clients":
+            return .listClients(format: stringValue(for: "-F", in: tokens))
         case "find-window":
             // `-t <session>` scopes the search; its VALUE must never be mistaken for the
             // search pattern (skipped from the positionals, captured separately).

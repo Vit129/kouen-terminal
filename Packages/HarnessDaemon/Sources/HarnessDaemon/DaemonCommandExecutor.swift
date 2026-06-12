@@ -53,7 +53,24 @@ final class DaemonCommandExecutor: @unchecked Sendable {
             case let .requests(requests):
                 for request in requests { _ = registry.handle(request) }
             case .clientLocal:
-                fputs("HarnessDaemon: hook command has no server-side action: \(command.shortDescription)\n", harnessStderr)
+                // find-window -C: daemon can do content search directly via capturePane
+                if case let .findWindow(pattern, name, content, title, scopeTarget) = command, content {
+                    let snapshot = registry.snapshot
+                    let match = FindWindowMatcher.firstMatch(
+                        snapshot, pattern: pattern, name: name, title: title,
+                        target: scopeTarget, current: snapshot.activeWorkspace?.activeSession
+                    ) { surfaceID in
+                        if case let .text(text) = registry.handle(.capturePane(surfaceID: surfaceID, includeScrollback: false)) {
+                            return text
+                        }
+                        return nil
+                    }
+                    if let match {
+                        _ = registry.handle(.selectTab(workspaceID: match.workspaceID, tabID: match.tabID))
+                    }
+                } else {
+                    fputs("HarnessDaemon: hook command has no server-side action: \(command.shortDescription)\n", harnessStderr)
+                }
             case .unresolved:
                 fputs("HarnessDaemon: hook command had no resolvable target: \(command.shortDescription)\n", harnessStderr)
             }

@@ -124,6 +124,18 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
             name: NotificationBus.shared.snapshotChanged,
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(viQuitCommand(_:)),
+            name: .viQuitCommand,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(viOpenFileCommand(_:)),
+            name: .viOpenFileCommand,
+            object: nil
+        )
         installCopySelectionToast()
         reloadTabBar()
         restoreEditorState()
@@ -158,6 +170,22 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         let force = pendingReload ?? true
         pendingReload = nil
         reloadIfNeeded(force: force)
+    }
+
+    @objc private func viQuitCommand(_ note: Notification) {
+        if let activeID = fileTabManager.activeTab()?.id {
+            closeFileTab(id: activeID)
+        }
+    }
+
+    @objc private func viOpenFileCommand(_ note: Notification) {
+        guard let path = note.userInfo?["path"] as? String else { return }
+        // Expand ~ and resolve relative paths against active tab's CWD
+        var expanded = (path as NSString).expandingTildeInPath
+        if !expanded.hasPrefix("/"), let cwd = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd {
+            expanded = (cwd as NSString).appendingPathComponent(expanded)
+        }
+        openFileTab(path: expanded)
     }
 
     @objc private func snapshotChanged(_ note: Notification) {

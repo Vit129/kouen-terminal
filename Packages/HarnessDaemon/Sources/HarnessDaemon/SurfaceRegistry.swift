@@ -960,6 +960,17 @@ public final class SurfaceRegistry: @unchecked Sendable {
             }
             return .error("Surface not found")
 
+        case let .resizeWindow(tabID, rows, cols):
+            // Resize all surfaces in the tab to the given dimensions (resize-window override).
+            let surfaceIDs = editor.snapshot.workspaces
+                .flatMap { $0.sessions }.flatMap { $0.tabs }
+                .first(where: { $0.id == tabID })?
+                .rootPane.allSurfaceIDs().map(\.uuidString) ?? []
+            for sid in surfaceIDs {
+                sessions[sid]?.resize(rows: rows, cols: cols)
+            }
+            return surfaceIDs.isEmpty ? .error("Tab not found") : .ok
+
         case let .setOption(scopeRaw, target, key, raw):            guard let scope = OptionStore.Scope(rawValue: scopeRaw) else {
                 return .error("Unknown option scope: \(scopeRaw)")
             }
@@ -1251,6 +1262,25 @@ public final class SurfaceRegistry: @unchecked Sendable {
     public func fireClientDetached(label: String?) {
         lock.lock(); let context = buildFormatContext(clientName: label); lock.unlock()
         hookExecutionHelper.fire(.clientDetached, context: context)
+        // `destroy-unattached`: when the last client detaches, kill sessions that have no
+        // attached clients if the option is on.
+        enforceDestroyUnattached()
+    }
+
+    private func enforceDestroyUnattached() {
+        lock.lock()
+        let enabled = optionStore.get("destroy-unattached")?.boolValue ?? false
+        guard enabled else { lock.unlock(); return }
+        let attachedCount = attachedClientCountProvider?() ?? 1
+        guard attachedCount == 0 else { lock.unlock(); return }
+        // Kill every session's surfaces to release PTYs. The editor snapshot will
+        // reflect an empty workspace on the next client connect.
+        let surfaceIDs = Array(sessions.keys)
+        lock.unlock()
+        for sid in surfaceIDs {
+            lock.lock(); let session = sessions[sid]; lock.unlock()
+            session?.close()
+        }
     }
 
     // MARK: - Hook target resolution + shell execution
