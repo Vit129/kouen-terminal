@@ -1,310 +1,193 @@
 # Harness
 
-> Forked from [robzilla1738/harness-terminal](https://github.com/robzilla1738/harness-terminal)
+A native macOS terminal that keeps your sessions running, brings your editor tools with you, and tells you the moment a coding agent needs you.
 
-Harness is a **Terminal First, IDE Convenient** workspace for macOS. It is a native GPU-accelerated terminal designed for speed and reliability, built on a persistent daemon architecture, with IDE-grade conveniences—such as a side panel file tree, real-time Git integration, and symbol fuzzy search—deeply integrated so you never have to leave your terminal.
-
-One self-contained app. The terminal engine, daemon, and CLI are all first-party Swift; the only external dependency is Sparkle (the macOS auto-update framework, GUI-only).
+Everything is first-party Swift — the GPU terminal engine, session daemon, and CLI. The only external dependency is Sparkle for auto-updates.
 
 ---
-
-## 🧬 Architecture — CMUX + Zed in a Terminal
-
-```
-┌─────────────────────────────────────────────────┐
-│              Harness Terminal                     │
-├─────────────────────────────────────────────────┤
-│  🖥️  GPU Terminal Engine (Metal, sRGB/P3)       │
-│  🔄  Daemon (persistent sessions, remote SSH)    │
-│  📐  CMUX (client-side split panes, N-ary)      │
-│  📁  File Tree + Editor (Zed-style)             │
-│  🌿  Git Panel — real-time (Zed-style)          │
-│  🤖  Agent Detection + Notifications            │
-│  🔔  ACP Chat — shelved (code preserved)        │
-└─────────────────────────────────────────────────┘
-```
-
-Open the DMG, drag `Harness.app` to Applications, and launch it normally. The release is signed, notarized, and built for Apple silicon Macs running macOS 15 or later.
-
-Verify the SHA-256 checksum against the value published on the [GitHub release page](https://github.com/robzilla1738/harness-terminal/releases/latest).
-
-Prefer to build it yourself? Jump to [Build from source](#build-from-source).
 
 ## Why Harness
 
-- **Terminal First.** GPU rendering, accurate sRGB color by default, opt-in converted Display-P3 vivid color, ligatures, inline images (Sixel / Kitty / iTerm2), and 490 built-in themes with a muted Harness default. Your sessions and splits are owned by a background daemon, meaning your workspace survives app quits, daemon restarts, and can be driven or attached locally or remotely via `harness-cli` or SSH.
-- **IDE Convenient.** Rather than forcing you to context-switch to a heavy IDE or multiple tools, Harness brings essential developer conveniences directly to your terminal. A side panel (`Cmd+\`) houses a live-updating file tree and a real-time Git status interface (stage, commit, push, worktrees, history, and diffs). Open files instantly with the command palette (`Cmd+K`).
-- **Designed for AI Coding Agents.** Harness passively monitors processes running inside it (like Claude Code, Codex, Cursor, and more). It alerts you the moment an agent stops or requires approval, letting you jump straight to the action with `Cmd+Shift+U`.
+**Terminal first.** GPU Metal renderer with accurate sRGB color, 490 built-in themes, inline images (Sixel/Kitty/iTerm2), ligatures, and procedural box-drawing. Your sessions live in a background daemon — quit the app, reopen it, everything is exactly where you left it. Attach the same session from a second window or a remote machine over SSH.
 
-## How it feels
+**vi power user.** The file editor has a full vi normal mode — motions, operators, text objects, marks, registers, macros, jump list, and `:` ex commands. Open files with `:e`, navigate buffers with `:bn`/`:bp`, substitute with `:%s`, set relative numbers with `:set relativenumber`. Feel at home if you live in vim.
 
-Harness ranges from a plain, get-out-of-your-way terminal to a full session manager. Pick the level in **Settings → Terminal → Experience**:
+**tmux compatible.** Prefix keymap, copy mode, `send-keys`, `capture-pane`, `pipe-pane`, `select-layout`, `synchronize-panes`, format strings, hooks — the full command set. Import `.tmux.conf` with `source-file`. Options: `word-separators`, `wrap-search`, `window-size`, `destroy-unattached`, `clear-history`.
 
-- **Plain Terminal** — fast and quiet. No command prefix, no status bar. Sessions close when you quit, like any terminal.
-- **Persistent Terminal** — the same clean look, but sessions survive quitting and you can attach to them from the CLI.
-- **Full Terminal** — everything: command prefix, status line, copy mode, paste buffers, panes, and the full `harness-cli` command set.
-- **Agent Workspace** — persistent project workspaces with agent detection and notifications turned up front.
+**IDE convenient.** A sidebar (`Cmd+\`) houses a file tree with keyboard navigation (j/k/h/l/Enter), a real-time Git panel (stage, commit, push, history, worktrees), and an LSP-powered file editor (hover, go-to-definition, diagnostics). Everything is in the terminal window — no app switching.
 
-New installs start in Plain. Moving over from another setup? See [docs/MIGRATION.md](docs/MIGRATION.md) — Harness can import an existing terminal config (colors, font, padding) on first run.
+**Agent aware.** Harness watches the agents running inside it (Claude Code, Codex, Cursor, and more), alerts you when one stops or needs approval, and lets you jump straight to it with `Cmd+Shift+U`.
+
+---
+
+## Quick start
+
+```bash
+make run          # build + sign + open Harness.app
+make preview      # isolated preview build (separate daemon socket)
+swift build       # compile all targets
+swift test        # run test suite
+```
+
+Or [download the signed DMG](https://github.com/Vit129/harness-terminal/releases/latest) and drag to Applications.
+
+**Requirements:** Apple silicon Mac, macOS 15+. (Daemon + CLI also build headless on Linux.)
+
+---
 
 ## Features
 
-- GPU-accelerated rendering by Harness's own terminal engine — accurate sRGB output by default, opt-in converted Display-P3 vivid color, a themed translucent canvas, and program output left untouched unless you opt into theme recoloring; damage-driven redraws keep selection drags, find highlights, IME composition, and streaming output cheap, full-rate on ProMotion displays, and covered or minimized windows stop rendering entirely
-- Mainstream-GPU-terminal polish: live re-wrap while resizing (with a grid-size overlay), word / line / block selection, middle-click paste, alternate-screen wheel scrolling, focus reporting, hollow unfocused cursor, minimum contrast, auto light/dark themes, bold-is-bright control, and paste protection
-- Sidebar sessions, per-session tabs, and horizontal / vertical splits — group sessions with shared window lists
-- Session layout persists across quits (daemon-owned, attach from the CLI or over SSH); if the daemon restarts under a pane, a quiet "Reconnecting…" chip rides the ~1-minute automatic backoff before the click-to-re-grab overlay takes over
-- Persistent scrollback: a pane's history is written to disk per surface and restored when the daemon restarts
-- Remote & headless daemon: run `HarnessDaemon` on a headless or remote box (Linux included) and drive it with `harness-cli --host <name>` over an SSH tunnel — register hosts with `harness-cli remote add`
-- `harness-cli` for automation and agent hooks
-- Color/theme diagnostics from the CLI: `harness-cli color-check` and `harness-cli theme-preview --theme <name>` print deterministic SGR pages for eyeballing fidelity in Harness itself
-- Command set: `send-keys`, `capture-pane`, `kill-pane`, `resize-pane`, `zoom-pane`, `swap-pane`, `rename-tab`, `attach`, `find-window`, `kill-server`, `start-server`, `respawn-window`, `refresh-client`, `clear-history`, `resize-window`, and more
-- Command prefix keymap (default `Ctrl-A`) with a live cheatsheet (prefix `?`)
-- **tmux parity options:** `word-separators`, `wrap-search`, `window-size` (smallest/largest/latest), `destroy-unattached`, `show-prompt-history`, `list-sessions/windows/panes/clients -F <format> [--json]`
-- Agent detection for Claude Code, Codex, Cursor, Grok, Pi, Hermes, OpenClaw, OpenCode, Aider, Gemini, and Goose — each with a brand color and a sidebar chip
-- Agent alerts as desktop banners and a sidebar bell; `Cmd+Shift+U` jumps to whoever is waiting
-- One-line hook install: `harness-cli install-hooks <agent>`
-- Command palette (`Cmd+K`) with fuzzy file quick-open, Switch Project (tmux-sessionizer-style + zoxide frecency), and workspace symbol search
-- Search command history with `Ctrl+R` — fuzzy search overlay with recency sorting, seeds the command prompt on selection
-- Layout presets (`Cmd+Opt+1`–`5`): Even Horizontal, Even Vertical, Main Horizontal, Main Vertical, Tiled — instant one-key splits
-- **⌘1–9 switches between sidebar sessions** (workspaces)
-- Git worktrees auto-open/close session tabs on add/remove
-- A native macOS Settings window (`Cmd+,`)
-- 490 built-in color themes with a muted Harness default, plus `.harnesstheme` export / import for sharing — double-click (or Open With) a theme file to install it, optionally applying its colors immediately
-- Shell integration (OSC 133): prompt marks for jump-to-prompt and a command success / failure gutter — bash / zsh / fish snippets in [docs/shell-integration/](docs/shell-integration/README.md)
-- Inline images that stay put across reflow and scroll into history
-- Drag file-backed folders or images into a pane to insert shell-quoted paths
-- Set Harness as the default terminal for SSH/Telnet/man-page links and `.command` / `.tool` files from Settings > Terminal
-- Automatic, signed background updates (Sparkle + EdDSA)
-- **Full vi mode in file editor** — normal/insert/visual/replace/operator-pending; all motions, operators, text objects, marks, registers, macros, jump list; `:` ex commands (`:w`, `:q`, `:s/old/new/g`, `:%s`, `:set number/relativenumber`, `:e <file>`, `:bn/:bp`)
-- **Keyboard navigation in file tree** — j/k move, h/l fold/expand, Enter open, g/G first/last, `/` filter
-- **LSP in file editor** — hover tooltip, go-to-definition (⌘+click), diagnostics underline (Swift, TypeScript, Python, Rust, Go)
-
-## harness-cli
-
-Harness launches its daemon automatically; the CLI talks to it.
-
-```bash
-harness-cli list-surfaces
-harness-cli new-session --workspace Default --cwd ~/Code/myproject
-harness-cli new-tab --workspace Default --cwd ~/Code/myproject
-harness-cli send-keys --surface "$HARNESS_SURFACE" --keys "ls -la Enter"
-harness-cli notify --surface "$HARNESS_SURFACE" --title Agent --body "Needs approval"
-harness-cli color-check
-harness-cli theme-preview --theme "Harness Default"
-```
-
-| Layer | What it does |
-|-------|-------------|
-| **GPU Terminal** | Metal renderer, 490 themes, inline images (Sixel/Kitty/iTerm2), ligatures, procedural box-drawing |
-| **Daemon** | Sessions survive quit/relaunch, scrollback persists to disk, attach from CLI or remote SSH |
-| **CMUX** | Binary-tree split panes, drag-to-split, auto-balanced ratios, pane-local surface tabs |
-| **File Tree** | FSEvents live-watch, git status colors, keyboard navigation (j/k/h/l/Enter), context menu |
-| **File Editor** | 20+ language syntax highlighting, full vi mode (normal/visual/operator/ex), LSP (hover/go-to-def/diagnostics), find/replace, git diff gutter, relative line numbers |
-| **Git Panel** | Stage/unstage, commit (amend/signoff), fetch/pull/push, branch switch, history + diff, worktrees |
-| **Agent Chat** | ACP Client over stdio — shelved (code preserved, adapters not yet available) |
-| **Agent Detection** | Process-tree scan for 12+ agents, brand colors, desktop notifications, Cmd+Shift+U jump |
-
----
-
-## ⚡ Quick Start
-
-```bash
-make preview          # build + launch isolated preview app
-make run              # build + package + sign + open Harness.app
-swift build           # compile all targets
-swift test            # run test suite
-```
-
-The first-run setup in `Harness.app` performs the same local installation for new
-users: it copies `harness-cli` and `HarnessDaemon`, registers the LaunchAgent,
-adds PATH blocks for zsh/bash/fish with backups, installs fish completions, asks
-for notification permission, and offers detected agent hooks. On a fresh install, Harness displays
-a one-shot welcome tour; after an update, it shows release highlights (suppressible via the `update-banner` option).
-
----
-
-## 🖥️ Terminal
-
-- GPU-accelerated Metal renderer — sRGB default, opt-in Display P3 vivid color
+### Terminal engine
+- Metal renderer — sRGB default, opt-in Display P3 vivid color
 - 490 built-in themes + `.harnesstheme` import/export
 - Inline images: Sixel, Kitty, iTerm2
-- Ligatures, procedural box-drawing, minimum contrast
+- Ligatures, procedural box-drawing glyphs (no seams at any font size)
 - Live re-wrap on resize with grid-size overlay
-- Word/line/block selection, middle-click paste, alternate-screen scrolling
+- Word/line/block/rectangle selection; middle-click paste; alternate-screen scrolling
 - Shell integration (OSC 133): prompt marks, jump-to-prompt, success/fail gutter
-- Auto light/dark theme switching
+- Auto light/dark theme switching; minimum contrast; hollow unfocused cursor
+
+### Sessions & daemon
+- Sessions, tabs, and splits owned by a background daemon — survive quit and relaunch
+- Scrollback persisted to disk per surface, restored on daemon restart
+- Remote daemon: `harness-cli --host devbox` via SSH tunnel (`harness-cli remote add`)
+- Experience modes: **Plain** (no prefix, closes on quit) → **Persistent** → **Full** → **Agent Workspace**
+
+### Split panes (CMUX)
+- Binary-tree pane model, N-ary flatten, drag-to-split with live drop overlays
+- Layout presets `Cmd+Opt+1–5`: Even Horizontal, Even Vertical, Main Horizontal, Main Vertical, Tiled
+- Pane-local surface tabs, zoom pane, synchronize panes
+- Layouts persist across restarts
+
+### File tree
+- FSEvents live-watch with 500ms debounce
+- Git status colors on every entry
+- **Keyboard navigation:** j/k move cursor, h/l collapse/expand folder, Enter/o open/preview, g/G first/last, Ctrl+d/u half-page, `/` focus filter
+- Context menu: new file, reveal in Finder, copy path, delete
+
+### File editor + vi mode
+- 20+ language syntax highlighting
+- **Full vi normal mode** — all motions (hjkl wWbBeE 0^$ gg/G {}/% H/M/L f/F/t/T), operators (d/c/y + motion + text objects), visual mode (v/V), marks (`ma`/`'a`/`` `a ``), named registers (`"ayy`/`"ap`), macros (`qa`…`q` / `@a`), jump list (Ctrl+o/Ctrl+i), count prefix
+- **Text objects:** `iw`/`aw`, `i"`/`a"`, `i'`/`a'`, `i(`/`a(`, `i[`/`a[`, `i{`/`a{`, `ip`/`ap`, `is`/`as`
+- **Ex commands:** `:w` `:q` `:wq` `:N` `:s/old/new/g` `:%s` `:noh` `:set number/relativenumber/hlsearch` `:e <file>` `:bn`/`:bp`/`:ls` `:set wrap/ignorecase`
+- **Inline `*`/`#` search highlight** — all matches highlighted; `:noh` clears
+- **LSP:** hover tooltip, go-to-definition (⌘+click), diagnostics underline — Swift, TypeScript, Python (pyright), Rust (rust-analyzer), Go (gopls) — auto-detected by project markers
+- Git diff gutter (added/modified/deleted bars per line)
+- Find/replace, vi-mode, drag-to-resize editor/terminal split
+
+### Git panel
+- **Changes** — stage/unstage per file, Stage All, commit (amend, signoff), +N -M counts per file
+- **Sync** — Fetch/Pull/Push with per-remote options
+- **History** — click commit → file list + diff with syntax coloring; right-click for Copy ID/Message/Show Diff
+- **Worktrees** — add/remove `git worktree` entries; adding one opens a new session tab automatically
+- FSEvents recursive watcher, 500ms debounce — reflects every commit, stage, and checkout instantly
+
+### tmux compatibility
+Full tmux command set: `send-keys`, `capture-pane`, `pipe-pane`, `kill-pane`, `zoom-pane`, `select-pane`, `select-layout`, `rotate-window`, `break-pane`, `join-pane`, `synchronize-panes`, `if-shell`, `run-shell`, `wait-for`, `source-file`, `set-option`, `bind-key`, `display-message`, `command-prompt`, `choose-*`, `find-window`, and more.
+
+Options: `word-separators`, `wrap-search`, `window-size` (smallest/largest/latest), `destroy-unattached`, `clear-history`, `remain-on-exit`, `base-index`, `repeat-time`, `monitor-activity`, `monitor-silence`, `pane-border-status`, and the full format-string `#{…}` set.
+
+`source-file ~/.tmux.conf` parses bind/set/setenv lines as-is. Import your existing config.
+
+```bash
+list-sessions -F "#{session_name}: #{session_windows} windows"
+list-panes --json
+clear-history
+resize-window -x 220 -y 50
+```
+
+### Command palette (`Cmd+K`)
+- Fuzzy session/tab switch
+- File quick-open (background enumeration, no stutter)
+- Switch Project — open tabs' CWDs + zoxide frecency list
+- Workspace symbol search (functions, classes, variables) → send to terminal
+
+### Agent system
+Passive process-tree scan detects: Claude Code, Codex, Cursor, Grok, Pi, Hermes, OpenClaw, OpenCode, Aider, Gemini, Goose, and more — each with brand color + sidebar chip.
+
+- Desktop banner + sidebar bell when agent stops or needs input
+- `Cmd+Shift+U` jumps to the waiting agent
+- `harness-cli install-hooks <agent>` one-line hook setup
 
 ---
 
-## 🔄 Daemon & Sessions
+## Keyboard shortcuts
 
-- Sessions, tabs, splits owned by background daemon — survive quit and relaunch
-- Scrollback persisted to disk — survives daemon restart
-- Remote daemon: `harness-cli --host devbox` over SSH tunnel
-- `harness-cli` for automation: `send-keys`, `capture-pane`, `new-session`, `notify`
-- Experience modes: Plain → Persistent → Full → Agent Workspace
-
----
-
-## 📐 CMUX (Split Panes)
-
-- Binary-tree pane model (`PaneNode`) with N-ary flatten
-- Split right (Cmd+D): auto-balanced 50/50 → 33/33/33 → 25/25/25/25
-- Drag surface tabs to split with live drop overlays
-- Pane-local surface tabs — multiple terminals per pane
-- Move surfaces between panes
-- Layout persists across restarts
-
----
-
-## 📁 IDE Sidebar
-
-Toggle with `Cmd+\`. Four tabs:
-
-| Tab | What it does |
-|-----|-------------|
-| **Sessions** | Project groups, session cards (with session ID), drag-reorder, recent projects, CWD grouping |
-| **Files** | File tree with FSEvents auto-refresh, git status colors, right-click menu |
-| **Git** | Changes (stage/commit), History (click→file editor), Worktrees |
-
----
-
-## 🌿 Git (Real-time)
-
-- **Auto-refresh** — FSEvents watcher on `.git` dir, 500ms debounce
-- **Changes** — stage/unstage per-file, Stage All, commit message + Commit ▼ (amend, signoff)
-- **Sync** — Fetch/Pull/Push with per-remote options, auto-detects ahead/behind
-- **History** — commit list, click → changed files list + diff, click file → opens in editor (Zed-like)
-- **Worktrees** — list/add/remove `git worktree` entries
-- **Branch** — switcher from bottom bar
-
----
-
-## 🤖 Agent System
-
-### Detection (passive — zero config)
-Harness scans process trees and detects: Claude Code, Codex, Cursor, Grok, Pi, Hermes, OpenClaw, OpenCode, Aider, Gemini, Goose, Antigravity, Kiro — each with brand color + sidebar chip.
-
-### Notifications
-- Desktop banners when agent stops or needs input
-- Sidebar bell + `Cmd+Shift+U` jump to waiting agent
-- One-line hook install: `harness-cli install-hooks claude-code`
-
-### ACP Client (shelved — code preserved for future)
-- Spawn agent as subprocess via Agent Client Protocol (JSON-RPC 2.0 over stdio)
-- Send prompts, receive streaming text + tool calls
-- Approve/reject file edits and command execution
-- Currently disabled: adapters not widely available, PATH issues in .app bundles
-- Re-enable in Settings when ACP ecosystem matures
-
----
-
-## ⌨️ Keyboard Shortcuts
-
-| Action | Shortcut |
-|--------|----------|
+| Action | Key |
+|--------|-----|
 | New tab | `Cmd+T` |
 | New session | `Cmd+Shift+N` |
 | Close tab | `Cmd+W` |
 | Split right | `Cmd+D` |
 | Toggle sidebar | `Cmd+\` |
+| Toggle IDE mode | `Cmd+Shift+D` |
 | Command palette | `Cmd+K` |
 | Search command history | `Ctrl+R` |
 | Jump to waiting agent | `Cmd+Shift+U` |
+| Switch session 1–9 | `Cmd+1` … `Cmd+9` |
+| Layout presets | `Cmd+Opt+1–5` |
 | Settings | `Cmd+,` |
-| Switch tab 1–9 | `Cmd+1` … `Cmd+9` |
-| Layout: Even Horizontal | `Cmd+Opt+1` |
-| Layout: Even Vertical | `Cmd+Opt+2` |
-| Layout: Main Horizontal | `Cmd+Opt+3` |
-| Layout: Main Vertical | `Cmd+Opt+4` |
-| Layout: Tiled | `Cmd+Opt+5` |
 
-Command prefix (default `Ctrl-A`) adds the full pane/session keymap — press prefix then `?` for cheatsheet.
+Command prefix (default `Ctrl-A`): press prefix then `?` for the full cheatsheet.
 
 ---
 
-## 💻 Tech Stack
+## harness-cli
+
+```bash
+harness-cli list-surfaces
+harness-cli new-session --workspace Default --cwd ~/Code/myproject
+harness-cli send-keys --surface "$HARNESS_SURFACE" --keys "ls -la Enter"
+harness-cli capture-pane --surface "$HARNESS_SURFACE"
+harness-cli notify --surface "$HARNESS_SURFACE" --title Agent --body "Needs approval"
+harness-cli remote add devbox user@devbox.example.com
+harness-cli --host devbox list-surfaces
+harness-cli color-check
+harness-cli theme-preview --theme "Harness Default"
+```
+
+---
+
+## Tech stack
 
 | Layer | Technology |
 |-------|-----------|
-| **Language** | Swift 6 (strict concurrency) |
-| **GUI** | AppKit + Metal |
-| **Terminal Engine** | First-party VT parser + screen model |
-| **Renderer** | CoreText + Metal glyph atlas |
-| **IPC** | Unix-domain sockets, length-prefixed JSON + binary PTY frames |
-| **Agent Protocol** | ACP v1 (JSON-RPC 2.0, Content-Length framing over stdio) |
-| **Auto-update** | Sparkle (macOS only) |
-| **Platforms** | macOS 15+ (GUI), Linux (daemon + CLI headless) |
+| Language | Swift 6 (strict concurrency throughout) |
+| GUI | AppKit + Metal |
+| Terminal engine | First-party VT parser + screen/grid model |
+| Renderer | CoreText + Metal glyph atlas, sRGB/P3 |
+| IPC | Unix-domain sockets, length-prefixed JSON + binary PTY frames |
+| Auto-update | Sparkle (macOS only, EdDSA signatures) |
+| Platforms | macOS 15+ (GUI), Linux (daemon + CLI headless) |
 
 ---
 
-## 📦 Package Map
-
-| Package | Role |
-|---------|------|
-| `HarnessCore` | IPC, commands, settings, ACP, models, persistence |
-| `HarnessTerminalEngine` | Pure-Swift VT parser → screen/grid model |
-| `HarnessTerminalRenderer` | CoreText/Metal renderer (macOS) |
-| `HarnessTerminalKit` | AppKit terminal surface (macOS) |
-| `HarnessDaemonCore` | Daemon: Unix socket server, PTY sessions, hooks |
-| `HarnessDaemon` | Daemon executable |
-| `HarnessCLI` | CLI: `harness-cli` commands |
-| `HarnessApp` | GUI app: windows, sidebar, git panel, agent chat |
-| `CHarnessSys` | C shim for PTY/ioctl |
-
----
-
-## 🧠 Agent Memory System
-
-| Layer | Location | Purpose |
-|-------|----------|---------|
-| **Auto Memory** | `~/.claude/projects/.../memory/` | Session knowledge (Claude writes automatically) |
-| **agent-memory/** | `agent-memory/` | Structured state: memory, playbook, skill-log, user-profile |
-| **CLAUDE.md / AGENTS.md** | repo root | Build commands, architecture, constraints for all agents |
-
----
-
-## 📊 Graphify
+## Build from source
 
 ```bash
-graphify update .     # rebuild knowledge graph (no API cost)
-graphify serve        # local graph viewer
+git clone https://github.com/Vit129/harness-terminal
+cd harness-terminal
+make run            # builds, signs, and opens Harness.app
 ```
 
-7303 nodes · 13291 edges · 439 communities → `graphify-out/GRAPH_REPORT.md`
+Requires Xcode 16+ / Swift 6.0. The daemon and CLI (`swift build --product HarnessDaemon`, `swift build --product harness-cli`) also build on Linux without Xcode.
 
 ---
-
-## 🤖 Multi-Agent Development
-
-| File | Agent | Purpose |
-|------|-------|---------|
-| `CLAUDE.md` | Claude Code | Build/architecture/constraints |
-| `AGENTS.md` | Codex / Gemini / Kiro | Same (agent-agnostic format) |
-| `agent-memory/memory.md` | All | Active sprint context |
-| `agent-memory/playbook.md` | All | Resolved cases (CASE-001–011) |
-
----
-
-## Requirements
-
-- Apple silicon Mac running macOS 15.0 or later for the downloadable DMG
-- Xcode 16+ / Swift 6.0 (to build from source)
-- For a headless/remote daemon: any machine with Swift 6.0 (macOS or Linux) — build the daemon + CLI with `swift build -c release` (the GUI app, renderer, and Sparkle are macOS-only and are dropped from the Linux build)
 
 ## Documentation
 
-- [Experience modes](docs/MODES.md) — Plain / Persistent / Full / Agent
-- [IDE sidebar](docs/IDE-SIDEBAR.md) — Files, Git, and active agent activity panel
-- [Agent handbook](docs/AGENT-HANDBOOK.md) — instructions and guidelines for AI coding agents
-- [Sessions & panes guide](docs/MULTIPLEXER_GUIDE.md) — prefix, panes, sessions, copy mode, attach from anywhere
-- [tmux parity ledger](docs/TMUX_PARITY.md) — capability status, adaptations for the daemon-owned model, explicitly rejected tmux features with rationale
-- [tmux-style capabilities PDF](docs/HARNESS_TMUX_CAPABILITIES.pdf) — printable setup, shortcuts, commands, attach, copy mode, and troubleshooting
-- [Release runbook](docs/RELEASE.md) — signed/notarized DMG, GitHub Actions release workflow, and Sparkle appcast publishing
-- [Migration](docs/MIGRATION.md) — bringing your config and habits across
-- [Keybindings](docs/KEYBINDINGS.md) · [Commands](docs/COMMANDS.md) · [Shell integration](docs/shell-integration/README.md) · [Agent hooks](docs/agent-hooks/README.md)
-- [Changelog](CHANGELOG.md) — release history
-- [Third-party notices](docs/THIRD-PARTY-NOTICES.md)
+- [Experience modes](docs/MODES.md)
+- [tmux parity ledger](docs/TMUX_PARITY.md) — capability status, adaptations, explicitly rejected features
+- [tmux capabilities guide](docs/HARNESS_TMUX_CAPABILITIES.md)
+- [Commands reference](docs/COMMANDS.md)
+- [Keybindings](docs/KEYBINDINGS.md)
+- [Shell integration](docs/shell-integration/README.md)
+- [Agent hooks](docs/agent-hooks/README.md)
+- [Migration](docs/MIGRATION.md)
+- [Release runbook](docs/RELEASE.md)
+- [Changelog](CHANGELOG.md)
+
+---
 
 ## License
 
