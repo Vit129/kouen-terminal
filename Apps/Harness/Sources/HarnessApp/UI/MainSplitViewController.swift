@@ -327,16 +327,22 @@ final class MainSplitViewController: NSViewController {
         }
     }
 
+    func resetFocusMode() {
+        isFocusModeActive = false
+    }
+
     func toggleSidebar() {
+        resetFocusMode()
         setSidebarVisible(!SessionCoordinator.shared.settings.sidebarVisible, animated: true)
     }
 
     func toggleIDEMode() {
+        resetFocusMode()
         if content.isFileEditorVisible {
-            content.hideFileEditorSplit()
+            content.hideFileEditorSplit(resetFocusMode: false)
         } else {
             setSidebarVisible(true, animated: true)
-            content.showFileEditorSplit()
+            content.showFileEditorSplit(resetFocusMode: false)
         }
     }
 
@@ -344,9 +350,9 @@ final class MainSplitViewController: NSViewController {
         if isFocusModeActive {
             setSidebarVisible(preFocusSidebarVisible, animated: true)
             if preFocusFileEditorVisible {
-                content.showFileEditorSplit()
+                content.showFileEditorSplit(resetFocusMode: false)
             } else {
-                content.hideFileEditorSplit()
+                content.hideFileEditorSplit(resetFocusMode: false)
             }
             isFocusModeActive = false
         } else {
@@ -355,7 +361,7 @@ final class MainSplitViewController: NSViewController {
             
             if preFocusSidebarVisible || preFocusFileEditorVisible {
                 setSidebarVisible(false, animated: true)
-                content.hideFileEditorSplit()
+                content.hideFileEditorSplit(resetFocusMode: false)
                 isFocusModeActive = true
             } else {
                 setSidebarVisible(true, animated: true)

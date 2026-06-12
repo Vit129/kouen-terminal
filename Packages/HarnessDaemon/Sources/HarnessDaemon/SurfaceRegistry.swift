@@ -281,6 +281,12 @@ public final class SurfaceRegistry: @unchecked Sendable {
         switch request {
         case .ping:
             return .pong
+        case let .clearHistory(surfaceID):
+            if let session = sessions[surfaceID] {
+                session.clearHistory()
+                return .ok
+            }
+            return .error("Surface not found")
         case .listWorkspaces:
             return .workspaces(editor.snapshot.workspaces.map {
                 WorkspaceSummary(id: $0.id, name: $0.name, tabCount: $0.sessions.count)
@@ -953,8 +959,14 @@ public final class SurfaceRegistry: @unchecked Sendable {
                 return .error("Could not respawn surface")
             }
             return .ok
-        case let .setOption(scopeRaw, target, key, raw):
-            guard let scope = OptionStore.Scope(rawValue: scopeRaw) else {
+        case let .clearHistory(surfaceID):
+            if let session = sessions[surfaceID] {
+                session.clearHistory()
+                return .ok
+            }
+            return .error("Surface not found")
+
+        case let .setOption(scopeRaw, target, key, raw):            guard let scope = OptionStore.Scope(rawValue: scopeRaw) else {
                 return .error("Unknown option scope: \(scopeRaw)")
             }
             // The on-disk key joins scope:target:key with colons; a colon in the option name or

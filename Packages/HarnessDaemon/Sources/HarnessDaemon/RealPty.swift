@@ -460,8 +460,6 @@ public final class RealPty: @unchecked Sendable {
             scrollbackBytes = 0
             nextSequence = 1
             scrollbackLock.unlock()
-            // Drop the persisted copy too, so a later restart doesn't resurrect the history the
-            // user just cleared.
             scrollbackFile?.reset()
         }
         // Spawn a new shell, reusing the cwd of the previous process when it was still
@@ -482,6 +480,16 @@ public final class RealPty: @unchecked Sendable {
             lifecycleLock.unlock()
             childEnded(generation: gen)
         }
+    }
+
+    public func clearHistory() {
+        scrollbackLock.lock()
+        scrollback.removeAll()
+        scrollbackHead = 0
+        scrollbackBytes = 0
+        nextSequence = 1
+        scrollbackLock.unlock()
+        scrollbackFile?.reset()
     }
 
     private func restartChild(cwd: String, shell: String, rows: UInt16, cols: UInt16) throws {

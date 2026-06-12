@@ -124,7 +124,7 @@ public enum CommandParser {
         "set-environment", "show-environment",
         "set-buffer", "paste-buffer", "delete-buffer", "list-buffers", "show-buffer",
         "set-hook", "show-hooks", "unbind-hook", "find-window",
-        "refresh-client", "respawn-window", "show-messages",
+        "refresh-client", "respawn-window", "show-messages", "clear-history",
     ]
 
     private static func buildCommand(name rawName: String, tokens: [String]) throws -> Command {
@@ -349,6 +349,8 @@ public enum CommandParser {
             return .breakPane
         case "respawn-pane":
             return .respawnPane(keepHistory: !(tokens.contains("-k") || tokens.contains("--clear-history")))
+        case "clear-history":
+            return .clearHistory
         case "move-pane":
             // move-pane -s <src> [-t <dst>] [-h|-v] — like join-pane with an
             // explicit source. `-v` stacks (horizontal divider); default/`-h` is
