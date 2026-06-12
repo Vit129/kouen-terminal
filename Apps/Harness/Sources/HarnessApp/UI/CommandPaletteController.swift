@@ -406,6 +406,9 @@ final class PaletteViewController: NSViewController, NSTableViewDataSource, NSTa
     private let allActions: [PaletteAction]
     private let recentIDs: [String]
     private weak var parentWindow: NSWindow?
+    /// Cached file matches from background scan; keyed by rootPath.
+    private var cachedFileEntries: (rootPath: String, entries: [(path: String, relativePath: String, fileName: String)]) = ("", [])
+    private var fileScanTask: Task<Void, Never>?
     /// Flat list of rows shown — alternating section headers and items.
     private var rows: [Row] = []
     /// Logical positions of actionable rows so arrow-keys skip headers.
@@ -588,6 +591,40 @@ final class PaletteViewController: NSViewController, NSTableViewDataSource, NSTa
 
     func focusSearch() {
         view.window?.makeFirstResponder(searchField)
+        startFileScanIfNeeded()
+    }
+
+    private func startFileScanIfNeeded() {
+        guard let rootPath = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd,
+              rootPath != cachedFileEntries.rootPath else { return }
+        fileScanTask?.cancel()
+        fileScanTask = Task.detached(priority: .userInitiated) { [weak self] in
+            let rootURL = URL(fileURLWithPath: rootPath)
+            let rootPrefix = rootPath.hasSuffix("/") ? rootPath : rootPath + "/"
+            let enumerator = FileManager.default.enumerator(
+                at: rootURL,
+                includingPropertiesForKeys: [.isDirectoryKey],
+                options: [.skipsHiddenFiles, .skipsPackageDescendants]
+            )
+            var entries: [(path: String, relativePath: String, fileName: String)] = []
+            while let url = enumerator?.nextObject() as? URL {
+                if Task.isCancelled { break }
+                if (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
+                    let name = url.lastPathComponent
+                    if name == "node_modules" || name == ".git" || name == ".build" || name == "DerivedData" {
+                        enumerator?.skipDescendants()
+                    }
+                    continue
+                }
+                let path = url.path
+                let rel = path.hasPrefix(rootPrefix) ? String(path.dropFirst(rootPrefix.count)) : url.lastPathComponent
+                entries.append((path: path, relativePath: rel, fileName: url.lastPathComponent))
+                if entries.count >= 5000 { break }
+            }
+            await MainActor.run { [weak self] in
+                self?.cachedFileEntries = (rootPath, entries)
+            }
+        }
     }
 
     // MARK: - Filtering / ranking
@@ -695,38 +732,19 @@ final class PaletteViewController: NSViewController, NSTableViewDataSource, NSTa
     }
 
     private func fileMatches(query: String) -> [(action: PaletteAction, score: Int)] {
-        guard let rootPath = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd else { return [] }
-        let rootURL = URL(fileURLWithPath: rootPath)
-        let rootPrefix = rootPath.hasSuffix("/") ? rootPath : rootPath + "/"
-        let enumerator = FileManager.default.enumerator(
-            at: rootURL,
-            includingPropertiesForKeys: [.isDirectoryKey],
-            options: [.skipsHiddenFiles, .skipsPackageDescendants]
-        )
-
+        guard !cachedFileEntries.rootPath.isEmpty else { return [] }
         var matches: [(action: PaletteAction, score: Int)] = []
-        while let url = enumerator?.nextObject() as? URL {
-            if (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
-                let name = url.lastPathComponent
-                if name == "node_modules" || name == ".git" || name == ".build" || name == "DerivedData" {
-                    enumerator?.skipDescendants()
-                }
-                continue
-            }
-
-            let path = url.path
-            let relativePath = path.hasPrefix(rootPrefix) ? String(path.dropFirst(rootPrefix.count)) : url.lastPathComponent
-            let fileName = url.lastPathComponent
-            let titleScore = FuzzyMatcher.score(query: query, in: fileName) ?? -1
-            let pathScore = FuzzyMatcher.score(query: query, in: relativePath) ?? -1
+        for entry in cachedFileEntries.entries {
+            let titleScore = FuzzyMatcher.score(query: query, in: entry.fileName) ?? -1
+            let pathScore = FuzzyMatcher.score(query: query, in: entry.relativePath) ?? -1
             let best = max(titleScore, pathScore >= 0 ? pathScore - 4 : -1)
             guard best >= 0 else { continue }
-
+            let path = entry.path
             matches.append((
                 action: PaletteAction(
                     id: "file.\(path)",
-                    title: fileName,
-                    subtitle: relativePath,
+                    title: entry.fileName,
+                    subtitle: entry.relativePath,
                     symbol: "doc.text",
                     shortcut: "",
                     section: .files
@@ -738,10 +756,8 @@ final class PaletteViewController: NSViewController, NSTableViewDataSource, NSTa
                 },
                 score: best
             ))
-
             if matches.count >= 200 { break }
         }
-
         return matches
             .sorted { $0.score > $1.score }
             .prefix(20)
