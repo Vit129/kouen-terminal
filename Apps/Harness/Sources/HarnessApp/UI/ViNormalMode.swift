@@ -34,6 +34,12 @@ final class ViEngine {
     var onOpenFile: ((String) -> Void)?
     /// Called when `:set` changes a visual setting (key, value pairs like "number"=true).
     var onSetOption: ((String, String) -> Void)?
+    /// Called for :bn/:bp buffer navigation — host switches to next/prev tab. delta = +1 or -1.
+    var onNextBuffer: ((Int) -> Void)?
+    /// Called for :ls/:buffers — host returns list of open tab names for display.
+    var onListBuffers: (() -> [String])?
+    /// Called when * / # search word — host highlights all matches inline.
+    var onSearchHighlight: ((String) -> Void)?
 
     // Count prefix accumulation
     private var countBuf = ""
@@ -49,6 +55,9 @@ final class ViEngine {
     // Marks a-z (local), A-Z (global treated same here)
     private var marks: [Character: Int] = [:]
     private var lastJumpPos: Int = 0       // for '' and `` (jump back)
+    // Jump list (Ctrl+o / Ctrl+i)
+    private var jumpList: [Int] = []
+    private var jumpIndex: Int = -1        // current position in jumpList
     // Last visual selection for gv
     private var lastVisualRange: NSRange = NSRange(location: 0, length: 0)
     private var lastVisualIsLine: Bool = false
@@ -153,6 +162,8 @@ final class ViEngine {
             case "f": scroll(tv, lines: tv.visibleRect.height / lineHeight(tv), down: true);  return true
             case "b": scroll(tv, lines: tv.visibleRect.height / lineHeight(tv), down: false); return true
             case "r": tv.undoManager?.redo(); return true
+            case "o": jumpListBack(tv);    return true   // Ctrl+o — jump back
+            case "i": jumpListForward(tv); return true   // Ctrl+i — jump forward
             default: break
             }
         }
@@ -267,6 +278,9 @@ final class ViEngine {
         case "'":
             pendingMarkJump = true
             return true
+        case "`":
+            pendingMarkJump = true   // backtick — same exact-pos behaviour
+            return true
 
         // MARK: Named register prefix "
         case "\"":
@@ -359,9 +373,11 @@ final class ViEngine {
             if key == "'" || key == "`" {
                 // '' / `` — jump back
                 let dest = lastJumpPos
+                pushJump(cursorPos(tv))
                 lastJumpPos = cursorPos(tv)
                 tv.setSelectedRange(NSRange(location: dest, length: 0))
             } else if let c = key.first, let pos = marks[c] {
+                pushJump(cursorPos(tv))
                 lastJumpPos = cursorPos(tv)
                 tv.setSelectedRange(NSRange(location: pos, length: 0))
                 tv.scrollRangeToVisible(NSRange(location: pos, length: 0))
@@ -394,8 +410,38 @@ final class ViEngine {
         return false
     }
 
-    private func playMacro(_ register: Character, tv: NSTextView, count: Int) {
-        guard let macro = macros[register] else { return }
+    // MARK: - Jump list (Ctrl+o / Ctrl+i)
+
+    private func pushJump(_ pos: Int) {
+        // Truncate forward history, append current
+        if jumpIndex < jumpList.count - 1 {
+            jumpList = Array(jumpList.prefix(jumpIndex + 1))
+        }
+        jumpList.append(pos)
+        if jumpList.count > 100 { jumpList.removeFirst() }
+        jumpIndex = jumpList.count - 1
+    }
+
+    func pushJumpPublic(_ pos: Int) { pushJump(pos) }  // called after go-to-def
+
+    private func jumpListBack(_ tv: NSTextView) {
+        guard jumpIndex > 0 else { return }
+        if jumpIndex == jumpList.count - 1 { pushJump(cursorPos(tv)); jumpIndex -= 1 }
+        jumpIndex -= 1
+        let pos = jumpList[jumpIndex]
+        tv.setSelectedRange(NSRange(location: pos, length: 0))
+        tv.scrollRangeToVisible(NSRange(location: pos, length: 0))
+    }
+
+    private func jumpListForward(_ tv: NSTextView) {
+        guard jumpIndex < jumpList.count - 1 else { return }
+        jumpIndex += 1
+        let pos = jumpList[jumpIndex]
+        tv.setSelectedRange(NSRange(location: pos, length: 0))
+        tv.scrollRangeToVisible(NSRange(location: pos, length: 0))
+    }
+
+    private func playMacro(_ register: Character, tv: NSTextView, count: Int) {        guard let macro = macros[register] else { return }
         lastPlayedMacro = register
         // Re-execute stored keystroke string by directly calling the action dispatcher.
         // Each char is treated as a plain normal-mode key (no modifiers).
@@ -1317,7 +1363,9 @@ final class ViEngine {
         var start = pos, end = pos
         while start > 0 && isWordChar(ns.character(at: start - 1), bigWord: false) { start -= 1 }
         while end < ns.length && isWordChar(ns.character(at: end), bigWord: false) { end += 1 }
-        lastSearch = (ns.substring(with: NSRange(location: start, length: end - start)), forward)
+        let word = ns.substring(with: NSRange(location: start, length: end - start))
+        lastSearch = (word, forward)
+        onSearchHighlight?(word)
         repeatSearch(tv, reverse: false, count: 1)
     }
 
@@ -1445,8 +1493,19 @@ final class ViEngine {
             onSave?(); onQuit?()
         case "q!":
             onQuit?()
+        case "bn", "bnext":
+            onNextBuffer?(1)
+        case "bp", "bprev", "bprevious":
+            onNextBuffer?(-1)
+        case "ls", "buffers", "files":
+            let list = onListBuffers?() ?? []
+            let text = list.isEmpty ? "no open buffers" : list.enumerated().map { "\($0.offset + 1): \($0.element)" }.joined(separator: "\n")
+            // Display via NSAlert-style toast or reuse the ex panel label
+            displayExMessage(text)
+            return
         case "noh", "nohlsearch":
             tv.performFindPanelAction(NSTextFinder.Action.hideFindInterface)
+            onSearchHighlight?("")  // clear inline highlights
         default:
             // :set option  — notify host to apply setting
             if cmd.hasPrefix("set ") || cmd == "set" {
@@ -1469,8 +1528,30 @@ final class ViEngine {
     }
 
     /// Handles :s/old/new/[g]  and :%s/old/new/[g]
-    private func execSet(_ setting: String, tv: NSTextView) {
-        // Handle boolean toggles and key=value pairs
+    private func displayExMessage(_ text: String) {
+        guard let tv = textView, let win = tv.window else { return }
+        // Reuse the ex panel style — show briefly then auto-dismiss
+        let panel = NSPanel(
+            contentRect: NSRect(x: 0, y: 0, width: win.frame.width, height: CGFloat(22 + text.components(separatedBy: "\n").count * 18)),
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered, defer: false
+        )
+        panel.isFloatingPanel = true; panel.level = .floating
+        panel.backgroundColor = NSColor(white: 0.12, alpha: 0.95)
+        let label = NSTextField(wrappingLabelWithString: text)
+        label.frame = NSRect(x: 8, y: 4, width: win.frame.width - 16, height: panel.frame.height - 8)
+        label.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
+        label.textColor = .white
+        panel.contentView?.addSubview(label)
+        let wf = win.frame
+        panel.setFrame(NSRect(x: wf.minX, y: wf.minY, width: wf.width, height: panel.frame.height), display: false)
+        win.addChildWindow(panel, ordered: .above)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+            panel.orderOut(nil); panel.parent?.removeChildWindow(panel)
+        }
+    }
+
+    private func execSet(_ setting: String, tv: NSTextView) {        // Handle boolean toggles and key=value pairs
         switch setting {
         case "number", "nu":         onSetOption?("number", "true")
         case "nonumber", "nonu":     onSetOption?("number", "false")

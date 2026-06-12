@@ -13,14 +13,10 @@ import HarnessCore
 final class WorkspaceFileTreeView: NSView {
     private let watcher = FileTreeWatcher()
     private var rootPath: String
-    /// Last session identity used to hydrate the tree. Different sessions at the
-    /// same CWD can be on different branches, so we always reload on session change.
     private var lastSessionID: SessionID?
     private let hostingView: NSHostingView<FileTreeSwiftUIView>
+    let keyboard = FileTreeKeyboardNavigator()
 
-    /// Single-click on a file row — set by the owning sidebar to show a preview.
-    /// Forwarded into the SwiftUI tree via a stable closure so updating it never
-    /// requires rebuilding `FileTreeSwiftUIView`.
     var onFilePreview: ((FileNode) -> Void)?
 
     init(rootPath: String? = nil) {
@@ -32,6 +28,7 @@ final class WorkspaceFileTreeView: NSView {
             rootPath: self.rootPath,
             sessionID: self.lastSessionID,
             watcher: watcher,
+            keyboard: FileTreeKeyboardState(),
             onPreview: { _ in }
         ))
         super.init(frame: .zero)
@@ -39,16 +36,47 @@ final class WorkspaceFileTreeView: NSView {
             rootPath: self.rootPath,
             sessionID: self.lastSessionID,
             watcher: watcher,
+            keyboard: keyboard.state,
             onPreview: { [weak self] node in self?.onFilePreview?(node) }
         )
+        keyboard.onOpenFile = { [weak self] path in
+            guard let self else { return }
+            let url = URL(fileURLWithPath: path)
+            let node = FileNode(id: path, name: url.lastPathComponent, path: path,
+                                isDirectory: url.hasDirectoryPath)
+            self.onFilePreview?(node)
+        }
+        keyboard.onPreviewFile = { [weak self] path in
+            guard let self else { return }
+            let url = URL(fileURLWithPath: path)
+            let node = FileNode(id: path, name: url.lastPathComponent, path: path,
+                                isDirectory: url.hasDirectoryPath)
+            self.onFilePreview?(node)
+        }
+        keyboard.onToggleExpand = { token in
+            if token.hasSuffix("__expand") {
+                let path = String(token.dropLast("__expand".count))
+                NotificationCenter.default.post(name: .fileTreeToggleExpand, object: nil,
+                    userInfo: ["path": path, "action": "expand"])
+            } else if token.hasSuffix("__collapse") {
+                let path = String(token.dropLast("__collapse".count))
+                NotificationCenter.default.post(name: .fileTreeToggleExpand, object: nil,
+                    userInfo: ["path": path, "action": "collapse"])
+            }
+        }
         setup()
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 
-    /// Update the file tree root, forcing a refresh when the session changes even
-    /// if the path is the same (different branches, same repo root).
+    override var acceptsFirstResponder: Bool { true }
+
+    override func keyDown(with event: NSEvent) {
+        if keyboard.handle(event) { return }
+        super.keyDown(with: event)
+    }
+
     func updateRoot(path: String, sessionID: SessionID?) {
         guard path != rootPath || sessionID != lastSessionID else { return }
         rootPath = path
@@ -57,6 +85,7 @@ final class WorkspaceFileTreeView: NSView {
             rootPath: path,
             sessionID: sessionID,
             watcher: watcher,
+            keyboard: keyboard.state,
             onPreview: { [weak self] node in self?.onFilePreview?(node) }
         )
     }

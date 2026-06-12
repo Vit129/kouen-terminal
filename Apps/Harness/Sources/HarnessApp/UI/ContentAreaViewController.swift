@@ -130,12 +130,8 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
             name: .viQuitCommand,
             object: nil
         )
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(viOpenFileCommand(_:)),
-            name: .viOpenFileCommand,
-            object: nil
-        )
+        NotificationCenter.default.addObserver(self, selector: #selector(viOpenFileCommand(_:)), name: .viOpenFileCommand, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(viNextBufferCommand(_:)), name: .viNextBufferCommand, object: nil)
         installCopySelectionToast()
         reloadTabBar()
         restoreEditorState()
@@ -186,6 +182,15 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
             expanded = (cwd as NSString).appendingPathComponent(expanded)
         }
         openFileTab(path: expanded)
+    }
+
+    @objc private func viNextBufferCommand(_ note: Notification) {
+        guard let delta = note.userInfo?["delta"] as? Int else { return }
+        let tabs = fileTabManager.openTabs
+        guard !tabs.isEmpty, let active = fileTabManager.activeTab() else { return }
+        let idx = tabs.firstIndex(where: { $0.id == active.id }) ?? 0
+        let newIdx = (idx + delta + tabs.count) % tabs.count
+        selectFileTab(id: tabs[newIdx].id)
     }
 
     @objc private func snapshotChanged(_ note: Notification) {

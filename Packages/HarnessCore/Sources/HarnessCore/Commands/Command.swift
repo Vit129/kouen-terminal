@@ -79,10 +79,10 @@ public indirect enum Command: Codable, Sendable, Equatable {
     case respawnPane(keepHistory: Bool)            // respawn-pane [-k]
     case clearHistory                              // clear-history
     case resizeWindow(rows: Int?, cols: Int?)      // resize-window [-x cols] [-y rows]
-    case listSessions(format: String?)             // list-sessions [-F format]
-    case listWindows(format: String?)              // list-windows [-F format]
-    case listPanes(format: String?)                // list-panes [-F format]
-    case listClients(format: String?)              // list-clients [-F format]
+    case listSessions(format: String?, json: Bool)  // list-sessions [-F format] [--json]
+    case listWindows(format: String?, json: Bool)   // list-windows [-F format] [--json]
+    case listPanes(format: String?, json: Bool)     // list-panes [-F format] [--json]
+    case listClients(format: String?, json: Bool)   // list-clients [-F format] [--json]
     case movePane(direction: SplitDirection, source: TargetSpec)  // move-pane -s <src> [-h|-v]
     case renumberWindows                           // move-window -r — renumber tabs contiguously
 
@@ -271,10 +271,10 @@ extension Command {
             if let c = cols { parts += ["-x", "\(c)"] }
             if let r = rows { parts += ["-y", "\(r)"] }
             return parts.joined(separator: " ")
-        case let .listSessions(fmt): return fmt.map { "list-sessions -F '\($0)'" } ?? "list-sessions"
-        case let .listWindows(fmt):  return fmt.map { "list-windows -F '\($0)'" }  ?? "list-windows"
-        case let .listPanes(fmt):    return fmt.map { "list-panes -F '\($0)'" }    ?? "list-panes"
-        case let .listClients(fmt):  return fmt.map { "list-clients -F '\($0)'" }  ?? "list-clients"
+        case let .listSessions(fmt, json): return (json ? "list-sessions --json" : fmt.map { "list-sessions -F '\($0)'" } ?? "list-sessions")
+        case let .listWindows(fmt, json):  return (json ? "list-windows --json"  : fmt.map { "list-windows -F '\($0)'" }  ?? "list-windows")
+        case let .listPanes(fmt, json):    return (json ? "list-panes --json"    : fmt.map { "list-panes -F '\($0)'" }    ?? "list-panes")
+        case let .listClients(fmt, json):  return (json ? "list-clients --json"  : fmt.map { "list-clients -F '\($0)'" }  ?? "list-clients")
         case let .targeted(spec, command):
             return "\(command.shortDescription)\(spec.raw.isEmpty ? "" : " -t \(spec.raw)")"
         }

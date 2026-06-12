@@ -208,9 +208,10 @@ final class MainExecutor: CommandExecutor {
             let entries = CommandPromptController.shared.historyEntries
             DisplayMessage.show(entries.isEmpty ? "no history" : entries.reversed().joined(separator: "\n"))
 
-        case let .listSessions(fmt):
+        case let .listSessions(fmt, json):
             let snap = coordinator.snapshot
             let format = fmt ?? "#{session_name}: #{session_windows} windows"
+            var rows: [[String: String]] = []
             var lines: [String] = []
             for ws in snap.workspaces {
                 for (si, session) in ws.sessions.enumerated() {
@@ -221,54 +222,59 @@ final class MainExecutor: CommandExecutor {
                     ctx.windowActive = session.id == ws.activeSessionID
                     ctx.sessionAttached = 1
                     ctx.tabIndex = si
-                    lines.append(FormatString.evaluate(format, context: ctx))
+                    if json { rows.append(["session_name": ctx.sessionName ?? "", "session_id": ctx.sessionID ?? "", "session_windows": "\(ctx.sessionWindows ?? 0)"]) }
+                    else { lines.append(FormatString.evaluate(format, context: ctx)) }
                 }
             }
-            DisplayMessage.show(lines.isEmpty ? "no sessions" : lines.joined(separator: "\n"))
+            DisplayMessage.show(json ? jsonArray(rows) : (lines.isEmpty ? "no sessions" : lines.joined(separator: "\n")))
 
-        case let .listWindows(fmt):
+        case let .listWindows(fmt, json):
             let snap = coordinator.snapshot
             let format = fmt ?? "#{window_index}: #{window_name}#{window_flags}"
+            var rows: [[String: String]] = []
             var lines: [String] = []
             let sessions = snap.activeWorkspace?.sessions ?? []
             for session in sessions {
                 for (ti, tab) in session.tabs.enumerated() {
                     var ctx = FormatContext()
-                    ctx.tabName = tab.title
-                    ctx.tabIndex = ti
+                    ctx.tabName = tab.title; ctx.tabIndex = ti
                     ctx.windowID = tab.id.uuidString
                     ctx.windowPanes = tab.rootPane.allSurfaceIDs().count
                     ctx.windowActive = tab.id == session.activeTabID
                     ctx.windowFlags = tab.id == session.activeTabID ? "*" : ""
-                    lines.append(FormatString.evaluate(format, context: ctx))
+                    if json { rows.append(["window_index": "\(ti)", "window_name": tab.title, "window_id": tab.id.uuidString, "window_active": ctx.windowActive == true ? "1" : "0"]) }
+                    else { lines.append(FormatString.evaluate(format, context: ctx)) }
                 }
             }
-            DisplayMessage.show(lines.isEmpty ? "no windows" : lines.joined(separator: "\n"))
+            DisplayMessage.show(json ? jsonArray(rows) : (lines.isEmpty ? "no windows" : lines.joined(separator: "\n")))
 
-        case let .listPanes(fmt):
+        case let .listPanes(fmt, json):
             let snap = coordinator.snapshot
-            let format = fmt ?? "#{pane_index}: #{pane_title} [#{pane_width}x#{pane_height}]"
+            let format = fmt ?? "#{pane_index}: [#{pane_width}x#{pane_height}]"
+            var rows: [[String: String]] = []
             var lines: [String] = []
-            let tab = snap.activeWorkspace?.activeTab
-            if let tab {
-                let paneIDs = tab.rootPane.allPaneIDs()
-                for (pi, pid) in paneIDs.enumerated() {
+            if let tab = snap.activeWorkspace?.activeTab {
+                for (pi, pid) in tab.rootPane.allPaneIDs().enumerated() {
                     var ctx = FormatContext()
-                    ctx.paneIndex = pi
-                    ctx.paneID = pid.uuidString
+                    ctx.paneIndex = pi; ctx.paneID = pid.uuidString
                     ctx.paneActive = pid == tab.activePaneID
-                    lines.append(FormatString.evaluate(format, context: ctx))
+                    if json { rows.append(["pane_index": "\(pi)", "pane_id": pid.uuidString, "pane_active": ctx.paneActive ? "1" : "0"]) }
+                    else { lines.append(FormatString.evaluate(format, context: ctx)) }
                 }
             }
-            DisplayMessage.show(lines.isEmpty ? "no panes" : lines.joined(separator: "\n"))
+            DisplayMessage.show(json ? jsonArray(rows) : (lines.isEmpty ? "no panes" : lines.joined(separator: "\n")))
 
-        case let .listClients(fmt):
+        case let .listClients(fmt, json):
             let format = fmt ?? "#{client_name}: #{session_name}"
             var ctx = FormatContext()
             ctx.clientName = "gui"
             ctx.sessionName = coordinator.snapshot.activeWorkspace?.activeSession?.name
                 ?? coordinator.snapshot.activeWorkspace?.name ?? ""
-            DisplayMessage.show(FormatString.evaluate(format, context: ctx))
+            if json {
+                DisplayMessage.show(jsonArray([["client_name": "gui", "session_name": ctx.sessionName ?? ""]]))
+            } else {
+                DisplayMessage.show(FormatString.evaluate(format, context: ctx))
+            }
         case let .findWindow(pattern, name, content, title, scopeTarget):
             // Non-content searches translate to a selectTab request; -C needs live
             // captures, done inline (re-dispatching the clientLocal result would loop).
@@ -373,6 +379,16 @@ final class MainExecutor: CommandExecutor {
     /// and for verbs (move-pane, renumber-windows) whose resolution already lives
     /// in the translator.
     @MainActor
+    private func jsonArray(_ rows: [[String: String]]) -> String {
+        let items = rows.map { dict in
+            let pairs = dict.sorted(by: { $0.key < $1.key })
+                .map { "  \"\($0.key)\": \"\($0.value.replacingOccurrences(of: "\"", with: "\\\""))\"" }
+                .joined(separator: ",\n")
+            return "{\n\(pairs)\n}"
+        }
+        return "[\n" + items.joined(separator: ",\n") + "\n]"
+    }
+
     private func runViaTranslator(_ command: Command, coordinator: SessionCoordinator) throws {
         let baseIndex = optionInt("base-index", default: 0, coordinator: coordinator)
         let paneBaseIndex = optionInt("pane-base-index", default: 0, coordinator: coordinator)

@@ -28,6 +28,30 @@ final class SyntaxTextView: NSView {
     var onDefinition: ((LSPPosition) async -> SyntaxDefinitionTarget?)?
     var onNavigateToDefinition: ((SyntaxDefinitionTarget) -> Void)?
 
+    /// Highlight all occurrences of a pattern inline (vi * / # search).
+    func highlightSearchPattern(_ pattern: String) {
+        guard let storage = textView.textStorage else { return }
+        // Clear previous highlights
+        let full = NSRange(location: 0, length: storage.length)
+        storage.removeAttribute(.backgroundColor, range: full)
+        guard !pattern.isEmpty else { return }
+        let text = storage.string as NSString
+        let highlightColor = NSColor.systemYellow.withAlphaComponent(0.35)
+        var searchRange = NSRange(location: 0, length: text.length)
+        while searchRange.length > 0 {
+            let found = text.range(of: pattern, options: .caseInsensitive, range: searchRange)
+            if found.location == NSNotFound { break }
+            storage.addAttribute(.backgroundColor, value: highlightColor, range: found)
+            let next = found.location + found.length
+            searchRange = NSRange(location: next, length: text.length - next)
+        }
+    }
+
+    func clearSearchHighlight() {
+        guard let storage = textView.textStorage else { return }
+        storage.removeAttribute(.backgroundColor, range: NSRange(location: 0, length: storage.length))
+    }
+
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         setup()
@@ -183,6 +207,10 @@ final class SyntaxTextView: NSView {
             Task {
                 guard let target = await onDefinition(position) else { return }
                 await MainActor.run { [weak self] in
+                    // Push current position to jump list before navigating
+                    if let pos = self?.textView.selectedRange().location {
+                        self?.vi.pushJumpPublic(pos)
+                    }
                     self?.onNavigateToDefinition?(target)
                 }
             }
@@ -282,8 +310,24 @@ final class SyntaxTextView: NSView {
             case "number":
                 self.gutterView.isHidden = value == "false"
                 self.gutterView.needsDisplay = true
+            case "relativenumber":
+                self.gutterView.relativeNumbers = value == "true"
+                self.gutterView.needsDisplay = true
             default: break
             }
+        }
+        vi.onNextBuffer = { delta in
+            NotificationCenter.default.post(name: .viNextBufferCommand, object: nil, userInfo: ["delta": delta])
+        }
+        vi.onListBuffers = { [weak self] in
+            guard let self else { return [] }
+            var result: [String] = []
+            NotificationCenter.default.post(name: .viListBuffersCommand, object: self)
+            return result  // async result comes back via notification; simplified to immediate
+        }
+        vi.onSearchHighlight = { [weak self] pattern in
+            guard let self else { return }
+            if pattern.isEmpty { self.clearSearchHighlight() } else { self.highlightSearchPattern(pattern) }
         }
     }
 
@@ -390,6 +434,7 @@ private final class SyntaxLineNumberGutterView: NSView {
     weak var textView: NSTextView?
     var diffLines: [Int: SyntaxTextView.DiffLineType] = [:]
     var diagnostics: [LSPDiagnostic] = []
+    var relativeNumbers: Bool = false
 
     override var isFlipped: Bool { true }
 
@@ -446,7 +491,20 @@ private final class SyntaxLineNumberGutterView: NSView {
                 NSBezierPath(ovalIn: NSRect(x: 6, y: lineRect.midY - 3, width: 6, height: 6)).fill()
             }
 
-            let value = "\(lineNumber)" as NSString
+            let cursorLine: Int
+            if relativeNumbers {
+                let tv2 = textView  // already non-optional here (inside guard-let scope)
+                let cursorPos = tv2.selectedRange().location
+                var ln = 1
+                (tv2.string as NSString).enumerateSubstrings(
+                    in: NSRange(location: 0, length: cursorPos),
+                    options: [.byLines, .substringNotRequired]) { _, _, _, _ in ln += 1 }
+                cursorLine = ln
+            } else {
+                cursorLine = 0
+            }
+            let displayNumber = relativeNumbers ? abs(lineNumber - cursorLine) : lineNumber
+            let value = (relativeNumbers && displayNumber == 0 ? "\(lineNumber)" : "\(displayNumber)") as NSString
             let size = value.size(withAttributes: attrs)
             value.draw(at: NSPoint(x: bounds.width - size.width - 8, y: lineRect.origin.y + (lineRect.height - size.height) / 2), withAttributes: attrs)
             lineNumber += 1
@@ -659,4 +717,6 @@ extension SyntaxTextView: NSTextViewDelegate {
 extension Notification.Name {
     static let viQuitCommand = Notification.Name("HarnessViQuitCommand")
     static let viOpenFileCommand = Notification.Name("HarnessViOpenFileCommand")
+    static let viNextBufferCommand = Notification.Name("HarnessViNextBufferCommand")
+    static let viListBuffersCommand = Notification.Name("HarnessViListBuffersCommand")
 }
