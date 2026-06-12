@@ -33,6 +33,11 @@ case "$command" in
     make build
     Scripts/package-app.sh debug
     codesign --force --sign - --deep Harness.app >/dev/null
+    # Kill any already-running instance so the new build is what actually
+    # loads — `open` on a running app just re-activates the old process.
+    pkill -f "$ROOT/Harness.app/Contents/MacOS/HarnessDaemon" 2>/dev/null || true
+    pkill -f "$ROOT/Harness.app/Contents/MacOS/Harness\$" 2>/dev/null || true
+    sleep 0.5
     open Harness.app
     ;;
   build)
