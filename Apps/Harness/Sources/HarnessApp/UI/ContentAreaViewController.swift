@@ -803,7 +803,7 @@ private final class PaneSplitButtonsView: NSView {
     }
 
     @objc private func closePane() {
-        SessionCoordinator.shared.killActivePane()
+        SessionCoordinator.shared.killPane(paneID: paneID)
     }
 }
 
