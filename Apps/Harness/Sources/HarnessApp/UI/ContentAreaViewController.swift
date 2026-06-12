@@ -848,6 +848,10 @@ final class HarnessSplitView: NSSplitView, NSSplitViewDelegate {
                 setPosition(position, ofDividerAt: 0)
             }
         }
+        subviews.forEach {
+            $0.needsLayout = true
+            $0.layoutSubtreeIfNeeded()
+        }
     }
 
     override func adjustSubviews() {
