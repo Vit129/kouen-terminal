@@ -2,9 +2,7 @@
 
 > Forked from [robzilla1738/harness-terminal](https://github.com/robzilla1738/harness-terminal)
 
-The native macOS terminal that keeps your sessions running and tells you the moment a coding agent needs you.
-
-Every pane renders on Harness's own GPU engine. Your splits and sessions live in a background daemon, so they survive quitting the app — and their scrollback survives a daemon restart. You can drive or attach to them from the command line, including a headless or remote daemon over SSH. And Harness watches the agents you run inside it (Claude Code, Codex, Cursor, and more), so an approval prompt never sits unseen behind another tab.
+Harness is a **Terminal First, IDE Convenient** workspace for macOS. It is a native GPU-accelerated terminal designed for speed and reliability, built on a persistent daemon architecture, with IDE-grade conveniences—such as a side panel file tree, real-time Git integration, and symbol fuzzy search—deeply integrated so you never have to leave your terminal.
 
 One self-contained app. The terminal engine, daemon, and CLI are all first-party Swift; the only external dependency is Sparkle (the macOS auto-update framework, GUI-only).
 
@@ -34,10 +32,9 @@ Prefer to build it yourself? Jump to [Build from source](#build-from-source).
 
 ## Why Harness
 
-- **It's a real terminal first.** GPU rendering, accurate sRGB color by default, opt-in converted Display-P3 vivid color, ligatures, inline images (Sixel / Kitty / iTerm2), and 490 built-in themes with a muted Harness default. Block and box-drawing glyphs are drawn procedurally, so borders tile without seams at any font.
-- **Your work outlives the window.** Sessions, tabs, and splits are owned by a daemon. Quit and reopen and everything is exactly where you left it, scrollback included — history is persisted to disk and restored even if the daemon restarts. Attach the same session from a second window or another machine.
-- **It's scriptable, locally or remotely.** `harness-cli` drives the whole thing — open tabs, send keys, capture a pane, resize, swap, zoom — so your tooling can build the layout it needs. Point any command at a headless or remote daemon with `--host <name>`; the daemon and CLI run on Linux too, so a remote box can host your sessions.
-- **It watches your agents.** Harness detects Claude Code, Codex, Cursor, and others by their process tree, shows which session is running what, and pings you when an agent stops or asks for approval. `Cmd+Shift+U` jumps you to the one that's waiting and skips the ones still thinking.
+- **Terminal First.** GPU rendering, accurate sRGB color by default, opt-in converted Display-P3 vivid color, ligatures, inline images (Sixel / Kitty / iTerm2), and 490 built-in themes with a muted Harness default. Your sessions and splits are owned by a background daemon, meaning your workspace survives app quits, daemon restarts, and can be driven or attached locally or remotely via `harness-cli` or SSH.
+- **IDE Convenient.** Rather than forcing you to context-switch to a heavy IDE or multiple tools, Harness brings essential developer conveniences directly to your terminal. A side panel (`Cmd+\`) houses a live-updating file tree and a real-time Git status interface (stage, commit, push, worktrees, history, and diffs). Open files instantly with the command palette (`Cmd+K`).
+- **Designed for AI Coding Agents.** Harness passively monitors processes running inside it (like Claude Code, Codex, Cursor, and more). It alerts you the moment an agent stops or requires approval, letting you jump straight to the action with `Cmd+Shift+U`.
 
 ## How it feels
 
@@ -50,21 +47,6 @@ Harness ranges from a plain, get-out-of-your-way terminal to a full session mana
 
 New installs start in Plain. Moving over from another setup? See [docs/MIGRATION.md](docs/MIGRATION.md) — Harness can import an existing terminal config (colors, font, padding) on first run.
 
-## Features
-
-- GPU-accelerated rendering by Harness's own terminal engine — accurate sRGB output by default, opt-in converted Display-P3 vivid color, a themed translucent canvas, and program output left untouched unless you opt into theme recoloring; damage-driven redraws keep selection drags, find highlights, IME composition, and streaming output cheap, full-rate on ProMotion displays, and covered or minimized windows stop rendering entirely
-- Mainstream-GPU-terminal polish: live re-wrap while resizing (with a grid-size overlay), word / line / block selection, middle-click paste, alternate-screen wheel scrolling, focus reporting, hollow unfocused cursor, minimum contrast, auto light/dark themes, bold-is-bright control, and paste protection
-- Sidebar sessions, per-session tabs, and horizontal / vertical splits — group sessions with shared window lists
-- Session layout persists across quits (daemon-owned, attach from the CLI or over SSH); if the daemon restarts under a pane, a quiet "Reconnecting…" chip rides the ~1-minute automatic backoff before the click-to-re-grab overlay takes over
-- Persistent scrollback: a pane's history is written to disk per surface and restored when the daemon restarts
-- Remote & headless daemon: run `HarnessDaemon` on a headless or remote box (Linux included) and drive it with `harness-cli --host <name>` over an SSH tunnel — register hosts with `harness-cli remote add`
-- `harness-cli` for automation and agent hooks
-- Color/theme diagnostics from the CLI: `harness-cli color-check` and `harness-cli theme-preview --theme <name>` print deterministic SGR pages for eyeballing fidelity in Harness itself
-- Command set: `send-keys`, `capture-pane`, `kill-pane`, `resize-pane`, `zoom-pane`, `swap-pane`, `rename-tab`, `attach`, `find-window`, `kill-server`, `start-server`, `respawn-window`, `refresh-client`, and more
-- Command prefix keymap (default `Ctrl-A`) with a live cheatsheet (prefix `?`)
-- Agent detection for Claude Code, Codex, Cursor, Grok, Pi, Hermes, OpenClaw, OpenCode, Aider, Gemini, and Goose — each with a brand color and a sidebar chip
-- Agent alerts as desktop banners and a sidebar bell; `Cmd+Shift+U` jumps to whoever is waiting
-- One-line hook install: `harness-cli install-hooks <agent>`
 ## Features
 
 - GPU-accelerated rendering by Harness's own terminal engine — accurate sRGB output by default, opt-in converted Display-P3 vivid color, a themed translucent canvas, and program output left untouched unless you opt into theme recoloring; damage-driven redraws keep selection drags, find highlights, IME composition, and streaming output cheap, full-rate on ProMotion displays, and covered or minimized windows stop rendering entirely
@@ -104,7 +86,6 @@ harness-cli send-keys --surface "$HARNESS_SURFACE" --keys "ls -la Enter"
 harness-cli notify --surface "$HARNESS_SURFACE" --title Agent --body "Needs approval"
 harness-cli color-check
 harness-cli theme-preview --theme "Harness Default"
->>>>>>> upstream/main
 ```
 
 | Layer | What it does |
