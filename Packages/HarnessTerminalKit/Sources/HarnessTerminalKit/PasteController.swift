@@ -11,11 +11,20 @@ enum PasteController {
     static func writePastedImage(from pasteboard: NSPasteboard) -> String? {
         guard let png = pngImageData(from: pasteboard) else { return nil }
         let dir = HarnessPaths.pastedImagesDirectory
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let readableDir: [FileAttributeKey: Any] = [.posixPermissions: 0o755]
+        try? FileManager.default.createDirectory(
+            at: dir, withIntermediateDirectories: true, attributes: readableDir)
+        try? FileManager.default.setAttributes(readableDir, ofItemAtPath: dir.path)
         prunePastedImages(in: dir)
         let stamp = Int(Date().timeIntervalSince1970)
         let url = dir.appendingPathComponent("pasted-\(stamp)-\(UUID().uuidString.prefix(8)).png")
-        do { try png.write(to: url); return url.path } catch { return nil }
+        do {
+            try png.write(to: url)
+            try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: url.path)
+            return url.path
+        } catch {
+            return nil
+        }
     }
 
     /// Best-effort PNG bytes for whatever image the pasteboard carries (screenshot = PNG/TIFF).

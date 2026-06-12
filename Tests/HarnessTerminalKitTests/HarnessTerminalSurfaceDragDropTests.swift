@@ -69,8 +69,34 @@ final class HarnessTerminalSurfaceDragDropTests: XCTestCase {
         defer { try? FileManager.default.removeItem(atPath: path) }
 
         XCTAssertTrue(path.hasSuffix(".png"))
+        XCTAssertTrue(path.contains("/pasted-images/"))
         let written = try Data(contentsOf: URL(fileURLWithPath: path))
         XCTAssertNotNil(ImageDecoder.decode(written), "the written file should be a decodable image")
+    }
+
+    @MainActor
+    func testPasteImageWritesReadableHandoffPath() throws {
+        let rep = NSBitmapImageRep(
+            bitmapDataPlanes: nil, pixelsWide: 2, pixelsHigh: 2,
+            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+            colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0
+        )!
+        let png = try XCTUnwrap(rep.representation(using: .png, properties: [:]))
+
+        let pasteboard = NSPasteboard(name: NSPasteboard.Name("HarnessPasteReadableImage-\(UUID().uuidString)"))
+        pasteboard.clearContents()
+        pasteboard.setData(png, forType: .png)
+
+        let path = try XCTUnwrap(HarnessTerminalSurfaceView.writePastedImage(from: pasteboard))
+        defer { try? FileManager.default.removeItem(atPath: path) }
+
+        let dirPath = URL(fileURLWithPath: path).deletingLastPathComponent().path
+        let fileAttributes = try FileManager.default.attributesOfItem(atPath: path)
+        let dirAttributes = try FileManager.default.attributesOfItem(atPath: dirPath)
+        let fileMode = try XCTUnwrap(fileAttributes[.posixPermissions] as? NSNumber)
+        let dirMode = try XCTUnwrap(dirAttributes[.posixPermissions] as? NSNumber)
+        XCTAssertEqual(fileMode.intValue & 0o777, 0o644)
+        XCTAssertEqual(dirMode.intValue & 0o777, 0o755)
     }
 
     @MainActor

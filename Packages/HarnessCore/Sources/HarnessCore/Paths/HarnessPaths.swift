@@ -144,9 +144,27 @@ public enum HarnessPaths {
 
     /// Images pasted into a terminal (e.g. a screenshot on the clipboard) are written here as
     /// PNGs and their path is pasted into the pane, so programs that accept image-file paths
-    /// (Claude Code, etc.) attach them. Transient (under `runtime/`); the writer prunes old files.
+    /// (Claude Code, etc.) attach them. Keep this out of the owner-only runtime tree: the daemon
+    /// socket/session state stays private there, while image paths are intentionally handed to
+    /// child tools and other apps. The writer prunes old files.
     public static var pastedImagesDirectory: URL {
-        runtimeDirectory.appendingPathComponent("pasted-images", isDirectory: true)
+        if let raw = ProcessInfo.processInfo.environment["HARNESS_HOME"], !raw.isEmpty {
+            return URL(fileURLWithPath: (raw as NSString).expandingTildeInPath, isDirectory: true)
+                .appendingPathComponent("pasted-images", isDirectory: true)
+        }
+        #if os(Linux)
+        let env = ProcessInfo.processInfo.environment
+        if let xdg = env["XDG_CACHE_HOME"], !xdg.isEmpty {
+            return URL(fileURLWithPath: (xdg as NSString).expandingTildeInPath, isDirectory: true)
+                .appendingPathComponent("harness/pasted-images", isDirectory: true)
+        }
+        return FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".cache/harness/pasted-images", isDirectory: true)
+        #else
+        let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Caches", isDirectory: true)
+        return base.appendingPathComponent("Harness/pasted-images", isDirectory: true)
+        #endif
     }
 
     public static func tunnelSocketURL(forHost name: String) -> URL {
