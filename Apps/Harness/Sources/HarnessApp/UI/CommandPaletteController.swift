@@ -1002,3 +1002,25 @@ private final class PaletteItemView: NSView {
         return result
     }
 }
+
+// MARK: - Zoxide helper
+
+private extension Process {
+    /// Run `zoxide query -l` synchronously and return stdout. Returns nil if zoxide is not found
+    /// or exits non-zero. Searches common Homebrew paths before relying on PATH.
+    static func zoxideQueryAll() throws -> String? {
+        let candidates = ["/opt/homebrew/bin/zoxide", "/usr/local/bin/zoxide", "/usr/bin/zoxide"]
+        let binary = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) })
+            ?? "zoxide"
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: binary)
+        proc.arguments = ["query", "-l"]
+        let pipe = Pipe()
+        proc.standardOutput = pipe
+        proc.standardError = Pipe()
+        try proc.run()
+        proc.waitUntilExit()
+        guard proc.terminationStatus == 0 else { return nil }
+        return String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)
+    }
+}
