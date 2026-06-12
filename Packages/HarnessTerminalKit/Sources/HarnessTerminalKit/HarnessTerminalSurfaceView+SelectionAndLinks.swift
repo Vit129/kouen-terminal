@@ -32,14 +32,14 @@ extension HarnessTerminalSurfaceView {
 
     /// Resolve a raw selection into a render region. Delegates to `SelectionResolver`.
     nonisolated static func resolveSelectionRegion(_ sel: RawSelection?, emulator: TerminalEmulator,
-                                                           scrollOffset: Int, columns: Int) -> SelectionRegion? {
+                                                   scrollOffset: Int, columns: Int, wordSeparators: String) -> SelectionRegion? {
         guard let sel else { return nil }
         let raw = SelectionResolver.RawSelection(
             anchorRow: sel.anchorRow, anchorColumn: sel.anchorColumn,
             headRow: sel.headRow, headColumn: sel.headColumn,
             granularity: sel.granularity, rectangular: sel.rectangular
         )
-        return SelectionResolver.resolve(raw, emulator: emulator, scrollOffset: scrollOffset, columns: columns)
+        return SelectionResolver.resolve(raw, emulator: emulator, scrollOffset: scrollOffset, columns: columns, wordSeparators: wordSeparators)
     }
 
     /// The active selection region (nil when nothing is selected): rectangular for an Option-drag,
@@ -73,11 +73,11 @@ extension HarnessTerminalSurfaceView {
         // tracked in the release-audit backlog.
         case .line: return 0 ... max(0, columns - 1)
         case .word:
+            let separators = wordSeparators
             return emulatorSync { emu in
                 let virtualLine = emu.historyCount - scrollOffset + row
-                return emu.wordColumnRange(line: virtualLine, column: column)
-            }
-        }
+                return emu.wordColumnRange(line: virtualLine, column: column, separators: separators)
+            }        }
     }
 
     func clearSelection() {

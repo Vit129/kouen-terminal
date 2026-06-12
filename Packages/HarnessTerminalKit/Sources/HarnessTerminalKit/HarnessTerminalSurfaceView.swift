@@ -496,6 +496,9 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// `mode-keys` option value (`vi` / `emacs`); the host sets it from the daemon option.
     public var copyModeKeys: String = "vi"
     public var isInCopyMode: Bool { copyMode != nil }
+    /// Characters treated as word boundaries for double-click selection and copy-mode word motions.
+    /// Maps to the `word-separators` option (default: space + tab).
+    public var wordSeparators: String = " \t"
 
     // MARK: Find (in-scrollback search bar)
     /// True while the Cmd+F find bar is open; gates highlight rendering + scroll-to-match.
@@ -1810,6 +1813,7 @@ public final class HarnessTerminalSurfaceView: NSView {
         let opacity = canvasOpacity
         let findIsActive = findActive
         let findMatchesSnapshot = findMatches
+        let separators = wordSeparators
 
         // The frame build, identical for the async (coalesced) and synchronous (forced) paths. Pure
         // over the captured value snapshot + the emulator; the only mutation is `state`'s plain-frame
@@ -1886,7 +1890,8 @@ public final class HarnessTerminalSurfaceView: NSView {
                 // it resolves against the same emulator state this frame renders.
                 let selectionRegion = Self.resolveSelectionRegion(rawSelection, emulator: emulator,
                                                                   scrollOffset: requestedScrollOffset,
-                                                                  columns: viewColumns)
+                                                                  columns: viewColumns,
+                                                                  wordSeparators: separators)
                 let overlayFree = selectionRegion == nil && preedit.isEmpty && findHits.isEmpty
                 // The LIVE view (offset 0) always builds CLEAN: selection/find/preedit are
                 // re-shaded onto a copy after the reuse caches are updated (the cell-overlay

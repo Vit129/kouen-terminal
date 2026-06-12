@@ -336,16 +336,6 @@ final class MainSplitViewController: NSViewController {
         setSidebarVisible(!SessionCoordinator.shared.settings.sidebarVisible, animated: true)
     }
 
-    func toggleIDEMode() {
-        resetFocusMode()
-        if content.isFileEditorVisible {
-            content.hideFileEditorSplit(resetFocusMode: false)
-        } else {
-            setSidebarVisible(true, animated: true)
-            content.showFileEditorSplit(resetFocusMode: false)
-        }
-    }
-
     func toggleFocusMode() {
         if isFocusModeActive {
             setSidebarVisible(preFocusSidebarVisible, animated: true)

@@ -451,6 +451,11 @@ public final class TerminalHostView: NSView {
         set { nativeView.allowProgramClipboardAccess = newValue }
     }
 
+    public var wordSeparators: String {
+        get { nativeView.wordSeparators }
+        set { nativeView.wordSeparators = newValue }
+    }
+
     /// Set the terminal identity the engine answers in XTVERSION / secondary DA. The app resolves
     /// this from the `terminal-identity` option (HarnessCore `TerminalIdentity`).
     public func setTerminalIdentity(name: String, version: String, daVersion: Int) {

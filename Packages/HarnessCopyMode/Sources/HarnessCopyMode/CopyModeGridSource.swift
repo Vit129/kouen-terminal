@@ -79,12 +79,11 @@ struct CopyModeLine {
 }
 
 extension CopyModeGridSource {
-    /// Grid columns `[start, end]` of the whitespace-delimited word at `column` on virtual `line`,
-    /// using the same separator rule as copy-mode word motion (space / tab). When `column` lands on
-    /// whitespace or past the content, returns just that column. Shared so mouse double-click word
-    /// selection matches copy mode exactly.
-    public func wordColumnRange(line: Int, column: Int) -> ClosedRange<Int> {
-        func isSeparator(_ c: Character) -> Bool { c == " " || c == "\t" }
+    /// Grid columns `[start, end]` of the word at `column` on virtual `line`.
+    /// `separators` defaults to space+tab (tmux default); pass a custom set from
+    /// the `word-separators` option to match the user's preference.
+    public func wordColumnRange(line: Int, column: Int, separators: String = " \t") -> ClosedRange<Int> {
+        func isSeparator(_ c: Character) -> Bool { separators.contains(c) }
         let rl = renderedLine(line)
         let idx = rl.charIndex(atOrBefore: column)
         guard idx < rl.chars.count else { return column ... column }
