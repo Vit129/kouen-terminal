@@ -7,14 +7,16 @@ import HarnessTerminalKit
 @MainActor
 struct PaletteAction: Identifiable {
     enum Section: Int, CaseIterable {
-        case recent, actions, navigation, tabs, themes
+        case recent, files, actions, navigation, tabs, projects, themes
 
         var title: String {
             switch self {
             case .recent: return "Recent"
+            case .files: return "Files"
             case .actions: return "Actions"
             case .navigation: return "Navigation"
             case .tabs: return "Tabs"
+            case .projects: return "Switch Project"
             case .themes: return "Themes"
             }
         }
@@ -45,7 +47,7 @@ enum CommandPaletteController {
 
     static func present(relativeTo parent: NSWindow?) {
         panel?.close()
-        let controller = PaletteViewController(actions: buildActions(), recentIDs: loadRecents())
+        let controller = PaletteViewController(actions: buildActions(), recentIDs: loadRecents(), parentWindow: parent)
         let panel = PalettePanel(
             contentRect: NSRect(x: 0, y: 0, width: 620, height: 440),
             styleMask: [.nonactivatingPanel, .borderless],
@@ -286,6 +288,37 @@ enum CommandPaletteController {
             }
         }
 
+        // MARK: - Projects
+        var seenRoots = Set<String>()
+        for workspace in snapshot.workspaces {
+            for session in workspace.sessions {
+                for tab in session.tabs {
+                    let cwd = tab.cwd.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !cwd.isEmpty else { continue }
+                    let root = HarnessDesign.projectGroupRootPath(for: cwd)
+                    if seenRoots.insert(root).inserted {
+                        let title = HarnessDesign.pathDisplayName(root)
+                        let subtitle = HarnessDesign.shortenPath(root)
+                        let wsID = workspace.id
+                        let tabID = tab.id
+                        actions.append(PaletteAction(
+                            id: "project.\(root)",
+                            title: title,
+                            subtitle: subtitle,
+                            symbol: "folder",
+                            shortcut: "",
+                            section: .projects
+                        ) {
+                            if coordinator.snapshot.activeWorkspaceID != wsID {
+                                coordinator.selectWorkspace(wsID)
+                            }
+                            coordinator.selectTab(workspaceID: wsID, tabID: tabID)
+                        })
+                    }
+                }
+            }
+        }
+
         // MARK: - Themes (featured first)
         for theme in ThemeManager.featuredThemes {
             actions.append(PaletteAction(
@@ -372,6 +405,7 @@ final class PaletteViewController: NSViewController, NSTableViewDataSource, NSTa
     private let footer = NSView()
     private let allActions: [PaletteAction]
     private let recentIDs: [String]
+    private weak var parentWindow: NSWindow?
     /// Flat list of rows shown — alternating section headers and items.
     private var rows: [Row] = []
     /// Logical positions of actionable rows so arrow-keys skip headers.
@@ -382,9 +416,10 @@ final class PaletteViewController: NSViewController, NSTableViewDataSource, NSTa
         case item(PaletteAction)
     }
 
-    init(actions: [PaletteAction], recentIDs: [String]) {
+    init(actions: [PaletteAction], recentIDs: [String], parentWindow: NSWindow?) {
         allActions = actions
         self.recentIDs = recentIDs
+        self.parentWindow = parentWindow
         super.init(nibName: nil, bundle: nil)
         rebuildRows(query: "")
     }
@@ -614,6 +649,7 @@ final class PaletteViewController: NSViewController, NSTableViewDataSource, NSTa
                     matches.append((action, best + recencyBoost))
                 }
             }
+            matches.append(contentsOf: fileMatches(query: query))
             matches.sort { $0.score > $1.score }
         }
 
@@ -622,7 +658,7 @@ final class PaletteViewController: NSViewController, NSTableViewDataSource, NSTa
         var selectable: [Int] = []
         if query.isEmpty {
             // Empty: keep section order natural — recent first, then everything else.
-            let sectionsInOrder: [PaletteAction.Section] = [.recent, .actions, .navigation, .tabs, .themes]
+            let sectionsInOrder: [PaletteAction.Section] = [.recent, .actions, .navigation, .tabs, .projects, .themes]
             for section in sectionsInOrder {
                 let entries = matches.filter { $0.action.section == section }
                 if entries.isEmpty { continue }
@@ -656,6 +692,60 @@ final class PaletteViewController: NSViewController, NSTableViewDataSource, NSTa
 
         rows = newRows
         selectableRowIndexes = selectable
+    }
+
+    private func fileMatches(query: String) -> [(action: PaletteAction, score: Int)] {
+        guard let rootPath = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd else { return [] }
+        let rootURL = URL(fileURLWithPath: rootPath)
+        let rootPrefix = rootPath.hasSuffix("/") ? rootPath : rootPath + "/"
+        let enumerator = FileManager.default.enumerator(
+            at: rootURL,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles, .skipsPackageDescendants]
+        )
+
+        var matches: [(action: PaletteAction, score: Int)] = []
+        while let url = enumerator?.nextObject() as? URL {
+            if (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
+                let name = url.lastPathComponent
+                if name == "node_modules" || name == ".git" || name == ".build" || name == "DerivedData" {
+                    enumerator?.skipDescendants()
+                }
+                continue
+            }
+
+            let path = url.path
+            let relativePath = path.hasPrefix(rootPrefix) ? String(path.dropFirst(rootPrefix.count)) : url.lastPathComponent
+            let fileName = url.lastPathComponent
+            let titleScore = FuzzyMatcher.score(query: query, in: fileName) ?? -1
+            let pathScore = FuzzyMatcher.score(query: query, in: relativePath) ?? -1
+            let best = max(titleScore, pathScore >= 0 ? pathScore - 4 : -1)
+            guard best >= 0 else { continue }
+
+            matches.append((
+                action: PaletteAction(
+                    id: "file.\(path)",
+                    title: fileName,
+                    subtitle: relativePath,
+                    symbol: "doc.text",
+                    shortcut: "",
+                    section: .files
+                ) { [weak window = parentWindow] in
+                    guard let split = window?.contentViewController as? MainSplitViewController
+                        ?? NSApp.mainWindow?.contentViewController as? MainSplitViewController
+                    else { return }
+                    split.contentVC.openFileTab(path: path)
+                },
+                score: best
+            ))
+
+            if matches.count >= 200 { break }
+        }
+
+        return matches
+            .sorted { $0.score > $1.score }
+            .prefix(20)
+            .map { $0 }
     }
 
     private func selectFirstSelectable() {
