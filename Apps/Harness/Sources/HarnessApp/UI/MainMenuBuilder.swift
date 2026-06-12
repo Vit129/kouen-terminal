@@ -477,8 +477,10 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
         let coordinator = SessionCoordinator.shared
         guard let workspace = coordinator.snapshot.activeWorkspace,
               let tab = workspace.activeTab else { return }
-        coordinator.requestDaemon(.applyLayout(tabID: tab.id, layout: layouts[idx].rawValue, mainPaneID: tab.activePaneID))
-        coordinator.syncFromDaemon()
+        Task {
+            await coordinator.requestDaemon(.applyLayout(tabID: tab.id, layout: layouts[idx].rawValue, mainPaneID: tab.activePaneID))
+            await coordinator.syncFromDaemon()
+        }
     }
 
     @objc func showAbout() {

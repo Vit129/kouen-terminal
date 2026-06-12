@@ -231,7 +231,8 @@ public enum CommandIPCTranslator {
         // through its own surface (GUI message, compositor status flash, control-mode
         // lines). The daemon's hook executor logs them as no-ops.
         case .showOptions, .showEnvironment, .listBuffers, .showBuffer, .showHooks,
-             .showMessages, .refreshClient:
+             .showMessages, .refreshClient, .showPromptHistory,
+             .listSessions, .listWindows, .listPanes, .listClients:
             return .clientLocal(command)
 
         case let .findWindow(pattern, name, content, title, scopeTarget):
@@ -270,6 +271,12 @@ public enum CommandIPCTranslator {
         case .clearHistory:
             guard let pane = target.paneID, let surface = target.surfaceID(of: pane) else { return .unresolved }
             return .requests([.clearHistory(surfaceID: surface)])
+
+        case let .resizeWindow(rows, cols):
+            guard let tab = target.tab else { return .clientLocal(command) }
+            let r = UInt16(clamping: rows ?? 24)
+            let c = UInt16(clamping: cols ?? 80)
+            return .requests([.resizeWindow(tabID: tab.id, rows: r, cols: c)])
 
         case let .resizePane(direction, amount):
             guard let pane = target.paneID else { return .unresolved }

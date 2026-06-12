@@ -204,6 +204,71 @@ final class MainExecutor: CommandExecutor {
             if case let .text(log)? = coordinator.requestDaemon(.showMessages) {
                 DisplayMessage.show(log.isEmpty ? "no messages" : log)
             }
+        case .showPromptHistory:
+            let entries = CommandPromptController.shared.historyEntries
+            DisplayMessage.show(entries.isEmpty ? "no history" : entries.reversed().joined(separator: "\n"))
+
+        case let .listSessions(fmt):
+            let snap = coordinator.snapshot
+            let format = fmt ?? "#{session_name}: #{session_windows} windows"
+            var lines: [String] = []
+            for ws in snap.workspaces {
+                for (si, session) in ws.sessions.enumerated() {
+                    var ctx = FormatContext()
+                    ctx.sessionName = session.name ?? ws.name
+                    ctx.sessionID = session.id.uuidString
+                    ctx.sessionWindows = session.tabs.count
+                    ctx.windowActive = session.id == ws.activeSessionID
+                    ctx.sessionAttached = 1
+                    ctx.tabIndex = si
+                    lines.append(FormatString.evaluate(format, context: ctx))
+                }
+            }
+            DisplayMessage.show(lines.isEmpty ? "no sessions" : lines.joined(separator: "\n"))
+
+        case let .listWindows(fmt):
+            let snap = coordinator.snapshot
+            let format = fmt ?? "#{window_index}: #{window_name}#{window_flags}"
+            var lines: [String] = []
+            let sessions = snap.activeWorkspace?.sessions ?? []
+            for session in sessions {
+                for (ti, tab) in session.tabs.enumerated() {
+                    var ctx = FormatContext()
+                    ctx.tabName = tab.title
+                    ctx.tabIndex = ti
+                    ctx.windowID = tab.id.uuidString
+                    ctx.windowPanes = tab.rootPane.allSurfaceIDs().count
+                    ctx.windowActive = tab.id == session.activeTabID
+                    ctx.windowFlags = tab.id == session.activeTabID ? "*" : ""
+                    lines.append(FormatString.evaluate(format, context: ctx))
+                }
+            }
+            DisplayMessage.show(lines.isEmpty ? "no windows" : lines.joined(separator: "\n"))
+
+        case let .listPanes(fmt):
+            let snap = coordinator.snapshot
+            let format = fmt ?? "#{pane_index}: #{pane_title} [#{pane_width}x#{pane_height}]"
+            var lines: [String] = []
+            let tab = snap.activeWorkspace?.activeTab
+            if let tab {
+                let paneIDs = tab.rootPane.allPaneIDs()
+                for (pi, pid) in paneIDs.enumerated() {
+                    var ctx = FormatContext()
+                    ctx.paneIndex = pi
+                    ctx.paneID = pid.uuidString
+                    ctx.paneActive = pid == tab.activePaneID
+                    lines.append(FormatString.evaluate(format, context: ctx))
+                }
+            }
+            DisplayMessage.show(lines.isEmpty ? "no panes" : lines.joined(separator: "\n"))
+
+        case let .listClients(fmt):
+            let format = fmt ?? "#{client_name}: #{session_name}"
+            var ctx = FormatContext()
+            ctx.clientName = "gui"
+            ctx.sessionName = coordinator.snapshot.activeWorkspace?.activeSession?.name
+                ?? coordinator.snapshot.activeWorkspace?.name ?? ""
+            DisplayMessage.show(FormatString.evaluate(format, context: ctx))
         case let .findWindow(pattern, name, content, title, scopeTarget):
             // Non-content searches translate to a selectTab request; -C needs live
             // captures, done inline (re-dispatching the clientLocal result would loop).
@@ -249,6 +314,8 @@ final class MainExecutor: CommandExecutor {
         case .clearHistory:
             guard let sid = coordinator.activeSurfaceID else { throw CommandExecutionError.noActiveSurface }
             coordinator.requestDaemon(.clearHistory(surfaceID: sid.uuidString))
+        case .resizeWindow:
+            try runViaTranslator(command, coordinator: coordinator)
         case let .movePane(direction, source):
             try runViaTranslator(.movePane(direction: direction, source: source), coordinator: coordinator)
         case .renumberWindows:

@@ -130,6 +130,7 @@ public enum IPCRequest: Codable, Sendable {
     case joinPane(sourcePaneID: UUID, destPaneID: UUID, direction: SplitDirection)
     case respawnPane(surfaceID: String, keepHistory: Bool)
     case clearHistory(surfaceID: String)
+    case resizeWindow(tabID: UUID, rows: UInt16, cols: UInt16)
     // Phase 6: options + hooks + display
     case setOption(scope: String, target: String?, key: String, rawValue: String)
     case showOptions(scope: String?)

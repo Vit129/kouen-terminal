@@ -78,6 +78,11 @@ public indirect enum Command: Codable, Sendable, Equatable {
     case breakPane                                 // break-pane
     case respawnPane(keepHistory: Bool)            // respawn-pane [-k]
     case clearHistory                              // clear-history
+    case resizeWindow(rows: Int?, cols: Int?)      // resize-window [-x cols] [-y rows]
+    case listSessions(format: String?)             // list-sessions [-F format]
+    case listWindows(format: String?)              // list-windows [-F format]
+    case listPanes(format: String?)                // list-panes [-F format]
+    case listClients(format: String?)              // list-clients [-F format]
     case movePane(direction: SplitDirection, source: TargetSpec)  // move-pane -s <src> [-h|-v]
     case renumberWindows                           // move-window -r — renumber tabs contiguously
 
@@ -134,6 +139,7 @@ public indirect enum Command: Codable, Sendable, Equatable {
     case respawnWindow(keepHistory: Bool)
     /// `show-messages`: the daemon's recent display-message log.
     case showMessages
+    case showPromptHistory              // show-prompt-history
 
     // MARK: Targeting
     /// Run `command` as if the client's focus were `spec`'s resolved target
@@ -259,6 +265,16 @@ extension Command {
         case .refreshClient: return "refresh-client"
         case let .respawnWindow(keep): return keep ? "respawn-window" : "respawn-window -k"
         case .showMessages: return "show-messages"
+        case .showPromptHistory: return "show-prompt-history"
+        case let .resizeWindow(rows, cols):
+            var parts = ["resize-window"]
+            if let c = cols { parts += ["-x", "\(c)"] }
+            if let r = rows { parts += ["-y", "\(r)"] }
+            return parts.joined(separator: " ")
+        case let .listSessions(fmt): return fmt.map { "list-sessions -F '\($0)'" } ?? "list-sessions"
+        case let .listWindows(fmt):  return fmt.map { "list-windows -F '\($0)'" }  ?? "list-windows"
+        case let .listPanes(fmt):    return fmt.map { "list-panes -F '\($0)'" }    ?? "list-panes"
+        case let .listClients(fmt):  return fmt.map { "list-clients -F '\($0)'" }  ?? "list-clients"
         case let .targeted(spec, command):
             return "\(command.shortDescription)\(spec.raw.isEmpty ? "" : " -t \(spec.raw)")"
         }

@@ -59,12 +59,17 @@ final class SyntaxTextView: NSView {
         gutterView.needsDisplay = true
     }
 
+    /// Vi engine — handles all normal/visual/operator-pending key dispatch.
+    private let vi = ViEngine()
+    /// Exposed mode for status bar display.
+    var viMode: ViMode { vi.mode }
+    /// Callback when vi mode changes (for status display).
+    var onEditModeChange: ((Bool) -> Void)?  // kept for compatibility: true = insert
+
     /// Vi-like mode: read-only by default, press `i` to edit, `Esc` to return.
-    private(set) var isEditMode = false
+    var isEditMode: Bool { if case .insert = vi.mode { return true }; return false }
     /// Callback to save the current text content to disk.
     var onSave: ((String) -> Void)?
-    /// Callback when edit mode changes (for status display).
-    var onEditModeChange: ((Bool) -> Void)?
 
     func showFindBar() {
         textView.performFindPanelAction(NSTextFinder.Action.showFindInterface)
@@ -75,39 +80,19 @@ final class SyntaxTextView: NSView {
     override func keyDown(with event: NSEvent) {
         let cmd = event.modifierFlags.contains(.command)
         let key = event.charactersIgnoringModifiers ?? ""
-        if cmd && key == "f" {
-            showFindBar()
-            return
-        }
+        // ⌘S: save (any mode)
         if cmd && key == "s" {
-            if isEditMode {
+            if case .insert = vi.mode {
                 onSave?(textView.string)
-                exitEditMode()
+                vi.enter(mode: .normal)
             }
             return
         }
-        if !isEditMode && key == "i" && !cmd {
-            enterEditMode()
-            return
-        }
-        if isEditMode && event.keyCode == 53 { // Esc
-            exitEditMode()
-            return
-        }
+        // ⌘F: find
+        if cmd && key == "f" { showFindBar(); return }
+        // Let vi engine handle everything else
+        if vi.handle(event) { return }
         super.keyDown(with: event)
-    }
-
-    private func enterEditMode() {
-        isEditMode = true
-        textView.isEditable = true
-        onEditModeChange?(true)
-    }
-
-    private func exitEditMode() {
-        isEditMode = false
-        textView.isEditable = false
-        onEditModeChange?(false)
-        dismissCompletionPopup()
     }
 
     func handleTextViewKeyDown(_ event: NSEvent) -> Bool {
@@ -270,6 +255,36 @@ final class SyntaxTextView: NSView {
             name: NSView.boundsDidChangeNotification,
             object: scrollView.contentView
         )
+
+        // Vi engine setup
+        vi.textView = textView
+        textView.isEditable = false
+        vi.onModeChange = { [weak self] newMode in
+            guard let self else { return }
+            let isInsert: Bool
+            if case .insert = newMode { isInsert = true } else { isInsert = false }
+            self.onEditModeChange?(isInsert)
+        }
+        vi.onSave = { [weak self] in
+            guard let self else { return }
+            self.onSave?(self.textView.string)
+        }
+        vi.onQuit = { [weak self] in
+            // bubble up — ContentAreaViewController listens for this notification
+            NotificationCenter.default.post(name: .viQuitCommand, object: self)
+        }
+        vi.onOpenFile = { [weak self] path in
+            NotificationCenter.default.post(name: .viOpenFileCommand, object: self, userInfo: ["path": path])
+        }
+        vi.onSetOption = { [weak self] key, value in
+            guard let self else { return }
+            switch key {
+            case "number":
+                self.gutterView.isHidden = value == "false"
+                self.gutterView.needsDisplay = true
+            default: break
+            }
+        }
     }
 
     @objc private func textDidScroll() {
@@ -639,4 +654,9 @@ extension SyntaxTextView: NSTextViewDelegate {
             dismissCompletionPopup()
         }
     }
+}
+
+extension Notification.Name {
+    static let viQuitCommand = Notification.Name("HarnessViQuitCommand")
+    static let viOpenFileCommand = Notification.Name("HarnessViOpenFileCommand")
 }

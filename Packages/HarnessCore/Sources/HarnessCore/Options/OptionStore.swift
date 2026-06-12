@@ -175,6 +175,9 @@ public final class OptionStore: @unchecked Sendable {
         // When the attached session is destroyed: `on` (default, tmux) detaches the
         // attach-window client; `off` re-targets the most recently active surviving session.
         "detach-on-destroy": .bool(true),
+        // `destroy-unattached`: when on, sessions with no attached clients are destroyed.
+        // tmux default is off; Harness default is off to preserve Harness's "sessions survive quit" promise.
+        "destroy-unattached": .bool(false),
     ]
 
     /// Values that shipped as defaults in an earlier build and have since been
