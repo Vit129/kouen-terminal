@@ -34,6 +34,20 @@ kill_stale() {
   sleep 0.5
 }
 
+# prod/run builds at the repo root are release builds, so they share the production
+# HARNESS_HOME (~/Library/Application Support/Harness) with /Applications/Harness.app
+# and the launchd-managed daemon (`make install`). Without stopping those too, the
+# fresh repo-root app reconnects to the old launchd daemon/socket and looks unchanged.
+# `debug` builds use an isolated HarnessDebug home and don't need this.
+kill_stale_prod() {
+  kill_stale
+  pkill -f "/Applications/Harness.app/Contents/MacOS/HarnessDaemon" 2>/dev/null || true
+  pkill -f "/Applications/Harness.app/Contents/MacOS/Harness\$" 2>/dev/null || true
+  launchctl bootout "gui/$(id -u)/com.robert.harness.daemon" 2>/dev/null || true
+  pkill -f "$HOME/Library/Application Support/Harness/bin/HarnessDaemon" 2>/dev/null || true
+  sleep 0.5
+}
+
 command="${1:-preview}"
 
 case "$command" in
@@ -51,7 +65,7 @@ case "$command" in
     swift build -c release --product Harness --product HarnessDaemon --product harness-cli
     Scripts/package-app.sh release
     codesign --force --sign - --deep Harness.app >/dev/null
-    kill_stale
+    kill_stale_prod
     open Harness.app
     ;;
   run)
@@ -59,7 +73,7 @@ case "$command" in
       echo "error: Harness.app not found at repo root — run 'make debug' or 'make prod' first" >&2
       exit 1
     fi
-    kill_stale
+    kill_stale_prod
     open Harness.app
     ;;
   build)
