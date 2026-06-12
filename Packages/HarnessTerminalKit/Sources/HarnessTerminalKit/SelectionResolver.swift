@@ -20,7 +20,8 @@ enum SelectionResolver {
         _ sel: RawSelection?,
         emulator: TerminalEmulator,
         scrollOffset: Int,
-        columns: Int
+        columns: Int,
+        wordSeparators: String = " \t"
     ) -> SelectionRegion? {
         guard let sel else { return nil }
         if sel.rectangular {
@@ -35,7 +36,7 @@ enum SelectionResolver {
             case .line: return 0 ... max(0, columns - 1)
             case .word:
                 let virtualLine = emulator.historyCount - scrollOffset + row
-                return emulator.wordColumnRange(line: virtualLine, column: column)
+                return emulator.wordColumnRange(line: virtualLine, column: column, separators: wordSeparators)
             }
         }
         let lo: (row: Int, column: Int), hi: (row: Int, column: Int)
