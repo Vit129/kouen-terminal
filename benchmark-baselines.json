@@ -1,139 +1,151 @@
 {
+  "buffer_search_keystroke_regex": {
+    "benchmark": "buffer_search_keystroke_regex",
+    "hits": 20000,
+    "lines": 20001,
+    "nanos": 87929042
+  },
+  "buffer_search_keystroke_substring": {
+    "benchmark": "buffer_search_keystroke_substring",
+    "hits": 20000,
+    "lines": 20001,
+    "nanos": 27206959
+  },
   "build_frame_160x48": {
     "benchmark": "build_frame_160x48",
     "cells": 7680,
-    "nanos": 270542
+    "nanos": 195750
   },
   "build_frame_240x80": {
     "benchmark": "build_frame_240x80",
     "cells": 19200,
-    "nanos": 523209
+    "nanos": 471541
   },
   "build_frame_80x24": {
     "benchmark": "build_frame_80x24",
     "cells": 1920,
-    "nanos": 63583
+    "nanos": 64625
   },
   "build_frame_combining_heavy_160x48": {
     "benchmark": "build_frame_combining_heavy_160x48",
     "cells": 7680,
-    "nanos": 268708
+    "nanos": 272416
   },
   "build_frame_search_highlights_160x48": {
     "benchmark": "build_frame_search_highlights_160x48",
     "cells": 7680,
     "hits": 216,
-    "nanos": 362917
+    "nanos": 314791
   },
   "cell_scroll_region_160x48": {
     "benchmark": "cell_scroll_region_160x48",
     "lines": 5000,
-    "nanos": 40076833
+    "nanos": 32302250
   },
   "compositor_frame_build_four_panes": {
     "benchmark": "compositor_frame_build_four_panes",
     "frames": 40,
-    "nanos": 41882125,
+    "nanos": 40012292,
     "panes": 4
   },
   "consume_latency_under_load_4096": {
     "benchmark": "consume_latency_under_load_4096",
     "bytes": 4194382,
     "chunks": 1025,
-    "mainGapMaxNanos": 3417,
-    "mainGapP50Nanos": 250,
-    "mainGapP95Nanos": 792,
-    "mainHops": 1025,
-    "mbps": 9.173,
-    "nanos": 457254500
+    "mainGapMaxNanos": 1875,
+    "mainGapP50Nanos": 292,
+    "mainGapP95Nanos": 1500,
+    "mainHops": 1,
+    "mbps": 8.974,
+    "nanos": 467396209
   },
   "consume_latency_under_load_65536": {
     "benchmark": "consume_latency_under_load_65536",
     "bytes": 4194382,
     "chunks": 65,
-    "mainGapMaxNanos": 3208,
-    "mainGapP50Nanos": 208,
-    "mainGapP95Nanos": 708,
-    "mainHops": 65,
-    "mbps": 9.207,
-    "nanos": 455571250
+    "mainGapMaxNanos": 875,
+    "mainGapP50Nanos": 209,
+    "mainGapP95Nanos": 625,
+    "mainHops": 1,
+    "mbps": 9.17,
+    "nanos": 457397833
   },
   "consumer_ansi_sgr": {
     "benchmark": "consumer_ansi_sgr",
     "bytes": 1048626,
-    "feedNanos": 107341917,
-    "frameBuildNanos": 175792,
-    "mbps": 9.753,
-    "nanos": 107518042
+    "feedNanos": 108271417,
+    "frameBuildNanos": 176291,
+    "mbps": 9.669,
+    "nanos": 108448083
   },
   "consumer_attributes": {
     "benchmark": "consumer_attributes",
     "bytes": 1048618,
-    "feedNanos": 113875875,
-    "frameBuildNanos": 189375,
-    "mbps": 9.193,
-    "nanos": 114065375
+    "feedNanos": 116584250,
+    "frameBuildNanos": 188625,
+    "mbps": 8.98,
+    "nanos": 116773125
   },
   "consumer_plain_ascii": {
     "benchmark": "consumer_plain_ascii",
     "bytes": 1048600,
-    "feedNanos": 149761000,
-    "frameBuildNanos": 199042,
-    "mbps": 6.992,
-    "nanos": 149960708
+    "feedNanos": 151204667,
+    "frameBuildNanos": 218875,
+    "mbps": 6.925,
+    "nanos": 151424334
   },
   "consumer_redraw": {
     "benchmark": "consumer_redraw",
     "bytes": 2463300,
-    "feedNanos": 15551833,
-    "frameBuildNanos": 178542,
-    "mbps": 156.593,
-    "nanos": 15730625
+    "feedNanos": 15387666,
+    "frameBuildNanos": 172833,
+    "mbps": 158.303,
+    "nanos": 15560666
   },
   "consumer_scrollback": {
     "benchmark": "consumer_scrollback",
     "bytes": 1280000,
-    "feedNanos": 161133792,
-    "frameBuildNanos": 177833,
-    "mbps": 7.935,
-    "nanos": 161312167
+    "feedNanos": 163351458,
+    "frameBuildNanos": 182250,
+    "mbps": 7.827,
+    "nanos": 163534041
   },
   "consumer_truecolor_gradient": {
     "benchmark": "consumer_truecolor_gradient",
     "bytes": 899700,
-    "feedNanos": 12050416,
-    "frameBuildNanos": 166125,
-    "mbps": 73.646,
-    "nanos": 12216541
+    "feedNanos": 11765667,
+    "frameBuildNanos": 168417,
+    "mbps": 75.388,
+    "nanos": 11934209
   },
   "consumer_unicode_mixed": {
     "benchmark": "consumer_unicode_mixed",
     "bytes": 1048619,
-    "feedNanos": 67317458,
-    "frameBuildNanos": 175708,
-    "mbps": 15.537,
-    "nanos": 67493500
+    "feedNanos": 67510333,
+    "frameBuildNanos": 176250,
+    "mbps": 15.492,
+    "nanos": 67686917
   },
   "data_frame_json_base64": {
     "benchmark": "data_frame_json_base64",
-    "nanos": 1490500,
+    "nanos": 1760084,
     "payload": 65536,
     "wire": 88806
   },
   "echo_latency_local_p50": {
     "benchmark": "echo_latency_local_p50",
-    "nanos": 17375
+    "nanos": 17458
   },
   "echo_latency_local_p95": {
     "benchmark": "echo_latency_local_p95",
-    "nanos": 18167
+    "nanos": 18959
   },
   "glyph_atlas_ascii_warm_path": {
     "benchmark": "glyph_atlas_ascii_warm_path",
     "entries": 94,
     "hits": 18800,
     "misses": 0,
-    "nanos": 681209,
+    "nanos": 725708,
     "pages": 1
   },
   "glyph_atlas_mixed_unicode_path": {
@@ -141,128 +153,138 @@
     "entries": 8,
     "hits": 8,
     "misses": 8,
-    "nanos": 9034083,
+    "nanos": 12736125,
     "pages": 1
   },
   "ipc_codec_round_trip_4mib": {
     "benchmark": "ipc_codec_round_trip_4mib",
     "bytes": 4194304,
-    "nanos": 33598250
+    "nanos": 32588458
   },
   "ipc_consumer_ansi_sgr_4096": {
     "benchmark": "ipc_consumer_ansi_sgr_4096",
     "bytes": 1048626,
     "chunkBytes": 4096,
-    "mbps": 9.754,
-    "nanos": 107507875
+    "mbps": 9.641,
+    "nanos": 108765375
   },
   "ipc_consumer_ansi_sgr_65536": {
     "benchmark": "ipc_consumer_ansi_sgr_65536",
     "bytes": 1048626,
     "chunkBytes": 65536,
-    "mbps": 9.647,
-    "nanos": 108703333
+    "mbps": 9.282,
+    "nanos": 112973625
   },
   "ipc_consumer_attributes_4096": {
     "benchmark": "ipc_consumer_attributes_4096",
     "bytes": 1048618,
     "chunkBytes": 4096,
-    "mbps": 9.158,
-    "nanos": 114499125
+    "mbps": 9.119,
+    "nanos": 114995292
   },
   "ipc_consumer_attributes_65536": {
     "benchmark": "ipc_consumer_attributes_65536",
     "bytes": 1048618,
     "chunkBytes": 65536,
-    "mbps": 9.093,
-    "nanos": 115327500
+    "mbps": 8.698,
+    "nanos": 120557416
   },
   "ipc_consumer_plain_ascii_4096": {
     "benchmark": "ipc_consumer_plain_ascii_4096",
     "bytes": 1048600,
     "chunkBytes": 4096,
-    "mbps": 7.042,
-    "nanos": 148911458
+    "mbps": 6.897,
+    "nanos": 152034209
   },
   "ipc_consumer_plain_ascii_65536": {
     "benchmark": "ipc_consumer_plain_ascii_65536",
     "bytes": 1048600,
     "chunkBytes": 65536,
-    "mbps": 6.963,
-    "nanos": 150603958
+    "mbps": 6.65,
+    "nanos": 157689750
   },
   "ipc_consumer_redraw_4096": {
     "benchmark": "ipc_consumer_redraw_4096",
     "bytes": 2463300,
     "chunkBytes": 4096,
-    "mbps": 149.143,
-    "nanos": 16516416
+    "mbps": 148.053,
+    "nanos": 16637917
   },
   "ipc_consumer_redraw_65536": {
     "benchmark": "ipc_consumer_redraw_65536",
     "bytes": 2463300,
     "chunkBytes": 65536,
-    "mbps": 157.556,
-    "nanos": 15634459
+    "mbps": 153.771,
+    "nanos": 16019292
   },
   "ipc_consumer_scrollback_4096": {
     "benchmark": "ipc_consumer_scrollback_4096",
     "bytes": 1280000,
     "chunkBytes": 4096,
-    "mbps": 8.056,
-    "nanos": 158896958
+    "mbps": 7.984,
+    "nanos": 160327708
   },
   "ipc_consumer_scrollback_65536": {
     "benchmark": "ipc_consumer_scrollback_65536",
     "bytes": 1280000,
     "chunkBytes": 65536,
-    "mbps": 8.017,
-    "nanos": 159654208
+    "mbps": 7.878,
+    "nanos": 162478959
   },
   "ipc_consumer_truecolor_gradient_4096": {
     "benchmark": "ipc_consumer_truecolor_gradient_4096",
     "bytes": 899700,
     "chunkBytes": 4096,
-    "mbps": 73.066,
-    "nanos": 12313583
+    "mbps": 74.674,
+    "nanos": 12048417
   },
   "ipc_consumer_truecolor_gradient_65536": {
     "benchmark": "ipc_consumer_truecolor_gradient_65536",
     "bytes": 899700,
     "chunkBytes": 65536,
-    "mbps": 74.495,
-    "nanos": 12077333
+    "mbps": 74.806,
+    "nanos": 12027167
   },
   "ipc_consumer_unicode_mixed_4096": {
     "benchmark": "ipc_consumer_unicode_mixed_4096",
     "bytes": 1048619,
     "chunkBytes": 4096,
-    "mbps": 15.324,
-    "nanos": 68431500
+    "mbps": 15.365,
+    "nanos": 68246375
   },
   "ipc_consumer_unicode_mixed_65536": {
     "benchmark": "ipc_consumer_unicode_mixed_65536",
     "bytes": 1048619,
     "chunkBytes": 65536,
-    "mbps": 15.519,
-    "nanos": 67568334
+    "mbps": 15.022,
+    "nanos": 69805041
+  },
+  "osc_1337_inline_image_feed": {
+    "benchmark": "osc_1337_inline_image_feed",
+    "nanos": 4827041,
+    "payloadBytes": 4194326
+  },
+  "osc_52_clipboard_feed": {
+    "benchmark": "osc_52_clipboard_feed",
+    "nanos": 350458,
+    "payloadBytes": 819208
   },
   "output_scroll_full_resolve": {
     "benchmark": "output_scroll_full_resolve",
-    "nanos": 57204875,
+    "nanos": 58365583,
     "ticks": 200
   },
   "preview_reflow_10k_prose": {
     "benchmark": "preview_reflow_10k_prose",
     "iterations": 50,
     "lines": 10000,
-    "nanos": 52755
+    "nanos": 52971
   },
   "preview_reflow_cost": {
     "benchmark": "preview_reflow_cost",
     "fromCols": 200,
     "historyLines": 50000,
-    "nanos": 57875,
+    "nanos": 58583,
     "toCols": 80
   },
   "read_grid_snapshot_full_screen": {
@@ -275,14 +297,14 @@
     "cols": 120,
     "fromRows": 24,
     "historyLines": 50000,
-    "nanos": 35959,
+    "nanos": 38458,
     "toRows": 60
   },
   "reflow_cost_width": {
     "benchmark": "reflow_cost_width",
     "fromCols": 200,
     "historyLines": 50000,
-    "nanos": 73307875,
+    "nanos": 72372292,
     "toCols": 80
   },
   "render_encode_incremental_damage_160x48": {
@@ -292,7 +314,7 @@
     "encodedRows": 1,
     "glyphInstances": 7680,
     "instanceUploadBytes": 493056,
-    "nanos": 139000,
+    "nanos": 189333,
     "reusedRows": 47
   },
   "render_encode_stable_damage_160x48": {
@@ -302,7 +324,7 @@
     "encodedRows": 0,
     "glyphInstances": 7680,
     "instanceUploadBytes": 0,
-    "nanos": 17625,
+    "nanos": 17666,
     "reusedRows": 48
   },
   "render_encode_stats_160x48": {
@@ -317,91 +339,97 @@
     "glyphInstances": 7680,
     "imageInstances": 0,
     "instanceUploadBytes": 493056,
-    "nanos": 808958,
+    "nanos": 642750,
     "reusedRows": 0
   },
   "scroll_tick_full_rebuild": {
     "benchmark": "scroll_tick_full_rebuild",
-    "nanos": 51275291,
+    "nanos": 51328583,
     "ticks": 200
+  },
+  "scrollback_compaction_64mib": {
+    "benchmark": "scrollback_compaction_64mib",
+    "fileBytes": 67108864,
+    "nanos": 18355875,
+    "retentionCap": 16777216
   },
   "scrollback_steady_state_at_cap": {
     "benchmark": "scrollback_steady_state_at_cap",
     "bytes": 286890,
-    "nanos": 14926250
+    "nanos": 11437042
   },
   "selection_drag_baked_rebuild": {
     "benchmark": "selection_drag_baked_rebuild",
-    "nanos": 52812917,
+    "nanos": 54501166,
     "ticks": 200
   },
   "surface_main_thread_stall_4mib": {
     "benchmark": "surface_main_thread_stall_4mib",
     "bytes": 4194334,
     "cells": 7680,
-    "feedNanos": 85156292,
-    "frameBuildNanos": 180125,
+    "feedNanos": 84700459,
+    "frameBuildNanos": 193458,
     "historyLines": 0,
-    "nanos": 85336875
+    "nanos": 84893958
   },
   "surface_off_main_thread_stall_4mib": {
     "benchmark": "surface_off_main_thread_stall_4mib",
     "bytes": 4194334,
     "cells": 7680,
-    "nanos": 3250,
-    "workerDrainNanos": 85148708
+    "nanos": 3167,
+    "workerDrainNanos": 86407250
   },
   "transport_output_frame_encode": {
     "benchmark": "transport_output_frame_encode",
     "bytes": 16777216,
     "frames": 256,
-    "nanos": 473333
+    "nanos": 474000
   },
   "vt_parse_ansi_colored_ascii_256kib": {
     "benchmark": "vt_parse_ansi_colored_ascii_256kib",
     "bytes": 262148,
-    "nanos": 32550000
+    "nanos": 31050333
   },
   "vt_parse_plain_ascii_256kib": {
     "benchmark": "vt_parse_plain_ascii_256kib",
     "bytes": 262200,
-    "nanos": 21049583
+    "nanos": 21248917
   },
   "vt_parse_run_path_print_heavy_ascii": {
     "benchmark": "vt_parse_run_path_print_heavy_ascii",
     "bytes": 1048630,
-    "nanos": 12699458
+    "nanos": 10728958
   },
   "vt_parse_scalar_baseline_print_heavy_ascii": {
     "benchmark": "vt_parse_scalar_baseline_print_heavy_ascii",
     "bytes": 1048630,
-    "nanos": 100220917
+    "nanos": 92587958
   },
   "vt_parse_sgr_attribute_storm_512kib": {
     "benchmark": "vt_parse_sgr_attribute_storm_512kib",
     "bytes": 524348,
-    "nanos": 40719167
+    "nanos": 41124583
   },
   "vt_parse_throughput_256kib": {
     "benchmark": "vt_parse_throughput_256kib",
     "bytes": 262150,
-    "nanos": 4692000
+    "nanos": 4752500
   },
   "vt_parse_unicode_mixed_512kib": {
     "benchmark": "vt_parse_unicode_mixed_512kib",
     "bytes": 524290,
-    "nanos": 24687791
+    "nanos": 24621708
   },
   "width_reflow_10k_cjk": {
     "benchmark": "width_reflow_10k_cjk",
     "iterations": 10,
     "lines": 10000,
-    "nanos": 19247116
+    "nanos": 19367766
   },
   "width_reflow_10k_prose": {
     "benchmark": "width_reflow_10k_prose",
     "iterations": 10,
     "lines": 10000,
-    "nanos": 8499845
+    "nanos": 8377729
   }
 }

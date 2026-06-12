@@ -6,6 +6,45 @@ All notable changes to Harness are documented here. The format is based on
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/robzilla1738/harness-terminal/releases).
 
+## [1.11.0] - 2026-06-11
+
+An engine efficiency pass. The theme is paths that did per-item work where one pass would
+do: per-byte OSC consumption, per-cell search Strings, per-chunk main-thread dispatches,
+whole-file reads to keep a file's tail. Plus one real bug the audit turned up in the
+hyperlink registry.
+
+### Changed
+- **Inline images and clipboard writes parse 7–10× faster.** (#164) OSC payloads were decoded
+  to a String (full UTF-8 validation + copy of a multi-megabyte base64 body), re-encoded back
+  to bytes, then decoded to a String *again* — and the parser consumed every payload byte
+  one at a time through the state machine. The dispatcher now routes by code bytewise, bulk
+  payloads (OSC 1337 images, OSC 52 clipboard) stay byte slices end to end, and the parser
+  bulk-consumes OSC bodies to the next delimiter. A 4 MiB inline image feeds in 5.6ms
+  (was 41ms); an 800 KiB clipboard set in 0.5ms (was 4.9ms).
+- **Find-bar keystrokes search the buffer 1.9× faster.** (#165) Each keystroke re-scans the
+  whole buffer, and every cell built (and discarded) its own String. Per-cell units now come
+  from a static ASCII table plus a codepoint memo; only cells carrying combining marks still
+  pay the cluster build. A 20k-line search drops from 51ms to 27ms per keystroke.
+- **Output floods no longer schedule per-chunk work on the main thread.** (#166) The off-main
+  output path dispatched a main-queue hop for every PTY chunk — tens of thousands of
+  dispatches per second under `yes`-class floods, all competing with input and rendering.
+  Chunks now merge their post-parse state into one staged hop (1025 hops → 1 in the drain
+  benchmark); a lone keystroke echo still hops immediately, so latency is unchanged.
+- **Scrollback compaction streams the log's tail instead of reading the whole file.** (#163)
+  Trimming an over-limit log read the entire file into memory on the same queue that
+  persists output — up to 1 GiB with unlimited scrollback. It now seeks to the tail and
+  streams it through a 4 MiB buffer; a 64 MiB log compacts in under 10ms.
+- **Renderer encode path sheds its steady-state allocations.** (#167) Ligature run buffers,
+  the prompt-gutter cache key, dirty-row sets, and splice spans were rebuilt per frame;
+  row content keys were hashed twice per resize salvage. All now reuse or memoize, with
+  byte-identical instance output.
+
+### Fixed
+- **A stale hyperlink can no longer point at a different URL.** (#162) When the OSC 8
+  registry hit its flood bound it purged all entries *and reset the ID counter*, so links
+  already on screen could silently resolve to whatever URL later landed on the recycled ID.
+  Purged links now go dead instead.
+
 ## [1.10.0] - 2026-06-10
 
 ### Added
