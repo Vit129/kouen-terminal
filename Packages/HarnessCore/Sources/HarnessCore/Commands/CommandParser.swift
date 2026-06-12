@@ -516,13 +516,13 @@ public enum CommandParser {
             let rows = stringValue(for: "-y", in: tokens).flatMap(Int.init)
             return .resizeWindow(rows: rows, cols: cols)
         case "list-sessions":
-            return .listSessions(format: stringValue(for: "-F", in: tokens))
+            return .listSessions(format: stringValue(for: "-F", in: tokens), json: tokens.contains("--json"))
         case "list-windows":
-            return .listWindows(format: stringValue(for: "-F", in: tokens))
+            return .listWindows(format: stringValue(for: "-F", in: tokens), json: tokens.contains("--json"))
         case "list-panes":
-            return .listPanes(format: stringValue(for: "-F", in: tokens))
+            return .listPanes(format: stringValue(for: "-F", in: tokens), json: tokens.contains("--json"))
         case "list-clients":
-            return .listClients(format: stringValue(for: "-F", in: tokens))
+            return .listClients(format: stringValue(for: "-F", in: tokens), json: tokens.contains("--json"))
         case "find-window":
             // `-t <session>` scopes the search; its VALUE must never be mistaken for the
             // search pattern (skipped from the positionals, captured separately).

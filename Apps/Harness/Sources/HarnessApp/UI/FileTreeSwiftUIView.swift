@@ -36,11 +36,10 @@ final class FileTreeNode: Identifiable {
 @MainActor
 struct FileTreeSwiftUIView: View {
     let rootPath: String
-    /// Session identity included in the `.task` id so switching sessions in the
-    /// same repo (e.g. main vs feat/A) re-runs `loadRoot()`.
     let sessionID: SessionID?
     let watcher: FileTreeWatcher
-    /// Single-click on a file row — shows a read-only preview in the sidebar.
+    /// Keyboard navigation state — written by AppKit, read here for highlight + scroll.
+    let keyboard: FileTreeKeyboardState
     let onPreview: (FileNode) -> Void
     @State private var rootNodes: [FileTreeNode] = []
     @State private var gitBranch: String?
@@ -110,14 +109,19 @@ struct FileTreeSwiftUIView: View {
                         watcher: watcher,
                         scanOptions: scanOptions,
                         gitStatus: currentGitStatus,
+                        keyboard: keyboard,
                         onPreview: onPreview
                     )
                 }
             }
             .listStyle(.sidebar)
             .scrollContentBackground(.hidden)
+            .onChange(of: filteredNodes.map(\.node.path)) { _, _ in
+                updateVisiblePaths()
+            }
+            .onAppear { updateVisiblePaths() }
         }
-        .onAppear { refreshGitBranch() }
+        .onAppear { refreshGitBranch(); updateVisiblePaths() }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("HarnessActiveTabGitBranchDidChange"))) { _ in
             refreshGitBranch()
         }
@@ -262,6 +266,22 @@ struct FileTreeSwiftUIView: View {
         gitBranch = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.gitBranch
     }
 
+    /// Build a flat ordered list of visible node paths for keyboard navigation.
+    private func updateVisiblePaths() {
+        var paths: [String] = []
+        func collect(_ nodes: [FileTreeNode]) {
+            for n in nodes {
+                paths.append(n.node.path)
+                if n.isExpanded, let children = n.children {
+                    collect(children)
+                }
+            }
+        }
+        collect(filteredNodes)
+        keyboard.visiblePaths = paths
+        if keyboard.focusedPath == nil { keyboard.focusedPath = paths.first }
+    }
+
     private func loadRoot() async {
         let statusProvider = GitStatusProvider()
         async let gitStatusTask  = statusProvider.status(rootPath: rootPath)
@@ -313,7 +333,10 @@ private struct NodeRow: View {
     let watcher: FileTreeWatcher
     let scanOptions: FileTreeScanOptions
     let gitStatus: [String: GitStatusType]
+    let keyboard: FileTreeKeyboardState
     let onPreview: (FileNode) -> Void
+
+    private var isFocused: Bool { keyboard.focusedPath == node.node.path }
 
     var body: some View {
         if node.node.isDirectory {
@@ -325,28 +348,49 @@ private struct NodeRow: View {
                         watcher: watcher,
                         scanOptions: scanOptions,
                         gitStatus: gitStatus,
+                        keyboard: keyboard,
                         onPreview: onPreview
                     )
                 }
             } label: {
                 rowLabel(systemImage: "folder")
                     .contentShape(Rectangle())
-                    .onTapGesture { node.isExpanded.toggle() }
+                    .background(isFocused ? Color.accentColor.opacity(0.2) : Color.clear)
+                    .cornerRadius(4)
+                    .onTapGesture {
+                        keyboard.focusedPath = node.node.path
+                        node.isExpanded.toggle()
+                    }
             }
             .onChange(of: node.isExpanded) { _, expanded in
                 if expanded {
                     Task { await loadChildren() }
                 } else {
-                    // Reset children so sub-expand states are cleared on collapse.
                     node.children = []
                 }
+            }
+            // h/l expand/collapse via keyboard navigator
+            .onChange(of: keyboard.focusedPath) { _, focused in
+                guard focused == node.node.path else { return }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .fileTreeToggleExpand)) { note in
+                guard let path = note.userInfo?["path"] as? String,
+                      let action = note.userInfo?["action"] as? String,
+                      path == node.node.path else { return }
+                if action == "expand" && !node.isExpanded { node.isExpanded = true }
+                if action == "collapse" && node.isExpanded { node.isExpanded = false }
             }
         } else {
             rowLabel(systemImage: "doc")
                 .contentShape(Rectangle())
+                .background(isFocused ? Color.accentColor.opacity(0.2) : Color.clear)
+                .cornerRadius(4)
                 .gesture(
                     TapGesture(count: 2).onEnded { openFile() }
-                        .exclusively(before: TapGesture(count: 1).onEnded { onPreview(node.node) })
+                        .exclusively(before: TapGesture(count: 1).onEnded {
+                            keyboard.focusedPath = node.node.path
+                            onPreview(node.node)
+                        })
                 )
         }
     }
@@ -568,4 +612,5 @@ final class BranchSwitchHelper: NSObject {
 
 extension Notification.Name {
     static let fileTreeDidChange = Notification.Name("HarnessFileTreeDidChange")
+    static let fileTreeToggleExpand = Notification.Name("HarnessFileTreeToggleExpand")
 }

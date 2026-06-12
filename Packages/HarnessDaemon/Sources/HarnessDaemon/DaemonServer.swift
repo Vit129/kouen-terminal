@@ -524,17 +524,26 @@ public final class DaemonServer: @unchecked Sendable {
     }
 
     private func applyEffectiveSize(surfaceID: String) {
-        var minRows: UInt16 = .max
-        var minCols: UInt16 = .max
+        var minRows: UInt16 = .max, minCols: UInt16 = .max
+        var maxRows: UInt16 = 0, maxCols: UInt16 = 0
+        var latestRows: UInt16 = 0, latestCols: UInt16 = 0
         var found = false
         for sizes in clientSurfaceSizes.values {
             guard let size = sizes[surfaceID] else { continue }
             found = true
-            minRows = min(minRows, size.rows)
-            minCols = min(minCols, size.cols)
+            minRows = min(minRows, size.rows); minCols = min(minCols, size.cols)
+            maxRows = max(maxRows, size.rows); maxCols = max(maxCols, size.cols)
+            latestRows = size.rows; latestCols = size.cols
         }
         guard found, minRows > 0, minCols > 0 else { return }
-        _ = registry.handle(.resizeSurface(surfaceID: surfaceID, rows: minRows, cols: minCols))
+        let mode = registry.optionStore.get("window-size")?.stringValue ?? "smallest"
+        let (rows, cols): (UInt16, UInt16)
+        switch mode {
+        case "largest":  rows = maxRows; cols = maxCols
+        case "latest":   rows = latestRows; cols = latestCols
+        default:         rows = minRows; cols = minCols      // "smallest"
+        }
+        _ = registry.handle(.resizeSurface(surfaceID: surfaceID, rows: rows, cols: cols))
     }
 
     private func handleSubscribeSnapshot(label: String?, fd: Int32) {

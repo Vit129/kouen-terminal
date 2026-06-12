@@ -178,6 +178,9 @@ public final class OptionStore: @unchecked Sendable {
         // `destroy-unattached`: when on, sessions with no attached clients are destroyed.
         // tmux default is off; Harness default is off to preserve Harness's "sessions survive quit" promise.
         "destroy-unattached": .bool(false),
+        // `window-size`: vote aggregation when multiple clients size a surface.
+        // "smallest" (tmux default), "largest", "latest"
+        "window-size": .string("smallest"),
     ]
 
     /// Values that shipped as defaults in an earlier build and have since been
