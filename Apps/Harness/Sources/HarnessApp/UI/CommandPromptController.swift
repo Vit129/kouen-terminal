@@ -12,6 +12,7 @@ final class CommandPromptController: NSObject, NSTextFieldDelegate {
     private var window: NSPanel?
     private let field = NSTextField()
     private var history: [String] = []
+    var historyEntries: [String] { history }
     private var historyCursor: Int = -1
     /// In-progress text saved when history recall begins, restored on Down past the newest entry.
     private var draft = ""
@@ -78,6 +79,12 @@ final class CommandPromptController: NSObject, NSTextFieldDelegate {
                 editor.selectedRange = NSRange(location: ns.length, length: 0)
             }
         }
+    }
+
+    func presentSeeded(text: String) {
+        present()
+        field.stringValue = text
+        moveInsertionPointToEnd()
     }
 
     func dismiss() {

@@ -46,6 +46,7 @@
 | 31 | CASE-026 black terminal on new session — display link race fix | ✅ Done |
 | 32 | Lazy scrollback reflow (skip O(history) during live resize), Task Board sidebar, Focus Mode (⌘P) | ✅ Done |
 | 30 | P10 implementation: Sidebar session state dots, Toggle IDE Mode shortcut (⌘⇧D), and Workspace Symbol Index autocomplete completions popup | ✅ Done |
+| 33 | Implement Ctrl+R-style fuzzy command-history search overlay | ✅ Done |
 
 
 ### Recent_Lessons
