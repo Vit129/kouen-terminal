@@ -1,4 +1,4 @@
-.PHONY: run debug prod start install install-no-build build bench preview preview-stop preview-clean release release-notes package dmg smoke-dmg sign appcast finalize hotfix-release icon clean video-skills video-dev video-check video-render video-doctor
+.PHONY: run debug prod start install install-no-build build bench preview preview-stop preview-clean clean-state release release-notes package dmg smoke-dmg sign appcast finalize hotfix-release icon clean video-skills video-dev video-check video-render video-doctor
 
 run:
 	./Scripts/run.sh run
@@ -11,6 +11,11 @@ prod:
 
 start:
 	./Scripts/start.sh
+
+# Clear persisted session/scrollback state for debug builds (HarnessDebug home only —
+# never touches the production app's real session state).
+clean-state:
+	./Scripts/clean-state.sh
 
 install:
 	./Scripts/install-app.sh

@@ -21,6 +21,13 @@ echo "Info.plist version/build: $plist_version ($plist_build)"
 echo "CHANGELOG.md top version:  $cl_version"
 echo ""
 
+if [[ "$cl_version" == "Unreleased" ]]; then
+  echo "CHANGELOG.md's top entry is still '[Unreleased]'." >&2
+  echo "Rename it to '## [X.Y.Z] - $(date +%Y-%m-%d)' describing this release's changes," >&2
+  echo "commit it (Scripts/commit-push.sh), then re-run." >&2
+  exit 1
+fi
+
 if [[ "$cl_version" == "$plist_version" ]]; then
   echo "CHANGELOG.md's top entry ($cl_version) matches the shipped Info.plist version." >&2
   echo "Add a new '## [X.Y.Z] - $(date +%Y-%m-%d)' section to CHANGELOG.md describing" >&2
