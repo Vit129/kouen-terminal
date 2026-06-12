@@ -73,8 +73,8 @@ enum MainMenuBuilder {
         workspace.submenu?.addItem(.separator())
         for index in 1...9 {
             let item = NSMenuItem(
-                title: "Switch to Tab \(index)",
-                action: #selector(MenuTarget.selectTabNumber(_:)),
+                title: "Switch to Session \(index)",
+                action: #selector(MenuTarget.selectSessionNumber(_:)),
                 keyEquivalent: "\(index)"
             )
             item.tag = index
@@ -372,6 +372,11 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
         SessionCoordinator.shared.toggleFindBar()
     }
 
+
+    /// ⌘1–9 switch to the session (workspace) at that position in the sidebar.
+    @objc func selectSessionNumber(_ sender: NSMenuItem) {
+        SessionCoordinator.shared.selectWorkspace(byIndex: sender.tag - 1)
+    }
 
     /// ⌘1–9 switch to the tab at that position in the active session.
     @objc func selectTabNumber(_ sender: NSMenuItem) {

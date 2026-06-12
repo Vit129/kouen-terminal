@@ -267,6 +267,10 @@ public enum CommandIPCTranslator {
             guard let pane = target.paneID, let surface = target.surfaceID(of: pane) else { return .unresolved }
             return .requests([.respawnPane(surfaceID: surface, keepHistory: keepHistory)])
 
+        case .clearHistory:
+            guard let pane = target.paneID, let surface = target.surfaceID(of: pane) else { return .unresolved }
+            return .requests([.clearHistory(surfaceID: surface)])
+
         case let .resizePane(direction, amount):
             guard let pane = target.paneID else { return .unresolved }
             return .requests([.resizePane(paneID: pane, direction: direction, amount: amount)])

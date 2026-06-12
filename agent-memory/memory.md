@@ -47,6 +47,7 @@
 | 32 | Lazy scrollback reflow (skip O(history) during live resize), Task Board sidebar, Focus Mode (⌘P) | ✅ Done |
 | 30 | P10 implementation: Sidebar session state dots, Toggle IDE Mode shortcut (⌘⇧D), and Workspace Symbol Index autocomplete completions popup | ✅ Done |
 | 33 | Implement Ctrl+R-style fuzzy command-history search overlay | ✅ Done |
+| 34 | Fix Focus Mode (⌘P) out-of-sync sidebar state when manual visibility toggles occur | ✅ Done |
 
 
 ### Recent_Lessons

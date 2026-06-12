@@ -12,8 +12,7 @@ final class FileEditorView: NSView {
     private let syntaxView = SyntaxTextView()
     private let messageLabel = NSTextField(labelWithString: "")
     private let quickLookContainer = NSView()
-    // TODO: LSP integration — disabled for now.
-    // private let lspSession = LSPFileSession()
+    private let lspSession = LSPFileSession()
 
     private static let maxPreviewBytes = 5_000_000
     private(set) var filePath: String = ""
@@ -81,12 +80,12 @@ final class FileEditorView: NSView {
             try? text.write(toFile: self.filePath, atomically: true, encoding: .utf8)
             DisplayMessage.show("Saved \((self.filePath as NSString).lastPathComponent)")
         }
-        // LSP hooks — disabled (see TODO above)
-        // syntaxView.onHover = { [weak self] position in await self?.lspSession.hover(position: position) }
-        // syntaxView.onDefinition = { [weak self] position in await self?.lspSession.definition(position: position) }
-        // syntaxView.onNavigateToDefinition = { [weak self] target in
-        //     self?.load(path: target.url.path)
-        // }
+        // LSP hooks
+        syntaxView.onHover = { [weak self] position in await self?.lspSession.hover(position: position) }
+        syntaxView.onDefinition = { [weak self] position in await self?.lspSession.definition(position: position) }
+        syntaxView.onNavigateToDefinition = { [weak self] target in
+            self?.load(path: target.url.path)
+        }
         addSubview(syntaxView)
 
         messageLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -115,10 +114,9 @@ final class FileEditorView: NSView {
             quickLookContainer.bottomAnchor.constraint(equalTo: bottomAnchor),
         ])
 
-        // LSP diagnostics — disabled
-        // lspSession.onDiagnostics = { [weak self] diagnostics in
-        //     self?.syntaxView.setDiagnostics(diagnostics)
-        // }
+        lspSession.onDiagnostics = { [weak self] diagnostics in
+            self?.syntaxView.setDiagnostics(diagnostics)
+        }
     }
 
     // MARK: - Git Diff Gutter
@@ -241,11 +239,11 @@ final class FileEditorView: NSView {
         let root = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd ?? fileDir
         symbolIndex.scan(root: root)
         syntaxView.symbolIndex = symbolIndex
-        // lspSession.open(url: URL(fileURLWithPath: filePath), text: text, fileExtension: ext)
+        lspSession.open(url: URL(fileURLWithPath: filePath), text: text, fileExtension: ext)
     }
 
     private func showMessage(_ message: String) {
-        // lspSession.close()
+        lspSession.close()
         syntaxView.isHidden = true
         quickLookContainer.isHidden = true
         messageLabel.isHidden = false
@@ -253,7 +251,7 @@ final class FileEditorView: NSView {
     }
 
     private func showQuickLook(url: URL) {
-        // lspSession.close()
+        lspSession.close()
         syntaxView.isHidden = true
         messageLabel.isHidden = true
         quickLookContainer.isHidden = false
