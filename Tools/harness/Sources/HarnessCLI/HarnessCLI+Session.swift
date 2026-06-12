@@ -203,7 +203,7 @@ extension HarnessCLI {
             }
             return
         }
-        if let target = flagValue(args, flag: "--session") {
+        if flagValue(args, flag: "--session") != nil {
             let session = sessions.first!
             try emit(SnapshotQueryFormatter.windowRows(in: session), args) {
                 SnapshotQueryFormatter.windows(in: session).forEach { print($0) }
