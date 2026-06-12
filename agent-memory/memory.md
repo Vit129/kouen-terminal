@@ -5,7 +5,7 @@
 - **Fork:** Vit129/harness-terminal (fork of robzilla1738/harness-terminal)
 - **Working branch:** `main`
 - **Preview:** `make preview` (uses `.harness-preview/` dir)
-- **Latest release:** v2.5.0 (commits 55c7bff + 6cd143d — terminal power-user sprint: vi mode, tmux parity, LSP, keyboard file tree)
+- **Latest release:** v2.5.1 (build 129 — translucent window legibility tint, per-theme opacity, ⌘1-9 session switch fix)
 
 ## Current Sprint — Post-v2.1.0 Polish & Shelving
 
