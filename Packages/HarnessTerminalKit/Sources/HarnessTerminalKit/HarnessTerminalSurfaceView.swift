@@ -394,10 +394,14 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// transitions never double-report the same state.
     var lastReportedFocus: Bool?
     var effectivelyFocused: Bool { focused && windowIsKey }
-    /// Mouse selection endpoints (anchor = where the drag started, head = current). A
-    /// `SelectionRegion` is derived from these (expanded by granularity) for highlight + extraction.
-    var selectionAnchor: (row: Int, column: Int)?
-    var selectionHead: (row: Int, column: Int)?
+    /// Mouse selection endpoints (anchor = where the drag started, head = current), stored as
+    /// virtual-line/column positions — the same scroll-stable coordinate space copy mode uses
+    /// (`historyCount - scrollOffset + viewportRow`, 0 = oldest retained line) — so a selection
+    /// survives scrolling instead of being reinterpreted against the new viewport. A
+    /// `SelectionRegion` is derived from these (expanded by granularity, converted to viewport
+    /// rows) for highlight + extraction.
+    var selectionAnchor: (line: Int, column: Int)?
+    var selectionHead: (line: Int, column: Int)?
     /// Selection unit set by click count: 1 = character, 2 = word, 3 = line. A drag extends by
     /// the unit; word/line ranges reuse copy-mode's word definition.
     enum SelectionGranularity { case character, word, line }
@@ -778,12 +782,15 @@ public final class HarnessTerminalSurfaceView: NSView {
     }
     // Scroll-reuse seams: drive a synchronous build+present and a scrollback scroll headlessly.
     func testingForceRender() { scheduler.forceRender() }
-    /// Programmatic selection for the cell-overlay tests (a mouse drag's end state).
+    /// Programmatic selection for the cell-overlay tests (a mouse drag's end state). `anchor`/
+    /// `head` are viewport rows, matching a real mouse position; converted to the virtual-line
+    /// coordinates `selectionAnchor`/`selectionHead` actually store.
     func testingSetSelection(
         anchor: (row: Int, column: Int)?, head: (row: Int, column: Int)?, rectangular: Bool = false
     ) {
-        selectionAnchor = anchor
-        selectionHead = head
+        let topLine = selectionTopLine
+        selectionAnchor = anchor.map { (line: topLine + $0.row, column: $0.column) }
+        selectionHead = head.map { (line: topLine + $0.row, column: $0.column) }
         selectionRectangular = rectangular
         selectionGranularity = .character
         scheduleRender()

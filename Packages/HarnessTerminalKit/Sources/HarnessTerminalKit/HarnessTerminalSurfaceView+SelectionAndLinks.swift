@@ -17,16 +17,16 @@ extension HarnessTerminalSurfaceView {
     /// output feed on every build while the word selection is held (the stall the off-main pipeline
     /// exists to avoid). `Sendable` so the `@Sendable` build closure can capture it.
     struct RawSelection: Sendable {
-        let anchorRow: Int, anchorColumn: Int
-        let headRow: Int, headColumn: Int
+        let anchorLine: Int, anchorColumn: Int
+        let headLine: Int, headColumn: Int
         let granularity: SelectionGranularity
         let rectangular: Bool
     }
 
     var currentRawSelection: RawSelection? {
         guard let a = selectionAnchor, let h = selectionHead else { return nil }
-        return RawSelection(anchorRow: a.row, anchorColumn: a.column,
-                            headRow: h.row, headColumn: h.column,
+        return RawSelection(anchorLine: a.line, anchorColumn: a.column,
+                            headLine: h.line, headColumn: h.column,
                             granularity: selectionGranularity, rectangular: selectionRectangular)
     }
 
@@ -35,24 +35,35 @@ extension HarnessTerminalSurfaceView {
                                                    scrollOffset: Int, columns: Int, wordSeparators: String) -> SelectionRegion? {
         guard let sel else { return nil }
         let raw = SelectionResolver.RawSelection(
-            anchorRow: sel.anchorRow, anchorColumn: sel.anchorColumn,
-            headRow: sel.headRow, headColumn: sel.headColumn,
+            anchorLine: sel.anchorLine, anchorColumn: sel.anchorColumn,
+            headLine: sel.headLine, headColumn: sel.headColumn,
             granularity: sel.granularity, rectangular: sel.rectangular
         )
         return SelectionResolver.resolve(raw, emulator: emulator, scrollOffset: scrollOffset, columns: columns, wordSeparators: wordSeparators)
+    }
+
+    /// Virtual line at viewport row 0 — `historyCount - scrollOffset`. Subtract this from a
+    /// selection endpoint's virtual line to get its row in the current viewport, or add it to a
+    /// viewport row to get the virtual line, the same convention copy mode uses.
+    var selectionTopLine: Int {
+        let historyCount = offMainParserFramePipelineEnabled ? historyCountMirror : emulatorState.emulator.historyCount
+        return historyCount - scrollOffset
     }
 
     /// The active selection region (nil when nothing is selected): rectangular for an Option-drag,
     /// else linear with the endpoints expanded by the current granularity (word / line).
     var currentSelectionRegion: SelectionRegion? {
         guard let a = selectionAnchor, let h = selectionHead else { return nil }
-        if selectionRectangular { return .block(BlockSelection((a.row, a.column), (h.row, h.column))) }
+        let topLine = selectionTopLine
+        let a2 = (row: a.line - topLine, column: a.column)
+        let h2 = (row: h.line - topLine, column: h.column)
+        if selectionRectangular { return .block(BlockSelection((a2.row, a2.column), (h2.row, h2.column))) }
         guard selectionGranularity != .character else {
-            return .linear(TerminalSelection((a.row, a.column), (h.row, h.column)))
+            return .linear(TerminalSelection((a2.row, a2.column), (h2.row, h2.column)))
         }
         // Order the endpoints, then expand the lower one to the start of its unit and the higher
         // one to the end of its unit (unioning when both are on the same row).
-        let (lo, hi) = (a.row, a.column) <= (h.row, h.column) ? (a, h) : (h, a)
+        let (lo, hi) = (a2.row, a2.column) <= (h2.row, h2.column) ? (a2, h2) : (h2, a2)
         let loRange = unitColumnRange(viewportRow: lo.row, column: lo.column)
         let hiRange = unitColumnRange(viewportRow: hi.row, column: hi.column)
         if lo.row == hi.row {
@@ -155,8 +166,9 @@ extension HarnessTerminalSurfaceView {
         default: selectionGranularity = .character
         }
         selectionRectangular = event.modifierFlags.contains(.option)
-        selectionAnchor = pos
-        selectionHead = pos
+        let line = selectionTopLine + pos.row
+        selectionAnchor = (line: line, column: pos.column)
+        selectionHead = (line: line, column: pos.column)
         scheduleRender()
     }
 
@@ -255,7 +267,7 @@ extension HarnessTerminalSurfaceView {
             return
         }
         guard selectionAnchor != nil, let pos = cell(at: event.locationInWindow) else { return }
-        selectionHead = pos
+        selectionHead = (line: selectionTopLine + pos.row, column: pos.column)
         scheduleRender()
     }
 
