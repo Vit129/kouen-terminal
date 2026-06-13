@@ -6,7 +6,11 @@ All notable changes to Harness are documented here. The format is based on
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/robzilla1738/harness-terminal/releases).
 
-## [Unreleased]
+## [1.12.0] - 2026-06-13
+
+A fresh-eyes improvement pass: two user-reported bugs fixed, a batch of power-user features
+(output triggers, per-host theme profiles, prompt navigation, a full-vocabulary command
+palette, hover-reveal pane close), and the first end-to-end typing-latency measurements.
 
 ### Added
 - **Output triggers.** Watch terminal output for patterns and react: `highlight` shades the
