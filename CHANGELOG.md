@@ -8,6 +8,14 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 
 ## [Unreleased]
 
+## [2.5.3] - 2026-06-13
+
+### Changed
+- **`⌘[` / `⌘]` repurposed for session navigation.** Previously bound to `⌘⇧[`/`⌘⇧]` and wired to dead tab-switching code with no visible UI effect. Now they cycle to the previous/next session (same `selectAdjacentSession` mechanism as `⌘1–9`), matching the top bar's one-pill-per-session model.
+
+### Removed
+- **Dead tab-switching shortcuts and code.** `selectTabNumber(_:)`, `SessionCoordinator.selectTab(atIndex:)`, and the old `selectAdjacentTab(offset:)` operated on a `Tab` collection with no separate UI representation — switching "tabs" was a silent no-op from the user's perspective. Removed in favor of the session-level navigation that actually matches the top bar pills.
+
 ## [2.5.2] - 2026-06-12
 
 ### Fixed
