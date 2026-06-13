@@ -459,7 +459,10 @@ private final class TabPillView: NSView {
         closeButton.target = self
         closeButton.action = #selector(closeClicked)
         closeButton.translatesAutoresizingMaskIntoConstraints = false
-        closeButton.alphaValue = 1
+        // Tabs with a ⌘N shortcut badge show that badge instead of the close button until
+        // hovered (mouseEntered/mouseExited swap the two); tabs past position 9 have no
+        // badge and show the close button at rest.
+        closeButton.alphaValue = position != nil ? 0 : 1
         closeButton.wantsLayer = true
         closeButton.layer?.cornerRadius = HarnessDesign.Radius.badge
         closeButton.layer?.cornerCurve = .continuous

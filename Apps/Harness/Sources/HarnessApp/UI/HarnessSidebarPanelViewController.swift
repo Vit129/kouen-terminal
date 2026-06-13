@@ -295,6 +295,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
 
     private var notificationsDropdown: NotificationDropdownPanelView?
     private var notificationsDropdownMonitor: Any?
+    private weak var notificationsDropdownPreviousResponder: NSResponder?
 
     private func showNotificationsDropdown() {
         if notificationsDropdown != nil {
@@ -312,6 +313,9 @@ final class HarnessSidebarPanelViewController: NSViewController {
             onClearAll: { [weak self] in
                 self?.dismissNotificationsDropdown()
                 coordinator.clearAllNotifications()
+            },
+            onDismiss: { [weak self] in
+                self?.dismissNotificationsDropdown()
             }
         )
         dropdown.alphaValue = 0
@@ -342,6 +346,10 @@ final class HarnessSidebarPanelViewController: NSViewController {
             dropdown.animator().alphaValue = 1
         }
         installNotificationsDropdownMonitor()
+        // Take first responder so arrow keys / Enter / Escape reach the dropdown
+        // immediately; restore whatever had focus (e.g. the terminal) on dismiss.
+        notificationsDropdownPreviousResponder = view.window?.firstResponder
+        view.window?.makeFirstResponder(dropdown)
     }
 
     private func dismissNotificationsDropdown() {
@@ -350,6 +358,10 @@ final class HarnessSidebarPanelViewController: NSViewController {
         if let monitor = notificationsDropdownMonitor {
             NSEvent.removeMonitor(monitor)
             notificationsDropdownMonitor = nil
+        }
+        if let previous = notificationsDropdownPreviousResponder {
+            view.window?.makeFirstResponder(previous)
+            notificationsDropdownPreviousResponder = nil
         }
     }
 
