@@ -1596,6 +1596,12 @@ final class SessionCoordinator: NSObject {
         guard let waiting = firstWaitingTab() else { return }
         selectWorkspace(waiting.workspaceID)
         selectTab(workspaceID: waiting.workspaceID, tabID: waiting.tabID)
+        // Focus the terminal so the keyboard is ready immediately — without this,
+        // the user still has to click into the pane before they can type.
+        if let surfaceID = firstSurfaceID(forTab: waiting.tabID) {
+            setActiveSurface(surfaceID)
+            terminalHosts.host(for: surfaceID)?.focusTerminal()
+        }
     }
 
     /// All tabs currently `.waiting` plus enough context to render a notification

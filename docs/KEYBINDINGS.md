@@ -74,24 +74,21 @@ These are fixed `NSMenuItem` bindings defined in `MainMenuBuilder` — not prefi
 
 | Action | Shortcut |
 |--------|----------|
-| New tab | `⌘T` |
+| New session (workspace) | `⌘⇧N` |
+| Close session (workspace) | `⌘⇧W` |
+| Switch to session 1–9 | `⌘1` … `⌘9` |
 | Close tab | `⌘W` |
-| Split horizontal / vertical | `⌘D` / `⌘⇧D` |
+| Previous / Next tab | `⌘⇧[` / `⌘⇧]` |
+| Split horizontal | `⌘D` |
 | Command palette | `⌘K` |
 | Command prompt | `⌘;` |
 | Search command history | `⌃R` |
-| Toggle sidebar | `⌘\` |
-| Toggle IDE Mode | `⌘⇧D` |
-| Toggle Focus Mode | `⌘P` |
+| Toggle sidebar + file editor (focus mode) | `⌘\` |
+| Show Git panel | `⌘G` |
 | Jump to notification | `⌘⇧U` |
 | Settings | `⌘,` |
-| Layout: Even Horizontal | `⌘⌥1` |
-| Layout: Even Vertical | `⌘⌥2` |
-| Layout: Main Horizontal | `⌘⌥3` |
-| Layout: Main Vertical | `⌘⌥4` |
-| Layout: Tiled | `⌘⌥5` |
-| Enter Full Screen (native, macOS Space transition) | `⌃⌘F` |
-| Toggle Fast Full Screen (non-native, instant fill, no Space animation) | `⌃⌘⇧F` |
+| Increase / Decrease / Reset font size | `⌘+` / `⌘-` / `⌘0` |
+| Toggle Fast Full Screen (instant fill, no Space animation) | `⌃⌘⇧F` |
 
 ## Command prompt
 

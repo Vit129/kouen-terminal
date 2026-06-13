@@ -126,7 +126,7 @@ enum CommandPaletteController {
                 title: "New Tab",
                 subtitle: "Open a new shell in the active session",
                 symbol: "plus.rectangle.on.rectangle",
-                shortcut: "⌘T",
+                shortcut: "",
                 section: .actions
             ) {
                 if let id = coordinator.snapshot.activeWorkspaceID {
