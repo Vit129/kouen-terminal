@@ -58,6 +58,7 @@
 | 42 | Code review + bug fixes: async syncFromDaemon missing terminalHosts.prune(), ViNormalMode force-unwrap crash on surrogate unichars, selectSessionNumber rename to selectWorkspaceNumber | ✅ Done |
 | 43 | fzf install + shell integration (brew install fzf + source <(fzf --zsh) in ~/.zshrc) | ✅ Done |
 | 44 | CASE-028: ⌘1-9 verified/kept as Switch to Session N (selectWorkspaceNumber→selectSession); added ⌘[/⌘] = Previous/Next Session (selectAdjacentSession); removed dead selectTabNumber/selectTab(atIndex:)/selectAdjacentTab; menu cleanup (removed New Tab, Layout presets, native fullscreen; Toggle Focus Mode → Show Git Panel ⌘G); fixed make preview socket path | ✅ Done |
+| 45 | Rework file-tree sidebar search with Spotlight-style relevance ranking, fuzzy fallback, suffix matching, robust path value checking, and search debounce | ✅ Done |
 
 ### Removed / Reverted Features
 - **Task Board sidebar** — was added in sprint #32 but has since been **removed**. Not present in current codebase.
