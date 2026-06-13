@@ -56,9 +56,6 @@ enum MainMenuBuilder {
         newSessionItem.keyEquivalentModifierMask = [.command, .shift]
         newSessionItem.target = MenuTarget.shared
         workspace.submenu?.addItem(newSessionItem)
-        let newTabItem = NSMenuItem(title: "New Tab", action: #selector(MenuTarget.newTab), keyEquivalent: "t")
-        newTabItem.target = MenuTarget.shared
-        workspace.submenu?.addItem(newTabItem)
         let closeTab = NSMenuItem(title: "Close Tab", action: #selector(MenuTarget.closeTab), keyEquivalent: "w")
         closeTab.target = MenuTarget.shared
         workspace.submenu?.addItem(closeTab)
@@ -151,24 +148,13 @@ enum MainMenuBuilder {
         sidebarItem.keyEquivalentModifierMask = [.command]
         sidebarItem.target = MenuTarget.shared
         view.submenu?.addItem(sidebarItem)
-        let focusModeItem = NSMenuItem(title: "Toggle Focus Mode", action: #selector(MenuTarget.toggleFocusMode), keyEquivalent: "p")
-        focusModeItem.keyEquivalentModifierMask = [.command]
-        focusModeItem.target = MenuTarget.shared
-        view.submenu?.addItem(focusModeItem)
+        let gitPanelItem = NSMenuItem(title: "Show Git Panel", action: #selector(MenuTarget.showGitPanel), keyEquivalent: "g")
+        gitPanelItem.keyEquivalentModifierMask = [.command]
+        gitPanelItem.target = MenuTarget.shared
+        view.submenu?.addItem(gitPanelItem)
         let sidebarPosItem = NSMenuItem(title: "Move Sidebar to Right", action: #selector(MenuTarget.toggleSidebarPosition), keyEquivalent: "")
         sidebarPosItem.target = MenuTarget.shared
         view.submenu?.addItem(sidebarPosItem)
-        view.submenu?.addItem(.separator())
-        let layoutNames: [(String, String)] = [
-            ("Even Horizontal", "1"), ("Even Vertical", "2"),
-            ("Main Horizontal", "3"), ("Main Vertical", "4"), ("Tiled", "5")
-        ]
-        for (title, key) in layoutNames {
-            let item = NSMenuItem(title: title, action: #selector(MenuTarget.applyLayoutPreset(_:)), keyEquivalent: key)
-            item.keyEquivalentModifierMask = [.command, .option]
-            item.target = MenuTarget.shared
-            view.submenu?.addItem(item)
-        }
         view.submenu?.addItem(.separator())
         let zoomIn = NSMenuItem(title: "Increase Font Size", action: #selector(MenuTarget.zoomIn), keyEquivalent: "+")
         zoomIn.keyEquivalentModifierMask = [.command]
@@ -208,9 +194,6 @@ enum MainMenuBuilder {
         window.submenu = windowMenu
         windowMenu.addItem(NSMenuItem(title: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m"))
         windowMenu.addItem(NSMenuItem(title: "Zoom", action: #selector(MainWindowController.toggleVisibleFrameZoom(_:)), keyEquivalent: ""))
-        let fullScreen = NSMenuItem(title: "Enter Full Screen", action: #selector(NSWindow.toggleFullScreen(_:)), keyEquivalent: "f")
-        fullScreen.keyEquivalentModifierMask = [.command, .control]
-        windowMenu.addItem(fullScreen)
         // Non-native ("fast") full screen: fills the screen without the macOS Space animation.
         let fastFullScreen = NSMenuItem(
             title: "Toggle Fast Full Screen",
@@ -351,11 +334,6 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
         SessionCoordinator.shared.closeActiveSession()
     }
 
-    @objc func newTab() {
-        guard let id = SessionCoordinator.shared.snapshot.activeWorkspaceID else { return }
-        SessionCoordinator.shared.addTab(to: id)
-    }
-
     @objc func closeTab() {
         SessionCoordinator.shared.closeActiveTabWithConfirmation()
     }
@@ -445,11 +423,11 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
         }
     }
 
-    @objc func toggleFocusMode() {
+    @objc func showGitPanel() {
         let win = NSApp.keyWindow ?? NSApp.mainWindow
             ?? NSApp.windows.first(where: { $0.contentViewController is MainSplitViewController })
         if let split = win?.contentViewController as? MainSplitViewController {
-            split.toggleFocusMode()
+            split.showGitPanel()
         }
     }
 
@@ -474,19 +452,6 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
 
     @objc func installCLI() {
         CLIInstaller.install()
-    }
-
-    @objc func applyLayoutPreset(_ sender: NSMenuItem) {
-        let layouts: [LayoutTemplate] = [.evenHorizontal, .evenVertical, .mainHorizontal, .mainVertical, .tiled]
-        let keys = ["1", "2", "3", "4", "5"]
-        guard let idx = keys.firstIndex(of: sender.keyEquivalent), idx < layouts.count else { return }
-        let coordinator = SessionCoordinator.shared
-        guard let workspace = coordinator.snapshot.activeWorkspace,
-              let tab = workspace.activeTab else { return }
-        Task {
-            await coordinator.requestDaemon(.applyLayout(tabID: tab.id, layout: layouts[idx].rawValue, mainPaneID: tab.activePaneID))
-            await coordinator.syncFromDaemon()
-        }
     }
 
     @objc func showAbout() {

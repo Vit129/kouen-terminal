@@ -331,12 +331,16 @@ final class MainSplitViewController: NSViewController {
         isFocusModeActive = false
     }
 
-    func toggleSidebar() {
+    /// Shows the sidebar (if hidden) and switches it to the Git tab (⌘G).
+    func showGitPanel() {
         resetFocusMode()
-        setSidebarVisible(!SessionCoordinator.shared.settings.sidebarVisible, animated: true)
+        setSidebarVisible(true, animated: true)
+        sidebar.selectGitTab()
     }
 
-    func toggleFocusMode() {
+    /// Toggles sidebar + file editor split together (⌘\), restoring both to their
+    /// prior visibility on the next toggle. Absorbs the former separate "Focus Mode" (⌘P).
+    func toggleSidebar() {
         if isFocusModeActive {
             setSidebarVisible(preFocusSidebarVisible, animated: true)
             if preFocusFileEditorVisible {
@@ -348,7 +352,7 @@ final class MainSplitViewController: NSViewController {
         } else {
             preFocusSidebarVisible = SessionCoordinator.shared.settings.sidebarVisible
             preFocusFileEditorVisible = content.isFileEditorVisible
-            
+
             if preFocusSidebarVisible || preFocusFileEditorVisible {
                 setSidebarVisible(false, animated: true)
                 content.hideFileEditorSplit(resetFocusMode: false)
