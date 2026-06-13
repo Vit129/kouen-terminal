@@ -78,7 +78,7 @@ These are fixed `NSMenuItem` bindings defined in `MainMenuBuilder` — not prefi
 | Close session (workspace) | `⌘⇧W` |
 | Switch to session 1–9 | `⌘1` … `⌘9` |
 | Close tab | `⌘W` |
-| Previous / Next tab | `⌘⇧[` / `⌘⇧]` |
+| Previous / Next session | `⌘[` / `⌘]` |
 | Split horizontal | `⌘D` |
 | Command palette | `⌘K` |
 | Command prompt | `⌘;` |
