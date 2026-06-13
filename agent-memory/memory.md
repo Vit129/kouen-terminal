@@ -110,6 +110,16 @@
 - **Split right 4+ panes slightly uneven** — NSSplitView default resize compresses middle panes. Tolerable.
 - **CWD detection latency** — up to 500ms after `cd` for sidebar to update (daemon poll interval). Acceptable.
 
+## Strategic Backlog (Competitive Gap Analysis, 2026-06-13)
+WezTerm/tmux/cmux comparison surfaced 3 capability gaps. Image protocols (Kitty/iTerm2/Sixel)
+checked and confirmed already at parity with WezTerm — no plan needed there.
+
+- `plans/p11-scripting-config-api.md` — P3, scriptable config/event-hooks (WezTerm Lua parity), JavaScriptCore-based
+- `plans/p12-agent-orchestration-mcp.md` — P2, extend `harness-mcp` with pane control tools (cmux socket-API parity); also addresses ACP's "no tool control" blocker via PBI-ORCH-004
+- `plans/p13-embedded-browser.md` — P3, WKWebView pane as new `PaneNode` leaf (cmux embedded browser parity); depends on P12 for scripting
+
+None started — idea-stage only, not yet prioritized into a sprint.
+
 ## Completed Sprints
 - **v1.3.0** — IDE-like Sidebar (PBI-001): Files tab, Git tab, session tabs, recent projects
 - **v1.4.0** — Git panel: Commit ▼ menu, Sync button with per-remote options
