@@ -78,14 +78,14 @@ enum MainMenuBuilder {
             item.target = MenuTarget.shared
             workspace.submenu?.addItem(item)
         }
-        let prevTab = NSMenuItem(title: "Previous Tab", action: #selector(MenuTarget.previousTab), keyEquivalent: "[")
-        prevTab.keyEquivalentModifierMask = [.command, .shift]
-        prevTab.target = MenuTarget.shared
-        workspace.submenu?.addItem(prevTab)
-        let nextTab = NSMenuItem(title: "Next Tab", action: #selector(MenuTarget.nextTab), keyEquivalent: "]")
-        nextTab.keyEquivalentModifierMask = [.command, .shift]
-        nextTab.target = MenuTarget.shared
-        workspace.submenu?.addItem(nextTab)
+        let prevSession = NSMenuItem(title: "Previous Session", action: #selector(MenuTarget.previousSession), keyEquivalent: "[")
+        prevSession.keyEquivalentModifierMask = [.command]
+        prevSession.target = MenuTarget.shared
+        workspace.submenu?.addItem(prevSession)
+        let nextSession = NSMenuItem(title: "Next Session", action: #selector(MenuTarget.nextSession), keyEquivalent: "]")
+        nextSession.keyEquivalentModifierMask = [.command]
+        nextSession.target = MenuTarget.shared
+        workspace.submenu?.addItem(nextSession)
         main.addItem(workspace)
 
         let view = NSMenuItem()
@@ -356,17 +356,12 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
         coordinator.selectSession(workspaceID: workspace.id, sessionID: workspace.sessions[index].id)
     }
 
-    /// ⌘1–9 switch to the tab at that position in the active session.
-    @objc func selectTabNumber(_ sender: NSMenuItem) {
-        SessionCoordinator.shared.selectTab(atIndex: sender.tag - 1)
+    @objc func previousSession() {
+        SessionCoordinator.shared.selectAdjacentSession(offset: -1)
     }
 
-    @objc func previousTab() {
-        SessionCoordinator.shared.selectAdjacentTab(offset: -1)
-    }
-
-    @objc func nextTab() {
-        SessionCoordinator.shared.selectAdjacentTab(offset: 1)
+    @objc func nextSession() {
+        SessionCoordinator.shared.selectAdjacentSession(offset: 1)
     }
 
     @objc func splitH() {

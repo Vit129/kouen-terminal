@@ -10,7 +10,7 @@
 | acp-client.md | ACP/Agent | JSON-RPC, stdio, shelved, adapter | 0/0 | ACP protocol integration — shelved due to adapter ecosystem immaturity |
 | git-panel.md | AppKit/Git | DispatchSource, worktrees, real-time | 1/0 | Git panel with real-time refresh, history click→editor, worktree support |
 | project-history.md | Meta | sprints, releases, architecture | 0/0 | Sprint timeline and architecture decisions from v1.3→v2.1 |
-| session-tab-hierarchy.md | AppKit/UI | session, tab, pane, top-bar, keybinding, ⌘1-9 | 1/0 | Workspace/Session/Tab/Pane hierarchy; top bar = 1 pill per Session, not per-Tab; ⌘1-9 must target selectWorkspaceNumber |
+| session-tab-hierarchy.md | AppKit/UI | session, tab, pane, top-bar, keybinding, ⌘1-9, ⌘[, ⌘] | 1/0 | Workspace/Session/Tab/Pane hierarchy; top bar = 1 pill per Session, not per-Tab; ⌘1-9 and ⌘[/⌘] both target Session level, Tab-level shortcuts removed |
 
 ## Source Map
 

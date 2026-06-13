@@ -876,24 +876,15 @@ final class SessionCoordinator: NSObject {
         syncFromDaemon()
     }
 
-    func selectAdjacentTab(offset: Int) {
+    func selectAdjacentSession(offset: Int) {
         guard let workspace = snapshot.activeWorkspace,
-              let activeTabID = workspace.activeTabID,
-              let index = workspace.tabs.firstIndex(where: { $0.id == activeTabID }),
-              !workspace.tabs.isEmpty
+              let activeSessionID = workspace.activeSessionID,
+              let index = workspace.sessions.firstIndex(where: { $0.id == activeSessionID }),
+              !workspace.sessions.isEmpty
         else { return }
-        let count = workspace.tabs.count
+        let count = workspace.sessions.count
         let nextIndex = (index + offset % count + count) % count
-        selectTab(workspaceID: workspace.id, tabID: workspace.tabs[nextIndex].id)
-    }
-
-    /// Select the Nth (0-based) tab — backs the ⌘1–9 tab-switch shortcuts.
-    /// Out-of-range numbers (e.g. ⌘5 with 3 tabs) are no-ops.
-    func selectTab(atIndex index: Int) {
-        guard let workspace = snapshot.activeWorkspace,
-              index >= 0, index < workspace.tabs.count
-        else { return }
-        selectTab(workspaceID: workspace.id, tabID: workspace.tabs[index].id)
+        selectSession(workspaceID: workspace.id, sessionID: workspace.sessions[nextIndex].id)
     }
 
     func closeActiveTab() {

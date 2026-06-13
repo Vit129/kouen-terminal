@@ -228,24 +228,24 @@ enum CommandPaletteController {
                 coordinator.jumpToLatestNotification()
             },
             PaletteAction(
-                id: "nav.prevTab",
-                title: "Previous Tab",
-                subtitle: "Cycle to the previous tab",
+                id: "nav.prevSession",
+                title: "Previous Session",
+                subtitle: "Cycle to the previous session",
                 symbol: "chevron.left.square",
-                shortcut: "⇧⌘[",
+                shortcut: "⌘[",
                 section: .navigation
             ) {
-                coordinator.selectAdjacentTab(offset: -1)
+                coordinator.selectAdjacentSession(offset: -1)
             },
             PaletteAction(
-                id: "nav.nextTab",
-                title: "Next Tab",
-                subtitle: "Cycle to the next tab",
+                id: "nav.nextSession",
+                title: "Next Session",
+                subtitle: "Cycle to the next session",
                 symbol: "chevron.right.square",
-                shortcut: "⇧⌘]",
+                shortcut: "⌘]",
                 section: .navigation
             ) {
-                coordinator.selectAdjacentTab(offset: 1)
+                coordinator.selectAdjacentSession(offset: 1)
             },
             PaletteAction(
                 id: "nav.cyclePane",
