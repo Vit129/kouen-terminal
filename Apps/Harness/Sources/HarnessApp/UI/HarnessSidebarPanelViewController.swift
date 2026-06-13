@@ -691,6 +691,12 @@ final class HarnessSidebarPanelViewController: NSViewController {
         selectSidebarTab(index: sidebarTabs.selectedSegment)
     }
 
+    /// Switches the sidebar to the Git tab (used by the "Show Git Panel" ⌘G shortcut).
+    func selectGitTab() {
+        sidebarTabs.selectedSegment = 2
+        selectSidebarTab(index: 2)
+    }
+
     private func selectSidebarTab(index: Int) {
         sessionScroll?.isHidden = index != 0
         if index != 1 {

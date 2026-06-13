@@ -8,6 +8,14 @@ PREVIEW_HOME="$ROOT/.harness-preview"
 APP="$PREVIEW_HOME/HarnessPreview.app"
 mkdir -p "$PREVIEW_HOME"
 
+# HARNESS_HOME (and therefore the control socket path) must fit inside
+# sockaddr_un.sun_path (103 bytes on Darwin). A worktree checkout under
+# .claude/worktrees/<random-name> can push "$PREVIEW_HOME/harness.sock" over
+# that limit, so keep the actual runtime state in a short, stable path under
+# /tmp keyed off $ROOT instead of inside the repo.
+PREVIEW_HARNESS_HOME="/tmp/harness-preview-$(echo -n "$ROOT" | md5 | cut -c1-10)"
+mkdir -p "$PREVIEW_HARNESS_HOME"
+
 # ─── Build (shared .build/debug output) ───────────────────────────────────────
 # Only rebuild if sources are newer than the binary, or binary doesn't exist.
 HARNESS_BIN="$ROOT/.build/debug/Harness"
@@ -25,7 +33,7 @@ BUILD_DIR="$ROOT/.build/debug"
 # ─── Kill previous preview (ONLY preview, never prod) ─────────────────────────
 pkill -f "$APP/Contents/MacOS/Harness" 2>/dev/null || true
 pkill -f "$APP/Contents/MacOS/HarnessDaemon" 2>/dev/null || true
-rm -f "$PREVIEW_HOME/harness.sock" "$PREVIEW_HOME/daemon.pid"
+rm -f "$PREVIEW_HARNESS_HOME/harness.sock" "$PREVIEW_HARNESS_HOME/daemon.pid"
 
 # ─── Package preview app bundle ───────────────────────────────────────────────
 rm -rf "$APP"
@@ -91,7 +99,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>NSPrincipalClass</key>
   <string>NSApplication</string>
   <key>HarnessPreviewHome</key>
-  <string>$PREVIEW_HOME</string>
+  <string>$PREVIEW_HARNESS_HOME</string>
 </dict>
 </plist>
 PLIST
@@ -107,18 +115,19 @@ codesign --force --sign - --deep "$APP" >/dev/null
 cat <<EOF
 
 Launching Harness Preview (isolated SIT environment).
-State directory:  $PREVIEW_HOME
-Socket:           $PREVIEW_HOME/harness.sock
+App bundle:       $APP
+State directory:  $PREVIEW_HARNESS_HOME
+Socket:           $PREVIEW_HARNESS_HOME/harness.sock
 
 Production app is NOT affected.
 
 Preview CLI:
-  HARNESS_HOME="$PREVIEW_HOME" "$BUILD_DIR/harness-cli" ping
+  HARNESS_HOME="$PREVIEW_HARNESS_HOME" "$BUILD_DIR/harness-cli" ping
 
 EOF
 
 if [[ "${PREVIEW_SIGNPOSTS:-0}" == "1" ]]; then
-  HARNESS_HOME="$PREVIEW_HOME" "$APP/Contents/MacOS/Harness" -HARNESS_FRAME_SIGNPOSTS 1 &
+  HARNESS_HOME="$PREVIEW_HARNESS_HOME" "$APP/Contents/MacOS/Harness" -HARNESS_FRAME_SIGNPOSTS 1 &
 else
-  HARNESS_HOME="$PREVIEW_HOME" "$APP/Contents/MacOS/Harness" &
+  HARNESS_HOME="$PREVIEW_HARNESS_HOME" "$APP/Contents/MacOS/Harness" &
 fi

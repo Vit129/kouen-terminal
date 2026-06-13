@@ -31,6 +31,10 @@ final class MainWindowController: NSWindowController {
             ? "Harness Preview"
             : "Harness"
         window.isRestorable = false
+        // Disable AppKit's native tab feature so its auto-injected "Show Next/Previous
+        // Tab" Window-menu items (⌘⇧] / ⌘⇧[) don't shadow our own Session ▸ Next/Previous
+        // Tab shortcuts, which use the same key equivalents.
+        window.tabbingMode = .disallowed
         // Allow a genuinely narrow window (single-pane / sidebar-collapsed use). The
         // sidebar can be hidden (⌘\), so we don't reserve room for it in the floor.
         window.minSize = NSSize(width: 480, height: 400)
