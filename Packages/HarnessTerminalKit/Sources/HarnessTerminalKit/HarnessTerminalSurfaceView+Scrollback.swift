@@ -86,7 +86,6 @@ extension HarnessTerminalSurfaceView {
         let offsetChanged = newOffset != scrollOffset
         scrollOffset = newOffset
         scrollFraction = newFraction
-        clearSelection()
         notifyScrollChanged(historyCount: historyCount)
         if offsetChanged {
             scheduleRender()
@@ -141,7 +140,6 @@ extension HarnessTerminalSurfaceView {
         guard target != scrollOffset || scrollFraction != 0 else { return }
         scrollOffset = target
         scrollFraction = 0 // prompt jumps anchor on a whole line
-        clearSelection()
         notifyScrollChanged(historyCount: historyCount)
         scheduleRender()
     }

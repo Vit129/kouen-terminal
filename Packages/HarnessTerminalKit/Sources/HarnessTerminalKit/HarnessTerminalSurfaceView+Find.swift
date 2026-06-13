@@ -301,8 +301,9 @@ extension HarnessTerminalSurfaceView {
         guard rows > 0, columns > 0 else { return }
         selectionGranularity = .character
         selectionRectangular = false
-        selectionAnchor = (row: 0, column: 0)
-        selectionHead = (row: rows - 1, column: columns - 1)
+        let topLine = selectionTopLine
+        selectionAnchor = (line: topLine, column: 0)
+        selectionHead = (line: topLine + rows - 1, column: columns - 1)
         scheduleRender()
     }
 
@@ -332,47 +333,52 @@ extension HarnessTerminalSurfaceView {
         onCopy?(text)
     }
 
-    /// The current selection's text, or nil when there is no selection (or it's empty).
+    /// The current selection's text, or nil when there is no selection (or it's empty). Reads
+    /// lines by virtual-line index via `TerminalEmulator`'s `CopyModeGridSource` conformance —
+    /// the same scroll-independent source copy mode extracts text from — so copying works
+    /// correctly even when the selection has scrolled out of the current viewport.
     func selectionTextIfAny() -> String? {
         guard let region = currentSelectionRegion else { return nil }
+        let topLine = selectionTopLine
         let text = emulatorSync { emu -> String in
-            let snapshot = scrollOffset > 0 ? emu.readGrid(scrollbackOffset: scrollOffset) : emu.readGrid()
             switch region {
-            case let .linear(sel): return selectedText(sel, snapshot)
-            case let .block(blk): return blockSelectedText(blk, snapshot)
+            case let .linear(sel): return selectedText(sel, emu, topLine: topLine)
+            case let .block(blk): return blockSelectedText(blk, emu, topLine: topLine)
             }
         }
         return text.isEmpty ? nil : text
     }
 
-    /// Extract the selected text from the grid: per row, the in-range columns, skipping the
-    /// trailing spacer of wide chars, with trailing whitespace trimmed and rows joined by \n.
-    private func selectedText(_ sel: TerminalSelection, _ snapshot: TerminalGridSnapshot) -> String {
+    /// Extract the selected text: per virtual line, the in-range columns, skipping the trailing
+    /// spacer of wide chars, with trailing whitespace trimmed and lines joined by \n.
+    private func selectedText(_ sel: TerminalSelection, _ emulator: TerminalEmulator, topLine: Int) -> String {
         var lines: [String] = []
         for row in sel.startRow ... sel.endRow {
+            let cells = emulator.line(topLine + row)
             let startCol = (row == sel.startRow) ? sel.startColumn : 0
-            let endCol = (row == sel.endRow) ? sel.endColumn : snapshot.cols - 1
-            lines.append(rowText(row: row, startCol: startCol, endCol: endCol, snapshot: snapshot))
+            let endCol = (row == sel.endRow) ? sel.endColumn : cells.count - 1
+            lines.append(rowText(cells, startCol: startCol, endCol: endCol))
         }
         return lines.joined(separator: "\n")
     }
 
-    /// Extract a rectangular (block) selection: the same column span on every row, rows joined by \n.
-    private func blockSelectedText(_ blk: BlockSelection, _ snapshot: TerminalGridSnapshot) -> String {
+    /// Extract a rectangular (block) selection: the same column span on every virtual line, lines
+    /// joined by \n.
+    private func blockSelectedText(_ blk: BlockSelection, _ emulator: TerminalEmulator, topLine: Int) -> String {
         (blk.startRow ... blk.endRow)
-            .map { rowText(row: $0, startCol: blk.startColumn, endCol: blk.endColumn, snapshot: snapshot) }
+            .map { rowText(emulator.line(topLine + $0), startCol: blk.startColumn, endCol: blk.endColumn) }
             .joined(separator: "\n")
     }
 
-    /// One row's text over `[startCol, endCol]`: drop wide-char spacer tails, blanks → space,
+    /// One line's text over `[startCol, endCol]`: drop wide-char spacer tails, blanks → space,
     /// trailing whitespace trimmed.
-    private func rowText(row: Int, startCol: Int, endCol: Int, snapshot: TerminalGridSnapshot) -> String {
+    private func rowText(_ cells: [TerminalGridCell], startCol: Int, endCol: Int) -> String {
         var line = ""
         var col = startCol
-        while col <= endCol {
-            let cell = snapshot.cell(row: row, col: col)
-            if cell?.width == .spacerTail { col += 1; continue }
-            if let cell, cell.codepoint != 0 {
+        while col <= endCol, col < cells.count {
+            let cell = cells[col]
+            if cell.width == .spacerTail { col += 1; continue }
+            if cell.codepoint != 0 {
                 line += cell.cluster // base + combining marks
             } else {
                 line += " "
