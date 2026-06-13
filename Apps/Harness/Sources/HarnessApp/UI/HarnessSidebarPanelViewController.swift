@@ -297,7 +297,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
     private var notificationsDropdownMonitor: Any?
     private weak var notificationsDropdownPreviousResponder: NSResponder?
 
-    private func showNotificationsDropdown() {
+    func showNotificationsDropdown() {
         if notificationsDropdown != nil {
             dismissNotificationsDropdown()
             return
@@ -330,13 +330,27 @@ final class HarnessSidebarPanelViewController: NSViewController {
         let host = view.window?.contentView ?? view
         let width: CGFloat = 300
         let height = dropdown.preferredHeight
-        let bell = host.convert(notificationBell.bounds, from: notificationBell)
-        var originX = bell.minX
-        originX = min(originX, host.bounds.maxX - width - 8)
-        originX = max(8, originX)
-        // The content view is not flipped (y grows upward), so the panel sits below the bell
-        // when its top edge is the bell's bottom edge.
-        let originY = bell.minY - 6 - height
+        // Only anchor to the bell when the sidebar is visible — if the sidebar is hidden the
+        // bell has no real position in the window (coordinates are 0,0) and the panel would
+        // appear off-screen below the window bottom. Fall back to top-left of the content view.
+        let isBellOnScreen = notificationBell.window != nil
+            && !notificationBell.isHiddenOrHasHiddenAncestor
+            && notificationBell.visibleRect != .zero
+        let originX: CGFloat
+        let originY: CGFloat
+        if isBellOnScreen {
+            let bell = host.convert(notificationBell.bounds, from: notificationBell)
+            // minX is the bell's left edge; clamp so the panel never leaves the window.
+            originX = max(8, min(bell.minX, host.bounds.maxX - width - 8))
+            // The content view is not flipped (y grows upward), so the panel sits below the bell
+            // when its top edge is the bell's bottom edge.
+            originY = bell.minY - 6 - height
+        } else {
+            // Sidebar is collapsed: anchor to the top-left of the content view, 8pt from the edge,
+            // just below the title bar (assume ~52pt chrome at the top).
+            originX = 8
+            originY = host.bounds.maxY - 52 - height
+        }
         dropdown.frame = NSRect(x: originX, y: originY, width: width, height: height)
         host.addSubview(dropdown)
         notificationsDropdown = dropdown

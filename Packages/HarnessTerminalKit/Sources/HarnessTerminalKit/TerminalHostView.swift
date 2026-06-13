@@ -60,6 +60,14 @@ public final class TerminalHostView: NSView {
     public var activeBorderColor: NSColor = .systemBlue
     public var waitingRingColor: NSColor = .systemBlue
 
+    public var isWaiting: Bool = false {
+        didSet {
+            if oldValue != isWaiting {
+                borderOverlayView.needsDisplay = true
+            }
+        }
+    }
+
     static let terminalOverlayCornerRadius: CGFloat = 10
 
     public var showsActiveBorder: Bool {
@@ -189,6 +197,13 @@ public final class TerminalHostView: NSView {
         // If the very first subscribe didn't take (daemon mid-restart at creation), don't leave the
         // pane dead — retry on the same backoff that recovers a later drop.
         if outputSubscription == nil { scheduleDaemonReconnect() }
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(snapshotChanged),
+            name: NotificationBus.shared.snapshotChanged,
+            object: nil
+        )
     }
 
     @available(*, unavailable)
@@ -475,10 +490,19 @@ public final class TerminalHostView: NSView {
     }
 
     fileprivate func drawTerminalOverlay(in bounds: NSRect) {
-        // Note: no pane border is drawn for focus or waiting state — both read as an
-        // unwanted edge around the terminal. Waiting/attention surfaces via the tab
-        // working dot, bell badge, and notifications; `showsActiveBorder` is kept for
-        // its focus-change side effects only (pane-style dimming + border-label tint).
+        // Draw AI-Agent Notification Ring (glowing thick border) when the surface's tab is waiting.
+        if isWaiting {
+            let rect = bounds.insetBy(dx: 2.0, dy: 2.0)
+            let path = NSBezierPath(
+                roundedRect: rect,
+                xRadius: Self.terminalOverlayCornerRadius,
+                yRadius: Self.terminalOverlayCornerRadius
+            )
+            path.lineWidth = 4.0
+            waitingRingColor.withAlphaComponent(0.85).setStroke()
+            path.stroke()
+        }
+
         // The marked pane (join-pane source) gets a distinct dashed accent on top,
         // so it reads as "marked" independently of focus.
         if isMarked {
@@ -823,6 +847,10 @@ public final class TerminalHostView: NSView {
             )
             onAttached(subscription)
         }
+    }
+
+    @objc private func snapshotChanged() {
+        borderOverlayView.needsDisplay = true
     }
 
     deinit {

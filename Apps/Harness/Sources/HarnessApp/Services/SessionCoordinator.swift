@@ -373,8 +373,7 @@ final class SessionCoordinator: NSObject {
 
     private func syncWaitingRings() {
         for host in terminalHosts.allHosts() {
-            // surfaceIndex provides O(1) lookup; previously triple-nested scan.
-            _ = surfaceIndex[host.surfaceID]
+            host.isWaiting = isSurfaceWaiting(host.surfaceID)
         }
     }
 
@@ -885,6 +884,17 @@ final class SessionCoordinator: NSObject {
         let count = workspace.sessions.count
         let nextIndex = (index + offset % count + count) % count
         selectSession(workspaceID: workspace.id, sessionID: workspace.sessions[nextIndex].id)
+    }
+
+    func moveActiveSession(offset: Int) {
+        guard offset != 0,
+              let workspace = snapshot.activeWorkspace,
+              let activeSessionID = workspace.activeSessionID,
+              let index = workspace.sessions.firstIndex(where: { $0.id == activeSessionID })
+        else { return }
+        let targetIndex = index + offset
+        guard workspace.sessions.indices.contains(targetIndex) else { return }
+        reorderSession(workspaceID: workspace.id, sessionID: activeSessionID, toIndex: targetIndex)
     }
 
     func closeActiveTab() {
@@ -1593,6 +1603,19 @@ final class SessionCoordinator: NSObject {
             setActiveSurface(surfaceID)
             terminalHosts.host(for: surfaceID)?.focusTerminal()
         }
+    }
+
+    func isSurfaceWaiting(_ surfaceID: UUID) -> Bool {
+        for workspace in snapshot.workspaces {
+            for session in workspace.sessions {
+                for tab in session.tabs where tab.status == .waiting {
+                    if tab.rootPane.allSurfaceIDs().contains(surfaceID) {
+                        return true
+                    }
+                }
+            }
+        }
+        return false
     }
 
     /// All tabs currently `.waiting` plus enough context to render a notification
