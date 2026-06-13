@@ -6,6 +6,20 @@ All notable changes to Harness are documented here. The format is based on
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/robzilla1738/harness-terminal/releases).
 
+## [1.12.1] - 2026-06-13
+
+A fast follow-up: a fresh-eyes review of the v1.12.0 changes turned up a few rough edges.
+
+### Fixed
+- **Re-importing your terminal config no longer wipes output triggers or per-host profiles.**
+  "Re-import Terminal Config" rebuilds settings from your source terminal's visuals; it now
+  preserves the Harness-specific triggers and profiles you've configured instead of clearing
+  them.
+- **Slow memory growth across many pane open/close cycles.** Two per-pane bookkeeping tables
+  (last-reported ssh host, last command duration) only shrank on signals a killed pane never
+  sends, so they accumulated one stale entry per pane over a long session. They're now pruned
+  whenever the layout changes.
+
 ## [1.12.0] - 2026-06-13
 
 A fresh-eyes improvement pass: two user-reported bugs fixed, a batch of power-user features
