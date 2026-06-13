@@ -2085,8 +2085,8 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/harness-terminal/agent-memory/memory.md": {
-    "mtime": 1781323309.0366962,
-    "ast_hash": "210c1143dd95c1589baa0544a1508055",
+    "mtime": 1781342829.422393,
+    "ast_hash": "0f1043acc2c2aa5da4fc0ff22da22cbf",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/harness-terminal/agent-memory/playbook.md": {
@@ -2185,8 +2185,8 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/harness-terminal/Apps/Harness/Sources/HarnessApp/UI/FileTreeSwiftUIView.swift": {
-    "mtime": 1781318063.0197196,
-    "ast_hash": "65fbec558321ec32f5988c9414c486fd",
+    "mtime": 1781344942.5655906,
+    "ast_hash": "293ef8e75f61c0b3f117b04c64cd1110",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/harness-terminal/Scripts/run.sh": {
@@ -2300,7 +2300,7 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/harness-terminal/AGENTS.md": {
-    "mtime": 1781341609.2468524,
+    "mtime": 1781344748.773979,
     "ast_hash": "9f67f47ce97cfd40a08c09f3079abb62",
     "semantic_hash": ""
   },
@@ -2625,8 +2625,8 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/harness-terminal/Tests/HarnessAppTests/FileTreeWatcherTests.swift": {
-    "mtime": 1781318063.0211575,
-    "ast_hash": "16a0d7a7636d56588d9d730ef09ae59f",
+    "mtime": 1781344195.0250742,
+    "ast_hash": "93d0b4d9193906236491e25683c5d461",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/harness-terminal/Tests/HarnessAppTests/NotchLayoutMetricsTests.swift": {
@@ -2745,8 +2745,8 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/harness-terminal/Apps/Harness/Sources/HarnessApp/Services/FileExplorer/FileTreeWatcher.swift": {
-    "mtime": 1781318063.0175517,
-    "ast_hash": "410bf1d4d6a5c53428f70c82b0d1023a",
+    "mtime": 1781345668.9566,
+    "ast_hash": "70aa8c5b68a3609f5d9402462b547693",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/harness-terminal/Apps/Harness/Sources/HarnessApp/Services/FileExplorer/GitStatusProvider.swift": {

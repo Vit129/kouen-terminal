@@ -18,6 +18,7 @@ public actor FileTreeWatcher {
         "node_modules",
         ".build",
         "DerivedData",
+        "Library",
     ]
     private static let maxNodeCount = 10_000
 
@@ -217,6 +218,33 @@ public actor FileTreeWatcher {
         return isDirectory ? options.showsHiddenFolders : options.showsHiddenFiles
     }
 
+    private struct ScoredMatch {
+        let node: FileNode
+        let category: SearchMatcher.MatchCategory
+        let relativePath: String
+    }
+
+    private static func compareMatches(_ lhs: ScoredMatch, _ rhs: ScoredMatch) -> Bool {
+        if lhs.category != rhs.category {
+            return lhs.category < rhs.category
+        }
+
+        // Tie-breaker 1: shallower path (fewer path components / / characters)
+        let lhsSlashCount = lhs.relativePath.filter { $0 == "/" }.count
+        let rhsSlashCount = rhs.relativePath.filter { $0 == "/" }.count
+        if lhsSlashCount != rhsSlashCount {
+            return lhsSlashCount < rhsSlashCount
+        }
+
+        // Tie-breaker 2: shorter path length
+        if lhs.relativePath.count != rhs.relativePath.count {
+            return lhs.relativePath.count < rhs.relativePath.count
+        }
+
+        // Tie-breaker 3: alphabetical order of relative path
+        return lhs.relativePath.localizedStandardCompare(rhs.relativePath) == .orderedAscending
+    }
+
     private func searchRecursively(
         rootPath: String,
         query: String,
@@ -234,17 +262,49 @@ public actor FileTreeWatcher {
             options: [.skipsPackageDescendants]
         )
 
-        var matches: [FileNode] = []
-        while let url = enumerator?.nextObject() as? URL, matches.count < limit {
+        var directMatches: [ScoredMatch] = []
+        var fuzzyMatches: [ScoredMatch] = []
+
+        while let url = enumerator?.nextObject() as? URL {
+            if Task.isCancelled {
+                break
+            }
+            if directMatches.count >= limit * 10 {
+                break
+            }
+
             let standardizedURL = url.standardizedFileURL
             let name = standardizedURL.lastPathComponent
             guard !name.isEmpty else { continue }
 
-            let values = try standardizedURL.resourceValues(forKeys: [.isDirectoryKey])
-            let isDirectory = values.isDirectory ?? false
-            if isDirectory, Self.excludedDirectoryNames.contains(name) {
-                enumerator?.skipDescendants()
+            let isDirectory: Bool
+            do {
+                let values = try standardizedURL.resourceValues(forKeys: [.isDirectoryKey])
+                isDirectory = values.isDirectory ?? false
+            } catch {
                 continue
+            }
+
+            if isDirectory {
+                if Self.excludedDirectoryNames.contains(name) {
+                    enumerator?.skipDescendants()
+                    continue
+                }
+                
+                let parentPath = standardizedURL.deletingLastPathComponent().path
+                if parentPath == "/" {
+                    let allowedDirs: Set<String> = ["Users", "usr", "Applications"]
+                    if !allowedDirs.contains(name) {
+                        enumerator?.skipDescendants()
+                        continue
+                    }
+                } else if parentPath == "/usr" {
+                    let allowedUsrDirs: Set<String> = ["local", "bin", "sbin"]
+                    if !allowedUsrDirs.contains(name) {
+                        enumerator?.skipDescendants()
+                        continue
+                    }
+                }
             }
             guard shouldInclude(name: name, isDirectory: isDirectory, options: options) else {
                 if isDirectory { enumerator?.skipDescendants() }
@@ -255,26 +315,54 @@ public actor FileTreeWatcher {
             let relativePath = path.hasPrefix(rootPrefix)
                 ? String(path.dropFirst(rootPrefix.count))
                 : path
-            guard matcher.matches(name: name, relativePath: relativePath) else { continue }
 
-            matches.append(FileNode(
-                id: path,
-                name: name,
-                path: path,
-                isDirectory: isDirectory,
-                children: nil,
-                gitStatus: .unmodified
-            ))
+            if let directCategory = matcher.matchCategory(name: name, relativePath: relativePath, allowFuzzy: false) {
+                let node = FileNode(
+                    id: path,
+                    name: name,
+                    path: path,
+                    isDirectory: isDirectory,
+                    children: nil,
+                    gitStatus: .unmodified
+                )
+                directMatches.append(ScoredMatch(node: node, category: directCategory, relativePath: relativePath))
+            } else if let fuzzyCategory = matcher.matchCategory(name: name, relativePath: relativePath, allowFuzzy: true) {
+                let node = FileNode(
+                    id: path,
+                    name: name,
+                    path: path,
+                    isDirectory: isDirectory,
+                    children: nil,
+                    gitStatus: .unmodified
+                )
+                fuzzyMatches.append(ScoredMatch(node: node, category: fuzzyCategory, relativePath: relativePath))
+            }
         }
 
-        return matches.sorted { lhs, rhs in
-            let lhsPath = lhs.path.hasPrefix(rootPrefix) ? String(lhs.path.dropFirst(rootPrefix.count)) : lhs.path
-            let rhsPath = rhs.path.hasPrefix(rootPrefix) ? String(rhs.path.dropFirst(rootPrefix.count)) : rhs.path
-            return lhsPath.localizedStandardCompare(rhsPath) == .orderedAscending
-        }
+        let sortedScored = !directMatches.isEmpty ? directMatches : fuzzyMatches
+        let sortedNodes = sortedScored
+            .sorted(by: Self.compareMatches)
+            .map { $0.node }
+
+        return Array(sortedNodes.prefix(limit))
     }
 
     nonisolated struct SearchMatcher {
+        enum MatchCategory: Int, Comparable, Sendable {
+            case exactFilename = 1
+            case filenameStartsWith = 2
+            case filenameEndsWith = 3
+            case filenameContains = 4
+            case filenameContainsTokens = 5
+            case pathContains = 6
+            case pathContainsTokens = 7
+            case fuzzy = 8
+
+            static func < (lhs: MatchCategory, rhs: MatchCategory) -> Bool {
+                lhs.rawValue < rhs.rawValue
+            }
+        }
+
         let wholeQuery: String
         let tokens: [String]
 
@@ -290,19 +378,54 @@ public actor FileTreeWatcher {
             !wholeQuery.isEmpty || !tokens.isEmpty
         }
 
-        func matches(name: String, relativePath: String) -> Bool {
-            let haystacks = [
-                Self.normalized(name),
-                Self.normalized(relativePath),
-            ]
+        func matchCategory(name: String, relativePath: String, allowFuzzy: Bool) -> MatchCategory? {
+            let normalizedName = Self.normalized(name)
+            let normalizedPath = Self.normalized(relativePath)
 
-            if !wholeQuery.isEmpty, haystacks.contains(where: { $0.contains(wholeQuery) }) {
-                return true
+            if normalizedName == wholeQuery {
+                return .exactFilename
             }
-            guard !tokens.isEmpty else { return false }
-            return tokens.allSatisfy { token in
-                haystacks.contains { $0.contains(token) }
+            if normalizedName.hasPrefix(wholeQuery) {
+                return .filenameStartsWith
             }
+            if normalizedName.hasSuffix(wholeQuery) {
+                return .filenameEndsWith
+            }
+            if normalizedName.contains(wholeQuery) {
+                return .filenameContains
+            }
+            if !tokens.isEmpty, tokens.allSatisfy({ normalizedName.contains($0) }) {
+                return .filenameContainsTokens
+            }
+            if normalizedPath.contains(wholeQuery) {
+                return .pathContains
+            }
+            if !tokens.isEmpty, tokens.allSatisfy({ normalizedPath.contains($0) }) {
+                return .pathContainsTokens
+            }
+
+            if allowFuzzy {
+                if Self.isSubsequence(wholeQuery, in: normalizedName) ||
+                    Self.isSubsequence(wholeQuery, in: normalizedPath) {
+                    return .fuzzy
+                }
+            }
+
+            return nil
+        }
+
+        private static func isSubsequence(_ query: String, in haystack: String) -> Bool {
+            if query.isEmpty { return true }
+            var queryIdx = query.startIndex
+            for char in haystack {
+                if char == query[queryIdx] {
+                    queryIdx = query.index(after: queryIdx)
+                    if queryIdx == query.endIndex {
+                        return true
+                    }
+                }
+            }
+            return false
         }
 
         private static func normalized(_ value: String) -> String {
