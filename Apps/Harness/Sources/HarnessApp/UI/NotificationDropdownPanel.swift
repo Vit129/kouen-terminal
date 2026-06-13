@@ -2,23 +2,31 @@ import AppKit
 import HarnessCore
 
 /// Popover-style panel that the notification bell shows. Lists every tab in
-/// `.waiting` state with its agent and a short body; clicking a row jumps to
-/// that pane and clears the notification.
+/// `.waiting` state with its agent and a short body; clicking a row (or
+/// arrow-keying to it and pressing Return) jumps to that pane and clears the
+/// notification. `Escape` dismisses without selecting.
 @MainActor
 final class NotificationDropdownPanelView: NSView {
     private let entries: [NotificationEntry]
     private let onSelect: (NotificationEntry) -> Void
     private let onClearAll: () -> Void
+    private let onDismiss: () -> Void
     let preferredHeight: CGFloat
+
+    private var rows: [NotificationRowView] = []
+    private var scrollView: NSScrollView?
+    private var highlightedIndex: Int?
 
     init(
         entries: [NotificationEntry],
         onSelect: @escaping (NotificationEntry) -> Void,
-        onClearAll: @escaping () -> Void
+        onClearAll: @escaping () -> Void,
+        onDismiss: @escaping () -> Void
     ) {
         self.entries = entries
         self.onSelect = onSelect
         self.onClearAll = onClearAll
+        self.onDismiss = onDismiss
         // Header (28) + rows (52 each, max 6 shown then scrolls) + footer (38).
         let visibleRowCount = min(entries.count, 6)
         let bodyHeight = entries.isEmpty ? 64 : CGFloat(visibleRowCount * 52 + 10)
@@ -36,10 +44,50 @@ final class NotificationDropdownPanelView: NSView {
         HarnessDesign.applyShadow(.overlay, to: layer)
 
         setupContent()
+        if !entries.isEmpty {
+            highlightedIndex = 0
+            updateHighlight()
+        }
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
+
+    override var acceptsFirstResponder: Bool { true }
+
+    override func keyDown(with event: NSEvent) {
+        switch event.keyCode {
+        case 125: // Down arrow
+            move(by: 1)
+        case 126: // Up arrow
+            move(by: -1)
+        case 36, 76: // Return / keypad Enter
+            if let index = highlightedIndex {
+                onSelect(entries[index])
+            }
+        case 53: // Escape
+            onDismiss()
+        default:
+            super.keyDown(with: event)
+        }
+    }
+
+    private func move(by delta: Int) {
+        guard !rows.isEmpty else { return }
+        let current = highlightedIndex ?? (delta > 0 ? -1 : rows.count)
+        let next = (current + delta + rows.count) % rows.count
+        highlightedIndex = next
+        updateHighlight()
+    }
+
+    private func updateHighlight() {
+        for (index, row) in rows.enumerated() {
+            row.isHighlighted = index == highlightedIndex
+        }
+        if let index = highlightedIndex {
+            rows[index].scrollToVisible(rows[index].bounds)
+        }
+    }
 
     private func setupContent() {
         let header = NSTextField(labelWithString: "Notifications")
@@ -73,6 +121,7 @@ final class NotificationDropdownPanelView: NSView {
                     onSelect(entry)
                 }
                 stack.addArrangedSubview(row)
+                rows.append(row)
             }
             let scroll = NSScrollView()
             scroll.drawsBackground = false
@@ -82,6 +131,7 @@ final class NotificationDropdownPanelView: NSView {
             scroll.documentView = stack
             scroll.translatesAutoresizingMaskIntoConstraints = false
             bodyContainer.addSubview(scroll)
+            scrollView = scroll
             NSLayoutConstraint.activate([
                 scroll.topAnchor.constraint(equalTo: bodyContainer.topAnchor),
                 scroll.leadingAnchor.constraint(equalTo: bodyContainer.leadingAnchor),
@@ -137,6 +187,7 @@ private final class NotificationRowView: NSView {
     private let entry: NotificationEntry
     private var trackingArea: NSTrackingArea?
     private var isHovered = false { didSet { applyChrome() } }
+    var isHighlighted = false { didSet { applyChrome() } }
 
     init(entry: NotificationEntry) {
         self.entry = entry
@@ -217,7 +268,7 @@ private final class NotificationRowView: NSView {
 
     private func applyChrome() {
         let c = HarnessDesign.chrome
-        layer?.backgroundColor = isHovered
+        layer?.backgroundColor = (isHovered || isHighlighted)
             ? c.textPrimary.withAlphaComponent(0.06).cgColor
             : NSColor.clear.cgColor
     }
