@@ -60,6 +60,7 @@
 | 44 | CASE-028: ⌘1-9 verified/kept as Switch to Session N (selectWorkspaceNumber→selectSession); added ⌘[/⌘] = Previous/Next Session (selectAdjacentSession); removed dead selectTabNumber/selectTab(atIndex:)/selectAdjacentTab; menu cleanup (removed New Tab, Layout presets, native fullscreen; Toggle Focus Mode → Show Git Panel ⌘G); fixed make preview socket path | ✅ Done |
 | 45 | Notification dropdown keyboard nav (arrow/Enter/Escape + first-responder restore); tab bar close-button vs ⌘N badge overlap at rest fix | ✅ Done |
 | 46 | CASE-029: terminal text selection survives scroll — selectionAnchor/Head now virtual-line coords (matches CopyModeGridSource convention); removed clearSelection() on scroll; copy reads via TerminalEmulator.line(_:) | ✅ Done |
+| 47 | Rework file-tree sidebar search with Spotlight-style relevance ranking, fuzzy fallback, suffix matching, robust path value checking, search safety checks, and fix git status update/blinking issues | ✅ Done |
 
 ### Removed / Reverted Features
 - **Task Board sidebar** — was added in sprint #32 but has since been **removed**. Not present in current codebase.

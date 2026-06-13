@@ -16,6 +16,98 @@ final class FileTreeNode: Identifiable {
         self.node = node
         self.children = node.isDirectory ? [] : nil
     }
+
+    static func buildSearchTree(
+        from rawNodes: [FileNode],
+        rootPath: String,
+        gitStatus: [String: GitStatusType]
+    ) -> [FileTreeNode] {
+        let standardizedRoot = URL(fileURLWithPath: rootPath).standardizedFileURL.path
+        
+        var allPaths = Set<String>()
+        var parentPaths = Set<String>()
+        
+        let lowercasedRoot = standardizedRoot.lowercased()
+        for node in rawNodes {
+            var currentPath = node.path
+            while currentPath.lowercased().hasPrefix(lowercasedRoot) && currentPath.count > standardizedRoot.count {
+                allPaths.insert(currentPath)
+                let parentPath = (currentPath as NSString).deletingLastPathComponent
+                if parentPath == currentPath || parentPath.isEmpty {
+                    break
+                }
+                parentPaths.insert(parentPath.lowercased())
+                currentPath = parentPath
+            }
+        }
+        
+        var treeNodes: [String: FileTreeNode] = [:]
+        let rawNodesByPath = Dictionary(uniqueKeysWithValues: rawNodes.map { ($0.path.lowercased(), $0) })
+        
+        // First, create FileTreeNode for every path
+        for path in allPaths {
+            let fileNode: FileNode
+            let lowercasedPath = path.lowercased()
+            if let matched = rawNodesByPath[lowercasedPath] {
+                fileNode = matched
+            } else {
+                let name = (path as NSString).lastPathComponent
+                let prefix = standardizedRoot.hasSuffix("/") ? standardizedRoot : standardizedRoot + "/"
+                let rel = path.hasPrefix(prefix) ? String(path.dropFirst(prefix.count)) : path
+                fileNode = FileNode(
+                    id: path,
+                    name: name,
+                    path: path,
+                    isDirectory: true,
+                    children: nil,
+                    gitStatus: gitStatus[rel] ?? .unmodified
+                )
+            }
+            
+            let treeNode = FileTreeNode(node: fileNode)
+            if parentPaths.contains(lowercasedPath) {
+                treeNode.isExpanded = true
+            }
+            
+            treeNodes[lowercasedPath] = treeNode
+        }
+        
+        // Link children to parents
+        for treeNode in treeNodes.values {
+            let path = treeNode.node.path
+            let parentPath = (path as NSString).deletingLastPathComponent
+            if let parentNode = treeNodes[parentPath.lowercased()] {
+                if parentNode.children == nil {
+                    parentNode.children = []
+                }
+                parentNode.children?.append(treeNode)
+            }
+        }
+        
+        // Sort children
+        func sortNodes(_ nodes: [FileTreeNode]) -> [FileTreeNode] {
+            nodes.sorted { lhs, rhs in
+                if lhs.node.isDirectory != rhs.node.isDirectory {
+                    return lhs.node.isDirectory && !rhs.node.isDirectory
+                }
+                return lhs.node.name.localizedStandardCompare(rhs.node.name) == .orderedAscending
+            }
+        }
+        
+        for node in treeNodes.values {
+            if let children = node.children {
+                node.children = sortNodes(children)
+            }
+        }
+        
+        // Root level nodes are those whose parent is standardizedRoot
+        let rootLevel = treeNodes.values.filter {
+            let parentPath = ($0.node.path as NSString).deletingLastPathComponent
+            return parentPath.lowercased() == lowercasedRoot
+        }
+        
+        return sortNodes(Array(rootLevel))
+    }
 }
 
 /// SwiftUI view for the file-explorer sidebar panel.
@@ -54,7 +146,7 @@ struct FileTreeSwiftUIView: View {
     }
 
     private var taskID: String {
-        "\(sessionID?.uuidString ?? "nil")|\(rootPath)|\(gitBranch ?? "nil")|\(showsHiddenFiles)|\(showsHiddenFolders)"
+        "\(sessionID?.uuidString ?? "nil")|\(rootPath)|\(showsHiddenFiles)|\(showsHiddenFolders)"
     }
 
     @State private var searchText: String = ""
@@ -124,6 +216,7 @@ struct FileTreeSwiftUIView: View {
         .onAppear { refreshGitBranch(); updateVisiblePaths() }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("HarnessActiveTabGitBranchDidChange"))) { _ in
             refreshGitBranch()
+            Task { await loadRoot() }
         }
         .onReceive(NotificationCenter.default.publisher(for: .fileTreeDidChange)) { _ in
             Task { await loadRoot() }
@@ -131,7 +224,7 @@ struct FileTreeSwiftUIView: View {
         // React to both path and session changes — different sessions may be on
         // different branches sharing the same rootPath.
         .task(id: taskID) { await loadRoot() }
-        .task(id: "\(taskID)|search|\(trimmedSearchText)") { await loadSearchResults() }
+        .task(id: "\(taskID)|search|\(trimmedSearchText)") { await loadSearchResults(query: trimmedSearchText) }
         // FSEvents live watcher: starts alongside loadRoot, auto-cancelled on
         // key change (session/path switch) or view disappearance.
         .task(id: taskID) {
@@ -283,23 +376,40 @@ struct FileTreeSwiftUIView: View {
         if keyboard.focusedPath == nil { keyboard.focusedPath = paths.first }
     }
 
-    private func loadSearchResults() async {
-        let query = trimmedSearchText
+    @discardableResult
+    private func loadSearchResults(query: String) async -> [FileTreeNode] {
         guard !query.isEmpty else {
             searchResultNodes = []
             updateVisiblePaths()
-            return
+            return []
         }
 
-        let rawNodes = (try? await watcher.search(
-            rootPath: rootPath,
-            query: query,
-            gitStatus: currentGitStatus,
-            options: scanOptions
-        )) ?? []
-        guard query == trimmedSearchText else { return }
-        searchResultNodes = rawNodes.map { FileTreeNode(node: $0) }
+        // 200ms debounce
+        do {
+            try await Task.sleep(nanoseconds: 200_000_000)
+        } catch {
+            return []
+        }
+
+        guard !Task.isCancelled else { return [] }
+
+        let rawNodes: [FileNode]
+        do {
+            rawNodes = try await watcher.search(
+                rootPath: rootPath,
+                query: query,
+                gitStatus: currentGitStatus,
+                options: scanOptions
+            )
+        } catch {
+            rawNodes = []
+        }
+
+        guard !Task.isCancelled else { return [] }
+        let results = FileTreeNode.buildSearchTree(from: rawNodes, rootPath: rootPath, gitStatus: currentGitStatus)
+        searchResultNodes = results
         updateVisiblePaths()
+        return results
     }
 
     private func loadRoot() async {
@@ -336,7 +446,7 @@ struct FileTreeSwiftUIView: View {
         }
         rootNodes = reconciled
         if !trimmedSearchText.isEmpty {
-            await loadSearchResults()
+            await loadSearchResults(query: trimmedSearchText)
         }
 
         let branch = await getCurrentBranch()
@@ -370,6 +480,23 @@ private struct NodeRow: View {
         let url = URL(fileURLWithPath: rel)
         let parent = url.deletingLastPathComponent().path
         return parent.isEmpty || parent == "/" || parent == "." ? nil : parent
+    }
+
+    private var resolvedGitStatus: GitStatusType {
+        let prefix = rootPath.hasSuffix("/") ? rootPath : rootPath + "/"
+        let rel = node.node.path.hasPrefix(prefix)
+            ? String(node.node.path.dropFirst(prefix.count))
+            : node.node.path
+        if let status = gitStatus[rel] {
+            return status
+        }
+        let lowerRel = rel.lowercased()
+        for (key, status) in gitStatus {
+            if key.lowercased() == lowerRel {
+                return status
+            }
+        }
+        return .unmodified
     }
 
     var body: some View {
@@ -431,11 +558,12 @@ private struct NodeRow: View {
     }
 
     private func rowLabel(systemImage: String) -> some View {
-        HStack(spacing: 4) {
+        let status = resolvedGitStatus
+        return HStack(spacing: 4) {
             Label {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(node.node.name)
-                        .strikethrough(node.node.gitStatus == .deleted, color: gitStatusColor(node.node.gitStatus))
+                        .strikethrough(status == .deleted, color: gitStatusColor(status))
                     if let parent = parentDirectory {
                         Text(parent)
                             .font(.system(size: 9))
@@ -449,7 +577,7 @@ private struct NodeRow: View {
             }
             .help(node.node.path)
             Spacer()
-            gitStatusBadge(node.node.gitStatus)
+            gitStatusBadge(status)
         }
         .onDrag {
             NSItemProvider(contentsOf: URL(fileURLWithPath: node.node.path)) ?? NSItemProvider()
