@@ -38,7 +38,7 @@ preview-stop:
 
 preview-clean:
 	rm -rf .harness-preview
-	rm -rf "/tmp/harness-preview-$$(echo -n "$(CURDIR)" | md5 | cut -c1-10)"
+	rm -rf "/tmp/harness-preview-$$(printf '%s' "$(CURDIR)" | md5 | cut -c1-10)"
 	-tccutil reset All com.robert.harness.preview 2>/dev/null || true
 
 icon:

@@ -86,6 +86,15 @@ enum MainMenuBuilder {
         nextSession.keyEquivalentModifierMask = [.command]
         nextSession.target = MenuTarget.shared
         workspace.submenu?.addItem(nextSession)
+        workspace.submenu?.addItem(.separator())
+        let moveSessionLeft = NSMenuItem(title: "Move Session Left", action: #selector(MenuTarget.moveSessionLeft), keyEquivalent: "\u{F702}")
+        moveSessionLeft.keyEquivalentModifierMask = [.command]
+        moveSessionLeft.target = MenuTarget.shared
+        workspace.submenu?.addItem(moveSessionLeft)
+        let moveSessionRight = NSMenuItem(title: "Move Session Right", action: #selector(MenuTarget.moveSessionRight), keyEquivalent: "\u{F703}")
+        moveSessionRight.keyEquivalentModifierMask = [.command]
+        moveSessionRight.target = MenuTarget.shared
+        workspace.submenu?.addItem(moveSessionRight)
         main.addItem(workspace)
 
         let view = NSMenuItem()
@@ -125,7 +134,7 @@ enum MainMenuBuilder {
         reattachItem.target = MenuTarget.shared
         view.submenu?.addItem(reattachItem)
         view.submenu?.addItem(.separator())
-        let jumpItem = NSMenuItem(title: "Jump to Notification", action: #selector(MenuTarget.jumpNotification), keyEquivalent: "u")
+        let jumpItem = NSMenuItem(title: "Show Notifications", action: #selector(MenuTarget.jumpNotification), keyEquivalent: "u")
         jumpItem.keyEquivalentModifierMask = [.command, .shift]
         jumpItem.target = MenuTarget.shared
         view.submenu?.addItem(jumpItem)
@@ -364,6 +373,14 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
         SessionCoordinator.shared.selectAdjacentSession(offset: 1)
     }
 
+    @objc func moveSessionLeft() {
+        SessionCoordinator.shared.moveActiveSession(offset: -1)
+    }
+
+    @objc func moveSessionRight() {
+        SessionCoordinator.shared.moveActiveSession(offset: 1)
+    }
+
     @objc func splitH() {
         SessionCoordinator.shared.splitActivePane(direction: .horizontal)
     }
@@ -383,7 +400,11 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
     }
 
     @objc func jumpNotification() {
-        SessionCoordinator.shared.jumpToLatestNotification()
+        let window = NSApp.keyWindow ?? NSApp.mainWindow
+            ?? NSApp.windows.first(where: { $0.contentViewController is MainSplitViewController })
+        if let split = window?.contentViewController as? MainSplitViewController {
+            split.showNotificationsDropdown()
+        }
     }
 
     @objc func showOnboarding() {

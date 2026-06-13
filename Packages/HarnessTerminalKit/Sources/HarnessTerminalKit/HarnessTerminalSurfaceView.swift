@@ -1188,6 +1188,7 @@ public final class HarnessTerminalSurfaceView: NSView {
     // `viewDidMoveToWindow(nil)` is the teardown hook (AppKit always calls it before dealloc).
 
     public override func viewDidMoveToWindow() {
+        fputs("BLINKDBG viewDidMoveToWindow: surface=\(ObjectIdentifier(self)) window=\(window != nil)\n", harnessStderr)
         super.viewDidMoveToWindow()
         windowKeyObservers.forEach(NotificationCenter.default.removeObserver(_:))
         windowKeyObservers.removeAll()
@@ -1276,6 +1277,7 @@ public final class HarnessTerminalSurfaceView: NSView {
     }
 
     public override func viewDidMoveToSuperview() {
+        fputs("BLINKDBG viewDidMoveToSuperview: surface=\(ObjectIdentifier(self)) superview=\(superview != nil) window=\(window != nil)\n", harnessStderr)
         super.viewDidMoveToSuperview()
         if window != nil {
             stopDisplayLink()
@@ -1411,6 +1413,9 @@ public final class HarnessTerminalSurfaceView: NSView {
         updateGridSize()
         let sizeChanged = bounds.size != oldBounds.size
         let needsTempSync = sizeChanged && !metalLayer.presentsWithTransaction
+        if sizeChanged || needsFirstPaint {
+            fputs("BLINKDBG layout: surface=\(ObjectIdentifier(self)) needsFirstPaint=\(needsFirstPaint) sizeChanged=\(sizeChanged) old=\(oldBounds.size) new=\(bounds.size) hasSizedGrid=\(hasSizedGrid) window=\(window != nil)\n", harnessStderr)
+        }
         if needsTempSync {
             metalLayer.presentsWithTransaction = true
         }

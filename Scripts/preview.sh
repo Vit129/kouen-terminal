@@ -13,8 +13,33 @@ mkdir -p "$PREVIEW_HOME"
 # .claude/worktrees/<random-name> can push "$PREVIEW_HOME/harness.sock" over
 # that limit, so keep the actual runtime state in a short, stable path under
 # /tmp keyed off $ROOT instead of inside the repo.
-PREVIEW_HARNESS_HOME="/tmp/harness-preview-$(echo -n "$ROOT" | md5 | cut -c1-10)"
+PREVIEW_HARNESS_HOME="/tmp/harness-preview-$(printf '%s' "$ROOT" | md5 | cut -c1-10)"
 mkdir -p "$PREVIEW_HARNESS_HOME"
+
+xml_escape() {
+  local value="${1:-}"
+  value="${value//&/&amp;}"
+  value="${value//</&lt;}"
+  value="${value//>/&gt;}"
+  value="${value//\"/&quot;}"
+  value="${value//\'/&apos;}"
+  printf '%s' "$value"
+}
+
+GIT_BRANCH="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || printf 'unknown')"
+GIT_SHA="$(git rev-parse --short HEAD 2>/dev/null || printf 'unknown')"
+GIT_SUBJECT="$(git log -1 --pretty=%s 2>/dev/null || printf 'no git commit')"
+GIT_DIRTY=""
+if [[ -n "$(git status --short 2>/dev/null || true)" ]]; then
+  GIT_DIRTY="+dirty"
+fi
+PREVIEW_BUILT_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+PREVIEW_TASK_LABEL="${HARNESS_PREVIEW_TASK:-${PREVIEW_TASK:-}}"
+if [[ -n "$PREVIEW_TASK_LABEL" ]]; then
+  PREVIEW_BUILD_LABEL="$PREVIEW_TASK_LABEL · $GIT_BRANCH@$GIT_SHA$GIT_DIRTY"
+else
+  PREVIEW_BUILD_LABEL="$GIT_BRANCH@$GIT_SHA$GIT_DIRTY · $GIT_SUBJECT"
+fi
 
 # ─── Build (shared .build/debug output) ───────────────────────────────────────
 # Only rebuild if sources are newer than the binary, or binary doesn't exist.
@@ -100,6 +125,18 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <string>NSApplication</string>
   <key>HarnessPreviewHome</key>
   <string>$PREVIEW_HARNESS_HOME</string>
+  <key>HarnessPreviewBuildLabel</key>
+  <string>$(xml_escape "$PREVIEW_BUILD_LABEL")</string>
+  <key>HarnessPreviewBuiltAt</key>
+  <string>$(xml_escape "$PREVIEW_BUILT_AT")</string>
+  <key>HarnessPreviewGitBranch</key>
+  <string>$(xml_escape "$GIT_BRANCH")</string>
+  <key>HarnessPreviewGitSHA</key>
+  <string>$(xml_escape "$GIT_SHA")</string>
+  <key>HarnessPreviewGitDirty</key>
+  <string>$(xml_escape "$GIT_DIRTY")</string>
+  <key>HarnessPreviewGitSubject</key>
+  <string>$(xml_escape "$GIT_SUBJECT")</string>
 </dict>
 </plist>
 PLIST
@@ -118,6 +155,7 @@ Launching Harness Preview (isolated SIT environment).
 App bundle:       $APP
 State directory:  $PREVIEW_HARNESS_HOME
 Socket:           $PREVIEW_HARNESS_HOME/harness.sock
+Build label:      $PREVIEW_BUILD_LABEL
 
 Production app is NOT affected.
 

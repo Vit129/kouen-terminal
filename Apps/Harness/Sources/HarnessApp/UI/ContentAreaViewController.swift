@@ -364,6 +364,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
             paneContainer?.refreshChrome(snapshot: coordinator.snapshot)
             return
         }
+        fputs("BLINKDBG reloadIfNeeded REBUILD: force=\(force) oldKey=\(lastStructureKey) newKey=\(key)\n", harnessStderr)
         lastStructureKey = key
 
         // Incremental update: detach existing terminal hosts from old container
@@ -461,6 +462,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
     private var editorDivider: NSView?
 
     func showFileEditorSplit(resetFocusMode: Bool = true) {
+        fputs("BLINKDBG showFileEditorSplit: alreadyOpen=\(fileEditorPanel != nil)\n", harnessStderr)
         if resetFocusMode {
             (view.window?.contentViewController as? MainSplitViewController)?.resetFocusMode()
         }

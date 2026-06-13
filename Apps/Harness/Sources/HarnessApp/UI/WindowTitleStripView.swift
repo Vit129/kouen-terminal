@@ -9,6 +9,7 @@ import AppKit
 final class WindowTitleStripView: NSView {
     private let folderIcon = NSImageView()
     private let label = NSTextField(labelWithString: "")
+    private let previewBadge = NSTextField(labelWithString: "")
     private let stack = NSStackView()
     /// Base left padding for the readout; the traffic-light inset is added on top while
     /// the sidebar is collapsed (the lights then sit over the strip's left edge).
@@ -34,6 +35,12 @@ final class WindowTitleStripView: NSView {
         label.lineBreakMode = .byTruncatingMiddle
         label.translatesAutoresizingMaskIntoConstraints = false
 
+        previewBadge.font = .monospacedSystemFont(ofSize: 10.5, weight: .medium)
+        previewBadge.alignment = .right
+        previewBadge.lineBreakMode = .byTruncatingMiddle
+        previewBadge.translatesAutoresizingMaskIntoConstraints = false
+        previewBadge.isHidden = true
+
         stack.orientation = .horizontal
         stack.alignment = .centerY
         stack.spacing = 6
@@ -41,16 +48,21 @@ final class WindowTitleStripView: NSView {
         stack.addArrangedSubview(folderIcon)
         stack.addArrangedSubview(label)
         addSubview(stack)
+        addSubview(previewBadge)
 
         let leading = stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: basePadding)
         stackLeading = leading
         NSLayoutConstraint.activate([
             leading,
             stack.centerYAnchor.constraint(equalTo: centerYAnchor),
-            stack.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -12),
+            stack.trailingAnchor.constraint(lessThanOrEqualTo: previewBadge.leadingAnchor, constant: -12),
+            previewBadge.centerYAnchor.constraint(equalTo: centerYAnchor),
+            previewBadge.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -14),
+            previewBadge.widthAnchor.constraint(lessThanOrEqualToConstant: 520),
             folderIcon.widthAnchor.constraint(equalToConstant: 16),
             folderIcon.heightAnchor.constraint(equalToConstant: 16),
         ])
+        configurePreviewBadge()
         applyColors()
     }
 
@@ -102,5 +114,18 @@ final class WindowTitleStripView: NSView {
         let c = HarnessDesign.chrome
         folderIcon.contentTintColor = c.textSecondary
         label.textColor = c.textSecondary
+        previewBadge.textColor = c.textTertiary
+    }
+
+    private func configurePreviewBadge() {
+        guard Bundle.main.bundleIdentifier == "com.robert.harness.preview",
+              let label = Bundle.main.object(forInfoDictionaryKey: "HarnessPreviewBuildLabel") as? String,
+              !label.isEmpty
+        else { return }
+        previewBadge.stringValue = "PREVIEW · \(label)"
+        if let builtAt = Bundle.main.object(forInfoDictionaryKey: "HarnessPreviewBuiltAt") as? String {
+            previewBadge.toolTip = "Built \(builtAt)"
+        }
+        previewBadge.isHidden = false
     }
 }

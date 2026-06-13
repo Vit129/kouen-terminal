@@ -61,6 +61,10 @@
 | 45 | Notification dropdown keyboard nav (arrow/Enter/Escape + first-responder restore); tab bar close-button vs ⌘N badge overlap at rest fix | ✅ Done |
 | 46 | CASE-029: terminal text selection survives scroll — selectionAnchor/Head now virtual-line coords (matches CopyModeGridSource convention); removed clearSelection() on scroll; copy reads via TerminalEmulator.line(_:) | ✅ Done |
 | 47 | Rework file-tree sidebar search with Spotlight-style relevance ranking, fuzzy fallback, suffix matching, robust path value checking, search safety checks, and fix git status update/blinking issues | ✅ Done |
+| 48 | AI-Agent Notification Rings (TerminalHostView.isWaiting + syncWaitingRings) and ⌘⇧U notifications dropdown wiring | ✅ Done |
+| 49 | Quick Select Mode (⌘⇧Y) removed at user's request — didn't work, all related code deleted (HarnessTerminalSurfaceView+QuickSelect.swift, +Input.swift hook, TerminalHostView.enterQuickSelectMode, MainMenuBuilder menu item) | ✅ Done |
+| 50 | Fix git history card click not opening file preview (GitPanelView: replaced dead NSClickGestureRecognizer with HistoryCardView.onTap closure) | ✅ Done |
+| 51 | Investigate terminal panel black-flash when opening file preview from Git Changes/History/file-tree (even fresh tabs); not last-line scroll after preview open | 🔍 In progress |
 
 ### Removed / Reverted Features
 - **Task Board sidebar** — was added in sprint #32 but has since been **removed**. Not present in current codebase.

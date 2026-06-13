@@ -735,8 +735,9 @@ final class GitPanelView: NSView {
         if porcelain.isEmpty {
             changesStack.addArrangedSubview(makeLabel("Working tree clean"))
         } else {
-            for line in porcelain.components(separatedBy: "\n").prefix(40) where !line.isEmpty {
+            for (rowIndex, line) in porcelain.components(separatedBy: "\n").prefix(40).enumerated() where !line.isEmpty {
                 let file = String(line.dropFirst(3))
+                fputs("CLICKDBG buildRow[\(rowIndex)] line=\(line) file=\(file)\n", harnessStderr)
                 let row = makeChangeRow(line, stats: stats[file])
                 changesStack.addArrangedSubview(row)
                 row.leadingAnchor.constraint(equalTo: changesStack.leadingAnchor).isActive = true
@@ -857,6 +858,7 @@ final class GitPanelView: NSView {
         guard let path = currentPath,
               let row = sender.view,
               let file = row.identifier?.rawValue else { return }
+        fputs("CLICKDBG showChangedFileDiff: senderView=\(ObjectIdentifier(row)) identifier=\(file) frame=\(row.frame)\n", harnessStderr)
         Task {
             let diff = await runGit(["diff", "HEAD", "--", file], in: path)
             let content = diff.isEmpty ? (try? String(contentsOfFile: path + "/" + file, encoding: .utf8)) ?? "" : diff
@@ -865,6 +867,7 @@ final class GitPanelView: NSView {
             let safeName = file.replacingOccurrences(of: "/", with: "_")
             let ext = diff.isEmpty ? (file as NSString).pathExtension : "diff"
             let tmpPath = tmpDir + "\(safeName).\(ext)"
+            fputs("CLICKDBG showChangedFileDiff: opening file=\(file) tmpPath=\(tmpPath)\n", harnessStderr)
             try? content.write(toFile: tmpPath, atomically: true, encoding: .utf8)
             guard let split = self.window?.contentViewController as? MainSplitViewController else { return }
             split.contentVC.openFileTab(path: tmpPath)
@@ -1038,8 +1041,11 @@ final class GitPanelView: NSView {
                 process.standardError = Pipe()
                 do {
                     try process.run()
-                    process.waitUntilExit()
+                    // Drain stdout before waitUntilExit(): for output >64KB the pipe
+                    // buffer fills and git blocks on write() while we'd be blocked in
+                    // waitUntilExit(), deadlocking (e.g. diffing graphify-out/graph.json).
                     let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                    process.waitUntilExit()
                     continuation.resume(returning: String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "")
                 } catch {
                     continuation.resume(returning: "")
