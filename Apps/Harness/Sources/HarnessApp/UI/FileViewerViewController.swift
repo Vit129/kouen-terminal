@@ -42,6 +42,7 @@ final class FileViewerViewController: NSViewController {
            (cleanPath.hasPrefix("\"") && cleanPath.hasSuffix("\"")) {
             cleanPath = String(cleanPath.dropFirst().dropLast())
         }
+        let isReloadingSamePath = pathLabel.toolTip == cleanPath
         pathLabel.stringValue = (cleanPath as NSString).lastPathComponent
         pathLabel.toolTip = cleanPath
 
@@ -72,7 +73,7 @@ final class FileViewerViewController: NSViewController {
             showMessage("Unable to preview this file (binary or unsupported encoding).")
             return
         }
-        showText(contents, url: url, fileExtension: ext)
+        showText(contents, url: url, fileExtension: ext, resetScroll: !isReloadingSamePath)
     }
 
     // MARK: - Setup
@@ -170,11 +171,11 @@ final class FileViewerViewController: NSViewController {
 
     // MARK: - Display state
 
-    private func showText(_ text: String, url: URL, fileExtension ext: String) {
+    private func showText(_ text: String, url: URL, fileExtension ext: String, resetScroll: Bool) {
         messageLabel.isHidden = true
         quickLookView?.isHidden = true
         syntaxView.isHidden = false
-        syntaxView.load(text: text, fileExtension: ext)
+        syntaxView.load(text: text, fileExtension: ext, resetScroll: resetScroll)
         // lspSession.open(url: url, text: text, fileExtension: ext)
     }
 

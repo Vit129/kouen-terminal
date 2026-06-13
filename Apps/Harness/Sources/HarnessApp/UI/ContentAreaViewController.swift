@@ -538,6 +538,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
 
         fileEditorPanel = panel
         refreshEditorPanelFill()
+        layoutFileEditorSplitSynchronously()
         persistEditorState()
     }
 
@@ -561,7 +562,16 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         let restored = terminalHost.leadingAnchor.constraint(equalTo: view.leadingAnchor)
         restored.isActive = true
         terminalHostLeading = restored
+        layoutFileEditorSplitSynchronously()
         persistEditorState()
+    }
+
+    private func layoutFileEditorSplitSynchronously() {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        view.layoutSubtreeIfNeeded()
+        terminalHost.layoutSubtreeIfNeeded()
+        CATransaction.commit()
     }
 
     private func persistEditorState() {

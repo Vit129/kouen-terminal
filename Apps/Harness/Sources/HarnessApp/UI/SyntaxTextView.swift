@@ -62,10 +62,17 @@ final class SyntaxTextView: NSView {
 
     var string: String { textView.string }
 
-    func load(text: String, fileExtension ext: String) {
+    func load(text: String, fileExtension ext: String, resetScroll: Bool = true) {
+        let previousOrigin = scrollView.contentView.bounds.origin
         fileExtension = ext.lowercased()
         textView.textStorage?.setAttributedString(SyntaxHighlighter.highlight(text, fileExtension: fileExtension))
-        textView.scrollToBeginningOfDocument(nil)
+        if resetScroll {
+            textView.scrollToBeginningOfDocument(nil)
+        } else {
+            textView.layoutSubtreeIfNeeded()
+            scrollView.contentView.scroll(to: previousOrigin)
+            scrollView.reflectScrolledClipView(scrollView.contentView)
+        }
         diagnostics = []
         gutterView.diagnostics = []
         gutterView.needsDisplay = true
@@ -321,7 +328,7 @@ final class SyntaxTextView: NSView {
         }
         vi.onListBuffers = { [weak self] in
             guard let self else { return [] }
-            var result: [String] = []
+            let result: [String] = []
             NotificationCenter.default.post(name: .viListBuffersCommand, object: self)
             return result  // async result comes back via notification; simplified to immediate
         }

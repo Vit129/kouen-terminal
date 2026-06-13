@@ -33,6 +33,7 @@ final class FileEditorView: NSView {
            (cleanPath.hasPrefix("\"") && cleanPath.hasSuffix("\"")) {
             cleanPath = String(cleanPath.dropFirst().dropLast())
         }
+        let isReloadingSamePath = filePath == cleanPath
         filePath = cleanPath
         quickLookContainer.isHidden = true
         let expanded = (cleanPath as NSString).expandingTildeInPath
@@ -65,7 +66,7 @@ final class FileEditorView: NSView {
             showMessage("Binary file — cannot preview.")
             return
         }
-        showText(contents, fileExtension: ext)
+        showText(contents, fileExtension: ext, resetScroll: !isReloadingSamePath)
     }
 
     // MARK: - Setup
@@ -223,12 +224,12 @@ final class FileEditorView: NSView {
 
     // MARK: - Display
 
-    private func showText(_ text: String, fileExtension ext: String) {
+    private func showText(_ text: String, fileExtension ext: String, resetScroll: Bool) {
         messageLabel.isHidden = true
         syntaxView.isHidden = false
         quickLookContainer.isHidden = true
 
-        syntaxView.load(text: text, fileExtension: ext)
+        syntaxView.load(text: text, fileExtension: ext, resetScroll: resetScroll)
         if ["diff", "patch"].contains(ext) {
             loadDiffContentGutter(text)
         } else {
