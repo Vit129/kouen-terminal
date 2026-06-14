@@ -70,6 +70,7 @@
 | 54 | P12 PBI-ORCH-002/003: harness-mcp env-gated pane/session control tools plus waitForPaneOutput | ✅ Done |
 | 55 | P12 PBI-ORCH-004/005: persisted MCP tool policy for mutating tools; scoped UI visibility design note only | ✅ Done |
 | 56 | P4 Track 1 Syntax Highlighting: verified and structured. Integrated SyntaxTextView highlighting (regex-based heuristics supporting 30+ languages) in FileViewerViewController; preserved size guards, binary/non-UTF8 placeholders, copy/select and scroll behaviors; added SyntaxHighlighterTests.swift verifying correctness; noted CLI cat/view commands absence. | ✅ Done |
+| 57 | P4 Track 2/3: LSP CLI (`harness lsp start/status/hover/definition/diagnostics`) and `harness view` done; vi `:view/:edit/:split/:vsplit` done; fuzzy `:find`/partial path resolution partial (best-match, no picker); PBI-VI-001 partial (`gf` only, `gd`/`K`/diagnostic jumps not wired). Build + CLI/App/Completion tests pass. | ✅ Done |
 
 ### Removed / Reverted Features
 - **Task Board sidebar** — was added in sprint #32 but has since been **removed**. Not present in current codebase.

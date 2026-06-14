@@ -308,6 +308,7 @@ final class ViEngine {
             pendingG = false
             switch key {
             case "g": moveToLine(tv, line: count == 1 ? 1 : count); return true
+            case "f": openPathUnderCursor(tv); return true
             case "d": return false  // let LSP go-to-def handle (Cmd+click)
             case "e": moveWords(tv, count: count, forward: false, bigWord: false, toEnd: true); return true
             case "E": moveWords(tv, count: count, forward: false, bigWord: true, toEnd: true); return true
@@ -1370,6 +1371,42 @@ final class ViEngine {
         repeatSearch(tv, reverse: false, count: 1)
     }
 
+    private func openPathUnderCursor(_ tv: NSTextView) {
+        guard let raw = pathTokenUnderCursor(tv) else {
+            displayExMessage("gf: no path under cursor")
+            return
+        }
+        onOpenFile?(Self.stripLineColumnSuffix(raw))
+    }
+
+    private func pathTokenUnderCursor(_ tv: NSTextView) -> String? {
+        let ns = tv.string as NSString
+        guard ns.length > 0 else { return nil }
+        let pos = min(cursorPos(tv), max(0, ns.length - 1))
+        var start = pos
+        var end = pos
+        while start > 0 && Self.isPathTokenChar(ns.character(at: start - 1)) { start -= 1 }
+        while end < ns.length && Self.isPathTokenChar(ns.character(at: end)) { end += 1 }
+        let token = ns.substring(with: NSRange(location: start, length: end - start))
+            .trimmingCharacters(in: CharacterSet(charactersIn: "'\"`()[]{}<>"))
+        return token.contains("/") || token.contains(".") || token.hasPrefix("~") ? token : nil
+    }
+
+    private static func isPathTokenChar(_ c: unichar) -> Bool {
+        guard let scalar = UnicodeScalar(c) else { return false }
+        if CharacterSet.alphanumerics.contains(scalar) { return true }
+        return "/._-~:@+".unicodeScalars.contains(scalar)
+    }
+
+    private static func stripLineColumnSuffix(_ token: String) -> String {
+        let parts = token.split(separator: ":", omittingEmptySubsequences: false)
+        guard parts.count >= 2, let last = parts.last, Int(last) != nil else { return token }
+        if parts.count >= 3, Int(parts[parts.count - 2]) != nil {
+            return parts.dropLast(2).joined(separator: ":")
+        }
+        return parts.dropLast().joined(separator: ":")
+    }
+
     // MARK: - Screen position motions (H/M/L)
 
     enum ScreenPos { case top, middle, bottom }
@@ -1513,10 +1550,32 @@ final class ViEngine {
                 execSet(String(cmd.dropFirst(4)).trimmingCharacters(in: .whitespaces), tv: tv)
                 return
             }
-            // :e file  — notify host to open file
-            if cmd.hasPrefix("e ") {
-                let path = String(cmd.dropFirst(2)).trimmingCharacters(in: .whitespaces)
+            // :e/:edit file  — notify host to open file
+            if cmd.hasPrefix("e ") || cmd.hasPrefix("edit ") {
+                let dropCount = cmd.hasPrefix("edit ") ? 5 : 2
+                let path = String(cmd.dropFirst(dropCount)).trimmingCharacters(in: .whitespaces)
                 onOpenFile?(path)
+                return
+            }
+            if cmd.hasPrefix("view ") {
+                let path = String(cmd.dropFirst(5)).trimmingCharacters(in: .whitespaces)
+                NotificationCenter.default.post(name: .viViewFileCommand, object: self, userInfo: ["path": path])
+                return
+            }
+            if cmd.hasPrefix("find ") {
+                let query = String(cmd.dropFirst(5)).trimmingCharacters(in: .whitespaces)
+                NotificationCenter.default.post(name: .viFindFileCommand, object: self, userInfo: ["query": query])
+                return
+            }
+            if cmd.hasPrefix("split ") || cmd.hasPrefix("sp ") || cmd.hasPrefix("vsplit ") || cmd.hasPrefix("vsp ") {
+                let isVertical = cmd.hasPrefix("vsplit ") || cmd.hasPrefix("vsp ")
+                let dropCount = cmd.hasPrefix("vsplit ") ? 7 : (cmd.hasPrefix("split ") ? 6 : 3)
+                let path = String(cmd.dropFirst(dropCount)).trimmingCharacters(in: .whitespaces)
+                NotificationCenter.default.post(
+                    name: .viSplitFileCommand,
+                    object: self,
+                    userInfo: ["path": path, "direction": isVertical ? "vertical" : "horizontal"]
+                )
                 return
             }
             // :s/old/new/flags  or  :%s/old/new/flags
