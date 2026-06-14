@@ -213,7 +213,7 @@ struct HarnessDaemonTools: Sendable {
         guard let paneID = UUID(uuidString: paneId) else {
             return (nil, JSONRPCError(code: -32602, message: "Invalid 'paneId' UUID"))
         }
-        guard let splitDirection = Self.layoutDirection(forPaneDirection: direction) else {
+        guard let splitDirection = CommandIPCTranslator.layoutDirection(forPaneDirection: direction) else {
             return (nil, JSONRPCError(code: -32602, message: "Invalid 'direction' parameter"))
         }
         guard let response = await send(.newSplit(tabID: tabID, paneID: paneID, direction: splitDirection, shell: shell)) else {
@@ -325,17 +325,6 @@ struct HarnessDaemonTools: Sendable {
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> Bool {
         environment[controlGateVariable] == "1"
-    }
-
-    static func layoutDirection(forPaneDirection direction: String) -> SplitDirection? {
-        switch direction.lowercased() {
-        case "right", "left":
-            return .horizontal
-        case "up", "down":
-            return .vertical
-        default:
-            return nil
-        }
     }
 
     private func toolResult(json value: AnyCodable) -> AnyCodable {

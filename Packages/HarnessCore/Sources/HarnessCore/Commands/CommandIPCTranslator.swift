@@ -135,6 +135,20 @@ public enum CommandIPCTranslator {
         commandDirection == .vertical ? .horizontal : .vertical
     }
 
+    /// Maps a pane-relative direction string (`"right"`/`"left"`/`"up"`/`"down"`) to the
+    /// layout `SplitDirection` used by `newSplit`. The single mapping shared by P12's MCP
+    /// `splitPane` tool and P11's `harness.panes.split` so both agree on what `"right"` means.
+    public static func layoutDirection(forPaneDirection direction: String) -> SplitDirection? {
+        switch direction.lowercased() {
+        case "right", "left":
+            return .horizontal
+        case "up", "down":
+            return .vertical
+        default:
+            return nil
+        }
+    }
+
     public static func translate(
         _ command: Command,
         target: CommandTarget,
