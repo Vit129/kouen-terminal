@@ -809,6 +809,13 @@ public struct SessionEditor: Sendable {
         bumpRevision()
     }
 
+    /// Stamps the tab's `lastMCPControlAt` so the UI can show a "MCP" badge.
+    public mutating func stampMCPActivity(surfaceID: SurfaceID, at date: Date) {
+        guard let match = tabIndex(surfaceID: surfaceID) else { return }
+        snapshot.workspaces[match.workspaceIndex].sessions[match.sessionIndex].tabs[match.tabIndex].lastMCPControlAt = date
+        bumpRevision()
+    }
+
     public func tab(for surfaceID: SurfaceID) -> (workspaceID: WorkspaceID, tabID: TabID)? {
         tab(forSurfaceKey: surfaceID.uuidString)
     }

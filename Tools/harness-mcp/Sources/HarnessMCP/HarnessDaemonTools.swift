@@ -161,12 +161,20 @@ struct HarnessDaemonTools: Sendable {
 
     func sendPaneText(surfaceId: String, text: String, bracketed _: Bool) async -> (AnyCodable?, JSONRPCError?) {
         guard isToolAllowed("sendPaneText") else { return (nil, disabledError("sendPaneText")) }
-        return await okResponse(for: .send(surfaceID: surfaceId, text: text), expected: "send")
+        let result = await okResponse(for: .send(surfaceID: surfaceId, text: text), expected: "send")
+        if result.1 == nil { await notifyMCPActivity(surfaceId: surfaceId, tool: "sendPaneText") }
+        return result
     }
 
     func sendPaneKeys(surfaceId: String, keys: [String]) async -> (AnyCodable?, JSONRPCError?) {
         guard isToolAllowed("sendPaneKeys") else { return (nil, disabledError("sendPaneKeys")) }
-        return await okResponse(for: .sendKeys(surfaceID: surfaceId, keys: keys), expected: "sendKeys")
+        let result = await okResponse(for: .sendKeys(surfaceID: surfaceId, keys: keys), expected: "sendKeys")
+        if result.1 == nil { await notifyMCPActivity(surfaceId: surfaceId, tool: "sendPaneKeys") }
+        return result
+    }
+
+    private func notifyMCPActivity(surfaceId: String, tool: String) async {
+        _ = await send(.notifyMCPActivity(surfaceID: surfaceId, toolName: tool))
     }
 
     func spawnSession(
