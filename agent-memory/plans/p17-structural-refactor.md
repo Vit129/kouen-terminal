@@ -1,6 +1,6 @@
 # P17 — Structural Refactor
 
-Status: **PBI-002/003/005 DONE** (worktree `p17-refactor-002-005`, branch `worktree-p17-refactor-002-005`, commits `2c4dd5a`, `6a8b8e7` — not yet merged to main). PBI-004 remains optional/unscheduled.
+Status: **DONE** — PBI-001/002/003/005 all complete and merged to main. PBI-004 deferred (build time 9s, not worth the risk).
 Priority: **P3** — structural improvement, no new features
 Owner surface: HarnessApp, HarnessCore
 Created: 2026-06-14
@@ -159,7 +159,17 @@ Status: **DONE** — split into `UI/FileEditor/ViEngine.swift` (362), `ViExComma
 
 ---
 
-## PBI-REFACTOR-004: Split HarnessCore into focused packages (optional, highest effort)
+## PBI-REFACTOR-004: Split HarnessCore into focused packages (DEFERRED)
+
+**Status:** Deferred indefinitely.
+
+**Reason:** After completing PBI-001/002/003/005 the codebase is navigable and maintainable. PBI-004 was assessed as high effort (not medium) because:
+- 91 files across 25 subdirectories have dense cross-dependencies (Commands→Models→IPC→Options→Format all circular)
+- Would require ~200+ import fixups across 13 targets
+- Build time is 9s — not a bottleneck worth the risk/effort
+- Any mistake in dependency direction creates circular package deps that SPM rejects outright
+
+**Reopen when:** Incremental build time exceeds 30s consistently, or a new target needs to depend on only IPC without pulling all of HarnessCore.
 
 **Problem:** HarnessCore (91 files, 15K LOC) is depended upon by every target. A change to `FormatString.swift` forces recompilation of CLI, daemon, renderer, and app.
 
