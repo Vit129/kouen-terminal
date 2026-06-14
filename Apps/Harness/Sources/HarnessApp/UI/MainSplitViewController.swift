@@ -18,9 +18,6 @@ final class MainSplitViewController: NSViewController {
     /// Owned (not a singleton) so collapse state is per-window. Carries the
     /// `allowFullCollapse` flag the divider min-coordinate reads.
     private let splitDelegate = SplitChromeDelegate()
-    private var isFocusModeActive = false
-    private var preFocusSidebarVisible = true
-    private var preFocusFileEditorVisible = false
 
     override func loadView() {
         // The root contentView must stay a plain, NON-layer-backed NSView. A plain NSView
@@ -328,13 +325,8 @@ final class MainSplitViewController: NSViewController {
         }
     }
 
-    func resetFocusMode() {
-        isFocusModeActive = false
-    }
-
     /// Shows the sidebar (if hidden) and switches it to the Git tab (⌘G).
     func showGitPanel() {
-        resetFocusMode()
         setSidebarVisible(true, animated: true)
         sidebar.selectGitTab()
     }
@@ -346,30 +338,10 @@ final class MainSplitViewController: NSViewController {
         sidebar.showNotificationsDropdown()
     }
 
-    /// Toggles sidebar + file editor split together (⌘\), restoring both to their
-    /// prior visibility on the next toggle. Absorbs the former separate "Focus Mode" (⌘P).
+    /// Toggles sidebar visibility (⌘\).
     func toggleSidebar() {
-        if isFocusModeActive {
-            setSidebarVisible(preFocusSidebarVisible, animated: true)
-            if preFocusFileEditorVisible {
-                content.showFileEditorSplit(resetFocusMode: false)
-            } else {
-                content.hideFileEditorSplit(resetFocusMode: false)
-            }
-            isFocusModeActive = false
-        } else {
-            preFocusSidebarVisible = SessionCoordinator.shared.settings.sidebarVisible
-            preFocusFileEditorVisible = content.isFileEditorVisible
-
-            if preFocusSidebarVisible || preFocusFileEditorVisible {
-                setSidebarVisible(false, animated: true)
-                content.hideFileEditorSplit(resetFocusMode: false)
-                isFocusModeActive = true
-            } else {
-                setSidebarVisible(true, animated: true)
-                isFocusModeActive = false
-            }
-        }
+        let visible = SessionCoordinator.shared.settings.sidebarVisible
+        setSidebarVisible(!visible, animated: true)
     }
 
     private var edgeDividerConstraint: NSLayoutConstraint?
