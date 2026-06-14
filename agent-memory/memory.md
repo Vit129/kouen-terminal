@@ -70,6 +70,7 @@
 | 54 | P12 PBI-ORCH-002/003: harness-mcp env-gated pane/session control tools plus waitForPaneOutput | ✅ Done |
 | 55 | P12 PBI-ORCH-004/005: persisted MCP tool policy for mutating tools; scoped UI visibility design note only | ✅ Done |
 | 56 | P4 Track 1 Syntax Highlighting: verified and structured. Integrated SyntaxTextView highlighting (regex-based heuristics supporting 30+ languages) in FileViewerViewController; preserved size guards, binary/non-UTF8 placeholders, copy/select and scroll behaviors; added SyntaxHighlighterTests.swift verifying correctness; noted CLI cat/view commands absence. | ✅ Done |
+| 57 | Fix ⌘\\ "Toggle Sidebar" first-press bug: toggleSidebar() previously coupled sidebar visibility with the file-editor split via a "focus mode" (isFocusModeActive/preFocusSidebarVisible/preFocusFileEditorVisible) — if a file editor split was open on a freshly-opened window, the first ⌘\\ press hid both sidebar and editor split instead of opening the sidebar. Decoupled: toggleSidebar() now purely flips settings.sidebarVisible; removed resetFocusMode() and the resetFocusMode: params on ContentAreaViewController.showFileEditorSplit/hideFileEditorSplit. Build + 67/67 HarnessAppTests + 1529/1529 full suite pass. | ✅ Done |
 
 ### Removed / Reverted Features
 - **Task Board sidebar** — was added in sprint #32 but has since been **removed**. Not present in current codebase.
