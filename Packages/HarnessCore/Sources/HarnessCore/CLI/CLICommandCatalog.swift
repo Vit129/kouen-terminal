@@ -43,6 +43,7 @@ public enum CLICommandCatalog {
         .init("has-session", "Exit 0 if a session exists, else 1"),
         .init("list-commands", "List known command verbs"),
         .init("get-snapshot", "Dump the full session snapshot as JSON"),
+        .init("board", "Kanban-style view of sessions by status (--watch to live-update)"),
         // Layout
         .init("new-workspace", "Create a workspace"),
         .init("new-session", "Create a session in a workspace"),

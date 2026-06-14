@@ -1,6 +1,7 @@
 # P16 — Agent/Session Board (Jira/Trello/Devin-Windsurf parity, GUI + Terminal)
 
-Status: **planned / not started**
+Status: **PBI-BOARD-001/002/003/005 done; PBI-BOARD-004/006 deferred** (see notes
+in each PBI section and "Deferred PBIs" below).
 Priority: **P3** — strategic, builds on [[p15-integration-roadmap]] step 3 (event bridge)
 Owner surface: HarnessApp UI (new sidebar tab/panel) + harness-cli + harness-mcp (read-only)
 Created: 2026-06-14
@@ -119,6 +120,22 @@ Tests:
 
 - Snapshot fixtures → expected column assignment for each state-dot color.
 
+**Done.** `BoardModel.swift` defines `BoardCard`, `BoardColumnKind` (5 cases,
+`CaseIterable`, in canonical order Needs Attention/Running/Idle/Done/Error), and
+`BoardColumn`. `classify(snapshot:)` always returns all 5 columns (even if empty)
+and ports the exact P10 Session State Dot precedence (exit 0 → Done, exit non-zero
+→ Error, non-shell `currentCommand` → Running, else Idle). 11 tests in
+`BoardModelTests.swift`, all passing.
+
+**"Needs Attention" simplification:** classified solely from
+`tab.agent?.activity == .awaiting`, given precedence over exit-status-based
+Done/Error. The Column Model table above also lists "unacknowledged
+`notificationPosted`" as a Needs-Attention trigger, but that signal doesn't exist
+yet — it depends on the same `harness.events`/`NotificationBus` bridge as
+PBI-BOARD-004 ([[p15-integration-roadmap]] step 3). Per Non-Goals, no new
+persisted/ack state was invented to fake it. Once the event bridge lands, extend
+`columnKind(for tab:)` to also check unacknowledged notifications for that tab.
+
 ### PBI-BOARD-002: GUI board view
 
 Files:
@@ -140,6 +157,24 @@ Tests:
 - Snapshot fixture → view renders expected card count per column (snapshot test
   or structural assertion, matching existing `HarnessAppTests` conventions).
 
+**Done.** New `BoardViewController.swift` renders `BoardModel.classify(...)` as a
+horizontally-scrolling `NSStackView` of columns, each a vertical stack of
+`BoardCardView` cards (title, cwd/branch meta, current command, agent chip). Card
+click reuses `SessionCoordinator.selectWorkspace`/`selectTab` — no new IPC path.
+Refresh wired to `NotificationBus.shared.snapshotChanged`, same as other sidebar
+panels.
+
+**Naming decision:** used **"Board"** as-is. Re-confirmed via repo-wide search
+that no `TaskBoard`/"Task Board" symbols exist on `main` — the collision flagged
+in Non-Goals is not live, so no rename/"Agent Board" fallback was needed.
+
+**Sidebar wiring:** `HarnessSidebarPanelViewController.sidebarTabs` went from
+`["Sessions", "Files", "Git"]` to `["Sessions", "Files", "Git", "Board"]` (index
+3). The previously-unreachable `case 3`/`case 4` (Search/Agent, for the shelved
+ACP panel and unwired search panel) were shifted to indices 4/5 with an
+explanatory comment — those views/cases are kept intact, just no longer collide
+with the new Board tab. 3 structural tests in `BoardViewControllerTests.swift`.
+
 ### PBI-BOARD-003: CLI board view
 
 Files:
@@ -158,6 +193,15 @@ Tests:
 
 - `HarnessCLITests`: snapshot fixture → expected table output (one-shot mode).
 
+**Done.** New `HarnessCLI+Board.swift` adds `harness board` (one-shot, renders
+`BoardModel.classify(...)` against `.getSnapshot` as a text table grouped by
+column, "(none)" placeholder for empty columns) and `harness board --watch`
+(subscribes via `client.subscribeSnapshot`, clears + re-renders on each
+revision until the connection ends). Renderer factored into a pure
+`renderBoard(_ columns:) -> String` for testability. Registered in the CLI
+dispatch table, `CLICommandCatalog` (shell completion), and
+`docs/COMMANDS.md`. 2 new tests in `BoardCommandTests.swift`.
+
 ### PBI-BOARD-004: Live updates via event bridge
 
 Files:
@@ -175,6 +219,20 @@ Tests:
 
 - Integration: simulate a state-dot transition, verify board card moves column
   without a full re-snapshot poll.
+
+**Deferred.** Not implemented in this pass — `harness.events`/`NotificationBus`
+event bridge ([[p15-integration-roadmap]] step 3) does not exist yet, and this
+PBI explicitly depends on it (per Rollout Order item 5, ordered after
+PBI-BOARD-005). Both the GUI board tab (PBI-BOARD-002, refreshed via
+`NotificationBus.shared.snapshotChanged` on a full reload — cheap enough for the
+current handful of columns/cards) and `harness board --watch` (PBI-BOARD-003,
+polls via `client.subscribeSnapshot` on every snapshot revision) already get
+"live enough" updates through existing snapshot-change notifications; this PBI is
+specifically about avoiding a full reclassify/re-render and instead moving a
+single card between columns when its event fires. Revisit once the event bridge
+lands — wire `BoardViewController` and the CLI `--watch` path to
+`agentStateChanged`/`notificationPosted` instead of (or in addition to)
+`snapshotChanged`.
 
 ### PBI-BOARD-005: Scripting + MCP read access
 
@@ -198,6 +256,18 @@ Tests:
 - `ScriptingTests`: `harness.board.list()` shape matches fixture.
 - `HarnessMCPTests` (or equivalent): `harnessBoard` tool output matches fixture.
 
+**Done.** `ScriptAPI.swift` adds `harness.board.list()` (same
+`Codable`→`JSONEncoder`→`JSONSerialization`→`JSValue` pattern as
+`harness.commands.parse`). `HarnessDaemonTools.swift` adds `harnessBoard()`
+(`.getSnapshot` → `BoardModel.classify` → `AnyCodable` → `toolResult(json:)`),
+registered in `ToolRegistry.listTools()` and the tool-dispatch switch. No
+`ToolPolicy` changes needed — `harnessBoard` isn't in `dangerousTools`, so it's
+allowed by default like `harnessList`. New test
+`ScriptingTests.testBoardListReturnsAllColumns` (5 columns,
+`kind === 'needsAttention'` first, default snapshot's 1 idle tab appears in the
+`idle` column) and `HarnessDaemonToolsTests.testHarnessBoardIsReadOnlyAndRegistered`
+(default policy allows it, `listTools()` includes it).
+
 ### PBI-BOARD-006 (stretch): Card acknowledgement/dismissal
 
 Files:
@@ -215,6 +285,15 @@ Tasks:
 - Do **not** add a "kill from board" action in this PBI — if wanted later, route
   through `CommandIPCTranslator`'s existing `killPane`/`killSession` path behind
   the same policy gate P12 uses for mutating MCP tools, as its own PBI.
+
+**Deferred.** Not started — per Rollout Order item 6, this stretch PBI only makes
+sense once PBI-BOARD-001/002/003/005 are stable (done, this pass) **and**
+PBI-BOARD-004's live-update path exists, since "acknowledging" a Needs Attention
+card is most useful when the card can move/disappear from the board live without
+a manual reload. Also blocked on the same missing
+"unacknowledged-notification-per-pane" signal noted under PBI-BOARD-001 — there is
+currently nothing to acknowledge beyond `AgentSnapshot.activity == .awaiting`,
+which isn't a per-notification flag. Revisit after PBI-BOARD-004.
 
 ---
 

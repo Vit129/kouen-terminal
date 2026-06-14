@@ -90,7 +90,7 @@ final class HarnessCLITests: XCTestCase {
         "color-check", "theme-preview", "view", "lsp", "remote", "daemon", "version",
         "list-workspaces", "list-surfaces", "list-sessions", "list-agents", "doctor",
         "completions", "list-windows", "list-panes", "has-session", "list-commands",
-        "get-snapshot", "new-workspace", "new-session", "new-tab", "new-split",
+        "get-snapshot", "board", "new-workspace", "new-session", "new-tab", "new-split",
         "select-workspace", "select-tab", "select-session", "close-tab", "close-session",
         "promote-session", "demote-session", "send", "notify", "install", "ping",
         "send-keys", "capture-pane", "pipe-pane", "wait-for", "link-window", "unlink-window",

@@ -27,7 +27,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
     /// Wraps the search field so it gets the same radius-7 elevated-surface chrome as
     /// the workspace pill and session cards.
     private let searchContainer = NSView()
-    private let sidebarTabs = NSSegmentedControl(labels: ["Sessions", "Files", "Git"], trackingMode: .selectOne, target: nil, action: nil)
+    private let sidebarTabs = NSSegmentedControl(labels: ["Sessions", "Files", "Git", "Board"], trackingMode: .selectOne, target: nil, action: nil)
     private let agentChatPanel = AgentChatPanelView()
     private let sectionHeader = NSView()
     private let sectionLabel = NSTextField(labelWithString: "Sessions")
@@ -35,6 +35,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
     let fileTreeView = WorkspaceFileTreeView()
     private let fileViewerVC = FileViewerViewController()
     let gitPanelView = GitPanelView()
+    let boardViewController = BoardViewController()
     private let searchPanelView = SearchPanelView()
     private let footer = NSView()
     /// Opens the Agent Inbox popover (every running agent, waiting first). Stored so
@@ -172,6 +173,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
         setupFileTree()
         setupFileViewer()
         setupGitPlaceholder()
+        setupBoardPanel()
         setupSearchPanel()
         setupAgentPanel()
         selectSidebarTab(index: 0)
@@ -672,6 +674,20 @@ final class HarnessSidebarPanelViewController: NSViewController {
         ])
     }
 
+    private func setupBoardPanel() {
+        addChild(boardViewController)
+        let boardView = boardViewController.view
+        boardView.translatesAutoresizingMaskIntoConstraints = false
+        boardView.isHidden = true
+        view.addSubview(boardView)
+        NSLayoutConstraint.activate([
+            boardView.topAnchor.constraint(equalTo: sectionHeader.bottomAnchor),
+            boardView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            boardView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            boardView.bottomAnchor.constraint(equalTo: footer.topAnchor),
+        ])
+    }
+
     private func setupSearchPanel() {
         searchPanelView.isHidden = true
         view.addSubview(searchPanelView)
@@ -770,8 +786,12 @@ final class HarnessSidebarPanelViewController: NSViewController {
             fileTreeView.isHidden = fileViewerVC.view.isHidden == false
         }
         gitPanelView.isHidden = index != 2
-        searchPanelView.isHidden = index != 3
-        agentChatPanel.isHidden = index != 4
+        boardViewController.view.isHidden = index != 3
+        // Search/Agent tabs are not in `sidebarTabs` today (only Sessions/Files/Git/Board
+        // are shown) but the views/cases are kept for the shelved ACP agent panel and an
+        // unwired search panel; shifted to 4/5 so "Board" can take index 3.
+        searchPanelView.isHidden = index != 4
+        agentChatPanel.isHidden = index != 5
         switch index {
         case 1:
             sectionLabel.stringValue = "FILES"
@@ -787,11 +807,14 @@ final class HarnessSidebarPanelViewController: NSViewController {
                 gitPanelView.clearRoot()
             }
         case 3:
+            sectionLabel.stringValue = "BOARD"
+            boardViewController.reload()
+        case 4:
             sectionLabel.stringValue = "SEARCH"
             if let cwd = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd {
                 searchPanelView.updateRoot(path: cwd)
             }
-        case 4:
+        case 5:
             sectionLabel.stringValue = "AGENT"
             // [ACP SHELVED] connectAgentIfNeeded()
         default:

@@ -1,5 +1,6 @@
 import XCTest
 @testable import HarnessApp
+import HarnessCore
 
 final class ScriptingTests: XCTestCase {
 
@@ -168,6 +169,31 @@ final class ScriptingTests: XCTestCase {
         // Fetch the list again, verify the name is not mutated on the next fetch
         let refetchedName = runtime.context.evaluateScript("harness.sessions.list()[0].name")?.toString()
         XCTAssertNotEqual(refetchedName, "MutatedNameJS")
+        #endif
+    }
+
+    /// P16 PBI-BOARD-005: `harness.board.list()` returns `BoardModel.classify(...)`
+    /// columns, same shape as the `harnessBoard` MCP tool.
+    @MainActor
+    func testBoardListReturnsAllColumns() throws {
+        let runtime = ScriptRuntime()
+
+        #if canImport(JavaScriptCore)
+        let boardVal = runtime.context.evaluateScript("harness.board.list()")
+        XCTAssertNotNil(boardVal)
+        XCTAssertTrue(boardVal!.isArray)
+
+        let columnCount = runtime.context.evaluateScript("harness.board.list().length")?.toInt32() ?? 0
+        XCTAssertEqual(Int(columnCount), BoardColumnKind.allCases.count)
+
+        let firstColumnName = runtime.context.evaluateScript("harness.board.list()[0].kind")?.toString()
+        XCTAssertEqual(firstColumnName, BoardColumnKind.needsAttention.rawValue)
+
+        // Default SessionCoordinator snapshot has one idle tab.
+        let idleCardCount = runtime.context.evaluateScript("""
+        harness.board.list().find(c => c.kind === 'idle').cards.length
+        """)?.toInt32() ?? -1
+        XCTAssertEqual(Int(idleCardCount), 1)
         #endif
     }
 
