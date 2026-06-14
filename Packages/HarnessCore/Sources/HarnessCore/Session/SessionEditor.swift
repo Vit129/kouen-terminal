@@ -665,6 +665,8 @@ public struct SessionEditor: Sendable {
         switch node {
         case let .leaf(leaf):
             return .leaf(PaneLeaf(id: UUID(), surfaceID: leaf.surfaceID, daemonSurfaceID: leaf.daemonSurfaceID))
+        case let .browser(leaf):
+            return .browser(BrowserLeaf(id: UUID(), url: leaf.url))
         case let .branch(direction, ratio, first, second):
             return .branch(direction: direction, ratio: ratio,
                            first: cloneWithFreshPaneIDs(first), second: cloneWithFreshPaneIDs(second))
@@ -834,6 +836,7 @@ public struct SessionEditor: Sendable {
         func leaf(_ node: PaneNode) -> PaneLeaf? {
             switch node {
             case let .leaf(l): return l.surfaceID.uuidString == key ? l : nil
+            case .browser: return nil
             case let .branch(_, _, first, second): return leaf(first) ?? leaf(second)
             }
         }
@@ -955,14 +958,24 @@ public struct SessionEditor: Sendable {
 
     private func removePane(_ node: inout PaneNode, target: PaneID) -> Bool {
         switch node {
-        case let .leaf(leaf) where leaf.id == target:
+        case .leaf:
+            return false
+        case .browser:
             return false
         case .branch(let direction, let ratio, var first, var second):
             if case let .leaf(leaf) = first, leaf.id == target {
                 node = second
                 return true
             }
+            if case let .browser(bleaf) = first, bleaf.id == target {
+                node = second
+                return true
+            }
             if case let .leaf(leaf) = second, leaf.id == target {
+                node = first
+                return true
+            }
+            if case let .browser(bleaf) = second, bleaf.id == target {
                 node = first
                 return true
             }
@@ -974,8 +987,6 @@ public struct SessionEditor: Sendable {
                 node = .branch(direction: direction, ratio: ratio, first: first, second: second)
                 return true
             }
-            return false
-        default:
             return false
         }
     }
@@ -1020,6 +1031,8 @@ public struct SessionEditor: Sendable {
             } else if leaf.id == dstID {
                 node = .leaf(src)
             }
+        case .browser:
+            break
         case .branch(let direction, let ratio, var first, var second):
             swapLeaves(in: &first, srcID: srcID, src: src, dstID: dstID, dst: dst)
             swapLeaves(in: &second, srcID: srcID, src: src, dstID: dstID, dst: dst)
@@ -1160,6 +1173,7 @@ public struct SessionEditor: Sendable {
     private func firstLeafID(in node: PaneNode) -> PaneID? {
         switch node {
         case let .leaf(leaf): return leaf.id
+        case let .browser(leaf): return leaf.id
         case let .branch(_, _, first, _): return firstLeafID(in: first)
         }
     }
@@ -1460,6 +1474,7 @@ public struct SessionEditor: Sendable {
     private func pathTo(paneID: PaneID, in node: PaneNode) -> [Int]? {
         switch node {
         case let .leaf(leaf): return leaf.id == paneID ? [] : nil
+        case let .browser(leaf): return leaf.id == paneID ? [] : nil
         case let .branch(_, _, first, second):
             if let sub = pathTo(paneID: paneID, in: first) { return [0] + sub }
             if let sub = pathTo(paneID: paneID, in: second) { return [1] + sub }
@@ -1521,6 +1536,7 @@ public struct SessionEditor: Sendable {
     private func collectLeaves(in node: PaneNode) -> [PaneLeaf] {
         switch node {
         case let .leaf(leaf): return [leaf]
+        case .browser: return []
         case let .branch(_, _, first, second):
             return collectLeaves(in: first) + collectLeaves(in: second)
         }
@@ -1530,6 +1546,8 @@ public struct SessionEditor: Sendable {
         switch node {
         case .leaf:
             return iterator.next().map { .leaf($0) } ?? node
+        case .browser:
+            return node
         case let .branch(direction, ratio, first, second):
             let f = substituteLeaves(in: first, iterator: &iterator)
             let s = substituteLeaves(in: second, iterator: &iterator)

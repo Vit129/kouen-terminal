@@ -107,6 +107,7 @@ public final class DaemonClient: @unchecked Sendable {
     public func subscribeSnapshot(
         label: String? = nil,
         onRevision: @escaping @Sendable (Int) -> Void,
+        onBrowserRequest: (@Sendable (UUID, UUID?, BrowserRequestPayload) -> Void)? = nil,
         onEnd: (@Sendable () -> Void)? = nil
     ) throws -> DaemonSubscription {
         let fd = try connectSocket()
@@ -115,7 +116,14 @@ public final class DaemonClient: @unchecked Sendable {
         let subscription = DaemonSubscription(fd: fd)
         subscription.start(
             onResponse: { response in
-                if case let .snapshotChanged(revision) = response { onRevision(revision) }
+                switch response {
+                case let .snapshotChanged(revision):
+                    onRevision(revision)
+                case let .browserRequest(id, paneID, req):
+                    onBrowserRequest?(id, paneID, req)
+                default:
+                    break
+                }
             },
             onEnd: onEnd
         )

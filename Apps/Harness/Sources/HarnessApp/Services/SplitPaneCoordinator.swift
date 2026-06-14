@@ -141,6 +141,8 @@ final class SplitPaneCoordinator {
         case let .leaf(leaf): return leaf.id == paneID ? leaf.surfaceID : nil
         case let .branch(_, _, first, second):
             return surfaceID(forPaneID: paneID, in: first) ?? surfaceID(forPaneID: paneID, in: second)
+        case .browser:
+            return nil
         }
     }
 
@@ -152,6 +154,77 @@ final class SplitPaneCoordinator {
             return surfaceID(forPane: paneID, in: first) ?? surfaceID(forPane: paneID, in: second)
         default:
             return nil
+        }
+    }
+
+    func openBrowserPane(url: URL, direction: SplitDirection, paneID: PaneID = UUID()) {
+        guard let workspace = coord.snapshot.activeWorkspace,
+              let tab = workspace.activeTab,
+              let activePaneID = coord.activeSurfaceID.flatMap({ self.paneID(for: $0, in: tab.rootPane) })
+                ?? tab.rootPane.allPaneIDs().last
+        else { return }
+
+        let resolvedURL: URL
+        if let savedURLString = UserDefaults.standard.string(forKey: "browserPane.\(paneID.uuidString).url"),
+           let savedURL = URL(string: savedURLString) {
+            resolvedURL = savedURL
+        } else {
+            resolvedURL = url
+        }
+
+        let browserLeaf = BrowserLeaf(id: paneID, url: resolvedURL)
+
+        var updatedSnapshot = coord.snapshot
+        for (wIdx, ws) in updatedSnapshot.workspaces.enumerated() {
+            for (sIdx, session) in ws.sessions.enumerated() {
+                for (tIdx, t) in session.tabs.enumerated() {
+                    if t.id == tab.id {
+                        var updatedTab = t
+                        var root = updatedTab.rootPane
+                        if insertBrowserLeaf(browserLeaf, into: &root, targetPaneID: activePaneID, direction: direction) {
+                            updatedTab.rootPane = root
+                            updatedTab.activePaneID = paneID
+                            updatedTab.lastActivePaneID = tab.activePaneID
+                            updatedSnapshot.workspaces[wIdx].sessions[sIdx].tabs[tIdx] = updatedTab
+
+                            coord.daemonSyncService.applyLocalSnapshot(updatedSnapshot)
+                            return
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func insertBrowserLeaf(
+        _ browserLeaf: BrowserLeaf,
+        into node: inout PaneNode,
+        targetPaneID: PaneID,
+        direction: SplitDirection
+    ) -> Bool {
+        switch node {
+        case let .leaf(leaf):
+            if leaf.id == targetPaneID {
+                node = .branch(direction: direction, ratio: 0.5, first: .leaf(leaf), second: .browser(browserLeaf))
+                return true
+            }
+            return false
+        case let .browser(bleaf):
+            if bleaf.id == targetPaneID {
+                node = .branch(direction: direction, ratio: 0.5, first: .browser(bleaf), second: .browser(browserLeaf))
+                return true
+            }
+            return false
+        case .branch(let d, let r, var first, var second):
+            if insertBrowserLeaf(browserLeaf, into: &first, targetPaneID: targetPaneID, direction: direction) {
+                node = .branch(direction: d, ratio: r, first: first, second: second)
+                return true
+            }
+            if insertBrowserLeaf(browserLeaf, into: &second, targetPaneID: targetPaneID, direction: direction) {
+                node = .branch(direction: d, ratio: r, first: first, second: second)
+                return true
+            }
+            return false
         }
     }
 }

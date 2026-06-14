@@ -146,6 +146,63 @@ public enum IPCRequest: Codable, Sendable {
     case displayMessage(format: String)
     /// tmux `show-messages`: the daemon's recent display-message log (most recent last).
     case showMessages
+
+    // Browser tool integration (P14)
+    case browserOpen(url: URL, direction: SplitDirection?)
+    case browserNavigate(paneID: UUID, url: URL)
+    case browserWait(paneID: UUID, timeoutSeconds: Double?)
+    case browserSnapshot(paneID: UUID, interactive: Bool?)
+    case browserInteract(paneID: UUID, action: String, elementID: String, text: String?)
+    case browserClose(paneID: UUID)
+    case browserResponse(id: UUID, response: BrowserResponsePayload)
+}
+
+public enum BrowserRequestPayload: Codable, Sendable {
+    case open(url: URL, direction: SplitDirection?)
+    case navigate(paneID: UUID, url: URL)
+    case wait(paneID: UUID, timeoutSeconds: Double?)
+    case snapshot(paneID: UUID, interactive: Bool?)
+    case interact(paneID: UUID, action: String, elementID: String, text: String?)
+    case close(paneID: UUID)
+}
+
+public enum BrowserResponsePayload: Codable, Sendable {
+    case open(paneID: UUID)
+    case ok
+    case snapshot(BrowserSnapshot)
+    case error(String)
+}
+
+public struct BrowserSnapshot: Codable, Sendable {
+    public var url: String
+    public var title: String
+    public var text: String
+    public var elements: [BrowserElement]
+
+    public init(url: String, title: String, text: String, elements: [BrowserElement]) {
+        self.url = url
+        self.title = title
+        self.text = text
+        self.elements = elements
+    }
+}
+
+public struct BrowserElement: Codable, Sendable {
+    public var id: String
+    public var tag: String
+    public var text: String
+    public var value: String
+    public var placeholder: String
+    public var href: String?
+
+    public init(id: String, tag: String, text: String, value: String, placeholder: String, href: String? = nil) {
+        self.id = id
+        self.tag = tag
+        self.text = text
+        self.value = value
+        self.placeholder = placeholder
+        self.href = href
+    }
 }
 
 public enum DirectionalAxis: String, Codable, Sendable {
@@ -193,6 +250,10 @@ public enum IPCResponse: Codable, Sendable {
     case hookID(UUID)
     case hooks([HookEntry])
     case error(String)
+
+    // Browser tool integration (P14)
+    case browserRequest(id: UUID, paneID: UUID?, req: BrowserRequestPayload)
+    case browserSuccess(BrowserResponsePayload)
 }
 
 public struct OptionEntry: Codable, Sendable, Equatable {
