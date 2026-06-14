@@ -1,8 +1,8 @@
 # P15 — Integration Roadmap (P4 + P10 + P11 + P12 + P13/P14)
 
-Status: **in progress** — Sequencing steps 1, 2, 3, and 6 done (P13, P4 Track 2/3,
-the `harness.events` bridge, and P16 PBI-BOARD-001/002/003/005 all landed). Steps
-4, 5, 7, and P16's PBI-BOARD-004/006 are now unblocked.
+Status: **in progress** — Sequencing steps 1, 2, 3, 4, and 6 done (P13, P4 Track 2/3,
+the `harness.events` bridge, P11 PBI-SCRIPT-004/005, and P16 PBI-BOARD-001/002/003/005
+all landed). Steps 5 and 7, and P16's PBI-BOARD-004/006 are now unblocked.
 Priority: **P2** — sequencing/coordination plan, not a feature in itself
 Owner surface: cross-cutting (HarnessCore, HarnessApp UI, harness-mcp, harness-cli)
 Created: 2026-06-14, after P11 PBI-SCRIPT-001/002/003 and P13 PBI-SPLIT-001..005 landed
@@ -39,7 +39,7 @@ and records the decisions needed to land them without duplicate or conflicting w
 |------|--------|-----------------|
 | P4 — LSP + File View | **Done and merged** (PR #16, `worktree-p4-track23`). The divergent-docs gap noted below is resolved — `agent-memory/plans/p4-lsp-file-view.md` on `main` is now the single authoritative doc, marking Track 1/2/3 DONE. | Sidebar file viewer + `HarnessLSP` client, `ContentAreaViewController.showFileEditorSplit()` sibling panel (not a `PaneNode` leaf). |
 | P10 — Performance & Feature Roadmap | Items 1-3 done (lazy reflow, local completion, keyboard layout presets). Item 4 (ACP sidebar) deferred. Also shipped: Session State Dot, IDE Mode Persistence, Task Board Sidebar Tab (Makefile/package.json runner), Focus Mode (⌘P). | `WorkspaceSymbolIndex`, `CompletionPopupView`, per-session state dot, Makefile/package.json task runner sidebar tab. |
-| P11 — Scripting & Config API | PBI-SCRIPT-001/002/003 DONE (merged PR #15, JavaScriptCore runtime, reload lifecycle, read-only snapshot API + `commands.parse`). `harness.events` bridge (`snapshotChanged`/`configReloaded`) now done as part of P15 step 3. PBI-SCRIPT-004/005 (`harness.config.set`/`harness.keys`/mutating pane-session API, and remaining v1 events) not started. | `ScriptRuntime`, `ScriptHookCoordinator`, `ScriptAPI` (`harness.sessions`, `harness.panes`, `harness.commands.parse`, `harness.board`, `harness.events`). |
+| P11 — Scripting & Config API | **All PBIs DONE** (PBI-SCRIPT-001/002/003 merged PR #15; PBI-SCRIPT-004/005 + `harness.events` bridge completed in `worktree-p11-script-004-005`). `harness.config.get/set` (11 allowlisted keys, persists via `HarnessSettings.save()` + `applySettingsToHosts()`); `harness.keys.bind/unbind/reload` (persists via `KeybindingsService`/`KeybindingsStore`); `harness.commands.run` (Promise-wrapped `__runSync` via `MainExecutor`); pane mutators `sendText/split/close` + session `spawn` via same `CommandIPCTranslator` + `DaemonClientActor` IPC path as P12's MCP tools. `harness.events.on/off` bridges `snapshotChanged`/`configReloaded`. 1601/1601 tests pass. | `ScriptRuntime`, `ScriptHookCoordinator`, `ScriptAPI` (`harness.sessions`, `harness.panes`, `harness.commands`, `harness.board`, `harness.events`, `harness.config`, `harness.keys`). |
 | P12 — Agent Orchestration via MCP | PBI-ORCH-001/002/003/004 DONE. PBI-ORCH-005 (UI visibility indicator) scoped only, no implementation — now unblocked by the P15 step 3 `harness.events`/`NotificationBus` bridge. | `harnessList`, `readPaneOutput`, `waitForPaneOutput`, gated mutating tools (`sendPaneText`, `sendPaneKeys`, `spawnSession`, `splitPane`, `closePane`), `ToolPolicy`, read-only `harnessBoard`. |
 | P13 — Split Pane Parity | **Done and merged** (PR #10). PBI-SPLIT-001..005 implemented; top/bottom splits restored alongside side-by-side. | Vertical-split gate removed in `SessionCoordinator.splitActivePane`, "Split Down" UI affordances, CLI/docs parity, geometry + targeting tests. |
 | P13 (alt doc) — Embedded Browser ("P14" in narrative) | Idea / not started. Explicitly depends on split panes landing first (P13 is now merged, so P14 can be scoped). | `WKWebView`-backed third `PaneNode` leaf kind. |
@@ -155,8 +155,12 @@ implementation to integrate against.
    P11 scripts, with P12 PBI-ORCH-005's MCP indicator and the board feature
    ([[p16-task-board]]) able to subscribe to the same pattern. Done — see "Shared
    Primitives Map" item 3 for implementation details.
-4. ⬜ **P11 PBI-SCRIPT-004/005** — config/keybinding writes and mutating pane/session
-   API, reusing P12's command facade per "Shared Primitives Map" item 1. Not started.
+4. ✅ **P11 PBI-SCRIPT-004/005** — `harness.config.get/set` (11 allowlisted keys),
+   `harness.keys.bind/unbind/reload`, `harness.commands.run` (Promise), and mutating
+   pane/session API (`sendText`, `split`, `close`, `spawn`) reusing P12's
+   `CommandIPCTranslator` + `DaemonClientActor` facade per "Shared Primitives Map"
+   item 1. Fixed `NSApp!` crash in `NotificationCoordinator.updateDockBadge` for
+   test-environment safety. 1601/1601 tests pass.
 5. ⬜ **P12 PBI-ORCH-005** — MCP-controlled indicator. Unblocked by step 3.
 6. ✅ **P16 (board feature)** — read-only PBI-BOARD-001/002/003/005 merged
    (PRs #17–#19); PBI-BOARD-004/006 are now unblocked by step 3.
@@ -172,8 +176,8 @@ implementation to integrate against.
 - ✅ `harness.events` bridge exists, is used by at least P11's `configReloaded`/
   `snapshotChanged` events, and is documented as the integration point for P12
   PBI-ORCH-005 and P16.
-- P11 PBI-SCRIPT-005 mutators and P12's MCP mutating tools share direction-parsing
-  and IPC-dispatch code (no duplicated `CommandIPCTranslator` call sites with
-  diverging direction maps).
+- ✅ P11 PBI-SCRIPT-005 mutators and P12's MCP mutating tools share direction-parsing
+  and IPC-dispatch code (`CommandIPCTranslator.layoutDirection(forPaneDirection:)` is
+  the single mapping used by both `ScriptAPI.swift` and `HarnessDaemonTools.swift`).
 - P14 scoping doc references the resolved file-editor/`PaneNode` decision instead
   of leaving it as an open question.
