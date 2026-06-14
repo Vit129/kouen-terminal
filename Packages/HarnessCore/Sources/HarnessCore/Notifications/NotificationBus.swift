@@ -14,6 +14,9 @@ public final class NotificationBus: @unchecked Sendable {
     /// Posted when a mutating MCP tool executes, carrying the surface ID and tool name.
     /// Used by StatusLineView to show a transient "MCP" indicator.
     public let mcpActivity = Notification.Name("HarnessMCPActivity")
+    /// Posted when an agent's activity state changes (idle↔working↔awaiting).
+    /// Used by BoardViewController for live card movement and ScriptRuntime for harness.events.
+    public let agentStateChanged = Notification.Name("HarnessAgentStateChanged")
 
     private var latest: AgentNotification?
     private let lock = NSLock()
@@ -58,6 +61,16 @@ public final class NotificationBus: @unchecked Sendable {
             NotificationCenter.default.post(
                 name: self.mcpActivity, object: nil,
                 userInfo: ["surfaceID": surfaceID, "toolName": toolName]
+            )
+        }
+    }
+
+    /// Posted when an agent's activity state changes. `surfaceID` identifies the pane.
+    public func postAgentStateChanged(surfaceID: String, activity: String) {
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(
+                name: self.agentStateChanged, object: nil,
+                userInfo: ["surfaceID": surfaceID, "activity": activity]
             )
         }
     }
