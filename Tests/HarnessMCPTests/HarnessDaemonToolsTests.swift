@@ -37,6 +37,28 @@ final class HarnessDaemonToolsTests: XCTestCase {
         XCTAssertFalse(policy.isToolAllowed("sendPaneText"))
     }
 
+    /// P16 PBI-BOARD-005: `harnessBoard` is a read-only tool, so it must be
+    /// allowed by the default policy and registered in `ToolRegistry` like
+    /// `harnessList`.
+    func testHarnessBoardIsReadOnlyAndRegistered() async {
+        let missingPolicyURL = temporaryDirectory().appendingPathComponent("missing-policy.json")
+        let policy = ToolPolicy.load(from: missingPolicyURL, environment: [:])
+        XCTAssertTrue(policy.isToolAllowed("harnessBoard"))
+
+        let registry = ToolRegistry(policy: policy)
+        guard case let .object(root) = registry.listTools(),
+              case let .array(tools) = root["tools"]
+        else {
+            XCTFail("Expected listTools() to return { tools: [...] }")
+            return
+        }
+        let names: [String] = tools.compactMap {
+            guard case let .object(tool) = $0, case let .string(name) = tool["name"] else { return nil }
+            return name
+        }
+        XCTAssertTrue(names.contains("harnessBoard"))
+    }
+
     func testPolicyExplicitDenyBlocksControlTools() async throws {
         let policyURL = try writePolicy(#"{ "version": 1, "allowControl": false, "allowedTools": [] }"#)
         let policy = ToolPolicy.load(from: policyURL, environment: [:])
