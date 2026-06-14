@@ -1,6 +1,6 @@
 # P17 — Structural Refactor
 
-Status: **planned** — not started, intentionally sequenced after P15 integration completes
+Status: **PBI-002/003/005 DONE** (worktree `p17-refactor-002-005`, branch `worktree-p17-refactor-002-005`, commits `2c4dd5a`, `6a8b8e7` — not yet merged to main). PBI-004 remains optional/unscheduled.
 Priority: **P3** — structural improvement, no new features
 Owner surface: HarnessApp, HarnessCore
 Created: 2026-06-14
@@ -59,6 +59,8 @@ Status: **DONE** — SessionCoordinator 2050→397 LOC. 8 files total:
 ---
 
 ## PBI-REFACTOR-002: Organize HarnessApp/UI/ into feature subfolders
+
+Status: **DONE** — 47 files moved via `git mv` into Terminal/, Sidebar/, FileEditor/, FileTree/, Git/, CommandPalette/, Search/, Notifications/, Chrome/, Agents/, Shared/ (Notch/ already existed). Verified `swift build` + `swift test --filter HarnessAppTests` (109/109).
 
 **Problem:** 50+ files in a flat `UI/` directory. Only `Notch/` is sub-grouped. File names like `Phase67UI.swift`, `HarnessChrome.swift`, `HarnessControls.swift` are opaque.
 
@@ -137,6 +139,8 @@ UI/
 
 ## PBI-REFACTOR-003: Decompose ViNormalMode.swift (1792 LOC → 5 files)
 
+Status: **DONE** — split into `UI/FileEditor/ViEngine.swift` (362), `ViExCommands.swift` (373), `ViMotions.swift` (322), `ViOperators.swift` (433), `ViRegisters.swift` (315), total 1805 LOC. Verified `swift build` + `swift test --filter HarnessAppTests` (109/109).
+
 **Problem:** Single file contains the full vi engine: state machine, motions, operators, text objects, ex commands, macros, registers, jump list, search.
 
 **Split:**
@@ -191,6 +195,8 @@ HarnessCLI ──→ HarnessCommands ──→ HarnessIPC
 ---
 
 ## PBI-REFACTOR-005: Retire shelved ACP code to compilation flag
+
+Status: **DONE** — Option 1 (`#if HARNESS_ACP`). Wrapped `ACPClient.swift`, `ACPSession.swift`, `ACPProcess.swift`, `AgentConfig.swift` (HarnessCore/ACP), `AgentChatPanelView.swift`, plus the related sidebar/settings wiring in `HarnessSidebarPanelViewController.swift`, `SettingsViewController.swift`, `SettingsViewController+Agents.swift`. `ACPMessage.swift`/`ACPTransport.swift` left unwrapped (HarnessMCP dependency). Verified `swift build` (no flag) and `swift build -Xswiftc -DHARNESS_ACP` both succeed; `swift test --filter HarnessAppTests` 109/109.
 
 **Problem:** ~1K LOC of ACP code (`ACPClient`, `ACPSession`, `ACPTransport`, `ACPProcess`, `ACPMessage`, `AgentChatPanelView`) compiles and links into every build despite being shelved indefinitely.
 
