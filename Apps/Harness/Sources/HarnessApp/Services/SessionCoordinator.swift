@@ -10,33 +10,27 @@ import UserNotifications
 final class SessionCoordinator: NSObject {
     static let shared = SessionCoordinator()
 
-    // MARK: - Services (created after self is valid)
+    // MARK: - Services
+
     private(set) lazy var daemonSyncService: DaemonSyncService = DaemonSyncService(coordinator: self)
     private(set) lazy var splitPaneCoordinator: SplitPaneCoordinator = SplitPaneCoordinator(coordinator: self)
     private(set) lazy var sessionLifecycleService: SessionLifecycleService = SessionLifecycleService(coordinator: self)
     private(set) lazy var notificationCoordinator: NotificationCoordinator = NotificationCoordinator(coordinator: self)
+    private(set) lazy var themeService: ThemeService = ThemeService(coordinator: self)
+    private(set) lazy var activePaneService: ActivePaneService = ActivePaneService(coordinator: self)
 
-    // MARK: - State (owned here; services read/write via `coord` back-reference)
+    // MARK: - State
 
-    /// Snapshot forwarded from DaemonSyncService for convenience access.
-    var snapshot: SessionSnapshot {
-        get { daemonSyncService.snapshot }
-    }
-
+    var snapshot: SessionSnapshot { daemonSyncService.snapshot }
     var settings = HarnessSettings.load()
     private(set) var activeEndpoint: Endpoint = .localControlSocket
     var activeSurfaceID: SurfaceID?
-    private(set) var lastActiveSurfaceID: SurfaceID?
-    private var suppressActivePaneSync = false
-    private(set) var markedSurfaceID: SurfaceID?
-    private var synchronizedTabIDs: Set<TabID> = []
+    var lastActiveSurfaceID: SurfaceID?
+    var suppressActivePaneSync = false
     var structureRevision = 0
     var appliedThemeKey = ""
-    /// Flat index rebuilt once per `syncFromDaemon`.
     var surfaceIndex: [SurfaceID: (tab: Tab, tabID: TabID)] = [:]
-    /// The most recently closed tab's directory + title for ⇧⌘T reopen.
     var lastClosedTab: (cwd: String, title: String)?
-    /// The TerminalPaneRegistry — package-internal so services can reference it.
     let terminalHosts = TerminalPaneRegistry()
     private var lastDaemonErrorNotice: Date?
 
@@ -48,27 +42,17 @@ final class SessionCoordinator: NSObject {
     private override init() {
         super.init()
         observeNotifications()
-        // Trigger lazy init so services are ready before the first notification fires.
-        _ = daemonSyncService
-        _ = notificationCoordinator
-        _ = splitPaneCoordinator
-        _ = sessionLifecycleService
+        _ = daemonSyncService; _ = notificationCoordinator
+        _ = splitPaneCoordinator; _ = sessionLifecycleService
+        _ = themeService; _ = activePaneService
         daemonSyncService.startMetadataRefresh()
     }
 
     private func observeNotifications() {
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(snapshotChangedNotification(_:)),
-            name: NotificationBus.shared.snapshotChanged,
-            object: nil
-        )
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(notificationPosted(_:)),
-            name: NotificationBus.shared.notificationPosted,
-            object: nil
-        )
+        NotificationCenter.default.addObserver(self, selector: #selector(snapshotChangedNotification(_:)),
+            name: NotificationBus.shared.snapshotChanged, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(notificationPosted(_:)),
+            name: NotificationBus.shared.notificationPosted, object: nil)
     }
 
     @objc private func snapshotChangedNotification(_ note: Notification) {
@@ -84,29 +68,19 @@ final class SessionCoordinator: NSObject {
         NotificationCenter.default.post(name: NotificationBus.shared.tabStatusChanged, object: nil)
     }
 
-    // MARK: - Remote daemons
+    // MARK: - Remote daemon
 
     func connectToRemote(named name: String) {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            var resolved: Endpoint?
-            var failureMessage: String?
-            do {
-                resolved = try RemoteHostsService.shared.connect(named: name)
-            } catch {
-                failureMessage = "\(error)"
-            }
-            let endpoint = resolved
-            let message = failureMessage
-            DispatchQueue.main.async {
-                MainActor.assumeIsolated {
-                    guard let self else { return }
-                    if let endpoint {
-                        self.applyEndpointSwitch(endpoint)
-                    } else {
-                        self.noteDaemonError(DaemonSessionError.daemonError(message ?? "connection failed"))
-                    }
-                }
-            }
+            var resolved: Endpoint?; var failureMessage: String?
+            do { resolved = try RemoteHostsService.shared.connect(named: name) }
+            catch { failureMessage = "\(error)" }
+            let endpoint = resolved; let message = failureMessage
+            DispatchQueue.main.async { MainActor.assumeIsolated {
+                guard let self else { return }
+                if let endpoint { self.applyEndpointSwitch(endpoint) }
+                else { self.noteDaemonError(DaemonSessionError.daemonError(message ?? "connection failed")) }
+            }}
         }
     }
 
@@ -122,35 +96,21 @@ final class SessionCoordinator: NSObject {
         _ = syncFromDaemon()
     }
 
-    // MARK: - Sync (facade delegating to DaemonSyncService)
+    // MARK: - Sync (facade → DaemonSyncService)
 
-    @discardableResult
-    func syncFromDaemon(metadataOnly: Bool = false) -> Bool {
+    @discardableResult func syncFromDaemon(metadataOnly: Bool = false) -> Bool {
         daemonSyncService.sync(metadataOnly: metadataOnly)
     }
-
-    @discardableResult
-    func syncFromDaemon(metadataOnly: Bool = false) async -> Bool {
+    @discardableResult func syncFromDaemon(metadataOnly: Bool = false) async -> Bool {
         await daemonSyncService.sync(metadataOnly: metadataOnly)
     }
+    func closeEphemeralSessionsBeforeQuit() { daemonSyncService.closeEphemeralSessionsBeforeQuit() }
+    func saveImmediately() { syncFromDaemon() }
 
-    func closeEphemeralSessionsBeforeQuit() {
-        daemonSyncService.closeEphemeralSessionsBeforeQuit()
-    }
-
-    func saveImmediately() {
-        syncFromDaemon()
-    }
-
-    // MARK: - Daemon request
-
-    @discardableResult
-    func requestDaemon(_ request: IPCRequest) -> IPCResponse? {
+    @discardableResult func requestDaemon(_ request: IPCRequest) -> IPCResponse? {
         daemonSyncService.request(request)
     }
-
-    @discardableResult
-    func requestDaemon(_ request: IPCRequest) async -> IPCResponse? {
+    @discardableResult func requestDaemon(_ request: IPCRequest) async -> IPCResponse? {
         await daemonSyncService.request(request)
     }
 
@@ -162,25 +122,17 @@ final class SessionCoordinator: NSObject {
         Toast.show("Reconnecting to HarnessDaemon…", in: host)
     }
 
-    // MARK: - Session lifecycle (facade)
+    // MARK: - Session lifecycle (facade → SessionLifecycleService)
 
     func addWorkspace(name: String) { sessionLifecycleService.addWorkspace(name: name) }
     func addSession(to workspaceID: WorkspaceID, cwd: String? = nil, name: String? = nil) {
         sessionLifecycleService.addSession(to: workspaceID, cwd: cwd, name: name)
     }
-    func addTab(to workspaceID: WorkspaceID, cwd: String? = nil) {
-        sessionLifecycleService.addTab(to: workspaceID, cwd: cwd)
-    }
-    func openDefaultTerminalLaunch(_ launch: DefaultTerminalLaunchRequest) {
-        sessionLifecycleService.openDefaultTerminalLaunch(launch)
-    }
+    func addTab(to workspaceID: WorkspaceID, cwd: String? = nil) { sessionLifecycleService.addTab(to: workspaceID, cwd: cwd) }
+    func openDefaultTerminalLaunch(_ launch: DefaultTerminalLaunchRequest) { sessionLifecycleService.openDefaultTerminalLaunch(launch) }
     func selectWorkspace(_ id: WorkspaceID) { sessionLifecycleService.selectWorkspace(id) }
-    func selectSession(workspaceID: WorkspaceID, sessionID: SessionID) {
-        sessionLifecycleService.selectSession(workspaceID: workspaceID, sessionID: sessionID)
-    }
-    func selectTab(workspaceID: WorkspaceID, tabID: TabID) {
-        sessionLifecycleService.selectTab(workspaceID: workspaceID, tabID: tabID)
-    }
+    func selectSession(workspaceID: WorkspaceID, sessionID: SessionID) { sessionLifecycleService.selectSession(workspaceID: workspaceID, sessionID: sessionID) }
+    func selectTab(workspaceID: WorkspaceID, tabID: TabID) { sessionLifecycleService.selectTab(workspaceID: workspaceID, tabID: tabID) }
     func selectAdjacentSession(offset: Int) { sessionLifecycleService.selectAdjacentSession(offset: offset) }
     func moveActiveSession(offset: Int) { sessionLifecycleService.moveActiveSession(offset: offset) }
     func closeActiveTab() { sessionLifecycleService.closeActiveTab() }
@@ -195,46 +147,22 @@ final class SessionCoordinator: NSObject {
     func closeActiveWorkspace() { sessionLifecycleService.closeActiveWorkspace() }
     func closeWorkspace(id: WorkspaceID) { sessionLifecycleService.closeWorkspace(id: id) }
 
-    // MARK: - Split pane (facade)
+    // MARK: - Split pane (facade → SplitPaneCoordinator)
 
     func splitActivePane(direction: SplitDirection) { splitPaneCoordinator.splitActivePane(direction: direction) }
-    func splitActivePaneAndRun(direction: SplitDirection, command: String) {
-        splitPaneCoordinator.splitActivePaneAndRun(direction: direction, command: command)
-    }
+    func splitActivePaneAndRun(direction: SplitDirection, command: String) { splitPaneCoordinator.splitActivePaneAndRun(direction: direction, command: command) }
     func focusPaneDirectional(_ direction: DirectionalAxis) { splitPaneCoordinator.focusPaneDirectional(direction) }
-    func splitPaneSurface(
-        tabID: TabID, sourcePaneID: PaneID, surfaceID: SurfaceID,
-        targetPaneID: PaneID, direction: SplitDirection, beforeTarget: Bool
-    ) {
-        splitPaneCoordinator.splitPaneSurface(
-            tabID: tabID, sourcePaneID: sourcePaneID, surfaceID: surfaceID,
-            targetPaneID: targetPaneID, direction: direction, beforeTarget: beforeTarget
-        )
+    func splitPaneSurface(tabID: TabID, sourcePaneID: PaneID, surfaceID: SurfaceID, targetPaneID: PaneID, direction: SplitDirection, beforeTarget: Bool) {
+        splitPaneCoordinator.splitPaneSurface(tabID: tabID, sourcePaneID: sourcePaneID, surfaceID: surfaceID, targetPaneID: targetPaneID, direction: direction, beforeTarget: beforeTarget)
     }
-    func splitTab(workspaceID: WorkspaceID, tabID: TabID, direction: SplitDirection) {
-        splitPaneCoordinator.splitTab(workspaceID: workspaceID, tabID: tabID, direction: direction)
-    }
-    func splitSession(workspaceID: WorkspaceID, sessionID: SessionID, direction: SplitDirection) {
-        splitPaneCoordinator.splitSession(workspaceID: workspaceID, sessionID: sessionID, direction: direction)
-    }
+    func splitTab(workspaceID: WorkspaceID, tabID: TabID, direction: SplitDirection) { splitPaneCoordinator.splitTab(workspaceID: workspaceID, tabID: tabID, direction: direction) }
+    func splitSession(workspaceID: WorkspaceID, sessionID: SessionID, direction: SplitDirection) { splitPaneCoordinator.splitSession(workspaceID: workspaceID, sessionID: sessionID, direction: direction) }
     func killActivePane() { splitPaneCoordinator.killActivePane() }
     func killPane(paneID: PaneID) { splitPaneCoordinator.killPane(paneID: paneID) }
+    func paneID(for surfaceID: SurfaceID, in node: PaneNode) -> PaneID? { splitPaneCoordinator.paneID(for: surfaceID, in: node) }
+    func firstSurfaceID(forTab tabID: TabID) -> SurfaceID? { splitPaneCoordinator.firstSurfaceID(forTab: tabID) }
 
-    // Internal pane-tree helpers (used by services and self)
-    func paneID(for surfaceID: SurfaceID, in node: PaneNode) -> PaneID? {
-        splitPaneCoordinator.paneID(for: surfaceID, in: node)
-    }
-    func firstSurfaceID(forTab tabID: TabID) -> SurfaceID? {
-        splitPaneCoordinator.firstSurfaceID(forTab: tabID)
-    }
-    private func surfaceID(forPaneID paneID: PaneID, in node: PaneNode) -> SurfaceID? {
-        splitPaneCoordinator.surfaceID(forPaneID: paneID, in: node)
-    }
-    private func surfaceID(forPane paneID: PaneID, in node: PaneNode) -> SurfaceID? {
-        splitPaneCoordinator.surfaceID(forPane: paneID, in: node)
-    }
-
-    // MARK: - Notifications (facade)
+    // MARK: - Notifications (facade → NotificationCoordinator)
 
     func jumpToLatestNotification() { notificationCoordinator.jumpToLatestNotification() }
     func isSurfaceWaiting(_ surfaceID: UUID) -> Bool { notificationCoordinator.isSurfaceWaiting(surfaceID) }
@@ -244,304 +172,63 @@ final class SessionCoordinator: NSObject {
     func openNotification(_ entry: NotificationEntry) { notificationCoordinator.openNotification(entry) }
     func clearNotification(surfaceID: SurfaceID) { notificationCoordinator.clearNotification(surfaceID: surfaceID) }
     func clearAllNotifications() { notificationCoordinator.clearAllNotifications() }
-    func handleNotification(for surfaceID: SurfaceID, event: NotificationEvent, title: String, body: String) {
-        notificationCoordinator.handleNotification(for: surfaceID, event: event, title: title, body: body)
-    }
+    func handleNotification(for surfaceID: SurfaceID, event: NotificationEvent, title: String, body: String) { notificationCoordinator.handleNotification(for: surfaceID, event: event, title: title, body: body) }
     func syncWaitingRings() { notificationCoordinator.syncWaitingRings() }
 
-    // MARK: - Theme
+    // MARK: - Theme (facade → ThemeService)
 
-    /// Push the current `settings` to every live terminal host and refresh chrome.
-    func applySettingsToHosts() {
-        HarnessChrome.update(
-            themeName: snapshot.themeName,
-            opacity: CGFloat(settings.backgroundOpacity),
-            blur: settings.backgroundBlur,
-            backgroundHex: settings.customBackgroundHex,
-            foregroundHex: settings.customForegroundHex,
-            cursorHex: settings.customCursorHex
-        )
-        let allowClipboard = HarnessOptions.shared.get("set-clipboard")?.boolValue ?? true
-        let wordSep = HarnessOptions.shared.get("word-separators")?.stringValue ?? " \t"
-        let wrapSearch = HarnessOptions.shared.get("wrap-search")?.boolValue ?? true
-        for host in terminalHosts.allHosts() {
-            host.applyTheme(named: snapshot.themeName)
-            host.applySettings(settings)
-            host.allowProgramClipboardAccess = allowClipboard
-            host.wordSeparators = wordSep
-            host.wrapSearch = wrapSearch
-            applyTerminalIdentity(to: host)
-            pushBorderColors(to: host)
-        }
-        NotificationCenter.default.post(
-            name: NotificationBus.shared.snapshotChanged,
-            object: nil,
-            userInfo: [
-                "revision": snapshot.revision,
-                "structureChanged": false,
-                "chromeChanged": true,
-            ]
-        )
-    }
-
-    func applyThemeToAllHosts() {
-        HarnessChrome.update(
-            themeName: snapshot.themeName,
-            opacity: CGFloat(settings.backgroundOpacity),
-            blur: settings.backgroundBlur,
-            backgroundHex: settings.customBackgroundHex,
-            foregroundHex: settings.customForegroundHex,
-            cursorHex: settings.customCursorHex
-        )
-        let allowClipboard = HarnessOptions.shared.get("set-clipboard")?.boolValue ?? true
-        let wordSep = HarnessOptions.shared.get("word-separators")?.stringValue ?? " \t"
-        let wrapSearch = HarnessOptions.shared.get("wrap-search")?.boolValue ?? true
-        for host in terminalHosts.allHosts() {
-            host.applyTheme(named: snapshot.themeName)
-            host.applySettings(settings)
-            host.allowProgramClipboardAccess = allowClipboard
-            host.wordSeparators = wordSep
-            host.wrapSearch = wrapSearch
-            applyTerminalIdentity(to: host)
-            pushBorderColors(to: host)
-        }
-        adoptSynchronizeOptions()
-        refreshSyncSiblings()
-        reassertMarkedPane()
-    }
-
-    private func applyTerminalIdentity(to host: TerminalHostView) {
-        let spec = TerminalIdentity.spec(forOption: HarnessOptions.shared.get(TerminalIdentity.optionKey)?.stringValue)
-        host.setTerminalIdentity(name: spec.name, version: spec.version, daVersion: spec.daVersion)
-    }
-
-    private func pushBorderColors(to host: TerminalHostView) {
-        let chrome = HarnessChrome.current
-        host.applyBorderColors(
-            active: chrome.focusRing,
-            waiting: chrome.waiting
-        )
-    }
-
-    func setTheme(_ name: String, seedColors: Bool = true) {
-        if seedColors {
-            let preset = ThemeManager.presetColors(themeName: name)
-            settings.customBackgroundHex = preset.backgroundHex
-            settings.customForegroundHex = preset.foregroundHex
-            settings.customCursorHex = preset.cursorHex
-            settings.cursorTextHex = preset.cursorTextHex
-            settings.selectionBackgroundHex = preset.selectionBackgroundHex
-            settings.selectionForegroundHex = preset.selectionForegroundHex
-            settings.boldColorHex = preset.boldHex
-            settings.paletteHex = HarnessSettings.normalizedPalette(preset.paletteHex)
-            settings.dividerHex = nil
-            settings.statusLineHex = nil
-            try? settings.save()
-        }
-        requestDaemon(.setTheme(name: name))
-        syncFromDaemon()
-    }
-
-    func applyImportedTheme(_ document: ThemeDocument) {
-        let colors = document.colors
-        settings.customBackgroundHex = colors.background.hexString
-        settings.customForegroundHex = colors.foreground.hexString
-        settings.customCursorHex = colors.cursor?.hexString
-        settings.cursorTextHex = colors.cursorText?.hexString
-        settings.selectionBackgroundHex = colors.selectionBackground?.hexString
-        settings.selectionForegroundHex = colors.selectionForeground?.hexString
-        settings.boldColorHex = colors.bold?.hexString
-        settings.paletteHex = HarnessSettings.normalizedPalette(colors.palette.map { $0.hexString })
-        settings.dividerHex = nil
-        settings.statusLineHex = nil
-        if let appearance = document.appearance {
-            if let opacity = appearance.backgroundOpacity {
-                settings.backgroundOpacity = HarnessSettings.clampedOpacity(Float(opacity))
-            }
-            if let blur = appearance.backgroundBlur {
-                settings.backgroundBlur = HarnessSettings.clampedBlur(blur)
-            }
-            if let family = appearance.fontFamily, !family.isEmpty {
-                settings.fontFamily = family
-            }
-            if let size = appearance.fontSize {
-                settings.fontSize = HarnessSettings.clampedFontSize(Float(size))
-            }
-            if let px = appearance.windowPaddingX {
-                settings.windowPaddingX = HarnessSettings.clampedPadding(Float(px))
-            }
-            if let py = appearance.windowPaddingY {
-                settings.windowPaddingY = HarnessSettings.clampedPadding(Float(py))
-            }
-            if let applyToOutput = appearance.applyToTerminalOutput {
-                settings.applyThemeToTerminalOutput = applyToOutput
-            }
-        }
-        try? settings.save()
-        requestDaemon(.setTheme(name: document.name))
-        syncFromDaemon()
-    }
+    func applySettingsToHosts() { themeService.applySettingsToHosts() }
+    func applyThemeToAllHosts() { themeService.applyThemeToAllHosts() }
+    func setTheme(_ name: String, seedColors: Bool = true) { themeService.setTheme(name, seedColors: seedColors) }
+    func applyImportedTheme(_ document: ThemeDocument) { themeService.applyImportedTheme(document) }
+    func applyAutoThemeForCurrentAppearance() { themeService.applyAutoThemeForCurrentAppearance() }
+    func reimportTerminalConfig() { themeService.reimportTerminalConfig() }
 
     static var isSystemAppearanceDark: Bool {
         NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
     }
 
-    func applyAutoThemeForCurrentAppearance() {
-        guard let light = settings.lightThemeName, let dark = settings.darkThemeName else { return }
-        let isDark = SessionCoordinator.isSystemAppearanceDark
-        let target = isDark ? dark : light
-        let targetOpacity = isDark ? settings.darkThemeOpacity : settings.lightThemeOpacity
+    // MARK: - Active pane (facade → ActivePaneService)
 
-        var didChange = false
-        if target != snapshot.themeName {
-            setTheme(target, seedColors: true)
-            didChange = true
-        }
-        if let targetOpacity {
-            let clamped = HarnessSettings.clampedOpacity(targetOpacity)
-            if settings.backgroundOpacity != clamped {
-                settings.backgroundOpacity = clamped
-                try? settings.save()
-                didChange = true
-            }
-        }
-        if didChange {
-            applySettingsToHosts()
-        }
+    func setActiveSurface(_ surfaceID: SurfaceID?) { activePaneService.setActiveSurface(surfaceID) }
+    func reflectRemoteActivePane() { activePaneService.reflectRemoteActivePane() }
+    func refreshPaneStyles() { activePaneService.refreshPaneStyles() }
+    func refreshPaneBorders() { activePaneService.refreshPaneBorders() }
+    func setMarkedPane(_ set: Bool) { activePaneService.setMarkedPane(set) }
+    var markedSurfaceID: SurfaceID? { activePaneService.markedSurfaceID }
+    func reassertMarkedPane() { activePaneService.reassertMarkedPane() }
+    func setSynchronizePanes(_ on: Bool?) { activePaneService.setSynchronizePanes(on) }
+    func adoptSynchronizeOptions() { activePaneService.adoptSynchronizeOptions() }
+    func refreshSyncSiblings() { activePaneService.refreshSyncSiblings() }
+    func zoomActivePane() { activePaneService.zoomActivePane() }
+    func cycleActivePane(forward: Bool) { activePaneService.cycleActivePane(forward: forward) }
+    func ensureActivePane(for tab: Tab) { activePaneService.ensureActivePane(for: tab) }
+    func selectLastPane() { activePaneService.selectLastPane() }
+
+    // MARK: - Pane operations (kept here — use coordinator state directly)
+
+    func joinMarkedPane(direction: SplitDirection) {
+        guard let markedSurface = activePaneService.markedSurfaceID,
+              let tab = snapshot.activeWorkspace?.activeTab,
+              let activeSurface = activeSurfaceID,
+              let destPane = paneID(for: activeSurface, in: tab.rootPane)
+        else { DisplayMessage.show("join-pane: no marked pane"); return }
+        let sourcePane = snapshot.workspaces.flatMap(\.sessions).flatMap(\.tabs)
+            .compactMap { paneID(for: markedSurface, in: $0.rootPane) }.first
+        guard let sourcePane, sourcePane != destPane else { DisplayMessage.show("join-pane: invalid mark"); return }
+        _ = requestDaemon(.joinPane(sourcePaneID: sourcePane, destPaneID: destPane, direction: direction))
+        setMarkedPane(false)
+        syncFromDaemon()
     }
 
-    func reimportTerminalConfig() {
-        if let imported = TerminalConfigImporter.load() {
-            settings = HarnessSettings.makeDefaults(imported: imported)
-            try? settings.save()
-            if let theme = imported.themeName {
-                setTheme(theme, seedColors: false)
-            } else {
-                setTheme(ThemeManager.defaultDisplayName, seedColors: false)
-            }
-            applyAutoThemeForCurrentAppearance()
-            applySettingsToHosts()
-        }
-    }
-
-    // MARK: - Active surface and pane management
-
-    func setActiveSurface(_ surfaceID: SurfaceID?) {
-        if let old = activeSurfaceID, let new = surfaceID, old != new,
-           let oldTab = tabID(forSurface: old), oldTab == tabID(forSurface: new) {
-            lastActiveSurfaceID = old
-        }
-        activeSurfaceID = surfaceID
-        refreshPaneStyles()
-        let showBorder = surfaceID.map { paneCount(forSurface: $0) > 1 } ?? false
-        for host in terminalHosts.allHosts() {
-            host.showsActiveBorder = showBorder && host.surfaceID == surfaceID
-        }
-        refreshPaneBorders()
-        if !suppressActivePaneSync, let surfaceID, let loc = tabAndPane(forSurface: surfaceID) {
-            _ = requestDaemon(.selectPane(tabID: loc.tabID, paneID: loc.paneID))
-        }
-    }
-
-    func reflectRemoteActivePane() {
-        guard let tab = snapshot.activeWorkspace?.activeTab,
-              let paneID = tab.activePaneID,
-              let surfaceID = surfaceID(forPaneID: paneID, in: tab.rootPane),
-              surfaceID != activeSurfaceID
-        else { return }
-        suppressActivePaneSync = true
-        setActiveSurface(surfaceID)
-        suppressActivePaneSync = false
-    }
-
-    func refreshPaneStyles() {
-        let opts = OptionStore()
-        func value(_ key: String) -> String { opts.get(key, scope: .global)?.stringValue ?? "" }
-        let styles = PaneStyleSet(
-            window: value("window-style"),
-            windowActive: value("window-active-style"),
-            pane: value("pane-style"),
-            paneActive: value("pane-active-style")
-        )
-        for host in terminalHosts.allHosts() { host.applyPaneStyles(styles) }
-    }
-
-    func refreshPaneBorders() {
-        let opts = OptionStore()
-        let status = PaneBorderStatus(option: opts.get("pane-border-status", scope: .global)?.stringValue ?? "off")
-        let atTop = status == .top
-        let format = opts.get("pane-border-format", scope: .global)?.stringValue ?? ""
-        for host in terminalHosts.allHosts() {
-            if status == .off || format.isEmpty {
-                host.setPaneBorderLabel(nil, atTop: atTop)
-            } else {
-                let label = FormatString.evaluate(format, context: paneBorderContext(forSurface: host.surfaceID))
-                host.setPaneBorderLabel(label, atTop: atTop)
-            }
-        }
-    }
-
-    private func paneBorderContext(forSurface surfaceID: SurfaceID) -> FormatContext {
-        let owningTab = surfaceIndex[surfaceID]?.tab
-        let paneIndex = owningTab.flatMap { tab in
-            tab.rootPane.allSurfaceIDs().firstIndex(of: surfaceID)
-        }
-        return FormatContext(
-            paneID: surfaceID.uuidString,
-            paneTitle: owningTab?.title,
-            paneCwd: owningTab?.cwd,
-            paneActive: surfaceID == activeSurfaceID,
-            paneIndex: paneIndex,
-            tabName: owningTab?.title,
-            workspaceName: snapshot.activeWorkspace?.name,
-            agentKind: owningTab?.agent?.kind.rawValue,
-            gitBranch: owningTab?.gitBranch,
-            clientName: "Harness.app"
-        )
-    }
-
-    private func tabAndPane(forSurface surfaceID: SurfaceID) -> (tabID: TabID, paneID: PaneID)? {
-        guard let entry = surfaceIndex[surfaceID],
-              let pane = paneID(for: surfaceID, in: entry.tab.rootPane)
-        else { return nil }
-        return (entry.tabID, pane)
-    }
-
-    private func paneCount(forSurface surfaceID: SurfaceID) -> Int {
-        guard let tab = surfaceIndex[surfaceID]?.tab else { return 0 }
-        return tab.rootPane.allSurfaceIDs().count
-    }
-
-    private func tabID(forSurface surfaceID: SurfaceID) -> TabID? {
-        surfaceIndex[surfaceID]?.tabID
-    }
-
-    func selectLastPane() {
-        guard let tab = snapshot.activeWorkspace?.activeTab,
-              let last = lastActiveSurfaceID,
-              tab.rootPane.allSurfaceIDs().contains(last)
-        else { return }
-        setActiveSurface(last)
-        terminalHosts.host(for: last)?.focusTerminal()
-    }
-
-    func setMarkedPane(_ set: Bool) {
-        markedSurfaceID = set ? activeSurfaceID : nil
-        for host in terminalHosts.allHosts() {
-            host.showsMarkedBorder = host.surfaceID == markedSurfaceID
-        }
-    }
-
-    func reassertMarkedPane() {
-        for host in terminalHosts.allHosts() {
-            host.showsMarkedBorder = markedSurfaceID != nil && host.surfaceID == markedSurfaceID
-        }
+    func setSplitRatio(tabID: TabID, firstPaneID: PaneID, secondPaneID: PaneID, ratio: Double) {
+        requestDaemon(.resizePaneRatio(tabID: tabID, firstPaneID: firstPaneID, secondPaneID: secondPaneID, ratio: ratio))
+        syncFromDaemon(metadataOnly: true)
     }
 
     func showDisplayPanes() {
         guard let tab = snapshot.activeWorkspace?.activeTab else { return }
-        let surfaces = tab.rootPane.allSurfaceIDs()
-        let panes = surfaces.enumerated().compactMap { index, sid -> (number: Int, host: TerminalHostView)? in
+        let panes = tab.rootPane.allSurfaceIDs().enumerated().compactMap { index, sid -> (number: Int, host: TerminalHostView)? in
             guard let host = terminalHosts.host(for: sid) else { return nil }
             return (number: index, host: host)
         }
@@ -549,79 +236,6 @@ final class SessionCoordinator: NSObject {
             self?.setActiveSurface(surfaceID)
             self?.terminalHosts.host(for: surfaceID)?.focusTerminal()
         }
-    }
-
-    func setSynchronizePanes(_ on: Bool?) {
-        guard let tab = snapshot.activeWorkspace?.activeTab else { return }
-        let nowOn = on ?? !synchronizedTabIDs.contains(tab.id)
-        if nowOn { synchronizedTabIDs.insert(tab.id) } else { synchronizedTabIDs.remove(tab.id) }
-        requestDaemon(.setOption(
-            scope: "tab", target: tab.id.uuidString,
-            key: "synchronize-panes", rawValue: nowOn ? "on" : "off"
-        ))
-        refreshSyncSiblings()
-        DisplayMessage.show(nowOn ? "synchronize-panes: on" : "synchronize-panes: off")
-    }
-
-    func adoptSynchronizeOptions() {
-        guard case let .options(entries)? = requestDaemon(.showOptions(scope: "tab")) else { return }
-        var changed = false
-        for entry in entries where entry.key == "synchronize-panes" {
-            guard let target = entry.target, let tabID = TabID(uuidString: target) else { continue }
-            let on = entry.value == "on" || entry.value == "true" || entry.value == "1"
-            if on != synchronizedTabIDs.contains(tabID) {
-                if on { synchronizedTabIDs.insert(tabID) } else { synchronizedTabIDs.remove(tabID) }
-                changed = true
-            }
-        }
-        if changed { refreshSyncSiblings() }
-    }
-
-    func refreshSyncSiblings() {
-        let liveTabIDs = Set(surfaceIndex.values.map(\.tabID))
-        synchronizedTabIDs.formIntersection(liveTabIDs)
-        var seenTabIDs = Set<TabID>()
-        for (_, entry) in surfaceIndex {
-            guard seenTabIDs.insert(entry.tabID).inserted else { continue }
-            let surfaceIDs = entry.tab.rootPane.allSurfaceIDs()
-            let synced = synchronizedTabIDs.contains(entry.tabID) && surfaceIDs.count > 1
-            for sid in surfaceIDs {
-                guard let host = terminalHosts.host(for: sid) else { continue }
-                host.setSyncSiblings(synced ? surfaceIDs.filter { $0 != sid }.map(\.uuidString) : [])
-            }
-        }
-    }
-
-    func joinMarkedPane(direction: SplitDirection) {
-        guard let markedSurface = markedSurfaceID,
-              let tab = snapshot.activeWorkspace?.activeTab,
-              let activeSurface = activeSurfaceID,
-              let destPane = paneID(for: activeSurface, in: tab.rootPane)
-        else { DisplayMessage.show("join-pane: no marked pane"); return }
-        let sourcePane = snapshot.workspaces
-            .flatMap(\.sessions).flatMap(\.tabs)
-            .compactMap { paneID(for: markedSurface, in: $0.rootPane) }
-            .first
-        guard let sourcePane, sourcePane != destPane else {
-            DisplayMessage.show("join-pane: invalid mark")
-            return
-        }
-        _ = requestDaemon(.joinPane(sourcePaneID: sourcePane, destPaneID: destPane, direction: direction))
-        setMarkedPane(false)
-        syncFromDaemon()
-    }
-
-    func ensureActivePane(for tab: Tab) {
-        let surfaces = tab.rootPane.allSurfaceIDs()
-        guard !surfaces.isEmpty else { return }
-        let target = activeSurfaceID.flatMap { surfaces.contains($0) ? $0 : nil } ?? surfaces.first
-        setActiveSurface(target)
-        if let target { terminalHosts.host(for: target)?.focusTerminal() }
-    }
-
-    func setSplitRatio(tabID: TabID, firstPaneID: PaneID, secondPaneID: PaneID, ratio: Double) {
-        requestDaemon(.resizePaneRatio(tabID: tabID, firstPaneID: firstPaneID, secondPaneID: secondPaneID, ratio: ratio))
-        syncFromDaemon(metadataOnly: true)
     }
 
     func reorderSession(workspaceID: WorkspaceID, sessionID: SessionID, toIndex: Int) {
@@ -639,43 +253,11 @@ final class SessionCoordinator: NSObject {
         syncFromDaemon()
     }
 
-    // MARK: - Terminal host management
-
-    func terminalHostIfExists(for surfaceID: SurfaceID) -> TerminalHostView? {
-        terminalHosts.host(for: surfaceID)
-    }
-
-    func terminalHost(for surfaceID: SurfaceID, cwd: String) -> TerminalHostView {
-        if let existing = terminalHosts.host(for: surfaceID) {
-            return existing
-        }
-        let host = TerminalHostView(
-            surfaceID: surfaceID,
-            workingDirectory: cwd,
-            harnessSurfaceEnv: surfaceID.uuidString,
-            settings: settings,
-            themeName: snapshot.themeName,
-            endpoint: activeEndpoint
-        )
-        host.hostDelegate = self
-        host.applyTheme(named: snapshot.themeName)
-        host.applySettings(settings)
-        applyTerminalIdentity(to: host)
-        pushBorderColors(to: host)
-        terminalHosts.register(host)
-        return host
-    }
-
-    // MARK: - Pane operations
-
     func newSurface(tabID: TabID, paneID: PaneID) {
         Task {
             guard case let .surfaceID(raw)? = await requestDaemon(.newSurface(tabID: tabID, paneID: paneID, shell: settings.defaultShell)),
                   let surfaceID = UUID(uuidString: raw)
-            else {
-                await syncFromDaemon()
-                return
-            }
+            else { await syncFromDaemon(); return }
             await syncFromDaemon()
             setActiveSurface(surfaceID)
             terminalHosts.host(for: surfaceID)?.focusTerminal()
@@ -691,112 +273,93 @@ final class SessionCoordinator: NSObject {
         }
     }
 
-    func zoomActivePane() {
-        guard let workspace = snapshot.activeWorkspace,
-              let tab = workspace.activeTab,
-              let paneID = activeSurfaceID.flatMap({ paneID(for: $0, in: tab.rootPane) })
-                ?? tab.rootPane.allPaneIDs().last
-        else { return }
-        requestDaemon(.zoomPane(paneID: paneID))
-        syncFromDaemon()
+    // MARK: - Terminal host management
+
+    func terminalHostIfExists(for surfaceID: SurfaceID) -> TerminalHostView? { terminalHosts.host(for: surfaceID) }
+
+    func terminalHost(for surfaceID: SurfaceID, cwd: String) -> TerminalHostView {
+        if let existing = terminalHosts.host(for: surfaceID) { return existing }
+        let host = TerminalHostView(
+            surfaceID: surfaceID, workingDirectory: cwd,
+            harnessSurfaceEnv: surfaceID.uuidString, settings: settings,
+            themeName: snapshot.themeName, endpoint: activeEndpoint
+        )
+        host.hostDelegate = self
+        host.applyTheme(named: snapshot.themeName)
+        host.applySettings(settings)
+        themeService.applyTerminalIdentity(to: host)
+        themeService.pushBorderColors(to: host)
+        terminalHosts.register(host)
+        return host
     }
 
-    func cycleActivePane(forward: Bool) {
-        guard let tab = snapshot.activeWorkspace?.activeTab else { return }
-        let panes = tab.rootPane.allPaneIDs()
-        guard !panes.isEmpty else { return }
-        let currentIndex: Int
-        if let surfaceID = activeSurfaceID,
-           let pane = paneID(for: surfaceID, in: tab.rootPane),
-           let idx = panes.firstIndex(of: pane) {
-            currentIndex = idx
-        } else {
-            currentIndex = 0
-        }
-        let nextIndex = (currentIndex + (forward ? 1 : -1) + panes.count) % panes.count
-        let targetPane = panes[nextIndex]
-        if let surfaceID = surfaceID(forPane: targetPane, in: tab.rootPane) {
-            setActiveSurface(surfaceID)
-            terminalHosts.host(for: surfaceID)?.focusTerminal()
-        }
-    }
-
-    // MARK: - Find bar
+    // MARK: - Find bar / Copy mode / Detach / Prompts
 
     func toggleFindBar() {
         guard let surfaceID = activeSurfaceID, let host = terminalHosts.host(for: surfaceID) else { return }
         host.toggleFind()
     }
 
-    // MARK: - Copy mode / detach / prompts
-
     func toggleCopyMode() {
-        guard let surfaceID = activeSurfaceID,
-              let host = TerminalPaneRegistryAccess.host(for: surfaceID) else { return }
-        if host.isInCopyMode {
-            host.exitCopyMode()
-        } else {
-            let modeKeys = HarnessOptions.shared.get("mode-keys", scope: .global)?.stringValue ?? "vi"
-            host.enterCopyMode(modeKeys: modeKeys)
-        }
+        guard let surfaceID = activeSurfaceID, let host = TerminalPaneRegistryAccess.host(for: surfaceID) else { return }
+        if host.isInCopyMode { host.exitCopyMode() }
+        else { host.enterCopyMode(modeKeys: HarnessOptions.shared.get("mode-keys", scope: .global)?.stringValue ?? "vi") }
     }
 
     func performCopyModeAction(_ action: CopyModeAction) {
-        guard let surfaceID = activeSurfaceID,
-              let host = TerminalPaneRegistryAccess.host(for: surfaceID) else { return }
+        guard let surfaceID = activeSurfaceID, let host = TerminalPaneRegistryAccess.host(for: surfaceID) else { return }
         host.performCopyModeAction(action)
     }
 
     func detachActiveSurface() {
-        guard let surfaceID = activeSurfaceID,
-              let host = TerminalPaneRegistryAccess.host(for: surfaceID) else { return }
+        guard let surfaceID = activeSurfaceID, let host = TerminalPaneRegistryAccess.host(for: surfaceID) else { return }
         host.detachFromDaemonSurface()
     }
 
     func reattachActiveSurface() {
-        guard let surfaceID = activeSurfaceID,
-              let host = TerminalPaneRegistryAccess.host(for: surfaceID) else { return }
+        guard let surfaceID = activeSurfaceID, let host = TerminalPaneRegistryAccess.host(for: surfaceID) else { return }
         host.reattachToDaemonSurface()
     }
 
     var activePaneIsDetached: Bool {
-        guard let surfaceID = activeSurfaceID,
-              let host = TerminalPaneRegistryAccess.host(for: surfaceID) else { return false }
+        guard let surfaceID = activeSurfaceID, let host = TerminalPaneRegistryAccess.host(for: surfaceID) else { return false }
         return host.isDetachedFromDaemon
     }
 
     func jumpToPreviousPrompt() {
-        guard let surfaceID = activeSurfaceID,
-              let host = TerminalPaneRegistryAccess.host(for: surfaceID) else { return }
+        guard let surfaceID = activeSurfaceID, let host = TerminalPaneRegistryAccess.host(for: surfaceID) else { return }
         host.jumpToPreviousPrompt()
     }
 
     func jumpToNextPrompt() {
-        guard let surfaceID = activeSurfaceID,
-              let host = TerminalPaneRegistryAccess.host(for: surfaceID) else { return }
+        guard let surfaceID = activeSurfaceID, let host = TerminalPaneRegistryAccess.host(for: surfaceID) else { return }
         host.jumpToNextPrompt()
     }
 
     // MARK: - Misc
+
+    func paneBorderContext(forSurface surfaceID: SurfaceID) -> FormatContext {
+        let owningTab = surfaceIndex[surfaceID]?.tab
+        let paneIndex = owningTab.flatMap { tab in tab.rootPane.allSurfaceIDs().firstIndex(of: surfaceID) }
+        return FormatContext(
+            paneID: surfaceID.uuidString, paneTitle: owningTab?.title, paneCwd: owningTab?.cwd,
+            paneActive: surfaceID == activeSurfaceID, paneIndex: paneIndex,
+            tabName: owningTab?.title, workspaceName: snapshot.activeWorkspace?.name,
+            agentKind: owningTab?.agent?.kind.rawValue, gitBranch: owningTab?.gitBranch, clientName: "Harness.app"
+        )
+    }
 
     func currentFormatContext() -> FormatContext {
         let workspace = snapshot.activeWorkspace
         let session = workspace?.activeSession
         let tab = workspace?.activeTab
         var context = FormatContext(
-            paneID: activeSurfaceID?.uuidString,
-            paneTitle: tab?.title,
-            paneCwd: tab?.cwd,
-            paneActive: activeSurfaceID != nil,
-            paneIndex: nil,
+            paneID: activeSurfaceID?.uuidString, paneTitle: tab?.title, paneCwd: tab?.cwd,
+            paneActive: activeSurfaceID != nil, paneIndex: nil,
             sessionName: session?.name.isEmpty == false ? session?.name : nil,
-            tabName: tab?.title,
-            tabIndex: session?.tabs.firstIndex(where: { $0.id == tab?.id }),
-            workspaceName: workspace?.name,
-            agentKind: tab?.agent?.kind.rawValue,
-            agentActivity: tab?.agent?.activity.rawValue,
-            gitBranch: tab?.gitBranch,
-            clientName: "Harness.app"
+            tabName: tab?.title, tabIndex: session?.tabs.firstIndex(where: { $0.id == tab?.id }),
+            workspaceName: workspace?.name, agentKind: tab?.agent?.kind.rawValue,
+            agentActivity: tab?.agent?.activity.rawValue, gitBranch: tab?.gitBranch, clientName: "Harness.app"
         )
         context.paneCurrentCommand = tab?.currentCommand
         context.paneDead = tab.map { $0.exitStatus != nil }
@@ -820,20 +383,12 @@ final class SessionCoordinator: NSObject {
         NotificationCenter.default.post(name: NotificationBus.shared.snapshotChanged, object: nil, userInfo: ["beginRenameActiveTab": true])
     }
 
-    func updateFontSize(delta: Float) {
-        applyFontSize(settings.fontSize + delta)
-    }
-
-    func resetFontSize() {
-        applyFontSize(HarnessSettings().fontSize)
-    }
-
+    func updateFontSize(delta: Float) { applyFontSize(settings.fontSize + delta) }
+    func resetFontSize() { applyFontSize(HarnessSettings().fontSize) }
     private func applyFontSize(_ size: Float) {
         settings.fontSize = max(8, min(32, size))
         try? settings.save()
-        for host in terminalHosts.allHosts() {
-            host.applySettings(settings)
-        }
+        for host in terminalHosts.allHosts() { host.applySettings(settings) }
     }
 }
 
@@ -859,8 +414,7 @@ extension SessionCoordinator: TerminalHostDelegate {
     }
 
     func surfaceShellTrackerDidUpdateCwd(_ surfaceID: SurfaceID, cwd: String) {
-        let current = snapshot.workspaces
-            .flatMap { workspace in workspace.sessions.flatMap { $0.tabs } }
+        let current = snapshot.workspaces.flatMap { $0.sessions.flatMap { $0.tabs } }
             .first { $0.rootPane.allSurfaceIDs().contains(surfaceID) }?.cwd
         if current == cwd { return }
         Task {
@@ -877,10 +431,8 @@ extension SessionCoordinator: TerminalHostDelegate {
     }
 
     private func tabIsWaiting(forSurface surfaceID: SurfaceID) -> Bool {
-        snapshot.workspaces
-            .flatMap { workspace in workspace.sessions.flatMap { $0.tabs } }
-            .first { $0.rootPane.allSurfaceIDs().contains(surfaceID) }?
-            .status == .waiting
+        snapshot.workspaces.flatMap { $0.sessions.flatMap { $0.tabs } }
+            .first { $0.rootPane.allSurfaceIDs().contains(surfaceID) }?.status == .waiting
     }
 
     func terminalHostDidRingBell(surfaceID: SurfaceID) {
@@ -915,8 +467,6 @@ extension SessionCoordinator: TerminalHostDelegate {
     }
 }
 
-// MARK: - clearNotification(for:) needed by TerminalHostDelegate
-
 extension SessionCoordinator {
     func clearNotification(for surfaceID: SurfaceID) {
         requestDaemon(.clearNotification(surfaceID: surfaceID.uuidString))
@@ -939,31 +489,18 @@ struct NotificationEntry: Identifiable, Equatable {
 }
 
 enum DesktopNotifier {
-    // UNUserNotificationCenter.current() crashes on macOS 26 beta due to a corrupted
-    // NSCalendarDate in the notification database. All banner delivery is disabled until
-    // the system issue is resolved; sound fallback is preserved.
-
     static func requestAuthorizationIfNeeded() {}
-
     static func show(title: String, body: String, withSound: Bool = true) {
-        if withSound {
-            DispatchQueue.main.async { NSSound(named: "Glass")?.play() }
-        }
+        if withSound { DispatchQueue.main.async { NSSound(named: "Glass")?.play() } }
     }
-
     static func authorizationStatus(_ completion: @escaping @MainActor (UNAuthorizationStatus) -> Void) {
         DispatchQueue.main.async { MainActor.assumeIsolated { completion(.notDetermined) } }
     }
-
-    static func requestOrOpenSettings() {
-        openSystemNotificationSettings()
-    }
-
+    static func requestOrOpenSettings() { openSystemNotificationSettings() }
     static func openSystemNotificationSettings() {
         guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.notifications") else { return }
         NSWorkspace.shared.open(url)
     }
-
     static func sendTest() {}
 }
 
