@@ -1,4 +1,5 @@
 import AppKit
+import HarnessCore
 import HarnessLSP
 
 extension ViEngine {
@@ -113,6 +114,96 @@ extension ViEngine {
             if cmd.hasPrefix("find ") {
                 let query = String(cmd.dropFirst(5)).trimmingCharacters(in: .whitespaces)
                 NotificationCenter.default.post(name: .viFindFileCommand, object: self, userInfo: ["query": query])
+                return
+            }
+            // :recent — show MRU file list
+            if cmd == "recent" {
+                let list = WorkbenchMRU.shared.entries
+                if list.isEmpty {
+                    displayExMessage("recent: no recently opened files")
+                } else {
+                    let text = list.prefix(10).enumerated().map { "\($0.offset + 1): \($0.element)" }.joined(separator: "\n")
+                    displayExMessage(text)
+                }
+                return
+            }
+            // :copy-path [relative|absolute] — copy current file path
+            if cmd == "copy-path" || cmd.hasPrefix("copy-path ") {
+                let relative = !cmd.contains("absolute")
+                if let file = onCurrentFile?() {
+                    let path: String
+                    if relative, let cwd = onCurrentCWD?(), file.hasPrefix(cwd + "/") {
+                        path = String(file.dropFirst(cwd.count + 1))
+                    } else {
+                        path = file
+                    }
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(path, forType: .string)
+                    displayExMessage("copied: \(path)")
+                } else {
+                    displayExMessage("copy-path: no current file")
+                }
+                return
+            }
+            // :board — post notification to show Board tab
+            if cmd == "board" {
+                NotificationCenter.default.post(name: .viWorkbenchCommand, object: self, userInfo: ["command": "board"])
+                return
+            }
+            // :attention — focus next Needs Attention board card
+            if cmd == "attention" {
+                let snapshot = SessionCoordinator.shared.snapshot
+                let card = BoardModel.classify(snapshot: snapshot)
+                    .first { $0.kind == .needsAttention }?.cards.first
+                if let card {
+                    SessionCoordinator.shared.selectTab(workspaceID: card.workspaceID, tabID: card.tabID)
+                } else {
+                    displayExMessage("attention: no items need attention")
+                }
+                return
+            }
+            // :ack — dismiss current tab's Needs Attention card
+            if cmd == "ack" {
+                if let tabID = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.id {
+                    NotificationCenter.default.post(name: .viBoardAckCommand, object: self, userInfo: ["tabID": tabID.uuidString])
+                    displayExMessage("acknowledged")
+                }
+                return
+            }
+            // :errors — show LSP diagnostics
+            if cmd == "errors" {
+                let diags = onDiagnostics?() ?? []
+                if diags.isEmpty {
+                    displayExMessage("no diagnostics")
+                } else {
+                    let text = diags.prefix(20).map { d in
+                        ":\(d.range.start.line + 1):\(d.range.start.character + 1): \(d.message)"
+                    }.joined(separator: "\n")
+                    displayExMessage(text)
+                }
+                return
+            }
+            // :grep <query> — run search in split pane
+            if cmd.hasPrefix("grep ") {
+                let query = String(cmd.dropFirst(5)).trimmingCharacters(in: .whitespaces)
+                let grepCmd = "rg --vimgrep '\(query)' 2>/dev/null || grep -rn '\(query)' ."
+                SessionCoordinator.shared.splitActivePaneAndRun(direction: .horizontal, command: grepCmd)
+                return
+            }
+            // :make [build|test|last] — run project task
+            if cmd == "make" || cmd.hasPrefix("make ") {
+                let target = cmd == "make" ? nil : String(cmd.dropFirst(5)).trimmingCharacters(in: .whitespaces)
+                let cwd = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd ?? "."
+                let task = ProjectTaskDetector.detect(at: cwd)
+                let runCmd: String
+                switch target {
+                case "build": runCmd = task?.buildCmd ?? "swift build"
+                case "test": runCmd = task?.testCmd ?? "swift test"
+                case "last": runCmd = lastMakeCommand ?? task?.defaultCmd ?? "swift build"
+                default: runCmd = task?.defaultCmd ?? task?.buildCmd ?? "swift build"
+                }
+                lastMakeCommand = runCmd
+                SessionCoordinator.shared.splitActivePaneAndRun(direction: .horizontal, command: runCmd)
                 return
             }
             if cmd.hasPrefix("split ") || cmd.hasPrefix("sp ") || cmd.hasPrefix("vsplit ") || cmd.hasPrefix("vsp ") {
