@@ -724,6 +724,9 @@ extension SyntaxTextView: NSTextViewDelegate {
 extension Notification.Name {
     static let viQuitCommand = Notification.Name("HarnessViQuitCommand")
     static let viOpenFileCommand = Notification.Name("HarnessViOpenFileCommand")
+    static let viViewFileCommand = Notification.Name("HarnessViViewFileCommand")
+    static let viSplitFileCommand = Notification.Name("HarnessViSplitFileCommand")
+    static let viFindFileCommand = Notification.Name("HarnessViFindFileCommand")
     static let viNextBufferCommand = Notification.Name("HarnessViNextBufferCommand")
     static let viListBuffersCommand = Notification.Name("HarnessViListBuffersCommand")
 }
