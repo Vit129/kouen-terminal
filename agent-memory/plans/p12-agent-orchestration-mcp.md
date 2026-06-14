@@ -1,6 +1,6 @@
 # P12 — Agent Orchestration via MCP (cmux parity)
 
-Status: **in progress — PBI-ORCH-001 done; PBI-ORCH-002 done; PBI-ORCH-003 done; PBI-ORCH-004 done; PBI-ORCH-005 scoped only (design note below, no UI implemented)**
+Status: **DONE — PBI-ORCH-001/002/003/004/005 all complete**
 Priority: **P2** — implement before P11 mutating pane APIs
 Owner surface: **harness-mcp + existing daemon IPC**
 Created from gap review: 2026-06-13 WezTerm/tmux/cmux comparison

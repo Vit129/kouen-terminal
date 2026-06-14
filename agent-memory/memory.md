@@ -80,6 +80,7 @@
 | 64 | P4 unit tests: ViPathAndLSPTests.swift (23 tests — stripLineColumnSuffix, isPathTokenChar including surrogate safety, LSPTextLocationParser edge cases). Made ViEngine.stripLineColumnSuffix + isPathTokenChar internal for testability. 244 tests pass. | ✅ Done |
 | 65 | Docs: README updated (P11 scripting, P12 MCP, CLI section, stack table, Manual Test Plan link); docs/MANUAL_TEST_PLAN.md created (P4/P11/P12/P13/P16 manual test steps with mock data setup); agent-memory/plans/p17-structural-refactor.md and p18-ui-automation.md (Robot Framework) created; skill-log.md updated with P18 RF entry. Commit 06f0d56 pushed. | ✅ Done |
 | 66 | P17 PBI-REFACTOR-001 complete: SessionCoordinator 2050→397 LOC (target <500 ✅). Services: DaemonSyncService(233), NotificationCoordinator(247), SessionLifecycleService(360), SplitPaneCoordinator(157), ThemeService(178), ActivePaneService(197), SessionCoordinator+HostDelegate(86), SessionCoordinatorTypes(47). All 8 files use unowned coordinator back-reference. Build pass. | ✅ Done |
+| 67 | P12 PBI-ORCH-005: MCP-controlled indicator on tab bar. Tab.lastMCPControlAt field; IPCMessage.notifyMCPActivity; SessionEditor.stampMCPActivity; SurfaceRegistry handler; harness-mcp posts after sendPaneText/sendPaneKeys succeed; TabPillView shows "MCP" badge (blue, 5s). Build pass. | ✅ Done |
 
 ### Removed / Reverted Features
 - **Task Board sidebar** — was added in sprint #32 but has since been **removed**. Not present in current codebase.
