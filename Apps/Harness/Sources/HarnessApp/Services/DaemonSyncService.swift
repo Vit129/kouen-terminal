@@ -15,6 +15,7 @@ final class DaemonSyncService {
     private var metadataTask: Task<Void, Never>?
     private(set) var snapshotRefreshTask: Task<Void, Never>?
     var pendingSnapshotRevision: Int?
+    private var snapshotSub: DaemonSubscription?
 
     init(coordinator: SessionCoordinator) {
         self.coord = coordinator
@@ -24,6 +25,156 @@ final class DaemonSyncService {
 
     func switchEndpoint(_ endpoint: Endpoint) {
         daemon.switchEndpoint(endpoint)
+        snapshotSub = nil
+        ensureSnapshotSubscription()
+    }
+
+    func ensureSnapshotSubscription() {
+        guard snapshotSub == nil else { return }
+        do {
+            let endpoint = daemon.endpoint
+            let client = DaemonClient(endpoint: endpoint)
+            snapshotSub = try client.subscribeSnapshot(
+                label: "HarnessGUI",
+                onRevision: { [weak self] revision in
+                    guard let self else { return }
+                    Task { @MainActor in
+                        guard revision != self.lastRevision,
+                              revision != self.pendingSnapshotRevision else { return }
+                        self.pendingSnapshotRevision = revision
+                        self.scheduleSnapshotRefresh()
+                    }
+                },
+                onBrowserRequest: { [weak self] id, paneID, req in
+                    guard let self else { return }
+                    Task { @MainActor in
+                        await self.handleBrowserRequest(id: id, req: req)
+                    }
+                }
+            )
+        } catch {
+            fputs("Harness: failed to subscribe to snapshot channel: \(error)\n", harnessStderr)
+        }
+    }
+
+    private func handleBrowserRequest(id: UUID, req: BrowserRequestPayload) async {
+        switch req {
+        case let .open(url, direction):
+            let newPaneID = UUID()
+            coord.splitPaneCoordinator.openBrowserPane(url: url, direction: direction ?? .horizontal, paneID: newPaneID)
+            _ = await request(.browserResponse(id: id, response: .open(paneID: newPaneID)))
+
+        case let .navigate(paneID, url):
+            guard let view = BrowserPaneRegistry.shared.get(paneID) else {
+                _ = await request(.browserResponse(id: id, response: .error("Browser pane not found")))
+                return
+            }
+            view.navigate(to: url)
+            _ = await request(.browserResponse(id: id, response: .ok))
+
+        case let .wait(paneID, timeoutSeconds):
+            guard let view = BrowserPaneRegistry.shared.get(paneID) else {
+                _ = await request(.browserResponse(id: id, response: .error("Browser pane not found")))
+                return
+            }
+            do {
+                try await view.waitForLoad(timeout: timeoutSeconds ?? 30.0)
+                _ = await request(.browserResponse(id: id, response: .ok))
+            } catch {
+                _ = await request(.browserResponse(id: id, response: .error(error.localizedDescription)))
+            }
+
+        case let .snapshot(paneID, interactive):
+            guard let view = BrowserPaneRegistry.shared.get(paneID) else {
+                _ = await request(.browserResponse(id: id, response: .error("Browser pane not found")))
+                return
+            }
+            do {
+                let snap = try await view.snapshot(interactive: interactive ?? false)
+                _ = await request(.browserResponse(id: id, response: .snapshot(snap)))
+            } catch {
+                _ = await request(.browserResponse(id: id, response: .error(error.localizedDescription)))
+            }
+
+        case let .interact(paneID, action, elementID, text):
+            guard let view = BrowserPaneRegistry.shared.get(paneID) else {
+                _ = await request(.browserResponse(id: id, response: .error("Browser pane not found")))
+                return
+            }
+            
+            // extract the index from elementID, e.g. "e3" -> 3
+            let numericString = elementID.trimmingCharacters(in: CharacterSet.decimalDigits.inverted)
+            guard let index = Int(numericString) else {
+                _ = await request(.browserResponse(id: id, response: .error("Invalid element ID '\(elementID)'")))
+                return
+            }
+            
+            let script: String
+            if action.lowercased() == "type" {
+                let escapedText = (text ?? "").replacingOccurrences(of: "\\", with: "\\\\")
+                                               .replacingOccurrences(of: "\"", with: "\\\"")
+                                               .replacingOccurrences(of: "\n", with: "\\n")
+                script = """
+                (function(){
+                  var all=document.querySelectorAll('a,button,input,select,textarea,[role=button]');
+                  var el=all[\(index) - 1];
+                  if(!el) return JSON.stringify({ok:false,error:'element not found'});
+                  el.focus();
+                  el.value = "\(escapedText)";
+                  el.dispatchEvent(new Event('input', { bubbles: true }));
+                  el.dispatchEvent(new Event('change', { bubbles: true }));
+                  return JSON.stringify({ok:true});
+                })()
+                """
+            } else if action.lowercased() == "click" {
+                script = """
+                (function(){
+                  var all=document.querySelectorAll('a,button,input,select,textarea,[role=button]');
+                  var el=all[\(index) - 1];
+                  if(!el) return JSON.stringify({ok:false,error:'element not found'});
+                  el.click();
+                  return JSON.stringify({ok:true});
+                })()
+                """
+            } else if action.lowercased() == "scroll" {
+                script = """
+                (function(){
+                  var all=document.querySelectorAll('a,button,input,select,textarea,[role=button]');
+                  var el=all[\(index) - 1];
+                  if(!el) return JSON.stringify({ok:false,error:'element not found'});
+                  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  return JSON.stringify({ok:true});
+                })()
+                """
+            } else {
+                _ = await request(.browserResponse(id: id, response: .error("Unknown action '\(action)'")))
+                return
+            }
+            
+            do {
+                let jsonResult = try await view.evaluateJS(script)
+                struct JSResult: Codable {
+                    var ok: Bool
+                    var error: String?
+                }
+                if let data = jsonResult.data(using: .utf8),
+                   let parsed = try? JSONDecoder().decode(JSResult.self, from: data) {
+                    if parsed.ok {
+                        _ = await request(.browserResponse(id: id, response: .ok))
+                    } else {
+                        _ = await request(.browserResponse(id: id, response: .error(parsed.error ?? "Interaction failed")))
+                    }
+                } else {
+                    _ = await request(.browserResponse(id: id, response: .ok))
+                }
+            } catch {
+                _ = await request(.browserResponse(id: id, response: .error(error.localizedDescription)))
+            }
+
+        case let .close(paneID):
+            coord.splitPaneCoordinator.killPane(paneID: paneID)
+            _ = await request(.browserResponse(id: id, response: .ok))
+        }
     }
 
     // MARK: - Sync
@@ -46,6 +197,7 @@ final class DaemonSyncService {
 
     @discardableResult
     func sync(metadataOnly: Bool = false) -> Bool {
+        ensureSnapshotSubscription()
         let remote: SessionSnapshot
         do {
             remote = try daemon.fetchSnapshot()
@@ -61,6 +213,7 @@ final class DaemonSyncService {
 
     @discardableResult
     func sync(metadataOnly: Bool = false) async -> Bool {
+        ensureSnapshotSubscription()
         let remote: SessionSnapshot
         do {
             remote = try await daemon.fetchSnapshot()
@@ -112,6 +265,10 @@ final class DaemonSyncService {
         )
     }
 
+    func applyLocalSnapshot(_ updated: SessionSnapshot) {
+        applySnapshot(updated, metadataOnly: false)
+    }
+
     // MARK: - Ephemeral cleanup
 
     func closeEphemeralSessionsBeforeQuit() {
@@ -141,7 +298,8 @@ final class DaemonSyncService {
     func structureFingerprint(_ snap: SessionSnapshot) -> String {
         guard let ws = snap.activeWorkspace, let session = ws.activeSession, let tab = session.activeTab else { return "" }
         let surfaces = tab.rootPane.allSurfaceIDs().map(\.uuidString).sorted().joined(separator: ",")
-        return "\(ws.id)|\(session.id)|\(tab.id)|\(surfaces)"
+        let panes = tab.rootPane.allPaneIDs().map(\.uuidString).sorted().joined(separator: ",")
+        return "\(ws.id)|\(session.id)|\(tab.id)|\(surfaces)|\(panes)"
     }
 
     // MARK: - Daemon request

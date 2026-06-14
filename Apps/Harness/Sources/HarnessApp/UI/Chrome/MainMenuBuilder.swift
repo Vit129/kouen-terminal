@@ -217,6 +217,14 @@ enum MainMenuBuilder {
         fastFullScreen.keyEquivalentModifierMask = [.command, .control, .shift]
         windowMenu.addItem(fastFullScreen)
         windowMenu.addItem(.separator())
+        let openBrowserItem = NSMenuItem(
+            title: "Open Browser Pane",
+            action: #selector(MenuTarget.openBrowserPane),
+            keyEquivalent: ""
+        )
+        openBrowserItem.target = MenuTarget.shared
+        windowMenu.addItem(openBrowserItem)
+        windowMenu.addItem(.separator())
         windowMenu.addItem(NSMenuItem(title: "Bring All to Front", action: #selector(NSApplication.arrangeInFront(_:)), keyEquivalent: ""))
         main.addItem(window)
         NSApp.windowsMenu = windowMenu
@@ -481,5 +489,12 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
 
     @objc func showAbout() {
         AboutPanelController.show()
+    }
+
+    @objc func openBrowserPane() {
+        SessionCoordinator.shared.splitPaneCoordinator.openBrowserPane(
+            url: URL(string: "about:blank")!,
+            direction: .horizontal
+        )
     }
 }

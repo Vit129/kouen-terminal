@@ -41,6 +41,12 @@ public final class DaemonServer: @unchecked Sendable {
     /// so a small ssh client never truncates a larger one's view and vice versa.
     private var clientSurfaceSizes: [Int32: [String: (rows: UInt16, cols: UInt16)]] = [:]
 
+    private struct PendingBrowserRequest {
+        let continuation: CheckedContinuation<BrowserResponsePayload, Never>
+        let createdAt: Date
+    }
+    private var pendingBrowserRequests: [UUID: PendingBrowserRequest] = [:]
+
     private struct ClientRecord {
         let id: UUID
         var label: String
@@ -277,6 +283,68 @@ public final class DaemonServer: @unchecked Sendable {
                 send(intercepted, to: fd)
                 continue
             }
+
+            // Intercept browser requests from MCP / CLI clients
+            switch request {
+            case let .browserOpen(url, direction):
+                Task {
+                    let resp = await self.forwardBrowserRequest(paneID: nil, req: .open(url: url, direction: direction))
+                    self.queue.async {
+                        self.send(.browserSuccess(resp), to: fd)
+                    }
+                }
+                continue
+            case let .browserNavigate(paneID, url):
+                Task {
+                    let resp = await self.forwardBrowserRequest(paneID: paneID, req: .navigate(paneID: paneID, url: url))
+                    self.queue.async {
+                        self.send(.browserSuccess(resp), to: fd)
+                    }
+                }
+                continue
+            case let .browserWait(paneID, timeoutSeconds):
+                Task {
+                    let resp = await self.forwardBrowserRequest(paneID: paneID, req: .wait(paneID: paneID, timeoutSeconds: timeoutSeconds))
+                    self.queue.async {
+                        self.send(.browserSuccess(resp), to: fd)
+                    }
+                }
+                continue
+            case let .browserSnapshot(paneID, interactive):
+                Task {
+                    let resp = await self.forwardBrowserRequest(paneID: paneID, req: .snapshot(paneID: paneID, interactive: interactive))
+                    self.queue.async {
+                        self.send(.browserSuccess(resp), to: fd)
+                    }
+                }
+                continue
+            case let .browserInteract(paneID, action, elementID, text):
+                Task {
+                    let resp = await self.forwardBrowserRequest(paneID: paneID, req: .interact(paneID: paneID, action: action, elementID: elementID, text: text))
+                    self.queue.async {
+                        self.send(.browserSuccess(resp), to: fd)
+                    }
+                }
+                continue
+            case let .browserClose(paneID):
+                Task {
+                    let resp = await self.forwardBrowserRequest(paneID: paneID, req: .close(paneID: paneID))
+                    self.queue.async {
+                        self.send(.browserSuccess(resp), to: fd)
+                    }
+                }
+                continue
+            case let .browserResponse(id, response):
+                // Intercept response from GUI client
+                if let pending = self.pendingBrowserRequests.removeValue(forKey: id) {
+                    pending.continuation.resume(returning: response)
+                }
+                send(.ok, to: fd)
+                continue
+            default:
+                break
+            }
+
             let response = registry.handle(request)
             if case .snapshot = response {
                 // keep buffer updated
@@ -597,6 +665,37 @@ public final class DaemonServer: @unchecked Sendable {
 
     public func runLoop() {
         dispatchMain()
+    }
+
+    private func forwardBrowserRequest(
+        id: UUID = UUID(),
+        paneID: UUID?,
+        req: BrowserRequestPayload
+    ) async -> BrowserResponsePayload {
+        await withCheckedContinuation { continuation in
+            queue.async {
+                guard let guiFD = self.snapshotSubscribers.first else {
+                    continuation.resume(returning: .error("Harness GUI is not running or connected"))
+                    return
+                }
+
+                self.pendingBrowserRequests[id] = PendingBrowserRequest(
+                    continuation: continuation,
+                    createdAt: Date()
+                )
+
+                // Send request to the GUI app over the subscription channel
+                self.send(.browserRequest(id: id, paneID: paneID, req: req), to: guiFD)
+
+                // Setup a timeout (e.g. 30s)
+                self.queue.asyncAfter(deadline: .now() + 30.0) { [weak self] in
+                    guard let self else { return }
+                    if let pending = self.pendingBrowserRequests.removeValue(forKey: id) {
+                        pending.continuation.resume(returning: .error("Request timed out"))
+                    }
+                }
+            }
+        }
     }
 
     /// Cancel the accept loop and tear down all client connections + subscriptions.

@@ -49,6 +49,9 @@ final class MainExecutor: CommandExecutor {
     private func dispatch(_ command: Command) throws {
         let coordinator = SessionCoordinator.shared
         switch command {
+        case let .openBrowser(url, direction):
+            let layoutDir = CommandIPCTranslator.layoutDirection(for: direction)
+            coordinator.splitPaneCoordinator.openBrowserPane(url: url, direction: layoutDir)
         case .splitWindow(let direction):
             // `Command.SplitDirection` is divider-orientation (`.vertical` =
             // side-by-side, the CommandParser convention); `splitActivePane`
@@ -544,6 +547,7 @@ final class MainExecutor: CommandExecutor {
     private func neighborSurface(paneID: PaneID, in node: PaneNode) -> SurfaceID? {
         switch node {
         case let .leaf(leaf): return leaf.id == paneID ? (leaf.activeSurfaceID ?? leaf.surfaceID) : nil
+        case .browser: return nil
         case let .branch(_, _, first, second):
             return neighborSurface(paneID: paneID, in: first) ?? neighborSurface(paneID: paneID, in: second)
         }
@@ -598,6 +602,7 @@ final class MainExecutor: CommandExecutor {
     private func panePathLookup(surfaceID: SurfaceID, in node: PaneNode) -> PaneID? {
         switch node {
         case let .leaf(leaf): return leaf.surfaceIDs.contains(surfaceID) ? leaf.id : nil
+        case .browser: return nil
         case let .branch(_, _, first, second):
             return panePathLookup(surfaceID: surfaceID, in: first)
                 ?? panePathLookup(surfaceID: surfaceID, in: second)

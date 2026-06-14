@@ -743,6 +743,8 @@ extension Notification.Name {
     static let viViewFileCommand = Notification.Name("HarnessViViewFileCommand")
     static let viSplitFileCommand = Notification.Name("HarnessViSplitFileCommand")
     static let viFindFileCommand = Notification.Name("HarnessViFindFileCommand")
+    static let viWorkbenchCommand = Notification.Name("HarnessViWorkbenchCommand")
+    static let viBoardAckCommand = Notification.Name("HarnessViBoardAckCommand")
     static let viNextBufferCommand = Notification.Name("HarnessViNextBufferCommand")
     static let viListBuffersCommand = Notification.Name("HarnessViListBuffersCommand")
 }
