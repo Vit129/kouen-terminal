@@ -50,3 +50,30 @@ All plans below are **done** and merged into main.
 - Subviews (FileEditorView, FileEditorTabBarView, SyntaxTextView, gutter) required no changes — all already transparent
 - Key insight: Metal renderer handles terminal alpha itself; AppKit-only panels must apply it explicitly to their layer
 - `HarnessSettings.clampedOpacity` returns `Float` — must cast to `CGFloat` for `withAlphaComponent`
+
+## P2 — Async IPC Refactor
+- IPC and metadata refresh moved off the main actor via `DaemonClientActor` and async background task contexts
+- `SessionCoordinator` snapshot sync no longer blocks UI interactions on daemon round-trips
+
+## P9 — Complexity Reduction
+- Extracted `LiveResizeGeometry`, `PasteController`, and `SelectionResolver` from terminal surface code
+- Split CLI handlers into `HarnessCLI+*.swift` extension files while preserving command dispatch behavior
+- Extracted `WindowInputRouter` with focused CLI tests
+- Extracted daemon `HookExecutor` and `FormatContextBuilder`
+- Documented intentional `GridCompositor` duplication between app and onboarding packages
+
+## P10 — Terminal Performance and Convenience
+- Lazy scrollback reflow shipped for live resize performance
+- Local workspace symbol completion and completion popup shipped
+- IDE mode, focus mode, session state dots, diff highlighting, git preview/history improvements, and task board sidebar shipped
+- ACP sidebar work remains intentionally shelved; implementation is preserved but not exposed
+
+## P5 — ACP Client
+- ACP core implementation exists in `HarnessCore/ACP`: `ACPClient`, `ACPSession`, `ACPProcess`, `ACPTransport`, `ACPMessage`, and `AgentConfig`
+- `AgentChatPanelView` and settings-side ACP agent configuration remain in the app code
+- Runtime entry point is intentionally disabled in the sidebar (`[ACP SHELVED] connectAgentIfNeeded()`)
+- Shelved rationale is tracked in `agent-memory/knowledge/acp-client.md`
+
+## P7 — Sidebar UI Polish
+- Large-screen sidebar group header button visibility/alignment completed
+- Session card spacing and file editor tab bar overlap polish completed
