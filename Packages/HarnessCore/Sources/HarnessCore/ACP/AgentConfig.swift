@@ -1,3 +1,4 @@
+#if HARNESS_ACP
 import Foundation
 
 public struct AgentConfig: Identifiable, Codable, Equatable, Sendable {
@@ -35,3 +36,4 @@ public final class AgentRegistryStore {
         defaults.set(data, forKey: key)
     }
 }
+#endif

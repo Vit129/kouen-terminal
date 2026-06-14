@@ -1,3 +1,4 @@
+#if HARNESS_ACP
 import AppKit
 import HarnessCore
 
@@ -328,3 +329,4 @@ extension AgentChatPanelView: NSTextFieldDelegate {
         return false
     }
 }
+#endif

@@ -28,7 +28,9 @@ final class HarnessSidebarPanelViewController: NSViewController {
     /// the workspace pill and session cards.
     private let searchContainer = NSView()
     private let sidebarTabs = NSSegmentedControl(labels: ["Sessions", "Files", "Git", "Board"], trackingMode: .selectOne, target: nil, action: nil)
+#if HARNESS_ACP
     private let agentChatPanel = AgentChatPanelView()
+#endif
     private let sectionHeader = NSView()
     private let sectionLabel = NSTextField(labelWithString: "Sessions")
     let sessionTable = NSTableView()
@@ -175,7 +177,9 @@ final class HarnessSidebarPanelViewController: NSViewController {
         setupGitPlaceholder()
         setupBoardPanel()
         setupSearchPanel()
+#if HARNESS_ACP
         setupAgentPanel()
+#endif
         selectSidebarTab(index: 0)
         reload()
         applyChromeColors()
@@ -703,6 +707,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
         }
     }
 
+#if HARNESS_ACP
     private func setupAgentPanel() {
         agentChatPanel.translatesAutoresizingMaskIntoConstraints = false
         agentChatPanel.isHidden = true
@@ -734,6 +739,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
     }
 
     private var agentSession: ACPSession?
+#endif
 
     @objc private func sidebarTabChanged() {
         selectSidebarTab(index: sidebarTabs.selectedSegment)
@@ -791,7 +797,9 @@ final class HarnessSidebarPanelViewController: NSViewController {
         // are shown) but the views/cases are kept for the shelved ACP agent panel and an
         // unwired search panel; shifted to 4/5 so "Board" can take index 3.
         searchPanelView.isHidden = index != 4
+#if HARNESS_ACP
         agentChatPanel.isHidden = index != 5
+#endif
         switch index {
         case 1:
             sectionLabel.stringValue = "FILES"

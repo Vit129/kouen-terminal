@@ -111,6 +111,7 @@ extension SettingsViewController {
 
     // MARK: - ACP Agent Configs
 
+#if HARNESS_ACP
     private func buildACPAgentsGroup() -> NSView {
         let store = AgentRegistryStore()
         let configs = store.load()
@@ -230,6 +231,7 @@ extension SettingsViewController {
             store.save(configs)
         }
     }
+#endif
 
     /// One per-agent row: brand icon + name + the executables it matches + a color-override
     /// swatch + a one-click "Install hooks" button (with installed status) where supported.
@@ -274,6 +276,7 @@ extension SettingsViewController {
         trailing.spacing = 10
         if let well = agentColorWells[kind] { trailing.addArrangedSubview(well) }
 
+#if HARNESS_ACP
         // "Chat" toggle — enables this agent as an ACP chat agent
         let chatToggle = NSButton(checkboxWithTitle: "Chat", target: self, action: #selector(chatToggleClicked(_:)))
         chatToggle.tag = kind.hashValue
@@ -283,6 +286,7 @@ extension SettingsViewController {
         chatToggle.state = isRegistered ? .on : .off
         chatToggles[kind] = chatToggle
         trailing.addArrangedSubview(chatToggle)
+#endif
 
         if AgentHookInstaller.canInstall(kind) {
             let installed = AgentHookInstaller.isInstalled(agent: kind)
@@ -389,6 +393,7 @@ extension SettingsViewController {
         }
     }
 
+#if HARNESS_ACP
     @objc private func chatToggleClicked(_ sender: NSButton) {
         guard let kindRaw = sender.identifier?.rawValue,
               let kind = AgentKind(rawValue: kindRaw) else { return }
@@ -446,4 +451,5 @@ extension SettingsViewController {
         default: return (kind.rawValue, ["--acp"])
         }
     }
+#endif
 }

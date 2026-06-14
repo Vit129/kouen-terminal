@@ -1,3 +1,4 @@
+#if HARNESS_ACP
 import Foundation
 
 /// Represents a single message in the agent chat conversation.
@@ -216,3 +217,4 @@ extension ACPClient {
         self.delegate = delegate
     }
 }
+#endif
