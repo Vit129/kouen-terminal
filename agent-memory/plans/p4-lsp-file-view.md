@@ -1,6 +1,6 @@
 # P4 — Terminal-First Code Viewing + Lightweight LSP
 
-Status: **Track 1 DONE; Track 2: PBI-VI-002 DONE, PBI-VI-003 PARTIAL, PBI-VI-001 PARTIAL; Track 3: PBI-LSP-001/002/003 DONE**
+Status: **Track 1 DONE; Track 2: PBI-VI-001/002/003 DONE; Track 3: PBI-LSP-001/002/003 DONE**
 Priority: **P1** — terminal convenience, not IDE replacement
 Depends on: terminal/file viewer infrastructure already exists
 Branch: `worktree-p4-track23`
@@ -110,7 +110,7 @@ unblocks a future `--highlight` flag).
 
 ### Track 2 — Vi Navigation
 
-#### PBI-VI-001 — PARTIAL — `gf` path-under-cursor + LSP-backed `gd`/`K`/`]d`/`[d`
+#### PBI-VI-001 — DONE — `gf` path-under-cursor + LSP-backed `gd`/`K`/`]d`/`[d`
 
 - Add path-under-cursor detection to `SyntaxTextView`/`ViNormalMode`: given
   the current cursor position, extract a candidate file path token (handle
@@ -136,7 +136,8 @@ unblocks a future `--highlight` flag).
 
 - Implementation Notes:
   - Added low-risk `gf` support in `Apps/Harness/Sources/HarnessApp/UI/ViNormalMode.swift`: extracts a path-like token under the cursor, strips common `:line[:col]` suffixes, and routes through the existing `onOpenFile` path.
-  - `gd`, `K`, `]d`, and `[d` are not wired in this pass; they still need `LSPFileSession` state/diagnostics exposure to vi normal mode and UI feedback plumbing.
+  - Wired `gd`, `K`, `]d`, and `[d` through `SyntaxTextView`'s existing LSP callbacks and diagnostics state. `gd` calls `LSPFileSession.definition()` and navigates to file:line:column when available, falling back to path-under-cursor/no-op status messaging. `K` calls `hover()` and displays hover text in the existing ex-message/status panel. Diagnostic jumps use the surfaced diagnostics array, wrap at the ends, and show a no-diagnostics status when empty.
+  - Added focused `ViDiagnosticNavigatorTests` for diagnostic ordering and wrap behavior.
 
 #### PBI-VI-002 — DONE — `:view`, `:edit`, `:split <path>`, `:vsplit <path>`, `harness view`
 
@@ -162,7 +163,7 @@ unblocks a future `--highlight` flag).
   - Added `:edit` alias, `:view`, `:split`, and `:vsplit` notifications in `ViNormalMode.swift`/`SyntaxTextView.swift`.
   - `:view` opens the sidebar `FileViewerViewController` via `HarnessSidebarPanelViewController.previewFile(path:)`; `:split`/`:vsplit` use `SessionCoordinator.splitActivePaneAndRun` to create a terminal pane and run `${EDITOR:-vi} <path>`.
 
-#### PBI-VI-003 — PARTIAL — `:find <query>` fuzzy path resolution
+#### PBI-VI-003 — DONE — `:find <query>` fuzzy path resolution
 
 - Extract/reuse `FuzzyMatcher` from `CommandPaletteController.swift` into a
   location both `HarnessApp` UI and ex-command handling can call (e.g. a
@@ -182,7 +183,7 @@ unblocks a future `--highlight` flag).
   - Added `Tests/HarnessAppTests/FuzzyPathResolverTests.swift` for score/ranking behavior.
   - Added `:find <query>` notification handling in `ContentAreaViewController.swift`; it scans under the active tab CWD, opens the best match, and displays the top matches when ambiguous.
   - Added fuzzy fallback for `:edit <partial>` and `:view <partial>`.
-  - Still partial because there is no interactive picker/selection UI for ambiguous `:find` results; it opens the best-ranked match.
+  - Ambiguous fuzzy results now use a terminal-first `:ls`-style ranked list and do not silently open the best match. Unique clear winners still open directly; no-match cases show a status message. The same behavior applies to `:find`, `:edit <partial>`, and `:view <partial>`.
 
 #### Track 2 Follow-ups (explicitly deferred, not in this pass)
 

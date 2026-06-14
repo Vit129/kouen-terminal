@@ -178,7 +178,8 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
 
     @objc private func viOpenFileCommand(_ note: Notification) {
         guard let path = note.userInfo?["path"] as? String else { return }
-        openFileTab(path: resolveViPath(path))
+        guard let resolved = resolveViPath(path, command: "edit") else { return }
+        openFileTab(path: resolved)
     }
 
     @objc private func viSplitFileCommand(_ note: Notification) {
@@ -186,7 +187,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         let direction = (note.userInfo?["direction"] as? String) == "vertical"
             ? SplitDirection.vertical
             : SplitDirection.horizontal
-        let expanded = resolveViPath(path)
+        guard let expanded = resolveViPath(path, command: "split") else { return }
         SessionCoordinator.shared.splitActivePaneAndRun(
             direction: direction,
             command: "${EDITOR:-vi} \(Self.shellQuote(expanded))"
@@ -196,16 +197,13 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
     @objc private func viFindFileCommand(_ note: Notification) {
         guard let query = note.userInfo?["query"] as? String, !query.isEmpty else { return }
         let root = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd ?? FileManager.default.currentDirectoryPath
-        let matches = FuzzyPathResolver.rankedMatches(query: query, root: root, limit: 5)
-        guard let first = matches.first else {
+        switch FuzzyPathResolver.resolve(query: query, root: root, limit: 5) {
+        case .none:
             DisplayMessage.show("find: no match")
-            return
-        }
-        if matches.count == 1 {
-            openFileTab(path: first)
-        } else {
+        case .unique(let path):
+            openFileTab(path: path)
+        case .ambiguous(let matches):
             DisplayMessage.show(matches.enumerated().map { "\($0.offset + 1): \($0.element)" }.joined(separator: "\n"))
-            openFileTab(path: first)
         }
     }
 
@@ -455,15 +453,22 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         persistEditorState()
     }
 
-    private func resolveViPath(_ path: String) -> String {
+    private func resolveViPath(_ path: String, command: String) -> String? {
         var expanded = (path as NSString).expandingTildeInPath
         if !expanded.hasPrefix("/"), let cwd = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd {
             expanded = (cwd as NSString).appendingPathComponent(expanded)
         }
         if !FileManager.default.fileExists(atPath: expanded) {
             let root = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd ?? FileManager.default.currentDirectoryPath
-            if let match = FuzzyPathResolver.bestMatch(query: path, root: root) {
+            switch FuzzyPathResolver.resolve(query: path, root: root, limit: 5) {
+            case .none:
+                DisplayMessage.show("\(command): no match")
+                return nil
+            case .unique(let match):
                 return match
+            case .ambiguous(let matches):
+                DisplayMessage.show(matches.enumerated().map { "\($0.offset + 1): \($0.element)" }.joined(separator: "\n"))
+                return nil
             }
         }
         return expanded

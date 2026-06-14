@@ -745,8 +745,15 @@ final class HarnessSidebarPanelViewController: NSViewController {
         }
         if !FileManager.default.fileExists(atPath: expanded) {
             let root = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd ?? FileManager.default.currentDirectoryPath
-            if let match = FuzzyPathResolver.bestMatch(query: path, root: root) {
+            switch FuzzyPathResolver.resolve(query: path, root: root, limit: 5) {
+            case .none:
+                DisplayMessage.show("view: no match")
+                return
+            case .unique(let match):
                 expanded = match
+            case .ambiguous(let matches):
+                DisplayMessage.show(matches.enumerated().map { "\($0.offset + 1): \($0.element)" }.joined(separator: "\n"))
+                return
             }
         }
         previewFile(path: expanded)

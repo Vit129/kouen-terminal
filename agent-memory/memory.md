@@ -71,6 +71,7 @@
 | 55 | P12 PBI-ORCH-004/005: persisted MCP tool policy for mutating tools; scoped UI visibility design note only | ✅ Done |
 | 56 | P4 Track 1 Syntax Highlighting: verified and structured. Integrated SyntaxTextView highlighting (regex-based heuristics supporting 30+ languages) in FileViewerViewController; preserved size guards, binary/non-UTF8 placeholders, copy/select and scroll behaviors; added SyntaxHighlighterTests.swift verifying correctness; noted CLI cat/view commands absence. | ✅ Done |
 | 57 | P4 Track 2/3: LSP CLI (`harness lsp start/status/hover/definition/diagnostics`) and `harness view` done; vi `:view/:edit/:split/:vsplit` done; fuzzy `:find`/partial path resolution partial (best-match, no picker); PBI-VI-001 partial (`gf` only, `gd`/`K`/diagnostic jumps not wired). Build + CLI/App/Completion tests pass. | ✅ Done |
+| 58 | P4 Track 2 follow-up: completed PBI-VI-001 (`gd`, `K`, `]d`, `[d` wired through existing `LSPFileSession`/`SyntaxTextView` callbacks with graceful no-LSP/no-result status messages) and PBI-VI-003 ambiguous fuzzy handling (`:find`, `:edit <partial>`, `:view <partial>` list ranked ambiguous matches instead of opening first). Added App tests for fuzzy resolution and diagnostic navigation; `swift build`, HarnessAppTests, and HarnessCLITests pass. | ✅ Done |
 
 ### Removed / Reverted Features
 - **Task Board sidebar** — was added in sprint #32 but has since been **removed**. Not present in current codebase.

@@ -60,15 +60,39 @@ enum FileFuzzyMatcher {
     }
 }
 
+enum FuzzyPathResolution: Equatable {
+    case none
+    case unique(String)
+    case ambiguous([String])
+}
+
 enum FuzzyPathResolver {
+    private static let clearWinnerMargin = 12
+
     static func bestMatch(query: String, root: String, fileManager: FileManager = .default) -> String? {
-        let candidates = scanFiles(root: root, fileManager: fileManager)
-        return FileFuzzyMatcher.rank(query: query, candidates: candidates, limit: 2).first?.candidate
+        switch resolve(query: query, root: root, limit: 5, fileManager: fileManager) {
+        case .unique(let path): return path
+        default: return nil
+        }
     }
 
     static func rankedMatches(query: String, root: String, limit: Int = 10, fileManager: FileManager = .default) -> [String] {
         FileFuzzyMatcher.rank(query: query, candidates: scanFiles(root: root, fileManager: fileManager), limit: limit)
             .map(\.candidate)
+    }
+
+    static func resolve(query: String, root: String, limit: Int = 10, fileManager: FileManager = .default) -> FuzzyPathResolution {
+        resolve(query: query, ranked: FileFuzzyMatcher.rank(query: query, candidates: scanFiles(root: root, fileManager: fileManager), limit: limit))
+    }
+
+    static func resolve(query: String, ranked: [(candidate: String, score: Int)]) -> FuzzyPathResolution {
+        guard let first = ranked.first else { return .none }
+        guard ranked.count > 1 else { return .unique(first.candidate) }
+        let second = ranked[1]
+        if first.score - second.score >= clearWinnerMargin {
+            return .unique(first.candidate)
+        }
+        return .ambiguous(ranked.map(\.candidate))
     }
 
     private static func scanFiles(root: String, fileManager: FileManager) -> [String] {

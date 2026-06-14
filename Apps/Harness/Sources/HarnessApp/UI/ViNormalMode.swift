@@ -1,4 +1,5 @@
 import AppKit
+import HarnessLSP
 
 // MARK: - Vi Mode State
 
@@ -8,6 +9,22 @@ enum ViMode: Equatable {
     case visual(line: Bool)    // v = char, V = line
     case replace               // R
     case operatorPending(op: Character)  // d/c/y waiting for motion/text-object
+}
+
+enum ViDiagnosticNavigator {
+    static func targetIndex(currentLine: Int, diagnostics: [LSPDiagnostic], forward: Bool) -> Int? {
+        guard !diagnostics.isEmpty else { return nil }
+        let sorted = diagnostics.enumerated().sorted {
+            let lhs = $0.element.range.start
+            let rhs = $1.element.range.start
+            if lhs.line == rhs.line { return lhs.character < rhs.character }
+            return lhs.line < rhs.line
+        }
+        if forward {
+            return sorted.first { $0.element.range.start.line > currentLine }?.offset ?? sorted.first?.offset
+        }
+        return sorted.last { $0.element.range.start.line < currentLine }?.offset ?? sorted.last?.offset
+    }
 }
 
 // MARK: - Vi Engine
@@ -40,6 +57,10 @@ final class ViEngine {
     var onListBuffers: (() -> [String])?
     /// Called when * / # search word — host highlights all matches inline.
     var onSearchHighlight: ((String) -> Void)?
+    var onHover: ((LSPPosition) async -> String?)?
+    var onDefinition: ((LSPPosition) async -> SyntaxDefinitionTarget?)?
+    var onNavigateToDefinition: ((SyntaxDefinitionTarget) -> Void)?
+    var onDiagnostics: (() -> [LSPDiagnostic])?
 
     // Count prefix accumulation
     private var countBuf = ""
@@ -154,6 +175,15 @@ final class ViEngine {
         let count = max(1, Int(countBuf) ?? 1)
         countBuf = ""
 
+        if let forward = pendingDiagnosticJump {
+            pendingDiagnosticJump = nil
+            if key == "d" {
+                jumpDiagnostic(tv, forward: forward)
+                return true
+            }
+            return false
+        }
+
         // Ctrl combinations
         if ctrl {
             switch key {
@@ -253,6 +283,9 @@ final class ViEngine {
         case "N": repeatSearch(tv, reverse: true,  count: count); return true
         case "*": searchWordUnderCursor(tv, forward: true);  return true
         case "#": searchWordUnderCursor(tv, forward: false); return true
+        case "K": showHover(tv); return true
+        case "]": pendingDiagnosticJump = true; return true
+        case "[": pendingDiagnosticJump = false; return true
 
         // MARK: Ex command
         case ":": presentExPrompt(tv); return true
@@ -309,7 +342,7 @@ final class ViEngine {
             switch key {
             case "g": moveToLine(tv, line: count == 1 ? 1 : count); return true
             case "f": openPathUnderCursor(tv); return true
-            case "d": return false  // let LSP go-to-def handle (Cmd+click)
+            case "d": goToDefinition(tv); return true
             case "e": moveWords(tv, count: count, forward: false, bigWord: false, toEnd: true); return true
             case "E": moveWords(tv, count: count, forward: false, bigWord: true, toEnd: true); return true
             case "~": toggleCaseLine(tv); return true
@@ -476,7 +509,7 @@ final class ViEngine {
         case "u": tv.undoManager?.undo()
         case "J": joinLines(tv, count: count)
         case "~": toggleCase(tv, count: count)
-        case "0", "1", "2", "3", "4", "5", "6", "7", "8", "9":
+        case "1", "2", "3", "4", "5", "6", "7", "8", "9":
             countBuf += key; return true
         default: return false
         }
@@ -485,6 +518,7 @@ final class ViEngine {
 
     // Pending state (kept as private vars to avoid complex associated values)
     private var pendingG = false
+    private var pendingDiagnosticJump: Bool?
     private var pendingZ = false
     private var pendingMark = false
     private var pendingMarkJump = false
@@ -532,7 +566,9 @@ final class ViEngine {
         case "E": range = wordEndRange(tv, count: count, bigWord: true)
         case "0": range = rangeToLineStart(tv, firstNonBlank: false)
         case "^": range = rangeToLineStart(tv, firstNonBlank: true)
-        case "$", "D" where op == "d":
+        case "$":
+            range = rangeToLineEnd(tv)
+        case "D" where op == "d":
             range = rangeToLineEnd(tv)
         case "h": range = NSRange(location: max(0, cursorPos(tv) - count), length: count)
         case "l": range = NSRange(location: cursorPos(tv), length: count)
@@ -1377,6 +1413,97 @@ final class ViEngine {
             return
         }
         onOpenFile?(Self.stripLineColumnSuffix(raw))
+    }
+
+    private func goToDefinition(_ tv: NSTextView) {
+        let position = lspPosition(tv)
+        Task { [weak self] in
+            guard let self else { return }
+            if let target = await self.onDefinition?(position) {
+                await MainActor.run { [weak self] in
+                    guard let self else { return }
+                    self.pushJumpPublic(self.cursorPos(tv))
+                    self.onNavigateToDefinition?(target)
+                }
+                return
+            }
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                if let raw = self.pathTokenUnderCursor(tv) {
+                    self.onOpenFile?(Self.stripLineColumnSuffix(raw))
+                } else {
+                    self.displayExMessage("gd: no definition")
+                }
+            }
+        }
+    }
+
+    private func showHover(_ tv: NSTextView) {
+        let position = lspPosition(tv)
+        Task { [weak self] in
+            guard let self else { return }
+            let text = await self.onHover?(position)
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                guard let text, !text.isEmpty else {
+                    self.displayExMessage("K: no hover")
+                    return
+                }
+                self.displayExMessage(text)
+            }
+        }
+    }
+
+    private func jumpDiagnostic(_ tv: NSTextView, forward: Bool) {
+        let diagnostics = onDiagnostics?() ?? []
+        let currentLine = lspPosition(tv).line
+        guard let index = ViDiagnosticNavigator.targetIndex(currentLine: currentLine, diagnostics: diagnostics, forward: forward) else {
+            displayExMessage("no diagnostics")
+            return
+        }
+        let diagnostic = diagnostics[index]
+        moveToLSPPosition(tv, diagnostic.range.start)
+        displayExMessage(diagnostic.message.isEmpty ? "diagnostic" : diagnostic.message)
+    }
+
+    private func moveToLSPPosition(_ tv: NSTextView, _ position: LSPPosition) {
+        let ns = tv.string as NSString
+        let lineStart = offset(line: position.line, character: 0, in: ns)
+        guard lineStart != NSNotFound else { return }
+        let target = min(lineEnd(tv, at: lineStart), lineStart + max(0, position.character))
+        tv.setSelectedRange(NSRange(location: target, length: 0))
+        tv.scrollRangeToVisible(NSRange(location: target, length: 0))
+    }
+
+    private func lspPosition(_ tv: NSTextView) -> LSPPosition {
+        let ns = tv.string as NSString
+        let offset = min(cursorPos(tv), ns.length)
+        var line = 0
+        var lineStart = 0
+        ns.enumerateSubstrings(
+            in: NSRange(location: 0, length: offset),
+            options: [.byLines, .substringNotRequired]
+        ) { _, range, _, _ in
+            line += 1
+            lineStart = NSMaxRange(range)
+        }
+        return LSPPosition(line: max(0, line), character: max(0, offset - lineStart))
+    }
+
+    private func offset(line: Int, character: Int, in text: NSString) -> Int {
+        var currentLine = 0
+        var result = NSNotFound
+        text.enumerateSubstrings(in: NSRange(location: 0, length: text.length), options: [.byLines, .substringNotRequired]) { _, range, _, stop in
+            if currentLine == line {
+                result = min(range.location + max(0, character), NSMaxRange(range))
+                stop.pointee = true
+            }
+            currentLine += 1
+        }
+        if result == NSNotFound, line == currentLine {
+            result = text.length
+        }
+        return result
     }
 
     private func pathTokenUnderCursor(_ tv: NSTextView) -> String? {

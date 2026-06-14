@@ -21,4 +21,27 @@ final class FuzzyPathResolverTests: XCTestCase {
         XCTAssertEqual(ranked.first?.candidate, "/tmp/project/editor-notes.txt")
         XCTAssertTrue(ranked.contains { $0.candidate.hasSuffix("FileEditorView.swift") })
     }
+
+    func testResolveReturnsUniqueForClearWinner() {
+        let resolution = FuzzyPathResolver.resolve(query: "editor", ranked: [
+            (candidate: "/tmp/project/editor-notes.txt", score: 100),
+            (candidate: "/tmp/project/FileEditorView.swift", score: 80),
+        ])
+        XCTAssertEqual(resolution, .unique("/tmp/project/editor-notes.txt"))
+    }
+
+    func testResolveReturnsAmbiguousForCloseMatches() {
+        let resolution = FuzzyPathResolver.resolve(query: "editor", ranked: [
+            (candidate: "/tmp/project/FileEditorView.swift", score: 100),
+            (candidate: "/tmp/project/EditorGuide.md", score: 95),
+        ])
+        XCTAssertEqual(resolution, .ambiguous([
+            "/tmp/project/FileEditorView.swift",
+            "/tmp/project/EditorGuide.md",
+        ]))
+    }
+
+    func testResolveReturnsNoneForNoMatches() {
+        XCTAssertEqual(FuzzyPathResolver.resolve(query: "missing", ranked: []), .none)
+    }
 }
