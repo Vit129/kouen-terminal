@@ -1,5 +1,6 @@
 import Foundation
 import AppKit
+import HarnessCore
 
 /// Coordinates scripting lifecycle, discovery, and file watching.
 @MainActor
@@ -30,6 +31,10 @@ final class ScriptHookCoordinator {
 
             // Evaluated successfully! Update the active runtime.
             self.runtime = newRuntime
+
+            // Let `harness.events.on("configReloaded", ...)` handlers registered
+            // during evaluation react to the (re)load that just happened.
+            NotificationBus.shared.postConfigReloaded()
 
             if !isInitial {
                 showToast("Script reloaded successfully")

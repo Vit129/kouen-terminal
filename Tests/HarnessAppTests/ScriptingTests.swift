@@ -197,6 +197,99 @@ final class ScriptingTests: XCTestCase {
         #endif
     }
 
+    /// P15 step 3: `harness.events.on/off` dispatch JS handlers synchronously via
+    /// `ScriptRuntime.dispatchEvent`, which `NotificationBus`-bridged notifications
+    /// (`snapshotChanged`, `configReloaded`) drive.
+    @MainActor
+    func testEventsOnDispatchesHandlerWithPayload() throws {
+        let runtime = ScriptRuntime()
+
+        #if canImport(JavaScriptCore)
+        var capturedRevision: Int32?
+        let captureBlock: @convention(block) (Int32) -> Void = { revision in
+            capturedRevision = revision
+        }
+        runtime.context.setObject(captureBlock, forKeyedSubscript: "__testCapture" as NSString)
+
+        try runtime.evaluate(script: """
+        harness.events.on("snapshotChanged", function(e) { __testCapture(e.revision); });
+        """, sourceURL: URL(fileURLWithPath: "/tmp/events-on.js"))
+
+        runtime.dispatchEvent("snapshotChanged", payload: ["revision": 42])
+
+        XCTAssertEqual(capturedRevision, 42)
+        #endif
+    }
+
+    @MainActor
+    func testEventsOffRemovesHandler() throws {
+        let runtime = ScriptRuntime()
+
+        #if canImport(JavaScriptCore)
+        var callCount = 0
+        let captureBlock: @convention(block) () -> Void = {
+            callCount += 1
+        }
+        runtime.context.setObject(captureBlock, forKeyedSubscript: "__testCapture" as NSString)
+
+        try runtime.evaluate(script: """
+        function handler(e) { __testCapture(); }
+        harness.events.on("snapshotChanged", handler);
+        harness.events.off("snapshotChanged", handler);
+        """, sourceURL: URL(fileURLWithPath: "/tmp/events-off.js"))
+
+        runtime.dispatchEvent("snapshotChanged", payload: ["revision": 1])
+
+        XCTAssertEqual(callCount, 0)
+        #endif
+    }
+
+    /// A throwing handler is caught and does not propagate or crash; the JS
+    /// exception is cleared so subsequent dispatches are unaffected.
+    @MainActor
+    func testEventsHandlerErrorDoesNotCrashOrLeakException() throws {
+        let runtime = ScriptRuntime()
+
+        #if canImport(JavaScriptCore)
+        try runtime.evaluate(script: """
+        harness.events.on("snapshotChanged", function(e) { throw new Error("boom"); });
+        """, sourceURL: URL(fileURLWithPath: "/tmp/events-error.js"))
+
+        runtime.dispatchEvent("snapshotChanged", payload: ["revision": 1])
+        runtime.dispatchEvent("snapshotChanged", payload: ["revision": 2])
+
+        XCTAssertNil(runtime.context.exception)
+        #endif
+    }
+
+    /// End-to-end: `NotificationBus.shared.postConfigReloaded` (fired by
+    /// `ScriptHookCoordinator` after (re)loading the config) reaches a
+    /// `harness.events.on("configReloaded", ...)` handler.
+    @MainActor
+    func testNotificationBusConfigReloadedReachesScriptHandler() async throws {
+        let runtime = ScriptRuntime()
+
+        #if canImport(JavaScriptCore)
+        var fired = false
+        let captureBlock: @convention(block) () -> Void = {
+            fired = true
+        }
+        runtime.context.setObject(captureBlock, forKeyedSubscript: "__testCapture" as NSString)
+
+        try runtime.evaluate(script: """
+        harness.events.on("configReloaded", function() { __testCapture(); });
+        """, sourceURL: URL(fileURLWithPath: "/tmp/events-config-reloaded.js"))
+
+        NotificationBus.shared.postConfigReloaded()
+
+        for _ in 0..<20 where !fired {
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+
+        XCTAssertTrue(fired)
+        #endif
+    }
+
     @MainActor
     func testCommandParseBridge() throws {
         let runtime = ScriptRuntime()

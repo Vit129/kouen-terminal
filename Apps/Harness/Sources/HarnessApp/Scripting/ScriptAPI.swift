@@ -98,6 +98,31 @@ struct ScriptAPI {
         }
         commandsObj.setObject(commandsParseBlock, forKeyedSubscript: "parse" as NSString)
         harnessObj.setObject(commandsObj, forKeyedSubscript: "commands" as NSString)
+
+        // 5. harness.events namespace — bridges NotificationBus to JS handlers (P11
+        // PBI-SCRIPT-003 gap / P15 step 3). v1 events: snapshotChanged, configReloaded.
+
+        // harness.events.on(name, handler)
+        let eventsOnBlock: @convention(block) (String, JSValue) -> Void = { [weak runtime] name, handler in
+            guard let runtime, handler.isObject else { return }
+            runtime.eventHandlers[name, default: []].append(handler)
+        }
+
+        // harness.events.off(name, handler?) — drops a specific handler, or all
+        // handlers for `name` if `handler` is omitted.
+        let eventsOffBlock: @convention(block) (String, JSValue?) -> Void = { [weak runtime] name, handler in
+            guard let runtime else { return }
+            guard let handler, handler.isObject else {
+                runtime.eventHandlers[name] = nil
+                return
+            }
+            runtime.eventHandlers[name]?.removeAll { $0.isEqual(to: handler) }
+        }
+
+        guard let eventsObj = JSValue(newObjectIn: context) else { return }
+        eventsObj.setObject(eventsOnBlock, forKeyedSubscript: "on" as NSString)
+        eventsObj.setObject(eventsOffBlock, forKeyedSubscript: "off" as NSString)
+        harnessObj.setObject(eventsObj, forKeyedSubscript: "events" as NSString)
     }
     #endif
 }
