@@ -623,6 +623,12 @@ public final class SurfaceRegistry: @unchecked Sendable {
             editor.updateTabMetadata(workspaceID: workspaceID, tabID: tabID, gitBranch: branch, cwd: nil)
             commit()
             return .ok
+        case let .notifyMCPActivity(surfaceID, _):
+            if let uuid = UUID(uuidString: surfaceID) {
+                editor.stampMCPActivity(surfaceID: uuid, at: Date())
+                commit()
+            }
+            return .ok
         case .getSnapshot:
             return .snapshot(editor.snapshot)
         case let .createSurface(cwd, shell):

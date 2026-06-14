@@ -11,6 +11,9 @@ public final class NotificationBus: @unchecked Sendable {
     public let sendKeysRequested = Notification.Name("HarnessSendKeysRequested")
     public let copyModeRequested = Notification.Name("HarnessCopyModeRequested")
     public let captureRequested = Notification.Name("HarnessCaptureRequested")
+    /// Posted when a mutating MCP tool executes, carrying the surface ID and tool name.
+    /// Used by StatusLineView to show a transient "MCP" indicator.
+    public let mcpActivity = Notification.Name("HarnessMCPActivity")
 
     private var latest: AgentNotification?
     private let lock = NSLock()
@@ -46,6 +49,16 @@ public final class NotificationBus: @unchecked Sendable {
     public func postConfigReloaded() {
         DispatchQueue.main.async {
             NotificationCenter.default.post(name: self.configReloaded, object: nil)
+        }
+    }
+
+    /// Posted when a mutating MCP tool is executed. `toolName` is e.g. "sendPaneText".
+    public func postMCPActivity(surfaceID: String, toolName: String) {
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(
+                name: self.mcpActivity, object: nil,
+                userInfo: ["surfaceID": surfaceID, "toolName": toolName]
+            )
         }
     }
 

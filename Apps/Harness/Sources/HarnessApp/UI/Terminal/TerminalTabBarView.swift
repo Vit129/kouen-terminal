@@ -395,10 +395,9 @@ private final class TabPillView: NSView {
     private let titleLabel = NSTextField(labelWithString: "")
     private let closeButton = NSButton()
     private let agentIcon = NSImageView()
-    /// "Kept alive" flag: a small pin shown at the leading edge when this tab is pinned to
-    /// survive a clean quit (`tab.persistent`). The visible counterpart of the context-menu
-    /// "Keep Tab Running After Quit" checkmark — a tmux-style window flag for persistence.
     private let persistentIcon = NSImageView()
+    /// Transient "MCP" badge shown for 5s after a mutating MCP tool controls this tab's pane.
+    private let mcpBadge = NSTextField(labelWithString: "MCP")
     /// Ghostty-style "AI is working" indicator: a tiny dot before the title that discretely
     /// shuttles between two spots while the tab's agent is producing output. Hidden otherwise.
     private let workingDot = NSView()
@@ -498,6 +497,12 @@ private final class TabPillView: NSView {
         addSubview(closeButton)
         addSubview(workingDot)
 
+        mcpBadge.font = .monospacedSystemFont(ofSize: 8, weight: .bold)
+        mcpBadge.textColor = .systemBlue
+        mcpBadge.translatesAutoresizingMaskIntoConstraints = false
+        mcpBadge.isHidden = true
+        addSubview(mcpBadge)
+
         // Title centers inside the pill with the close button floating on the
         // right edge and the agent brand icon (when present) on the left. Leading
         // edge inset matches the close button's trailing inset so the title stays
@@ -537,11 +542,15 @@ private final class TabPillView: NSView {
             workingDot.centerYAnchor.constraint(equalTo: centerYAnchor),
             workingDot.widthAnchor.constraint(equalToConstant: 2),
             workingDot.heightAnchor.constraint(equalToConstant: 2),
+            // MCP badge: trailing edge of title, center Y
+            mcpBadge.leadingAnchor.constraint(equalTo: titleLabel.trailingAnchor, constant: 3),
+            mcpBadge.centerYAnchor.constraint(equalTo: centerYAnchor),
         ])
 
         setAgentIcon(for: tab)
         setPersistentIndicator(tab.persistent)
         setWorkingDotVisible(Self.isAgentWorking(tab))
+        setMCPBadge(tab.lastMCPControlAt)
         applyChrome(isActive: isActive)
 
         // Re-evaluate the shuttle animation when the user toggles Reduce Motion mid-session,
@@ -698,8 +707,7 @@ private final class TabPillView: NSView {
         setAgentIcon(for: tab)
         setPersistentIndicator(tab.persistent)
         setWorkingDotVisible(Self.isAgentWorking(tab))
-        // Reset close/shortcut visibility to match current hover state — prevents stale
-        // animator values from persisting after sleep/wake or daemon sync refreshes.
+        setMCPBadge(tab.lastMCPControlAt)
         if !isHovered {
             closeButton.layer?.removeAllAnimations()
             closeButton.alphaValue = hasShortcut ? 0 : 1
@@ -712,6 +720,11 @@ private final class TabPillView: NSView {
     private func setPersistentIndicator(_ visible: Bool) {
         persistentIcon.isHidden = !visible
         persistentIconWidth.constant = visible ? 12 : 0
+    }
+
+    private func setMCPBadge(_ lastAt: Date?) {
+        let active = lastAt.map { Date().timeIntervalSince($0) < 5 } ?? false
+        mcpBadge.isHidden = !active
     }
 
     /// Show/hide the working dot and run its shuttle: a gentle glide between two spots —

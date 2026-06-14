@@ -46,6 +46,9 @@ public enum IPCRequest: Codable, Sendable {
     case updateTabTitle(surfaceID: String, title: String)
     case updateTabCwd(surfaceID: String, path: String)
     case updateTabGitBranch(workspaceID: UUID, tabID: UUID, branch: String?)
+    /// Posted by harness-mcp after a mutating tool succeeds, so the daemon can
+    /// stamp `lastMCPControlAt` on the affected tab and the UI shows a badge.
+    case notifyMCPActivity(surfaceID: String, toolName: String)
     case send(surfaceID: String, text: String)
     case sendData(surfaceID: String, data: Data)
     case getSnapshot

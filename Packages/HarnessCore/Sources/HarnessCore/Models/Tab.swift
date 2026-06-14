@@ -35,6 +35,9 @@ public struct Tab: Codable, Sendable, Identifiable, Equatable {
     /// persistence control: a tab survives iff `keepSessionsOnQuit || session.persistent ||
     /// tab.persistent`. Defaults to unpinned; older snapshots decode to `false`.
     public var persistent: Bool
+    /// Set by the daemon when a mutating MCP tool last controlled this tab's pane.
+    /// Cleared after 10s by the daemon's metadata scan. Drives the "MCP" badge in the UI.
+    public var lastMCPControlAt: Date?
 
     /// The tmux activity/silence/bell portion of `#{window_flags}`.
     public var alertFlags: String {
@@ -60,7 +63,8 @@ public struct Tab: Codable, Sendable, Identifiable, Equatable {
         bell: Bool = false,
         exitStatus: Int? = nil,
         currentCommand: String? = nil,
-        persistent: Bool = false
+        persistent: Bool = false,
+        lastMCPControlAt: Date? = nil
     ) {
         self.id = id
         self.title = title
@@ -74,8 +78,6 @@ public struct Tab: Codable, Sendable, Identifiable, Equatable {
         self.sortOrder = sortOrder
         self.agent = agent
         self.zoomedPaneID = zoomedPaneID
-        // Default focus to the first leaf so a freshly built tab always has a
-        // resolvable active pane (target-less commands depend on it).
         self.activePaneID = activePaneID ?? resolvedRoot.allPaneIDs().first
         self.lastActivePaneID = lastActivePaneID
         self.activity = activity
@@ -84,6 +86,7 @@ public struct Tab: Codable, Sendable, Identifiable, Equatable {
         self.exitStatus = exitStatus
         self.currentCommand = currentCommand
         self.persistent = persistent
+        self.lastMCPControlAt = lastMCPControlAt
     }
 
     public var displaySubtitle: String {
@@ -122,5 +125,7 @@ public struct Tab: Codable, Sendable, Identifiable, Equatable {
         currentCommand = try container.decodeIfPresent(String.self, forKey: .currentCommand)
         // Per-tab persistence pin — absent in older layout.json; default to unpinned.
         persistent = try container.decodeIfPresent(Bool.self, forKey: .persistent) ?? false
+        // MCP control timestamp — absent in older layout.json; nil = not recently MCP-controlled.
+        lastMCPControlAt = try container.decodeIfPresent(Date.self, forKey: .lastMCPControlAt)
     }
 }
