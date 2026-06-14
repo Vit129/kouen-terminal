@@ -62,6 +62,8 @@ struct HarnessCLI {
                 CommandParser.knownVerbs.forEach { print($0) }
             case "get-snapshot":
                 try printSnapshot(client)
+            case "board":
+                try printBoard(args, client: client)
             case "new-workspace":
                 let name = flagValue(args, flag: "--name") ?? "Workspace"
                 let response = try checkedRequest(client, .newWorkspace(name: name))

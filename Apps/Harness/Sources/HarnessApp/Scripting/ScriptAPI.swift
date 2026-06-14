@@ -63,7 +63,25 @@ struct ScriptAPI {
         panesObj.setObject(panesListBlock, forKeyedSubscript: "list" as NSString)
         harnessObj.setObject(panesObj, forKeyedSubscript: "panes" as NSString)
 
-        // 3. harness.commands namespace
+        // 3. harness.board namespace (P16 PBI-BOARD-005)
+        guard let boardObj = JSValue(newObjectIn: context) else { return }
+
+        // harness.board.list() — Kanban columns from the shared BoardModel, same
+        // shape as the `harnessBoard` MCP tool and `harness board` CLI output.
+        let boardListBlock: @convention(block) () -> JSValue? = {
+            let snapshot = SessionCoordinator.shared.snapshot
+            let columns = BoardModel.classify(snapshot: snapshot)
+            guard let data = try? JSONEncoder().encode(columns),
+                  let foundationObj = try? JSONSerialization.jsonObject(with: data, options: [])
+            else {
+                return JSValue(object: [], in: context)
+            }
+            return JSValue(object: foundationObj, in: context)
+        }
+        boardObj.setObject(boardListBlock, forKeyedSubscript: "list" as NSString)
+        harnessObj.setObject(boardObj, forKeyedSubscript: "board" as NSString)
+
+        // 4. harness.commands namespace
         guard let commandsObj = JSValue(newObjectIn: context) else { return }
 
         // harness.commands.parse(commandSource)

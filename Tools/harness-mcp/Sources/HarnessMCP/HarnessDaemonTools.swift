@@ -107,6 +107,28 @@ struct HarnessDaemonTools: Sendable {
         ])
     }
 
+    // MARK: - harnessBoard
+
+    /// P16 PBI-BOARD-005: read-only Kanban view over `BoardModel.classify(...)`, the
+    /// same shared classification used by the GUI board tab, `harness board` CLI,
+    /// and `harness.board.list()` scripting — so an orchestrator agent sees the
+    /// same columns/cards as a human looking at the board.
+    func harnessBoard() async -> (AnyCodable?, JSONRPCError?) {
+        guard let response = await send(.getSnapshot) else {
+            return (nil, Self.daemonUnavailableError)
+        }
+        guard case let .snapshot(snapshot) = response else {
+            return (nil, JSONRPCError(code: -32000, message: "Unexpected response to getSnapshot"))
+        }
+        let columns = BoardModel.classify(snapshot: snapshot)
+        guard let data = try? JSONEncoder().encode(columns),
+              let json = try? JSONDecoder().decode(AnyCodable.self, from: data)
+        else {
+            return (nil, JSONRPCError(code: -32000, message: "Failed to encode board"))
+        }
+        return (toolResult(json: .object(["columns": json])), nil)
+    }
+
     // MARK: - readPaneOutput
 
     func readPaneOutput(
