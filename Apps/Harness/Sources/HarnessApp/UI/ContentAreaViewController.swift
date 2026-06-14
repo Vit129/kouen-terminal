@@ -509,11 +509,8 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
     private var editorWidthConstraint: NSLayoutConstraint?
     private var editorDivider: NSView?
 
-    func showFileEditorSplit(resetFocusMode: Bool = true) {
+    func showFileEditorSplit() {
         fputs("BLINKDBG showFileEditorSplit: alreadyOpen=\(fileEditorPanel != nil)\n", harnessStderr)
-        if resetFocusMode {
-            (view.window?.contentViewController as? MainSplitViewController)?.resetFocusMode()
-        }
         if fileEditorPanel != nil {
             loadActiveFileTab()
             return
@@ -592,10 +589,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         persistEditorState()
     }
 
-    func hideFileEditorSplit(resetFocusMode: Bool = true) {
-        if resetFocusMode {
-            (view.window?.contentViewController as? MainSplitViewController)?.resetFocusMode()
-        }
+    func hideFileEditorSplit() {
         guard let panel = fileEditorPanel else { return }
         panel.removeFromSuperview()
         editorDivider?.removeFromSuperview()
