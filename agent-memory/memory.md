@@ -82,6 +82,7 @@
 | 65 | Docs: README updated (P11 scripting, P12 MCP, CLI section, stack table, Manual Test Plan link); docs/MANUAL_TEST_PLAN.md created (P4/P11/P12/P13/P16 manual test steps with mock data setup); agent-memory/plans/p17-structural-refactor.md and p18-ui-automation.md (Robot Framework) created; skill-log.md updated with P18 RF entry. Commit 06f0d56 pushed. | ✅ Done |
 | 66 | P17 PBI-REFACTOR-001 complete: SessionCoordinator 2050→397 LOC (target <500 ✅). Services: DaemonSyncService(233), NotificationCoordinator(247), SessionLifecycleService(360), SplitPaneCoordinator(157), ThemeService(178), ActivePaneService(197), SessionCoordinator+HostDelegate(86), SessionCoordinatorTypes(47). All 8 files use unowned coordinator back-reference. Build pass. | ✅ Done |
 | 67 | P12 PBI-ORCH-005: MCP-controlled indicator on tab bar. Tab.lastMCPControlAt field; IPCMessage.notifyMCPActivity; SessionEditor.stampMCPActivity; SurfaceRegistry handler; harness-mcp posts after sendPaneText/sendPaneKeys succeed; TabPillView shows "MCP" badge (blue, 5s). Build pass. | ✅ Done |
+| 68 | P14 PBI-BROWSER-001..005: Embedded browser pane (WKWebView) in split tree, toolbar controls, URL persistence, and MCP tools (Open/Navigate/Wait/Snapshot/Interact/Close) with security policy. | ✅ Done |
 
 ### Removed / Reverted Features
 - **Task Board sidebar** — was added in sprint #32 but has since been **removed**. Not present in current codebase.
@@ -138,11 +139,11 @@
 WezTerm/tmux/cmux comparison surfaced 3 capability gaps. Image protocols (Kitty/iTerm2/Sixel)
 checked and confirmed already at parity with WezTerm — no plan needed there.
 
-- `plans/p11-scripting-config-api.md` — P3, scriptable config/event-hooks (WezTerm Lua parity), JavaScriptCore-based
+- `plans/p11-scripting-config-api.md` — P3, scriptable config/event-hooks (WezTerm Lua parity), JavaScriptCore-based. **PBI-SCRIPT-001..005 done**
 - `plans/p12-agent-orchestration-mcp.md` — P2, extend `harness-mcp` with pane control tools (cmux socket-API parity); also addresses ACP's "no tool control" blocker via PBI-ORCH-004. **PBI-ORCH-001 through PBI-ORCH-005 done**
-- `plans/p14-web-browser-pane.md` — P3, WKWebView pane as new `PaneNode` leaf (cmux embedded browser parity); depends on P13 split parity and preferably P12 MCP control
+- `plans/p14-web-browser-pane.md` — P3, WKWebView pane as new `PaneNode` leaf (cmux embedded browser parity). **PBI-BROWSER-001..005 done**
 
-P11 and P14 not started — idea-stage only.
+P11, P12, and P14 fully implemented.
 
 ## Completed Sprints
 - **v1.3.0** — IDE-like Sidebar (PBI-001): Files tab, Git tab, session tabs, recent projects

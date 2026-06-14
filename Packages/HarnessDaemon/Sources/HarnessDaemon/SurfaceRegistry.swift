@@ -1046,6 +1046,8 @@ public final class SurfaceRegistry: @unchecked Sendable {
             // observe the notification bus and decide how to surface it.
             postDisplayMessage(FormatString.evaluate(format, context: buildFormatContext()))
             return .ok
+        case .browserOpen, .browserNavigate, .browserWait, .browserSnapshot, .browserInteract, .browserClose, .browserResponse:
+            return .error("Browser requests are handled at the daemon server layer")
         }
     }
 

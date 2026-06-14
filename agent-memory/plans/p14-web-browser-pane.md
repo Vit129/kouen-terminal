@@ -1,6 +1,6 @@
 # P14 — Embedded Browser Pane (cmux parity)
 
-Status: **ready to implement** — P13 ✅, P12 ✅, P11 ✅ all unblocked this
+Status: **done** — PBI-BROWSER-001..005 implemented
 Priority: **P3**
 Owner surface: **HarnessApp pane UI + harness-mcp browser tools**
 Depends on: P13 ✅, P12 ✅

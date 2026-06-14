@@ -96,6 +96,7 @@ public struct CommandTarget: Sendable {
     private static func findLeaf(_ node: PaneNode, paneID: PaneID) -> PaneLeaf? {
         switch node {
         case let .leaf(leaf): return leaf.id == paneID ? leaf : nil
+        case .browser: return nil
         case let .branch(_, _, first, second):
             return findLeaf(first, paneID: paneID) ?? findLeaf(second, paneID: paneID)
         }
@@ -133,6 +134,20 @@ public enum CommandIPCTranslator {
     /// `SplitDirection` the daemon stores.
     public static func layoutDirection(for commandDirection: SplitDirection) -> SplitDirection {
         commandDirection == .vertical ? .horizontal : .vertical
+    }
+
+    /// Maps a pane-relative direction string (`"right"`/`"left"`/`"up"`/`"down"`) to the
+    /// layout `SplitDirection` used by `newSplit`. The single mapping shared by P12's MCP
+    /// `splitPane` tool and P11's `harness.panes.split` so both agree on what `"right"` means.
+    public static func layoutDirection(forPaneDirection direction: String) -> SplitDirection? {
+        switch direction.lowercased() {
+        case "right", "left":
+            return .horizontal
+        case "up", "down":
+            return .vertical
+        default:
+            return nil
+        }
     }
 
     public static func translate(
@@ -433,7 +448,8 @@ public enum CommandIPCTranslator {
              .displayMessage, .runShell, .ifShell, .bindKey, .unbindKey, .listKeys,
              .sourceConfig, .reloadKeybindings, .showCheatsheet, .sequence,
              .sendPrefix, .sourceFile, .commandPrompt, .confirmBefore, .choose,
-             .lockClient, .clockMode, .switchClientTable, .displayPopup, .displayMenu:
+             .lockClient, .clockMode, .switchClientTable, .displayPopup, .displayMenu,
+             .openBrowser:
             return .clientLocal(command)
         }
     }

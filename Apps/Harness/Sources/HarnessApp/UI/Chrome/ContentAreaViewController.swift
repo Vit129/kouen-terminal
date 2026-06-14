@@ -420,6 +420,8 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         switch node {
         case let .leaf(leaf):
             return "l:\((leaf.activeSurfaceID ?? leaf.surfaceID).uuidString)"
+        case let .browser(leaf):
+            return "br:\(leaf.id.uuidString)"
         case let .branch(direction, _, first, second):
             // Ratio is intentionally excluded from the rebuild key: a divider drag
             // persists the ratio but must not force a pane remount (that was the
@@ -728,6 +730,16 @@ final class PaneContainerView: NSView {
 
     private func build(node: PaneNode, cwd: String, into parent: NSView) {
         switch node {
+        case let .browser(bl):
+            let bv = BrowserPaneView(url: bl.url, paneID: bl.id)
+            bv.translatesAutoresizingMaskIntoConstraints = false
+            parent.addSubview(bv)
+            NSLayoutConstraint.activate([
+                bv.topAnchor.constraint(equalTo: parent.topAnchor),
+                bv.leadingAnchor.constraint(equalTo: parent.leadingAnchor),
+                bv.trailingAnchor.constraint(equalTo: parent.trailingAnchor),
+                bv.bottomAnchor.constraint(equalTo: parent.bottomAnchor),
+            ])
         case let .leaf(leaf):
             let paneShell = NSView()
             HarnessDesign.makeClear(paneShell)
@@ -822,6 +834,7 @@ final class PaneContainerView: NSView {
     private func firstLeafID(_ node: PaneNode) -> PaneID? {
         switch node {
         case let .leaf(leaf): return leaf.id
+        case let .browser(leaf): return leaf.id
         case let .branch(_, _, first, _): return firstLeafID(first)
         }
     }

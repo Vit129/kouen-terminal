@@ -5,10 +5,15 @@ import HarnessCore
 struct ToolRegistry: Sendable {
     private let policy: ToolPolicy
     private let daemonTools: HarnessDaemonTools
+    private let browserTools: HarnessBrowserTools
 
     init(policy: ToolPolicy = ToolPolicy.load()) {
         self.policy = policy
         self.daemonTools = HarnessDaemonTools(
+            isToolAllowed: { policy.isToolAllowed($0) },
+            disabledError: { policy.disabledError(for: $0) }
+        )
+        self.browserTools = HarnessBrowserTools(
             isToolAllowed: { policy.isToolAllowed($0) },
             disabledError: { policy.disabledError(for: $0) }
         )
@@ -82,6 +87,31 @@ struct ToolRegistry: Sendable {
                 param("path", "string", "Path to the git repository"),
                 param("count", "number", "Number of commits (default 10)"),
             ]),
+            toolDef("harnessBrowserOpen", "Open a new browser pane (requires MCP policy allowlist or HARNESS_MCP_ALLOW_CONTROL=1)", [
+                param("url", "string", "URL to load"),
+                param("direction", "string", "Split direction: right, left, up, or down (optional)"),
+            ]),
+            toolDef("harnessBrowserNavigate", "Navigate an existing browser pane (requires MCP policy allowlist or HARNESS_MCP_ALLOW_CONTROL=1)", [
+                param("paneId", "string", "Browser pane UUID"),
+                param("url", "string", "URL to load"),
+            ]),
+            toolDef("harnessBrowserWait", "Wait for a browser pane to finish loading (requires MCP policy allowlist or HARNESS_MCP_ALLOW_CONTROL=1)", [
+                param("paneId", "string", "Browser pane UUID"),
+                param("timeoutSeconds", "number", "Timeout in seconds (optional, default 30)"),
+            ]),
+            toolDef("harnessBrowserSnapshot", "Take a DOM snapshot and list interactive elements from a browser pane", [
+                param("paneId", "string", "Browser pane UUID"),
+                param("interactive", "boolean", "Include interactive elements only (optional)"),
+            ]),
+            toolDef("harnessBrowserInteract", "Interact (click, type, or scroll) with an element in a browser pane (requires MCP policy allowlist or HARNESS_MCP_ALLOW_CONTROL=1)", [
+                param("paneId", "string", "Browser pane UUID"),
+                param("action", "string", "Interaction action: 'click', 'type', or 'scroll'"),
+                param("elementId", "string", "Element ID from snapshot (e.g. 'e1')"),
+                param("text", "string", "Text to type (optional, required if action is 'type')"),
+            ]),
+            toolDef("harnessBrowserClose", "Close an existing browser pane (requires MCP policy allowlist or HARNESS_MCP_ALLOW_CONTROL=1)", [
+                param("paneId", "string", "Browser pane UUID"),
+            ]),
         ])])
     }
 
@@ -112,6 +142,12 @@ struct ToolRegistry: Sendable {
         case "gitStatus": return await gitStatus(args)
         case "gitDiff": return await gitDiff(args)
         case "gitLog": return await gitLog(args)
+        case "harnessBrowserOpen": return await harnessBrowserOpen(args)
+        case "harnessBrowserNavigate": return await harnessBrowserNavigate(args)
+        case "harnessBrowserWait": return await harnessBrowserWait(args)
+        case "harnessBrowserSnapshot": return await harnessBrowserSnapshot(args)
+        case "harnessBrowserInteract": return await harnessBrowserInteract(args)
+        case "harnessBrowserClose": return await harnessBrowserClose(args)
         default:
             return (nil, JSONRPCError(code: -32602, message: "Unknown tool: \(name)"))
         }
@@ -303,6 +339,64 @@ struct ToolRegistry: Sendable {
         if case let .int(n)? = args["count"] { count = n } else { count = 10 }
         let (out, _, _) = await shell("git log --oneline -\(count)", cwd: path)
         return (toolResult(out.isEmpty ? "No commits" : out), nil)
+    }
+
+    // MARK: - Browser tools
+
+    private func harnessBrowserOpen(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        guard case let .string(url)? = args["url"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'url' parameter"))
+        }
+        let direction = optionalStringArg(args["direction"])
+        return await browserTools.harnessBrowserOpen(urlStr: url, directionStr: direction)
+    }
+
+    private func harnessBrowserNavigate(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        guard case let .string(paneId)? = args["paneId"],
+              case let .string(url)? = args["url"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'paneId' or 'url' parameter"))
+        }
+        return await browserTools.harnessBrowserNavigate(paneIdStr: paneId, urlStr: url)
+    }
+
+    private func harnessBrowserWait(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        guard case let .string(paneId)? = args["paneId"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'paneId' parameter"))
+        }
+        let timeoutSeconds: Double?
+        if case let .double(d)? = args["timeoutSeconds"] {
+            timeoutSeconds = d
+        } else if case let .int(i)? = args["timeoutSeconds"] {
+            timeoutSeconds = Double(i)
+        } else {
+            timeoutSeconds = nil
+        }
+        return await browserTools.harnessBrowserWait(paneIdStr: paneId, timeoutSeconds: timeoutSeconds)
+    }
+
+    private func harnessBrowserSnapshot(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        guard case let .string(paneId)? = args["paneId"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'paneId' parameter"))
+        }
+        let interactive = boolArg(args["interactive"], default: false)
+        return await browserTools.harnessBrowserSnapshot(paneIdStr: paneId, interactive: interactive)
+    }
+
+    private func harnessBrowserInteract(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        guard case let .string(paneId)? = args["paneId"],
+              case let .string(action)? = args["action"],
+              case let .string(elementId)? = args["elementId"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'paneId', 'action', or 'elementId' parameter"))
+        }
+        let text = optionalStringArg(args["text"])
+        return await browserTools.harnessBrowserInteract(paneIdStr: paneId, action: action, elementId: elementId, text: text)
+    }
+
+    private func harnessBrowserClose(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        guard case let .string(paneId)? = args["paneId"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'paneId' parameter"))
+        }
+        return await browserTools.harnessBrowserClose(paneIdStr: paneId)
     }
 
     // MARK: - Helpers

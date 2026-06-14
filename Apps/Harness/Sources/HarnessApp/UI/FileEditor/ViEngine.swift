@@ -61,6 +61,12 @@ final class ViEngine {
     var onDefinition: ((LSPPosition) async -> SyntaxDefinitionTarget?)?
     var onNavigateToDefinition: ((SyntaxDefinitionTarget) -> Void)?
     var onDiagnostics: (() -> [LSPDiagnostic])?
+    /// Returns the current file path being edited (for :copy-path).
+    var onCurrentFile: (() -> String?)?
+    /// Returns the current working directory (for :copy-path relative).
+    var onCurrentCWD: (() -> String?)?
+    /// Last :make command for :make last.
+    var lastMakeCommand: String?
 
     // Count prefix accumulation
     var countBuf = ""

@@ -1,33 +1,48 @@
 import Foundation
 
+public struct BrowserLeaf: Codable, Sendable, Equatable {
+    public var id: PaneID
+    public var url: URL
+    public init(id: PaneID = UUID(), url: URL) { self.id = id; self.url = url }
+}
+
 public enum PaneNode: Codable, Sendable, Equatable {
     case leaf(PaneLeaf)
+    case browser(BrowserLeaf)
     indirect case branch(direction: SplitDirection, ratio: Double, first: PaneNode, second: PaneNode)
 
     public var paneID: PaneID? {
-        if case let .leaf(leaf) = self { return leaf.id }
-        return nil
+        switch self {
+        case let .leaf(leaf): return leaf.id
+        case let .browser(leaf): return leaf.id
+        case .branch: return nil
+        }
     }
 
     public var surfaceID: SurfaceID? {
-        if case let .leaf(leaf) = self { return leaf.activeSurfaceID ?? leaf.surfaceID }
-        return nil
+        switch self {
+        case let .leaf(leaf): return leaf.activeSurfaceID ?? leaf.surfaceID
+        case .browser: return nil
+        case .branch: return nil
+        }
     }
 
     public mutating func replaceSurface(_ surfaceID: SurfaceID, in paneID: PaneID) {
         switch self {
-        case var .leaf(leaf) where leaf.id == paneID:
-            leaf.surfaceID = surfaceID
-            leaf.activeSurfaceID = surfaceID
-            if !leaf.surfaces.contains(where: { $0.id == surfaceID }) {
-                leaf.surfaces.append(PaneSurface(id: surfaceID, daemonSurfaceID: leaf.daemonSurfaceID))
+        case var .leaf(leaf):
+            if leaf.id == paneID {
+                leaf.surfaceID = surfaceID
+                leaf.activeSurfaceID = surfaceID
+                if !leaf.surfaces.contains(where: { $0.id == surfaceID }) {
+                    leaf.surfaces.append(PaneSurface(id: surfaceID, daemonSurfaceID: leaf.daemonSurfaceID))
+                }
+                self = .leaf(leaf)
             }
-            self = .leaf(leaf)
         case .branch(let direction, let ratio, var first, var second):
             first.replaceSurface(surfaceID, in: paneID)
             second.replaceSurface(surfaceID, in: paneID)
             self = .branch(direction: direction, ratio: ratio, first: first, second: second)
-        default:
+        case .browser:
             break
         }
     }
@@ -35,18 +50,22 @@ public enum PaneNode: Codable, Sendable, Equatable {
     public func allSurfaceIDs() -> [SurfaceID] {
         switch self {
         case let .leaf(leaf):
-            leaf.surfaceIDs
+            return leaf.surfaceIDs
         case let .branch(_, _, first, second):
-            first.allSurfaceIDs() + second.allSurfaceIDs()
+            return first.allSurfaceIDs() + second.allSurfaceIDs()
+        case .browser:
+            return []
         }
     }
 
     public func allPaneIDs() -> [PaneID] {
         switch self {
         case let .leaf(leaf):
-            [leaf.id]
+            return [leaf.id]
         case let .branch(_, _, first, second):
-            first.allPaneIDs() + second.allPaneIDs()
+            return first.allPaneIDs() + second.allPaneIDs()
+        case let .browser(leaf):
+            return [leaf.id]
         }
     }
 
@@ -55,9 +74,11 @@ public enum PaneNode: Codable, Sendable, Equatable {
     public func allLeaves() -> [PaneLeaf] {
         switch self {
         case let .leaf(leaf):
-            [leaf]
+            return [leaf]
         case let .branch(_, _, first, second):
-            first.allLeaves() + second.allLeaves()
+            return first.allLeaves() + second.allLeaves()
+        case .browser:
+            return []
         }
     }
 }
