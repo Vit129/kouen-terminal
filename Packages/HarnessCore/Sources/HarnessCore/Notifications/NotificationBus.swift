@@ -7,6 +7,7 @@ public final class NotificationBus: @unchecked Sendable {
     public let notificationPosted = Notification.Name("HarnessNotificationPosted")
     public let tabStatusChanged = Notification.Name("HarnessTabStatusChanged")
     public let snapshotChanged = Notification.Name("HarnessSnapshotChanged")
+    public let configReloaded = Notification.Name("HarnessConfigReloaded")
     public let sendKeysRequested = Notification.Name("HarnessSendKeysRequested")
     public let copyModeRequested = Notification.Name("HarnessCopyModeRequested")
     public let captureRequested = Notification.Name("HarnessCaptureRequested")
@@ -37,6 +38,14 @@ public final class NotificationBus: @unchecked Sendable {
                 object: nil,
                 userInfo: ["revision": revision]
             )
+        }
+    }
+
+    /// Posted after a script config file is (re)loaded, so `harness.events.on("configReloaded", ...)`
+    /// handlers can react to the load that just happened.
+    public func postConfigReloaded() {
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: self.configReloaded, object: nil)
         }
     }
 

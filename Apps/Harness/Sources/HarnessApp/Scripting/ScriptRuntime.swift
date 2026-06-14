@@ -3,19 +3,32 @@ import JavaScriptCore
 #endif
 import Foundation
 import AppKit
+import HarnessCore
 
 /// Wraps the JavaScriptCore runtime and exposes the public JS API.
 @MainActor
-final class ScriptRuntime {
+final class ScriptRuntime: NSObject {
     #if canImport(JavaScriptCore)
     let context: JSContext
     #endif
 
-    init() {
+    /// JS handlers registered via `harness.events.on(name, handler)`, keyed by event name.
+    var eventHandlers: [String: [JSValue]] = [:]
+    private var hasReportedEventError = false
+
+    override init() {
         #if canImport(JavaScriptCore)
         self.context = JSContext()!
+        super.init()
         setupAPI()
+        registerNotificationBridge()
+        #else
+        super.init()
         #endif
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 
     #if canImport(JavaScriptCore)
@@ -58,6 +71,60 @@ final class ScriptRuntime {
                 NSLog("[Script Error] \(exc)")
             }
             context?.exception = exception
+        }
+    }
+
+    /// Bridges `NotificationBus` signals to `harness.events.on(name, handler)` listeners.
+    private func registerNotificationBridge() {
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(handleSnapshotChanged(_:)),
+            name: NotificationBus.shared.snapshotChanged, object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(handleConfigReloaded(_:)),
+            name: NotificationBus.shared.configReloaded, object: nil
+        )
+    }
+
+    @objc private func handleSnapshotChanged(_ note: Notification) {
+        let revision = note.userInfo?["revision"] as? Int ?? 0
+        dispatchEvent("snapshotChanged", payload: ["revision": revision])
+    }
+
+    @objc private func handleConfigReloaded(_ note: Notification) {
+        dispatchEvent("configReloaded", payload: [:])
+    }
+
+    /// Invokes JS handlers registered via `harness.events.on(name, ...)` serially.
+    /// Handler errors are caught, logged, and surfaced via toast at most once per
+    /// script load to avoid toast spam (RL: a misbehaving handler fires on every
+    /// `snapshotChanged`, which can be many times per second).
+    func dispatchEvent(_ name: String, payload: [String: Any]) {
+        guard let handlers = eventHandlers[name], !handlers.isEmpty else { return }
+        guard let jsPayload = JSValue(object: payload, in: context) else { return }
+        for handler in handlers {
+            handler.call(withArguments: [jsPayload])
+            if let exception = context.exception {
+                reportEventError(name: name, exception: exception)
+                context.exception = nil
+            }
+        }
+    }
+
+    private func reportEventError(name: String, exception: JSValue) {
+        guard !hasReportedEventError else { return }
+        hasReportedEventError = true
+        let message = "Script event handler error (\(name)): \(exception)"
+        NSLog("[Script Error] \(message)")
+        DispatchQueue.main.async {
+            if NSClassFromString("XCTest") != nil {
+                NSLog("[Script Toast (Test Mode)] \(message)")
+                return
+            }
+            guard let app = NSApplication.shared as AnyObject? as? NSApplication else { return }
+            if let host = (app.keyWindow ?? app.mainWindow ?? app.windows.first(where: { $0.contentView != nil }))?.contentView {
+                Toast.show(message, in: host, hold: 3.5)
+            }
         }
     }
     #endif
