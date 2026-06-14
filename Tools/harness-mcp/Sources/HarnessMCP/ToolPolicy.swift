@@ -18,6 +18,11 @@ struct ToolPolicy: Sendable {
         "spawnSession",
         "splitPane",
         "closePane",
+        "harnessBrowserOpen",
+        "harnessBrowserNavigate",
+        "harnessBrowserWait",
+        "harnessBrowserInteract",
+        "harnessBrowserClose",
     ]
 
     private let allowControl: Bool

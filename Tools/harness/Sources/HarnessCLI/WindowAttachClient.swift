@@ -339,6 +339,7 @@ private final class WindowSession: @unchecked Sendable {
     private func findLeaf(_ node: PaneNode, paneID: PaneID) -> PaneLeaf? {
         switch node {
         case let .leaf(leaf): return leaf.id == paneID ? leaf : nil
+        case .browser: return nil
         case let .branch(_, _, first, second):
             return findLeaf(first, paneID: paneID) ?? findLeaf(second, paneID: paneID)
         }

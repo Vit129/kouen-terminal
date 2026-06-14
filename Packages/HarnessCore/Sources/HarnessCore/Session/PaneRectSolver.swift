@@ -98,6 +98,21 @@ public enum PaneRectSolver {
                 x: x, y: iy, cols: cols, rows: irows, labelRow: labelRow
             ))
 
+        case let .browser(leaf):
+            var iy = y, irows = rows, labelRow: Int? = nil
+            if status != .off, rows >= 2 {
+                switch status {
+                case .top: labelRow = y; iy = y + 1; irows = rows - 1
+                case .bottom: labelRow = y + rows - 1; irows = rows - 1
+                case .off: break
+                }
+            }
+            out.append(PaneRect(
+                paneID: leaf.id,
+                surfaceID: leaf.id,
+                x: x, y: iy, cols: cols, rows: irows, labelRow: labelRow
+            ))
+
         case let .branch(direction, ratio, first, second):
             switch direction {
             case .horizontal:
