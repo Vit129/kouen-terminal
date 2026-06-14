@@ -5,8 +5,7 @@ native GUI terminal with a daemon-owned session model, so a handful of tmux conc
 *adapted* to that architecture and a few are *rejected* with rationale. This document is
 the single honest ledger. Updated last for the 2026-06 parity close-out series
 (PRs #102–#108); user-facing usage lives in
-[HARNESS_TMUX_CAPABILITIES.md](HARNESS_TMUX_CAPABILITIES.md), grammar in
-[COMMANDS.md](COMMANDS.md).
+[MULTIPLEXER_GUIDE.md](MULTIPLEXER_GUIDE.md), grammar in [COMMANDS.md](COMMANDS.md).
 
 ## At parity
 
