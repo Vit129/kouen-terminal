@@ -61,6 +61,13 @@ final class NotificationCoordinator {
                     let previous = lastAgentActivity[key]
                     lastAgentActivity[key] = agent.activity
 
+                    // Broadcast any activity change to harness.events + BoardViewController.
+                    if previous != agent.activity {
+                        NotificationBus.shared.postAgentStateChanged(
+                            surfaceID: key, activity: agent.activity.rawValue
+                        )
+                    }
+
                     let stopped = previous == .working
                         && (agent.activity == .idle || agent.activity == .awaiting)
                     guard stopped else { continue }

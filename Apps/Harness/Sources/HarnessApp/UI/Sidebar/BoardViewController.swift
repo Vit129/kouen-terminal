@@ -61,23 +61,40 @@ final class BoardViewController: NSViewController {
         HarnessDesign.makeClear(scrollView)
         reload()
         NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(reload),
-            name: NotificationBus.shared.snapshotChanged,
-            object: nil
+            self, selector: #selector(reload),
+            name: NotificationBus.shared.snapshotChanged, object: nil
+        )
+        // PBI-BOARD-004: live card movement on agent state change
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(reload),
+            name: NotificationBus.shared.agentStateChanged, object: nil
         )
     }
 
+    /// PBI-BOARD-006: dismissed card IDs (runtime-only, not persisted).
+    private var dismissedCardIDs: Set<TabID> = []
+
     /// Recomputes columns from the live snapshot and rebuilds the card stacks.
-    /// Cheap enough to call on every snapshot change — no diffing needed for a
-    /// handful of columns/cards.
     @objc func reload() {
         columns = BoardModel.classify(snapshot: SessionCoordinator.shared.snapshot)
+            .map { col in
+                // Filter dismissed cards from Needs Attention column only.
+                var c = col
+                if col.kind == .needsAttention {
+                    c.cards = col.cards.filter { !dismissedCardIDs.contains($0.tabID) }
+                }
+                return c
+            }
 
         columnsStack.subviews.forEach { $0.removeFromSuperview() }
         for column in columns {
             columnsStack.addArrangedSubview(makeColumnView(column))
         }
+    }
+
+    func dismissCard(_ tabID: TabID) {
+        dismissedCardIDs.insert(tabID)
+        reload()
     }
 
     private func makeColumnView(_ column: BoardColumn) -> NSView {
@@ -122,6 +139,9 @@ final class BoardViewController: NSViewController {
         cardView.onTap = { [weak self] in
             self?.focus(card: card)
         }
+        cardView.onDismiss = card.column == .needsAttention ? { [weak self] in
+            self?.dismissCard(card.tabID)
+        } : nil
         return cardView
     }
 
@@ -142,6 +162,12 @@ final class BoardViewController: NSViewController {
 @MainActor
 final class BoardCardView: NSView {
     var onTap: (() -> Void)?
+    /// Set only for Needs Attention cards. Nil hides the dismiss button.
+    var onDismiss: (() -> Void)? {
+        didSet { dismissButton.isHidden = onDismiss == nil }
+    }
+
+    private let dismissButton = NSButton()
 
     init(card: BoardCard) {
         super.init(frame: .zero)
@@ -189,11 +215,23 @@ final class BoardCardView: NSView {
         stack.translatesAutoresizingMaskIntoConstraints = false
 
         addSubview(stack)
+        // Dismiss button (× top-right, hidden by default, shown for Needs Attention)
+        dismissButton.title = "×"
+        dismissButton.isBordered = false
+        dismissButton.font = .systemFont(ofSize: 11, weight: .regular)
+        dismissButton.contentTintColor = .tertiaryLabelColor
+        dismissButton.isHidden = true
+        dismissButton.target = self
+        dismissButton.action = #selector(handleDismiss)
+        dismissButton.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(dismissButton)
         NSLayoutConstraint.activate([
             stack.topAnchor.constraint(equalTo: topAnchor, constant: 8),
             stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -8),
             stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
-            stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
+            stack.trailingAnchor.constraint(equalTo: dismissButton.leadingAnchor, constant: -4),
+            dismissButton.topAnchor.constraint(equalTo: topAnchor, constant: 4),
+            dismissButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -6),
         ])
 
         addGestureRecognizer(NSClickGestureRecognizer(target: self, action: #selector(handleClick)))
@@ -205,5 +243,9 @@ final class BoardCardView: NSView {
 
     @objc private func handleClick() {
         onTap?()
+    }
+
+    @objc private func handleDismiss() {
+        onDismiss?()
     }
 }

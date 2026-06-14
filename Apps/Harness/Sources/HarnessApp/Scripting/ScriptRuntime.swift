@@ -84,6 +84,16 @@ final class ScriptRuntime: NSObject {
             self, selector: #selector(handleConfigReloaded(_:)),
             name: NotificationBus.shared.configReloaded, object: nil
         )
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(handleAgentStateChanged(_:)),
+            name: NotificationBus.shared.agentStateChanged, object: nil
+        )
+    }
+
+    @objc private func handleAgentStateChanged(_ note: Notification) {
+        let surfaceID = note.userInfo?["surfaceID"] as? String ?? ""
+        let activity = note.userInfo?["activity"] as? String ?? ""
+        dispatchEvent("agentStateChanged", payload: ["surfaceID": surfaceID, "activity": activity])
     }
 
     @objc private func handleSnapshotChanged(_ note: Notification) {
