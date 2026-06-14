@@ -1,6 +1,12 @@
 # P5 — ACP (Agent Client Protocol) — Harness as ACP Editor/Client
 
-Status: **ready to implement** (design complete, Phase 3.1 pending)  
+Status: **implemented but shelved/experimental** — `ACPClient`, `ACPSession`,
+`AgentChatPanelView`, and `AgentConfig` exist in `HarnessCore`/`HarnessApp`, but the
+Agent sidebar tab and Chat toggle are commented out (see CLAUDE.md: most CLI agents
+need separate ACP adapter binaries that aren't widely installed, PATH resolution
+inside .app bundles is unreliable, and there's no tool-invocation control). Code
+remains intact for future re-enablement; do not resume "Phase 3.1" work without
+re-scoping against that note.  
 Priority: **P1** — enables Claude Code/Codex/Gemini native integration  
 Depends on: Async IPC (P2) recommended but not blocking  
 Full design: `.aidlc/harness/acp/`  
