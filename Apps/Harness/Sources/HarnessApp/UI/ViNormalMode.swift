@@ -1519,13 +1519,13 @@ final class ViEngine {
         return token.contains("/") || token.contains(".") || token.hasPrefix("~") ? token : nil
     }
 
-    private static func isPathTokenChar(_ c: unichar) -> Bool {
+    static func isPathTokenChar(_ c: unichar) -> Bool {
         guard let scalar = UnicodeScalar(c) else { return false }
         if CharacterSet.alphanumerics.contains(scalar) { return true }
         return "/._-~:@+".unicodeScalars.contains(scalar)
     }
 
-    private static func stripLineColumnSuffix(_ token: String) -> String {
+    static func stripLineColumnSuffix(_ token: String) -> String {
         let parts = token.split(separator: ":", omittingEmptySubsequences: false)
         guard parts.count >= 2, let last = parts.last, Int(last) != nil else { return token }
         if parts.count >= 3, Int(parts[parts.count - 2]) != nil {

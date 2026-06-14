@@ -44,6 +44,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         notchController = NotchPanelController.shared
         notchController?.start()
         PrefixKeymap.shared.install()
+        AppIdleThrottle.shared.install()
         SurfaceShellTracker.shared.start()
         ScriptHookCoordinator.shared.start()
         // Follow the macOS system appearance for auto light/dark theme switching. The startup
