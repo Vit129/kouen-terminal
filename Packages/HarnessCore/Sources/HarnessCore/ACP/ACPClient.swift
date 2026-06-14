@@ -1,3 +1,4 @@
+#if HARNESS_ACP
 import Foundation
 
 /// ACP protocol v1 client — manages agent subprocess lifecycle and JSON-RPC 2.0 communication.
@@ -377,3 +378,4 @@ public protocol ACPClientDelegate: AnyObject, Sendable {
     func acpClient(_ client: ACPClient, didRequestTerminal command: String, args: [String], terminalId: String)
     func acpClient(_ client: ACPClient, didFinishPrompt stopReason: String)
 }
+#endif

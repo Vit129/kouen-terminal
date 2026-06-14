@@ -120,9 +120,11 @@ final class SettingsViewController: NSViewController, NSFontChanging {
     var keyRecorder: KeyRecorderView!
     /// Live "Installed ✓ / Install hooks" buttons keyed by agent (Agents page).
     var hookButtons: [AgentKind: NSButton] = [:]
+#if HARNESS_ACP
     /// "Enable for Chat" toggles keyed by agent (Agents page).
     var chatToggles: [AgentKind: NSButton] = [:]
     var acpAgentRows: NSStackView?
+#endif
     var lastChromeSignature: String?
     /// Daemon-owned `OptionStore` values, fetched on page build. Keyed by option name.
     var advValues: [String: String] = [:]

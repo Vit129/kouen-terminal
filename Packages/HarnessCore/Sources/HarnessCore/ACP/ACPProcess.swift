@@ -1,3 +1,4 @@
+#if HARNESS_ACP
 import Foundation
 
 public enum ACPProcessError: Error, Equatable {
@@ -93,3 +94,4 @@ public actor ACPProcess {
         }
     }
 }
+#endif
