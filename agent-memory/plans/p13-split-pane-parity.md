@@ -1,6 +1,6 @@
 # P13 — Split Pane Parity (tmux / WezTerm / cmux foundation)
 
-Status: **done** — PBI-SPLIT-001 through PBI-SPLIT-005 implemented, build and tests pass (uncommitted, awaiting review)
+Status: **done** — PBI-SPLIT-001 through PBI-SPLIT-005 implemented, build and tests pass, merged to main via PR #10
 Priority: **P2** — do before P14 browser pane
 Owner surface: **HarnessCore split model + daemon IPC + HarnessApp UI + CLI/docs**
 Created from gap review: 2026-06-13 WezTerm/tmux/cmux comparison, refined after P11/P12 planning
