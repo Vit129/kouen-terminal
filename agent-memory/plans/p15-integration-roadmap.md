@@ -1,6 +1,9 @@
 # P15 — Integration Roadmap (P4 + P10 + P11 + P12 + P13/P14)
 
-Status: **planned / not started**
+Status: **in progress** — Sequencing steps 1, 2, and 6 done (P13, P4 Track 2/3,
+and P16 PBI-BOARD-001/002/003/005 all merged to main). Step 3 (`harness.events`
+bridge) is the remaining gap, now blocking steps 4, 5, 7, and P16's
+PBI-BOARD-004/006.
 Priority: **P2** — sequencing/coordination plan, not a feature in itself
 Owner surface: cross-cutting (HarnessCore, HarnessApp UI, harness-mcp, harness-cli)
 Created: 2026-06-14, after P11 PBI-SCRIPT-001/002/003 and P13 PBI-SPLIT-001..005 landed
@@ -31,16 +34,17 @@ and records the decisions needed to land them without duplicate or conflicting w
 
 ---
 
-## Current State Snapshot (2026-06-14)
+## Current State Snapshot (2026-06-14, updated after PRs #10/#13–#19 merged)
 
 | Plan | Status | Key deliverable |
 |------|--------|-----------------|
-| P4 — LSP + File View | Two divergent docs exist (see "Known Gap" below). `worktree-p4-track23`'s rewritten doc claims Track 1/2/3 DONE (syntax highlighting, Quick Look-style viewer, LSP). `origin/main`'s older doc still frames Track 2/3 as not started. | Sidebar file viewer + `HarnessLSP` client, `ContentAreaViewController.showFileEditorSplit()` sibling panel (not a `PaneNode` leaf). |
+| P4 — LSP + File View | **Done and merged** (PR #16, `worktree-p4-track23`). The divergent-docs gap noted below is resolved — `agent-memory/plans/p4-lsp-file-view.md` on `main` is now the single authoritative doc, marking Track 1/2/3 DONE. | Sidebar file viewer + `HarnessLSP` client, `ContentAreaViewController.showFileEditorSplit()` sibling panel (not a `PaneNode` leaf). |
 | P10 — Performance & Feature Roadmap | Items 1-3 done (lazy reflow, local completion, keyboard layout presets). Item 4 (ACP sidebar) deferred. Also shipped: Session State Dot, IDE Mode Persistence, Task Board Sidebar Tab (Makefile/package.json runner), Focus Mode (⌘P). | `WorkspaceSymbolIndex`, `CompletionPopupView`, per-session state dot, Makefile/package.json task runner sidebar tab. |
-| P11 — Scripting & Config API | PBI-SCRIPT-001/002/003 DONE (JavaScriptCore runtime, reload lifecycle, read-only snapshot API + `commands.parse`). PBI-SCRIPT-004/005 not started. Explicit gap: `harness.events` namespace and `harness.commands.run`/mutators not implemented. | `ScriptRuntime`, `ScriptHookCoordinator`, `ScriptAPI` (`harness.sessions`, `harness.panes`, `harness.commands.parse`). |
-| P12 — Agent Orchestration via MCP | PBI-ORCH-001/002/003/004 DONE. PBI-ORCH-005 (UI visibility indicator) scoped only, no implementation. | `harnessList`, `readPaneOutput`, `waitForPaneOutput`, gated mutating tools (`sendPaneText`, `sendPaneKeys`, `spawnSession`, `splitPane`, `closePane`), `ToolPolicy`. |
-| P13 — Split Pane Parity | **Done** (uncommitted, awaiting review on `worktree-p13-split-pane`). PBI-SPLIT-001..005 implemented; top/bottom splits restored alongside side-by-side. | Vertical-split gate removed in `SessionCoordinator.splitActivePane`, "Split Down" UI affordances, CLI/docs parity, geometry + targeting tests. |
-| P13 (alt doc) — Embedded Browser ("P14" in narrative) | Idea / not started. Explicitly depends on split panes landing first. | `WKWebView`-backed third `PaneNode` leaf kind. |
+| P11 — Scripting & Config API | PBI-SCRIPT-001/002/003 DONE (merged PR #15, JavaScriptCore runtime, reload lifecycle, read-only snapshot API + `commands.parse`). PBI-SCRIPT-004/005 not started. Explicit gap: `harness.events` namespace and `harness.commands.run`/mutators not implemented. | `ScriptRuntime`, `ScriptHookCoordinator`, `ScriptAPI` (`harness.sessions`, `harness.panes`, `harness.commands.parse`, `harness.board`). |
+| P12 — Agent Orchestration via MCP | PBI-ORCH-001/002/003/004 DONE. PBI-ORCH-005 (UI visibility indicator) scoped only, no implementation. | `harnessList`, `readPaneOutput`, `waitForPaneOutput`, gated mutating tools (`sendPaneText`, `sendPaneKeys`, `spawnSession`, `splitPane`, `closePane`), `ToolPolicy`, read-only `harnessBoard`. |
+| P13 — Split Pane Parity | **Done and merged** (PR #10). PBI-SPLIT-001..005 implemented; top/bottom splits restored alongside side-by-side. | Vertical-split gate removed in `SessionCoordinator.splitActivePane`, "Split Down" UI affordances, CLI/docs parity, geometry + targeting tests. |
+| P13 (alt doc) — Embedded Browser ("P14" in narrative) | Idea / not started. Explicitly depends on split panes landing first (P13 is now merged, so P14 can be scoped). | `WKWebView`-backed third `PaneNode` leaf kind. |
+| P16 — Agent/Session Board | PBI-BOARD-001/002/003/005 **done and merged** (PRs #17–#19: `BoardModel`, `harness board` CLI, GUI "Board" sidebar tab, scripting `harness.board.list()` + MCP `harnessBoard`). PBI-BOARD-004/006 deferred — blocked on step 3 below. | Shared `BoardModel.classify(snapshot:)` consumed by GUI/CLI/scripting/MCP. |
 
 ---
 
@@ -107,39 +111,37 @@ slightly different versions.
 
 ---
 
-## Known Gap: Divergent P4 Docs
+## Known Gap: Divergent P4 Docs — RESOLVED
 
-`agent-memory/plans/p4-lsp-file-view.md` differs between `origin/main` (older doc,
-"Track 2 — Quick Look Preview" / "Track 3 — LSP Integration" framed as not started)
-and `worktree-p4-track23` (rewritten doc, "Track 1/2/3 DONE"). These have **not been
-reconciled**. Before any of the integration points above that touch P4 (the
-file-editor `PaneNode` promotion in particular) are scheduled, merge
-`worktree-p4-track23` to `main` first so there is one authoritative P4 doc and one
-authoritative `ContentAreaViewController`/`HarnessLSP` implementation to integrate
-against.
+`agent-memory/plans/p4-lsp-file-view.md` previously differed between `origin/main`
+(older doc, "Track 2 — Quick Look Preview" / "Track 3 — LSP Integration" framed as
+not started) and `worktree-p4-track23` (rewritten doc, "Track 1/2/3 DONE"). This was
+resolved by merging `worktree-p4-track23` to `main` (PR #16) — there is now one
+authoritative P4 doc and one authoritative `ContentAreaViewController`/`HarnessLSP`
+implementation to integrate against.
 
 ---
 
 ## Recommended Sequencing
 
-1. **Merge P13** (`worktree-p13-split-pane`) — unblocks P14 scoping and is a
-   prerequisite for any `PaneNode` changes touched by P4/P10/P14 integration.
-2. **Merge P4 Track 2/3** (`worktree-p4-track23`) — reconciles the divergent P4
-   docs; gives P14 and the file-editor/`PaneNode` question one ground truth.
-3. **Build the `harness.events` bridge** (remaining P11 gap) — single
+1. ✅ **Merge P13** (PR #10) — unblocks P14 scoping and is a
+   prerequisite for any `PaneNode` changes touched by P4/P10/P14 integration. Done.
+2. ✅ **Merge P4 Track 2/3** (PR #16) — reconciles the divergent P4
+   docs; gives P14 and the file-editor/`PaneNode` question one ground truth. Done.
+3. ⬜ **Build the `harness.events` bridge** (remaining P11 gap) — single
    `NotificationBus`-backed fan-out used by P11 scripts, P12 PBI-ORCH-005's MCP
-   indicator, and the board feature ([[p16-task-board]]).
-4. **P11 PBI-SCRIPT-004/005** — config/keybinding writes and mutating pane/session
-   API, reusing P12's command facade per "Shared Primitives Map" item 1.
-5. **P12 PBI-ORCH-005** — MCP-controlled indicator, now that the event bridge
-   exists.
-6. **P16 (board feature)** — consumes the event bridge + read-only snapshot APIs
-   from P11/P12; can start in parallel with steps 4-5 since it only needs
-   read-only data plus the bridge.
-7. **P14 (embedded browser)** — only after step 1, and after the file-editor
-   `PaneNode` question from step 2 is resolved (a `WKWebView` leaf and a promoted
-   file-editor leaf are the same kind of change; do them together or in the same
-   PBI sequence to avoid two separate `PaneNode` migrations).
+   indicator, and the board feature ([[p16-task-board]]). **Still the open
+   prerequisite** — blocks steps 4, 5, 7, and P16's PBI-BOARD-004/006.
+4. ⬜ **P11 PBI-SCRIPT-004/005** — config/keybinding writes and mutating pane/session
+   API, reusing P12's command facade per "Shared Primitives Map" item 1. Not started.
+5. ⬜ **P12 PBI-ORCH-005** — MCP-controlled indicator, blocked on step 3.
+6. ✅ **P16 (board feature)** — read-only PBI-BOARD-001/002/003/005 merged
+   (PRs #17–#19); PBI-BOARD-004/006 remain blocked on step 3.
+7. ⬜ **P14 (embedded browser)** — step 1 is done; the file-editor
+   `PaneNode` question from step 2 is now resolvable since P4 is merged (a
+   `WKWebView` leaf and a promoted file-editor leaf are the same kind of change; do
+   them together or in the same PBI sequence to avoid two separate `PaneNode`
+   migrations). Not started.
 
 ## Acceptance Criteria
 
