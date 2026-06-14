@@ -45,6 +45,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         notchController?.start()
         PrefixKeymap.shared.install()
         SurfaceShellTracker.shared.start()
+        ScriptHookCoordinator.shared.start()
         // Follow the macOS system appearance for auto light/dark theme switching. The startup
         // application happens post-daemon-sync below (so the theme change reaches a ready daemon);
         // this observer handles every later Light/Dark flip.

@@ -1,6 +1,6 @@
 # P11 — Scripting & Config API (WezTerm parity)
 
-Status: **planned / not started**
+Status: **PBI-SCRIPT-001/002/003 DONE; PBI-SCRIPT-004/005 not started**
 Priority: **P3** — strategic, implement after P12 unless a user explicitly asks for WezTerm-style config first
 Owner surface: **HarnessApp first**, then daemon/CLI only where a script action already maps to IPC
 Created from gap review: 2026-06-13 WezTerm/tmux/cmux comparison
@@ -167,7 +167,7 @@ Implementation notes:
 
 ## Implementation Plan
 
-### PBI-SCRIPT-001: Runtime shell and config discovery
+### PBI-SCRIPT-001: Runtime shell and config discovery — DONE
 
 Files:
 
@@ -189,7 +189,13 @@ Tests:
 - Unit test missing file is no-op.
 - Unit test syntax error does not crash and reports an error.
 
-### PBI-SCRIPT-002: Reload lifecycle
+- Implementation Notes:
+  - `ScriptConfigLocator.locate()` implements the documented search order ($HARNESS_CONFIG_FILE, $XDG_CONFIG_HOME/harness/init.js, $HOME/.config/harness/init.js, $HOME/.harness.js) with an injectable environment/`fileExists` for testing.
+  - `ScriptRuntime` wraps `JSContext` behind `#if canImport(JavaScriptCore)`, exposes `harness.version`, `harness.log(msg)`, `harness.toast(msg)`, and registers `ScriptAPI` (PBI-SCRIPT-003). `evaluate(script:sourceURL:)` throws `ScriptError.evaluationError` on JS exceptions.
+  - `ScriptHookCoordinator.shared.start()` is called from `AppDelegate.applicationDidFinishLaunching`. No config file → silent no-op (no toast, no runtime). A configured-but-invalid script logs via `NSLog` and shows a `Toast` (skipped under `XCTest`), keeping the previous good runtime active.
+  - Tests in `Tests/HarnessAppTests/ScriptingTests.swift`: `testConfigLocatorPrecedence`, `testMissingFileIsNoOp`, `testMinimalScriptEvaluation`, `testSyntaxErrorThrowsAndDoesNotCrash`.
+
+### PBI-SCRIPT-002: Reload lifecycle — DONE
 
 Files:
 
@@ -208,7 +214,13 @@ Tests:
 - Unit test watcher re-arms on replacement where practical.
 - App-level smoke: save `init.js`, verify reload toast/log appears.
 
-### PBI-SCRIPT-003: Read-only API bridge
+- Implementation Notes:
+  - `ScriptFileWatcher` follows the RL-011 single-file `DispatchSourceFileSystemObject` pattern (`.write/.delete/.rename/.extend/.attrib`, debounced 0.3s on the main queue) and is re-armed by `ScriptHookCoordinator` after every (re)load so atomic-save renames keep watching the new inode.
+  - On reload, a new `ScriptRuntime` is evaluated; only on success does it replace `ScriptHookCoordinator.runtime` and show a "Script reloaded successfully" toast — the previously-good runtime stays active if the new script fails to evaluate.
+  - The manual `reload-script-config` command was **not** added — automatic reload via the file watcher covers the acceptance criterion ("Editing init.js reloads without restarting the app"); deferred as a follow-up if a manual trigger is wanted later.
+  - Test: `testScriptFileWatcherReloadAndReArm` (async) covers re-arm-on-replacement.
+
+### PBI-SCRIPT-003: Read-only API bridge — DONE
 
 Files:
 
@@ -225,6 +237,13 @@ Tests:
 
 - Snapshot fixture converts to JS-visible objects.
 - JS cannot mutate Swift snapshot models directly.
+
+- Implementation Notes:
+  - `ScriptSnapshotModels.swift` adds `toJSDictionary()` extensions on `SessionGroup`/`Tab`/`PaneLeaf` (id/name/cwd/title/gitBranch/currentCommand/etc.), all plain-value `[String: Any]` copies.
+  - `ScriptAPI.register(in:)` wires `harness.sessions.list()`, `harness.panes.list(sessionId?)` (reads `SessionCoordinator.shared.snapshot`, flattens tabs/panes, optional session-id filter), and `harness.commands.parse(commandSource)` (calls `CommandParser.parse`, JSON-round-trips the `Command` to a JS object; on parse failure sets `context.exception` via `String(describing: error)` so `CommandParseError`'s `CustomStringConvertible` description, e.g. "unknown command: ...", is preserved — `error.localizedDescription` would have returned a generic NSError string instead).
+  - `ScriptRuntime`'s default `exceptionHandler` now also assigns `context?.exception = exception` (matching JSContext's normal default behavior, which a custom handler otherwise suppresses) so native-thrown exceptions are observable via `context.exception` after `evaluateScript`.
+  - **Gap**: the `harness.events` namespace (`configReloaded`, `snapshotChanged`, etc.) and `harness.commands.run`/mutators from the broader "Public JS API v1" spec are **not** implemented — out of scope per Rollout Order (events bridge + mutators belong to PBI-SCRIPT-004/005 work). The Acceptance Criteria item "A script can observe at least one app event (snapshotChanged) and run display-message" is therefore not yet met.
+  - Tests: `testReadOnlySnapshotAPIAndNonMutating` (sessions/panes list shape + JS-side mutation does not affect a re-fetch), `testCommandParseBridge` (parse success JSON shape + parse-error exception message).
 
 ### PBI-SCRIPT-004: Config/keybinding writes
 
