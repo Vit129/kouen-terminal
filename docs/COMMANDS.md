@@ -99,6 +99,7 @@ These query the current Harness state and do not change your layout.
 | `has-session --session <name\|uuid>` | Scripting verb: exit `0` if it exists, `1` if not; prints nothing. |
 | `list-commands` | Print the bindable command vocabulary. |
 | `list-agents [--waiting]` | List all running agents with state, age, and surface ID. `--waiting` filters to agents that need a response. |
+| `board [--watch]` | Kanban-style view of every session/tab grouped into Needs Attention / Running / Idle / Done / Error columns. `--watch` re-renders in place on every snapshot change (tmux/htop-style) until the connection ends. |
 
 ### Local diagnostics
 
