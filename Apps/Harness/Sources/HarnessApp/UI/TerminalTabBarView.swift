@@ -698,6 +698,13 @@ private final class TabPillView: NSView {
         setAgentIcon(for: tab)
         setPersistentIndicator(tab.persistent)
         setWorkingDotVisible(Self.isAgentWorking(tab))
+        // Reset close/shortcut visibility to match current hover state — prevents stale
+        // animator values from persisting after sleep/wake or daemon sync refreshes.
+        if !isHovered {
+            closeButton.layer?.removeAllAnimations()
+            closeButton.alphaValue = hasShortcut ? 0 : 1
+            shortcutLabel.alphaValue = hasShortcut ? 1 : 0
+        }
         applyChrome(isActive: isActive)
     }
 

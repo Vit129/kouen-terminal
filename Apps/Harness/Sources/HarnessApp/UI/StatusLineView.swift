@@ -82,6 +82,20 @@ final class StatusLineView: NSView {
         )
         startTimer()
         refresh()
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(throttleDidSuspend), name: AppIdleThrottle.didSuspend, object: nil)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(throttleDidResume), name: AppIdleThrottle.didResume, object: nil)
+    }
+
+    @objc private func throttleDidSuspend() {
+        refreshTimer?.invalidate()
+        refreshTimer = nil
+    }
+
+    @objc private func throttleDidResume() {
+        startTimer()
+        refresh()
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }

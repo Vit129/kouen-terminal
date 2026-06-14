@@ -293,7 +293,7 @@ final class SessionCardRowView: NSView {
         toolTip = displayedAgentKind != nil ? "\(defaultTitle) — \(folder)" : folder
 
         var metaParts: [String] = []
-        metaParts.append(String(session.id.uuidString.prefix(8)))
+        metaParts.append(String(session.id.uuidString.replacingOccurrences(of: "-", with: "").prefix(7)).lowercased())
         var repoWithBranch = folderName
         if let branch = tab.gitBranch, !branch.isEmpty {
             repoWithBranch += " (⎇ \(branch))"
