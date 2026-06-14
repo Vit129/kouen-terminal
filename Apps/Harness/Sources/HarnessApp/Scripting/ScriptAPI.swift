@@ -422,6 +422,29 @@ struct ScriptAPI {
         }
         keysObj.setObject(keysReloadBlock, forKeyedSubscript: "reload" as NSString)
         harnessObj.setObject(keysObj, forKeyedSubscript: "keys" as NSString)
+
+        // 9. harness.profiles namespace (P19 WB-007) — opt-in IDE-migrant bindings
+        guard let profilesObj = JSValue(newObjectIn: context) else { return }
+        let profilesUseBlock: @convention(block) (String) -> Void = { name in
+            guard name == "ide-migrant-terminal" else { return } // other profiles: silent no-op
+            let bindings: [(table: String, key: String, cmd: String)] = [
+                ("root", "Cmd-p", "find"),
+                ("root", "Cmd-b", "board"),
+                ("root", "Cmd-T", "make test"),
+                ("root", "Cmd-B", "make build"),
+                ("root", "Cmd-e", "errors"),
+            ]
+            for binding in bindings {
+                guard let command = try? CommandParser.parse(binding.cmd) else { continue }
+                let table = CommandParser.canonicalTableName(binding.table)
+                try? KeybindingsService.shared.bind(
+                    table: KeyTableID(rawValue: table), specRaw: binding.key,
+                    command: command, repeatable: false
+                )
+            }
+        }
+        profilesObj.setObject(profilesUseBlock, forKeyedSubscript: "use" as NSString)
+        harnessObj.setObject(profilesObj, forKeyedSubscript: "profiles" as NSString)
     }
     #endif
 }
