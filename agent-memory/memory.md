@@ -65,6 +65,8 @@
 | 49 | Quick Select Mode (⌘⇧Y) removed at user's request — didn't work, all related code deleted (HarnessTerminalSurfaceView+QuickSelect.swift, +Input.swift hook, TerminalHostView.enterQuickSelectMode, MainMenuBuilder menu item) | ✅ Done |
 | 50 | Fix git history card click not opening file preview (GitPanelView: replaced dead NSClickGestureRecognizer with HistoryCardView.onTap closure) | ✅ Done |
 | 51 | Investigate terminal panel black-flash when opening file preview from Git Changes/History/file-tree (even fresh tabs); not last-line scroll after preview open | 🔍 In progress |
+| 52 | P12 PBI-ORCH-001: harness-mcp `harnessList` + `readPaneOutput` read-only tools (HarnessDaemonTools.swift) | ✅ Done |
+| 53 | P12 PBI-ORCH-002/003: harness-mcp env-gated pane/session control tools plus waitForPaneOutput | ✅ Done |
 
 ### Removed / Reverted Features
 - **Task Board sidebar** — was added in sprint #32 but has since been **removed**. Not present in current codebase.
@@ -99,6 +101,7 @@
 - **RL-023:** The async `syncFromDaemon` variant must mirror every side-effect of the sync variant — including `terminalHosts.prune(keeping:)` on structure changes. Missing it causes dead TerminalHostViews (and their Metal surfaces) to accumulate for the app lifetime because the `scheduleSnapshotRefresh()` path always uses the async variant.
 - **RL-024:** `unichar` (UInt16) can hold surrogate code units (0xD800–0xDFFF). `UnicodeScalar(unichar)` returns nil for those — force-unwrapping it crashes on malformed clipboard content. Always `guard let scalar = UnicodeScalar(c) else { return <safe_default> }` when converting unichar → Character.
 - **RL-025:** Any per-cell state tied to terminal content (selection, marks, cursors held across frames) must be stored in **virtual-line space** (`historyCount - scrollOffset + viewportRow`, 0 = oldest retained line), not viewport-relative `(row, column)`. Viewport-relative coordinates silently go stale the moment `scrollOffset` changes. Copy mode (`CopyModePosition`/`CopyModeGridSource`) already used this convention; mouse selection didn't, causing scroll to clear/misplace selections (CASE-029). `TerminalEmulator.line(_:)`/`bufferLine(_:)` are virtual-line indexed and return blank rows out-of-range — safe to read without clamping for display/copy purposes.
+- **RL-026:** `SurfaceRegistry.sessions` (the PTY-session dict consulted by `send`/`capturePane`/`capturePaneRange`/etc.) is keyed by the layout `PaneLeaf.activeSurfaceID` (or `.surfaceID`) `.uuidString` — the same `SurfaceID` UUID used in `PaneNode`/`Tab`. `PaneSurface.daemonSurfaceID` is a separate optional field that is *not* populated in current snapshots; don't use it as the IPC surface key (CASE: P12 PBI-ORCH-001, `harnessList`'s `surfaceId`).
 
 ### Decisions_In_Force
 
@@ -119,10 +122,10 @@ WezTerm/tmux/cmux comparison surfaced 3 capability gaps. Image protocols (Kitty/
 checked and confirmed already at parity with WezTerm — no plan needed there.
 
 - `plans/p11-scripting-config-api.md` — P3, scriptable config/event-hooks (WezTerm Lua parity), JavaScriptCore-based
-- `plans/p12-agent-orchestration-mcp.md` — P2, extend `harness-mcp` with pane control tools (cmux socket-API parity); also addresses ACP's "no tool control" blocker via PBI-ORCH-004
+- `plans/p12-agent-orchestration-mcp.md` — P2, extend `harness-mcp` with pane control tools (cmux socket-API parity); also addresses ACP's "no tool control" blocker via PBI-ORCH-004. **PBI-ORCH-001 done** (harnessList/readPaneOutput read-only tools)
 - `plans/p13-embedded-browser.md` — P3, WKWebView pane as new `PaneNode` leaf (cmux embedded browser parity); depends on P12 for scripting
 
-None started — idea-stage only, not yet prioritized into a sprint.
+P12 started (PBI-ORCH-001 done); P11, P13, P14 not started — idea-stage only.
 
 ## Completed Sprints
 - **v1.3.0** — IDE-like Sidebar (PBI-001): Files tab, Git tab, session tabs, recent projects

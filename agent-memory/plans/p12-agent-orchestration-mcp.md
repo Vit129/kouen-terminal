@@ -1,6 +1,6 @@
 # P12 — Agent Orchestration via MCP (cmux parity)
 
-Status: **planned / not started**
+Status: **in progress — PBI-ORCH-001 done; PBI-ORCH-002 done; PBI-ORCH-003 done**
 Priority: **P2** — implement before P11 mutating pane APIs
 Owner surface: **harness-mcp + existing daemon IPC**
 Created from gap review: 2026-06-13 WezTerm/tmux/cmux comparison
@@ -286,7 +286,16 @@ Do not add GUI confirmation in v1. MCP runs headless over stdio; a GUI prompt wo
 
 ## Implementation Plan
 
-### PBI-ORCH-001: Read-only daemon connection
+### PBI-ORCH-001: Read-only daemon connection — DONE
+
+Implemented `harnessList` (workspaces/sessions/tabs/panes incl. agent info) and
+`readPaneOutput` (capturePaneRange, default 200 / max 2000 lines). `surfaceId`
+is the layout `SurfaceID` (leaf `activeSurfaceID`/`surfaceID`) `.uuidString` —
+this is the key `SurfaceRegistry.sessions` uses, *not* `PaneSurface.daemonSurfaceID`
+(which is unpopulated in current snapshots). Smoke-tested against the running
+production daemon: `harnessList` returned real workspace/session/pane data
+(including a live Codex/Claude Code agent), and `readPaneOutput` captured that
+pane's scrollback.
 
 Files:
 
