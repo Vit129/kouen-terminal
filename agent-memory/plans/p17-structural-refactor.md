@@ -30,7 +30,16 @@ The full test suite (1500+ tests) must pass identically before and after each PB
 
 ## PBI-REFACTOR-001: Decompose SessionCoordinator (2050 LOC → ~400 LOC coordinator + 4 focused services)
 
-**Problem:** `SessionCoordinator` is a 2050-line @MainActor class with 80+ methods spanning daemon sync, split pane management, session lifecycle, notifications, themes, IDE mode, and terminal host management. Every new feature (board, scripting, MCP) must thread through it.
+Status: **DONE** — SessionCoordinator 2050→397 LOC. 8 files total:
+- `DaemonSyncService` (233 LOC)
+- `NotificationCoordinator` (247 LOC)
+- `SessionLifecycleService` (360 LOC)
+- `SplitPaneCoordinator` (157 LOC)
+- `ThemeService` (178 LOC)
+- `ActivePaneService` (197 LOC)
+- `SessionCoordinator+HostDelegate.swift` (86 LOC)
+- `SessionCoordinatorTypes.swift` (47 LOC)
+- `SessionCoordinator.swift` (397 LOC — thin facade)
 
 **Decomposition:**
 
