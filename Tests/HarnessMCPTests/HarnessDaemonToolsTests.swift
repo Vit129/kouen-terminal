@@ -128,12 +128,15 @@ final class HarnessDaemonToolsTests: XCTestCase {
     }
 
     func testSplitPaneDirectionMappingUsesLayoutSemantics() {
-        XCTAssertEqual(HarnessDaemonTools.layoutDirection(forPaneDirection: "right"), .horizontal)
-        XCTAssertEqual(HarnessDaemonTools.layoutDirection(forPaneDirection: "left"), .horizontal)
-        XCTAssertEqual(HarnessDaemonTools.layoutDirection(forPaneDirection: "up"), .vertical)
-        XCTAssertEqual(HarnessDaemonTools.layoutDirection(forPaneDirection: "down"), .vertical)
-        XCTAssertEqual(HarnessDaemonTools.layoutDirection(forPaneDirection: "RIGHT"), .horizontal)
-        XCTAssertNil(HarnessDaemonTools.layoutDirection(forPaneDirection: "diagonal"))
+        // P15 step 4: the direction-string mapping moved to `CommandIPCTranslator` so
+        // `harness.panes.split` (P11 PBI-SCRIPT-005) and this MCP tool agree on what
+        // "right"/"left"/"up"/"down" mean.
+        XCTAssertEqual(CommandIPCTranslator.layoutDirection(forPaneDirection: "right"), .horizontal)
+        XCTAssertEqual(CommandIPCTranslator.layoutDirection(forPaneDirection: "left"), .horizontal)
+        XCTAssertEqual(CommandIPCTranslator.layoutDirection(forPaneDirection: "up"), .vertical)
+        XCTAssertEqual(CommandIPCTranslator.layoutDirection(forPaneDirection: "down"), .vertical)
+        XCTAssertEqual(CommandIPCTranslator.layoutDirection(forPaneDirection: "RIGHT"), .horizontal)
+        XCTAssertNil(CommandIPCTranslator.layoutDirection(forPaneDirection: "diagonal"))
     }
 
     func testToolRegistryRejectsNonStringKeys() async {

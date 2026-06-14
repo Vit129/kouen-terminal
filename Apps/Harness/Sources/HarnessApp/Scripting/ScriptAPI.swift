@@ -19,8 +19,39 @@ struct ScriptAPI {
         // harness.sessions.list()
         let sessionsListBlock: @convention(block) () -> JSValue? = {
             let snapshot = SessionCoordinator.shared.snapshot
-            let sessions = snapshot.workspaces.flatMap { $0.sessions }
-            let list = sessions.map { $0.toJSDictionary() }
+            var list: [[String: Any]] = []
+            for workspace in snapshot.workspaces {
+                let workspaceID = workspace.id
+                for session in workspace.sessions {
+                    var dict = session.toJSDictionary()
+
+                    // session.spawn({cwd, shell, name}) — P11 PBI-SCRIPT-005. Spawns a new
+                    // session in this session's workspace via the same `.newSession` IPC
+                    // request the GUI "New Session" action and P12's MCP `spawnSession` use.
+                    let spawnBlock: @convention(block) (JSValue?) -> JSValue? = { options in
+                        var cwd: String?
+                        var shell: String?
+                        var name: String?
+                        if let options, options.isObject {
+                            if let v = options.objectForKeyedSubscript("cwd"), v.isString { cwd = v.toString() }
+                            if let v = options.objectForKeyedSubscript("shell"), v.isString { shell = v.toString() }
+                            if let v = options.objectForKeyedSubscript("name"), v.isString { name = v.toString() }
+                        }
+                        let coordinator = SessionCoordinator.shared
+                        guard case let .sessionID(newSessionID)? = coordinator.requestDaemon(
+                            .newSession(workspaceID: workspaceID, cwd: cwd, name: name, shell: shell)
+                        ) else {
+                            context.exception = JSValue(newErrorFromMessage: "session.spawn: failed", in: context)
+                            return nil
+                        }
+                        coordinator.syncFromDaemon()
+                        return JSValue(object: ["sessionId": newSessionID.uuidString], in: context)
+                    }
+                    dict["spawn"] = spawnBlock
+
+                    list.append(dict)
+                }
+            }
             return JSValue(object: list, in: context)
         }
         sessionsObj.setObject(sessionsListBlock, forKeyedSubscript: "list" as NSString)
@@ -47,14 +78,68 @@ struct ScriptAPI {
                 for tab in session.tabs {
                     let leaves = tab.rootPane.allLeaves()
                     for leaf in leaves {
-                        results.append(leaf.toJSDictionary(
+                        var dict = leaf.toJSDictionary(
                             sessionId: session.id.uuidString,
                             tabId: tab.id.uuidString,
                             tabTitle: tab.title,
                             tabCwd: tab.cwd,
                             tabGitBranch: tab.gitBranch,
                             tabCurrentCommand: tab.currentCommand
-                        ))
+                        )
+
+                        let paneID = leaf.id
+                        let surfaceID = leaf.activeSurfaceID ?? leaf.surfaceID
+                        let tabID = tab.id
+
+                        // pane.sendText(text) — P11 PBI-SCRIPT-005, same `.send` IPC request
+                        // MCP's `sendPaneText` and the terminal input path use.
+                        let sendTextBlock: @convention(block) (String) -> Void = { text in
+                            let coordinator = SessionCoordinator.shared
+                            _ = coordinator.requestDaemon(.send(surfaceID: surfaceID.uuidString, text: text))
+                            coordinator.syncFromDaemon()
+                        }
+                        dict["sendText"] = sendTextBlock
+
+                        // pane.split({direction, shell}) — direction is "right"/"left"/"up"/
+                        // "down", mapped to the layout SplitDirection via the shared
+                        // CommandIPCTranslator.layoutDirection(forPaneDirection:) helper so this
+                        // agrees with P12's MCP `splitPane`.
+                        let splitBlock: @convention(block) (JSValue?) -> JSValue? = { options in
+                            var direction = "right"
+                            var shell: String?
+                            if let options, options.isObject {
+                                if let v = options.objectForKeyedSubscript("direction"), v.isString, let s = v.toString() {
+                                    direction = s
+                                }
+                                if let v = options.objectForKeyedSubscript("shell"), v.isString {
+                                    shell = v.toString()
+                                }
+                            }
+                            guard let layoutDirection = CommandIPCTranslator.layoutDirection(forPaneDirection: direction) else {
+                                context.exception = JSValue(newErrorFromMessage: "pane.split: invalid direction '\(direction)'", in: context)
+                                return nil
+                            }
+                            let coordinator = SessionCoordinator.shared
+                            guard case let .paneID(newPaneID)? = coordinator.requestDaemon(
+                                .newSplit(tabID: tabID, paneID: paneID, direction: layoutDirection, shell: shell)
+                            ) else {
+                                context.exception = JSValue(newErrorFromMessage: "pane.split: failed", in: context)
+                                return nil
+                            }
+                            coordinator.syncFromDaemon()
+                            return JSValue(object: ["paneId": newPaneID.uuidString], in: context)
+                        }
+                        dict["split"] = splitBlock
+
+                        // pane.close() — same `.killPane` IPC request MCP's `closePane` uses.
+                        let closeBlock: @convention(block) () -> Void = {
+                            let coordinator = SessionCoordinator.shared
+                            _ = coordinator.requestDaemon(.killPane(paneID: paneID))
+                            coordinator.syncFromDaemon()
+                        }
+                        dict["close"] = closeBlock
+
+                        results.append(dict)
                     }
                 }
             }
@@ -97,7 +182,37 @@ struct ScriptAPI {
             }
         }
         commandsObj.setObject(commandsParseBlock, forKeyedSubscript: "parse" as NSString)
+
+        // harness.commands.__runSync(commandSource) — parses and executes commandSource through
+        // CommandParser + MainExecutor (which itself routes through CommandIPCTranslator using the
+        // current GUI focus, per `runViaTranslator`). Wrapped below in a Promise so
+        // `harness.commands.run` matches the documented `Promise<Result>` signature even though
+        // execution is synchronous on the main actor.
+        let commandsRunSyncBlock: @convention(block) (String) -> JSValue? = { commandSource in
+            do {
+                let command = try CommandParser.parse(commandSource)
+                try MainExecutor.shared.execute(command)
+                return JSValue(object: ["ok": true], in: context)
+            } catch {
+                context.exception = JSValue(newErrorFromMessage: String(describing: error), in: context)
+                return nil
+            }
+        }
+        commandsObj.setObject(commandsRunSyncBlock, forKeyedSubscript: "__runSync" as NSString)
         harnessObj.setObject(commandsObj, forKeyedSubscript: "commands" as NSString)
+
+        // `run` wraps `__runSync` in a Promise so callers can `await harness.commands.run(...)`.
+        context.evaluateScript("""
+        harness.commands.run = function(commandSource) {
+            return new Promise(function(resolve, reject) {
+                try {
+                    resolve(harness.commands.__runSync(commandSource));
+                } catch (e) {
+                    reject(e);
+                }
+            });
+        };
+        """)
 
         // 5. harness.events namespace — bridges NotificationBus to JS handlers (P11
         // PBI-SCRIPT-003 gap / P15 step 3). v1 events: snapshotChanged, configReloaded.
@@ -123,6 +238,190 @@ struct ScriptAPI {
         eventsObj.setObject(eventsOnBlock, forKeyedSubscript: "on" as NSString)
         eventsObj.setObject(eventsOffBlock, forKeyedSubscript: "off" as NSString)
         harnessObj.setObject(eventsObj, forKeyedSubscript: "events" as NSString)
+
+        // 6. harness.config namespace (P11 PBI-SCRIPT-004) — allowlisted HarnessSettings
+        // read/write, persisted through HarnessSettings.save() and applied through the same
+        // refresh path the Settings UI uses (SessionCoordinator.applySettingsToHosts(), or
+        // setTheme for "theme").
+        guard let configObj = JSValue(newObjectIn: context) else { return }
+
+        let configGetBlock: @convention(block) (String) -> JSValue? = { key in
+            let coordinator = SessionCoordinator.shared
+            let settings = coordinator.settings
+            switch key {
+            case "theme":
+                return JSValue(object: coordinator.snapshot.themeName, in: context)
+            case "fontFamily":
+                return JSValue(object: settings.fontFamily, in: context)
+            case "fontSize":
+                return JSValue(double: Double(settings.fontSize), in: context)
+            case "backgroundOpacity":
+                return JSValue(double: Double(settings.backgroundOpacity), in: context)
+            case "backgroundBlur":
+                return JSValue(double: Double(settings.backgroundBlur), in: context)
+            case "windowPaddingX":
+                return JSValue(double: Double(settings.windowPaddingX), in: context)
+            case "windowPaddingY":
+                return JSValue(double: Double(settings.windowPaddingY), in: context)
+            case "defaultShell":
+                return JSValue(object: settings.defaultShell, in: context)
+            case "defaultCWD":
+                return JSValue(object: settings.defaultCWD, in: context)
+            case "systemNotificationsEnabled":
+                return JSValue(bool: settings.systemNotificationsEnabled, in: context)
+            case "notificationSoundEnabled":
+                return JSValue(bool: settings.notificationSoundEnabled, in: context)
+            default:
+                context.exception = JSValue(newErrorFromMessage: "harness.config.get: unknown key '\(key)'", in: context)
+                return nil
+            }
+        }
+        configObj.setObject(configGetBlock, forKeyedSubscript: "get" as NSString)
+
+        let configSetBlock: @convention(block) (String, JSValue) -> Void = { key, value in
+            let coordinator = SessionCoordinator.shared
+            switch key {
+            case "theme":
+                guard value.isString, let name = value.toString(), !name.isEmpty else {
+                    context.exception = JSValue(newErrorFromMessage: "harness.config.set: 'theme' requires a non-empty string", in: context)
+                    return
+                }
+                coordinator.setTheme(name)
+                return
+            case "fontFamily":
+                guard value.isString, let name = value.toString() else {
+                    context.exception = JSValue(newErrorFromMessage: "harness.config.set: 'fontFamily' requires a string", in: context)
+                    return
+                }
+                coordinator.settings.fontFamily = name
+            case "fontSize":
+                guard value.isNumber else {
+                    context.exception = JSValue(newErrorFromMessage: "harness.config.set: 'fontSize' requires a number", in: context)
+                    return
+                }
+                coordinator.settings.fontSize = HarnessSettings.clampedFontSize(Float(value.toDouble()))
+            case "backgroundOpacity":
+                guard value.isNumber else {
+                    context.exception = JSValue(newErrorFromMessage: "harness.config.set: 'backgroundOpacity' requires a number", in: context)
+                    return
+                }
+                coordinator.settings.backgroundOpacity = HarnessSettings.clampedOpacity(Float(value.toDouble()))
+            case "backgroundBlur":
+                guard value.isNumber else {
+                    context.exception = JSValue(newErrorFromMessage: "harness.config.set: 'backgroundBlur' requires a number", in: context)
+                    return
+                }
+                coordinator.settings.backgroundBlur = HarnessSettings.clampedBlur(Int(value.toDouble()))
+            case "windowPaddingX":
+                guard value.isNumber else {
+                    context.exception = JSValue(newErrorFromMessage: "harness.config.set: 'windowPaddingX' requires a number", in: context)
+                    return
+                }
+                coordinator.settings.windowPaddingX = HarnessSettings.clampedPadding(Float(value.toDouble()))
+            case "windowPaddingY":
+                guard value.isNumber else {
+                    context.exception = JSValue(newErrorFromMessage: "harness.config.set: 'windowPaddingY' requires a number", in: context)
+                    return
+                }
+                coordinator.settings.windowPaddingY = HarnessSettings.clampedPadding(Float(value.toDouble()))
+            case "defaultShell":
+                guard value.isString, let shell = value.toString() else {
+                    context.exception = JSValue(newErrorFromMessage: "harness.config.set: 'defaultShell' requires a string", in: context)
+                    return
+                }
+                coordinator.settings.defaultShell = shell
+            case "defaultCWD":
+                guard value.isString, let cwd = value.toString() else {
+                    context.exception = JSValue(newErrorFromMessage: "harness.config.set: 'defaultCWD' requires a string", in: context)
+                    return
+                }
+                coordinator.settings.defaultCWD = cwd
+            case "systemNotificationsEnabled":
+                guard value.isBoolean else {
+                    context.exception = JSValue(newErrorFromMessage: "harness.config.set: 'systemNotificationsEnabled' requires a boolean", in: context)
+                    return
+                }
+                coordinator.settings.systemNotificationsEnabled = value.toBool()
+            case "notificationSoundEnabled":
+                guard value.isBoolean else {
+                    context.exception = JSValue(newErrorFromMessage: "harness.config.set: 'notificationSoundEnabled' requires a boolean", in: context)
+                    return
+                }
+                coordinator.settings.notificationSoundEnabled = value.toBool()
+            default:
+                context.exception = JSValue(newErrorFromMessage: "harness.config.set: unknown key '\(key)'", in: context)
+                return
+            }
+            // Persist and push to live terminals — the same refresh path Settings UI's
+            // `flushAndApply()` uses (HarnessSettings.save() + applySettingsToHosts()).
+            try? coordinator.settings.save()
+            coordinator.applySettingsToHosts()
+        }
+        configObj.setObject(configSetBlock, forKeyedSubscript: "set" as NSString)
+
+        // harness.config.reloadTerminalImport() — re-runs the tmux/ghostty config import
+        // (same as the "Reimport Terminal Config" command palette action).
+        let configReloadTerminalImportBlock: @convention(block) () -> Void = {
+            SessionCoordinator.shared.reimportTerminalConfig()
+        }
+        configObj.setObject(configReloadTerminalImportBlock, forKeyedSubscript: "reloadTerminalImport" as NSString)
+        harnessObj.setObject(configObj, forKeyedSubscript: "config" as NSString)
+
+        // 7. harness.keys namespace (P11 PBI-SCRIPT-004) — bind/unbind persist through
+        // KeybindingsService/KeybindingsStore (the same store `bind-key`/`unbind-key` use);
+        // `reload()` mirrors the `reload-keybindings` command's refresh path.
+        guard let keysObj = JSValue(newObjectIn: context) else { return }
+
+        // v1 allowlist: prefix, copy-mode, copy-mode-vi (alias for copy-mode), root.
+        let keysAllowedTables: Set<String> = ["prefix", "copy-mode", "copy-mode-vi", "root"]
+
+        let keysBindBlock: @convention(block) (String, String, String, JSValue?) -> Void = { table, keySpec, commandSource, options in
+            guard keysAllowedTables.contains(table) else {
+                context.exception = JSValue(newErrorFromMessage: "harness.keys.bind: unknown table '\(table)'", in: context)
+                return
+            }
+            var repeatable = false
+            if let options, options.isObject {
+                let repeatableVal = options.objectForKeyedSubscript("repeatable")
+                if let repeatableVal, !repeatableVal.isUndefined && !repeatableVal.isNull {
+                    repeatable = repeatableVal.toBool()
+                }
+            }
+            do {
+                let command = try CommandParser.parse(commandSource)
+                let canonicalTable = CommandParser.canonicalTableName(table)
+                try KeybindingsService.shared.bind(
+                    table: KeyTableID(rawValue: canonicalTable), specRaw: keySpec,
+                    command: command, repeatable: repeatable
+                )
+            } catch {
+                context.exception = JSValue(newErrorFromMessage: "harness.keys.bind: \(error)", in: context)
+            }
+        }
+        keysObj.setObject(keysBindBlock, forKeyedSubscript: "bind" as NSString)
+
+        let keysUnbindBlock: @convention(block) (String, String) -> Void = { table, keySpec in
+            guard keysAllowedTables.contains(table) else {
+                context.exception = JSValue(newErrorFromMessage: "harness.keys.unbind: unknown table '\(table)'", in: context)
+                return
+            }
+            do {
+                let canonicalTable = CommandParser.canonicalTableName(table)
+                try KeybindingsService.shared.unbind(table: KeyTableID(rawValue: canonicalTable), specRaw: keySpec)
+            } catch {
+                context.exception = JSValue(newErrorFromMessage: "harness.keys.unbind: \(error)", in: context)
+            }
+        }
+        keysObj.setObject(keysUnbindBlock, forKeyedSubscript: "unbind" as NSString)
+
+        // harness.keys.reload() — re-reads keybindings.json and rebuilds the prefix keymap,
+        // the same refresh path the `reload-keybindings` command takes in MainExecutor.
+        let keysReloadBlock: @convention(block) () -> Void = {
+            KeybindingsService.shared.reload()
+            PrefixKeymap.shared.rebuildFromSettings()
+        }
+        keysObj.setObject(keysReloadBlock, forKeyedSubscript: "reload" as NSString)
+        harnessObj.setObject(keysObj, forKeyedSubscript: "keys" as NSString)
     }
     #endif
 }
