@@ -170,6 +170,74 @@ Always run `swift build` after code edits. For daemon, IPC, or PTY changes, also
 | Production app still uses old daemon | `make install` refreshes `/Applications` and app-support binaries |
 | Agent hook does not notify | Check `harness-cli doctor`, `HARNESS_SURFACE`, and the matching guide in `docs/agent-hooks/` |
 
+## 8. IDE-Like Workflow (Terminal Workbench)
+
+Harness includes IDE-like features accessible without leaving the terminal. No path memorization required.
+
+### File Navigation (replaces File Tree)
+
+| Shortcut / Command | What it does |
+|--------------------|-------------|
+| `⌘K` | Fuzzy file search — like Spotlight or VS Code Cmd+P |
+| `:find <partial>` | Fuzzy-open file by name fragment (vi ex command) |
+| `:recent` | Show recently opened files, pick by number |
+| `:copy-path` | Copy relative path of the current file |
+| `:copy-path absolute` | Copy absolute path |
+| `gf` | Open path under cursor (works on compiler/test output) |
+
+### Search in Project (replaces Search Panel)
+
+| Command | What it does |
+|---------|-------------|
+| `:grep <query>` | Search across the project, results shown as `path:line:col` |
+| `gf` on result | Jump to file at that line |
+
+### Errors and Diagnostics (replaces Problems Panel)
+
+| Command | What it does |
+|---------|-------------|
+| `:errors` | Show LSP diagnostics for the current file |
+| `]d` / `[d` | Jump to next / previous error |
+| `gd` | Go to definition at cursor |
+| `K` | Hover info at cursor (requires LSP) |
+
+### Build and Test (replaces Run Panel)
+
+| Command | What it does |
+|---------|-------------|
+| `:make` | Auto-detect and run the project's default build command |
+| `:make build` | Run the build command (SwiftPM / Makefile / npm auto-detected) |
+| `:make test` | Run the test command |
+| `:make last` | Repeat the last `:make` command |
+
+Tasks run in a split pane — the current terminal stays usable.
+
+### Session State (replaces Status Panel)
+
+| Command | What it does |
+|---------|-------------|
+| `:board` | Open Board tab — Running / Idle / Done / Error / Needs Attention |
+| `:attention` | Jump to the next session that needs attention |
+| `:ack` | Dismiss the current tab's Needs Attention state |
+| `harness-cli board` | Same board view from the shell |
+| `harness-cli board --watch` | Live-updating board (htop-style) |
+
+### Vi Ex Commands (open file editor first, then press `:`)
+
+File editor opens when you click a file in the sidebar, or via `:view <path>` / `:edit <path>`.
+
+```
+:find SessionCoord     → fuzzy-open file matching "SessionCoord"
+:recent                → list recently opened files
+:copy-path             → copy relative path to clipboard
+:grep BoardModel       → search project for "BoardModel"
+:errors                → show LSP errors in current file
+:make test             → run tests in a split pane
+:make last             → repeat last build/test command
+:board                 → show session board
+:split path/to/file    → open file in a new split pane
+```
+
 ## More Docs
 
 - [docs/MULTIPLEXER_GUIDE.md](docs/MULTIPLEXER_GUIDE.md) - panes, sessions, copy mode, attach, remote workflows

@@ -80,7 +80,7 @@ These are fixed `NSMenuItem` bindings defined in `MainMenuBuilder` — not prefi
 | Close tab | `⌘W` |
 | Previous / Next session | `⌘[` / `⌘]` |
 | Split horizontal | `⌘D` |
-| Command palette | `⌘K` |
+| **File search (fuzzy — like Spotlight)** | **`⌘K`** |
 | Command prompt | `⌘;` |
 | Search command history | `⌃R` |
 | Toggle sidebar + file editor (focus mode) | `⌘\` |
@@ -89,6 +89,31 @@ These are fixed `NSMenuItem` bindings defined in `MainMenuBuilder` — not prefi
 | Settings | `⌘,` |
 | Increase / Decrease / Reset font size | `⌘+` / `⌘-` / `⌘0` |
 | Toggle Fast Full Screen (instant fill, no Space animation) | `⌃⌘⇧F` |
+
+## Vi ex commands (IDE-like workflow)
+
+Press `:` in the file editor to open the ex command line. These commands replace common IDE panel actions without leaving the terminal.
+
+| Command | IDE equivalent |
+|---------|---------------|
+| `:find <partial>` | Cmd+P file search |
+| `:recent` | Recently opened files |
+| `:copy-path` | Copy relative file path |
+| `:copy-path absolute` | Copy absolute file path |
+| `:grep <query>` | Cmd+Shift+F project search |
+| `:errors` | Problems / diagnostics panel |
+| `]d` / `[d` | Click next/prev error in Problems panel |
+| `gd` | Go to definition |
+| `K` | Hover / type info |
+| `gf` | Open path under cursor |
+| `:make` | Run default build command (auto-detected) |
+| `:make build` | Run build |
+| `:make test` | Run tests |
+| `:make last` | Repeat last build/test |
+| `:board` | Open session board |
+| `:attention` | Jump to session needing attention |
+| `:split <path>` | Open file in side-by-side pane |
+| `:vsplit <path>` | Open file in top/bottom pane |
 
 ## Command prompt
 
