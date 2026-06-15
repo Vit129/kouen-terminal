@@ -233,9 +233,19 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
     func reloadTabBar() {
         let snap = SessionCoordinator.shared.snapshot
         guard let workspace = snap.activeWorkspace else { return }
-        // Each session = one tab pill (1 session = 1 project path)
+        // Each session = one tab pill (1 session = 1 project path).
+        // Derive TabStatus from BoardModel so the dot reflects running/done/error/waiting
+        // using the same central logic as the sidebar session cards and Board tab.
         let sessionTabs = workspace.sessions.compactMap { session -> Tab? in
-            guard let tab = session.activeTab ?? session.tabs.first else { return nil }
+            guard var tab = session.activeTab ?? session.tabs.first else { return nil }
+            let kind = BoardModel.columnKind(for: tab)
+            switch kind {
+            case .needsAttention: tab.status = .waiting
+            case .running:        tab.status = .running
+            case .done:           tab.status = .done
+            case .error:          tab.status = .error
+            case .idle:           tab.status = .idle
+            }
             return tab
         }
         let activeTabID = workspace.activeSession?.activeTab?.id ?? workspace.activeSession?.tabs.first?.id

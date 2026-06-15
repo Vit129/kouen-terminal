@@ -803,6 +803,8 @@ final class StatusDotView: NSView {
     enum Style: Equatable {
         case idle
         case waiting
+        case running
+        case done
         case error
         case accent
         /// Tinted by the running agent (present/idle), with optional user overrides in settings.
@@ -883,6 +885,8 @@ final class StatusDotView: NSView {
         switch style {
         case .idle: color = c.idleStatus
         case .waiting: color = c.waiting
+        case .running: color = .systemBlue
+        case .done: color = .systemGreen
         case .error: color = c.danger
         case .accent: color = c.accent
         case let .agent(hex): color = NSColor.fromHex(hex) ?? c.accent

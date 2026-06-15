@@ -341,18 +341,10 @@ final class WorktreeRowView: NSView {
     private func highestStatus(for session: SessionGroup) -> BoardColumnKind {
         var highest = BoardColumnKind.idle
         for tab in session.tabs {
-            let s = columnKind(for: tab)
+            let s = BoardModel.columnKind(for: tab)
             if priority(s) > priority(highest) { highest = s }
         }
         return highest
-    }
-
-    private func columnKind(for tab: Tab) -> BoardColumnKind {
-        if tab.agent?.activity == .awaiting { return .needsAttention }
-        if let exit = tab.exitStatus { return exit == 0 ? .done : .error }
-        let shells: Set<String> = ["zsh", "bash", "sh", "fish", "csh", "tcsh", "login"]
-        if let cmd = tab.currentCommand, !cmd.isEmpty, !shells.contains(cmd.lowercased()) { return .running }
-        return .idle
     }
 
     private func priority(_ s: BoardColumnKind) -> Int {

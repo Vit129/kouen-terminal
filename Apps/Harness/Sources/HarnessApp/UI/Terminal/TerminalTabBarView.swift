@@ -408,6 +408,7 @@ private final class TabPillView: NSView {
     private let closeButton = NSButton()
     private let agentIcon = NSImageView()
     private let persistentIcon = NSImageView()
+    private let statusDot = NSView()
     /// Transient "MCP" badge shown for 5s after a mutating MCP tool controls this tab's pane.
     private let mcpBadge = NSTextField(labelWithString: "MCP")
     /// Ghostty-style "AI is working" indicator: a tiny dot before the title that discretely
@@ -525,12 +526,19 @@ private final class TabPillView: NSView {
         workingDot.translatesAutoresizingMaskIntoConstraints = false
         workingDot.isHidden = true
 
+        statusDot.wantsLayer = true
+        statusDot.layer?.cornerRadius = 3
+        statusDot.layer?.cornerCurve = .continuous
+        statusDot.translatesAutoresizingMaskIntoConstraints = false
+        applyStatusDot(tab.status)
+
         addSubview(persistentIcon)
         addSubview(agentIcon)
         addSubview(titleAndBranchStack)
         addSubview(shortcutLabel)
         addSubview(closeButton)
         addSubview(workingDot)
+        addSubview(statusDot)
 
         mcpBadge.font = .monospacedSystemFont(ofSize: 8, weight: .bold)
         mcpBadge.textColor = .systemBlue
@@ -580,6 +588,11 @@ private final class TabPillView: NSView {
             // MCP badge: trailing edge of title, center Y
             mcpBadge.leadingAnchor.constraint(equalTo: titleLabel.trailingAnchor, constant: 3),
             mcpBadge.centerYAnchor.constraint(equalTo: centerYAnchor),
+            // Status dot: leading edge of pill (before agent icon), 6×6
+            statusDot.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 6),
+            statusDot.centerYAnchor.constraint(equalTo: centerYAnchor),
+            statusDot.widthAnchor.constraint(equalToConstant: 6),
+            statusDot.heightAnchor.constraint(equalToConstant: 6),
         ])
 
         setAgentIcon(for: tab)
@@ -738,6 +751,7 @@ private final class TabPillView: NSView {
     func update(tab: Tab, isActive: Bool, showBranch: Bool) {
         status = tab.status
         isPersistent = tab.persistent
+        applyStatusDot(tab.status)
         
         if showBranch, let branch = tab.gitBranch, !branch.isEmpty {
             branchLabel.stringValue = "⎇ \(branch)"
@@ -801,6 +815,18 @@ private final class TabPillView: NSView {
 
     /// Show the agent's brand glyph as a leading icon (tinted to its brand color)
     /// when one exists; collapse the slot otherwise.
+    private func applyStatusDot(_ s: TabStatus) {
+        let color: NSColor
+        switch s {
+        case .idle:    color = HarnessDesign.chrome.idleStatus
+        case .waiting: color = HarnessDesign.chrome.waiting
+        case .running: color = .systemBlue
+        case .done:    color = .systemGreen
+        case .error:   color = HarnessDesign.chrome.danger
+        }
+        statusDot.layer?.backgroundColor = color.cgColor
+    }
+
     private func setAgentIcon(for tab: Tab) {
         if let kind = tabAgentKind(for: tab) {
             agentIcon.image = AgentIconRenderer.templateOrMonogramImage(for: kind, size: 14)
