@@ -10,6 +10,57 @@ grouped sessions (`new-session -t <session>`), and full `-t` targets on
 `select-pane`/`swap-pane`. tmux-parity status, adaptations, and divergences live in
 [TMUX_PARITY.md](TMUX_PARITY.md).
 
+## Workbench commands (IDE-like workflow)
+
+These ex-style commands are available from the `:` prompt, vi file editor, and key bindings. They provide IDE-like navigation and task running without leaving the terminal.
+
+### File navigation
+
+| Command | Effect |
+|---------|--------|
+| `:find <query>` | Fuzzy-open a file by partial name. Opens directly on a unique match; lists ranked results when ambiguous. |
+| `:recent` | Show up to 10 recently opened files. Follow with `:e 3` to open item 3. |
+| `:copy-path [relative\|absolute]` | Copy the current file's path to the clipboard. Defaults to relative (from cwd). |
+| `:view <path\|partial>` | Open a file in the sidebar read-only viewer. Accepts fuzzy partial names. |
+| `:edit <path\|partial>` | Open a file in the editor. Accepts fuzzy partial names. |
+| `:split <path>` | Open a file in a new side-by-side pane (`$EDITOR`). |
+| `:vsplit <path>` | Open a file in a new top/bottom pane. |
+| `gf` | Open the path token under the cursor (works on compiler/test/grep output). |
+
+### Search
+
+| Command | Effect |
+|---------|--------|
+| `:grep <query>` | Search for `<query>` across the project. Results show as `path:line:col:` tokens — navigate with `gf`. |
+
+### Errors and LSP
+
+| Command | Effect |
+|---------|--------|
+| `:errors` | Show LSP diagnostics for the current file as `:<line>:<col>: <message>` entries. |
+| `gd` | Go to definition at cursor (LSP). Falls back to `gf` path resolution when no LSP session is active. |
+| `K` | Show hover info at cursor (LSP). No-op with a status message when LSP is unavailable. |
+| `]d` / `[d` | Jump to next / previous diagnostic. Wraps at start/end. |
+
+### Task runner
+
+| Command | Effect |
+|---------|--------|
+| `:make` | Detect and run the project's default command. Checks `Package.swift` (SwiftPM), `Makefile`, `package.json`, `justfile`, `Taskfile.yml` in order. |
+| `:make build` | Run the detected build command. |
+| `:make test` | Run the detected test command. |
+| `:make last` | Repeat the last `:make` command. |
+
+Tasks run in a new split pane so the current terminal remains usable.
+
+### Board and attention
+
+| Command | Effect |
+|---------|--------|
+| `:board` | Switch the sidebar to the Board tab (Running / Idle / Done / Error / Needs Attention columns). |
+| `:attention` | Focus the next session in the Needs Attention column. |
+| `:ack` | Dismiss the current tab's Needs Attention state. |
+
 ## Pane operations
 
 | Command | What it does |
