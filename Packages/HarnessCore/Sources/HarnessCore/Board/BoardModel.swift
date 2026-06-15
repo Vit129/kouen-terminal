@@ -136,7 +136,7 @@ public enum BoardModel {
         }
     }
 
-    private static func columnKind(for tab: Tab) -> BoardColumnKind {
+    public static func columnKind(for tab: Tab) -> BoardColumnKind {
         if tab.agent?.activity == .awaiting {
             return .needsAttention
         }
