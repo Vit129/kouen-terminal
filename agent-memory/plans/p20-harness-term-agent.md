@@ -603,5 +603,5 @@ harness agent send <file> [--message <msg>]
 Finds agent pane via getSnapshot, sends file content to agent.
 
 ### ❌ Deferred: `harness chat` first-party branding
-Abstract vendor names behind "Harness Agent" brand — deferred; agents work well as-is using their native CLIs.
+Moved to [[p21-acp-agent-selection]] PBI-ACP-005 — `harness chat` is the UI layer on top of ACP agent selection.
 

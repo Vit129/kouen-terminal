@@ -239,5 +239,11 @@ harness agent list
 Agents currently use their own built-in tools (read/write file via shell).
 ACP would give Harness permission control over tool calls.
 
-### ❌ PBI-ACP-005: Agent Selection UI
+### ❌ PBI-ACP-005: Agent Selection UI + `harness chat`
 No picker UI yet. CLI flags (`--claude/--kiro/--model/--effort`) handle selection.
+
+`harness chat` first-party branding (from P20) is also scoped here:
+- `harness chat` → interactive picker: which agent + model + effort
+- `harness chat --claude --model opus-4.8 "fix tests"` → one-shot
+- Abstracts vendor names behind "Harness" brand if desired
+- Depends on PBI-ACP-001 (re-enable ACP) for full tool integration
