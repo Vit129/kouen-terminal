@@ -244,4 +244,29 @@ File editor opens when you click a file in the sidebar, or via `:view <path>` / 
 - [docs/COMMANDS.md](docs/COMMANDS.md) - full command reference
 - [docs/KEYBINDINGS.md](docs/KEYBINDINGS.md) - shortcuts and custom bindings
 - [docs/shell-integration/README.md](docs/shell-integration/README.md) - prompt marks and shell snippets
-- [docs/MANUAL_TEST_PLAN.md](docs/MANUAL_TEST_PLAN.md) - manual QA checklist
+
+## 9. Experience Modes
+
+Switch in **Settings → Terminal → Experience**.
+
+| Mode | Prefix key | Status line | Sessions survive quit | Agent workflows |
+|------|:----------:|:-----------:|:--------------------:|:---------------:|
+| **Plain Terminal** | — | — | No | available |
+| **Persistent Terminal** | — | — | Yes | available |
+| **Full Terminal** | ✓ | ✓ | Yes | available |
+| **Agent Workspace** | optional | optional | Yes | foregrounded |
+
+See [docs/MODES.md](docs/MODES.md) for full details on persistence and prefix/status line overrides.
+
+## 10. Migrating From Another Terminal
+
+### From tmux
+
+Switch to **Full Terminal** mode. Your muscle memory works immediately — prefix `Ctrl-A`, splits, copy mode, paste buffers, command prompt, and `harness-cli attach-window` for full layout attach.
+
+See [docs/MIGRATION.md](docs/MIGRATION.md) for the full tmux key-by-key translation and `.tmux.conf` import guide.
+
+### Importing Colors And Fonts
+
+Harness auto-imports colors, font face, opacity, and padding from compatible terminal configs on first run. Re-import any time via **Settings → Appearance → Reset to defaults** or the `source-config` command.
+
