@@ -339,7 +339,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
               let session = workspace.sessions.first(where: { $0.tabs.contains(where: { $0.id == tabID }) })
         else { return }
         coordinator.selectSession(workspaceID: workspaceID, sessionID: session.id)
-        coordinator.closeActiveSession()
+        coordinator.closeActiveTabWithConfirmation()
     }
 
     func tabBarDidReorder(tabID: TabID, toIndex: Int) {
