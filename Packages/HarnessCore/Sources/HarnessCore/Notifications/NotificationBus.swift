@@ -17,6 +17,9 @@ public final class NotificationBus: @unchecked Sendable {
     /// Posted when an agent's activity state changes (idle↔working↔awaiting).
     /// Used by BoardViewController for live card movement and ScriptRuntime for harness.events.
     public let agentStateChanged = Notification.Name("HarnessAgentStateChanged")
+    /// Posted when the OS reports memory pressure (warning or critical). Renderer surfaces
+    /// respond by purging their glyph atlas / shaped-run / image caches.
+    public let memoryPressure = Notification.Name("HarnessMemoryPressure")
 
     private var latest: AgentNotification?
     private let lock = NSLock()
@@ -72,6 +75,13 @@ public final class NotificationBus: @unchecked Sendable {
                 name: self.agentStateChanged, object: nil,
                 userInfo: ["surfaceID": surfaceID, "activity": activity]
             )
+        }
+    }
+
+    /// Posted when `MemoryPressureMonitor` observes a `.warning`/`.critical` DISPATCH_SOURCE_TYPE_MEMORYPRESSURE event.
+    public func postMemoryPressure() {
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: self.memoryPressure, object: nil)
         }
     }
 
