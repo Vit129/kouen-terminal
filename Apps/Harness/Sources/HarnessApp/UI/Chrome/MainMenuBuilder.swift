@@ -220,8 +220,9 @@ enum MainMenuBuilder {
         let openBrowserItem = NSMenuItem(
             title: "Open Browser Pane",
             action: #selector(MenuTarget.openBrowserPane),
-            keyEquivalent: ""
+            keyEquivalent: "b"
         )
+        openBrowserItem.keyEquivalentModifierMask = [.command]
         openBrowserItem.target = MenuTarget.shared
         windowMenu.addItem(openBrowserItem)
         windowMenu.addItem(.separator())
