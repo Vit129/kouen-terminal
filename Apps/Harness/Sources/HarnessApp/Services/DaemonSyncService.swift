@@ -229,7 +229,25 @@ final class DaemonSyncService {
 
     private func applySnapshot(_ remote: SessionSnapshot, metadataOnly: Bool) {
         let structureChanged = structureFingerprint(remote) != structureFingerprint(snapshot)
-        snapshot = remote
+        // Preserve app-only browser pane nodes — daemon doesn't know about them.
+        var merged = remote
+        for (wIdx, ws) in snapshot.workspaces.enumerated() {
+            guard wIdx < merged.workspaces.count else { continue }
+            for (sIdx, session) in ws.sessions.enumerated() {
+                guard sIdx < merged.workspaces[wIdx].sessions.count else { continue }
+                for (tIdx, tab) in session.tabs.enumerated() {
+                    guard tIdx < merged.workspaces[wIdx].sessions[sIdx].tabs.count else { continue }
+                    let browserLeaves = tab.rootPane.allBrowserLeaves()
+                    guard !browserLeaves.isEmpty else { continue }
+                    // Re-inject: if the incoming tab has no browser nodes, keep the current pane tree
+                    let incomingBrowserLeaves = merged.workspaces[wIdx].sessions[sIdx].tabs[tIdx].rootPane.allBrowserLeaves()
+                    if incomingBrowserLeaves.isEmpty {
+                        merged.workspaces[wIdx].sessions[sIdx].tabs[tIdx].rootPane = tab.rootPane
+                    }
+                }
+            }
+        }
+        snapshot = merged
         lastRevision = remote.revision
         if structureChanged {
             coord.structureRevision += 1

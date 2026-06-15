@@ -71,6 +71,15 @@ public enum PaneNode: Codable, Sendable, Equatable {
 
     /// All leaves in the same first-then-second order as `allPaneIDs()`/`allSurfaceIDs()` and
     /// `display-panes`/`select-pane` numbering — pairs each pane id with its surface atomically.
+    /// All browser pane leaves in the tree.
+    public func allBrowserLeaves() -> [BrowserLeaf] {
+        switch self {
+        case .leaf: return []
+        case let .browser(leaf): return [leaf]
+        case let .branch(_, _, first, second): return first.allBrowserLeaves() + second.allBrowserLeaves()
+        }
+    }
+
     public func allLeaves() -> [PaneLeaf] {
         switch self {
         case let .leaf(leaf):
