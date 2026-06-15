@@ -183,28 +183,56 @@ extension ViEngine {
                 }
                 return
             }
-            // :agent <command> — send current file + context to agent pane
+            // :agent <command> [--claude|--codex|--kiro] — send context to agent pane
             if cmd == "agent" || cmd.hasPrefix("agent ") {
-                let subcommand = cmd == "agent" ? "help" : String(cmd.dropFirst(6)).trimmingCharacters(in: .whitespaces)
+                let raw = cmd == "agent" ? "" : String(cmd.dropFirst(6)).trimmingCharacters(in: .whitespaces)
                 let bridge = AgentBridge.shared
-                guard bridge.agentSurfaceID() != nil else {
-                    displayExMessage("agent: no agent pane found")
+
+                // Parse --agent flag
+                let targetKind: AgentKind?
+                let subcommand: String
+                if raw.contains("--claude") {
+                    targetKind = .claudeCode
+                    subcommand = raw.replacingOccurrences(of: "--claude", with: "").trimmingCharacters(in: .whitespaces)
+                } else if raw.contains("--codex") {
+                    targetKind = .codex
+                    subcommand = raw.replacingOccurrences(of: "--codex", with: "").trimmingCharacters(in: .whitespaces)
+                } else if raw.contains("--kiro") {
+                    targetKind = .kiro
+                    subcommand = raw.replacingOccurrences(of: "--kiro", with: "").trimmingCharacters(in: .whitespaces)
+                } else {
+                    targetKind = nil
+                    subcommand = raw
+                }
+
+                // Check agents available
+                let agents = bridge.allAgents()
+                if agents.isEmpty {
+                    displayExMessage("agent: no agent pane found. Run claude/codex/kiro first.")
                     return
                 }
+                // If multiple and no flag, show list
+                if targetKind == nil && agents.count > 1 && subcommand.isEmpty {
+                    let list = agents.enumerated().map { "\($0.offset + 1): \($0.element.kind.rawValue) — \($0.element.tabTitle)" }.joined(separator: "\n")
+                    displayExMessage("Multiple agents:\n\(list)\nUse :agent <cmd> --claude/--codex/--kiro")
+                    return
+                }
+
                 let file = onCurrentFile?() ?? ""
-                switch subcommand {
+                let cmd = subcommand.isEmpty ? "help" : subcommand
+                switch cmd {
                 case "help":
-                    displayExMessage(":agent fix | review | <message>")
+                    displayExMessage(":agent fix|review|<msg> [--claude|--codex|--kiro]")
                 case "fix":
                     let errors = onDiagnostics?() ?? []
                     let errorText = errors.isEmpty ? "(no diagnostics)" : errors.map { ":\($0.range.start.line + 1): \($0.message)" }.joined(separator: "\n")
-                    bridge.sendFile(path: file, command: "fix these errors:\n\(errorText)")
+                    _ = bridge.sendFile(path: file, command: "fix these errors:\n\(errorText)", kind: targetKind)
                     displayExMessage("sent to agent: fix")
                 case "review":
-                    bridge.sendFile(path: file, command: "review this file")
+                    _ = bridge.sendFile(path: file, command: "review this file", kind: targetKind)
                     displayExMessage("sent to agent: review")
                 default:
-                    bridge.sendFile(path: file, command: subcommand)
+                    _ = bridge.sendFile(path: file, command: cmd, kind: targetKind)
                     displayExMessage("sent to agent")
                 }
                 return
