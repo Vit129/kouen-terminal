@@ -7,6 +7,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
     enum SidebarSessionRow {
         case groupHeader(name: String, rootPath: String, isCollapsed: Bool)
         case session(SessionGroup)
+        case tab(Tab, sessionID: SessionID, workspaceID: WorkspaceID, isLast: Bool)
     }
 
     private let chromeHeader = SidebarTitlebarHeaderView()
@@ -57,6 +58,8 @@ final class HarnessSidebarPanelViewController: NSViewController {
     /// Cached result of buildSidebarRows(). Rebuilt only when sessions, filter, or
     /// collapsed groups change — not on every NSTableViewDelegate call.
     var cachedSidebarRows: [SidebarSessionRow] = []
+    /// Sessions whose tab list is currently expanded in the sidebar.
+    var expandedSessionIDs: Set<SessionID> = []
     /// Last session ID sent to fileTreeView so we can detect session changes even
     /// when the CWD is the same (e.g. two sessions sharing the same repo root).
     var lastFileTreeSessionID: SessionID?
@@ -95,7 +98,18 @@ final class HarnessSidebarPanelViewController: NSViewController {
                 if isCollapsed {
                     return [header]
                 } else {
-                    return [header] + group.sessions.map { .session($0) }
+                    return [header] + group.sessions.flatMap { session -> [SidebarSessionRow] in
+                        let sessionRow = SidebarSessionRow.session(session)
+                        guard expandedSessionIDs.contains(session.id), session.tabs.count > 1 else {
+                            return [sessionRow]
+                        }
+                        let tabRows = session.tabs.enumerated().map { idx, tab in
+                            SidebarSessionRow.tab(tab, sessionID: session.id, workspaceID: group.sessions.first.map { _ in
+                                SessionCoordinator.shared.snapshot.activeWorkspace?.id ?? UUID()
+                            } ?? UUID(), isLast: idx == session.tabs.count - 1)
+                        }
+                        return [sessionRow] + tabRows
+                    }
                 }
             }
     }
@@ -1136,11 +1150,14 @@ extension HarnessSidebarPanelViewController: NSTableViewDataSource, NSTableViewD
             return 28
         case .session:
             return HarnessDesign.sessionRowHeight
+        case .tab:
+            return 36
         }
     }
 
     func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool {
-        sessionRow(at: row) != nil
+        if case .tab = cachedSidebarRows[row] { return true }
+        return sessionRow(at: row) != nil
     }
 
     func tableView(_ tableView: NSTableView, isGroupRow row: Int) -> Bool {
@@ -1177,6 +1194,17 @@ extension HarnessSidebarPanelViewController: NSTableViewDataSource, NSTableViewD
                 session: session,
                 isSelected: session.id == SessionCoordinator.shared.snapshot.activeWorkspace?.activeSessionID
             )
+            cell.isExpanded = expandedSessionIDs.contains(session.id)
+            cell.onToggleExpand = { [weak self] in
+                guard let self else { return }
+                if self.expandedSessionIDs.contains(session.id) {
+                    self.expandedSessionIDs.remove(session.id)
+                } else {
+                    self.expandedSessionIDs.insert(session.id)
+                }
+                self.rebuildSidebarRows()
+                self.sessionTable.reloadData()
+            }
             cell.onClose = { [weak self] in
                 self?.confirmCloseSession(session)
             }
@@ -1184,11 +1212,31 @@ extension HarnessSidebarPanelViewController: NSTableViewDataSource, NSTableViewD
                 self?.sessionActionsMenu(for: session)
             }
             return cell
+        case let .tab(tab, sessionID, workspaceID, _):
+            let cell = SessionTabRowView()
+            cell.configure(tab: tab)
+            cell.onTap = { [weak self] in
+                self?.selectAndOpenTab(workspaceID: workspaceID, sessionID: sessionID, tabID: tab.id)
+            }
+            return cell
         }
     }
 
     func tableViewSelectionDidChange(_ notification: Notification) {
         guard !isProgrammaticSelection else { return }
+        // If a tab row is selected, navigate to it
+        let row = sessionTable.selectedRow
+        if row >= 0, case let .tab(tab, sessionID, workspaceID, _) = cachedSidebarRows[row] {
+            selectAndOpenTab(workspaceID: workspaceID, sessionID: sessionID, tabID: tab.id)
+            return
+        }
         selectSessionRow()
+    }
+
+    private func selectAndOpenTab(workspaceID: WorkspaceID, sessionID: SessionID, tabID: TabID) {
+        let coord = SessionCoordinator.shared
+        if coord.snapshot.activeWorkspaceID != workspaceID { coord.selectWorkspace(workspaceID) }
+        coord.selectSession(workspaceID: workspaceID, sessionID: sessionID)
+        coord.selectTab(workspaceID: workspaceID, tabID: tabID)
     }
 }
