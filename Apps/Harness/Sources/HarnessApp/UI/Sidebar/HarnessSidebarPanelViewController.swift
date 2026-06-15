@@ -1197,13 +1197,42 @@ extension HarnessSidebarPanelViewController: NSTableViewDataSource, NSTableViewD
             cell.isExpanded = expandedSessionIDs.contains(session.id)
             cell.onToggleExpand = { [weak self] in
                 guard let self else { return }
-                if self.expandedSessionIDs.contains(session.id) {
+                let wasExpanded = self.expandedSessionIDs.contains(session.id)
+                let oldRows = self.cachedSidebarRows
+
+                if wasExpanded {
                     self.expandedSessionIDs.remove(session.id)
                 } else {
                     self.expandedSessionIDs.insert(session.id)
                 }
                 self.rebuildSidebarRows()
-                self.sessionTable.reloadData()
+                let newRows = self.cachedSidebarRows
+
+                // Find which row index the session is at
+                guard let sessionRow = oldRows.firstIndex(where: {
+                    if case .session(let s) = $0 { return s.id == session.id }
+                    return false
+                }) else {
+                    self.sessionTable.reloadData()
+                    return
+                }
+
+                // Calculate which tab rows to insert/remove
+                let tabCount = session.tabs.count
+                let tabIndexSet = IndexSet((sessionRow + 1)...(sessionRow + tabCount))
+
+                self.sessionTable.beginUpdates()
+                if wasExpanded {
+                    self.sessionTable.removeRows(at: tabIndexSet, withAnimation: .slideUp)
+                } else {
+                    self.sessionTable.insertRows(at: tabIndexSet, withAnimation: .slideDown)
+                }
+                self.sessionTable.endUpdates()
+
+                // Update the cell's expand state without recreating it
+                if let cellView = self.sessionTable.view(atColumn: 0, row: sessionRow, makeIfNecessary: false) as? SessionCardRowView {
+                    cellView.isExpanded = !wasExpanded
+                }
             }
             cell.onClose = { [weak self] in
                 self?.confirmCloseSession(session)
