@@ -287,6 +287,33 @@ final class EngineConformanceTests: XCTestCase {
         XCTAssertNil(URLDetection.url(in: line, at: 0), "the leading 'see' is not a URL")
     }
 
+    func testDetectLocalhostBarePortPrependsHTTPScheme() {
+        let line = "Local:   http://localhost:3000"
+        let col = line.distance(from: line.startIndex, to: line.range(of: "localhost")!.lowerBound)
+        let match = URLDetection.detectLocalhost(in: line, at: col)
+        XCTAssertEqual(match?.url, "http://localhost:3000")
+    }
+
+    func testDetectLocalhostWithoutSchemePrependsHTTP() {
+        let line = "Server running on localhost:8080/api"
+        let col = line.distance(from: line.startIndex, to: line.range(of: "localhost")!.lowerBound)
+        let match = URLDetection.detectLocalhost(in: line, at: col)
+        XCTAssertEqual(match?.url, "http://localhost:8080/api")
+    }
+
+    func testDetectLocalhostRewrites0000ToLocalhost() {
+        let line = "listening on 0.0.0.0:5173"
+        let col = line.distance(from: line.startIndex, to: line.range(of: "0.0.0.0")!.lowerBound)
+        let match = URLDetection.detectLocalhost(in: line, at: col)
+        XCTAssertEqual(match?.url, "http://localhost:5173")
+    }
+
+    func testDetectLocalhostRejectsNonLocalHost() {
+        let line = "see example.com:3000 now"
+        let col = line.distance(from: line.startIndex, to: line.range(of: "example.com")!.lowerBound)
+        XCTAssertNil(URLDetection.detectLocalhost(in: line, at: col))
+    }
+
     func testSynchronizedOutputModeAndDECRQM() {
         let term = HarnessGridTerminal(cols: 20, rows: 4)!
         var responses = Data()

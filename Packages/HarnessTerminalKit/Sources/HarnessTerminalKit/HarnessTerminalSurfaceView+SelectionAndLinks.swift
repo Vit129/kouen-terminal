@@ -197,7 +197,9 @@ extension HarnessTerminalSurfaceView {
                 guard let cell = grid.cell(row: row, col: c), cell.width != .spacerTail else { line.append(" "); continue }
                 line.unicodeScalars.append(cell.codepoint == 0 ? " " : (Unicode.Scalar(cell.codepoint) ?? " "))
             }
-            return URLDetection.match(in: line, at: col) ?? URLDetection.detectFilePath(in: line, at: col)
+            return URLDetection.match(in: line, at: col)
+                ?? URLDetection.detectFilePath(in: line, at: col)
+                ?? URLDetection.detectLocalhost(in: line, at: col)
         }
     }
 
@@ -223,6 +225,19 @@ extension HarnessTerminalSurfaceView {
         }
         guard let url = URL(string: string), let scheme = url.scheme?.lowercased(),
               ["http", "https", "mailto", "ftp", "ftps"].contains(scheme) else { return }
+
+        // Dev-server URLs open in the in-app Browser Pane instead of the system browser.
+        if ["http", "https"].contains(scheme),
+           let host = url.host?.lowercased(),
+           ["localhost", "127.0.0.1", "0.0.0.0", "::1", "[::1]"].contains(host) {
+            NotificationCenter.default.post(
+                name: Notification.Name("HarnessOpenLocalhostURL"),
+                object: nil,
+                userInfo: ["url": url]
+            )
+            return
+        }
+
         NSWorkspace.shared.open(url)
     }
 

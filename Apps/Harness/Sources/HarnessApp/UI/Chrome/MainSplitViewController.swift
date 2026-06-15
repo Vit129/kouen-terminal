@@ -133,11 +133,22 @@ final class MainSplitViewController: NSViewController {
             name: Notification.Name("HarnessOpenFilePreview"),
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(openLocalhostURLFromTerminal(_:)),
+            name: Notification.Name("HarnessOpenLocalhostURL"),
+            object: nil
+        )
     }
 
     @objc private func openFilePreviewFromTerminal(_ notification: Notification) {
         guard let path = notification.userInfo?["path"] as? String else { return }
         contentVC.openFileTab(path: path)
+    }
+
+    @objc private func openLocalhostURLFromTerminal(_ notification: Notification) {
+        guard let url = notification.userInfo?["url"] as? URL else { return }
+        SessionCoordinator.shared.splitPaneCoordinator.openBrowserPane(url: url, direction: .horizontal)
     }
 
     /// Resolve the divider line color: user override (`settings.dividerHex`) wins; otherwise
