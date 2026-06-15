@@ -27,9 +27,8 @@ final class SessionGroupHeaderRowView: NSView {
         layer?.backgroundColor = NSColor.clear.cgColor
 
         disclosureImage.image = NSImage(systemSymbolName: "chevron.right", accessibilityDescription: nil)?
-            .withSymbolConfiguration(HarnessDesign.symbolConfig(pointSize: HarnessDesign.IconSize.tiny, weight: .semibold))
+            .withSymbolConfiguration(HarnessDesign.symbolConfig(pointSize: HarnessDesign.IconSize.tiny, weight: .regular))
         disclosureImage.translatesAutoresizingMaskIntoConstraints = false
-        disclosureImage.imageScaling = .scaleProportionallyUpOrDown
         disclosureImage.setContentHuggingPriority(.required, for: .horizontal)
 
         label.font = .systemFont(ofSize: 13, weight: .semibold)
@@ -92,8 +91,8 @@ final class SessionGroupHeaderRowView: NSView {
             rightStack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -(HarnessDesign.horizontalInset - 4)),
             rightStack.centerYAnchor.constraint(equalTo: centerYAnchor),
 
-            disclosureImage.widthAnchor.constraint(equalToConstant: 16),
-            disclosureImage.heightAnchor.constraint(equalToConstant: 12),
+            disclosureImage.widthAnchor.constraint(equalToConstant: 10),
+            disclosureImage.heightAnchor.constraint(equalToConstant: 10),
 
             boardStatusDot.widthAnchor.constraint(equalToConstant: 6),
             boardStatusDot.heightAnchor.constraint(equalToConstant: 6),
@@ -134,7 +133,9 @@ final class SessionGroupHeaderRowView: NSView {
 
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
-        if addButton.frame.contains(point) || optionsButton.frame.contains(point) {
+        let addFrame = convert(addButton.bounds, from: addButton)
+        let optFrame = convert(optionsButton.bounds, from: optionsButton)
+        if addFrame.contains(point) || optFrame.contains(point) {
             super.mouseDown(with: event)
         } else {
             onToggleCollapse?()
@@ -148,7 +149,7 @@ final class SessionGroupHeaderRowView: NSView {
         disclosureImage.image = NSImage(
             systemSymbolName: isCollapsed ? "chevron.right" : "chevron.down",
             accessibilityDescription: isCollapsed ? "Collapsed" : "Expanded"
-        )?.withSymbolConfiguration(HarnessDesign.symbolConfig(pointSize: HarnessDesign.IconSize.tiny, weight: .semibold))
+        )?.withSymbolConfiguration(HarnessDesign.symbolConfig(pointSize: HarnessDesign.IconSize.tiny, weight: .regular))
         disclosureImage.needsDisplay = true
 
         let dotColor: NSColor
