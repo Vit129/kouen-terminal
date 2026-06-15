@@ -53,7 +53,7 @@ Harness recognizes standard notification OSC sequences (9, 99, 777) emitted by a
 Press `Cmd+Shift+I` in Harness, or run:
 
 ```bash
-# Use the command palette (Cmd+K) → jump-notification
+# Use the command palette (Cmd+P) → jump-notification
 ```
 
 ## Example Claude Code hook

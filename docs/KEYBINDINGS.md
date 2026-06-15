@@ -79,16 +79,21 @@ These are fixed `NSMenuItem` bindings defined in `MainMenuBuilder` — not prefi
 | Switch to session 1–9 | `⌘1` … `⌘9` |
 | Close tab | `⌘W` |
 | Previous / Next session | `⌘[` / `⌘]` |
-| Split horizontal | `⌘D` |
-| **File search (fuzzy — like Spotlight)** | **`⌘P`** |
+| Split Right | `⌘D` |
+| Split Down | `⌘⇧D` |
+| Close Pane | `⌘⌥W` |
+| Focus Pane direction | `⌘⌥←/→/↑/↓` |
+| **Find File (fuzzy)** | **`⌘P`** |
+| **Find in Files (grep)** | **`⌘F`** |
 | Command prompt | `⌘;` |
 | Search command history | `⌃R` |
-| Toggle sidebar + file editor (focus mode) | `⌘\` |
+| Toggle sidebar | `⌘\` |
 | Show Git panel | `⌘G` |
-| Jump to notification | `⌘⇧I` |
+| Notifications inbox | `⌘⇧I` |
+| Open Browser Pane | `⌘B` |
 | Settings | `⌘,` |
 | Increase / Decrease / Reset font size | `⌘+` / `⌘-` / `⌘0` |
-| Toggle Fast Full Screen (instant fill, no Space animation) | `⌃⌘⇧F` |
+| Toggle Fast Full Screen | `⌃⌘⇧F` |
 
 ## Vi ex commands (IDE-like workflow)
 
