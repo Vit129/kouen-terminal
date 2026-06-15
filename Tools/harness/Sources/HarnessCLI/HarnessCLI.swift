@@ -72,6 +72,8 @@ struct HarnessCLI {
                 CommandParser.knownVerbs.forEach { print($0) }
             case "get-snapshot":
                 try printSnapshot(client)
+            case "agent":
+                try Self.handleAgent(args, client: client)
             case "board":
                 try printBoard(args, client: client)
             case "new-workspace":
