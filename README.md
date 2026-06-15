@@ -136,14 +136,14 @@ harness-cli capture-pane --host devbox --surface <id>
 
 ## Documentation
 
-- [USAGE.md](USAGE.md) - install, run, CLI, remote/headless, IDE-like workflow, and troubleshooting quick guide
-- [docs/MODES.md](docs/MODES.md) - Plain, Persistent, Full, and Agent Workspace modes
-- [docs/MULTIPLEXER_GUIDE.md](docs/MULTIPLEXER_GUIDE.md) - sessions, panes, prefix key, attach, copy mode
+- [USAGE.md](USAGE.md) - install, run, CLI, remote/headless, IDE-like workflow, experience modes, migration, and troubleshooting
+- [docs/MODES.md](docs/MODES.md) - Plain, Persistent, Full, and Agent Workspace modes (detail)
+- [docs/MIGRATION.md](docs/MIGRATION.md) - migrating from tmux or another terminal setup
 - [docs/COMMANDS.md](docs/COMMANDS.md) - full command reference including workbench commands (`:find`, `:grep`, `:make`, `:errors`, `:recent`)
 - [docs/KEYBINDINGS.md](docs/KEYBINDINGS.md) - shortcuts, key bindings, and vi ex command quick reference (IDE-like navigation)
 - [docs/shell-integration/README.md](docs/shell-integration/README.md) - shell integration
 - [docs/agent-hooks/README.md](docs/agent-hooks/README.md) - agent notification hooks
-- [docs/MIGRATION.md](docs/MIGRATION.md) - moving from another terminal setup
+- [docs/MULTIPLEXER_GUIDE.md](docs/MULTIPLEXER_GUIDE.md) - sessions, panes, prefix key, attach, copy mode
 - [docs/RELEASE.md](docs/RELEASE.md) - release workflow
 - [CHANGELOG.md](CHANGELOG.md) - release history
 
