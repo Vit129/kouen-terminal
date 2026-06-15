@@ -732,6 +732,10 @@ final class PaneContainerView: NSView {
         switch node {
         case let .browser(bl):
             let bv = BrowserPaneView(url: bl.url, paneID: bl.id)
+            let paneIDCopy = bl.id
+            bv.onClosePaneRequested = {
+                SessionCoordinator.shared.splitPaneCoordinator.closeBrowserPane(paneID: paneIDCopy)
+            }
             bv.translatesAutoresizingMaskIntoConstraints = false
             parent.addSubview(bv)
             NSLayoutConstraint.activate([
