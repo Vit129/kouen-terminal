@@ -52,7 +52,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
             return
         }
         let agentActive = tab.agent != nil || AgentTitleInference.kind(from: tab.title) != nil
-        titleStrip.setPath(agentActive ? "" : tab.cwd)
+        titleStrip.setPath(agentActive ? "" : tab.cwd, gitBranch: tab.gitBranch)
     }
 
     /// Back the terminal host so the canvas reads the same as the rest of the window.

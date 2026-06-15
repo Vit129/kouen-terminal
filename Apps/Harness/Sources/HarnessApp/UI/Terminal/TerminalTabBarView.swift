@@ -128,7 +128,8 @@ final class TerminalTabBarView: NSView {
         for (index, tab) in tabs.enumerated() {
             let id = tab.id
             // ⌘1–9 switch to the first nine tabs; past that, no hint.
-            let pill = TabPillView(tab: tab, isActive: tab.id == activeTabID, position: index < 9 ? index + 1 : nil)
+            let showBranch = shouldShowBranch(for: tab)
+            let pill = TabPillView(tab: tab, isActive: tab.id == activeTabID, position: index < 9 ? index + 1 : nil, showBranch: showBranch)
             pill.translatesAutoresizingMaskIntoConstraints = true
             pill.toolTip = HarnessDesign.shortenPath(tab.cwd)
             pill.onSelect = { [weak self] id in self?.delegate?.tabBarDidSelect(tabID: id) }
@@ -144,6 +145,15 @@ final class TerminalTabBarView: NSView {
         applyChrome()
     }
 
+    private func shouldShowBranch(for tab: Tab) -> Bool {
+        guard let branch = tab.gitBranch, !branch.isEmpty else { return false }
+        if branch != "main" && branch != "master" {
+            return true
+        }
+        let folder = tabDisplayTitle(tab)
+        return tabs.filter { tabDisplayTitle($0) == folder }.count > 1
+    }
+
     /// Update titles/status of existing pills without rebuilding, for live PWD /
     /// title / agent updates. Falls back to a full reload if the set of tabs changed.
     func refreshMetadata(tabs: [Tab], activeTabID: TabID?) {
@@ -156,7 +166,8 @@ final class TerminalTabBarView: NSView {
         self.tabs = tabs
         self.activeTabID = activeTabID
         for tab in tabs {
-            pillsByID[tab.id]?.update(tab: tab, isActive: tab.id == activeTabID)
+            let showBranch = shouldShowBranch(for: tab)
+            pillsByID[tab.id]?.update(tab: tab, isActive: tab.id == activeTabID, showBranch: showBranch)
             pillsByID[tab.id]?.toolTip = HarnessDesign.shortenPath(tab.cwd)
         }
         needsLayout = true // active tab change can shift the visible window
@@ -393,6 +404,7 @@ private final class TabPillView: NSView {
     var onContextCommand: ((TabContextCommand) -> Void)?
 
     private let titleLabel = NSTextField(labelWithString: "")
+    private let branchLabel = NSTextField(labelWithString: "")
     private let closeButton = NSButton()
     private let agentIcon = NSImageView()
     private let persistentIcon = NSImageView()
@@ -425,7 +437,7 @@ private final class TabPillView: NSView {
     // (true), so dragging there still moves the window.
     override var mouseDownCanMoveWindow: Bool { false }
 
-    init(tab: Tab, isActive: Bool, position: Int?) {
+    init(tab: Tab, isActive: Bool, position: Int?, showBranch: Bool) {
         tabID = tab.id
         hasShortcut = position != nil
         super.init(frame: .zero)
@@ -440,13 +452,36 @@ private final class TabPillView: NSView {
         layer?.cornerCurve = .continuous
         layer?.masksToBounds = false
 
-        titleLabel.font = HarnessDesign.Typography.tabTitle
         titleLabel.lineBreakMode = .byTruncatingTail
         titleLabel.alignment = .center
         titleLabel.stringValue = tabDisplayTitle(tab)
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         titleLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
         titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        branchLabel.font = .systemFont(ofSize: 9, weight: .regular)
+        branchLabel.textColor = HarnessDesign.chrome.textSecondary
+        branchLabel.lineBreakMode = .byTruncatingTail
+        branchLabel.alignment = .center
+        branchLabel.translatesAutoresizingMaskIntoConstraints = false
+        branchLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        branchLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        if showBranch, let branch = tab.gitBranch, !branch.isEmpty {
+            branchLabel.stringValue = "⎇ \(branch)"
+            branchLabel.isHidden = false
+            titleLabel.font = .systemFont(ofSize: 11.5, weight: .medium)
+        } else {
+            branchLabel.stringValue = ""
+            branchLabel.isHidden = true
+            titleLabel.font = HarnessDesign.Typography.tabTitle
+        }
+
+        let titleAndBranchStack = NSStackView(views: [titleLabel, branchLabel])
+        titleAndBranchStack.orientation = .vertical
+        titleAndBranchStack.spacing = -1
+        titleAndBranchStack.alignment = .centerX
+        titleAndBranchStack.translatesAutoresizingMaskIntoConstraints = false
 
         let xConfig = NSImage.SymbolConfiguration(pointSize: 8, weight: .bold)
         closeButton.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: "Close tab")?
@@ -492,7 +527,7 @@ private final class TabPillView: NSView {
 
         addSubview(persistentIcon)
         addSubview(agentIcon)
-        addSubview(titleLabel)
+        addSubview(titleAndBranchStack)
         addSubview(shortcutLabel)
         addSubview(closeButton)
         addSubview(workingDot)
@@ -509,7 +544,7 @@ private final class TabPillView: NSView {
         // optically centered even when both are visible.
         agentIconWidth = agentIcon.widthAnchor.constraint(equalToConstant: 0)
         persistentIconWidth = persistentIcon.widthAnchor.constraint(equalToConstant: 0)
-        let titleLeading = titleLabel.leadingAnchor.constraint(greaterThanOrEqualTo: agentIcon.trailingAnchor, constant: 4)
+        let titleLeading = titleAndBranchStack.leadingAnchor.constraint(greaterThanOrEqualTo: agentIcon.trailingAnchor, constant: 4)
         let closeTrailing = closeButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -HarnessDesign.Spacing.xs)
         let closeWidth = closeButton.widthAnchor.constraint(equalToConstant: 14)
         let closeHeight = closeButton.heightAnchor.constraint(equalToConstant: 14)
@@ -526,10 +561,10 @@ private final class TabPillView: NSView {
             agentIcon.heightAnchor.constraint(equalToConstant: 14),
             agentIconWidth,
             titleLeading,
-            titleLabel.centerXAnchor.constraint(equalTo: centerXAnchor),
-            titleLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
-            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: shortcutLabel.leadingAnchor, constant: -HarnessDesign.Spacing.xs),
-            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: closeButton.leadingAnchor, constant: -HarnessDesign.Spacing.xs),
+            titleAndBranchStack.centerXAnchor.constraint(equalTo: centerXAnchor),
+            titleAndBranchStack.centerYAnchor.constraint(equalTo: centerYAnchor),
+            titleAndBranchStack.trailingAnchor.constraint(lessThanOrEqualTo: shortcutLabel.leadingAnchor, constant: -HarnessDesign.Spacing.xs),
+            titleAndBranchStack.trailingAnchor.constraint(lessThanOrEqualTo: closeButton.leadingAnchor, constant: -HarnessDesign.Spacing.xs),
             shortcutLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -HarnessDesign.Spacing.sm),
             shortcutLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
             closeTrailing,
@@ -700,9 +735,20 @@ private final class TabPillView: NSView {
         onClose?(tabID)
     }
 
-    func update(tab: Tab, isActive: Bool) {
+    func update(tab: Tab, isActive: Bool, showBranch: Bool) {
         status = tab.status
         isPersistent = tab.persistent
+        
+        if showBranch, let branch = tab.gitBranch, !branch.isEmpty {
+            branchLabel.stringValue = "⎇ \(branch)"
+            branchLabel.isHidden = false
+            titleLabel.font = .systemFont(ofSize: 11.5, weight: .medium)
+        } else {
+            branchLabel.stringValue = ""
+            branchLabel.isHidden = true
+            titleLabel.font = HarnessDesign.Typography.tabTitle
+        }
+        
         titleLabel.stringValue = tabDisplayTitle(tab)
         setAgentIcon(for: tab)
         setPersistentIndicator(tab.persistent)
