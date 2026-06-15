@@ -358,16 +358,16 @@ final class WorktreeRowView: NSView {
     }
 
     private func statusAppearance(for status: BoardColumnKind, tab: Tab) -> (NSColor, String) {
+        let color = status.color
         switch status {
-        case .needsAttention: return (.systemOrange, "waiting")
+        case .needsAttention: return (color, "waiting")
         case .running:
             let cmd = tab.currentCommand ?? ""
-            let shells: Set<String> = ["zsh", "bash", "sh", "fish", "csh", "tcsh", "login"]
-            let shortCmd = shells.contains(cmd.lowercased()) ? "" : cmd
-            return (.systemBlue, shortCmd.isEmpty ? "running" : shortCmd)
-        case .done:    return (.systemGreen, "done")
-        case .error:   return (.systemRed, "error")
-        case .idle:    return (.systemGray, "idle")
+            let shortCmd = BoardModel.shellNames.contains(cmd.lowercased()) ? "" : cmd
+            return (color, shortCmd.isEmpty ? "running" : shortCmd)
+        case .done:    return (color, "done")
+        case .error:   return (color, "error")
+        case .idle:    return (color, "idle")
         }
     }
 
