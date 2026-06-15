@@ -961,3 +961,21 @@ extension NSColor {
         return NSColor(srgbRed: r, green: g, blue: b, alpha: 1)
     }
 }
+
+// MARK: - BoardColumnKind → NSColor
+
+import HarnessCore
+
+extension BoardColumnKind {
+    /// Canonical status color used by sidebar cards, top bar pills, and board UI.
+    @MainActor
+    var color: NSColor {
+        switch self {
+        case .needsAttention: return HarnessDesign.chrome.waiting
+        case .running:        return .systemBlue
+        case .done:           return .systemGreen
+        case .error:          return HarnessDesign.chrome.danger
+        case .idle:           return HarnessDesign.chrome.idleStatus
+        }
+    }
+}

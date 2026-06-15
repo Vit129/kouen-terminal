@@ -818,11 +818,11 @@ private final class TabPillView: NSView {
     private func applyStatusDot(_ s: TabStatus) {
         let color: NSColor
         switch s {
-        case .idle:    color = HarnessDesign.chrome.idleStatus
-        case .waiting: color = HarnessDesign.chrome.waiting
-        case .running: color = .systemBlue
-        case .done:    color = .systemGreen
-        case .error:   color = HarnessDesign.chrome.danger
+        case .idle:    color = BoardColumnKind.idle.color
+        case .waiting: color = BoardColumnKind.needsAttention.color
+        case .running: color = BoardColumnKind.running.color
+        case .done:    color = BoardColumnKind.done.color
+        case .error:   color = BoardColumnKind.error.color
         }
         statusDot.layer?.backgroundColor = color.cgColor
     }

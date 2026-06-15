@@ -103,7 +103,7 @@ public enum BoardModel {
     /// Interactive shell names that don't count as a "running" foreground
     /// command — mirrors the Session State Dot classification in
     /// `SidebarSessionRows.swift`.
-    private static let shellNames: Set<String> = ["zsh", "bash", "sh", "fish", "csh", "tcsh", "login"]
+    public static let shellNames: Set<String> = ["zsh", "bash", "sh", "fish", "csh", "tcsh", "login"]
 
     public static func classify(snapshot: SessionSnapshot) -> [BoardColumn] {
         var cardsByColumn: [BoardColumnKind: [BoardCard]] = [:]
