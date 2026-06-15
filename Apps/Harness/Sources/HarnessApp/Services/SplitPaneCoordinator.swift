@@ -227,4 +227,40 @@ final class SplitPaneCoordinator {
             return false
         }
     }
+
+    /// Remove a browser pane from the app-side snapshot and deregister it.
+    func closeBrowserPane(paneID: PaneID) {
+        BrowserPaneRegistry.shared.unregister(paneID)
+        var updatedSnapshot = coord.snapshot
+        for (wIdx, ws) in updatedSnapshot.workspaces.enumerated() {
+            for (sIdx, session) in ws.sessions.enumerated() {
+                for (tIdx, tab) in session.tabs.enumerated() {
+                    var root = tab.rootPane
+                    if removePaneNode(paneID: paneID, from: &root) {
+                        updatedSnapshot.workspaces[wIdx].sessions[sIdx].tabs[tIdx].rootPane = root
+                        coord.daemonSyncService.applyLocalSnapshot(updatedSnapshot)
+                        return
+                    }
+                }
+            }
+        }
+    }
+
+    /// Returns true and removes the node with matching paneID, collapsing the branch.
+    private func removePaneNode(paneID: PaneID, from node: inout PaneNode) -> Bool {
+        switch node {
+        case let .leaf(leaf) where leaf.id == paneID: return true
+        case let .browser(leaf) where leaf.id == paneID: return true
+        case .branch(let dir, let ratio, var first, var second):
+            if removePaneNode(paneID: paneID, from: &first) {
+                node = second; return false
+            }
+            if removePaneNode(paneID: paneID, from: &second) {
+                node = first; return false
+            }
+            node = .branch(direction: dir, ratio: ratio, first: first, second: second)
+            return false
+        default: return false
+        }
+    }
 }
