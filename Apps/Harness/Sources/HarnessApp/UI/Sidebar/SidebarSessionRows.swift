@@ -161,12 +161,12 @@ final class SessionGroupHeaderRowView: NSView {
 
 @MainActor
 final class SessionCardRowView: NSView {
-    /// Builds the right-click actions menu for this row (rename, close, …). Shown
-    /// via `menu(for:)` — the row no longer carries inline ⋮ / × buttons.
     var onContextMenu: (() -> NSMenu?)?
     var onClose: (() -> Void)?
+    var onToggleExpand: (() -> Void)?
 
     private let fill = NSView()
+    private let expandButton = NSButton()
     private let titleLabel = NSTextField(labelWithString: "")
     private let metaLabel = NSTextField(labelWithString: "")
     private let agentChip = AgentChipView()
@@ -175,6 +175,24 @@ final class SessionCardRowView: NSView {
     private var isSelected = false
     private var isHovered = false
     private var trackingArea: NSTrackingArea?
+
+    var isExpanded: Bool = false {
+        didSet {
+            let angle: CGFloat = isExpanded ? 90 : 0
+            expandButton.image = NSImage(systemSymbolName: "chevron.right", accessibilityDescription: nil)?
+                .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 9, weight: .semibold))
+            if #available(macOS 14, *) {
+                expandButton.contentTintColor = HarnessDesign.chrome.textSecondary
+            }
+            // rotate via layer transform
+            expandButton.layer?.anchorPoint = CGPoint(x: 0.5, y: 0.5)
+            let rotation = CATransform3DMakeRotation(angle * .pi / 180, 0, 0, 1)
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            expandButton.layer?.transform = rotation
+            CATransaction.commit()
+        }
+    }
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -186,6 +204,16 @@ final class SessionCardRowView: NSView {
         fill.layer?.borderWidth = 1
         fill.layer?.masksToBounds = false
         fill.translatesAutoresizingMaskIntoConstraints = false
+
+        expandButton.image = NSImage(systemSymbolName: "chevron.right", accessibilityDescription: nil)?
+            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 9, weight: .semibold))
+        expandButton.isBordered = false
+        expandButton.imagePosition = .imageOnly
+        expandButton.wantsLayer = true
+        expandButton.translatesAutoresizingMaskIntoConstraints = false
+        expandButton.target = self
+        expandButton.action = #selector(expandClicked)
+        expandButton.alphaValue = 0   // hidden at rest, shown on hover
 
         titleLabel.font = HarnessDesign.Typography.sidebarLabel
         titleLabel.usesSingleLineMode = true
@@ -220,6 +248,7 @@ final class SessionCardRowView: NSView {
         stateIndicator.translatesAutoresizingMaskIntoConstraints = false
 
         addSubview(fill)
+        fill.addSubview(expandButton)
         fill.addSubview(titleLabel)
         fill.addSubview(metaLabel)
         fill.addSubview(agentChip)
@@ -232,7 +261,12 @@ final class SessionCardRowView: NSView {
             fill.leadingAnchor.constraint(equalTo: leadingAnchor, constant: HarnessDesign.horizontalInset - 4),
             fill.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -(HarnessDesign.horizontalInset - 4)),
 
-            titleLabel.leadingAnchor.constraint(equalTo: fill.leadingAnchor, constant: 12),
+            expandButton.leadingAnchor.constraint(equalTo: fill.leadingAnchor, constant: 4),
+            expandButton.centerYAnchor.constraint(equalTo: fill.centerYAnchor),
+            expandButton.widthAnchor.constraint(equalToConstant: 14),
+            expandButton.heightAnchor.constraint(equalToConstant: 14),
+
+            titleLabel.leadingAnchor.constraint(equalTo: expandButton.trailingAnchor, constant: 4),
             titleLabel.topAnchor.constraint(equalTo: fill.topAnchor, constant: 8),
             titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: agentChip.leadingAnchor, constant: -6),
             titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: closeButton.leadingAnchor, constant: -6),
@@ -263,6 +297,10 @@ final class SessionCardRowView: NSView {
 
     @objc private func closeClicked() {
         onClose?()
+    }
+
+    @objc private func expandClicked() {
+        onToggleExpand?()
     }
 
     @available(*, unavailable)
@@ -353,6 +391,8 @@ final class SessionCardRowView: NSView {
         let c = HarnessDesign.chrome
         metaLabel.textColor = c.textTertiary
         closeButton.alphaValue = isHovered ? 1 : 0
+        expandButton.alphaValue = isHovered || isExpanded ? 1 : 0
+        if #available(macOS 14, *) { expandButton.contentTintColor = c.textSecondary }
         stateIndicator.alphaValue = isHovered ? 0 : 1
         let closeColor = c.textSecondary
         closeButton.attributedTitle = NSAttributedString(
@@ -413,5 +453,110 @@ final class SidebarTitlebarHeaderView: NSView {
             return
         }
         super.mouseUp(with: event)
+    }
+}
+
+// MARK: - Tab sub-row (shown when session is expanded)
+
+@MainActor
+final class SessionTabRowView: NSView {
+    var onTap: (() -> Void)?
+
+    private let dot = NSView()
+    private let titleLabel = NSTextField(labelWithString: "")
+    private let metaLabel = NSTextField(labelWithString: "")
+    private var trackingArea: NSTrackingArea?
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+
+        dot.wantsLayer = true
+        dot.layer?.cornerRadius = 3
+        dot.translatesAutoresizingMaskIntoConstraints = false
+
+        titleLabel.font = .systemFont(ofSize: 11.5, weight: .regular)
+        titleLabel.usesSingleLineMode = true
+        titleLabel.lineBreakMode = .byTruncatingTail
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        metaLabel.font = .monospacedSystemFont(ofSize: 10, weight: .regular)
+        metaLabel.usesSingleLineMode = true
+        metaLabel.lineBreakMode = .byTruncatingMiddle
+        metaLabel.translatesAutoresizingMaskIntoConstraints = false
+        metaLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        addSubview(dot)
+        addSubview(titleLabel)
+        addSubview(metaLabel)
+
+        NSLayoutConstraint.activate([
+            dot.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 28),
+            dot.centerYAnchor.constraint(equalTo: centerYAnchor),
+            dot.widthAnchor.constraint(equalToConstant: 6),
+            dot.heightAnchor.constraint(equalToConstant: 6),
+
+            titleLabel.leadingAnchor.constraint(equalTo: dot.trailingAnchor, constant: 6),
+            titleLabel.topAnchor.constraint(equalTo: topAnchor, constant: 6),
+            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -12),
+
+            metaLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
+            metaLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 1),
+            metaLabel.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -12),
+            metaLabel.bottomAnchor.constraint(lessThanOrEqualTo: bottomAnchor, constant: -4),
+        ])
+
+        let click = NSClickGestureRecognizer(target: self, action: #selector(handleClick))
+        addGestureRecognizer(click)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError() }
+
+    func configure(tab: Tab) {
+        let c = HarnessDesign.chrome
+
+        // Board status dot
+        let column = BoardModel.classify(snapshot: SessionCoordinator.shared.snapshot)
+            .first { $0.cards.contains { $0.tabID == tab.id } }?.kind
+        switch column {
+        case .needsAttention: dot.layer?.backgroundColor = NSColor.systemOrange.cgColor
+        case .running:        dot.layer?.backgroundColor = NSColor.systemBlue.cgColor
+        case .error:          dot.layer?.backgroundColor = NSColor.systemRed.cgColor
+        case .done:           dot.layer?.backgroundColor = NSColor.systemGreen.cgColor
+        default:              dot.layer?.backgroundColor = c.textTertiary.withAlphaComponent(0.4).cgColor
+        }
+
+        // Title: command or folder name
+        let cmd = tab.currentCommand ?? ""
+        let isShell = ["zsh", "bash", "sh", "fish"].contains(cmd.lowercased())
+        titleLabel.stringValue = (!cmd.isEmpty && !isShell) ? cmd : HarnessDesign.pathDisplayName(tab.cwd)
+        titleLabel.textColor = c.textPrimary
+
+        // Meta: full branch + full CWD (not truncated in source — let label handle it)
+        var meta = tab.cwd
+        if let branch = tab.gitBranch, !branch.isEmpty {
+            meta = "⎇ \(branch)  \(tab.cwd)"
+        }
+        metaLabel.stringValue = meta
+        metaLabel.textColor = c.textTertiary
+    }
+
+    @objc private func handleClick() { onTap?() }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let t = trackingArea { removeTrackingArea(t) }
+        let a = NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect], owner: self, userInfo: nil)
+        addTrackingArea(a)
+        trackingArea = a
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        layer?.backgroundColor = HarnessDesign.chrome.textPrimary.withAlphaComponent(0.06).cgColor
+    }
+    override func mouseExited(with event: NSEvent) {
+        layer?.backgroundColor = .clear
     }
 }
