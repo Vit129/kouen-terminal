@@ -1,6 +1,6 @@
 # P19 — Terminal Workbench Migration Layer
 
-Status: **planned**
+Status: **DONE** — PBI-WB-001..007 fully implemented and merged to main.
 Priority: **P2** — product/workflow bridge for IDE migrants, built on P4/P11/P12/P16
 Owner surface: HarnessApp UI, HarnessCLI, HarnessCore workflow commands, scripting/MCP integration
 Created: 2026-06-14

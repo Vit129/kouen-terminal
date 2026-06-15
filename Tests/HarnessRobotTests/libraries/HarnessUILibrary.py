@@ -12,7 +12,7 @@ from robot.api.deco import keyword, library
 
 
 BUNDLE_ID = "com.robert.harness.preview"
-APP_NAME = "HarnessPreview"
+APP_NAME = "Harness"
 
 
 @library(scope="GLOBAL")

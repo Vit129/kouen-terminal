@@ -15,6 +15,7 @@ final class MainSplitViewController: NSViewController {
     /// Bumped each time a sidebar collapse/expand starts so any in-flight animation
     /// frame bails out — prevents two toggles from fighting over the divider position.
     private var sidebarAnimToken = 0
+    private var didApplyInitialSidebarState = false
     /// Owned (not a singleton) so collapse state is per-window. Carries the
     /// `allowFullCollapse` flag the divider min-coordinate reads.
     private let splitDelegate = SplitChromeDelegate()
@@ -93,22 +94,6 @@ final class MainSplitViewController: NSViewController {
 
         edgeDivider.layer?.backgroundColor = resolvedDividerColor().cgColor
 
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            let settings = SessionCoordinator.shared.settings
-            if settings.sidebarCollapsedOnLaunch {
-                // Keep `sidebarVisible` in sync with the forced-collapsed state so the
-                // first `toggleSidebar()` (e.g. user expanding the sidebar after launch)
-                // computes `!false -> true` and actually shows it. Without this, a stale
-                // `sidebarVisible == true` from a previous session makes the first toggle
-                // collapse (no-op) instead of expand.
-                SessionCoordinator.shared.settings.sidebarVisible = false
-                self.applySidebarVisibility(false, animated: false)
-            } else {
-                self.applySidebarVisibility(settings.sidebarVisible, animated: false)
-            }
-        }
-
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(snapshotChanged),
@@ -139,6 +124,29 @@ final class MainSplitViewController: NSViewController {
             name: Notification.Name("HarnessOpenLocalhostURL"),
             object: nil
         )
+    }
+
+    override func viewDidLayout() {
+        super.viewDidLayout()
+        if !didApplyInitialSidebarState && split.bounds.width > 0 {
+            didApplyInitialSidebarState = true
+            applyInitialSidebarState()
+        }
+    }
+
+    private func applyInitialSidebarState() {
+        let settings = SessionCoordinator.shared.settings
+        if settings.sidebarCollapsedOnLaunch {
+            // Keep `sidebarVisible` in sync with the forced-collapsed state so the
+            // first `toggleSidebar()` (e.g. user expanding the sidebar after launch)
+            // computes `!false -> true` and actually shows it. Without this, a stale
+            // `sidebarVisible == true` from a previous session makes the first toggle
+            // collapse (no-op) instead of expand.
+            SessionCoordinator.shared.settings.sidebarVisible = false
+            applySidebarVisibility(false, animated: false)
+        } else {
+            applySidebarVisibility(settings.sidebarVisible, animated: false)
+        }
     }
 
     @objc private func openFilePreviewFromTerminal(_ notification: Notification) {
