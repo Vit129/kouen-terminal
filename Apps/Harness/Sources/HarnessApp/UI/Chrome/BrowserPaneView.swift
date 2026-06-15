@@ -12,6 +12,9 @@ public final class BrowserPaneView: NSView {
     private let forwardButton = NSButton()
     private let reloadStopButton = NSButton()
     internal let urlTextField = NSTextField()
+    private let closePaneButton = NSButton()
+    /// Called when user taps the close (×) button in the toolbar.
+    public var onClosePaneRequested: (() -> Void)?
 
     private let errorBanner = NSView()
     private let errorLabel = NSTextField(labelWithString: "")
@@ -105,12 +108,16 @@ public final class BrowserPaneView: NSView {
         urlTextField.action = #selector(urlEntered(_:))
         urlTextField.font = NSFont.systemFont(ofSize: HarnessDesign.FontSize.chromeBody)
 
-        let toolbarStack = NSStackView(views: [backButton, forwardButton, reloadStopButton, urlTextField])
+        let toolbarStack = NSStackView(views: [backButton, forwardButton, reloadStopButton, urlTextField, closePaneButton])
         toolbarStack.orientation = .horizontal
         toolbarStack.spacing = 8
         toolbarStack.edgeInsets = NSEdgeInsets(top: 4, left: 8, bottom: 4, right: 8)
         toolbarStack.alignment = .centerY
         toolbarStack.translatesAutoresizingMaskIntoConstraints = false
+
+        configureNavigationButton(closePaneButton, symbolName: "xmark", action: #selector(closePaneClicked))
+        closePaneButton.toolTip = "Close Browser Pane"
+        closePaneButton.setContentHuggingPriority(.required, for: .horizontal)
         toolbar.addSubview(toolbarStack)
 
         NSLayoutConstraint.activate([
@@ -187,6 +194,15 @@ public final class BrowserPaneView: NSView {
     }
 
     // MARK: - Actions
+
+    @objc private func closePaneClicked() {
+        if let cb = onClosePaneRequested {
+            cb()
+        } else {
+            // Fallback: remove from pane tree via coordinator
+            SessionCoordinator.shared.splitPaneCoordinator.closeBrowserPane(paneID: paneID)
+        }
+    }
 
     @objc private func backClicked() {
         if webView.canGoBack {
