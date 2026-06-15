@@ -364,7 +364,31 @@ final class HarnessSidebarPanelViewController: NSViewController {
             return
         }
         let coordinator = SessionCoordinator.shared
-        let entries = coordinator.notificationsList()
+        let snapshot = coordinator.snapshot
+        // Agent notifications first, then board error/needs-attention sessions
+        var entries = coordinator.notificationsList()
+        let agentTabIDs = Set(entries.map(\.tabID))
+        for ws in snapshot.workspaces {
+            for session in ws.sessions {
+                for tab in session.tabs {
+                    guard !agentTabIDs.contains(tab.id) else { continue }
+                    let kind = BoardModel.columnKind(for: tab)
+                    guard kind == .needsAttention || kind == .error else { continue }
+                    let body = kind == .error ? "Exit error" : "Needs attention"
+                    let entry = NotificationEntry(
+                        workspaceID: ws.id,
+                        workspaceName: ws.name,
+                        sessionID: session.id,
+                        tabID: tab.id,
+                        tabTitle: tab.title.isEmpty ? tab.cwd : tab.title,
+                        surfaceID: tab.id,
+                        agentKind: tab.agent?.kind,
+                        body: body
+                    )
+                    entries.append(entry)
+                }
+            }
+        }
         let dropdown = NotificationDropdownPanelView(
             entries: entries,
             onSelect: { [weak self] entry in

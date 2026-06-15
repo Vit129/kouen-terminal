@@ -110,8 +110,12 @@ final class NotificationBellButton: NSControl {
     }
 
     @objc private func refresh() {
-        let count = SessionCoordinator.shared.snapshot.workspaces.reduce(into: 0) { acc, ws in
-            acc += ws.sessions.flatMap(\.tabs).filter { $0.status == .waiting }.count
+        let snapshot = SessionCoordinator.shared.snapshot
+        let count = snapshot.workspaces.reduce(into: 0) { acc, ws in
+            acc += ws.sessions.flatMap(\.tabs).filter {
+                let kind = BoardModel.columnKind(for: $0)
+                return kind == .needsAttention || kind == .error
+            }.count
         }
         waitingCount = count
         badge.stringValue = count > 99 ? "99+" : "\(count)"
