@@ -21,6 +21,11 @@ final class CommandParserTests: XCTestCase {
         XCTAssertEqual(try CommandParser.parse("respawn-pane --clear-history"), .respawnPane(keepHistory: false))
     }
 
+    func testParsesWorkbenchQueriesWithSpaces() throws {
+        XCTAssertEqual(try CommandParser.parse("find Sources App"), .workbench(.find(query: "Sources App")))
+        XCTAssertEqual(try CommandParser.parse(#"grep "fatal error""#), .workbench(.grep(query: "fatal error")))
+    }
+
     func testParsesNavigationAndSessions() throws {
         XCTAssertEqual(try CommandParser.parse("next-window"), .nextWindow)
         XCTAssertEqual(try CommandParser.parse("previous-window"), .previousWindow)

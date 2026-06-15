@@ -4,6 +4,7 @@
 
 | Version | Sprint | Key Deliverables |
 |---------|--------|-----------------|
+| v3.0.0 | Terminal Workbench aggregation | Terminal-first workbench layer, pane-aware context resolver, and collected Vi/Unix/panel workflow primitives from P4-P19 |
 | v1.3.0 | IDE-like Sidebar | Files tab, Git tab, session tabs, recent projects |
 | v1.4.0 | Git panel polish | Commit ▼ menu, Sync button with per-remote options |
 | v1.5.0 | CMUX split panes | N-ary flatten, host reuse, split down removed |
@@ -20,6 +21,7 @@
 | Metal renderer | GPU-accelerated terminal rendering; CoreText for glyph shaping |
 | UserDefaults for ACP registry | Simple persistence; later moved to shelved status |
 | Session = project concept | Tab bar shows sessions (one per project), not individual PTY tabs |
+| Terminal-first workbench context | Shared commands should resolve focused pane CWD/current file before tab-level fallbacks |
 
 ## Apple Platform Context — Transparency & Legibility
 

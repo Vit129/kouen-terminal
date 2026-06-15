@@ -23,6 +23,7 @@ final class SyntaxTextView: NSView {
     private var currentPrefix: String = ""
 
     var symbolIndex: WorkspaceSymbolIndex?
+    var activeDiagnostics: [LSPDiagnostic] { diagnostics }
 
     var onHover: ((LSPPosition) async -> String?)?
     var onDefinition: ((LSPPosition) async -> SyntaxDefinitionTarget?)?
