@@ -183,6 +183,32 @@ extension ViEngine {
                 }
                 return
             }
+            // :agent <command> — send current file + context to agent pane
+            if cmd == "agent" || cmd.hasPrefix("agent ") {
+                let subcommand = cmd == "agent" ? "help" : String(cmd.dropFirst(6)).trimmingCharacters(in: .whitespaces)
+                let bridge = AgentBridge.shared
+                guard bridge.agentSurfaceID() != nil else {
+                    displayExMessage("agent: no agent pane found")
+                    return
+                }
+                let file = onCurrentFile?() ?? ""
+                switch subcommand {
+                case "help":
+                    displayExMessage(":agent fix | review | <message>")
+                case "fix":
+                    let errors = onDiagnostics?() ?? []
+                    let errorText = errors.isEmpty ? "(no diagnostics)" : errors.map { ":\($0.range.start.line + 1): \($0.message)" }.joined(separator: "\n")
+                    bridge.sendFile(path: file, command: "fix these errors:\n\(errorText)")
+                    displayExMessage("sent to agent: fix")
+                case "review":
+                    bridge.sendFile(path: file, command: "review this file")
+                    displayExMessage("sent to agent: review")
+                default:
+                    bridge.sendFile(path: file, command: subcommand)
+                    displayExMessage("sent to agent")
+                }
+                return
+            }
             // :grep <query> — run search in split pane
             if cmd.hasPrefix("grep ") {
                 let query = String(cmd.dropFirst(5)).trimmingCharacters(in: .whitespaces)
