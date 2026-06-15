@@ -884,9 +884,11 @@ private final class PaneSplitButtonsView: NSView {
 
         let splitRight = makeButton("square.split.2x1", tooltip: "Split Right (⌘D)", action: #selector(splitH))
         let splitDown = makeButton("square.split.1x2", tooltip: "Split Down (⌘⇧D)", action: #selector(splitV))
+        let openBrowser = makeButton("safari", tooltip: "Open Browser Pane (⌘B)", action: #selector(openBrowserPane))
         let closeBtn = makeButton("xmark", tooltip: "Close Pane (⌥⇧⌘W)", action: #selector(closePane))
         stack.addArrangedSubview(splitRight)
         stack.addArrangedSubview(splitDown)
+        stack.addArrangedSubview(openBrowser)
         stack.addArrangedSubview(closeBtn)
 
         NSLayoutConstraint.activate([
@@ -922,6 +924,13 @@ private final class PaneSplitButtonsView: NSView {
 
     @objc private func splitV() {
         SessionCoordinator.shared.splitActivePane(direction: .vertical)
+    }
+
+    @objc private func openBrowserPane() {
+        SessionCoordinator.shared.splitPaneCoordinator.openBrowserPane(
+            url: URL(string: "about:blank")!,
+            direction: .horizontal
+        )
     }
 
     @objc private func closePane() {

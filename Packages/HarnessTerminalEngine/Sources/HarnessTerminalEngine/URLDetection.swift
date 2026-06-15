@@ -88,6 +88,49 @@ public enum URLDetection {
         return nil
     }
 
+    /// Detects a bare `host:port[/path]` reference to a local dev server (no `http://` scheme),
+    /// e.g. `localhost:3000` or `127.0.0.1:8080/api` from dev-server startup banners.
+    /// Returns the token with an `http://` scheme prepended (and `0.0.0.0` rewritten to
+    /// `localhost`, since `0.0.0.0` isn't directly browsable).
+    public static func detectLocalhost(in line: String, at column: Int) -> (url: String, columns: Range<Int>)? {
+        let chars = Array(line)
+        guard !line.isEmpty, column >= 0, column < chars.count else { return nil }
+        func isBoundary(_ c: Character) -> Bool { c == " " || c == "\t" || c == "'" || c == "\"" }
+        guard !isBoundary(chars[column]) else { return nil }
+        var lo = column
+        var hi = column
+        while lo > 0, !isBoundary(chars[lo - 1]) { lo -= 1 }
+        while hi + 1 < chars.count, !isBoundary(chars[hi + 1]) { hi += 1 }
+        var token = String(chars[lo ... hi])
+        while let last = token.last, ").,;:!?'\\\"]>".contains(last) {
+            token.removeLast()
+            hi -= 1
+        }
+        guard hi >= lo, column <= hi else { return nil }
+
+        var rest = Substring(token)
+        let scheme: String
+        if rest.lowercased().hasPrefix("https://") {
+            scheme = "https://"
+            rest = rest.dropFirst(scheme.count)
+        } else if rest.lowercased().hasPrefix("http://") {
+            scheme = "http://"
+            rest = rest.dropFirst(scheme.count)
+        } else {
+            scheme = "http://"
+        }
+
+        let hostAndPath = rest.split(separator: "/", maxSplits: 1, omittingEmptySubsequences: false)
+        let hostPort = hostAndPath[0]
+        let host = hostPort.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)[0].lowercased()
+        guard host == "localhost" || host == "127.0.0.1" || host == "0.0.0.0" || host == "::1" else {
+            return nil
+        }
+        let normalizedHostPort = host == "0.0.0.0" ? hostPort.replacingOccurrences(of: "0.0.0.0", with: "localhost") : String(hostPort)
+        let path = hostAndPath.count > 1 ? "/" + hostAndPath[1] : ""
+        return (scheme + normalizedHostPort + path, lo ..< (hi + 1))
+    }
+
     #if !canImport(Darwin)
     private static func tokenMatch(in line: String, at column: Int) -> (url: String, columns: Range<Int>)? {
         let chars = Array(line)
