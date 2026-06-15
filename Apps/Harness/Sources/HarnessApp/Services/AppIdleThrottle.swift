@@ -21,6 +21,17 @@ final class AppIdleThrottle {
         observers.append(nc.addObserver(
             forName: NSWorkspace.screensDidWakeNotification, object: nil, queue: .main
         ) { [weak self] _ in MainActor.assumeIsolated { self?.resume() } })
+
+        // While Harness isn't the active app, the sidebar's cwd display isn't visible — back off
+        // the shell-tracker's full-process-tree scan from 500ms to 2s instead of stopping it
+        // outright (so cwds are still fresh if the user switches back).
+        let dnc = NotificationCenter.default
+        observers.append(dnc.addObserver(
+            forName: NSApplication.didResignActiveNotification, object: nil, queue: .main
+        ) { _ in MainActor.assumeIsolated { SurfaceShellTracker.shared.setInterval(SurfaceShellTracker.backgroundInterval) } })
+        observers.append(dnc.addObserver(
+            forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main
+        ) { _ in MainActor.assumeIsolated { SurfaceShellTracker.shared.setInterval(SurfaceShellTracker.activeInterval) } })
     }
 
     private func suspend() {

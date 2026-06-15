@@ -1240,6 +1240,17 @@ public final class HarnessTerminalSurfaceView: NSView {
                     self.setWindowOccluded(!window.occlusionState.contains(.visible))
                 }
             })
+            // OS memory pressure (DISPATCH_SOURCE_TYPE_MEMORYPRESSURE, via MemoryPressureMonitor):
+            // drop this surface's glyph/shaped-run/image caches. Cheap to rebuild on next draw,
+            // and across many long-lived sessions these are the bulk of GPU/CPU cache memory.
+            windowKeyObservers.append(nc.addObserver(
+                forName: NotificationBus.shared.memoryPressure, object: nil, queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    self?.renderer?.purgeCaches()
+                    self?.scheduleRender()
+                }
+            })
             window.makeFirstResponder(self)
             focusStateChanged()
         } else {

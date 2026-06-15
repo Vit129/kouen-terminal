@@ -51,4 +51,12 @@ final class ImageTextureCache {
             textures.removeValue(forKey: oldest)
         }
     }
+
+    /// Drop every cached texture. Inline images are re-uploaded from the engine's image store on
+    /// next draw, so this just trades GPU memory for a one-time re-upload — used under memory
+    /// pressure.
+    func removeAll() {
+        textures.removeAll()
+        lru.removeAll()
+    }
 }

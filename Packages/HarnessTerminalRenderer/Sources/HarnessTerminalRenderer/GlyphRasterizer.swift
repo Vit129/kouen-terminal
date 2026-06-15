@@ -380,6 +380,14 @@ public final class GlyphRasterizer {
         shapedRunCacheOrderStart = 0
     }
 
+    /// Drop every cached shaped run. Runs re-shape from CoreText on next use — used under memory
+    /// pressure, alongside `GlyphAtlas.purgeForMemoryPressure()`.
+    func clearShapedRunCache() {
+        shapedRunCache.removeAll()
+        shapedRunCacheOrder.removeAll()
+        shapedRunCacheOrderStart = 0
+    }
+
     private func shapeUncached(_ text: String, font base: CTFont) -> [ShapedGlyph] {
         let fontKey = NSAttributedString.Key(kCTFontAttributeName as String)
         let attributed = NSAttributedString(string: text, attributes: [fontKey: base])

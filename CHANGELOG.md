@@ -6,6 +6,13 @@ All notable changes to Harness are documented here. The format is based on
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/robzilla1738/harness-terminal/releases).
 
+## [3.1.1] - 2026-06-15
+
+### Fixed
+- **Long-session memory growth** — the glyph atlas, shaped-run cache, and inline-image texture cache now purge on OS memory-pressure signals (`DISPATCH_SOURCE_TYPE_MEMORYPRESSURE`) instead of growing unbounded for the life of the process.
+- **Scrollback ring buffer never shrank** — `HistoryRingBuffer` now halves its backing storage once retained history drops below 25% of a previously-grown capacity, so a session that once scrolled a lot doesn't keep that peak allocation forever.
+- **Background CPU from shell-cwd polling** — `SurfaceShellTracker`'s full-process-tree scan backs off from 500ms to 2s while Harness isn't the active app, restoring full cadence on activation.
+
 ## [3.1.0] - 2026-06-15
 
 ### Added

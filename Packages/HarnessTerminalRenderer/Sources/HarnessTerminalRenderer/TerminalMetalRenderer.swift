@@ -249,6 +249,14 @@ public final class TerminalMetalRenderer {
     public private(set) var stats = TerminalRenderStats()
     public var glyphAtlasStats: GlyphAtlasStats { atlas.stats }
 
+    /// Drop the glyph atlas, shaped-run, and inline-image texture caches. Everything re-rasterizes
+    /// / re-uploads on next draw (at worst one stale-UV frame for the atlas, per
+    /// `GlyphAtlas.resetPacker`'s contract) — called when the OS reports memory pressure.
+    public func purgeCaches() {
+        atlas.purgeForMemoryPressure()
+        imageCache.removeAll()
+    }
+
     private let commandQueue: MTLCommandQueue
     private let bgPipeline: MTLRenderPipelineState
     private let glyphPipeline: MTLRenderPipelineState

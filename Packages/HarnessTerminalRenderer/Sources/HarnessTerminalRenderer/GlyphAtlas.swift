@@ -202,6 +202,15 @@ final class GlyphAtlas {
         rasterizer.shape(text, bold: bold, italic: italic)
     }
 
+    /// Drop all cached glyph/shaped-run entries and rewind the packer under OS memory pressure.
+    /// Reuses the `resetPacker` self-heal path (cached entries re-rasterize on next access, at
+    /// worst one stale-UV frame) and additionally clears the rasterizer's shaped-run cache, which
+    /// `resetPacker` alone doesn't touch.
+    func purgeForMemoryPressure() {
+        resetPacker()
+        rasterizer.clearShapedRunCache()
+    }
+
     /// Pack a rasterized glyph into the shelf and upload it. Returns nil only when the glyph has
     /// no ink, or (pathologically) is larger than one atlas page. Normal growth advances to a
     /// fresh page instead of resetting. At `maxPages`, the atlas keeps the old self-healing full

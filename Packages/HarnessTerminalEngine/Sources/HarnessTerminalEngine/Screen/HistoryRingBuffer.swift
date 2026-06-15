@@ -37,6 +37,10 @@ struct HistoryRingBuffer<Element> {
 
     var isEmpty: Bool { count == 0 }
 
+    /// Current backing-store size. Internal (not part of the engine's public surface) — exposed
+    /// only so tests can assert `shrinkIfNeeded` actually releases memory after a large trim.
+    var capacity: Int { storage.count }
+
     /// Append a new newest element. O(1) amortized; grows the backing store (doubling) when full.
     mutating func append(_ element: Element) {
         if count == storage.count {
@@ -77,6 +81,7 @@ struct HistoryRingBuffer<Element> {
         for i in 0 ..< drop { storage[backingIndex(i)] = nil }
         head = (head + drop) % storage.count
         count -= drop
+        shrinkIfNeeded()
     }
 
     /// Drop the newest `n` entries (clamped to `count`). Decrements `count` and niles the vacated
@@ -100,6 +105,17 @@ struct HistoryRingBuffer<Element> {
     /// from `append` after ensuring capacity), so `storage.count > 0` holds.
     private func backingIndex(_ logical: Int) -> Int {
         (head + logical) % storage.count
+    }
+
+    /// Halve the backing store once retained elements drop below a quarter of its capacity,
+    /// mirroring the doubling in `append`. Without this, a session whose history once neared
+    /// `maxHistoryLines` and was then capped lower (or simply trimmed back) keeps its peak
+    /// allocation for the rest of the run — across many long-lived sessions that's the bulk of
+    /// `HistoryRingBuffer`'s footprint. `growStorage` re-lays elements into any capacity >= count,
+    /// so it doubles as the shrink path too.
+    private mutating func shrinkIfNeeded() {
+        guard storage.count > 64, count * 4 < storage.count else { return }
+        growStorage(to: Swift.max(64, storage.count / 2))
     }
 
     /// Re-lay the retained elements out from index 0 into a larger backing store, then pad with nil.
