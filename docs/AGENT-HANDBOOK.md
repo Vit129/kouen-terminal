@@ -489,7 +489,7 @@ Per-agent guides: [docs/agent-hooks/](docs/agent-hooks/). Daemon hooks (`hooks.j
 | Component | File | Notes |
 |-----------|------|-------|
 | Window shell | `MainWindowController` | Root window, chrome palette |
-| Main menu | `MainMenuBuilder` | Global shortcuts (Cmd+T, Cmd+K, …) |
+| Main menu | `MainMenuBuilder` | Global shortcuts (Cmd+P, …) |
 | Main split | `MainSplitViewController` | Snapshot observer; sidebar collapse via `SplitChromeDelegate.allowFullCollapse` (divider min drops to 0 for a programmatic collapse, stays 200 for user drags) + a tab-strip toggle button; traffic-light leading inset applies to `WindowTitleStripView` (via `ContentAreaViewController.setTabBarLeadingInset`) when the sidebar collapses — the tab bar itself receives inset 0 (it sits below the title strip, already clear of the lights) |
 | Sidebar | `HarnessSidebarPanelViewController` | Sessions, agents |
 | Tab bar | `TerminalTabBarView` | `SoftIconButton`: `isBordered = false` for `+` |
@@ -507,7 +507,7 @@ Per-agent guides: [docs/agent-hooks/](docs/agent-hooks/). Daemon hooks (`hooks.j
 | About | `AboutPanelController` | Menu → About Harness |
 | Onboarding | `OnboardingController` → `HarnessOnboarding` | Thin app bridge to the embedded SwiftUI immersive first-run wizard; first launch + Help → Welcome; dismisses back into Harness, never exits the app |
 | Prefix / prompt | `PrefixKeymap`, `CommandPromptController` | |
-| Palette | `CommandPaletteController` | `Cmd+K`, MRU; featured themes only |
+| Palette | `CommandPaletteController` | `Cmd+P`, MRU; featured themes only |
 | Menu bar | `MenuBarController` | `NSStatusItem` (Harness mark, template); menu lists active agent sessions + every workspace's sessions from the daemon snapshot (shell-agnostic); rebuilt on open |
 | Design / chrome | `HarnessDesign`, `HarnessChrome` | Tokens, `ChromeBackdrop`, `HarnessPillButton` (theme-aware monochrome primary/secondary — used by onboarding + settings instead of system-blue bezels), Liquid Glass |
 | Toast / blur | `Toast`, `WindowBlur` | Transient feedback, backdrop blur |
