@@ -85,7 +85,7 @@ These are fixed `NSMenuItem` bindings defined in `MainMenuBuilder` — not prefi
 | Search command history | `⌃R` |
 | Toggle sidebar + file editor (focus mode) | `⌘\` |
 | Show Git panel | `⌘G` |
-| Jump to notification | `⌘⇧U` |
+| Jump to notification | `⌘⇧I` |
 | Settings | `⌘,` |
 | Increase / Decrease / Reset font size | `⌘+` / `⌘-` / `⌘0` |
 | Toggle Fast Full Screen (instant fill, no Space animation) | `⌃⌘⇧F` |

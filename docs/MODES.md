@@ -36,7 +36,7 @@ bringing an existing setup over.
 ## 4. Agent Workspace
 
 Persistent project workspaces with AI-agent detection, waiting/done/error notifications, and
-jump-to-agent (`⌘⇧U`) foregrounded. The prefix + status line are **available but off by default**
+jump-to-agent (`⌘⇧I`) foregrounded. The prefix + status line are **available but off by default**
 — enable them without leaving the mode (see *Opting into the prefix + status line*).
 
 ## Persistence (ephemeral vs. persistent)

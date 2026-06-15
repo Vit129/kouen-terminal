@@ -50,7 +50,7 @@ Harness recognizes standard notification OSC sequences (9, 99, 777) emitted by a
 
 ## Jump to waiting agent
 
-Press `Cmd+Shift+U` in Harness, or run:
+Press `Cmd+Shift+I` in Harness, or run:
 
 ```bash
 # Use the command palette (Cmd+K) → jump-notification

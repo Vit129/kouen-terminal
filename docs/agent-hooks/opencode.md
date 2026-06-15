@@ -37,6 +37,6 @@ the previous copy).
 
 - The tab pill's dot turns OpenCode teal when an `opencode` process is detected.
 - On idle / permission events you get a macOS banner + sidebar entry;
-  `Cmd+Shift+U` jumps to the pane.
+  `Cmd+Shift+I` jumps to the pane.
 
 The dot color for OpenCode panes is `#56b6c2`.
