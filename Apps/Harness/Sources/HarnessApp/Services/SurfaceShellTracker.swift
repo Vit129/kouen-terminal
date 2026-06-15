@@ -16,7 +16,14 @@ import HarnessCore
 final class SurfaceShellTracker {
     static let shared = SurfaceShellTracker()
 
+    /// Poll interval while the app is active (key) — matches the original 500ms cadence.
+    static let activeInterval: TimeInterval = 0.5
+    /// Poll interval while the app is in the background — the cwds it feeds the sidebar aren't
+    /// visible then, so a full `proc_listpids(PROC_ALL_PIDS)` walk every 500ms is wasted work.
+    static let backgroundInterval: TimeInterval = 2.0
+
     private var timer: DispatchSourceTimer?
+    private var currentInterval = activeInterval
     private var lastReportedCwd: [String: String] = [:]
     /// Set while a background scan is in flight so ticks don't pile up — a proc-tree walk on a
     /// loaded machine can exceed the 500ms interval, and stacking scans just wastes CPU.
@@ -31,7 +38,7 @@ final class SurfaceShellTracker {
     func start() {
         guard timer == nil else { return }
         let timer = DispatchSource.makeTimerSource(queue: .main)
-        timer.schedule(deadline: .now() + 0.5, repeating: 0.5)
+        timer.schedule(deadline: .now() + currentInterval, repeating: currentInterval)
         timer.setEventHandler { [weak self] in
             self?.tick()
         }
@@ -42,6 +49,15 @@ final class SurfaceShellTracker {
     func stop() {
         timer?.cancel()
         timer = nil
+    }
+
+    /// Reschedule the running timer at `interval` (e.g. back off while the app is backgrounded).
+    /// A no-op if the interval is unchanged or the timer isn't running; `start()` picks up the
+    /// latest interval next time it runs.
+    func setInterval(_ interval: TimeInterval) {
+        guard currentInterval != interval else { return }
+        currentInterval = interval
+        timer?.schedule(deadline: .now() + interval, repeating: interval)
     }
 
     /// Force a re-scan immediately (call after creating a new tab/surface so

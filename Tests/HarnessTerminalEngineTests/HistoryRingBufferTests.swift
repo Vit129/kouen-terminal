@@ -92,4 +92,26 @@ final class HistoryRingBufferTests: XCTestCase {
         XCTAssertEqual(Array(ring), [7, 8, 9])
         XCTAssertEqual(ring[0], 7)
     }
+
+    func testRemoveFirstShrinksStorageOnceBelowQuarterCapacity() {
+        var ring = HistoryRingBuffer<Int>()
+        for i in 0 ..< 200 { ring.append(i) }
+        let grownCapacity = ring.capacity
+        XCTAssertGreaterThanOrEqual(grownCapacity, 200)
+
+        // Drop down to a handful of elements — well under a quarter of the grown capacity.
+        ring.removeFirst(190)
+        XCTAssertEqual(ring.count, 10)
+        XCTAssertLessThan(ring.capacity, grownCapacity, "storage should shrink once retained elements drop below 25% of capacity")
+        XCTAssertGreaterThanOrEqual(ring.capacity, 64, "shrink never goes below the 64-element floor")
+        XCTAssertEqual(Array(ring), Array(190 ..< 200))
+    }
+
+    func testShrinkRespectsFloorAndDoesNotShrinkSmallBuffers() {
+        var ring = HistoryRingBuffer<Int>()
+        for i in 0 ..< 8 { ring.append(i) }
+        ring.removeFirst(6)
+        XCTAssertEqual(ring.capacity, 8, "buffers at or below the 64-element floor never shrink")
+        XCTAssertEqual(Array(ring), [6, 7])
+    }
 }
