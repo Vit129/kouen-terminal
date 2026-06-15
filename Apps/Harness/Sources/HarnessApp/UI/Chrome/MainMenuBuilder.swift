@@ -150,7 +150,7 @@ enum MainMenuBuilder {
         searchHistoryItem.keyEquivalentModifierMask = [.control]
         searchHistoryItem.target = MenuTarget.shared
         view.submenu?.addItem(searchHistoryItem)
-        let findItem = NSMenuItem(title: "Find File…", action: #selector(MenuTarget.commandPalette), keyEquivalent: "f")
+        let findItem = NSMenuItem(title: "Find in Files…", action: #selector(MenuTarget.findInFiles), keyEquivalent: "f")
         findItem.keyEquivalentModifierMask = [.command]
         findItem.target = MenuTarget.shared
         view.submenu?.addItem(findItem)
@@ -363,6 +363,10 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
 
     @objc func find() {
         SessionCoordinator.shared.toggleFindBar()
+    }
+
+    @objc func findInFiles() {
+        CommandPaletteController.present(relativeTo: NSApp.keyWindow, mode: .grep(query: ""))
     }
 
 
