@@ -178,7 +178,7 @@ Harness includes IDE-like features accessible without leaving the terminal. No p
 
 | Shortcut / Command | What it does |
 |--------------------|-------------|
-| `⌘K` | Fuzzy file search — like Spotlight or VS Code Cmd+P |
+| `⌘P` | Fuzzy file search — like Spotlight or VS Code Cmd+P |
 | `:find <partial>` | Fuzzy-open file by name fragment (vi ex command) |
 | `:recent` | Show recently opened files, pick by number |
 | `:copy-path` | Copy relative path of the current file |
