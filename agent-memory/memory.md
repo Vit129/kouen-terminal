@@ -83,6 +83,12 @@
 | 66 | P17 PBI-REFACTOR-001 complete: SessionCoordinator 2050→397 LOC (target <500 ✅). Services: DaemonSyncService(233), NotificationCoordinator(247), SessionLifecycleService(360), SplitPaneCoordinator(157), ThemeService(178), ActivePaneService(197), SessionCoordinator+HostDelegate(86), SessionCoordinatorTypes(47). All 8 files use unowned coordinator back-reference. Build pass. | ✅ Done |
 | 67 | P12 PBI-ORCH-005: MCP-controlled indicator on tab bar. Tab.lastMCPControlAt field; IPCMessage.notifyMCPActivity; SessionEditor.stampMCPActivity; SurfaceRegistry handler; harness-mcp posts after sendPaneText/sendPaneKeys succeed; TabPillView shows "MCP" badge (blue, 5s). Build pass. | ✅ Done |
 | 68 | P14 PBI-BROWSER-001..005: Embedded browser pane (WKWebView) in split tree, toolbar controls, URL persistence, and MCP tools (Open/Navigate/Wait/Snapshot/Interact/Close) with security policy. | ✅ Done |
+| 69 | P17 PBI-REFACTOR-002, 003, 005 complete: organized UI/ into feature subfolders, decomposed ViNormalMode.swift into 5 modular files, wrapped shelved ACP code in compilation flag `#if HARNESS_ACP` (PBI-REFACTOR-004 deferred). | ✅ Done |
+| 70 | P18 UI Automation: implemented 25 automated UI test cases across P4/P11/P12/P13/P16 using Robot Framework + custom `HarnessUILibrary.py` (via AppleScript/osascript and CLI verification). | ✅ Done |
+| 71 | P19 Terminal Workbench: completed PBI-WB-001..007 (Command facade, `:recent`, `:copy-path`, task detector/runner, `:grep`/`:errors`, attention workflow, and `ide-migrant-terminal` scriptable profile). | ✅ Done |
+| 72 | Post-browser polish: Browser pane URL local LAN dev-server links opening support, Cmd+B shortcut, close/refresh toolbar buttons bugfixes, and sidebar visibility expanding bugfix. | ✅ Done |
+| 73 | Fix: first-launch sidebar toggle bug (MainSplitViewController.swift) — initial `applySidebarVisibility` ran in `viewDidLoad`'s `DispatchQueue.main.async` while `split.bounds.width == 0`, collapsing the sidebar to 0pt while also hiding the ⌘\\ toggle icon (`sidebarToggle.isHidden = sidebarVisible`). Moved initial state application to first `viewDidLayout()` with `split.bounds.width > 0` via new `applyInitialSidebarState()` + `didApplyInitialSidebarState` flag. Build pass. | ✅ Done |
+
 
 ### Removed / Reverted Features
 - **Task Board sidebar** — was added in sprint #32 but has since been **removed**. Not present in current codebase.

@@ -1,10 +1,38 @@
 # P14 — Embedded Browser Pane (cmux parity)
 
-Status: **done** — PBI-BROWSER-001..005 implemented
+Status: **done** — PBI-BROWSER-001..005 implemented, post-release fixes shipped in v2.7.1
 Priority: **P3**
 Owner surface: **HarnessApp pane UI + harness-mcp browser tools**
 Depends on: P13 ✅, P12 ✅
 Research: cmux (WKWebView + CLI socket), Codex Tier 3 (Atlas/WKWebView for localhost), 2026-06-14
+
+---
+
+## Post-Release Fixes & Enhancements (v2.7.1, 2026-06-15)
+
+Two bugs found after the initial PBI-BROWSER-001..005 rollout, plus two follow-up
+requests, all on `fix/p14-browser-toolbar-tabs`:
+
+- **Close button silently did nothing.** `closeBrowserPane` correctly removed the
+  `.browser` leaf from the local snapshot, but `DaemonSyncService.applyLocalSnapshot`
+  ran the same browser-pane "preservation" re-injection used for remote daemon
+  snapshots, which restored the stale `rootPane` (with the leaf still in it).
+  Fixed by adding `preserveBrowserPanes: Bool` to `applySnapshot`, `false` for
+  `applyLocalSnapshot`. See `agent-memory/knowledge/browser-pane.md`.
+- **Refresh/close icons appeared clipped/intercepted.** The collapsed `errorBanner`
+  (height 0) still participated in hit-testing — `errorDismissButton` extended into
+  the toolbar's trailing edge and ate clicks meant for `closePaneButton`/
+  `reloadStopButton`. Fixed by toggling `errorBanner.isHidden` alongside the height
+  constraint.
+- **⌘B — Open Browser Pane shortcut.** Added to the Window menu and to
+  `PaneSplitButtonsView` (per-pane floating toolbar), matching the existing
+  Split Right/Split Down (⌘D/⌘⇧D) affordances.
+- **Click-to-open localhost/LAN links.** `URLDetection.detectLocalhost` +
+  `isLocalDevHost` detect `localhost`/`127.0.0.1`/`0.0.0.0`/`::1` and private
+  IPv4 (`10.x`, `172.16-31.x`, `192.168.x`) / IPv6 (`fe80::/10`, `fc00::/7`)
+  `host:port[/path]` references in terminal output (e.g. Vite's
+  `Local:`/`Network:` banner) and open them in a Browser Pane via the
+  `HarnessOpenLocalhostURL` notification instead of the system browser.
 
 ---
 

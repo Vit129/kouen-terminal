@@ -88,6 +88,98 @@ public enum URLDetection {
         return nil
     }
 
+    /// True if `host` is an IPv4 literal in a private (RFC 1918) range — 10.0.0.0/8,
+    /// 172.16.0.0/12, or 192.168.0.0/16 — the LAN addresses dev servers print alongside
+    /// `localhost` (e.g. Vite's "Network: http://192.168.x.x:5173").
+    private static func isPrivateIPv4(_ host: some StringProtocol) -> Bool {
+        let parts = host.split(separator: ".")
+        guard parts.count == 4 else { return false }
+        var octets: [Int] = []
+        for part in parts {
+            guard let value = Int(part), (0 ... 255).contains(value) else { return false }
+            octets.append(value)
+        }
+        switch octets[0] {
+        case 10: return true
+        case 172: return (16 ... 31).contains(octets[1])
+        case 192: return octets[1] == 168
+        default: return false
+        }
+    }
+
+    /// True if `host` is an IPv6 literal in a link-local (fe80::/10) or unique-local (fc00::/7)
+    /// range — the IPv6 analogues of private IPv4 LAN addresses.
+    private static func isPrivateIPv6(_ host: some StringProtocol) -> Bool {
+        let lower = host.lowercased()
+        guard lower.contains(":") else { return false }
+        if lower.hasPrefix("fc") || lower.hasPrefix("fd") { return true }
+        return ["fe8", "fe9", "fea", "feb"].contains { lower.hasPrefix($0) }
+    }
+
+    /// True if `host` is a loopback/unspecified address or a private-LAN IPv4/IPv6 literal —
+    /// i.e. an address a local dev server might bind to. Used to decide whether a clicked URL
+    /// should open in Harness's in-app Browser Pane instead of the system browser. `host` may
+    /// be bracketed (`[::1]`), as returned from a raw `host:port` token.
+    public static func isLocalDevHost(_ host: String) -> Bool {
+        var lower = host.lowercased()
+        if lower.hasPrefix("["), lower.hasSuffix("]") {
+            lower = String(lower.dropFirst().dropLast())
+        }
+        return lower == "localhost" || lower == "127.0.0.1" || lower == "0.0.0.0"
+            || lower == "::1" || isPrivateIPv4(lower) || isPrivateIPv6(lower)
+    }
+
+    /// Detects a bare `host:port[/path]` reference to a local or LAN dev server (no `http://`
+    /// scheme), e.g. `localhost:3000`, `127.0.0.1:8080/api`, or `192.168.1.5:5173` from
+    /// dev-server startup banners. Returns the token with an `http://` scheme prepended (and
+    /// `0.0.0.0` rewritten to `localhost`, since `0.0.0.0` isn't directly browsable).
+    public static func detectLocalhost(in line: String, at column: Int) -> (url: String, columns: Range<Int>)? {
+        let chars = Array(line)
+        guard !line.isEmpty, column >= 0, column < chars.count else { return nil }
+        func isBoundary(_ c: Character) -> Bool { c == " " || c == "\t" || c == "'" || c == "\"" }
+        guard !isBoundary(chars[column]) else { return nil }
+        var lo = column
+        var hi = column
+        while lo > 0, !isBoundary(chars[lo - 1]) { lo -= 1 }
+        while hi + 1 < chars.count, !isBoundary(chars[hi + 1]) { hi += 1 }
+        var token = String(chars[lo ... hi])
+        while let last = token.last, ").,;:!?'\\\"]>".contains(last) {
+            token.removeLast()
+            hi -= 1
+        }
+        guard hi >= lo, column <= hi else { return nil }
+
+        var rest = Substring(token)
+        let scheme: String
+        if rest.lowercased().hasPrefix("https://") {
+            scheme = "https://"
+            rest = rest.dropFirst(scheme.count)
+        } else if rest.lowercased().hasPrefix("http://") {
+            scheme = "http://"
+            rest = rest.dropFirst(scheme.count)
+        } else {
+            scheme = "http://"
+        }
+
+        let hostAndPath = rest.split(separator: "/", maxSplits: 1, omittingEmptySubsequences: false)
+        let hostPort = hostAndPath[0]
+        let host: Substring
+        if hostPort.hasPrefix("[") {
+            // Bracketed IPv6 literal, e.g. "[fe80::1]:8080" — the host is everything
+            // between the brackets, since the address itself contains colons.
+            guard let closeBracket = hostPort.firstIndex(of: "]") else { return nil }
+            host = hostPort[hostPort.index(after: hostPort.startIndex) ..< closeBracket]
+        } else {
+            host = hostPort.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)[0]
+        }
+        guard isLocalDevHost(String(host)) else {
+            return nil
+        }
+        let normalizedHostPort = host.lowercased() == "0.0.0.0" ? hostPort.replacingOccurrences(of: "0.0.0.0", with: "localhost") : String(hostPort)
+        let path = hostAndPath.count > 1 ? "/" + hostAndPath[1] : ""
+        return (scheme + normalizedHostPort + path, lo ..< (hi + 1))
+    }
+
     #if !canImport(Darwin)
     private static func tokenMatch(in line: String, at column: Int) -> (url: String, columns: Range<Int>)? {
         let chars = Array(line)

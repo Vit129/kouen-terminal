@@ -1,6 +1,6 @@
 # P18 — UI Automation (Robot Framework)
 
-Status: **planned** — intentionally sequenced after P17 structural refactor completes
+Status: **DONE** — implemented 25 automated tests using Robot Framework + osascript (System Events) and CLI verification (no Appium/XCUITest).
 Priority: **P3** — quality/confidence layer, no new features
 Owner surface: Tests/HarnessRobotTests/ (new), HarnessApp UI layer (accessibility identifiers)
 Created: 2026-06-14
