@@ -188,9 +188,22 @@ extension ViEngine {
                 let raw = cmd == "agent" ? "" : String(cmd.dropFirst(6)).trimmingCharacters(in: .whitespaces)
                 let bridge = AgentBridge.shared
 
-                // Parse --agent flag
+                // Parse --agent, --model, --effort flags
                 let targetKind: AgentKind?
+                var targetModel: String? = nil
+                var targetEffort: String? = nil
                 var cleaned = raw
+                // Extract --model <value>
+                if let range = cleaned.range(of: #"--model\s+(\S+)"#, options: .regularExpression) {
+                    targetModel = String(cleaned[range]).components(separatedBy: .whitespaces).last
+                    cleaned = cleaned.replacingCharacters(in: range, with: "").trimmingCharacters(in: .whitespaces)
+                }
+                // Extract --effort <value>
+                if let range = cleaned.range(of: #"--effort\s+(\S+)"#, options: .regularExpression) {
+                    targetEffort = String(cleaned[range]).components(separatedBy: .whitespaces).last
+                    cleaned = cleaned.replacingCharacters(in: range, with: "").trimmingCharacters(in: .whitespaces)
+                }
+                // Extract agent kind
                 if cleaned.contains("--claude") {
                     targetKind = .claudeCode
                     cleaned = cleaned.replacingOccurrences(of: "--claude", with: "").trimmingCharacters(in: .whitespaces)
@@ -200,23 +213,18 @@ extension ViEngine {
                 } else if cleaned.contains("--kiro") {
                     targetKind = .kiro
                     cleaned = cleaned.replacingOccurrences(of: "--kiro", with: "").trimmingCharacters(in: .whitespaces)
+                } else if cleaned.contains("--gemini") {
+                    targetKind = .gemini
+                    cleaned = cleaned.replacingOccurrences(of: "--gemini", with: "").trimmingCharacters(in: .whitespaces)
                 } else {
                     targetKind = nil
                 }
-
-                // Auto-spawn if no agent running
                 let agents = bridge.allAgents()
                 if agents.isEmpty || (targetKind != nil && !agents.contains(where: { $0.kind == targetKind })) {
                     let spawnKind = targetKind ?? .claudeCode
-                    let spawnCmd: String
-                    switch spawnKind {
-                    case .claudeCode: spawnCmd = "claude"
-                    case .codex: spawnCmd = "codex"
-                    case .kiro: spawnCmd = "kiro"
-                    default: spawnCmd = "claude"
-                    }
+                    let spawnCmd = AgentCatalog.spawnCommand(kind: spawnKind, model: targetModel, effort: targetEffort) ?? spawnKind.rawValue
                     SessionCoordinator.shared.splitActivePaneAndRun(direction: .horizontal, command: spawnCmd)
-                    displayExMessage("spawning \(spawnCmd)... retry :agent in a few seconds")
+                    displayExMessage("spawning \(spawnKind.rawValue)... retry :agent in a few seconds")
                     return
                 }
 
