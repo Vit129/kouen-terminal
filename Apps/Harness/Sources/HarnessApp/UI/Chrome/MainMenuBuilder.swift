@@ -59,10 +59,6 @@ enum MainMenuBuilder {
         let closeTab = NSMenuItem(title: "Close Tab", action: #selector(MenuTarget.closeTab), keyEquivalent: "w")
         closeTab.target = MenuTarget.shared
         workspace.submenu?.addItem(closeTab)
-        let reopenTab = NSMenuItem(title: "Reopen Closed Tab", action: #selector(MenuTarget.reopenClosedTab), keyEquivalent: "T")
-        reopenTab.keyEquivalentModifierMask = [.command]
-        reopenTab.target = MenuTarget.shared
-        workspace.submenu?.addItem(reopenTab)
         let closeSession = NSMenuItem(title: "Close Session", action: #selector(MenuTarget.closeSession), keyEquivalent: "W")
         closeSession.keyEquivalentModifierMask = [.command, .shift]
         closeSession.target = MenuTarget.shared
@@ -154,7 +150,7 @@ enum MainMenuBuilder {
         searchHistoryItem.keyEquivalentModifierMask = [.control]
         searchHistoryItem.target = MenuTarget.shared
         view.submenu?.addItem(searchHistoryItem)
-        let findItem = NSMenuItem(title: "Find…", action: #selector(MenuTarget.find), keyEquivalent: "f")
+        let findItem = NSMenuItem(title: "Find File…", action: #selector(MenuTarget.commandPalette), keyEquivalent: "f")
         findItem.keyEquivalentModifierMask = [.command]
         findItem.target = MenuTarget.shared
         view.submenu?.addItem(findItem)
