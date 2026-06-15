@@ -9,6 +9,8 @@ public enum WorkbenchCommand: Codable, Sendable, Equatable {
     case copyPath(relative: Bool)
     case cd(path: String)
     case mark(name: String, path: String)
+    // File preview
+    case view(path: String)       // open file in sidebar viewer; fuzzy partial name accepted
     // Search / errors
     case grep(query: String)
     case errors
@@ -18,6 +20,8 @@ public enum WorkbenchCommand: Codable, Sendable, Equatable {
     case board
     case attention
     case ack
+    // Agents
+    case agent(waiting: Bool)    // list agents; waiting=true filters to blocking-only
 }
 
 /// Parses plain-text ex command strings into `WorkbenchCommand` intents.
@@ -30,6 +34,7 @@ public enum WorkbenchCommandParser {
         let arg = parts.count > 1 ? parts[1] : nil
 
         switch verb {
+        case "view": return arg.map { .view(path: $0) }
         case "find": return arg.map { .find(query: $0) } ?? .find(query: "")
         case "recent": return .recent
         case "copy-path":
@@ -45,6 +50,7 @@ public enum WorkbenchCommandParser {
         case "board": return .board
         case "attention": return .attention
         case "ack": return .ack
+        case "agent": return .agent(waiting: arg == "--waiting" || arg == "waiting")
         default: return nil
         }
     }

@@ -287,12 +287,14 @@ extension Command {
             case let .copyPath(rel): return "copy-path\(rel ? " relative" : " absolute")"
             case let .cd(path): return "cd \(path)"
             case let .mark(name, path): return "mark \(name) \(path)"
+            case let .view(path): return "view \(path)"
             case let .grep(q): return "grep \(q)"
             case .errors: return "errors"
             case let .make(target): return "make\(target.map { " " + $0 } ?? "")"
             case .board: return "board"
             case .attention: return "attention"
             case .ack: return "ack"
+            case let .agent(waiting): return "agent\(waiting ? " --waiting" : "")"
             }
         }
     }

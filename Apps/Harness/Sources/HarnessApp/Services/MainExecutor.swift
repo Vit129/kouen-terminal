@@ -466,9 +466,43 @@ final class MainExecutor: CommandExecutor {
                 DisplayMessage.show("copy-path: no current file")
             }
         case let .cd(path):
-            throw CommandExecutionError.unsupportedInThisContext("cd '\(path)' not supported in GUI context yet")
+            let expanded = (path as NSString).expandingTildeInPath
+            let resolved = expanded.hasPrefix("/") ? expanded : ((context?.cwd ?? FileManager.default.currentDirectoryPath) + "/" + expanded)
+            let url = URL(fileURLWithPath: resolved, isDirectory: true)
+            let canonical = url.standardized.path
+            // Find any tab whose cwd matches and switch to it, else just display a message.
+            if let ws = coordinator.snapshot.workspaces.first,
+               let tab = ws.tabs.first(where: { $0.cwd.hasPrefix(canonical) }) {
+                coordinator.selectTab(workspaceID: ws.id, tabID: tab.id)
+            } else {
+                DisplayMessage.show("cd: \(canonical)")
+            }
         case let .mark(name, path):
             throw CommandExecutionError.unsupportedInThisContext("mark '\(name)' '\(path)' not supported in GUI context yet")
+        case let .view(path):
+            guard let contentVC = activeContentVC() else { return }
+            let root = context?.cwd ?? FileManager.default.currentDirectoryPath
+            switch FuzzyPathResolver.resolve(query: path, root: root, limit: 5) {
+            case .none:
+                DisplayMessage.show("view: no match for '\(path)'")
+            case .unique(let resolved):
+                contentVC.openFileTab(path: resolved)
+            case .ambiguous(let matches):
+                DisplayMessage.show(matches.enumerated().map { "\($0.offset + 1): \($0.element)" }.joined(separator: "\n"))
+            }
+        case let .agent(waiting):
+            let agents = coordinator.agentsList()
+            let list = waiting ? agents.filter { $0.waiting } : agents
+            if list.isEmpty {
+                DisplayMessage.show(waiting ? "agent: no agents waiting" : "agent: no running agents")
+            } else if list.count == 1, let first = list.first {
+                coordinator.openAgent(first)
+            } else {
+                let text = list.enumerated().map { i, a in
+                    "\(i + 1): \(a.agentName) — \(a.tabTitle)\(a.waiting ? " [waiting]" : "")"
+                }.joined(separator: "\n")
+                DisplayMessage.show(text)
+            }
         }
     }
 
