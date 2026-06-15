@@ -183,57 +183,80 @@ extension ViEngine {
                 }
                 return
             }
-            // :agent <command> [--claude|--codex|--kiro] — send context to agent pane
+            // :agent <command> [<file>] [--claude|--codex|--kiro] — send context to agent pane
             if cmd == "agent" || cmd.hasPrefix("agent ") {
                 let raw = cmd == "agent" ? "" : String(cmd.dropFirst(6)).trimmingCharacters(in: .whitespaces)
                 let bridge = AgentBridge.shared
 
                 // Parse --agent flag
                 let targetKind: AgentKind?
-                let subcommand: String
-                if raw.contains("--claude") {
+                var cleaned = raw
+                if cleaned.contains("--claude") {
                     targetKind = .claudeCode
-                    subcommand = raw.replacingOccurrences(of: "--claude", with: "").trimmingCharacters(in: .whitespaces)
-                } else if raw.contains("--codex") {
+                    cleaned = cleaned.replacingOccurrences(of: "--claude", with: "").trimmingCharacters(in: .whitespaces)
+                } else if cleaned.contains("--codex") {
                     targetKind = .codex
-                    subcommand = raw.replacingOccurrences(of: "--codex", with: "").trimmingCharacters(in: .whitespaces)
-                } else if raw.contains("--kiro") {
+                    cleaned = cleaned.replacingOccurrences(of: "--codex", with: "").trimmingCharacters(in: .whitespaces)
+                } else if cleaned.contains("--kiro") {
                     targetKind = .kiro
-                    subcommand = raw.replacingOccurrences(of: "--kiro", with: "").trimmingCharacters(in: .whitespaces)
+                    cleaned = cleaned.replacingOccurrences(of: "--kiro", with: "").trimmingCharacters(in: .whitespaces)
                 } else {
                     targetKind = nil
-                    subcommand = raw
                 }
 
-                // Check agents available
+                // Auto-spawn if no agent running
                 let agents = bridge.allAgents()
-                if agents.isEmpty {
-                    displayExMessage("agent: no agent pane found. Run claude/codex/kiro first.")
+                if agents.isEmpty || (targetKind != nil && !agents.contains(where: { $0.kind == targetKind })) {
+                    let spawnKind = targetKind ?? .claudeCode
+                    let spawnCmd: String
+                    switch spawnKind {
+                    case .claudeCode: spawnCmd = "claude"
+                    case .codex: spawnCmd = "codex"
+                    case .kiro: spawnCmd = "kiro"
+                    default: spawnCmd = "claude"
+                    }
+                    SessionCoordinator.shared.splitActivePaneAndRun(direction: .horizontal, command: spawnCmd)
+                    displayExMessage("spawning \(spawnCmd)... retry :agent in a few seconds")
                     return
                 }
+
                 // If multiple and no flag, show list
-                if targetKind == nil && agents.count > 1 && subcommand.isEmpty {
+                if targetKind == nil && agents.count > 1 && cleaned.isEmpty {
                     let list = agents.enumerated().map { "\($0.offset + 1): \($0.element.kind.rawValue) — \($0.element.tabTitle)" }.joined(separator: "\n")
                     displayExMessage("Multiple agents:\n\(list)\nUse :agent <cmd> --claude/--codex/--kiro")
                     return
                 }
 
-                let file = onCurrentFile?() ?? ""
-                let cmd = subcommand.isEmpty ? "help" : subcommand
-                switch cmd {
+                // Parse subcommand and optional file path
+                let parts = cleaned.split(separator: " ", maxSplits: 1).map(String.init)
+                let subcommand = parts.first ?? "help"
+                let filePath: String
+                if parts.count > 1 {
+                    // Resolve file via fuzzy match (same as :find)
+                    let query = parts[1]
+                    if let resolved = resolveFilePath(query) {
+                        filePath = resolved
+                    } else {
+                        filePath = query // fallback to literal
+                    }
+                } else {
+                    filePath = onCurrentFile?() ?? ""
+                }
+
+                switch subcommand {
                 case "help":
-                    displayExMessage(":agent fix|review|<msg> [--claude|--codex|--kiro]")
+                    displayExMessage(":agent fix|review|<msg> [<file>] [--claude|--codex|--kiro]")
                 case "fix":
                     let errors = onDiagnostics?() ?? []
                     let errorText = errors.isEmpty ? "(no diagnostics)" : errors.map { ":\($0.range.start.line + 1): \($0.message)" }.joined(separator: "\n")
-                    _ = bridge.sendFile(path: file, command: "fix these errors:\n\(errorText)", kind: targetKind)
-                    displayExMessage("sent to agent: fix")
+                    _ = bridge.sendFile(path: filePath, command: "fix these errors:\n\(errorText)", kind: targetKind)
+                    displayExMessage("sent to agent: fix \(filePath)")
                 case "review":
-                    _ = bridge.sendFile(path: file, command: "review this file", kind: targetKind)
-                    displayExMessage("sent to agent: review")
+                    _ = bridge.sendFile(path: filePath, command: "review this file", kind: targetKind)
+                    displayExMessage("sent to agent: review \(filePath)")
                 default:
-                    _ = bridge.sendFile(path: file, command: cmd, kind: targetKind)
-                    displayExMessage("sent to agent")
+                    _ = bridge.sendFile(path: filePath, command: subcommand, kind: targetKind)
+                    displayExMessage("sent to agent: \(filePath)")
                 }
                 return
             }
@@ -518,5 +541,15 @@ extension ViEngine {
             return parts.dropLast(2).joined(separator: ":")
         }
         return parts.dropLast().joined(separator: ":")
+    }
+
+    /// Resolve a partial file name via fuzzy matching against the current workspace root.
+    private func resolveFilePath(_ query: String) -> String? {
+        let cwd = onCurrentCWD?() ?? FileManager.default.currentDirectoryPath
+        switch FuzzyPathResolver.resolve(query: query, root: cwd, limit: 1) {
+        case .unique(let path): return path
+        case .ambiguous(let paths): return paths.first
+        case .none: return nil
+        }
     }
 }
