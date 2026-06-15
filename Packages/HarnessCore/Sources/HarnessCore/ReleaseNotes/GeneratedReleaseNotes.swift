@@ -1,19 +1,35 @@
-// Generated from the CHANGELOG.md [3.0.0] block by Scripts/generate-release-notes.swift.
+// Generated from the CHANGELOG.md [3.1.0] block by Scripts/generate-release-notes.swift.
 // DO NOT EDIT BY HAND — regenerate in release prep after updating CHANGELOG.md:
 //   swift Scripts/generate-release-notes.swift
 // Drift guards: ReleaseNotesGuardTests (version + changelog digest), package-app.sh.
 
 extension ReleaseNotes {
     public static let current = ReleaseNotes(
-        version: "3.0.0",
-        changelogDigest: "2d44e7e589e95255",
+        version: "3.1.0",
+        changelogDigest: "afb7d800a77d6618",
         sections: [
             Section(title: "Added", items: [
-                "Terminal Workbench aggregation now collects the P4-P19 Vi/Unix/terminal/panel surface into one terminal-first workflow layer: :recent, :copy-path, :grep, :errors, :make, :attention, :ack, and the scriptable IDE-migrant profile",
-                "Pane-aware workbench context resolves the focused terminal pane first, so cwd and current-file behavior follow the active project surface instead of a tab-level fallback",
+                "Session status indicators",
+                "Multi-branch / multi-agent visibility",
+                "⌘⇧I Notifications Inbox",
+                "⌘F Find in Files",
+                "⌘P Command Palette",
+                "⌘⌥W Close Pane",
+                "Close confirmation dialog on all paths",
+                "IDE-like Terminal Workbench docs",
             ]),
             Section(title: "Changed", items: [
-                "Sidebar session groups keep a visible header from the first row, and the expand chevron swaps symbols instead of rotating inside layout",
+                "⌘K removed",
+                "⌘⇧U changed to ⌘⇧I",
+                "⌘F",
+                "⌘⇧T Reopen Closed Tab removed",
+                "BoardModel.columnKind() made public; BoardModel.shellNames made public — all surfaces share one classification implementation",
+                "BoardColumnKind.color extension added in HarnessApp for canonical status colors",
+                "Docs consolidated: Modes and Migration summaries added to USAGE.md; MANUAL_TEST_PLAN moved to agent-memory",
+            ]),
+            Section(title: "Fixed", items: [
+                "Sidebar session group header chevron rendered too large; fixed frame (10×10), removed scale-to-fill, weight reduced to regular",
+                "Sidebar group header click hit-test used wrong coordinate space for add/options buttons; now uses convert(bounds:from:)",
             ]),
         ]
     )
