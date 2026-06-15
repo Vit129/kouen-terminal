@@ -36,6 +36,10 @@ public final class BrowserPaneView: NSView {
 
         super.init(frame: .zero)
 
+        // Layer-backed so the toolbar sits above the WKWebView in z-order
+        // and receives mouse events correctly.
+        wantsLayer = true
+
         setupUI()
         setupConstraints()
 
@@ -94,6 +98,10 @@ public final class BrowserPaneView: NSView {
         configureNavigationButton(backButton, symbolName: "chevron.left", action: #selector(backClicked))
         configureNavigationButton(forwardButton, symbolName: "chevron.right", action: #selector(forwardClicked))
         configureNavigationButton(reloadStopButton, symbolName: "arrow.clockwise", action: #selector(reloadStopClicked))
+        configureNavigationButton(closePaneButton, symbolName: "xmark", action: #selector(closePaneClicked))
+        closePaneButton.toolTip = "Close Browser Pane"
+        closePaneButton.setContentHuggingPriority(.required, for: .horizontal)
+        closePaneButton.setContentCompressionResistancePriority(.required, for: .horizontal)
 
         // URL Text Field configuration
         urlTextField.translatesAutoresizingMaskIntoConstraints = false
@@ -107,17 +115,15 @@ public final class BrowserPaneView: NSView {
         urlTextField.target = self
         urlTextField.action = #selector(urlEntered(_:))
         urlTextField.font = NSFont.systemFont(ofSize: HarnessDesign.FontSize.chromeBody)
+        urlTextField.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        urlTextField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
         let toolbarStack = NSStackView(views: [backButton, forwardButton, reloadStopButton, urlTextField, closePaneButton])
         toolbarStack.orientation = .horizontal
         toolbarStack.spacing = 8
-        toolbarStack.edgeInsets = NSEdgeInsets(top: 4, left: 8, bottom: 4, right: 8)
+        toolbarStack.edgeInsets = NSEdgeInsets(top: 4, left: 8, bottom: 4, right: 12)
         toolbarStack.alignment = .centerY
         toolbarStack.translatesAutoresizingMaskIntoConstraints = false
-
-        configureNavigationButton(closePaneButton, symbolName: "xmark", action: #selector(closePaneClicked))
-        closePaneButton.toolTip = "Close Browser Pane"
-        closePaneButton.setContentHuggingPriority(.required, for: .horizontal)
         toolbar.addSubview(toolbarStack)
 
         NSLayoutConstraint.activate([
