@@ -1,6 +1,7 @@
 import AppKit
 import HarnessCore
 import HarnessTerminalKit
+import HarnessLSP
 
 @MainActor
 final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate {
@@ -14,6 +15,8 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
     private var paneContainer: PaneContainerView?
     private let fileTabManager = FileTabManager()
     private var fileEditorView: FileEditorView?
+    var activeDiagnostics: [LSPDiagnostic] { fileEditorView?.activeDiagnostics ?? [] }
+    var currentFilePath: String? { fileEditorView?.filePath }
     private var lastStructureKey = ""
     private var pendingReload: Bool?
     /// Pasteboard change counter captured at left-mouse-down. On mouse-up, if it
@@ -196,7 +199,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
 
     @objc private func viFindFileCommand(_ note: Notification) {
         guard let query = note.userInfo?["query"] as? String, !query.isEmpty else { return }
-        let root = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd ?? FileManager.default.currentDirectoryPath
+        let root = currentWorkbenchCWD()
         switch FuzzyPathResolver.resolve(query: query, root: root, limit: 5) {
         case .none:
             DisplayMessage.show("find: no match")
@@ -455,13 +458,18 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         persistEditorState()
     }
 
+    func navigateCurrentFile(line: Int, column: Int) {
+        fileEditorView?.navigateTo(line: line, column: column)
+    }
+
     private func resolveViPath(_ path: String, command: String) -> String? {
         var expanded = (path as NSString).expandingTildeInPath
-        if !expanded.hasPrefix("/"), let cwd = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd {
+        let cwd = currentWorkbenchCWD()
+        if !expanded.hasPrefix("/") {
             expanded = (cwd as NSString).appendingPathComponent(expanded)
         }
         if !FileManager.default.fileExists(atPath: expanded) {
-            let root = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd ?? FileManager.default.currentDirectoryPath
+            let root = cwd
             switch FuzzyPathResolver.resolve(query: path, root: root, limit: 5) {
             case .none:
                 DisplayMessage.show("\(command): no match")
@@ -476,8 +484,17 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         return expanded
     }
 
+    private func currentWorkbenchCWD() -> String {
+        let coordinator = SessionCoordinator.shared
+        return WorkbenchContextResolver.resolve(
+            snapshot: coordinator.snapshot,
+            focusedSurfaceID: coordinator.activeSurfaceID,
+            currentFilePath: currentFilePath
+        )?.cwd ?? FileManager.default.currentDirectoryPath
+    }
+
     private static func shellQuote(_ value: String) -> String {
-        "'\(value.replacingOccurrences(of: "'", with: "'\\''"))'"
+        ShellQuoting.quote(value)
     }
 
     func closeFileTab(id: FileTabID) {

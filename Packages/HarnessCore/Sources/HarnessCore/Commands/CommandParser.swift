@@ -105,6 +105,7 @@ public enum CommandParser {
     /// list-commands`. `CommandParserTests.testKnownVerbsAreAllParseable` guards it from drifting
     /// out of sync with the switch below.
     public static let knownVerbs: [String] = [
+        "find", "grep", "recent", "errors", "make", "board", "attention", "ack", "copy-path", "cd", "mark",
         "bind-key", "break-pane", "choose-buffer", "choose-client", "choose-session",
         "choose-tree", "choose-window", "clock-mode", "command-prompt", "confirm-before",
         "copy-mode", "detach", "display-menu", "display-message", "display-panes",
@@ -288,6 +289,37 @@ public enum CommandParser {
                 throw CommandParseError.missingArgument("run-shell requires a command string")
             }
             return .runShell(shellCommand: cmd, captureToBuffer: tokens.contains("-b"))
+        case "find":
+            let query = positionalArguments(in: tokens).joined(separator: " ")
+            return .workbench(.find(query: query))
+        case "grep":
+            let query = positionalArguments(in: tokens).joined(separator: " ")
+            return .workbench(.grep(query: query))
+        case "recent":
+            return .workbench(.recent)
+        case "errors":
+            return .workbench(.errors)
+        case "make":
+            let target = positionalArguments(in: tokens).first
+            return .workbench(.make(target: target))
+        case "board":
+            return .workbench(.board)
+        case "attention":
+            return .workbench(.attention)
+        case "ack":
+            return .workbench(.ack)
+        case "copy-path":
+            let relative = !tokens.contains("absolute")
+            return .workbench(.copyPath(relative: relative))
+        case "cd":
+            let path = positionalArguments(in: tokens).first ?? ""
+            return .workbench(.cd(path: path))
+        case "mark":
+            let positional = positionalArguments(in: tokens)
+            guard positional.count >= 2 else {
+                throw CommandParseError.missingArgument("mark requires a name and a path")
+            }
+            return .workbench(.mark(name: positional[0], path: positional[1]))
         case "if-shell", "if":
             // if-shell <condition> <then-command> [<else-command>]
             let positional = tokens.filter { !$0.hasPrefix("-") }
@@ -615,6 +647,10 @@ public enum CommandParser {
             index += 1
         }
         return positional
+    }
+
+    private static func positionalArguments(in tokens: [String]) -> [String] {
+        positionalTokens(tokens, skippingValuesFor: [])
     }
 
     /// `display-menu … <title> <key> <command>` triples (key may be empty as `""`).

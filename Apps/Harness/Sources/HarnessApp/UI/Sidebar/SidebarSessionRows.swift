@@ -1,17 +1,6 @@
 import AppKit
 import HarnessCore
 
-@MainActor
-final class RotatableImageView: NSImageView {
-    override func setFrameSize(_ newSize: NSSize) {
-        let currentRotation = self.frameCenterRotation
-        super.setFrameSize(newSize)
-        if currentRotation != 0 {
-            super.frameCenterRotation = currentRotation
-        }
-    }
-}
-
 // MARK: - Session rows
 
 @MainActor
@@ -22,7 +11,7 @@ final class SessionGroupHeaderRowView: NSView {
 
     private let leftStack = NSStackView()
     private let rightStack = NSStackView()
-    private let disclosureImage = RotatableImageView()
+    private let disclosureImage = NSImageView()
     private let label = NSTextField(labelWithString: "")
     private let boardStatusDot = NSView()
     private let boardStatusLabel = NSTextField(labelWithString: "")
@@ -155,18 +144,12 @@ final class SessionGroupHeaderRowView: NSView {
     func configure(name: String, isCollapsed: Bool, status: BoardColumnKind) {
         label.stringValue = name
         toolTip = name
-        let changed = self.isCollapsed != isCollapsed
         self.isCollapsed = isCollapsed
-        let rotation: CGFloat = isCollapsed ? 0 : -90
-        if changed {
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = HarnessDesign.Motion.standard
-                context.timingFunction = HarnessDesign.Motion.standardEase
-                disclosureImage.animator().frameCenterRotation = rotation
-            }
-        } else {
-            disclosureImage.frameCenterRotation = rotation
-        }
+        disclosureImage.image = NSImage(
+            systemSymbolName: isCollapsed ? "chevron.right" : "chevron.down",
+            accessibilityDescription: isCollapsed ? "Collapsed" : "Expanded"
+        )?.withSymbolConfiguration(HarnessDesign.symbolConfig(pointSize: HarnessDesign.IconSize.tiny, weight: .semibold))
+        disclosureImage.needsDisplay = true
 
         let dotColor: NSColor
         let statusText: String

@@ -21,6 +21,24 @@ are also invisible at the pill level.
 **Easy misread:** screenshots showing N pills look like "N tabs", but they are N
 *sessions*. Verify against `reloadTabBar()` before reasoning about pill-based UI.
 
+## Sidebar Session Groups = One Header Per SessionGroup
+
+The sidebar session list follows the same `Workspace -> SessionGroup -> Tab`
+hierarchy, but it is a separate surface from the top bar pills. Each
+`SessionGroup` should have a visible group header from the start, even if the
+group currently contains one session row. That gives users a stable project
+anchor and a predictable expand target instead of hiding the container until the
+group grows.
+
+The expand affordance should be rendered as symbol state, not as a rotated view.
+Swapping the chevron symbol preserves layout in `NSStackView`/Auto Layout
+surfaces and avoids the disappearing-chevron regression we hit with
+`frameCenterRotation`.
+
+**Practical read:** top bar pills represent the active tab per session; sidebar
+group headers represent the session container itself. Keep both visible and do
+not collapse the sidebar group model down to a tab-only list.
+
 ## ⌘1-9 and ⌘[ / ⌘] = Session-level navigation (CASE-028)
 
 `MainMenuBuilder.swift` binds `⌘1`-`⌘9` to `MenuTarget.selectWorkspaceNumber(_:)` →

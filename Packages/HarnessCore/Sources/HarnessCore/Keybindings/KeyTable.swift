@@ -292,7 +292,9 @@ public struct KeyTableSet: Codable, Sendable, Equatable {
         // is a real, working surface — not a misleading no-op. It ships empty (tmux's default);
         // users add global bindings. The `command` table (command-prompt editing) is not seeded
         // until its consumer is wired, to avoid a rebindable-but-unconsulted surface.
-        let root = KeyTable(id: .root, bindings: [])
+        let root = KeyTable(id: .root, bindings: [
+            Binding(spec: KeySpec(key: "p", modifiers: .command), command: .workbench(.find(query: "")))
+        ])
         return KeyTableSet(tables: [prefix, copyMode, copyModeEmacs, root])
     }
 }

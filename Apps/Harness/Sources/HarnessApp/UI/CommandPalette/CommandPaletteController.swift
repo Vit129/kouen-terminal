@@ -1,5 +1,6 @@
 import AppKit
 import HarnessCore
+import HarnessLSP
 import HarnessTerminalKit
 
 /// One row in the palette — title + subtitle + SF Symbol + optional shortcut +
@@ -7,7 +8,7 @@ import HarnessTerminalKit
 @MainActor
 struct PaletteAction: Identifiable {
     enum Section: Int, CaseIterable {
-        case recent, files, symbols, actions, navigation, tabs, projects, themes
+        case recent, files, symbols, actions, navigation, tabs, projects, themes, errors, grep
 
         var title: String {
             switch self {
@@ -19,6 +20,8 @@ struct PaletteAction: Identifiable {
             case .tabs: return "Tabs"
             case .projects: return "Switch Project"
             case .themes: return "Themes"
+            case .errors: return "Compiler Errors"
+            case .grep: return "Search Results"
             }
         }
     }
@@ -46,9 +49,41 @@ enum CommandPaletteController {
     private static let recentDefaultsKey = "com.robert.harness.palette.recent"
     private static let recentLimit = 5
 
-    static func present(relativeTo parent: NSWindow?) {
+    enum PaletteMode: Equatable {
+        case normal
+        case errors
+        case grep(query: String)
+    }
+
+    static func present(relativeTo parent: NSWindow?, mode: PaletteMode = .normal) {
         panel?.close()
-        let controller = PaletteViewController(actions: buildActions(), recentIDs: loadRecents(), parentWindow: parent)
+        let actions: [PaletteAction]
+        if case .errors = mode, let diagInfo = getActiveDiagnostics() {
+            var errorActions: [PaletteAction] = []
+            for diag in diagInfo.diagnostics {
+                let lineNum = diag.range.start.line + 1
+                let colNum = diag.range.start.character + 1
+                let severitySymbol = diag.severity == .error ? "xmark.octagon.fill" : "exclamationmark.triangle.fill"
+                errorActions.append(PaletteAction(
+                    id: "error.\(diagInfo.filePath).\(lineNum).\(colNum)",
+                    title: diag.message,
+                    subtitle: "\((diagInfo.filePath as NSString).lastPathComponent):\(lineNum):\(colNum)",
+                    symbol: severitySymbol,
+                    shortcut: "",
+                    section: .errors
+                ) {
+                    guard let split = NSApp.keyWindow?.contentViewController as? MainSplitViewController
+                        ?? NSApp.mainWindow?.contentViewController as? MainSplitViewController
+                    else { return }
+                    split.contentVC.openFileTab(path: diagInfo.filePath)
+                    split.contentVC.navigateCurrentFile(line: lineNum, column: colNum)
+                })
+            }
+            actions = errorActions
+        } else {
+            actions = buildActions()
+        }
+        let controller = PaletteViewController(actions: actions, recentIDs: loadRecents(), parentWindow: parent, mode: mode)
         let panel = PalettePanel(
             contentRect: NSRect(x: 0, y: 0, width: 620, height: 440),
             styleMask: [.nonactivatingPanel, .borderless],
@@ -89,6 +124,15 @@ enum CommandPaletteController {
             panel.animator().alphaValue = 1
         }
         controller.focusSearch()
+    }
+
+    @MainActor
+    private static func getActiveDiagnostics() -> (filePath: String, diagnostics: [LSPDiagnostic])? {
+        let split = NSApp.keyWindow?.contentViewController as? MainSplitViewController
+            ?? NSApp.mainWindow?.contentViewController as? MainSplitViewController
+        guard let contentVC = split?.contentVC else { return nil }
+        guard let filePath = contentVC.currentFilePath else { return nil }
+        return (filePath, contentVC.activeDiagnostics)
     }
 
     static func recordUsage(_ actionID: String) {
@@ -393,16 +437,20 @@ final class PaletteViewController: NSViewController, NSTableViewDataSource, NSTa
     private var rows: [Row] = []
     /// Logical positions of actionable rows so arrow-keys skip headers.
     private var selectableRowIndexes: [Int] = []
+    private let mode: CommandPaletteController.PaletteMode
+    private var grepActions: [PaletteAction] = []
+    private var grepSearchTask: Task<Void, Never>?
 
     private enum Row {
         case header(PaletteAction.Section)
         case item(PaletteAction)
     }
 
-    init(actions: [PaletteAction], recentIDs: [String], parentWindow: NSWindow?) {
+    init(actions: [PaletteAction], recentIDs: [String], parentWindow: NSWindow?, mode: CommandPaletteController.PaletteMode = .normal) {
         allActions = actions
         self.recentIDs = recentIDs
         self.parentWindow = parentWindow
+        self.mode = mode
         super.init(nibName: nil, bundle: nil)
         rebuildRows(query: "")
     }
@@ -421,8 +469,18 @@ final class PaletteViewController: NSViewController, NSTableViewDataSource, NSTa
         let c = HarnessChrome.current
         guard let content = (view as? HarnessOverlayBackground)?.contentView else { return }
 
+        let placeholder: String
+        switch mode {
+        case .normal:
+            placeholder = "Search commands, workspaces, themes…"
+        case .errors:
+            placeholder = "Search compiler errors…"
+        case .grep:
+            placeholder = "Search text in files (grep)…"
+        }
+
         searchField.placeholderAttributedString = NSAttributedString(
-            string: "Search commands, workspaces, themes…",
+            string: placeholder,
             attributes: [
                 .foregroundColor: c.textTertiary,
                 .font: NSFont.systemFont(ofSize: 15),
@@ -513,6 +571,11 @@ final class PaletteViewController: NSViewController, NSTableViewDataSource, NSTa
 
         tableView.reloadData()
         selectFirstSelectable()
+
+        if case let .grep(query) = mode, !query.isEmpty {
+            searchField.stringValue = query
+            startGrepSearch(query: query)
+        }
     }
 
     private func makeFooterHint() -> NSView {
@@ -575,8 +638,8 @@ final class PaletteViewController: NSViewController, NSTableViewDataSource, NSTa
     }
 
     private func startFileScanIfNeeded() {
-        guard let rootPath = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd,
-              rootPath != cachedFileEntries.rootPath else { return }
+        let rootPath = Self.activeWorkbenchRoot()
+        guard rootPath != cachedFileEntries.rootPath else { return }
         symbolIndex.scan(root: rootPath)
         fileScanTask?.cancel()
         fileScanTask = Task.detached(priority: .userInitiated) { [weak self] in
@@ -611,10 +674,114 @@ final class PaletteViewController: NSViewController, NSTableViewDataSource, NSTa
     // MARK: - Filtering / ranking
 
     func controlTextDidChange(_ obj: Notification) {
-        rebuildRows(query: searchField.stringValue)
-        tableView.reloadData()
-        emptyLabel.isHidden = !selectableRowIndexes.isEmpty
-        selectFirstSelectable()
+        let query = searchField.stringValue
+        if case .grep = mode {
+            startGrepSearch(query: query)
+        } else {
+            rebuildRows(query: query)
+            tableView.reloadData()
+            emptyLabel.isHidden = !selectableRowIndexes.isEmpty
+            selectFirstSelectable()
+        }
+    }
+
+    private func startGrepSearch(query: String) {
+        grepSearchTask?.cancel()
+        guard !query.isEmpty else {
+            self.grepActions = []
+            self.rebuildRows(query: "")
+            self.tableView.reloadData()
+            self.emptyLabel.isHidden = !self.selectableRowIndexes.isEmpty
+            return
+        }
+        let root = Self.activeWorkbenchRoot()
+        
+        grepSearchTask = Task {
+            let actions = await Self.runSearch(query: query, root: root)
+            guard !Task.isCancelled else { return }
+            self.grepActions = actions
+            self.rebuildRows(query: query)
+            self.tableView.reloadData()
+            self.emptyLabel.isHidden = !self.selectableRowIndexes.isEmpty
+            self.selectFirstSelectable()
+        }
+    }
+
+    private static func runSearch(query: String, root: String) async -> [PaletteAction] {
+        let rgPath = ["/opt/homebrew/bin/rg", "/usr/local/bin/rg", "/usr/bin/rg"].first(where: { FileManager.default.fileExists(atPath: $0) })
+        let proc = Process()
+        let pipe = Pipe()
+        proc.standardOutput = pipe
+        proc.standardError = FileHandle.nullDevice
+        proc.currentDirectoryURL = URL(fileURLWithPath: root)
+        if let rgPath {
+            proc.executableURL = URL(fileURLWithPath: rgPath)
+            proc.arguments = ["--line-number", "--column", "--no-heading", "--color=never", query, "."]
+        } else {
+            proc.executableURL = URL(fileURLWithPath: "/usr/bin/grep")
+            proc.arguments = ["-rn", query, "."]
+        }
+        
+        do {
+            try proc.run()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            proc.waitUntilExit()
+            guard let output = String(data: data, encoding: .utf8) else { return [] }
+            
+            var actions: [PaletteAction] = []
+            var count = 0
+            for line in output.components(separatedBy: "\n") {
+                guard !line.isEmpty else { continue }
+                // Parse line of format: path:line:col:text or path:line:text
+                let parts = line.components(separatedBy: ":")
+                guard parts.count >= 3 else { continue }
+                let relPath = parts[0]
+                guard let lineNum = Int(parts[1]) else { continue }
+                
+                let colNum: Int
+                let text: String
+                if parts.count >= 4, let col = Int(parts[2]) {
+                    colNum = col
+                    text = parts.dropFirst(3).joined(separator: ":").trimmingCharacters(in: .whitespacesAndNewlines)
+                } else {
+                    colNum = 1
+                    text = parts.dropFirst(2).joined(separator: ":").trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+                
+                let absPath = (root as NSString).appendingPathComponent(relPath)
+                let filename = (relPath as NSString).lastPathComponent
+                
+                count += 1
+                actions.append(PaletteAction(
+                    id: "grep.\(absPath).\(lineNum).\(colNum).\(count)",
+                    title: text.isEmpty ? "Match" : text,
+                    subtitle: "\(filename):\(lineNum):\(colNum) — \(relPath)",
+                    symbol: "magnifyingglass",
+                    shortcut: "",
+                    section: .grep
+                ) {
+                    guard let split = NSApp.keyWindow?.contentViewController as? MainSplitViewController
+                        ?? NSApp.mainWindow?.contentViewController as? MainSplitViewController
+                    else { return }
+                    split.contentVC.openFileTab(path: absPath)
+                    split.contentVC.navigateCurrentFile(line: lineNum, column: colNum)
+                })
+                if actions.count >= 100 { break }
+            }
+            return actions
+        } catch {
+            return []
+        }
+    }
+
+    @MainActor
+    private static func activeWorkbenchRoot() -> String {
+        let coordinator = SessionCoordinator.shared
+        return WorkbenchContextResolver.resolve(
+            snapshot: coordinator.snapshot,
+            focusedSurfaceID: coordinator.activeSurfaceID,
+            currentFilePath: nil
+        )?.cwd ?? FileManager.default.currentDirectoryPath
     }
 
     func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
@@ -634,77 +801,129 @@ final class PaletteViewController: NSViewController, NSTableViewDataSource, NSTa
 
     private func rebuildRows(query rawQuery: String) {
         let query = rawQuery.trimmingCharacters(in: .whitespaces)
-        var matches: [(action: PaletteAction, score: Int)] = []
-
-        if query.isEmpty {
-            // Empty query: prepend recents (filtered against currently-available
-            // actions so stale IDs don't appear), then everything in section order.
-            let recents = recentIDs.compactMap { id in allActions.first(where: { $0.id == id }) }
-            for action in recents {
-                matches.append((action: PaletteAction(
-                    id: action.id,
-                    title: action.title,
-                    subtitle: action.subtitle,
-                    symbol: action.symbol,
-                    shortcut: action.shortcut,
-                    section: .recent,
-                    handler: action.handler
-                ), score: 0))
-            }
-            let recentIDSet = Set(recents.map(\.id))
-            for action in allActions where !recentIDSet.contains(action.id) {
-                matches.append((action, 0))
-            }
-        } else {
-            for action in allActions {
-                let titleScore = FileFuzzyMatcher.score(query: query, in: action.title) ?? -1
-                let subtitleScore = FileFuzzyMatcher.score(query: query, in: action.subtitle) ?? -1
-                let best = max(titleScore, subtitleScore >= 0 ? subtitleScore - 5 : -1)
-                if best >= 0 {
-                    // Boost recents so a query that matches multiple things prefers a
-                    // command the user actually uses.
-                    let recencyBoost = recentIDs.firstIndex(of: action.id).map { 15 - $0 } ?? 0
-                    matches.append((action, best + recencyBoost))
-                }
-            }
-            matches.append(contentsOf: fileMatches(query: query))
-            matches.append(contentsOf: symbolMatches(query: query))
-            matches.sort { $0.score > $1.score }
-        }
-
-        // Group into ordered sections with header rows.
         var newRows: [Row] = []
         var selectable: [Int] = []
-        if query.isEmpty {
-            // Empty: keep section order natural — recent first, then everything else.
-            let sectionsInOrder: [PaletteAction.Section] = [.recent, .actions, .navigation, .tabs, .projects, .themes]
-            for section in sectionsInOrder {
-                let entries = matches.filter { $0.action.section == section }
-                if entries.isEmpty { continue }
-                newRows.append(.header(section))
-                for entry in entries {
+
+        switch mode {
+        case .errors:
+            var matches: [(action: PaletteAction, score: Int)] = []
+            for action in allActions {
+                if query.isEmpty {
+                    matches.append((action, 0))
+                } else {
+                    let score = FileFuzzyMatcher.score(query: query, in: action.title) ?? -1
+                    if score >= 0 {
+                        matches.append((action, score))
+                    }
+                }
+            }
+            if !query.isEmpty {
+                matches.sort { $0.score > $1.score }
+            }
+            if !matches.isEmpty {
+                newRows.append(.header(.errors))
+                for entry in matches {
                     selectable.append(newRows.count)
                     newRows.append(.item(entry.action))
                 }
             }
-        } else {
-            // Search mode: top results first regardless of section, but still group
-            // by section to give the user a sense of *what kind* of thing matched.
-            var bySection: [PaletteAction.Section: [(PaletteAction, Int)]] = [:]
-            for entry in matches {
-                bySection[entry.action.section, default: []].append((entry.action, entry.score))
-            }
-            let sectionsInOrder = PaletteAction.Section.allCases.sorted { a, b in
-                let aBest = bySection[a]?.first?.1 ?? 0
-                let bBest = bySection[b]?.first?.1 ?? 0
-                return aBest > bBest
-            }
-            for section in sectionsInOrder {
-                guard let entries = bySection[section], !entries.isEmpty else { continue }
-                newRows.append(.header(section))
-                for entry in entries {
+        case .grep:
+            if !grepActions.isEmpty {
+                newRows.append(.header(.grep))
+                for action in grepActions {
                     selectable.append(newRows.count)
-                    newRows.append(.item(entry.0))
+                    newRows.append(.item(action))
+                }
+            }
+        case .normal:
+            var matches: [(action: PaletteAction, score: Int)] = []
+
+            if query.isEmpty {
+                // Empty query: prepend recents (filtered against currently-available
+                // actions so stale IDs don't appear), then everything in section order.
+                let recents = recentIDs.compactMap { id in allActions.first(where: { $0.id == id }) }
+                for action in recents {
+                    matches.append((action: PaletteAction(
+                        id: action.id,
+                        title: action.title,
+                        subtitle: action.subtitle,
+                        symbol: action.symbol,
+                        shortcut: action.shortcut,
+                        section: .recent,
+                        handler: action.handler
+                    ), score: 0))
+                }
+                let recentFiles = WorkbenchMRU.shared.entries
+                for file in recentFiles {
+                    let filename = (file as NSString).lastPathComponent
+                    let relativePath = HarnessDesign.shortenPath(file)
+                    matches.append((action: PaletteAction(
+                        id: "recent-file.\(file)",
+                        title: filename,
+                        subtitle: relativePath,
+                        symbol: "doc.text",
+                        shortcut: "",
+                        section: .recent
+                    ) {
+                        guard let split = NSApp.keyWindow?.contentViewController as? MainSplitViewController
+                            ?? NSApp.mainWindow?.contentViewController as? MainSplitViewController
+                        else { return }
+                        split.contentVC.openFileTab(path: file)
+                    }, score: 0))
+                }
+                let recentIDSet = Set(recents.map(\.id))
+                for action in allActions where !recentIDSet.contains(action.id) {
+                    matches.append((action, 0))
+                }
+            } else {
+                for action in allActions {
+                    let titleScore = FileFuzzyMatcher.score(query: query, in: action.title) ?? -1
+                    let subtitleScore = FileFuzzyMatcher.score(query: query, in: action.subtitle) ?? -1
+                    let best = max(titleScore, subtitleScore >= 0 ? subtitleScore - 5 : -1)
+                    if best >= 0 {
+                        // Boost recents so a query that matches multiple things prefers a
+                        // command the user actually uses.
+                        let recencyBoost = recentIDs.firstIndex(of: action.id).map { 15 - $0 } ?? 0
+                        matches.append((action, best + recencyBoost))
+                    }
+                }
+                matches.append(contentsOf: fileMatches(query: query))
+                matches.append(contentsOf: symbolMatches(query: query))
+                matches.sort { $0.score > $1.score }
+            }
+
+            // Group into ordered sections with header rows.
+            if query.isEmpty {
+                // Empty: keep section order natural — recent first, then everything else.
+                let sectionsInOrder: [PaletteAction.Section] = [.recent, .actions, .navigation, .tabs, .projects, .themes]
+                for section in sectionsInOrder {
+                    let entries = matches.filter { $0.action.section == section }
+                    if entries.isEmpty { continue }
+                    newRows.append(.header(section))
+                    for entry in entries {
+                        selectable.append(newRows.count)
+                        newRows.append(.item(entry.action))
+                    }
+                }
+            } else {
+                // Search mode: top results first regardless of section, but still group
+                // by section to give the user a sense of *what kind* of thing matched.
+                var bySection: [PaletteAction.Section: [(PaletteAction, Int)]] = [:]
+                for entry in matches {
+                    bySection[entry.action.section, default: []].append((entry.action, entry.score))
+                }
+                let sectionsInOrder = PaletteAction.Section.allCases.sorted { a, b in
+                    let aBest = bySection[a]?.first?.1 ?? 0
+                    let bBest = bySection[b]?.first?.1 ?? 0
+                    return aBest > bBest
+                }
+                for section in sectionsInOrder {
+                    guard let entries = bySection[section], !entries.isEmpty else { continue }
+                    newRows.append(.header(section))
+                    for entry in entries {
+                        selectable.append(newRows.count)
+                        newRows.append(.item(entry.0))
+                    }
                 }
             }
         }

@@ -327,6 +327,15 @@ struct HarnessDaemonTools: Sendable {
         environment[controlGateVariable] == "1"
     }
 
+    func getActiveCWD() async -> String? {
+        guard let response = await send(.getSnapshot),
+              case let .snapshot(snapshot) = response
+        else {
+            return nil
+        }
+        return WorkbenchContextResolver.resolve(snapshot: snapshot)?.cwd
+    }
+
     private func toolResult(json value: AnyCodable) -> AnyCodable {
         let data = try? JSONEncoder().encode(value)
         let text = data.flatMap { String(data: $0, encoding: .utf8) } ?? "{}"

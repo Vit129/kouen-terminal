@@ -11,6 +11,7 @@ import HarnessCore
 @MainActor
 final class MainExecutor: CommandExecutor {
     static let shared = MainExecutor()
+    private var lastMakeCommand: String?
 
     private init() {}
 
@@ -370,7 +371,114 @@ final class MainExecutor: CommandExecutor {
             Phase67UI.presentMenu(items: items)
         case let .targeted(spec, inner):
             try runViaTranslator(.targeted(spec, inner), coordinator: coordinator)
+        case .workbench(let wbCmd):
+            try executeWorkbenchCommand(wbCmd, coordinator: coordinator)
         }
+    }
+
+    @MainActor
+    private func activeContentVC() -> ContentAreaViewController? {
+        let split = NSApp.keyWindow?.contentViewController as? MainSplitViewController
+            ?? NSApp.mainWindow?.contentViewController as? MainSplitViewController
+        return split?.contentVC
+    }
+
+    @MainActor
+    private func executeWorkbenchCommand(_ wbCmd: WorkbenchCommand, coordinator: SessionCoordinator) throws {
+        let context = workbenchContext(coordinator: coordinator)
+        switch wbCmd {
+        case let .find(query):
+            if query.isEmpty {
+                CommandPaletteController.present(relativeTo: NSApp.keyWindow)
+            } else {
+                guard let contentVC = activeContentVC() else { return }
+                let root = context?.cwd ?? FileManager.default.currentDirectoryPath
+                switch FuzzyPathResolver.resolve(query: query, root: root, limit: 5) {
+                case .none:
+                    DisplayMessage.show("find: no match")
+                case .unique(let path):
+                    contentVC.openFileTab(path: path)
+                case .ambiguous(let matches):
+                    DisplayMessage.show(matches.enumerated().map { "\($0.offset + 1): \($0.element)" }.joined(separator: "\n"))
+                }
+            }
+        case let .grep(query):
+            CommandPaletteController.present(relativeTo: NSApp.keyWindow, mode: .grep(query: query))
+        case .recent:
+            let list = WorkbenchMRU.shared.entries
+            if list.isEmpty {
+                DisplayMessage.show("recent: no recently opened files")
+            } else {
+                let text = list.prefix(10).enumerated().map { "\($0.offset + 1): \($0.element)" }.joined(separator: "\n")
+                DisplayMessage.show(text)
+            }
+        case .errors:
+            guard let contentVC = activeContentVC() else { return }
+            let diags = contentVC.activeDiagnostics
+            if diags.isEmpty {
+                DisplayMessage.show("no diagnostics")
+            } else {
+                let text = diags.prefix(20).map { d in
+                    ":\(d.range.start.line + 1):\(d.range.start.character + 1): \(d.message)"
+                }.joined(separator: "\n")
+                DisplayMessage.show(text)
+            }
+        case let .make(target):
+            let cwd = context?.cwd ?? "."
+            let task = ProjectTaskDetector.detect(at: cwd)
+            let runCmd: String
+            switch target {
+            case "build": runCmd = task?.buildCmd ?? "swift build"
+            case "test": runCmd = task?.testCmd ?? "swift test"
+            case "last": runCmd = lastMakeCommand ?? task?.defaultCmd ?? "swift build"
+            default: runCmd = task?.defaultCmd ?? task?.buildCmd ?? "swift build"
+            }
+            lastMakeCommand = runCmd
+            coordinator.splitActivePaneAndRun(direction: .horizontal, command: runCmd)
+        case .board:
+            NotificationCenter.default.post(name: .viWorkbenchCommand, object: self, userInfo: ["command": "board"])
+        case .attention:
+            let snapshot = coordinator.snapshot
+            let card = BoardModel.classify(snapshot: snapshot)
+                .first { $0.kind == .needsAttention }?.cards.first
+            if let card {
+                coordinator.selectTab(workspaceID: card.workspaceID, tabID: card.tabID)
+            } else {
+                DisplayMessage.show("attention: no items need attention")
+            }
+        case .ack:
+            if let tabID = coordinator.snapshot.activeWorkspace?.activeTab?.id {
+                NotificationCenter.default.post(name: .viBoardAckCommand, object: self, userInfo: ["tabID": tabID.uuidString])
+                DisplayMessage.show("acknowledged")
+            }
+        case let .copyPath(relative):
+            if let file = context?.currentFilePath {
+                let path: String
+                if relative, let cwd = context?.cwd, file.hasPrefix(cwd + "/") {
+                    path = String(file.dropFirst(cwd.count + 1))
+                } else {
+                    path = file
+                }
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(path, forType: .string)
+                DisplayMessage.show("copied: \(path)")
+            } else {
+                DisplayMessage.show("copy-path: no current file")
+            }
+        case let .cd(path):
+            throw CommandExecutionError.unsupportedInThisContext("cd '\(path)' not supported in GUI context yet")
+        case let .mark(name, path):
+            throw CommandExecutionError.unsupportedInThisContext("mark '\(name)' '\(path)' not supported in GUI context yet")
+        }
+    }
+
+    @MainActor
+    private func workbenchContext(coordinator: SessionCoordinator) -> WorkbenchContext? {
+        WorkbenchContextResolver.resolve(
+            snapshot: coordinator.snapshot,
+            focusedSurfaceID: coordinator.activeSurfaceID,
+            currentFilePath: activeContentVC()?.currentFilePath
+        )
     }
 
     // MARK: Targeting
