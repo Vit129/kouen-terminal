@@ -202,6 +202,8 @@ final class WorktreeRowView: NSView {
 
     private let fill = NSView()
     private let textLabel = NSTextField(labelWithString: "")
+    private let statusDot = NSView()
+    private let statusLabel = NSTextField(labelWithString: "")
     private let closeButton = NSButton()
     private var isSelected = false
     private var isHovered = false
@@ -224,6 +226,17 @@ final class WorktreeRowView: NSView {
         textLabel.translatesAutoresizingMaskIntoConstraints = false
         textLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
+        statusDot.wantsLayer = true
+        statusDot.layer?.cornerRadius = 3
+        statusDot.layer?.cornerCurve = .continuous
+        statusDot.translatesAutoresizingMaskIntoConstraints = false
+
+        statusLabel.font = .systemFont(ofSize: 10, weight: .medium)
+        statusLabel.usesSingleLineMode = true
+        statusLabel.translatesAutoresizingMaskIntoConstraints = false
+        statusLabel.setContentHuggingPriority(.required, for: .horizontal)
+        statusLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+
         closeButton.title = "×"
         closeButton.bezelStyle = .accessoryBarAction
         closeButton.isBordered = false
@@ -235,6 +248,8 @@ final class WorktreeRowView: NSView {
 
         addSubview(fill)
         fill.addSubview(textLabel)
+        fill.addSubview(statusDot)
+        fill.addSubview(statusLabel)
         fill.addSubview(closeButton)
 
         NSLayoutConstraint.activate([
@@ -245,7 +260,15 @@ final class WorktreeRowView: NSView {
 
             textLabel.leadingAnchor.constraint(equalTo: fill.leadingAnchor, constant: 8),
             textLabel.centerYAnchor.constraint(equalTo: fill.centerYAnchor),
-            textLabel.trailingAnchor.constraint(lessThanOrEqualTo: closeButton.leadingAnchor, constant: -6),
+            textLabel.trailingAnchor.constraint(lessThanOrEqualTo: statusDot.leadingAnchor, constant: -6),
+
+            statusDot.centerYAnchor.constraint(equalTo: fill.centerYAnchor),
+            statusDot.trailingAnchor.constraint(equalTo: statusLabel.leadingAnchor, constant: -4),
+            statusDot.widthAnchor.constraint(equalToConstant: 6),
+            statusDot.heightAnchor.constraint(equalToConstant: 6),
+
+            statusLabel.centerYAnchor.constraint(equalTo: fill.centerYAnchor),
+            statusLabel.trailingAnchor.constraint(equalTo: closeButton.leadingAnchor, constant: -4),
 
             closeButton.centerYAnchor.constraint(equalTo: fill.centerYAnchor),
             closeButton.trailingAnchor.constraint(equalTo: fill.trailingAnchor, constant: -6),
@@ -305,7 +328,55 @@ final class WorktreeRowView: NSView {
         textLabel.attributedStringValue = attributedString
         toolTip = branchText.isEmpty ? tab.cwd : "\(branchText)\(tab.cwd)"
 
+        // Status indicator: derive from all tabs in the session
+        let status = highestStatus(for: session)
+        let (dotColor, labelText) = statusAppearance(for: status, tab: tab)
+        statusDot.layer?.backgroundColor = dotColor.cgColor
+        statusLabel.stringValue = labelText
+        statusLabel.textColor = dotColor.withAlphaComponent(0.8)
+
         setSelected(isSelected)
+    }
+
+    private func highestStatus(for session: SessionGroup) -> BoardColumnKind {
+        var highest = BoardColumnKind.idle
+        for tab in session.tabs {
+            let s = columnKind(for: tab)
+            if priority(s) > priority(highest) { highest = s }
+        }
+        return highest
+    }
+
+    private func columnKind(for tab: Tab) -> BoardColumnKind {
+        if tab.agent?.activity == .awaiting { return .needsAttention }
+        if let exit = tab.exitStatus { return exit == 0 ? .done : .error }
+        let shells: Set<String> = ["zsh", "bash", "sh", "fish", "csh", "tcsh", "login"]
+        if let cmd = tab.currentCommand, !cmd.isEmpty, !shells.contains(cmd.lowercased()) { return .running }
+        return .idle
+    }
+
+    private func priority(_ s: BoardColumnKind) -> Int {
+        switch s {
+        case .needsAttention: return 4
+        case .running:        return 3
+        case .error:          return 2
+        case .done:           return 1
+        case .idle:           return 0
+        }
+    }
+
+    private func statusAppearance(for status: BoardColumnKind, tab: Tab) -> (NSColor, String) {
+        switch status {
+        case .needsAttention: return (.systemOrange, "waiting")
+        case .running:
+            let cmd = tab.currentCommand ?? ""
+            let shells: Set<String> = ["zsh", "bash", "sh", "fish", "csh", "tcsh", "login"]
+            let shortCmd = shells.contains(cmd.lowercased()) ? "" : cmd
+            return (.systemBlue, shortCmd.isEmpty ? "running" : shortCmd)
+        case .done:    return (.systemGreen, "done")
+        case .error:   return (.systemRed, "error")
+        case .idle:    return (.systemGray, "idle")
+        }
     }
 
     override func menu(for event: NSEvent) -> NSMenu? {
