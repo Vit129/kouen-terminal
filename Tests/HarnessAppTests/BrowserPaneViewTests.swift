@@ -63,11 +63,90 @@ final class BrowserPaneViewTests: XCTestCase {
         XCTAssertTrue(removedFirst)
         XCTAssertEqual(root.paneID, termLeaf.id)
     }
+
+    func testBrowserPaneHitTestAndActions() {
+        let mockWebView = MockWebView(frame: .zero, configuration: WKWebViewConfiguration())
+        let testURL = URL(string: "https://example.com/test")!
+        mockWebView.mockURL = testURL
+
+        let paneView = BrowserPaneView(url: testURL, paneID: UUID(), webView: mockWebView)
+
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.contentView = paneView
+
+        // Force layout
+        window.contentView?.layoutSubtreeIfNeeded()
+        paneView.layoutSubtreeIfNeeded()
+
+        // Assert initial state: errorBanner is hidden
+        XCTAssertTrue(paneView.errorBanner.isHidden)
+        XCTAssertEqual(paneView.errorBannerHeightConstraint?.constant, 0)
+
+        // Compute center point of closePaneButton
+        let closeCenter = CGPoint(x: paneView.closePaneButton.bounds.midX, y: paneView.closePaneButton.bounds.midY)
+        guard let superview = paneView.superview else {
+            XCTFail("Expected paneView to have a superview")
+            return
+        }
+        let closeCenterInSuper = superview.convert(closeCenter, from: paneView.closePaneButton)
+        let hitViewClose = paneView.hitTest(closeCenterInSuper)
+        XCTAssertNotNil(hitViewClose)
+        XCTAssertTrue(hitViewClose === paneView.closePaneButton || hitViewClose!.isDescendant(of: paneView.closePaneButton))
+        XCTAssertNotEqual(hitViewClose, paneView.errorDismissButton)
+        XCTAssertFalse(hitViewClose!.isDescendant(of: paneView.errorDismissButton))
+
+        // Compute center point of reloadStopButton
+        let reloadCenter = CGPoint(x: paneView.reloadStopButton.bounds.midX, y: paneView.reloadStopButton.bounds.midY)
+        let reloadCenterInSuper = superview.convert(reloadCenter, from: paneView.reloadStopButton)
+        let hitViewReload = paneView.hitTest(reloadCenterInSuper)
+        XCTAssertNotNil(hitViewReload)
+        XCTAssertTrue(hitViewReload === paneView.reloadStopButton || hitViewReload!.isDescendant(of: paneView.reloadStopButton))
+
+        // Action test: close pane
+        var closeCalled = false
+        paneView.onClosePaneRequested = {
+            closeCalled = true
+        }
+        paneView.closePaneButton.performClick(nil)
+        XCTAssertTrue(closeCalled)
+
+        // Action test: reload click when webView is not loading
+        mockWebView.mockIsLoading = false
+        paneView.reloadStopButton.performClick(nil)
+        XCTAssertTrue(mockWebView.reloadCalled)
+
+        // Action test: stop click when webView is loading
+        mockWebView.mockIsLoading = true
+        paneView.webView(mockWebView, didStartProvisionalNavigation: nil)
+        paneView.reloadStopButton.performClick(nil)
+        XCTAssertTrue(mockWebView.stopLoadingCalled)
+    }
 }
 
 private final class MockWebView: WKWebView {
     var mockURL: URL?
     override var url: URL? {
         return mockURL
+    }
+
+    var mockIsLoading: Bool = false
+    override var isLoading: Bool {
+        return mockIsLoading
+    }
+
+    var reloadCalled = false
+    override func reload() -> WKNavigation? {
+        reloadCalled = true
+        return nil
+    }
+
+    var stopLoadingCalled = false
+    override func stopLoading() {
+        stopLoadingCalled = true
     }
 }
