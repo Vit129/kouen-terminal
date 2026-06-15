@@ -1,6 +1,6 @@
 # P20 — Harness-Term Agent
 
-Status: **planned**
+Status: **Partially implemented** — core agent workflow done; `harness chat` first-party branding deferred
 Priority: **P2** — first-party agent experience for P19 without exposing runtime vendor names
 Owner surface: HarnessApp, HarnessCLI, HarnessCore agent runtime adapters, harness-mcp integration
 Created: 2026-06-14
@@ -564,4 +564,44 @@ area.
   Harness-initiated launches.
 - Prompt handling can leak too much into logs. Store summaries, not full prompts,
   unless the terminal pane itself shows the command.
+
+
+---
+
+## What Was Implemented (2026-06-15)
+
+### ✅ AgentBridge (HarnessApp/Services/AgentBridge.swift)
+- `allAgents()` — list all running agent panes with kind
+- `agentSurfaceID(kind:)` — find agent by kind
+- `sendToAgent(_:kind:)` — send text to agent pane
+- `sendFile(path:command:kind:)` — send file content with command
+
+### ✅ AgentCatalog (HarnessApp/Services/AgentCatalog.swift)
+Centralized single source of truth for all agent CLI configurations:
+- **Claude:** binary=`claude`, models (opus-4.8/4.7/4.6, sonnet-4.6/4.5/4.0, haiku-4.5), `--model` flag
+- **Codex:** binary=`codex`, models (gpt-5.4/o3/o4-mini/gpt-4.1), `--model` + `-c model_reasoning_effort=` (low/medium/high)
+- **Kiro:** binary=`kiro-cli`, models (auto/opus/sonnet/haiku/deepseek/minimax/glm/qwen), `--model` + `--effort` (low/medium/high/xhigh/max)
+- **Gemini:** binary=`gemini`, models (2.5-pro/flash), `--acp` flag (ACP reference)
+- `spawnCommand(kind:model:effort:acp:)` — builds full CLI command string
+
+### ✅ :agent ex command (ViExCommands.swift)
+```
+:agent fix --claude --model claude-opus-4.8
+:agent review --kiro --model auto --effort high
+:agent fix BoardM --codex --model o3 --effort low
+:agent "add tests" --kiro
+```
+- Fuzzy file path resolution via FuzzyPathResolver
+- Auto-spawn: if agent not running → spawns via AgentCatalog.spawnCommand()
+- Parses --model, --effort, --claude/--codex/--kiro/--gemini flags
+- Shows agent list when multiple found and no flag given
+
+### ✅ CLI: `harness agent send`
+```bash
+harness agent send <file> [--message <msg>]
+```
+Finds agent pane via getSnapshot, sends file content to agent.
+
+### ❌ Deferred: `harness chat` first-party branding
+Abstract vendor names behind "Harness Agent" brand — deferred; agents work well as-is using their native CLIs.
 

@@ -1,6 +1,6 @@
 # P21 — ACP Re-enable + Agent Selection (Terminal-First)
 
-Status: **planned**
+Status: **PBI-ACP-001 planned; PBI-ACP-002/003 partially done via AgentCatalog+AgentBridge**
 Priority: **P1** — enables AI workflow without panel
 Owner surface: HarnessApp, HarnessCore, harness-cli
 Created: 2026-06-15
@@ -218,3 +218,26 @@ harness agent list
 3. PBI-ACP-003 — spawn with model/effort
 4. PBI-ACP-004 — ACP sideband (tools)
 5. PBI-ACP-005 — selection UI
+
+---
+
+## Implementation Progress (2026-06-15)
+
+### ✅ PBI-ACP-002: Agent Registry (via AgentCatalog)
+`AgentCatalog.swift` is the centralized config for all agents:
+- Models, effort levels, CLI flags for claude/codex/kiro/gemini
+- `spawnCommand(kind:model:effort:acp:)` builds correct spawn command
+- Update only this file when agents release new models
+
+### ✅ PBI-ACP-003: Agent spawn with model/effort
+`:agent fix --kiro --model auto --effort high` → spawns `kiro-cli --model auto --effort high`
+
+### ❌ PBI-ACP-001: Re-enable ACP compilation
+`#if HARNESS_ACP` guards still in place. Remove when ready to wire tools.
+
+### ❌ PBI-ACP-004: ACP sideband (tool access)
+Agents currently use their own built-in tools (read/write file via shell).
+ACP would give Harness permission control over tool calls.
+
+### ❌ PBI-ACP-005: Agent Selection UI
+No picker UI yet. CLI flags (`--claude/--kiro/--model/--effort`) handle selection.
