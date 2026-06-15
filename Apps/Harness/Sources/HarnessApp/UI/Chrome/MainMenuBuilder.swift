@@ -123,7 +123,7 @@ enum MainMenuBuilder {
         view.submenu?.addItem(focusDown)
 
         let closePane = NSMenuItem(title: "Close Pane", action: #selector(MenuTarget.closePane), keyEquivalent: "w")
-        closePane.keyEquivalentModifierMask = [.command, .shift, .option]
+        closePane.keyEquivalentModifierMask = [.command, .option]
         closePane.target = MenuTarget.shared
         view.submenu?.addItem(closePane)
         view.submenu?.addItem(.separator())
