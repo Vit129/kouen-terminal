@@ -6,6 +6,16 @@ All notable changes to Harness are documented here. The format is based on
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/robzilla1738/harness-terminal/releases).
 
+## [2.7.1] - 2026-06-15
+
+### Fixed
+- **Browser Pane close button now works.** `closeBrowserPane`'s pane-tree mutation was being silently overwritten by `DaemonSyncService`'s browser-pane re-injection logic running on local snapshots too; `applyLocalSnapshot` no longer re-injects closed browser panes.
+- **Browser Pane toolbar buttons no longer blocked by a hidden error banner.** The collapsed error banner's dismiss button extended into the toolbar and intercepted clicks meant for refresh/close; the banner is now hidden (not just zero-height) when collapsed.
+
+### Added
+- **⌘B opens a new Browser Pane** from the Window menu and the per-pane toolbar, matching the existing split-pane shortcuts.
+- **Clicking a localhost or LAN dev-server link in terminal output opens it in the in-app Browser Pane** instead of the system browser — covers `localhost`, `127.0.0.1`, `0.0.0.0`, `::1`, and private IPv4/IPv6 ranges (`10.x`, `172.16-31.x`, `192.168.x`, `fe80::/10`, `fc00::/7`).
+
 ## [2.7.0] - 2026-06-15
 
 ### Added
