@@ -10,16 +10,16 @@ public final class BrowserPaneView: NSView {
     private let toolbar = NSView()
     private let backButton = NSButton()
     private let forwardButton = NSButton()
-    private let reloadStopButton = NSButton()
+    internal let reloadStopButton = NSButton()
     internal let urlTextField = NSTextField()
-    private let closePaneButton = NSButton()
+    internal let closePaneButton = NSButton()
     /// Called when user taps the close (×) button in the toolbar.
     public var onClosePaneRequested: (() -> Void)?
 
-    private let errorBanner = NSView()
-    private let errorLabel = NSTextField(labelWithString: "")
-    private let errorDismissButton = NSButton()
-    private var errorBannerHeightConstraint: NSLayoutConstraint?
+    internal let errorBanner = NSView()
+    internal let errorLabel = NSTextField(labelWithString: "")
+    internal let errorDismissButton = NSButton()
+    internal var errorBannerHeightConstraint: NSLayoutConstraint?
 
     private var loadStates: [LoadCompletionState] = []
 
@@ -181,6 +181,7 @@ public final class BrowserPaneView: NSView {
         addSubview(mainStack)
 
         errorBannerHeightConstraint = errorBanner.heightAnchor.constraint(equalToConstant: 0)
+        errorBanner.isHidden = true
 
         NSLayoutConstraint.activate([
             mainStack.topAnchor.constraint(equalTo: topAnchor),
@@ -249,11 +250,13 @@ public final class BrowserPaneView: NSView {
 
     @objc private func dismissErrorBanner() {
         errorBannerHeightConstraint?.constant = 0
+        errorBanner.isHidden = true
     }
 
     private func showErrorBanner(message: String) {
         errorLabel.stringValue = message
         errorBannerHeightConstraint?.constant = 24
+        errorBanner.isHidden = false
     }
 
     private func updateReloadStopButton(isLoading: Bool) {
