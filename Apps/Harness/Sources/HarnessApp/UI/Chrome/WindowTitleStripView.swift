@@ -98,12 +98,20 @@ final class WindowTitleStripView: NSView {
 
     /// Show the active tab's directory as `· basename`, Ghostty-style. Empty cwd hides the readout
     /// (the strip stays as a drag handle).
-    func setPath(_ cwd: String) {
+    func setPath(_ cwd: String, gitBranch: String? = nil) {
         let name = HarnessDesign.pathDisplayName(cwd)
         let hasPath = !name.isEmpty
         folderIcon.isHidden = !hasPath
         label.isHidden = !hasPath
-        label.stringValue = hasPath ? "·  \(name)" : ""
+        if hasPath {
+            if let branch = gitBranch, !branch.isEmpty {
+                label.stringValue = "·  \(name)  (⎇ \(branch))"
+            } else {
+                label.stringValue = "·  \(name)"
+            }
+        } else {
+            label.stringValue = ""
+        }
         toolTip = hasPath ? HarnessDesign.shortenPath(cwd) : nil
     }
 

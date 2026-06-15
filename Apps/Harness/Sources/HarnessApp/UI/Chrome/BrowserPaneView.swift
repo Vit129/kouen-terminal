@@ -96,9 +96,13 @@ public final class BrowserPaneView: NSView {
 
         // Buttons configuration
         configureNavigationButton(backButton, symbolName: "chevron.left", action: #selector(backClicked))
+        backButton.setAccessibilityIdentifier("browser-back-button")
         configureNavigationButton(forwardButton, symbolName: "chevron.right", action: #selector(forwardClicked))
+        forwardButton.setAccessibilityIdentifier("browser-forward-button")
         configureNavigationButton(reloadStopButton, symbolName: "arrow.clockwise", action: #selector(reloadStopClicked))
+        reloadStopButton.setAccessibilityIdentifier("browser-reload-button")
         configureNavigationButton(closePaneButton, symbolName: "xmark", action: #selector(closePaneClicked))
+        closePaneButton.setAccessibilityIdentifier("browser-close-button")
         closePaneButton.toolTip = "Close Browser Pane"
         closePaneButton.setContentHuggingPriority(.required, for: .horizontal)
         closePaneButton.setContentCompressionResistancePriority(.required, for: .horizontal)
@@ -115,6 +119,7 @@ public final class BrowserPaneView: NSView {
         urlTextField.target = self
         urlTextField.action = #selector(urlEntered(_:))
         urlTextField.font = NSFont.systemFont(ofSize: HarnessDesign.FontSize.chromeBody)
+        urlTextField.setAccessibilityIdentifier("browser-url-text-field")
         urlTextField.setContentHuggingPriority(.defaultLow, for: .horizontal)
         urlTextField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 

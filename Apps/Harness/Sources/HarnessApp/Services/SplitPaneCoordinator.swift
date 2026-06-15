@@ -247,18 +247,28 @@ final class SplitPaneCoordinator {
     }
 
     /// Returns true and removes the node with matching paneID, collapsing the branch.
-    private func removePaneNode(paneID: PaneID, from node: inout PaneNode) -> Bool {
+    @discardableResult
+    func removePaneNode(paneID: PaneID, from node: inout PaneNode) -> Bool {
         switch node {
         case let .leaf(leaf) where leaf.id == paneID: return true
         case let .browser(leaf) where leaf.id == paneID: return true
         case .branch(let dir, let ratio, var first, var second):
             if removePaneNode(paneID: paneID, from: &first) {
-                node = second; return false
+                if first.paneID == paneID {
+                    node = second
+                } else {
+                    node = .branch(direction: dir, ratio: ratio, first: first, second: second)
+                }
+                return true
             }
             if removePaneNode(paneID: paneID, from: &second) {
-                node = first; return false
+                if second.paneID == paneID {
+                    node = first
+                } else {
+                    node = .branch(direction: dir, ratio: ratio, first: first, second: second)
+                }
+                return true
             }
-            node = .branch(direction: dir, ratio: ratio, first: first, second: second)
             return false
         default: return false
         }
