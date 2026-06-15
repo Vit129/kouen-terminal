@@ -227,22 +227,24 @@ final class DaemonSyncService {
         return true
     }
 
-    private func applySnapshot(_ remote: SessionSnapshot, metadataOnly: Bool) {
+    private func applySnapshot(_ remote: SessionSnapshot, metadataOnly: Bool, preserveBrowserPanes: Bool = true) {
         let structureChanged = structureFingerprint(remote) != structureFingerprint(snapshot)
-        // Preserve app-only browser pane nodes — daemon doesn't know about them.
         var merged = remote
-        for (wIdx, ws) in snapshot.workspaces.enumerated() {
-            guard wIdx < merged.workspaces.count else { continue }
-            for (sIdx, session) in ws.sessions.enumerated() {
-                guard sIdx < merged.workspaces[wIdx].sessions.count else { continue }
-                for (tIdx, tab) in session.tabs.enumerated() {
-                    guard tIdx < merged.workspaces[wIdx].sessions[sIdx].tabs.count else { continue }
-                    let browserLeaves = tab.rootPane.allBrowserLeaves()
-                    guard !browserLeaves.isEmpty else { continue }
-                    // Re-inject: if the incoming tab has no browser nodes, keep the current pane tree
-                    let incomingBrowserLeaves = merged.workspaces[wIdx].sessions[sIdx].tabs[tIdx].rootPane.allBrowserLeaves()
-                    if incomingBrowserLeaves.isEmpty {
-                        merged.workspaces[wIdx].sessions[sIdx].tabs[tIdx].rootPane = tab.rootPane
+        if preserveBrowserPanes {
+            // Preserve app-only browser pane nodes — daemon doesn't know about them.
+            for (wIdx, ws) in snapshot.workspaces.enumerated() {
+                guard wIdx < merged.workspaces.count else { continue }
+                for (sIdx, session) in ws.sessions.enumerated() {
+                    guard sIdx < merged.workspaces[wIdx].sessions.count else { continue }
+                    for (tIdx, tab) in session.tabs.enumerated() {
+                        guard tIdx < merged.workspaces[wIdx].sessions[sIdx].tabs.count else { continue }
+                        let browserLeaves = tab.rootPane.allBrowserLeaves()
+                        guard !browserLeaves.isEmpty else { continue }
+                        // Re-inject: if the incoming tab has no browser nodes, keep the current pane tree
+                        let incomingBrowserLeaves = merged.workspaces[wIdx].sessions[sIdx].tabs[tIdx].rootPane.allBrowserLeaves()
+                        if incomingBrowserLeaves.isEmpty {
+                            merged.workspaces[wIdx].sessions[sIdx].tabs[tIdx].rootPane = tab.rootPane
+                        }
                     }
                 }
             }
@@ -284,7 +286,10 @@ final class DaemonSyncService {
     }
 
     func applyLocalSnapshot(_ updated: SessionSnapshot) {
-        applySnapshot(updated, metadataOnly: false)
+        // `updated` already reflects the desired local pane tree (including any
+        // browser pane additions/removals), so skip the daemon-sync re-injection
+        // that would otherwise restore a just-closed browser pane.
+        applySnapshot(updated, metadataOnly: false, preserveBrowserPanes: false)
     }
 
     // MARK: - Ephemeral cleanup
