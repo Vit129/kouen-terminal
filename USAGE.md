@@ -124,7 +124,7 @@ Send a manual notification:
 harness-cli notify --surface "$HARNESS_SURFACE" --title "Agent" --body "Needs approval"
 ```
 
-Jump to the waiting agent with `Cmd+Shift+U`.
+Jump to the waiting agent with `Cmd+Shift+I`.
 
 Per-agent guides live in [docs/agent-hooks/README.md](docs/agent-hooks/README.md).
 

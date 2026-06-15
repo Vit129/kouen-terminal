@@ -198,7 +198,7 @@ false  # → exit code 1, shows "Error" in Board
 | 16.5 | Command completes | In Terminal 2: `exit 0` → watch Board | Card moves to "Done" column |
 | 16.6 | Exit error | In Terminal 3: `false` (exit 1) → watch Board | Card moves to "Error" column (red) |
 | 16.7 | Agent detection | Start Claude Code or similar in a pane | Card shows agent type icon + "Needs Attention" column if agent waiting |
-| 16.8 | Notifications (⌘⇧U) | Trigger agent notification (pane enters "Needs Attention") → ⌘⇧U | Dropdown shows notification with Board card link |
+| 16.8 | Notifications (⌘⇧I) | Trigger agent notification (pane enters "Needs Attention") → ⌘⇧I | Dropdown shows notification with Board card link |
 
 ### CLI Board
 
@@ -254,7 +254,7 @@ false  # → exit code 1, shows "Error" in Board
 | Resizing | ปรับขนาด |
 | Text truncation | ตัดคำ |
 | Board columns (Running/Idle/Done/Error) | คอลัมน์บอร์ด (กำลังทำ/ไม่ใช้งาน/เสร็จ/ผิดพลาด) |
-| Notification dropdown (⌘⇧U) | DropDown การแจ้งเตือน |
+| Notification dropdown (⌘⇧I) | DropDown การแจ้งเตือน |
 | Mock data setup | ตั้งค่าข้อมูลทดสอบ |
 | Agent waiting | Agent รอสัั่ง |
 | Go to definition | ไปยังคำนิยาม |

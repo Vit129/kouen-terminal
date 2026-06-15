@@ -36,7 +36,7 @@ Code, deep-merged into any existing hooks):
 
 - The tab pill's dot turns OpenAI green when Codex is the running agent.
 - When Codex pauses (waiting on approval, etc.), the pane's status flips to
-  `awaiting` and `Cmd+Shift+U` jumps right to it.
+  `awaiting` and `Cmd+Shift+I` jumps right to it.
 
 If your Codex install uses a different hook config path, copy the JSON above
 to the correct location manually.

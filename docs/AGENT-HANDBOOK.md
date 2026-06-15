@@ -458,7 +458,7 @@ harness-cli notify --surface "$HARNESS_SURFACE" --body "Approval required"
 
 Per-agent guides: [docs/agent-hooks/](docs/agent-hooks/). Daemon hooks (`hooks.json`): `after-new-tab`, `after-new-session`, `after-kill-tab`, `after-split-pane`, `after-kill-pane`, `after-resize-pane`, `pane-exited`, `client-attached`, `client-detached`, `agent-state-changed`, `notification-posted` (full list in [docs/COMMANDS.md](docs/COMMANDS.md)).
 
-**UI:** `SessionCardRowView`, `TabPillView`, **`AgentChipView`** in sidebar/session rows when agent kind is detected or inferred (static chip, not activity-gated), `NotificationBellButton` / `NotificationDropdownPanelView`, `Cmd+Shift+U` jump to notification (skips still-`working` agents). OS banners gated per-event by `notificationEvents` then by `systemNotificationsEnabled`, and presented even in-foreground via `DesktopNotifier`'s `ForegroundPresenter` (`UNUserNotificationCenterDelegate`).
+**UI:** `SessionCardRowView`, `TabPillView`, **`AgentChipView`** in sidebar/session rows when agent kind is detected or inferred (static chip, not activity-gated), `NotificationBellButton` / `NotificationDropdownPanelView`, `Cmd+Shift+I` jump to notification (skips still-`working` agents). OS banners gated per-event by `notificationEvents` then by `systemNotificationsEnabled`, and presented even in-foreground via `DesktopNotifier`'s `ForegroundPresenter` (`UNUserNotificationCenterDelegate`).
 
 **Agent Notch HUD:** `NotchPanelController` + `AgentNotchRootView` (`UI/Notch/`) show at-a-glance agent rows on Macs with a notch; data from `AgentNotchProjection` in `HarnessCore/Notch/`. Click a row → `SessionCoordinator` focuses that session/tab.
 

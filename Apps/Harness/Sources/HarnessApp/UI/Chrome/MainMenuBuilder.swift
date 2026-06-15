@@ -139,7 +139,7 @@ enum MainMenuBuilder {
         reattachItem.target = MenuTarget.shared
         view.submenu?.addItem(reattachItem)
         view.submenu?.addItem(.separator())
-        let jumpItem = NSMenuItem(title: "Show Notifications", action: #selector(MenuTarget.jumpNotification), keyEquivalent: "u")
+        let jumpItem = NSMenuItem(title: "Show Notifications", action: #selector(MenuTarget.jumpNotification), keyEquivalent: "i")
         jumpItem.keyEquivalentModifierMask = [.command, .shift]
         jumpItem.target = MenuTarget.shared
         view.submenu?.addItem(jumpItem)
