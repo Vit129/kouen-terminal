@@ -35,6 +35,13 @@ final class FileEditorView: NSView {
         }
         let isReloadingSamePath = filePath == cleanPath
         filePath = cleanPath
+        // Track in MRU for :recent command
+        WorkbenchMRU.shared.add(cleanPath)
+        // Wire :copy-path callbacks
+        syntaxView.onCurrentFile = { [weak self] in self?.filePath }
+        syntaxView.onCurrentCWD = {
+            SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd
+        }
         quickLookContainer.isHidden = true
         let expanded = (cleanPath as NSString).expandingTildeInPath
         let url = URL(fileURLWithPath: expanded).resolvingSymlinksInPath()

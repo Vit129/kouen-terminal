@@ -26,6 +26,15 @@ final class SyntaxTextView: NSView {
 
     var onHover: ((LSPPosition) async -> String?)?
     var onDefinition: ((LSPPosition) async -> SyntaxDefinitionTarget?)?
+
+    var onCurrentFile: (() -> String?)? {
+        get { vi.onCurrentFile }
+        set { vi.onCurrentFile = newValue }
+    }
+    var onCurrentCWD: (() -> String?)? {
+        get { vi.onCurrentCWD }
+        set { vi.onCurrentCWD = newValue }
+    }
     var onNavigateToDefinition: ((SyntaxDefinitionTarget) -> Void)?
 
     /// Highlight all occurrences of a pattern inline (vi * / # search).
