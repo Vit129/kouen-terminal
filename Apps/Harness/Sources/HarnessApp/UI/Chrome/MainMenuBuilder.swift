@@ -142,6 +142,9 @@ enum MainMenuBuilder {
         let paletteItem = NSMenuItem(title: "Command Palette", action: #selector(MenuTarget.commandPalette), keyEquivalent: "k")
         paletteItem.target = MenuTarget.shared
         view.submenu?.addItem(paletteItem)
+        let paletteAliasItem = NSMenuItem(title: "Command Palette", action: #selector(MenuTarget.commandPalette), keyEquivalent: "p")
+        paletteAliasItem.target = MenuTarget.shared
+        view.submenu?.addItem(paletteAliasItem)
         let promptItem = NSMenuItem(title: "Command Prompt", action: #selector(MenuTarget.commandPrompt), keyEquivalent: ";")
         promptItem.keyEquivalentModifierMask = [.command]
         promptItem.target = MenuTarget.shared
