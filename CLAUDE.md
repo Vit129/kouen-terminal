@@ -2,6 +2,12 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Product docs
+
+- `README.md` — public overview, install summary, feature map, and documentation index.
+- `USAGE.md` — practical install/run/CLI/remote/headless guide. Read before answering user-facing setup or usage questions.
+- `docs/MULTIPLEXER_GUIDE.md` and `docs/COMMANDS.md` — canonical multiplexer and command references.
+
 ## Build/test/run commands
 
 - `make build` -> `swift build`.

@@ -6,6 +6,15 @@ All notable changes to Harness are documented here. The format is based on
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/robzilla1738/harness-terminal/releases).
 
+## [3.0.0] - 2026-06-15
+
+### Added
+- Terminal Workbench aggregation now collects the P4-P19 Vi/Unix/terminal/panel surface into one terminal-first workflow layer: `:recent`, `:copy-path`, `:grep`, `:errors`, `:make`, `:attention`, `:ack`, and the scriptable IDE-migrant profile.
+- Pane-aware workbench context resolves the focused terminal pane first, so cwd and current-file behavior follow the active project surface instead of a tab-level fallback.
+
+### Changed
+- Sidebar session groups keep a visible header from the first row, and the expand chevron swaps symbols instead of rotating inside layout.
+
 ## [2.7.1] - 2026-06-15
 
 ### Fixed

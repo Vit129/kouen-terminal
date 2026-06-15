@@ -112,6 +112,17 @@ struct ToolRegistry: Sendable {
             toolDef("harnessBrowserClose", "Close an existing browser pane (requires MCP policy allowlist or HARNESS_MCP_ALLOW_CONTROL=1)", [
                 param("paneId", "string", "Browser pane UUID"),
             ]),
+            toolDef("harnessFind", "Fuzzy search for files in the active session's working directory", [
+                param("query", "string", "Query to filter files (optional)"),
+            ]),
+            toolDef("harnessGrep", "Search for regex matches in the active session's workspace", [
+                param("query", "string", "Pattern to search for"),
+                param("path", "string", "Directory path to search, relative or absolute (optional, default '.')"),
+            ]),
+            toolDef("harnessRecent", "List recently opened files in the workspace", []),
+            toolDef("harnessErrors", "Get diagnostics/compile errors in the active session's workspace or a specific file", [
+                param("path", "string", "Path to file to query diagnostics for (optional)"),
+            ]),
         ])])
     }
 
@@ -142,6 +153,10 @@ struct ToolRegistry: Sendable {
         case "gitStatus": return await gitStatus(args)
         case "gitDiff": return await gitDiff(args)
         case "gitLog": return await gitLog(args)
+        case "harnessFind": return await harnessFind(args)
+        case "harnessGrep": return await harnessGrep(args)
+        case "harnessRecent": return await harnessRecent(args)
+        case "harnessErrors": return await harnessErrors(args)
         case "harnessBrowserOpen": return await harnessBrowserOpen(args)
         case "harnessBrowserNavigate": return await harnessBrowserNavigate(args)
         case "harnessBrowserWait": return await harnessBrowserWait(args)
@@ -339,6 +354,64 @@ struct ToolRegistry: Sendable {
         if case let .int(n)? = args["count"] { count = n } else { count = 10 }
         let (out, _, _) = await shell("git log --oneline -\(count)", cwd: path)
         return (toolResult(out.isEmpty ? "No commits" : out), nil)
+    }
+
+    private func harnessFind(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        guard let cwd = await daemonTools.getActiveCWD() else {
+            return (nil, JSONRPCError(code: -32000, message: "No active workspace or session found"))
+        }
+        let query = optionalStringArg(args["query"]) ?? ""
+        let findCmd = "find . \\( -path '*/.git/*' -o -path '*/.build/*' -o -path '*/node_modules/*' -o -path '*/DerivedData/*' \\) -prune -o -type f -print"
+        let cmd = query.isEmpty
+            ? "\(findCmd) | sed 's#^./##' | head -200"
+            : "\(findCmd) | sed 's#^./##' | grep -i -- \(ShellQuoting.quote(query)) | head -200"
+        let (out, err, code) = await shell(cmd, cwd: cwd)
+        if code != 0 {
+            return (nil, JSONRPCError(code: -32000, message: err.isEmpty ? "find failed with exit code \(code)" : err))
+        }
+        return (toolResult(out), nil)
+    }
+
+    private func harnessGrep(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        guard let cwd = await daemonTools.getActiveCWD() else {
+            return (nil, JSONRPCError(code: -32000, message: "No active workspace or session found"))
+        }
+        guard case let .string(query)? = args["query"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'query' parameter"))
+        }
+        let path = optionalStringArg(args["path"]) ?? "."
+        let rg = "command -v rg >/dev/null 2>&1"
+        let quotedQuery = ShellQuoting.quote(query)
+        let quotedPath = ShellQuoting.quote(path)
+        let cmd = "\(rg) && rg --line-number --column --no-heading --color=never -- \(quotedQuery) \(quotedPath) || grep -RIn -- \(quotedQuery) \(quotedPath)"
+        let (out, err, code) = await shell(cmd, cwd: cwd)
+        if code != 0 {
+            return (nil, JSONRPCError(code: -32000, message: err.isEmpty ? "grep failed with exit code \(code)" : err))
+        }
+        return (toolResult(out), nil)
+    }
+
+    private func harnessRecent(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        let cliPath = BinaryRefresher.installedCLIPath.path
+        let binary = FileManager.default.fileExists(atPath: cliPath) ? cliPath : "harness"
+        let cmd = "'\(binary)' recent"
+        let (out, err, code) = await shell(cmd, cwd: nil)
+        if code != 0 {
+            return (nil, JSONRPCError(code: -32000, message: err.isEmpty ? "recent failed with exit code \(code)" : err))
+        }
+        return (toolResult(out), nil)
+    }
+
+    private func harnessErrors(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        let file = optionalStringArg(args["path"]) ?? "."
+        let cliPath = BinaryRefresher.installedCLIPath.path
+        let binary = FileManager.default.fileExists(atPath: cliPath) ? cliPath : "harness"
+        let cmd = "'\(binary)' lsp diagnostics '\(file)' --json"
+        let (out, err, code) = await shell(cmd, cwd: nil)
+        if code != 0 {
+            return (nil, JSONRPCError(code: -32000, message: err.isEmpty ? "errors failed with exit code \(code)" : err))
+        }
+        return (toolResult(out), nil)
     }
 
     // MARK: - Browser tools

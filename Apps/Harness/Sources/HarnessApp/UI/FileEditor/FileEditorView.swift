@@ -1,6 +1,7 @@
 import AppKit
 import HarnessCore
 import QuickLookUI
+import HarnessLSP
 
 /// File ID for GUI-only file tabs (not daemon-managed).
 typealias FileTabID = UUID
@@ -16,6 +17,7 @@ final class FileEditorView: NSView {
 
     private static let maxPreviewBytes = 5_000_000
     private(set) var filePath: String = ""
+    var activeDiagnostics: [LSPDiagnostic] { syntaxView.activeDiagnostics }
     private let fileWatcher = FileChangeWatcher()
     private let symbolIndex = WorkspaceSymbolIndex()
 
@@ -40,7 +42,12 @@ final class FileEditorView: NSView {
         // Wire :copy-path callbacks
         syntaxView.onCurrentFile = { [weak self] in self?.filePath }
         syntaxView.onCurrentCWD = {
-            SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd
+            let coordinator = SessionCoordinator.shared
+            return WorkbenchContextResolver.resolve(
+                snapshot: coordinator.snapshot,
+                focusedSurfaceID: coordinator.activeSurfaceID,
+                currentFilePath: nil
+            )?.cwd
         }
         quickLookContainer.isHidden = true
         let expanded = (cleanPath as NSString).expandingTildeInPath
@@ -74,6 +81,10 @@ final class FileEditorView: NSView {
             return
         }
         showText(contents, fileExtension: ext, resetScroll: !isReloadingSamePath)
+    }
+
+    func navigateTo(line: Int, column: Int) {
+        syntaxView.navigateTo(line: line, column: column)
     }
 
     // MARK: - Setup
@@ -245,7 +256,12 @@ final class FileEditorView: NSView {
         }
         
         let fileDir = (filePath as NSString).deletingLastPathComponent
-        let root = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd ?? fileDir
+        let coordinator = SessionCoordinator.shared
+        let root = WorkbenchContextResolver.resolve(
+            snapshot: coordinator.snapshot,
+            focusedSurfaceID: coordinator.activeSurfaceID,
+            currentFilePath: filePath
+        )?.cwd ?? fileDir
         symbolIndex.scan(root: root)
         syntaxView.symbolIndex = symbolIndex
         lspSession.open(url: URL(fileURLWithPath: filePath), text: text, fileExtension: ext)
