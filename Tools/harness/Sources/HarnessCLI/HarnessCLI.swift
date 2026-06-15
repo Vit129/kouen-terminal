@@ -27,6 +27,16 @@ struct HarnessCLI {
                 exit(Int32(handleView(args)))
             case "lsp":
                 exit(Int32(handleLSP(args)))
+            case "find":
+                exit(handleFind(args))
+            case "make":
+                exit(handleMake(args))
+            case "errors":
+                exit(handleErrors(args))
+            case "recent":
+                exit(handleRecent(args))
+            case "grep":
+                exit(handleGrep(args))
             case "remote":
                 exit(try handleRemote(args))
             case "daemon":
