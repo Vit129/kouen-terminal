@@ -1,8 +1,6 @@
 # P15 — Integration Roadmap (P4 + P10 + P11 + P12 + P13/P14)
 
-Status: **in progress** — Sequencing steps 1, 2, 3, 4, and 6 done (P13, P4 Track 2/3,
-the `harness.events` bridge, P11 PBI-SCRIPT-004/005, and P16 PBI-BOARD-001/002/003/005
-all landed). Steps 5 and 7, and P16's PBI-BOARD-004/006 are now unblocked.
+Status: **DONE** — All sequencing steps complete. P13 (split panes), P4 Track 2/3 (LSP/vi), P11 PBI-SCRIPT-004/005 (mutating API), P12 PBI-ORCH-005 (MCP badge on tab bar via `lastMCPControlAt`), P16 PBI-BOARD-001/002/003/005, P14 (browser pane), and P15 `harness.events` bridge all landed. P16 PBI-BOARD-006 (card ack/dismiss) is the only remaining deferred item.
 Priority: **P2** — sequencing/coordination plan, not a feature in itself
 Owner surface: cross-cutting (HarnessCore, HarnessApp UI, harness-mcp, harness-cli)
 Created: 2026-06-14, after P11 PBI-SCRIPT-001/002/003 and P13 PBI-SPLIT-001..005 landed

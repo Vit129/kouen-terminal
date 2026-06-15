@@ -1,6 +1,6 @@
 # P16 — Agent/Session Board (Jira/Trello/Devin-Windsurf parity, GUI + Terminal)
 
-Status: **PBI-BOARD-001/002/003/005 done; PBI-BOARD-004/006 deferred** (see notes
+Status: **PBI-BOARD-001/002/003/004/005 done; PBI-BOARD-006 deferred** (see notes
 in each PBI section and "Deferred PBIs" below).
 Priority: **P3** — strategic, builds on [[p15-integration-roadmap]] step 3 (event bridge)
 Owner surface: HarnessApp UI (new sidebar tab/panel) + harness-cli + harness-mcp (read-only)

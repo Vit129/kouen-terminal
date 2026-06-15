@@ -1,6 +1,6 @@
 # P11 — Scripting & Config API (WezTerm parity)
 
-Status: **PBI-SCRIPT-001/002/003 DONE; PBI-SCRIPT-004/005 not started**
+Status: **All PBIs DONE** — PBI-SCRIPT-001/002/003/004/005 complete. `harness.config.get/set` (11 allowlisted keys), `harness.keys.bind/unbind/reload`, `harness.commands.run` (Promise), pane mutators `sendText/split/close`, session `spawn`, and `harness.events.on/off` bridge (`snapshotChanged`/`configReloaded`) all implemented in `ScriptAPI.swift`.
 Priority: **P3** — strategic, implement after P12 unless a user explicitly asks for WezTerm-style config first
 Owner surface: **HarnessApp first**, then daemon/CLI only where a script action already maps to IPC
 Created from gap review: 2026-06-13 WezTerm/tmux/cmux comparison
