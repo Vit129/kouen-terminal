@@ -144,18 +144,12 @@ final class SessionGroupHeaderRowView: NSView {
     func configure(name: String, isCollapsed: Bool, status: BoardColumnKind) {
         label.stringValue = name
         toolTip = name
-        let changed = self.isCollapsed != isCollapsed
         self.isCollapsed = isCollapsed
-        let rotation: CGFloat = isCollapsed ? 0 : -90
-        if changed {
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = HarnessDesign.Motion.standard
-                context.timingFunction = HarnessDesign.Motion.standardEase
-                disclosureImage.animator().frameCenterRotation = rotation
-            }
-        } else {
-            disclosureImage.frameCenterRotation = rotation
-        }
+        disclosureImage.image = NSImage(
+            systemSymbolName: isCollapsed ? "chevron.right" : "chevron.down",
+            accessibilityDescription: isCollapsed ? "Collapsed" : "Expanded"
+        )?.withSymbolConfiguration(HarnessDesign.symbolConfig(pointSize: HarnessDesign.IconSize.tiny, weight: .semibold))
+        disclosureImage.needsDisplay = true
 
         let dotColor: NSColor
         let statusText: String

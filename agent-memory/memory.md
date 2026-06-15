@@ -5,7 +5,7 @@
 - **Fork:** Vit129/harness-terminal (fork of robzilla1738/harness-terminal)
 - **Working branch:** `main`
 - **Preview:** `make preview` (uses `.harness-preview/` dir)
-- **Latest release:** v2.5.2 (build 130 — Metal surface memory leak fix on pane close, Vi mode crash on surrogate clipboard, ⌘1–9 renamed selectWorkspaceNumber)
+- **Latest release:** v3.0.0 (build 137 — Terminal Workbench aggregation, pane-aware context resolver, sidebar session-group stability, release tag v3.0.0)
 
 ## Current Sprint — Post-v2.1.0 Polish & Shelving
 

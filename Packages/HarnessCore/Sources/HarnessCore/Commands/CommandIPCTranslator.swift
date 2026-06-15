@@ -157,6 +157,8 @@ public enum CommandIPCTranslator {
         paneBaseIndex: Int = 0
     ) -> CommandTranslation {
         switch command {
+        case .workbench(let wbCmd):
+            return .clientLocal(.workbench(wbCmd))
         // MARK: Targeting — resolve `-t` then run the inner verb against it.
         case let .targeted(spec, inner):
             // STRICT: a named component that doesn't match makes the whole command

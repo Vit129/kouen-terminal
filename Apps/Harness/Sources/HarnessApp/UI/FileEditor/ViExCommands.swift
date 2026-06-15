@@ -186,14 +186,18 @@ extension ViEngine {
             // :grep <query> — run search in split pane
             if cmd.hasPrefix("grep ") {
                 let query = String(cmd.dropFirst(5)).trimmingCharacters(in: .whitespaces)
-                let grepCmd = "rg --vimgrep '\(query)' 2>/dev/null || grep -rn '\(query)' ."
-                SessionCoordinator.shared.splitActivePaneAndRun(direction: .horizontal, command: grepCmd)
+                CommandPaletteController.present(relativeTo: NSApp.keyWindow, mode: .grep(query: query))
                 return
             }
             // :make [build|test|last] — run project task
             if cmd == "make" || cmd.hasPrefix("make ") {
                 let target = cmd == "make" ? nil : String(cmd.dropFirst(5)).trimmingCharacters(in: .whitespaces)
-                let cwd = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd ?? "."
+                let coordinator = SessionCoordinator.shared
+                let cwd = WorkbenchContextResolver.resolve(
+                    snapshot: coordinator.snapshot,
+                    focusedSurfaceID: coordinator.activeSurfaceID,
+                    currentFilePath: onCurrentFile?()
+                )?.cwd ?? "."
                 let task = ProjectTaskDetector.detect(at: cwd)
                 let runCmd: String
                 switch target {

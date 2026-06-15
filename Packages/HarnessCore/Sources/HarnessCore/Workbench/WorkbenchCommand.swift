@@ -2,7 +2,7 @@ import Foundation
 
 /// Intent-only workbench command vocabulary. No AppKit, no shell execution.
 /// Consumers (app ex commands, CLI, MCP) execute these through existing IPC paths.
-public enum WorkbenchCommand: Sendable, Equatable {
+public enum WorkbenchCommand: Codable, Sendable, Equatable {
     // Navigation
     case find(query: String)
     case recent

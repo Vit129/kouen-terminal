@@ -12,9 +12,9 @@ final class Phase6KeysTests: XCTestCase {
 
     func testRootTableSeededAndBindable() {
         var set = KeyTableSet.defaults
-        // Seeded (empty) so `bind-key -T root` is a real surface, not a no-op.
+        // Seeded so `bind-key -T root` is a real surface, not a no-op.
         XCTAssertNotNil(set.table(.root))
-        XCTAssertEqual(set.table(.root)?.bindings.count, 0)
+        XCTAssertEqual(set.table(.root)?.bindings.count, 1)
         set.setBinding(table: .root, binding: Binding(spec: KeySpec(key: "Right", modifiers: .option), command: .nextWindow))
         XCTAssertEqual(set.table(.root)?.lookup(KeySpec(key: "Right", modifiers: .option))?.command, .nextWindow)
     }

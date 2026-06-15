@@ -106,6 +106,7 @@ public indirect enum Command: Codable, Sendable, Equatable {
     case unlinkWindow                              // unlink-window
     case displayPopup(command: String?)            // display-popup [-E <command>]
     case displayMenu(items: [MenuItem])            // display-menu -T title <name> <key> <command> …
+    case workbench(WorkbenchCommand)
 
     // MARK: Config / buffer / hook verbs
     // Bindable forms of the harness-cli subcommands (same IPC underneath), so bind-key,
@@ -279,6 +280,20 @@ extension Command {
         case let .listClients(fmt, json):  return (json ? "list-clients --json"  : fmt.map { "list-clients -F '\($0)'" }  ?? "list-clients")
         case let .targeted(spec, command):
             return "\(command.shortDescription)\(spec.raw.isEmpty ? "" : " -t \(spec.raw)")"
+        case let .workbench(wbCmd):
+            switch wbCmd {
+            case let .find(q): return "find\(q.isEmpty ? "" : " " + q)"
+            case .recent: return "recent"
+            case let .copyPath(rel): return "copy-path\(rel ? " relative" : " absolute")"
+            case let .cd(path): return "cd \(path)"
+            case let .mark(name, path): return "mark \(name) \(path)"
+            case let .grep(q): return "grep \(q)"
+            case .errors: return "errors"
+            case let .make(target): return "make\(target.map { " " + $0 } ?? "")"
+            case .board: return "board"
+            case .attention: return "attention"
+            case .ack: return "ack"
+            }
         }
     }
 }
