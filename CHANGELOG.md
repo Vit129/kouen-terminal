@@ -6,6 +6,31 @@ All notable changes to Harness are documented here. The format is based on
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/robzilla1738/harness-terminal/releases).
 
+## [3.1.0] - 2026-06-15
+
+### Added
+- **Session status indicators** — sidebar session cards and top bar session pills now show a colored dot (blue=running, green=done, red=error, orange=waiting, gray=idle) derived from `BoardModel.columnKind`, the single source of truth used by the Board tab, CLI, scripting, and MCP.
+- **Multi-branch / multi-agent visibility** — sidebar shows a separate row per session when branches differ, enabling Agent A on branch A, Agent B on branch B, etc. to be visible simultaneously.
+- **⌘⇧I Notifications Inbox** — bell badge and dropdown now include board error/needs-attention sessions alongside agent notifications. Arrow keys and Enter navigate the dropdown.
+- **⌘F Find in Files** — opens the grep palette (project-wide content search), consistent with VS Code/Cursor Cmd+Shift+F.
+- **⌘P Command Palette** — replaces ⌘K for fuzzy file search, matching VS Code/Cursor/Zed convention.
+- **⌘⌥W Close Pane** — replaces ⌘⇧⌥W, matching iTerm2 convention.
+- **Close confirmation dialog on all paths** — ⌘W, tab bar × button, and sidebar × button all show a confirmation dialog before closing.
+- **IDE-like Terminal Workbench docs** — USAGE.md, COMMANDS.md, and KEYBINDINGS.md updated with full `:find`/`:recent`/`:grep`/`:errors`/`:make`/`:board` reference and IDE→terminal workflow guide.
+
+### Changed
+- **⌘K removed** in favour of ⌘P for Command Palette.
+- **⌘⇧U changed to ⌘⇧I** (Notifications Inbox).
+- **⌘F** changed from native find bar to Find in Files (grep palette).
+- **⌘⇧T Reopen Closed Tab removed** — not implementable as true restore (PTY terminates on close); daemon persistent sessions are the correct equivalent.
+- `BoardModel.columnKind()` made public; `BoardModel.shellNames` made public — all surfaces share one classification implementation.
+- `BoardColumnKind.color` extension added in HarnessApp for canonical status colors.
+- Docs consolidated: Modes and Migration summaries added to USAGE.md; MANUAL_TEST_PLAN moved to agent-memory.
+
+### Fixed
+- Sidebar session group header chevron rendered too large; fixed frame (10×10), removed scale-to-fill, weight reduced to regular.
+- Sidebar group header click hit-test used wrong coordinate space for add/options buttons; now uses `convert(bounds:from:)`.
+
 ## [3.0.0] - 2026-06-15
 
 ### Added

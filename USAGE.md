@@ -27,14 +27,13 @@ make preview-stop
 make preview-clean
 ```
 
-### Option C: Build a local app at the repo root
+### Option C: Interactive build menu (recommended)
 
 ```bash
-make prod
-open Harness.app
+make start
 ```
 
-This builds a release-style `Harness.app` at the repository root and opens it without copying it to `/Applications`.
+Opens an interactive menu to commit+push, run a preview build, bump version and build, or run a full release cycle. Use this as the primary workflow.
 
 ### Option D: Install the local build into `/Applications`
 
