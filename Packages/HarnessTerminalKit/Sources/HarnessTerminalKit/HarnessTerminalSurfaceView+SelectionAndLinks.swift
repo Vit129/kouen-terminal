@@ -228,8 +228,8 @@ extension HarnessTerminalSurfaceView {
 
         // Dev-server URLs open in the in-app Browser Pane instead of the system browser.
         if ["http", "https"].contains(scheme),
-           let host = url.host?.lowercased(),
-           ["localhost", "127.0.0.1", "0.0.0.0", "::1", "[::1]"].contains(host) {
+           let host = url.host,
+           URLDetection.isLocalDevHost(host) {
             NotificationCenter.default.post(
                 name: Notification.Name("HarnessOpenLocalhostURL"),
                 object: nil,

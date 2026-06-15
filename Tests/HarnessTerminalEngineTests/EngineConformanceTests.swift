@@ -314,6 +314,43 @@ final class EngineConformanceTests: XCTestCase {
         XCTAssertNil(URLDetection.detectLocalhost(in: line, at: col))
     }
 
+    func testDetectLocalhostAcceptsPrivateIPv4LAN() {
+        let line = "Network: http://192.168.1.42:5173/"
+        let col = line.distance(from: line.startIndex, to: line.range(of: "192.168")!.lowerBound)
+        let match = URLDetection.detectLocalhost(in: line, at: col)
+        XCTAssertEqual(match?.url, "http://192.168.1.42:5173/")
+    }
+
+    func testDetectLocalhostRejectsPublicIPv4() {
+        let line = "see 8.8.8.8:53 now"
+        let col = line.distance(from: line.startIndex, to: line.range(of: "8.8.8.8")!.lowerBound)
+        XCTAssertNil(URLDetection.detectLocalhost(in: line, at: col))
+    }
+
+    func testDetectLocalhostAcceptsBracketedIPv6Loopback() {
+        let line = "Listening on http://[::1]:3000"
+        let col = line.distance(from: line.startIndex, to: line.range(of: "[::1]")!.lowerBound)
+        let match = URLDetection.detectLocalhost(in: line, at: col)
+        XCTAssertEqual(match?.url, "http://[::1]:3000")
+    }
+
+    func testDetectLocalhostAcceptsLinkLocalIPv6() {
+        let line = "Listening on http://[fe80::1]:8080"
+        let col = line.distance(from: line.startIndex, to: line.range(of: "[fe80::1]")!.lowerBound)
+        let match = URLDetection.detectLocalhost(in: line, at: col)
+        XCTAssertEqual(match?.url, "http://[fe80::1]:8080")
+    }
+
+    func testIsLocalDevHostAcceptsPrivateRanges() {
+        XCTAssertTrue(URLDetection.isLocalDevHost("10.0.0.5"))
+        XCTAssertTrue(URLDetection.isLocalDevHost("172.20.0.1"))
+        XCTAssertTrue(URLDetection.isLocalDevHost("192.168.0.1"))
+        XCTAssertTrue(URLDetection.isLocalDevHost("fe80::1"))
+        XCTAssertTrue(URLDetection.isLocalDevHost("fd00::1"))
+        XCTAssertFalse(URLDetection.isLocalDevHost("8.8.8.8"))
+        XCTAssertFalse(URLDetection.isLocalDevHost("2001:4860:4860::8888"))
+    }
+
     func testSynchronizedOutputModeAndDECRQM() {
         let term = HarnessGridTerminal(cols: 20, rows: 4)!
         var responses = Data()
