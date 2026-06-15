@@ -116,6 +116,19 @@ class HarnessUILibrary:
                 f"Expected '{expected_substring}' in harness view output:\n{result.stdout[:500]}"
             )
 
+    @keyword("Type Text")
+    def type_text(self, text: str):
+        """Type a string of text into the focused element via osascript keystroke."""
+        escaped = text.replace("\\", "\\\\").replace('"', '\\"')
+        self._osascript(f'''
+            tell application "System Events"
+                tell process "{APP_NAME}"
+                    set frontmost to true
+                    keystroke "{escaped}"
+                end tell
+            end tell
+        ''')
+
     @keyword("Wait For UI")
     def wait_for_ui(self, seconds: float = 1.0):
         """Wait for UI to settle."""
@@ -171,8 +184,10 @@ class HarnessUILibrary:
             elif part in ("ctrl", "control"):
                 modifiers.append("control down")
             elif part == "backslash":
-                key_char = "\\\\"
-            elif part == "enter":
+                key_char = "\\"
+            elif part == "colon":
+                key_char = ":"
+            elif part in ("enter", "return"):
                 key_char = "return"
             elif part == "escape":
                 key_char = "escape"
@@ -181,14 +196,22 @@ class HarnessUILibrary:
             else:
                 key_char = part
 
-        modifier_str = "{" + ", ".join(modifiers) + "}" if modifiers else ""
-        if key_char in ("return", "escape"):
-            keystroke_cmd = f'key code {{"return": 36, "escape": 53}}'
+        mod_clause = " using {" + ", ".join(modifiers) + "}" if modifiers else ""
+        if key_char == "return":
             return f'''
             tell application "System Events"
                 tell process "{APP_NAME}"
                     set frontmost to true
-                    keystroke "" using {modifier_str}
+                    key code 36{mod_clause}
+                end tell
+            end tell
+            '''
+        if key_char == "escape":
+            return f'''
+            tell application "System Events"
+                tell process "{APP_NAME}"
+                    set frontmost to true
+                    key code 53{mod_clause}
                 end tell
             end tell
             '''
@@ -196,7 +219,7 @@ class HarnessUILibrary:
         tell application "System Events"
             tell process "{APP_NAME}"
                 set frontmost to true
-                keystroke "{key_char}" using {modifier_str}
+                keystroke "{key_char}"{mod_clause}
             end tell
         end tell
         '''
