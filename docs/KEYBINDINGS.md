@@ -80,7 +80,7 @@ These are fixed `NSMenuItem` bindings defined in `MainMenuBuilder` — not prefi
 | Close tab | `⌘W` |
 | Previous / Next session | `⌘[` / `⌘]` |
 | Split horizontal | `⌘D` |
-| **File search (fuzzy — like Spotlight)** | **`⌘K`** |
+| **File search (fuzzy — like Spotlight)** | **`⌘P`** |
 | Command prompt | `⌘;` |
 | Search command history | `⌃R` |
 | Toggle sidebar + file editor (focus mode) | `⌘\` |
