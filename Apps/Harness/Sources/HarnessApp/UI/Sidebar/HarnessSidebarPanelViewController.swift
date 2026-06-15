@@ -1189,13 +1189,78 @@ extension HarnessSidebarPanelViewController: NSTableViewDataSource, NSTableViewD
             }
             header.onToggleCollapse = { [weak self] in
                 guard let self else { return }
-                if self.collapsedGroups.contains(rootPath) {
+                let wasCollapsed = self.collapsedGroups.contains(rootPath)
+                let oldRows = self.cachedSidebarRows
+                
+                if wasCollapsed {
                     self.collapsedGroups.remove(rootPath)
                 } else {
                     self.collapsedGroups.insert(rootPath)
                 }
+                
                 self.rebuildSidebarRows()
-                self.sessionTable.reloadData()
+                let newRows = self.cachedSidebarRows
+                
+                // Find the index of the group header in oldRows
+                guard let headerIndex = oldRows.firstIndex(where: {
+                    if case .groupHeader(_, let path, _, _) = $0 { return path == rootPath }
+                    return false
+                }) else {
+                    self.sessionTable.reloadData()
+                    return
+                }
+                
+                self.sessionTable.beginUpdates()
+                
+                if wasCollapsed {
+                    // We expanded.
+                    guard let newHeaderIndex = newRows.firstIndex(where: {
+                        if case .groupHeader(_, let path, _, _) = $0 { return path == rootPath }
+                        return false
+                    }) else {
+                        self.sessionTable.endUpdates()
+                        self.sessionTable.reloadData()
+                        return
+                    }
+                    
+                    var insertedCount = 0
+                    for i in (newHeaderIndex + 1)..<newRows.count {
+                        if case .groupHeader = newRows[i] {
+                            break
+                        }
+                        insertedCount += 1
+                    }
+                    
+                    if insertedCount > 0 {
+                        let indexSet = IndexSet((headerIndex + 1)...(headerIndex + insertedCount))
+                        self.sessionTable.insertRows(at: indexSet, withAnimation: .slideDown)
+                    }
+                } else {
+                    // We collapsed.
+                    var removedCount = 0
+                    for i in (headerIndex + 1)..<oldRows.count {
+                        if case .groupHeader = oldRows[i] {
+                            break
+                        }
+                        removedCount += 1
+                    }
+                    
+                    if removedCount > 0 {
+                        let indexSet = IndexSet((headerIndex + 1)...(headerIndex + removedCount))
+                        self.sessionTable.removeRows(at: indexSet, withAnimation: .slideUp)
+                    }
+                }
+                
+                self.sessionTable.endUpdates()
+                
+                // Update the header view's collapsed state without recreating it
+                if let headerView = self.sessionTable.view(atColumn: 0, row: headerIndex, makeIfNecessary: false) as? SessionGroupHeaderRowView {
+                    if case let .groupHeader(_, _, freshIsCollapsed, freshStatus) = newRows[headerIndex] {
+                        headerView.configure(name: name, isCollapsed: freshIsCollapsed, status: freshStatus)
+                    } else {
+                        headerView.configure(name: name, isCollapsed: !wasCollapsed, status: status)
+                    }
+                }
             }
             header.onOptions = { [weak self] anchor in
                 self?.showGroupActionsMenu(for: rootPath, name: name, anchor: anchor)

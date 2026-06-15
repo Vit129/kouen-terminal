@@ -1,6 +1,17 @@
 import AppKit
 import HarnessCore
 
+@MainActor
+final class RotatableImageView: NSImageView {
+    override func setFrameSize(_ newSize: NSSize) {
+        let currentRotation = self.frameCenterRotation
+        super.setFrameSize(newSize)
+        if currentRotation != 0 {
+            super.frameCenterRotation = currentRotation
+        }
+    }
+}
+
 // MARK: - Session rows
 
 @MainActor
@@ -11,7 +22,7 @@ final class SessionGroupHeaderRowView: NSView {
 
     private let leftStack = NSStackView()
     private let rightStack = NSStackView()
-    private let disclosureImage = NSImageView()
+    private let disclosureImage = RotatableImageView()
     private let label = NSTextField(labelWithString: "")
     private let boardStatusDot = NSView()
     private let boardStatusLabel = NSTextField(labelWithString: "")
