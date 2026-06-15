@@ -5,9 +5,8 @@ import HarnessCore
 @MainActor
 final class HarnessSidebarPanelViewController: NSViewController {
     enum SidebarSessionRow {
-        case groupHeader(name: String, rootPath: String, isCollapsed: Bool)
+        case groupHeader(name: String, rootPath: String, isCollapsed: Bool, status: BoardColumnKind)
         case session(SessionGroup)
-        case tab(Tab, sessionID: SessionID, workspaceID: WorkspaceID, isLast: Bool)
     }
 
     private let chromeHeader = SidebarTitlebarHeaderView()
@@ -28,7 +27,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
     /// Wraps the search field so it gets the same radius-7 elevated-surface chrome as
     /// the workspace pill and session cards.
     private let searchContainer = NSView()
-    private let sidebarTabs = NSSegmentedControl(labels: ["Sessions", "Files", "Git", "Board"], trackingMode: .selectOne, target: nil, action: nil)
+    private let sidebarTabs = NSSegmentedControl(labels: ["Sessions", "Files", "Git"], trackingMode: .selectOne, target: nil, action: nil)
 #if HARNESS_ACP
     private let agentChatPanel = AgentChatPanelView()
 #endif
@@ -38,7 +37,6 @@ final class HarnessSidebarPanelViewController: NSViewController {
     let fileTreeView = WorkspaceFileTreeView()
     private let fileViewerVC = FileViewerViewController()
     let gitPanelView = GitPanelView()
-    let boardViewController = BoardViewController()
     private let searchPanelView = SearchPanelView()
     private let footer = NSView()
     /// Opens the Agent Inbox popover (every running agent, waiting first). Stored so
@@ -55,11 +53,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
     /// Live filter text from the search field; empty shows all sessions.
     var sessionFilter = ""
     private var collapsedGroups = Set<String>()
-    /// Cached result of buildSidebarRows(). Rebuilt only when sessions, filter, or
-    /// collapsed groups change — not on every NSTableViewDelegate call.
     var cachedSidebarRows: [SidebarSessionRow] = []
-    /// Sessions whose tab list is currently expanded in the sidebar.
-    var expandedSessionIDs: Set<SessionID> = []
     /// Last session ID sent to fileTreeView so we can detect session changes even
     /// when the CWD is the same (e.g. two sessions sharing the same repo root).
     var lastFileTreeSessionID: SessionID?
@@ -72,6 +66,42 @@ final class HarnessSidebarPanelViewController: NSViewController {
         let q = sessionFilter.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !q.isEmpty else { return sessions }
         return sessions.filter { sessionMatches($0, query: q) }
+    }
+
+    private func columnKind(for tab: Tab) -> BoardColumnKind {
+        if tab.agent?.activity == .awaiting {
+            return .needsAttention
+        }
+        if let exitStatus = tab.exitStatus {
+            return exitStatus == 0 ? .done : .error
+        }
+        let shellNames: Set<String> = ["zsh", "bash", "sh", "fish", "csh", "tcsh", "login"]
+        if let cmd = tab.currentCommand, !cmd.isEmpty, !shellNames.contains(cmd.lowercased()) {
+            return .running
+        }
+        return .idle
+    }
+
+    private func highestBoardStatus(for sessions: [SessionGroup]) -> BoardColumnKind {
+        var highest = BoardColumnKind.idle
+        func priority(_ status: BoardColumnKind) -> Int {
+            switch status {
+            case .needsAttention: return 4
+            case .running:        return 3
+            case .done:           return 2
+            case .error:          return 1
+            case .idle:           return 0
+            }
+        }
+        for session in sessions {
+            for tab in session.tabs {
+                let status = columnKind(for: tab)
+                if priority(status) > priority(highest) {
+                    highest = status
+                }
+            }
+        }
+        return highest
     }
 
     /// Rebuild `cachedSidebarRows` from the current `displayedSessions` and
@@ -90,26 +120,32 @@ final class HarnessSidebarPanelViewController: NSViewController {
                 groups.append((name: name, rootPath: rootPath, firstIndex: index, sessions: [session]))
             }
         }
+
+        let activeSessionID = SessionCoordinator.shared.snapshot.activeWorkspace?.activeSessionID
+
         cachedSidebarRows = groups
             .sorted { $0.firstIndex < $1.firstIndex }
             .flatMap { group -> [SidebarSessionRow] in
                 let isCollapsed = collapsedGroups.contains(group.rootPath)
-                let header = SidebarSessionRow.groupHeader(name: group.name, rootPath: group.rootPath, isCollapsed: isCollapsed)
+                let status = highestBoardStatus(for: group.sessions)
+                let header = SidebarSessionRow.groupHeader(name: group.name, rootPath: group.rootPath, isCollapsed: isCollapsed, status: status)
                 if isCollapsed {
                     return [header]
                 } else {
-                    return [header] + group.sessions.flatMap { session -> [SidebarSessionRow] in
-                        let sessionRow = SidebarSessionRow.session(session)
-                        guard expandedSessionIDs.contains(session.id), session.tabs.count > 1 else {
-                            return [sessionRow]
+                    var rows: [SidebarSessionRow] = [header]
+                    let branches = group.sessions.map { ($0.activeTab ?? $0.tabs.first)?.gitBranch ?? "" }
+                    let allSameBranch = branches.allSatisfy { $0 == branches.first }
+
+                    if allSameBranch {
+                        if let firstSession = group.sessions.first(where: { $0.id == activeSessionID }) ?? group.sessions.first {
+                            rows.append(.session(firstSession))
                         }
-                        let tabRows = session.tabs.enumerated().map { idx, tab in
-                            SidebarSessionRow.tab(tab, sessionID: session.id, workspaceID: group.sessions.first.map { _ in
-                                SessionCoordinator.shared.snapshot.activeWorkspace?.id ?? UUID()
-                            } ?? UUID(), isLast: idx == session.tabs.count - 1)
+                    } else {
+                        for session in group.sessions {
+                            rows.append(.session(session))
                         }
-                        return [sessionRow] + tabRows
                     }
+                    return rows
                 }
             }
     }
@@ -189,7 +225,6 @@ final class HarnessSidebarPanelViewController: NSViewController {
         setupFileTree()
         setupFileViewer()
         setupGitPlaceholder()
-        setupBoardPanel()
         setupSearchPanel()
 #if HARNESS_ACP
         setupAgentPanel()
@@ -692,19 +727,6 @@ final class HarnessSidebarPanelViewController: NSViewController {
         ])
     }
 
-    private func setupBoardPanel() {
-        addChild(boardViewController)
-        let boardView = boardViewController.view
-        boardView.translatesAutoresizingMaskIntoConstraints = false
-        boardView.isHidden = true
-        view.addSubview(boardView)
-        NSLayoutConstraint.activate([
-            boardView.topAnchor.constraint(equalTo: sectionHeader.bottomAnchor),
-            boardView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            boardView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            boardView.bottomAnchor.constraint(equalTo: footer.topAnchor),
-        ])
-    }
 
     private func setupSearchPanel() {
         searchPanelView.isHidden = true
@@ -806,13 +828,12 @@ final class HarnessSidebarPanelViewController: NSViewController {
             fileTreeView.isHidden = fileViewerVC.view.isHidden == false
         }
         gitPanelView.isHidden = index != 2
-        boardViewController.view.isHidden = index != 3
-        // Search/Agent tabs are not in `sidebarTabs` today (only Sessions/Files/Git/Board
+        // Search/Agent tabs are not in `sidebarTabs` today (only Sessions/Files/Git
         // are shown) but the views/cases are kept for the shelved ACP agent panel and an
-        // unwired search panel; shifted to 4/5 so "Board" can take index 3.
-        searchPanelView.isHidden = index != 4
+        // unwired search panel.
+        searchPanelView.isHidden = index != 3
 #if HARNESS_ACP
-        agentChatPanel.isHidden = index != 5
+        agentChatPanel.isHidden = index != 4
 #endif
         switch index {
         case 1:
@@ -829,14 +850,11 @@ final class HarnessSidebarPanelViewController: NSViewController {
                 gitPanelView.clearRoot()
             }
         case 3:
-            sectionLabel.stringValue = "BOARD"
-            boardViewController.reload()
-        case 4:
             sectionLabel.stringValue = "SEARCH"
             if let cwd = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd {
                 searchPanelView.updateRoot(path: cwd)
             }
-        case 5:
+        case 4:
             sectionLabel.stringValue = "AGENT"
             // [ACP SHELVED] connectAgentIfNeeded()
         default:
@@ -990,7 +1008,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
         rebuildSidebarRows()
         let rows = cachedSidebarRows
         for row in 0 ..< rows.count {
-            if let cell = sessionTable.view(atColumn: 0, row: row, makeIfNecessary: false) as? SessionCardRowView {
+            if let cell = sessionTable.view(atColumn: 0, row: row, makeIfNecessary: false) as? WorktreeRowView {
                 guard case let .session(session) = rows[row] else { continue }
                 cell.configure(session: session, isSelected: session.id == activeID)
             }
@@ -1149,14 +1167,11 @@ extension HarnessSidebarPanelViewController: NSTableViewDataSource, NSTableViewD
         case .groupHeader:
             return 28
         case .session:
-            return HarnessDesign.sessionRowHeight
-        case .tab:
-            return 36
+            return 30
         }
     }
 
     func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool {
-        if case .tab = cachedSidebarRows[row] { return true }
         return sessionRow(at: row) != nil
     }
 
@@ -1166,9 +1181,9 @@ extension HarnessSidebarPanelViewController: NSTableViewDataSource, NSTableViewD
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         switch cachedSidebarRows[row] {
-        case let .groupHeader(name, rootPath, isCollapsed):
+        case let .groupHeader(name, rootPath, isCollapsed, status):
             let header = SessionGroupHeaderRowView()
-            header.configure(name: name, isCollapsed: isCollapsed)
+            header.configure(name: name, isCollapsed: isCollapsed, status: status)
             header.onAdd = { [weak self] in
                 self?.addSessionInGroup(rootPath: rootPath)
             }
@@ -1179,8 +1194,6 @@ extension HarnessSidebarPanelViewController: NSTableViewDataSource, NSTableViewD
                 } else {
                     self.collapsedGroups.insert(rootPath)
                 }
-                // Rebuild cache before reloadData() so all delegate callbacks
-                // read O(1) cachedSidebarRows, not recomputed sidebarRows.
                 self.rebuildSidebarRows()
                 self.sessionTable.reloadData()
             }
@@ -1189,51 +1202,11 @@ extension HarnessSidebarPanelViewController: NSTableViewDataSource, NSTableViewD
             }
             return header
         case let .session(session):
-            let cell = SessionCardRowView()
+            let cell = WorktreeRowView()
             cell.configure(
                 session: session,
                 isSelected: session.id == SessionCoordinator.shared.snapshot.activeWorkspace?.activeSessionID
             )
-            cell.isExpanded = expandedSessionIDs.contains(session.id)
-            cell.onToggleExpand = { [weak self] in
-                guard let self else { return }
-                let wasExpanded = self.expandedSessionIDs.contains(session.id)
-                let oldRows = self.cachedSidebarRows
-
-                if wasExpanded {
-                    self.expandedSessionIDs.remove(session.id)
-                } else {
-                    self.expandedSessionIDs.insert(session.id)
-                }
-                self.rebuildSidebarRows()
-                let newRows = self.cachedSidebarRows
-
-                // Find which row index the session is at
-                guard let sessionRow = oldRows.firstIndex(where: {
-                    if case .session(let s) = $0 { return s.id == session.id }
-                    return false
-                }) else {
-                    self.sessionTable.reloadData()
-                    return
-                }
-
-                // Calculate which tab rows to insert/remove
-                let tabCount = session.tabs.count
-                let tabIndexSet = IndexSet((sessionRow + 1)...(sessionRow + tabCount))
-
-                self.sessionTable.beginUpdates()
-                if wasExpanded {
-                    self.sessionTable.removeRows(at: tabIndexSet, withAnimation: .slideUp)
-                } else {
-                    self.sessionTable.insertRows(at: tabIndexSet, withAnimation: .slideDown)
-                }
-                self.sessionTable.endUpdates()
-
-                // Update the cell's expand state without recreating it
-                if let cellView = self.sessionTable.view(atColumn: 0, row: sessionRow, makeIfNecessary: false) as? SessionCardRowView {
-                    cellView.isExpanded = !wasExpanded
-                }
-            }
             cell.onClose = { [weak self] in
                 self?.confirmCloseSession(session)
             }
@@ -1241,31 +1214,11 @@ extension HarnessSidebarPanelViewController: NSTableViewDataSource, NSTableViewD
                 self?.sessionActionsMenu(for: session)
             }
             return cell
-        case let .tab(tab, sessionID, workspaceID, _):
-            let cell = SessionTabRowView()
-            cell.configure(tab: tab)
-            cell.onTap = { [weak self] in
-                self?.selectAndOpenTab(workspaceID: workspaceID, sessionID: sessionID, tabID: tab.id)
-            }
-            return cell
         }
     }
 
     func tableViewSelectionDidChange(_ notification: Notification) {
         guard !isProgrammaticSelection else { return }
-        // If a tab row is selected, navigate to it
-        let row = sessionTable.selectedRow
-        if row >= 0, case let .tab(tab, sessionID, workspaceID, _) = cachedSidebarRows[row] {
-            selectAndOpenTab(workspaceID: workspaceID, sessionID: sessionID, tabID: tab.id)
-            return
-        }
         selectSessionRow()
-    }
-
-    private func selectAndOpenTab(workspaceID: WorkspaceID, sessionID: SessionID, tabID: TabID) {
-        let coord = SessionCoordinator.shared
-        if coord.snapshot.activeWorkspaceID != workspaceID { coord.selectWorkspace(workspaceID) }
-        coord.selectSession(workspaceID: workspaceID, sessionID: sessionID)
-        coord.selectTab(workspaceID: workspaceID, tabID: tabID)
     }
 }

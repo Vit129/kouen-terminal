@@ -75,9 +75,6 @@ extension HarnessSidebarPanelViewController {
             case .groupHeader:
                 targetSession = previousSession(beforeRow: clampedRow, in: rows)
                 placeAfterTarget = true
-            case .tab:
-                targetSession = previousSession(beforeRow: clampedRow, in: rows)
-                placeAfterTarget = true
             }
         } else {
             targetSession = rows.reversed().compactMap {
