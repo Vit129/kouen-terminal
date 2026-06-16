@@ -1447,27 +1447,29 @@ public final class SurfaceRegistry: @unchecked Sendable {
         }
     }
 
-    /// Consume the pending one-shot banner: render at the surface's spawn width and write
-    /// it into the surface's output stream (scrollback + fan-out, like real shell output).
-    /// The `update-banner` option (default on) suppresses the output; either way the state
-    /// file records the current build immediately, so the banner never repeats — not on
-    /// later surfaces, and not after a daemon restart. The on-screen render stays
-    /// at-most-once per run regardless; only the durable ack is retried on failure.
+    /// Inject the version banner into a newly created surface.
+    /// - whatsNew is one-shot: consumed on the first new surface after an update.
+    /// - welcome shows on every new surface (persistent MOTD); the one-shot flag is
+    ///   consumed so it doesn't also trigger a redundant whatsNew after a fresh install.
+    /// The `update-banner` option (default on) suppresses all output; the durable ack
+    /// for whatsNew is written before the option check so it is never re-shown.
     private func injectVersionBannerIfPending(into session: RealPty, columns: Int) {
         if versionAckRetryNeeded { versionAckRetryNeeded = !versionBannerStore.markSeen() }
-        guard let banner = pendingVersionBanner else { return }
-        pendingVersionBanner = nil
-        // Ack BEFORE the option check: suppressing the banner still consumes the one-shot.
-        versionAckRetryNeeded = !versionBannerStore.markSeen()
-        guard optionStore.get("update-banner")?.boolValue ?? true else { return }
-        let bytes: Data
-        switch banner {
-        case .welcome:
-            bytes = TerminalBanner.welcome(version: HarnessVersion.short, columns: columns)
-        case .whatsNew:
-            bytes = TerminalBanner.whatsNew(ReleaseNotes.current, columns: columns)
+
+        if let banner = pendingVersionBanner, case .whatsNew = banner {
+            pendingVersionBanner = nil
+            // Ack BEFORE the option check: suppressing still consumes the one-shot.
+            versionAckRetryNeeded = !versionBannerStore.markSeen()
+            guard optionStore.get("update-banner")?.boolValue ?? true else { return }
+            session.injectSyntheticOutput(TerminalBanner.whatsNew(ReleaseNotes.current, columns: columns))
+            return
         }
-        session.injectSyntheticOutput(bytes)
+
+        // Consume the first-run one-shot flag (if present) without re-acking —
+        // whatsNew already wrote the durable ack on update; welcome never needs one.
+        pendingVersionBanner = nil
+        guard optionStore.get("update-banner")?.boolValue ?? true else { return }
+        session.injectSyntheticOutput(TerminalBanner.welcome(version: HarnessVersion.short, columns: columns))
     }
 
     private func shellCandidate(for requested: String?) -> String {
