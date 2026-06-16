@@ -85,6 +85,7 @@ final class NotchPanelController: NSObject {
     }
 
     @objc private func snapshotChanged(_ note: Notification) {
+        guard note.userInfo?["metadataOnly"] as? Bool != true else { return }
         refreshVisibility()
     }
 

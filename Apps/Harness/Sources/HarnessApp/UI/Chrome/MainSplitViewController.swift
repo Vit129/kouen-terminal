@@ -194,7 +194,6 @@ final class MainSplitViewController: NSViewController {
 
     @objc private func snapshotChanged(_ note: Notification) {
         let metadataOnly = note.userInfo?["metadataOnly"] as? Bool ?? false
-        fputs("BLINKDBG MainSplitViewController.snapshotChanged: metadataOnly=\(metadataOnly) chromeChanged=\(note.userInfo?["chromeChanged"] as? Bool ?? false) structureChanged=\(note.userInfo?["structureChanged"] as? Bool ?? false)\n", harnessStderr)
         if note.userInfo?["chromeChanged"] as? Bool == true {
             // Cross-dissolve the chrome (theme switch) instead of a hard color pop.
             // Re-arming the flag per cascade means rapid successive switches just

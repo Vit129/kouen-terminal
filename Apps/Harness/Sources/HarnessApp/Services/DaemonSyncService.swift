@@ -377,7 +377,9 @@ final class DaemonSyncService {
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 5_000_000_000)
                 let work = await MainActor.run { () -> [(WorkspaceID, Tab)] in
-                    guard let self, let workspace = self.snapshot.activeWorkspace else { return [] }
+                    guard let self,
+                          !AppIdleThrottle.shared.isSuspended,
+                          let workspace = self.snapshot.activeWorkspace else { return [] }
                     return workspace.sessions.flatMap { $0.tabs }.map { (workspace.id, $0) }
                 }
                 var probedCWDs = Set<String>()
@@ -389,6 +391,7 @@ final class DaemonSyncService {
                     guard updated.gitBranch != tab.gitBranch else { return nil }
                     return (workspaceID, tab.id, updated.gitBranch)
                 }
+                guard !updates.isEmpty else { continue }
                 await MainActor.run { [weak self] in
                     guard let self else { return }
                     var activeTabGitBranchDidChange = false
