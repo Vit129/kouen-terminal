@@ -326,7 +326,7 @@ final class WorktreeRowView: NSView {
         attributedString.append(NSAttributedString(string: shortenedCwd, attributes: cwdAttrs))
 
         textLabel.attributedStringValue = attributedString
-        toolTip = branchText.isEmpty ? tab.cwd : "\(branchText)\(tab.cwd)"
+        toolTip = branchText.isEmpty ? shortenedCwd : "\(branchText)\(shortenedCwd)"
 
         // Status indicator: derive from all tabs in the session
         let status = highestStatus(for: session)
