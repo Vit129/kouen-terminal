@@ -1015,7 +1015,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
         }
         // Rebuild cache once; iterate the stored result — no redundant recomputation.
         // Skip entirely when session data hasn't changed (common on metadata-only ticks).
-        let sessionsChanged = newSessions != lastRefreshedSessions || activeID != lastRefreshedActiveID
+        let sessionsChanged = !newSessions.isStableEqual(to: lastRefreshedSessions) || activeID != lastRefreshedActiveID
         if sessionsChanged {
             lastRefreshedSessions = newSessions
             lastRefreshedActiveID = activeID
