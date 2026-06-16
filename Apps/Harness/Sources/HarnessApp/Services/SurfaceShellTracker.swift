@@ -18,13 +18,13 @@ final class SurfaceShellTracker {
 
     private var timer: DispatchSourceTimer?
     private var lastReportedCwd: [String: String] = [:]
-    /// Set while a background scan is in flight so ticks don't pile up — a proc-tree walk on a
-    /// loaded machine can exceed the 500ms interval, and stacking scans just wastes CPU.
     private var scanning = false
-    /// Serial queue for the blocking `proc_listpids` / `sysctl(KERN_PROCARGS2)` / `proc_pidinfo`
-    /// syscalls. Kept off the main thread: scanning every process on a busy machine can take
-    /// many milliseconds, and doing it on `.main` every 500ms drops frames.
     private static let scanQueue = DispatchQueue(label: "com.robert.harness.shell-tracker")
+    /// Consecutive no-change tick count — used for adaptive back-off.
+    private var idleTicks = 0
+    private static let activeInterval: TimeInterval = 0.5
+    private static let idleInterval: TimeInterval = 2.0
+    private static let idleThreshold = 4  // back off after 4 no-change ticks (~2s)
 
     private init() {}
 
@@ -47,6 +47,8 @@ final class SurfaceShellTracker {
     /// Force a re-scan immediately (call after creating a new tab/surface so
     /// we don't wait up to 500ms for the first cwd to land).
     func bumpScan() {
+        idleTicks = 0
+        reschedule(interval: Self.activeInterval)
         tick()
     }
 
@@ -71,11 +73,27 @@ final class SurfaceShellTracker {
             lastReportedCwd.removeValue(forKey: surface)
         }
         let coordinator = SessionCoordinator.shared
+        var changed = false
         for (surfaceID, cwd) in cwds where lastReportedCwd[surfaceID] != cwd {
             lastReportedCwd[surfaceID] = cwd
             guard let uuid = UUID(uuidString: surfaceID) else { continue }
             coordinator.surfaceShellTrackerDidUpdateCwd(uuid, cwd: cwd)
+            changed = true
         }
+        // Adaptive interval: slow down when nothing is changing.
+        if changed {
+            idleTicks = 0
+            reschedule(interval: Self.activeInterval)
+        } else {
+            idleTicks += 1
+            if idleTicks == Self.idleThreshold {
+                reschedule(interval: Self.idleInterval)
+            }
+        }
+    }
+
+    private func reschedule(interval: TimeInterval) {
+        timer?.schedule(deadline: .now() + interval, repeating: interval)
     }
 
     // MARK: - Process introspection (pure syscalls; run off the main actor)
