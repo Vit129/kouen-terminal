@@ -56,12 +56,14 @@ final class GitPanelView: NSView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        if window != nil {
-            startWatching()
-        } else {
-            stopWatching()
+    override nonisolated func viewDidMoveToWindow() {
+        MainActor.assumeIsolated {
+            super.viewDidMoveToWindow()
+            if window != nil {
+                startWatching()
+            } else {
+                stopWatching()
+            }
         }
     }
 
