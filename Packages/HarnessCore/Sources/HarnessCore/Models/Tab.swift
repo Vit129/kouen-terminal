@@ -135,3 +135,33 @@ public struct Tab: Codable, Sendable, Identifiable, Equatable {
         lastMCPControlAt = try container.decodeIfPresent(Date.self, forKey: .lastMCPControlAt)
     }
 }
+
+extension Tab {
+    /// Equality check ignoring volatile daemon-polled fields (`currentCommand`,
+    /// `lastMCPControlAt`) that change every ~1.5s but don't affect UI layout.
+    /// Used by sidebar and tab bar to skip redundant refreshes.
+    public func isStableEqual(to other: Tab) -> Bool {
+        id == other.id &&
+        title == other.title &&
+        cwd == other.cwd &&
+        gitBranch == other.gitBranch &&
+        status == other.status &&
+        agent == other.agent &&
+        sortOrder == other.sortOrder &&
+        exitStatus == other.exitStatus &&
+        persistent == other.persistent &&
+        zoomedPaneID == other.zoomedPaneID &&
+        activePaneID == other.activePaneID
+    }
+}
+
+extension Array where Element == Tab {
+    /// Stable comparison ignoring volatile per-tab fields.
+    public func isStableEqual(to other: [Tab]) -> Bool {
+        guard count == other.count else { return false }
+        for (a, b) in zip(self, other) {
+            guard a.isStableEqual(to: b) else { return false }
+        }
+        return true
+    }
+}

@@ -78,3 +78,24 @@ extension SessionSnapshot {
             ?? String(groupID.uuidString.prefix(8))
     }
 }
+
+extension SessionGroup {
+    /// Stable comparison ignoring volatile tab fields (currentCommand, lastMCPControlAt).
+    public func isStableEqual(to other: SessionGroup) -> Bool {
+        id == other.id &&
+        name == other.name &&
+        activeTabID == other.activeTabID &&
+        sortOrder == other.sortOrder &&
+        tabs.isStableEqual(to: other.tabs)
+    }
+}
+
+extension Array where Element == SessionGroup {
+    public func isStableEqual(to other: [SessionGroup]) -> Bool {
+        guard count == other.count else { return false }
+        for (a, b) in zip(self, other) {
+            guard a.isStableEqual(to: b) else { return false }
+        }
+        return true
+    }
+}

@@ -164,7 +164,7 @@ final class TerminalTabBarView: NSView {
             return
         }
         // Skip pill updates when tabs data is identical (common on idle metadata ticks).
-        guard tabs != self.tabs || activeTabID != self.activeTabID else { return }
+        guard !tabs.isStableEqual(to: self.tabs) || activeTabID != self.activeTabID else { return }
         self.tabs = tabs
         self.activeTabID = activeTabID
         for tab in tabs {
