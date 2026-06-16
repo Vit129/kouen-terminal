@@ -219,10 +219,12 @@ final class TerminalTabBarView: NSView {
 
     // MARK: - Layout
 
-    override func layout() {
-        super.layout()
-        guard draggingPill == nil else { return } // drag drives its own positioning
-        layoutPills()
+    override nonisolated func layout() {
+        MainActor.assumeIsolated {
+            super.layout()
+            guard draggingPill == nil else { return }
+            layoutPills()
+        }
     }
 
     private func layoutPills() {

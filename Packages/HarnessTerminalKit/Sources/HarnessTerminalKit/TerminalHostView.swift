@@ -526,6 +526,13 @@ public final class TerminalHostView: NSView {
         borderOverlayView.needsDisplay = true
     }
 
+    /// Temporarily sync Metal presentation with the CA transaction so the surface
+    /// doesn't flash black during a programmatic layout change (e.g. file-preview
+    /// split open/close). Call with `true` before layout, `false` immediately after.
+    public func setPresentsWithTransaction(_ enabled: Bool) {
+        nativeView.metalLayer.presentsWithTransaction = enabled
+    }
+
     public func focusTerminal() {
         window?.makeFirstResponder(nativeView)
         hostDelegate?.terminalHostDidChangeFocus(true, surfaceID: surfaceID)
