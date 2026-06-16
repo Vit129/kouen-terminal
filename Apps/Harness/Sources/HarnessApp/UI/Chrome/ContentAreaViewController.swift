@@ -13,6 +13,11 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
     /// relying on empty space to imply separation from the terminal canvas.
     private let tabBarDivider = HarnessDesign.divider()
     private var paneContainer: PaneContainerView?
+    /// Keep a strong reference to the previous pane container for one runloop cycle after
+    /// removal so AppKit's pending layout/display passes (which hold unsafe internal refs to
+    /// subviews) complete before ARC deallocates the view tree. Without this, a structural
+    /// rebuild can free views that AppKit still dispatches layout()/isFlipped/mouseMoved to.
+    private var retiredContainer: PaneContainerView?
     private let fileTabManager = FileTabManager()
     private var fileEditorView: FileEditorView?
     var activeDiagnostics: [LSPDiagnostic] { fileEditorView?.activeDiagnostics ?? [] }
@@ -407,7 +412,12 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         // (without removing them from window) then rebuild container around them.
         let existingHosts = paneContainer?.collectTerminalHosts() ?? [:]
         paneContainer?.detachHostsOnly()
+        // Keep the old container alive past this runloop tick so AppKit's pending
+        // layout/display passes that reference its subviews complete before dealloc.
+        let oldContainer = paneContainer
         paneContainer?.removeFromSuperview()
+        retiredContainer = oldContainer
+        DispatchQueue.main.async { [weak self] in self?.retiredContainer = nil }
 
         let container = PaneContainerView(
             node: displayNode,
@@ -987,6 +997,7 @@ final class HarnessSplitView: NSSplitView, NSSplitViewDelegate {
     override var dividerColor: NSColor { HarnessChrome.current.border }
 
     override nonisolated func layout() {
+        if !Thread.isMainThread { DispatchQueue.main.async { [weak self] in self?.needsLayout = true }; return }
         MainActor.assumeIsolated {
         super.layout()
         guard !appliedRatio, !isApplyingPositions else { return }

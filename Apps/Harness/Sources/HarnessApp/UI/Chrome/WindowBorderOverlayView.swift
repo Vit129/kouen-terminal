@@ -19,6 +19,7 @@ final class WindowBorderOverlayView: NSView {
     }
 
     override nonisolated func layout() {
+        if !Thread.isMainThread { DispatchQueue.main.async { [weak self] in self?.needsLayout = true }; return }
         MainActor.assumeIsolated {
         super.layout()
         needsDisplay = true // the stroke path depends on bounds

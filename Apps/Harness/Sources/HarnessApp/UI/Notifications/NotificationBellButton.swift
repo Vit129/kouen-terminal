@@ -80,6 +80,7 @@ final class NotificationBellButton: NSControl {
     required init?(coder: NSCoder) { fatalError() }
 
     override nonisolated func layout() {
+        if !Thread.isMainThread { DispatchQueue.main.async { [weak self] in self?.needsLayout = true }; return }
         MainActor.assumeIsolated {
             super.layout()
             applyChrome()

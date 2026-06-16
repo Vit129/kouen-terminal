@@ -445,6 +445,7 @@ final class SoftIconButton: NSButton {
     override func mouseExited(with event: NSEvent) { isHovered = false }
 
     override nonisolated func layout() {
+        if !Thread.isMainThread { DispatchQueue.main.async { [weak self] in self?.needsLayout = true }; return }
         MainActor.assumeIsolated {
         super.layout()
         applyChrome()
@@ -646,6 +647,7 @@ final class ChromeBackdrop: NSView {
     }
 
     override nonisolated func layout() {
+        if !Thread.isMainThread { DispatchQueue.main.async { [weak self] in self?.needsLayout = true }; return }
         MainActor.assumeIsolated {
         super.layout()
         // Manual frame (CALayer, not Auto Layout); AppKit suppresses implicit
@@ -770,6 +772,7 @@ final class HarnessOverlayBackground: NSView {
     required init?(coder: NSCoder) { fatalError() }
 
     override nonisolated func layout() {
+        if !Thread.isMainThread { DispatchQueue.main.async { [weak self] in self?.needsLayout = true }; return }
         MainActor.assumeIsolated {
         super.layout()
         // Manual frame (CALayer); implicit anim suppressed during layout.
@@ -863,6 +866,7 @@ final class StatusDotView: NSView {
     }
 
     override nonisolated func layout() {
+        if !Thread.isMainThread { DispatchQueue.main.async { [weak self] in self?.needsLayout = true }; return }
         MainActor.assumeIsolated {
         super.layout()
         let dotSize: CGFloat = diameter * 0.5
@@ -942,6 +946,7 @@ final class AgentChipView: NSView {
     }
 
     override nonisolated func layout() {
+        if !Thread.isMainThread { DispatchQueue.main.async { [weak self] in self?.needsLayout = true }; return }
         MainActor.assumeIsolated {
         super.layout()
         layer?.cornerRadius = 0

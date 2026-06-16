@@ -72,7 +72,9 @@ final class HarnessTextField: NSTextField {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 
-    override nonisolated func layout() { MainActor.assumeIsolated {
+    override nonisolated func layout() {
+        if !Thread.isMainThread { DispatchQueue.main.async { [weak self] in self?.needsLayout = true }; return }
+        MainActor.assumeIsolated {
             super.layout()
             applyChrome()
         }}
@@ -160,7 +162,9 @@ final class HarnessSearchField: NSView, NSTextFieldDelegate {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 
-    override nonisolated func layout() { MainActor.assumeIsolated {
+    override nonisolated func layout() {
+        if !Thread.isMainThread { DispatchQueue.main.async { [weak self] in self?.needsLayout = true }; return }
+        MainActor.assumeIsolated {
             super.layout()
             applyChrome()
         }}
@@ -255,6 +259,7 @@ final class HarnessToggle: NSControl {
     }
 
     override nonisolated func layout() {
+        if !Thread.isMainThread { DispatchQueue.main.async { [weak self] in self?.needsLayout = true }; return }
         MainActor.assumeIsolated {
         super.layout()
         let y = (bounds.height - Self.trackHeight) / 2
@@ -371,6 +376,7 @@ final class HarnessSlider: NSControl {
     }
 
     override nonisolated func layout() {
+        if !Thread.isMainThread { DispatchQueue.main.async { [weak self] in self?.needsLayout = true }; return }
         MainActor.assumeIsolated {
         super.layout()
         let midY = bounds.midY
@@ -473,6 +479,7 @@ final class HarnessSwatchWell: NSControl {
     required init?(coder: NSCoder) { fatalError() }
 
     override nonisolated func layout() {
+        if !Thread.isMainThread { DispatchQueue.main.async { [weak self] in self?.needsLayout = true }; return }
         MainActor.assumeIsolated {
         super.layout()
         CATransaction.begin(); CATransaction.setDisableActions(true)
@@ -623,6 +630,7 @@ final class HarnessSegmented: NSControl {
     }
 
     override nonisolated func layout() {
+        if !Thread.isMainThread { DispatchQueue.main.async { [weak self] in self?.needsLayout = true }; return }
         MainActor.assumeIsolated {
         super.layout()
         guard !titles.isEmpty else { return }
@@ -746,7 +754,9 @@ final class HarnessSelect: NSControl {
         setAccessibilityValue(title)
     }
 
-    override nonisolated func layout() { MainActor.assumeIsolated {
+    override nonisolated func layout() {
+        if !Thread.isMainThread { DispatchQueue.main.async { [weak self] in self?.needsLayout = true }; return }
+        MainActor.assumeIsolated {
             super.layout()
             applyChrome()
         }}
