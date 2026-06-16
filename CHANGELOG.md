@@ -6,6 +6,17 @@ All notable changes to Harness are documented here. The format is based on
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/robzilla1738/harness-terminal/releases).
 
+## [3.2.2] - 2026-06-16
+
+### Fixed
+- **Blink timer UAF crash** — Timer callback used `MainActor.assumeIsolated` which could fire during dealloc. Replaced with generation-token guard + direct access (RunLoop.main = already main thread).
+- **renderLink/blinkTimer deinit off-main** — `deinit` is nonisolated in Swift 6; invalidation now routes through `DispatchQueue.main.sync` if called from background thread.
+- **NotificationCenter observer UAF** — Removed redundant `MainActor.assumeIsolated` wrappers from 3 NC observers in `HarnessTerminalSurfaceView` (queue:.main already guarantees main delivery).
+- **OverlayWindow timer leak** — Phase67UI clock timer had no `deinit` invalidation; added.
+- **StatusLineView timer leak** — refreshTimer had no `deinit` invalidation; added.
+- **GitPanelView FSEvents leak** — FSEventStream never stopped on dealloc if `viewDidMoveToWindow(nil)` wasn't called; added `deinit`.
+- **TerminalHostView NC observer** — selector-based observer not removed on dealloc; added `removeObserver(self)` in `deinit`.
+
 ## [3.2.1] - 2026-06-16
 
 ### Fixed

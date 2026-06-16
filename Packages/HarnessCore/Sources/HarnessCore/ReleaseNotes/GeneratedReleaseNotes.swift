@@ -1,17 +1,20 @@
-// Generated from the CHANGELOG.md [3.2.1] block by Scripts/generate-release-notes.swift.
+// Generated from the CHANGELOG.md [3.2.2] block by Scripts/generate-release-notes.swift.
 // DO NOT EDIT BY HAND — regenerate in release prep after updating CHANGELOG.md:
 //   swift Scripts/generate-release-notes.swift
 // Drift guards: ReleaseNotesGuardTests (version + changelog digest), package-app.sh.
 
 extension ReleaseNotes {
     public static let current = ReleaseNotes(
-        version: "3.2.1",
-        changelogDigest: "a7c3e1f04b2d9801",
+        version: "3.2.2",
+        changelogDigest: "b4e9c2a07f1d3a02",
         sections: [
             Section(title: "Fixed", items: [
-                "UAF crash on pane rebuild (deferred dealloc of retired PaneContainerView)",
-                "UAF crash on tab bar rebuild (deferred dealloc of retired TabPillView)",
-                "Off-main-thread layout() crash — Thread.isMainThread guard on 15 custom NSView subclasses",
+                "Blink timer UAF crash (generation-token guard, no assumeIsolated)",
+                "renderLink/blinkTimer deinit off-main (sync dispatch to main)",
+                "NC observer UAF — removed redundant assumeIsolated wrappers",
+                "OverlayWindow/StatusLineView timer leak (added deinit)",
+                "GitPanelView FSEvents leak (added deinit)",
+                "TerminalHostView NC observer not removed (added removeObserver)",
             ]),
         ]
     )

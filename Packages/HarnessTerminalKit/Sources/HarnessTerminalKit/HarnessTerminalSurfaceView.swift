@@ -383,6 +383,9 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// Blink phase: false hides the cursor on the off-beat. Reset to true on activity.
     var cursorBlinkVisible = true
     nonisolated(unsafe) var blinkTimer: Timer?
+    /// Generation counter incremented on every restartBlinkTimer — lets a pending timer
+    /// callback detect that it belongs to a stale generation and bail before accessing self.
+    nonisolated(unsafe) var blinkGeneration: UInt8 = 0
     /// First-responder state — the cursor only blinks while focused.
     var focused = false
     /// Whether the host window is key. Combined with `focused` for the user-visible focus
@@ -1186,8 +1189,22 @@ public final class HarnessTerminalSurfaceView: NSView {
     // unsafe/weak reference to it). If the view is deallocated without invalidating the display link,
     // the display link remains active in the run loop and fires on the deallocated view, causing a crash.
     deinit {
-        renderLink?.invalidate()
-        blinkTimer?.invalidate()
+        // Both renderLink and blinkTimer are RunLoop-bound (main). If deinit runs off-main
+        // (Swift 6 nonisolated deinit), invalidate via a synchronous main dispatch so the
+        // invalidation is serialized with the RunLoop that drives them. The view is already
+        // unreachable (refcount=0) so no new fires can begin.
+        let link = renderLink
+        let timer = blinkTimer
+        blinkGeneration &+= 1
+        if Thread.isMainThread {
+            link?.invalidate()
+            timer?.invalidate()
+        } else {
+            DispatchQueue.main.sync {
+                link?.invalidate()
+                timer?.invalidate()
+            }
+        }
     }
 
     public override func viewDidMoveToWindow() {
@@ -1213,20 +1230,16 @@ public final class HarnessTerminalSurfaceView: NSView {
             windowKeyObservers.append(nc.addObserver(
                 forName: NSWindow.didBecomeKeyNotification, object: window, queue: .main
             ) { [weak self] _ in
-                MainActor.assumeIsolated {
-                    guard let self else { return }
-                    self.windowIsKey = true
-                    self.focusStateChanged()
-                }
+                guard let self else { return }
+                self.windowIsKey = true
+                self.focusStateChanged()
             })
             windowKeyObservers.append(nc.addObserver(
                 forName: NSWindow.didResignKeyNotification, object: window, queue: .main
             ) { [weak self] _ in
-                MainActor.assumeIsolated {
-                    guard let self else { return }
-                    self.windowIsKey = false
-                    self.focusStateChanged()
-                }
+                guard let self else { return }
+                self.windowIsKey = false
+                self.focusStateChanged()
             })
             // Track occlusion (covered / minimized / other Space): an invisible pane must not
             // acquire drawables or present — Apple guidance, and it keeps a backgrounded build
@@ -1238,10 +1251,8 @@ public final class HarnessTerminalSurfaceView: NSView {
             windowKeyObservers.append(nc.addObserver(
                 forName: NSWindow.didChangeOcclusionStateNotification, object: window, queue: .main
             ) { [weak self] _ in
-                MainActor.assumeIsolated {
-                    guard let self, let window = self.window else { return }
-                    self.setWindowOccluded(!window.occlusionState.contains(.visible))
-                }
+                guard let self, let window = self.window else { return }
+                self.setWindowOccluded(!window.occlusionState.contains(.visible))
             })
             window.makeFirstResponder(self)
             focusStateChanged()
@@ -1249,6 +1260,7 @@ public final class HarnessTerminalSurfaceView: NSView {
             // Removed from the window (pane closed / re-mounted): stop the blink timer so
             // it doesn't keep the run loop (and a dangling render) alive. The timer holds
             // `[weak self]`, so this is the teardown hook (no retain cycle either way).
+            blinkGeneration &+= 1
             blinkTimer?.invalidate()
             blinkTimer = nil
             stopDisplayLink()

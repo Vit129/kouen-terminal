@@ -155,7 +155,7 @@ private final class OverlayWindow: NSWindow {
     private let onDismiss: () -> Void
     private let showsClock: Bool
     private let label = NSTextField(labelWithString: "")
-    private var timer: Timer?
+    private nonisolated(unsafe) var timer: Timer?
 
     init(screen: NSScreen, message: String?, showsClock: Bool, onDismiss: @escaping () -> Void) {
         self.onDismiss = onDismiss
@@ -179,11 +179,13 @@ private final class OverlayWindow: NSWindow {
         contentView = content
         if showsClock {
             let timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-                MainActor.assumeIsolated { self?.label.stringValue = OverlayWindow.timeString() }
+                Task { @MainActor in self?.label.stringValue = OverlayWindow.timeString() }
             }
             self.timer = timer
         }
     }
+
+    deinit { timer?.invalidate() }
 
     override var canBecomeKey: Bool { true }
 
