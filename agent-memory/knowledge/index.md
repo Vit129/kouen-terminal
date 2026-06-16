@@ -15,6 +15,7 @@
 | service-decomposition.md | Architecture | SessionCoordinator, facade, services, @MainActor, unowned, lazy | 2/0 | P17 god-object decomposition: SessionCoordinator 2050→397 LOC via 6 focused services (DaemonSync, SessionLifecycle, SplitPane, Notification, Theme, ActivePane) + HostDelegate extension + Types file |
 | ui-automation.md | QA/Testing | Robot Framework, osascript, System Events, accessibility, CLI verification | 1/0 | P18 UI automation: Robot Framework + custom Python library using macOS System Events (AppleScript) for UI interaction + harness CLI for state verification. No Appium dependency. |
 | browser-pane.md | AppKit/WebKit | WKWebView, BrowserLeaf, applyLocalSnapshot, hit-testing, URLDetection, localhost | 2/0 | P14 embedded Browser Pane: architecture, applyLocalSnapshot re-injection bug (close button no-op), collapsed errorBanner hit-testing bug, ⌘B shortcut, click-to-open localhost/LAN dev-server links |
+| tab-bar.md | AppKit/UI | TabPillView, statusDot, branchLabel, gitBranch, drag, reorder, pill, shouldShowBranch | 1/0 | Tab bar pill layout (statusDot after title, branch always visible), git branch detection (5s poll via GitMetadataProvider), drag-reorder cancel-on-structural-reload pattern |
 
 ## Source Map
 
@@ -28,6 +29,7 @@
 | session-tab-hierarchy.md | `HarnessApp/UI/ContentAreaViewController.swift`, `HarnessApp/UI/MainMenuBuilder.swift`, `HarnessApp/Services/SessionCoordinator.swift`, `HarnessCore/Session/SessionEditor.swift` |
 | agent-session-board.md | `HarnessCore/Board/BoardModel.swift`, `HarnessCLI/HarnessCLI+Board.swift`, `HarnessApp/UI/BoardViewController.swift`, `HarnessApp/Scripting/ScriptAPI.swift`, `HarnessMCP/HarnessDaemonTools.swift`, `HarnessMCP/ToolRegistry.swift` |
 | browser-pane.md | `HarnessApp/UI/Chrome/BrowserPaneView.swift`, `HarnessApp/Services/SplitPaneCoordinator.swift`, `HarnessApp/Services/DaemonSyncService.swift`, `HarnessApp/UI/Chrome/MainMenuBuilder.swift`, `HarnessApp/UI/Chrome/ContentAreaViewController.swift`, `HarnessApp/UI/Chrome/MainSplitViewController.swift`, `HarnessTerminalEngine/URLDetection.swift`, `HarnessTerminalKit/HarnessTerminalSurfaceView+SelectionAndLinks.swift` |
+| tab-bar.md | `HarnessApp/UI/Terminal/TerminalTabBarView.swift`, `HarnessCore/Metadata/MetadataProvider.swift`, `HarnessApp/Services/DaemonSyncService.swift`, `HarnessApp/UI/Chrome/ContentAreaViewController.swift` |
 
 ## Edges
 
@@ -40,6 +42,8 @@
 | agent-session-board.md | session-tab-hierarchy.md | SessionSnapshot, Tab, PaneLeaf, status classification |
 | browser-pane.md | split-panes.md | PaneNode, PaneContainerView, SplitPaneCoordinator |
 | browser-pane.md | ipc-architecture.md | DaemonSyncService, snapshot, applySnapshot |
+| tab-bar.md | session-tab-hierarchy.md | reloadTabBar, TabPillView, SessionGroup, pill-per-session |
+| tab-bar.md | agent-session-board.md | statusDot, BoardColumnKind, tab status classification |
 
 ## Search Instructions
 
