@@ -6,6 +6,21 @@ All notable changes to Harness are documented here. The format is based on
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/robzilla1738/harness-terminal/releases).
 
+## [3.2.0] - 2026-06-16
+
+### Fixed
+- **TerminalTabBarView.layout() crash (CASE-034)** — Swift 6 executor check failure when AppKit calls `layout()` from non-main executor. Applied `nonisolated + MainActor.assumeIsolated` to all 21 `override func layout()` and `viewDidMoveToWindow()` overrides across HarnessApp.
+- **File preview black-flash (task 51)** — opening/closing the file-editor split caused Metal surface flash. `setPresentsWithTransaction(true)` is now set on all terminal hosts before the constraint layout pass.
+
+### Improved
+- **Adaptive SurfaceShellTracker** — proc-tree walk interval increases from 500ms to 2s after 4 consecutive no-change ticks. Resets to 500ms on `bumpScan()` (new tab) or CWD change. ~75% CPU reduction when idle.
+- **Sidebar skip-on-idle** — `rebuildSidebarRows()` + `configure()` loop now skipped entirely when sessions haven't changed (uses `isStableEqual` ignoring volatile fields like `currentCommand`). ~95% of metadata ticks are no-op.
+- **Tab bar skip-on-idle** — `refreshMetadata` pill updates skipped when tabs are stable-equal. Same volatile-field exclusion.
+- **`buildSurfaceIndex` conditional** — only rebuilds when pane-tree structure changes, not on every snapshot.
+- **Browser pane merge fast-path** — O(W×S×T) loop skipped when no browser panes exist in current snapshot (the common case).
+- **Agent icon cache** — sidebar `WorktreeRowView` caches the rendered agent `NSImage` by kind, avoiding re-render every 1.5s.
+- **Duplicate `fileTreeView.updateRoot` eliminated** — was called twice per refresh cycle, now once (only when session or branch actually changes).
+
 ## [3.1.5] - 2026-06-16
 
 ### Added
