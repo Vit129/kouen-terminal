@@ -16,6 +16,7 @@
 | ui-automation.md | QA/Testing | Robot Framework, osascript, System Events, accessibility, CLI verification | 1/0 | P18 UI automation: Robot Framework + custom Python library using macOS System Events (AppleScript) for UI interaction + harness CLI for state verification. No Appium dependency. |
 | browser-pane.md | AppKit/WebKit | WKWebView, BrowserLeaf, applyLocalSnapshot, hit-testing, URLDetection, localhost | 2/0 | P14 embedded Browser Pane: architecture, applyLocalSnapshot re-injection bug (close button no-op), collapsed errorBanner hit-testing bug, ⌘B shortcut, click-to-open localhost/LAN dev-server links |
 | tab-bar.md | AppKit/UI | TabPillView, statusDot, branchLabel, gitBranch, drag, reorder, pill, shouldShowBranch | 1/0 | Tab bar pill layout (statusDot after title, branch always visible), git branch detection (5s poll via GitMetadataProvider), drag-reorder cancel-on-structural-reload pattern |
+| background-polling.md | Performance | SurfaceShellTracker, DaemonSyncService, metadataRefresh, snapshotChanged, fanout, PerfCounters, metadataOnly, double-subscription | 1/0 | P22 background polling architecture: SurfaceShellTracker proc-tree walk, 5-s metadata refresh loop, snapshotChanged fanout consumers and gate logic, PerfCounters instrumentation, known non-P22 syncFromDaemon callers |
 
 ## Source Map
 
@@ -30,6 +31,7 @@
 | agent-session-board.md | `HarnessCore/Board/BoardModel.swift`, `HarnessCLI/HarnessCLI+Board.swift`, `HarnessApp/UI/BoardViewController.swift`, `HarnessApp/Scripting/ScriptAPI.swift`, `HarnessMCP/HarnessDaemonTools.swift`, `HarnessMCP/ToolRegistry.swift` |
 | browser-pane.md | `HarnessApp/UI/Chrome/BrowserPaneView.swift`, `HarnessApp/Services/SplitPaneCoordinator.swift`, `HarnessApp/Services/DaemonSyncService.swift`, `HarnessApp/UI/Chrome/MainMenuBuilder.swift`, `HarnessApp/UI/Chrome/ContentAreaViewController.swift`, `HarnessApp/UI/Chrome/MainSplitViewController.swift`, `HarnessTerminalEngine/URLDetection.swift`, `HarnessTerminalKit/HarnessTerminalSurfaceView+SelectionAndLinks.swift` |
 | tab-bar.md | `HarnessApp/UI/Terminal/TerminalTabBarView.swift`, `HarnessCore/Metadata/MetadataProvider.swift`, `HarnessApp/Services/DaemonSyncService.swift`, `HarnessApp/UI/Chrome/ContentAreaViewController.swift` |
+| background-polling.md | `HarnessApp/Services/SurfaceShellTracker.swift`, `HarnessApp/Services/DaemonSyncService.swift`, `HarnessApp/Services/PerfCounters.swift`, `HarnessApp/UI/Chrome/MainSplitViewController.swift`, `HarnessApp/UI/Sidebar/BoardViewController.swift`, `HarnessApp/UI/Notch/NotchPanelController.swift`, `HarnessApp/UI/Sidebar/HarnessSidebarPanelViewController.swift` |
 
 ## Edges
 
