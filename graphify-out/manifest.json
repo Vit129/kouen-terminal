@@ -90,8 +90,8 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Tools/harness/Sources/HarnessCLI/HarnessCLI.swift": {
-    "mtime": 1781484901.2035437,
-    "ast_hash": "d6f78c5fc97df9046d1405c3cb2978fd",
+    "mtime": 1781530032.9289367,
+    "ast_hash": "080e00b94ea003374b5c0b9b768c5af1",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Tools/harness/Sources/HarnessCLI/AgentHookInstaller.swift": {
@@ -120,7 +120,7 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Tools/harness-mcp/Sources/HarnessMCP/ToolRegistry.swift": {
-    "mtime": 1781512858.9681427,
+    "mtime": 1781514917.206757,
     "ast_hash": "966ea02792756d3801e6e066e2a46d50",
     "semantic_hash": ""
   },
@@ -140,7 +140,7 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Tools/harness-mcp/Sources/HarnessMCP/HarnessDaemonTools.swift": {
-    "mtime": 1781512795.295964,
+    "mtime": 1781514917.2063076,
     "ast_hash": "7d27cef2dceb74c6b2bb177e8a9180da",
     "semantic_hash": ""
   },
@@ -240,7 +240,7 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Tests/HarnessCoreTests/Phase6KeysTests.swift": {
-    "mtime": 1781511900.5943632,
+    "mtime": 1781514917.2055955,
     "ast_hash": "292b83f14caf0830e5456f97565991b3",
     "semantic_hash": ""
   },
@@ -310,7 +310,7 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Tests/HarnessCoreTests/CommandParserTests.swift": {
-    "mtime": 1781512896.492241,
+    "mtime": 1781514917.2052438,
     "ast_hash": "1da24c466bb9271bd1054f21cf5b42af",
     "semantic_hash": ""
   },
@@ -705,8 +705,8 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Tests/HarnessRobotTests/libraries/HarnessUILibrary.py": {
-    "mtime": 1781511609.1667602,
-    "ast_hash": "f3efa5bae471c6a295cc5557ae996718",
+    "mtime": 1781531569.9341733,
+    "ast_hash": "d01c6ffd9d9540240b344277457d6d81",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Tests/HarnessTerminalEngineTests/KittyKeyboardTests.swift": {
@@ -1335,7 +1335,7 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Packages/HarnessCore/Sources/HarnessCore/HarnessVersion.swift": {
-    "mtime": 1781514649.6209924,
+    "mtime": 1781514917.200923,
     "ast_hash": "a487953ddd5ad896097e87db5be30f38",
     "semantic_hash": ""
   },
@@ -1410,7 +1410,7 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Packages/HarnessCore/Sources/HarnessCore/Keybindings/KeyTable.swift": {
-    "mtime": 1781511712.9498827,
+    "mtime": 1781514917.2020407,
     "ast_hash": "56c5914dcda9a00dcca38ddd325f308a",
     "semantic_hash": ""
   },
@@ -1425,8 +1425,8 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Packages/HarnessCore/Sources/HarnessCore/Board/BoardModel.swift": {
-    "mtime": 1781432384.688241,
-    "ast_hash": "8ce50d6d4875a6b6cff0bb6a1d561587",
+    "mtime": 1781521660.6027548,
+    "ast_hash": "7e1172f3d652a43de845d0a0c08d49ce",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Packages/HarnessCore/Sources/HarnessCore/Shell/ShellRCWiring.swift": {
@@ -1525,8 +1525,8 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Packages/HarnessCore/Sources/HarnessCore/Models/TabStatus.swift": {
-    "mtime": 1780537743.659604,
-    "ast_hash": "5dd96755b136c48779fe72db50a3a36e",
+    "mtime": 1781520911.046176,
+    "ast_hash": "e6db9534230cf7474eeeb97209205576",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Packages/HarnessCore/Sources/HarnessCore/Models/PaneNode.swift": {
@@ -1575,13 +1575,13 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Packages/HarnessCore/Sources/HarnessCore/Workbench/WorkbenchContext.swift": {
-    "mtime": 1781512730.5242193,
+    "mtime": 1781514917.203332,
     "ast_hash": "01c10d6d6870a6ecfe20c36b60465692",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Packages/HarnessCore/Sources/HarnessCore/Workbench/WorkbenchCommand.swift": {
-    "mtime": 1781511514.9494607,
-    "ast_hash": "714c9951f63f325911ae2a84c5707d9c",
+    "mtime": 1781530740.549535,
+    "ast_hash": "88e5edb8f52d1ca6390cc18cae5aeab2",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Packages/HarnessCore/Sources/HarnessCore/Persistence/SessionStore.swift": {
@@ -1675,18 +1675,18 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Packages/HarnessCore/Sources/HarnessCore/Commands/CommandParser.swift": {
-    "mtime": 1781512819.6820538,
+    "mtime": 1781514917.2006044,
     "ast_hash": "f03e8bb6f7b386cccb0a38b561fd6f17",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Packages/HarnessCore/Sources/HarnessCore/Commands/CommandIPCTranslator.swift": {
-    "mtime": 1781511734.6948714,
+    "mtime": 1781514917.2002478,
     "ast_hash": "1fa7f415f071c683cfe520b351700e1a",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Packages/HarnessCore/Sources/HarnessCore/Commands/Command.swift": {
-    "mtime": 1781511662.5724256,
-    "ast_hash": "091b7a92575df0c143231474ef2a587d",
+    "mtime": 1781530791.8297412,
+    "ast_hash": "2204d61465d15e38876ad623fc2ac2c0",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Packages/HarnessCore/Sources/HarnessCore/Commands/FindWindowMatcher.swift": {
@@ -1715,8 +1715,8 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Packages/HarnessCore/Sources/HarnessCore/ReleaseNotes/GeneratedReleaseNotes.swift": {
-    "mtime": 1781514679.325758,
-    "ast_hash": "b32e8a097df7694ec51e58c4574fdf5a",
+    "mtime": 1781524255.3548522,
+    "ast_hash": "4dbeb86046a90e126043e1dba78ac2ed",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Packages/HarnessCore/Sources/HarnessCore/ReleaseNotes/TerminalBanner.swift": {
@@ -2240,8 +2240,8 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Apps/Harness/Sources/HarnessApp/UI/Sidebar/SidebarSessionRows.swift": {
-    "mtime": 1781513568.7100341,
-    "ast_hash": "21b69d0fccab5a4dfe248aece9ed1f48",
+    "mtime": 1781521728.3641047,
+    "ast_hash": "ebbe8954ee75a150e915b2ac83d699e7",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Apps/Harness/Sources/HarnessApp/UI/Sidebar/SidebarWorkspaceViews.swift": {
@@ -2260,8 +2260,8 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Apps/Harness/Sources/HarnessApp/UI/Sidebar/HarnessSidebarPanelViewController.swift": {
-    "mtime": 1781513712.7549615,
-    "ast_hash": "9aa0009b1bbda479e8bb9cd15e90941e",
+    "mtime": 1781522075.846814,
+    "ast_hash": "3ae20c0fd6e3f1e3c327493dfbdf7cb4",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Apps/Harness/Sources/HarnessApp/UI/Sidebar/HarnessSidebarPanelViewController+DragReorder.swift": {
@@ -2285,7 +2285,7 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Apps/Harness/Sources/HarnessApp/UI/FileEditor/SyntaxTextView.swift": {
-    "mtime": 1781511648.1994455,
+    "mtime": 1781514917.1972075,
     "ast_hash": "361f7247758e1a4085da42d2824b16e0",
     "semantic_hash": ""
   },
@@ -2325,12 +2325,12 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Apps/Harness/Sources/HarnessApp/UI/FileEditor/ViExCommands.swift": {
-    "mtime": 1781512784.6670473,
-    "ast_hash": "379fbcc36d3aea90ab89d4afb3d63f23",
+    "mtime": 1781532367.4826431,
+    "ast_hash": "a252c6ed8ba256ed5cf2f08eb88f0364",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Apps/Harness/Sources/HarnessApp/UI/FileEditor/FileEditorView.swift": {
-    "mtime": 1781512925.6126187,
+    "mtime": 1781514917.1967335,
     "ast_hash": "3e27c354247475342dcd6d589b1c5558",
     "semantic_hash": ""
   },
@@ -2360,8 +2360,8 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Apps/Harness/Sources/HarnessApp/UI/Terminal/TerminalTabBarView.swift": {
-    "mtime": 1781507864.034958,
-    "ast_hash": "7ded80ef2119fc7fdf805b7c5d64fb5e",
+    "mtime": 1781521733.825863,
+    "ast_hash": "5da7241a6fca0269f7a08a921a8e8310",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Apps/Harness/Sources/HarnessApp/UI/Agents/AgentChatPanelView.swift": {
@@ -2385,8 +2385,8 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Apps/Harness/Sources/HarnessApp/UI/Shared/HarnessDesign.swift": {
-    "mtime": 1781445714.167571,
-    "ast_hash": "c6be49fad7863fb46ed9957462d34e79",
+    "mtime": 1781521760.7300925,
+    "ast_hash": "2295d0bd5b8e3c72f6ece87360ea3046",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Apps/Harness/Sources/HarnessApp/UI/Shared/Phase67UI.swift": {
@@ -2440,8 +2440,8 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Apps/Harness/Sources/HarnessApp/UI/Chrome/ContentAreaViewController.swift": {
-    "mtime": 1781512975.7977202,
-    "ast_hash": "081a4bebd95ac96cbf49fcbb933ebbab",
+    "mtime": 1781523297.6059587,
+    "ast_hash": "615b743b370d515fe7eef271e0f1afc7",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Apps/Harness/Sources/HarnessApp/UI/Chrome/HarnessChrome.swift": {
@@ -2470,8 +2470,8 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Apps/Harness/Sources/HarnessApp/UI/Chrome/MainMenuBuilder.swift": {
-    "mtime": 1781511609.1633852,
-    "ast_hash": "7c361e967fab1e48adc24cc66ef94456",
+    "mtime": 1781522982.6792011,
+    "ast_hash": "36891ea5f00b1d052ef5c1d5bb0ff657",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Apps/Harness/Sources/HarnessApp/UI/CommandPalette/CommandHistorySearchController.swift": {
@@ -2485,7 +2485,7 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Apps/Harness/Sources/HarnessApp/UI/CommandPalette/CommandPaletteController.swift": {
-    "mtime": 1781512970.5072684,
+    "mtime": 1781514917.1961942,
     "ast_hash": "06a08e25b4cf7f5fe4f20b6ab741d10e",
     "semantic_hash": ""
   },
@@ -2500,8 +2500,8 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Apps/Harness/Sources/HarnessApp/UI/Notifications/NotificationBellButton.swift": {
-    "mtime": 1781445714.1665175,
-    "ast_hash": "b8209e39acfeca8e91806812d2c8adac",
+    "mtime": 1781522032.0782206,
+    "ast_hash": "a08b415a3c027c119ab81225b105d399",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Apps/Harness/Sources/HarnessApp/UI/Git/GitPanelView.swift": {
@@ -2705,8 +2705,8 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Apps/Harness/Sources/HarnessApp/Services/MainExecutor.swift": {
-    "mtime": 1781512745.1028314,
-    "ast_hash": "5db25ddd8d5a35b451384e9310647355",
+    "mtime": 1781530846.4462566,
+    "ast_hash": "b07911a43262cb95cbbc128431c0ee78",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Apps/Harness/Sources/HarnessApp/Services/SurfaceShellTracker.swift": {
@@ -2740,8 +2740,8 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/CHANGELOG.md": {
-    "mtime": 1781514672.1483815,
-    "ast_hash": "144b3be53d2de8cf39eb5c13676c78bc",
+    "mtime": 1781524217.075254,
+    "ast_hash": "7750fc0163cd0f7b80ebe46c1a289c63",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/project.yml": {
@@ -2750,17 +2750,17 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/README.md": {
-    "mtime": 1781513745.2285497,
-    "ast_hash": "17e1c2ad1504eeb56cdc2c1a1382dcb0",
+    "mtime": 1781523993.859728,
+    "ast_hash": "3447eafeff6d59482ad4b159d535d47e",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/AGENTS.md": {
-    "mtime": 1781513157.195941,
+    "mtime": 1781514917.1938992,
     "ast_hash": "8bf7d47ab9b6631ed418f61bcc272896",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/CLAUDE.md": {
-    "mtime": 1781513157.3192968,
+    "mtime": 1781514917.1994808,
     "ast_hash": "719729fc3d3d4c9c6d378a10b5daf0f2",
     "semantic_hash": ""
   },
@@ -2890,8 +2890,8 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/docs/AGENT-HANDBOOK.md": {
-    "mtime": 1781323309.0378945,
-    "ast_hash": "b96964bb4df0a5670682204a2b0f163c",
+    "mtime": 1781523655.1054933,
+    "ast_hash": "20b943d4fa83249f253ab6a4804ca5b2",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/docs/TMUX_PARITY.md": {
@@ -2905,8 +2905,8 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/docs/COMMANDS.md": {
-    "mtime": 1781432673.1034763,
-    "ast_hash": "24e4f152b3e2c51f164430e85dd2b362",
+    "mtime": 1781518313.5304835,
+    "ast_hash": "5936549d38ce3f41d0f3ea613c97e186",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/docs/MIGRATION.md": {
@@ -2920,28 +2920,28 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/docs/MODES.md": {
-    "mtime": 1780537743.7111785,
-    "ast_hash": "b213945c410ed04d92c89a5f4fdb863b",
+    "mtime": 1781522273.067544,
+    "ast_hash": "50c67da425fa449e765f0c2a0d90d3f9",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/docs/KEYBINDINGS.md": {
-    "mtime": 1781432673.103952,
-    "ast_hash": "1b94b9d350161fdde79f046f65b17711",
+    "mtime": 1781523689.7993577,
+    "ast_hash": "f941f9a2039f5d87b66aa51e47948218",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/docs/MULTIPLEXER_GUIDE.md": {
-    "mtime": 1781432673.1042295,
+    "mtime": 1781522273.0668707,
     "ast_hash": "8961cc4a552fae069e4b5ae9dbed5e0f",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/docs/agent-hooks/claude-code.md": {
-    "mtime": 1780653524.1747644,
-    "ast_hash": "86272a9dfb321a820bf0b46447eceeab",
+    "mtime": 1781522273.0553439,
+    "ast_hash": "5e70de93667b3ddbc068f7eb3faf6c52",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/docs/agent-hooks/cursor.md": {
-    "mtime": 1780537743.7117984,
-    "ast_hash": "a5e5e00d8c1247128b9f86b1e1c1adeb",
+    "mtime": 1781522273.0561376,
+    "ast_hash": "e13d5c2ad29be74af73fe5ecd8871738",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/docs/agent-hooks/openclaw.md": {
@@ -2950,18 +2950,18 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/docs/agent-hooks/README.md": {
-    "mtime": 1780537743.7115867,
-    "ast_hash": "1bf382ed743e7c5a977a081aede15e28",
+    "mtime": 1781523655.1003268,
+    "ast_hash": "4bc704ce6d12f3455501c1bfff10cdf7",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/docs/agent-hooks/codex.md": {
-    "mtime": 1780537743.7117264,
-    "ast_hash": "011ba0f516a1251ef669f19ad8a6d901",
+    "mtime": 1781522273.0571606,
+    "ast_hash": "7b5b36f266ed3eb9abc46a9baec41bfb",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/docs/agent-hooks/opencode.md": {
-    "mtime": 1780537743.712095,
-    "ast_hash": "c5252e084e81696fc8eb1e5b31441f19",
+    "mtime": 1781522273.0578327,
+    "ast_hash": "3ca4a7f1d1b39b7d56a82fba0d2d12e5",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/docs/agent-hooks/pi.md": {
@@ -2975,8 +2975,8 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/docs/agent-hooks/grok.md": {
-    "mtime": 1780537743.7118793,
-    "ast_hash": "6c5aacdace9b9d4fbf0d4c9cb289e8c9",
+    "mtime": 1781522273.058142,
+    "ast_hash": "48fd2337c116b6992da970d7ddf4b9d0",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/docs/shell-integration/README.md": {
@@ -3020,12 +3020,12 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/agent-memory/memory.md": {
-    "mtime": 1781514612.132042,
+    "mtime": 1781514917.2091794,
     "ast_hash": "ba60c27cbebe153dcf5fb29d343cf663",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/agent-memory/playbook.md": {
-    "mtime": 1781514606.7519703,
+    "mtime": 1781514917.2105112,
     "ast_hash": "4bb18b2869ca8f4f2f1fc952c0e13aaf",
     "semantic_hash": ""
   },
@@ -3045,8 +3045,8 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/agent-memory/plans/p11-scripting-config-api.md": {
-    "mtime": 1781432384.7021308,
-    "ast_hash": "0a8710b555800f0e24283936af745c08",
+    "mtime": 1781518662.4568706,
+    "ast_hash": "a72c2ad4ef2ad86998c59e703ee62806",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/agent-memory/plans/p14-web-browser-pane.md": {
@@ -3075,8 +3075,8 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/agent-memory/plans/p20-harness-term-agent.md": {
-    "mtime": 1781453882.8927815,
-    "ast_hash": "c73b26e5e470e3c707728fe42d338170",
+    "mtime": 1781532773.736865,
+    "ast_hash": "fc05749b6cb845ca45c3ea699c1c8eed",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/agent-memory/plans/p12-agent-orchestration-mcp.md": {
@@ -3090,13 +3090,13 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/agent-memory/plans/p16-task-board.md": {
-    "mtime": 1781432384.7051907,
-    "ast_hash": "17b798482787f6961bfc4f75932f5841",
+    "mtime": 1781518678.671238,
+    "ast_hash": "e4aa398575568dbb475dace69101cab6",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/agent-memory/plans/p15-integration-roadmap.md": {
-    "mtime": 1781450081.0028813,
-    "ast_hash": "7ec4ae052cabe26cc10bd6e1a4205f16",
+    "mtime": 1781518675.147555,
+    "ast_hash": "2ac3bb6001de4d27878a536910b53c45",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/agent-memory/knowledge/ipc-architecture.md": {
@@ -3115,12 +3115,12 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/agent-memory/knowledge/project-history.md": {
-    "mtime": 1781514600.1284318,
+    "mtime": 1781514917.2080932,
     "ast_hash": "ab3be62cc3436d6d59e4f065d8ed4fe4",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/agent-memory/knowledge/session-tab-hierarchy.md": {
-    "mtime": 1781514596.075008,
+    "mtime": 1781514917.2085373,
     "ast_hash": "f5f0866cc818ef5ddcd1e8ce41ec5f76",
     "semantic_hash": ""
   },
@@ -3135,7 +3135,7 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/agent-memory/knowledge/index.md": {
-    "mtime": 1781514602.7987244,
+    "mtime": 1781514917.2077916,
     "ast_hash": "b84184db6088b21477cf94f8bac1a1ea",
     "semantic_hash": ""
   },
@@ -6515,18 +6515,18 @@
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Tests/HarnessCoreTests/WorkbenchContextResolverTests.swift": {
-    "mtime": 1781512878.6504025,
+    "mtime": 1781514917.205938,
     "ast_hash": "bde05a386c2873e7e60e0d5a7f8b2a5c",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/Tests/HarnessAppTests/HarnessSidebarPanelViewControllerTests.swift": {
-    "mtime": 1781511041.2584624,
+    "mtime": 1781514917.2047307,
     "ast_hash": "1f37f9786fef8094859e45208881bbfc",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/USAGE.md": {
-    "mtime": 1781513482.4719996,
-    "ast_hash": "2750d1134f53aec02ec67cab9ef46b57",
+    "mtime": 1781524248.1851022,
+    "ast_hash": "c15b665cbf03d56a27dc0c258531e9b8",
     "semantic_hash": ""
   },
   "/Users/supavit.cho/Git/Personal/harness-terminal/results/log.html": {
@@ -6544,3314 +6544,39 @@
     "ast_hash": "a3fc1eb599665a567e8f19adf27e8137",
     "semantic_hash": ""
   },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Package.swift": {
-    "mtime": 1781534133.9814715,
-    "ast_hash": "a66de27bd9ebee1e665a96a2701a597f",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tools/harness/Sources/HarnessCLI/HarnessCLI+Agent.swift": {
-    "mtime": 1781534134.157824,
+  "/Users/supavit.cho/Git/Personal/harness-terminal/Tools/harness/Sources/HarnessCLI/HarnessCLI+Agent.swift": {
+    "mtime": 1781530026.2677305,
     "ast_hash": "4cb67a69b74011f6ce53b87bd29d0167",
     "semantic_hash": ""
   },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tools/harness/Sources/HarnessCLI/HarnessCLI+Server.swift": {
-    "mtime": 1781534134.1618624,
-    "ast_hash": "012a8e13e012c5898eaa2f007028c30f",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tools/harness/Sources/HarnessCLI/HarnessCLI+Workbench.swift": {
-    "mtime": 1781534134.1633215,
-    "ast_hash": "3a38ed82c2d87a2988af4d958174e544",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tools/harness/Sources/HarnessCLI/StatusLineWidth.swift": {
-    "mtime": 1781534134.164188,
-    "ast_hash": "a6044a559a650bc6b38178fab9bc63b0",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tools/harness/Sources/HarnessCLI/HarnessCLI+Buffer.swift": {
-    "mtime": 1781534134.158626,
-    "ast_hash": "391383227f08acf130a1b5ce5a626caa",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tools/harness/Sources/HarnessCLI/HarnessCLI+Board.swift": {
-    "mtime": 1781534134.1581442,
-    "ast_hash": "8fe7b511859df29e3f822c694fe2c15b",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tools/harness/Sources/HarnessCLI/WindowInputRouter.swift": {
-    "mtime": 1781534134.1659517,
-    "ast_hash": "0509086c01a45aab761c98ab901f4445",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tools/harness/Sources/HarnessCLI/HarnessCLI+LSP.swift": {
-    "mtime": 1781534134.1605258,
-    "ast_hash": "155c4aa9b16af088d289dd18302a1ddf",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tools/harness/Sources/HarnessCLI/HarnessCLI+Keys.swift": {
-    "mtime": 1781534134.160019,
-    "ast_hash": "f46602f260fc25924900a40a56452e5b",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tools/harness/Sources/HarnessCLI/HarnessCLI+Options.swift": {
-    "mtime": 1781534134.1609197,
-    "ast_hash": "f062b66fd192ec602d45616d81007efa",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tools/harness/Sources/HarnessCLI/RecordClient.swift": {
-    "mtime": 1781534134.163826,
-    "ast_hash": "2a07983a22732b31c6485229598ac425",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tools/harness/Sources/HarnessCLI/HarnessCLI+Session.swift": {
-    "mtime": 1781534134.1624434,
-    "ast_hash": "58bc3f013cba1d5950a8a26aedaba448",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tools/harness/Sources/HarnessCLI/HarnessCLI+Pane.swift": {
-    "mtime": 1781534134.1614156,
-    "ast_hash": "e8489b55fce42cf2824b1ac1af2c2892",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tools/harness/Sources/HarnessCLI/AttachClient.swift": {
-    "mtime": 1781534134.1570098,
-    "ast_hash": "9cc987e03e2d65c76ea484b7cd561ff9",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tools/harness/Sources/HarnessCLI/HarnessCLI+View.swift": {
-    "mtime": 1781534134.1629102,
-    "ast_hash": "49aaf171239a3caaf3ebeef1d17a7674",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tools/harness/Sources/HarnessCLI/ReplayClient.swift": {
-    "mtime": 1781534134.1640756,
-    "ast_hash": "406e4a1d8846a6179e12fdcd603bb9fe",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tools/harness/Sources/HarnessCLI/ControlModeClient.swift": {
-    "mtime": 1781534134.1573703,
-    "ast_hash": "f4e7a745d1b2d8217b49b265ce3a2332",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tools/harness/Sources/HarnessCLI/WindowAttachClient.swift": {
-    "mtime": 1781534134.1647868,
-    "ast_hash": "926f010a0e8434bf2dc909b32ba9408e",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tools/harness/Sources/HarnessCLI/HarnessCLI.swift": {
-    "mtime": 1781534134.1636655,
-    "ast_hash": "080e00b94ea003374b5c0b9b768c5af1",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tools/harness/Sources/HarnessCLI/AgentHookInstaller.swift": {
-    "mtime": 1781534134.156717,
-    "ast_hash": "5c76b794f2e3f6f3eda9e1164ce517fd",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tools/harness/Sources/HarnessCLI/HarnessCLI+Info.swift": {
-    "mtime": 1781534134.1596746,
-    "ast_hash": "7dd155104b4ae48bf31c651ee5f2bc23",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tools/harness/Sources/HarnessCLI/HarnessCLI+Hooks.swift": {
-    "mtime": 1781534134.1589518,
-    "ast_hash": "e493527afbc4312f6879c3f81988c19b",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tools/harness-mcp/Sources/HarnessMCP/MCPServer.swift": {
-    "mtime": 1781534134.1545494,
-    "ast_hash": "ecaaabbd258840630150d0f920545df2",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tools/harness-mcp/Sources/HarnessMCP/ToolPolicy.swift": {
-    "mtime": 1781534134.1558864,
-    "ast_hash": "729c25dd93c8a2582fffde3183ca4a46",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tools/harness-mcp/Sources/HarnessMCP/ToolRegistry.swift": {
-    "mtime": 1781534134.1564012,
-    "ast_hash": "966ea02792756d3801e6e066e2a46d50",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tools/harness-mcp/Sources/HarnessMCP/HarnessBrowserTools.swift": {
-    "mtime": 1781534134.153642,
-    "ast_hash": "2924364e346c831435d170382727bc64",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tools/harness-mcp/Sources/HarnessMCP/StdioTransport.swift": {
-    "mtime": 1781534134.1555636,
-    "ast_hash": "4963e7cb366916cf9ac20a140446a60b",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tools/harness-mcp/Sources/HarnessMCP/Main.swift": {
-    "mtime": 1781534134.1548514,
-    "ast_hash": "64a82e1861593513ba1e522165098e4e",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tools/harness-mcp/Sources/HarnessMCP/HarnessDaemonTools.swift": {
-    "mtime": 1781534134.1539762,
-    "ast_hash": "7d27cef2dceb74c6b2bb177e8a9180da",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalKitTests/CellOverlayTests.swift": {
-    "mtime": 1781534134.1444576,
-    "ast_hash": "1175f24ce80c07ceb094677a5742bc8e",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalKitTests/RenderSchedulerTests.swift": {
-    "mtime": 1781534134.146136,
-    "ast_hash": "d6b7782d5ae5125aef970e54a3070c50",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalKitTests/DaemonReconnectPolicyTests.swift": {
-    "mtime": 1781534134.1445358,
-    "ast_hash": "2540f2fe677fbb1487b3879a478b26cd",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalKitTests/ThemeManagerTests.swift": {
-    "mtime": 1781534134.1476722,
-    "ast_hash": "51726b6a5c38473e20062d271b994b5c",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalKitTests/HarnessTerminalSurfaceFocusTests.swift": {
-    "mtime": 1781534134.1454027,
-    "ast_hash": "6175e6d737e4c31989173535fd103a38",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalKitTests/HarnessTerminalSurfaceDragDropTests.swift": {
-    "mtime": 1781534134.145311,
-    "ast_hash": "77a3db51d55632426c4998ccae192420",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalKitTests/HarnessTerminalSurfaceWorkerTests.swift": {
-    "mtime": 1781534134.1455216,
-    "ast_hash": "e65ad03fa5b0f982540c09eac23a912e",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalKitTests/LiveResizeTests.swift": {
-    "mtime": 1781534134.1456647,
-    "ast_hash": "8fd83d4860c0be4c21bf97c2fe15c4f1",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalKitTests/GridCompositorCopyModeTests.swift": {
-    "mtime": 1781534134.1447184,
-    "ast_hash": "508439b003b8ae7cbad2bc1d4c71d278",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalKitTests/GridCompositorTests.swift": {
-    "mtime": 1781534134.1449244,
-    "ast_hash": "4aa2d297d6c657ea6335b36e091a4a7f",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalKitTests/TerminalHostViewTests.swift": {
-    "mtime": 1781534134.147583,
-    "ast_hash": "73b2a26ff68e7e891e5aabe9de907f2e",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalKitTests/SpecialKeyMappingTests.swift": {
-    "mtime": 1781534134.1472242,
-    "ast_hash": "54f1288c64e8096c0f7887d9f831cd05",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalKitTests/OcclusionTests.swift": {
-    "mtime": 1781534134.1457849,
-    "ast_hash": "51dca41e122c9e909334926b89b049b2",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalKitTests/ScrollReuseTests.swift": {
-    "mtime": 1781534134.1463385,
-    "ast_hash": "f75142276a9ae798f4d0134d37ffc362",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/ACPTransportTests.swift": {
-    "mtime": 1781534134.1058166,
-    "ast_hash": "e827760ee2155dae6a7d9d4f16793a61",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/FormatStringTests.swift": {
-    "mtime": 1781534134.1110826,
-    "ast_hash": "4b66fdb7c62b603bb5c123fd835577b0",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/DoctorRunnerTests.swift": {
-    "mtime": 1781534134.110495,
-    "ast_hash": "78d2438ff9a19a6d1f26379b6b56fe19",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/PasteBufferStoreTests.swift": {
-    "mtime": 1781534134.1162333,
-    "ast_hash": "e7626b48c26f6a240cb263f8a12c6cf1",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/ExperienceModeTests.swift": {
-    "mtime": 1781534134.1108158,
-    "ast_hash": "5061be9cee2df2c0710d227a90ea554a",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/Phase6KeysTests.swift": {
-    "mtime": 1781534134.1166844,
-    "ast_hash": "292b83f14caf0830e5456f97565991b3",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/Phase67Tests.swift": {
-    "mtime": 1781534134.1163301,
-    "ast_hash": "4bbfb3bef5ff9615c586275def30947c",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/HookRegistryTests.swift": {
-    "mtime": 1781534134.1127362,
-    "ast_hash": "3838adaa012d0e42f27c3260a8d7afb2",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/ReleaseNotesGuardTests.swift": {
-    "mtime": 1781534134.116793,
-    "ast_hash": "849f0475a4d65acc8db39124723c2d71",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/IPCCodecTests.swift": {
-    "mtime": 1781534134.1132312,
-    "ast_hash": "e9debac4f1110c0e09382061218f0e6c",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/JSONMergeTests.swift": {
-    "mtime": 1781534134.1133475,
-    "ast_hash": "9e0f7beb0a08c442e52c2ba990d06cf6",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/PaneNodeBrowserTests.swift": {
-    "mtime": 1781534134.1152904,
-    "ast_hash": "4e47d9fb47b0b7d0354764fe96cd0dd2",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/TabAlertTests.swift": {
-    "mtime": 1781534134.1194599,
-    "ast_hash": "f2de477f14fa10deb9ae9ae3e0a81d20",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/SGRMouseTests.swift": {
-    "mtime": 1781534134.1169918,
-    "ast_hash": "20ada52dab9f07d2ffa69c4fed56ba86",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/DefaultTerminalLaunchRequestTests.swift": {
-    "mtime": 1781534134.1101434,
-    "ast_hash": "79b72a4dfc707240991f950287c4ae28",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/KeybindingsStoreTests.swift": {
-    "mtime": 1781534134.1141348,
-    "ast_hash": "686fa1d607f1e3315983d0eafe135d2b",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/PaneStyleTests.swift": {
-    "mtime": 1781534134.116086,
-    "ast_hash": "9b432045f8021cffcddf0ebd10e4e441",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/KeyTableTests.swift": {
-    "mtime": 1781534134.1138427,
-    "ast_hash": "068d2af74da09804d7c0d745e947da48",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/BinaryRefresherTests.swift": {
-    "mtime": 1781534134.1070912,
-    "ast_hash": "583eee2b7189228b846ce8f5dcbd35c0",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/CommandParserTests.swift": {
-    "mtime": 1781534134.1092074,
-    "ast_hash": "1da24c466bb9271bd1054f21cf5b42af",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/AgentListFormatterTests.swift": {
-    "mtime": 1781534134.1065452,
-    "ast_hash": "ebf6cb69ad38f09d238126ec99e3f7ac",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/LaunchAgentInstallerTests.swift": {
-    "mtime": 1781534134.1144187,
-    "ast_hash": "f6c124955fca093465e519f70cb47af0",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/HookNotificationParserTests.swift": {
-    "mtime": 1781534134.1126125,
-    "ast_hash": "d181e2bf64d793a87307608316afb33e",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/FormatStyledTests.swift": {
-    "mtime": 1781534134.1112723,
-    "ast_hash": "d99db9099686091814c9a62a72ae7f78",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/OptionValueTests.swift": {
-    "mtime": 1781534134.1145875,
-    "ast_hash": "10842e7d9e8446abac1a296e73845eb6",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/AgentSessionSummaryTests.swift": {
-    "mtime": 1781534134.1068394,
-    "ast_hash": "57d8909d5467505b44bddb6bf2ee3afa",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/EndpointTests.swift": {
-    "mtime": 1781534134.110588,
-    "ast_hash": "bc91edb0286e162fcfa3d937557aaf2d",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/TerminalBannerTests.swift": {
-    "mtime": 1781534134.1201081,
-    "ast_hash": "e38644453de7cfabda9d4c90ee13970c",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/TerminalIdentityTests.swift": {
-    "mtime": 1781534134.120519,
-    "ast_hash": "2e1a0ce4af46b643f65156ab9090822d",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/ControlKeyNormalizerTests.swift": {
-    "mtime": 1781534134.1094549,
-    "ast_hash": "0497fb140c31fa4d4061f97e7ea95f24",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/FindWindowMatcherTests.swift": {
-    "mtime": 1781534134.1109476,
-    "ast_hash": "b5f5183fd09db5f6c34f7f146d8265ac",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/ShortcutRecorderSerializerTests.swift": {
-    "mtime": 1781534134.1185253,
-    "ast_hash": "ab81b0730f2aa7dba476707ac54f60f8",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/AgentDetectorTests.swift": {
-    "mtime": 1781534134.1062484,
-    "ast_hash": "c42800acacd1b9a1e0ec4aaffc8d2ab4",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/HarnessPathsTests.swift": {
-    "mtime": 1781534134.1120276,
-    "ast_hash": "b27f4d0a0cecac0639f3cdb01c223df9",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/StartupMetricsTests.swift": {
-    "mtime": 1781534134.1193604,
-    "ast_hash": "b8e990406232e274accb89d1856f48d7",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/ShellCompletionInstallerTests.swift": {
-    "mtime": 1781534134.1182246,
-    "ast_hash": "d0a04bf42ac7b370035391419b5d1a6c",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/TerminalRecordingTests.swift": {
-    "mtime": 1781534134.1206732,
-    "ast_hash": "cf0a1f393a88deac58e687ed1ae57215",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/ShellIntegrationTests.swift": {
-    "mtime": 1781534134.1183107,
-    "ast_hash": "2891616717b42f154e693d45a7b89a0f",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/CommandIPCTranslatorTests.swift": {
-    "mtime": 1781534134.107811,
-    "ast_hash": "092c9ce4049804c08abd4de8a08a40b2",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/CompletionGeneratorTests.swift": {
-    "mtime": 1781534134.109334,
-    "ast_hash": "15912e23eea4f378f222ef083fef0b1c",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/SessionEditorTests.swift": {
-    "mtime": 1781534134.1178734,
-    "ast_hash": "e705cb3d63917da52fb764f913c44dc8",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/TargetSpecTests.swift": {
-    "mtime": 1781534134.1199706,
-    "ast_hash": "cdec5ed813de421eac6fbb68acdb0c12",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/RemoteHostStoreTests.swift": {
-    "mtime": 1781534134.1169128,
-    "ast_hash": "dbc29357421eeeb3b2294c635d979854",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/BoardModelTests.swift": {
-    "mtime": 1781534134.1074219,
-    "ast_hash": "d1a9bc419b7c56572dc69a9b5a5907c8",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/SSHTunnelManagerTests.swift": {
-    "mtime": 1781534134.117296,
-    "ast_hash": "a44f44cd9189c0ed7d116a2faac93aee",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/AgentHookInstallerTests.swift": {
-    "mtime": 1781534134.1064053,
-    "ast_hash": "0cc441d6f2d129dac0d3386bcd3b97c8",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/EnvironmentStoreTests.swift": {
-    "mtime": 1781534134.1106832,
-    "ast_hash": "d379ece2b5c6761fa5efc0263a5c2f77",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/KeyTokenParserTests.swift": {
-    "mtime": 1781534134.1139677,
-    "ast_hash": "62041fe80096201bcb344700601fd0db",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/SessionPersistenceTests.swift": {
-    "mtime": 1781534134.118104,
-    "ast_hash": "67aa834233f5f526528965acdd480504",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/TerminalConfigImporterTests.swift": {
-    "mtime": 1781534134.1202419,
-    "ast_hash": "32cdb381c12a8fc13f34448fb3f94fb3",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/DaemonStatsTests.swift": {
-    "mtime": 1781534134.1098423,
-    "ast_hash": "81468184f4955ceb9b7b83e6f103f6f9",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/TmuxMigrationTests.swift": {
-    "mtime": 1781534134.120921,
-    "ast_hash": "403e6f0707de1f7a426ebaae15c3bf83",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/HarnessSettingsTests.swift": {
-    "mtime": 1781534134.1124907,
-    "ast_hash": "ee5d4906b1fa7fa7c880a4408a4381b6",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/SnapshotQueryFormatterTests.swift": {
-    "mtime": 1781534134.119266,
-    "ast_hash": "8a8040736d8b7953f436e45e0eaed442",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/GroupedSessionTests.swift": {
-    "mtime": 1781534134.1117597,
-    "ast_hash": "0e8d56271e035a8d61a12ecdd67e3e8e",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/AttachInputBatcherTests.swift": {
-    "mtime": 1781534134.1069696,
-    "ast_hash": "1291f9a96220e559a06b8edee5952991",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/WorkbenchContextResolverTests.swift": {
-    "mtime": 1781534134.12136,
-    "ast_hash": "bde05a386c2873e7e60e0d5a7f8b2a5c",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/DaemonClientTests.swift": {
-    "mtime": 1781534134.1096013,
-    "ast_hash": "c0786e425f5121e0e89133ef6e59a3f8",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/PaneRectSolverTests.swift": {
-    "mtime": 1781534134.115692,
-    "ast_hash": "33613cba9f3a3d88c704f8d6a9968ede",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/DaemonSessionServiceTests.swift": {
-    "mtime": 1781534134.1097183,
-    "ast_hash": "8df0856af2f6c612f864473e5e04052b",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/ServiceInstallerTests.swift": {
-    "mtime": 1781534134.117397,
-    "ast_hash": "71d2976cb8f2142b33d43a2f9063676d",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/SessionEditorPhase4Tests.swift": {
-    "mtime": 1781534134.1177545,
-    "ast_hash": "f649e11f49d9ec64fc9f93f89ae1c168",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCoreTests/JSONOutputFormatterTests.swift": {
-    "mtime": 1781534134.11344,
-    "ast_hash": "5ba458446c331a6265755f4ce0ed33cb",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessDaemonTests/DaemonContentionTests.swift": {
-    "mtime": 1781534134.1220343,
-    "ast_hash": "7b921b0c936d03620d8f38db97164450",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessDaemonTests/BellScanTests.swift": {
-    "mtime": 1781534134.121544,
-    "ast_hash": "65569429f4dcef18271769337eaa9ff2",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessDaemonTests/FormatContextDaemonTests.swift": {
-    "mtime": 1781534134.1230779,
-    "ast_hash": "3abe102876bbfa23e46873cd63186a60",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessDaemonTests/TestSupport.swift": {
-    "mtime": 1781534134.124997,
-    "ast_hash": "75143421f4b4f99168d7940a80f71d6e",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessDaemonTests/GroupedSessionDaemonTests.swift": {
-    "mtime": 1781534134.1232023,
-    "ast_hash": "e8b7152c10b1c50267fa324f752b49fb",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessDaemonTests/RealPtyLifecycleTests.swift": {
-    "mtime": 1781534134.123971,
-    "ast_hash": "e98dff55a1048adc55560bf77a3971e3",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessDaemonTests/DaemonLifecycleTests.swift": {
-    "mtime": 1781534134.122154,
-    "ast_hash": "95c2ed27f85129345918bef207a45ac7",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessDaemonTests/ShellLaunchProfileTests.swift": {
-    "mtime": 1781534134.1246154,
-    "ast_hash": "3db7d72dabbe81b55b270aa7c58a068c",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessDaemonTests/VersionBannerTests.swift": {
-    "mtime": 1781534134.125335,
-    "ast_hash": "261d2cb2c9adab02db491adca0eac5bb",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessDaemonTests/RealPtyReapRecordTests.swift": {
-    "mtime": 1781534134.1241062,
-    "ast_hash": "9ef41a3517b71d473f116d8551cdb9a4",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessDaemonTests/DaemonMetricsTests.swift": {
-    "mtime": 1781534134.1222448,
-    "ast_hash": "231d9789bb7b1dbc76a52308818c5ae5",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessDaemonTests/ScrollbackPersistenceTests.swift": {
-    "mtime": 1781534134.1245334,
-    "ast_hash": "e2348e0a3844a2609473ce332eb26911",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessDaemonTests/EndpointClientTests.swift": {
-    "mtime": 1781534134.122936,
-    "ast_hash": "16460141193858f2a9ca8469bcaac087",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessDaemonTests/SurfaceRegistryTests.swift": {
-    "mtime": 1781534134.1247592,
-    "ast_hash": "277dfb5f4d36da5819d0be4c69c49fdc",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessDaemonTests/PtyDrainCeilingBenchmark.swift": {
-    "mtime": 1781534134.1235833,
-    "ast_hash": "3cf26fdb63aefacb205d5007c4d02d6f",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessDaemonTests/WaitForRegistryTests.swift": {
-    "mtime": 1781534134.1254873,
-    "ast_hash": "f86c1c3e8fff0946106254f635866d1c",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessDaemonTests/HookFiringTests.swift": {
-    "mtime": 1781534134.1233811,
-    "ast_hash": "15622075f71cab009d9141a069d9b7d1",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessDaemonTests/RealPtyReplayTests.swift": {
-    "mtime": 1781534134.1243148,
-    "ast_hash": "8eb2a4cb9bfc7b2c972779453dac4278",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessDaemonTests/DaemonRoundTripTests.swift": {
-    "mtime": 1781534134.122528,
-    "ast_hash": "2826c8fa7286611a40052fa1becf105c",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessDaemonTests/ScrollbackFileTests.swift": {
-    "mtime": 1781534134.1244435,
-    "ast_hash": "61722fb3490be5effc3b04591d1baa0f",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCopyModeTests/WordColumnRangeTests.swift": {
-    "mtime": 1781534134.1052387,
-    "ast_hash": "245f19fe8cded6c75e915cd858657271",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCopyModeTests/CopyModeReducerTests.swift": {
-    "mtime": 1781534134.104691,
-    "ast_hash": "af9e05d8202d484f08ad8549d92af31b",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCopyModeTests/ThaiClusterCopyTests.swift": {
-    "mtime": 1781534134.1049793,
-    "ast_hash": "3b65433d09b60f72c6b726fc0686dbb8",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessMCPTests/HarnessDaemonToolsTests.swift": {
-    "mtime": 1781534134.12629,
-    "ast_hash": "c081ad8418197ff831a5b133e89a34d0",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessMCPTests/HarnessBrowserToolsTests.swift": {
-    "mtime": 1781534134.1258724,
-    "ast_hash": "b3f1746b7853f8c5937b6641463b987a",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessOnboardingTests/BinaryInstallerDisplayTests.swift": {
-    "mtime": 1781534134.126827,
-    "ast_hash": "79db922a42bb0c818a84e876bee2a7c9",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessOnboardingTests/OnboardingEnvironmentTests.swift": {
-    "mtime": 1781534134.1271844,
-    "ast_hash": "a120eebf0d3da6510aa169c917c24c04",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessOnboardingTests/BinaryInstallerVersionTests.swift": {
-    "mtime": 1781534134.1271033,
-    "ast_hash": "16e7e065463d339364570cf8ed10b952",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessOnboardingTests/ShellProfileInstallerTests.swift": {
-    "mtime": 1781534134.1274447,
-    "ast_hash": "5547815210849a2439a6b4d3bbed2faa",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalRendererTests/FrameBuilderTests.swift": {
-    "mtime": 1781534134.1497717,
-    "ast_hash": "1dece8571a30e1311c7b42c629b90a76",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalRendererTests/GlyphRasterizerTests.swift": {
-    "mtime": 1781534134.1502452,
-    "ast_hash": "94cb39abc3c4fc07e7bb5602d3aa931e",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalRendererTests/CellColorResolverTests.swift": {
-    "mtime": 1781534134.1494465,
-    "ast_hash": "dbb468c4ea0d7cc145fe63219885c597",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalRendererTests/FrameBuilderCopyModeTests.swift": {
-    "mtime": 1781534134.1496053,
-    "ast_hash": "14ba433e273d7e1a1016461914b8842f",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalRendererTests/ThaiClusterRenderTests.swift": {
-    "mtime": 1781534134.1512573,
-    "ast_hash": "3c76db6d15adacff164ff34821745a74",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalRendererTests/MetalRendererTests.swift": {
-    "mtime": 1781534134.1507914,
-    "ast_hash": "a493367ae697a92afd07725c9bbd9fac",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalRendererTests/NerdFontFallbackTests.swift": {
-    "mtime": 1781534134.15114,
-    "ast_hash": "5934ddc030f844b086cc7dcead943295",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessRobotTests/libraries/HarnessUILibrary.py": {
-    "mtime": 1781534134.1284213,
-    "ast_hash": "d01c6ffd9d9540240b344277457d6d81",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalEngineTests/KittyKeyboardTests.swift": {
-    "mtime": 1781534134.135516,
-    "ast_hash": "9ff6358fb07629e1ce37ed57cd316a69",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalEngineTests/SemanticPromptTests.swift": {
-    "mtime": 1781534134.1431267,
-    "ast_hash": "7ae3dec8a2ebd182f955214f339b786a",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalEngineTests/TerminalGridCellLayoutTests.swift": {
-    "mtime": 1781534134.1434112,
-    "ast_hash": "3cc4a98db73c06799f6a1d7f8d9df259",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalEngineTests/EngineConformanceTests.swift": {
-    "mtime": 1781534134.1341133,
-    "ast_hash": "64ce9a43860d0bc5efa2b843014e1bf8",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalEngineTests/ParserRobustnessTests.swift": {
-    "mtime": 1781534134.1356492,
-    "ast_hash": "b599bfd93fa9ed338633cc6cca5e5fac",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalEngineTests/CodepointRunFastPathTests.swift": {
-    "mtime": 1781534134.1331763,
-    "ast_hash": "94ffd86b2c49ed98f531dab3adb5faa2",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalEngineTests/ScrollbackTests.swift": {
-    "mtime": 1781534134.1430457,
-    "ast_hash": "bf9d5343af5f14b35cbb9a6f26f00812",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalEngineTests/AsciiFastPathTests.swift": {
-    "mtime": 1781534134.1327708,
-    "ast_hash": "b24fe3146c6ff9e11cc4dfc0bafa2296",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalEngineTests/ReflowPreviewTests.swift": {
-    "mtime": 1781534134.1427228,
-    "ast_hash": "9d3f84994cd641e36f817ea6cd05a976",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalEngineTests/HarnessGridTerminalTests.swift": {
-    "mtime": 1781534134.1342528,
-    "ast_hash": "3e7eba28d77024768603923852575997",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalEngineTests/ReflowCorpusTests.swift": {
-    "mtime": 1781534134.1357841,
-    "ast_hash": "2b097bd5db2067a1ad7b1fd0402c0ad4",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalEngineTests/DamageTrackingTests.swift": {
-    "mtime": 1781534134.1337888,
-    "ast_hash": "eba61ff3f66a80c0ee619dce4c36f658",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalEngineTests/TerminalProtocolCompatibilityTests.swift": {
-    "mtime": 1781534134.1436455,
-    "ast_hash": "86bbf36d543c7b68290aed3ddac65fde",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalEngineTests/TerminalBufferSearchTests.swift": {
-    "mtime": 1781534134.143213,
-    "ast_hash": "aec70b201111b7575398843785ac5c30",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalEngineTests/ReflowFastPathTests.swift": {
-    "mtime": 1781534134.13595,
-    "ast_hash": "67b0014a09c6eb2e9a330a6595893414",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalEngineTests/CommandFinishedTests.swift": {
-    "mtime": 1781534134.1335773,
-    "ast_hash": "9f9f7e35a48cf965dbeb2bb0214b8786",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalEngineTests/InputEncoderTests.swift": {
-    "mtime": 1781534134.134928,
-    "ast_hash": "6b049a2387633ca3d2bba013a21e17d2",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalEngineTests/ClipboardOSCTests.swift": {
-    "mtime": 1781534134.133061,
-    "ast_hash": "8dc6388225d8d2078f18056bb4efbb78",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalEngineTests/CharacterWidthTests.swift": {
-    "mtime": 1781534134.1329696,
-    "ast_hash": "0a9128907d3139b64eb251d0589f5483",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalEngineTests/VTConformanceCorpusTests.swift": {
-    "mtime": 1781534134.1442158,
-    "ast_hash": "6c44f9d28b9970d1b677657fb2e1574c",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalEngineTests/ThaiCombiningMarkTests.swift": {
-    "mtime": 1781534134.1440802,
-    "ast_hash": "54caad04af83d906495ee76eaece8661",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalEngineTests/ImageProtocolTests.swift": {
-    "mtime": 1781534134.134788,
-    "ast_hash": "2142f9b2899e766d371ef8a21387f814",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessTerminalEngineTests/HistoryRingBufferTests.swift": {
-    "mtime": 1781535285.3462656,
-    "ast_hash": "cd21a945308429339d27e00b617289b7",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCLITests/BoardCommandTests.swift": {
-    "mtime": 1781534134.1023638,
-    "ast_hash": "853979a57266a4cfb28aad53626344dc",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCLITests/WindowInputRouterTests.swift": {
-    "mtime": 1781534134.1041534,
-    "ast_hash": "a3d8ae65f89c7c1c26e197c3f4ec0bf4",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCLITests/HarnessCLITests.swift": {
-    "mtime": 1781534134.103162,
-    "ast_hash": "60327f86b72cbbe324864a494495e7a1",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessCLITests/StatusLineWidthTests.swift": {
-    "mtime": 1781534134.1032903,
-    "ast_hash": "7e27fa2f8e98102a4bfe81aaedfadb68",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessBenchmarks/PerformanceBenchmarks.swift": {
-    "mtime": 1781534134.1015205,
-    "ast_hash": "d1feca1147a92b4edb7e4120b132e6ac",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessBenchmarks/FluidityBenchmarks.swift": {
-    "mtime": 1781534134.1011462,
-    "ast_hash": "1b893797331f7dd51dec6293c7819b60",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessThemeTests/HarnessThemeTests.swift": {
-    "mtime": 1781534134.1518612,
-    "ast_hash": "600cdd30681c921a0e0c4a13705a10bb",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessThemeTests/ThemeCatalogEmbedTests.swift": {
-    "mtime": 1781534134.1520314,
-    "ast_hash": "f37e93f9be1401211c7aa2f7bfcee426",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessThemeTests/ThemeFileServiceTests.swift": {
-    "mtime": 1781534134.1521716,
-    "ast_hash": "68db21e89fe76734c3fa45c6a9108d3f",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/GridCompositorParityTests/PortCompositorFixture.swift": {
-    "mtime": 1781534134.0920997,
-    "ast_hash": "98123b944e512b17ad2d1fda3b7ee0f9",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/GridCompositorParityTests/LiveCompositorFixture.swift": {
-    "mtime": 1781534134.0918934,
-    "ast_hash": "9d1da48cf1b1106d95acf22b96c36a3e",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/GridCompositorParityTests/CompositorFixtureSpec.swift": {
-    "mtime": 1781534134.0917072,
-    "ast_hash": "a287232d57833032d795d4652af57a48",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/GridCompositorParityTests/GridCompositorParityTests.swift": {
-    "mtime": 1781534134.0918033,
-    "ast_hash": "2ecd9444a4076c87e204876fc7c4f305",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessAppTests/AgentNotchPeekDeciderTests.swift": {
-    "mtime": 1781534134.0926123,
-    "ast_hash": "10bf44b01164ee08c2d399ff8802cc55",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessAppTests/BoardViewControllerTests.swift": {
-    "mtime": 1781534134.0939682,
-    "ast_hash": "1d433cb779881b833daa617ff16e247d",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessAppTests/ExternalOpenKindTests.swift": {
-    "mtime": 1781534134.0945287,
-    "ast_hash": "aa5a62cbe19d3992ff4223d0c3bef8b2",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessAppTests/HarnessSliderTests.swift": {
-    "mtime": 1781534134.096168,
-    "ast_hash": "3b3da9d14b7830a43c6672aa2a96a27c",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessAppTests/ScriptingTests.swift": {
-    "mtime": 1781534134.0979657,
-    "ast_hash": "0984e130ffa4b67ea75276f41ed4c2d6",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessAppTests/FuzzyPathResolverTests.swift": {
-    "mtime": 1781534134.0954442,
-    "ast_hash": "eb7508b49f53e7665183083dbd336621",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessAppTests/SearchPanelViewTests.swift": {
-    "mtime": 1781534134.0986657,
-    "ast_hash": "15afea4a62e401de9f18b8744a66856b",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessAppTests/SyntaxHighlighterTests.swift": {
-    "mtime": 1781534134.0995262,
-    "ast_hash": "1a3e3a2262c1a6328d69106e2ba3dc20",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessAppTests/KeyRecorderViewTests.swift": {
-    "mtime": 1781534134.0970783,
-    "ast_hash": "ca1cb735ff764d788ff141ede4e85569",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessAppTests/ViPathAndLSPTests.swift": {
-    "mtime": 1781534134.1008613,
-    "ast_hash": "17f8fb7c481a5ef9d72019f3946e23ef",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessAppTests/ViDiagnosticNavigatorTests.swift": {
-    "mtime": 1781534134.1002045,
-    "ast_hash": "e03bed0996642e11e5b7f1f25137bc3f",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessAppTests/HarnessSplitViewTests.swift": {
-    "mtime": 1781534134.0969615,
-    "ast_hash": "cebc38041debcfb30c8b00c242099a02",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessAppTests/HarnessSidebarPanelViewControllerTests.swift": {
-    "mtime": 1781534134.0960476,
-    "ast_hash": "1f37f9786fef8094859e45208881bbfc",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessAppTests/PrefixKeymapFallbackTests.swift": {
-    "mtime": 1781534134.0974278,
-    "ast_hash": "8b554fca1c961b1c22109dc49f5cedad",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessAppTests/SettingsWindowCloseProxyTests.swift": {
-    "mtime": 1781534134.098934,
-    "ast_hash": "a1847c40a593b2016b074e9ce7641fae",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessAppTests/FileTreeWatcherTests.swift": {
-    "mtime": 1781534134.0950205,
-    "ast_hash": "93d0b4d9193906236491e25683c5d461",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessAppTests/NotchLayoutMetricsTests.swift": {
-    "mtime": 1781534134.0973148,
-    "ast_hash": "fc41ac1aff9647cd91ce860866b79268",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessAppTests/AgentNotchProjectionTests.swift": {
-    "mtime": 1781534134.0934727,
-    "ast_hash": "227af2c0a33d22882b2a2edad980f273",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessAppTests/BrowserPaneViewTests.swift": {
-    "mtime": 1781534134.0943105,
-    "ast_hash": "94fa106b5bea4db6b70406421f595979",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessAppTests/SurfaceProgressTrackerTests.swift": {
-    "mtime": 1781534134.099197,
-    "ast_hash": "acb5dcd26e77572ba91301edcaad4bf6",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/docs/shell-integration/harness.bash": {
-    "mtime": 1781534134.193668,
-    "ast_hash": "b6513f0055c6230c5d3acab124ad1d6e",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Scripts/generate-app-icon.sh": {
-    "mtime": 1781534134.0865223,
-    "ast_hash": "e5dc2722e45555ad50c0a5ca75982d54",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Scripts/release-hotfix.sh": {
-    "mtime": 1781534134.0896919,
-    "ast_hash": "3d8f7c7e403832f972dd8ebb9590464f",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Scripts/prepare-release.sh": {
-    "mtime": 1781534134.0885477,
-    "ast_hash": "4672e67ac0f1a2e333321b1bf9d7c3ea",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Scripts/generate-release-notes.swift": {
-    "mtime": 1781534134.086789,
-    "ast_hash": "f982e33f1f8f0eda7987d2aafe93e17d",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Scripts/bump-version.sh": {
-    "mtime": 1781534134.081808,
-    "ast_hash": "96e1e4c2e9e797afa5b3721474d7ca3b",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Scripts/clean-state.sh": {
-    "mtime": 1781534134.08389,
-    "ast_hash": "465c3a96769520ebec26aee9a2d40c90",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Scripts/sign-and-notarize.sh": {
-    "mtime": 1781534134.0906987,
-    "ast_hash": "422e61e532232eae1dd7c4433b4497d8",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Scripts/create-dmg.sh": {
-    "mtime": 1781534134.0856438,
-    "ast_hash": "c7791bdf72a8afb367f10bb87924818a",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Scripts/commit-push-merge.sh": {
-    "mtime": 1781534134.0848212,
-    "ast_hash": "be289830dd7dd00e955d08b1d1552b4d",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Scripts/cheat.sh": {
-    "mtime": 1781534134.0821605,
-    "ast_hash": "2db721fc97dfac65c2c3ea5007ebf1d7",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Scripts/start.mjs": {
-    "mtime": 1781534134.0912209,
-    "ast_hash": "95bc5f7c45c90a22247100ccf62108d8",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Scripts/smoke-dmg.sh": {
-    "mtime": 1781534134.0908246,
-    "ast_hash": "a7673c79d21b8d98c4365cdfaf3dab83",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Scripts/finalize-release.sh": {
-    "mtime": 1781534134.0857923,
-    "ast_hash": "9b96587d925b19d46bdad737ac404456",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Scripts/run.sh": {
-    "mtime": 1781534134.0900285,
-    "ast_hash": "927704c4e21a3040088684aa1ebc573a",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Scripts/package-app.sh": {
-    "mtime": 1781534134.0880806,
-    "ast_hash": "97e44fb55aba866113cbbc3302cb439a",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Scripts/clear-runtime-state.sh": {
-    "mtime": 1781534134.0844507,
-    "ast_hash": "30a0c8b46344ac57a1f49b50166cda60",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Scripts/preview.sh": {
-    "mtime": 1781534134.089197,
-    "ast_hash": "2d0749663bb317fa18f9c076e5fd4114",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Scripts/generate-appcast.sh": {
-    "mtime": 1781534134.0866435,
-    "ast_hash": "8ee887cdd5a864ebd35db4cc0d68347e",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Scripts/full-cycle.sh": {
-    "mtime": 1781534134.086254,
-    "ast_hash": "138c98e3f9e1301509f2b26450791a12",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Scripts/measure-fluidity.sh": {
-    "mtime": 1781534134.0879464,
-    "ast_hash": "06c90ca406b9615499d0fa4645fb9761",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Scripts/generate-width-table.swift": {
-    "mtime": 1781534134.0872524,
-    "ast_hash": "c80abb70c91b5f590295fa9db217563c",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Scripts/install-app.sh": {
-    "mtime": 1781534134.0875897,
-    "ast_hash": "b9670aab7f022a2dabb4e3caa153d883",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Scripts/install-linux.sh": {
-    "mtime": 1781534134.0878112,
-    "ast_hash": "da4340d0392db9acfa4c6e99cbb15138",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Scripts/commit-push.sh": {
-    "mtime": 1781534134.085265,
-    "ast_hash": "824f7a15ff73e602bea6c4ea8371d9db",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Scripts/start.sh": {
-    "mtime": 1781534134.0914736,
-    "ast_hash": "a7054b6d4dad8cc85ef7bf8815ef141d",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Scripts/build-release.sh": {
-    "mtime": 1781534134.081049,
-    "ast_hash": "926de2bbc7b6e583c0332042d19d32d2",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Scripts/benchmarks/terminal_stress_runner.py": {
-    "mtime": 1781534134.0809226,
-    "ast_hash": "d551e1a88706c8b714264282e9b909b7",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTheme/Sources/HarnessTheme/BundledThemesData.swift": {
-    "mtime": 1781534134.0762424,
-    "ast_hash": "82305634e816bcf8df1ee58f84eff97e",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTheme/Sources/HarnessTheme/ThemeDocument.swift": {
-    "mtime": 1781534134.0789828,
-    "ast_hash": "d2fa89ff8d9475cd619696d2c4a7da8a",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTheme/Sources/HarnessTheme/ThemeDiagnostics.swift": {
-    "mtime": 1781534134.0781133,
-    "ast_hash": "6e1558e718143bfe8fa69c4b523b351b",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTheme/Sources/HarnessTheme/HarnessThemeCatalog.swift": {
-    "mtime": 1781534134.0767624,
-    "ast_hash": "b2fc0d9c8069107a38eb127af5e634b7",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTheme/Sources/HarnessTheme/ThemeFileService.swift": {
-    "mtime": 1781534134.0791106,
-    "ast_hash": "f1e14623357369d184b699d777d1d612",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTheme/Sources/HarnessTheme/HarnessThemeDefinition.swift": {
-    "mtime": 1781534134.0768895,
-    "ast_hash": "ee6866ed7785532e551b5d457b4431d3",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTheme/Sources/HarnessTheme/Color/RGBColor.swift": {
-    "mtime": 1781534134.07653,
-    "ast_hash": "46a26be6a6ccf1e4761330f2020230fb",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTheme/Sources/HarnessTheme/Resources/themes.json": {
-    "mtime": 1781534134.077761,
-    "ast_hash": "9bd3933fa5cffcc53129dd41577eb300",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessLSP/Sources/HarnessLSP/LSPTextLocation.swift": {
-    "mtime": 1781534134.042336,
-    "ast_hash": "5daaf4ab7a5fbdf6478e93197a96f4fb",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessLSP/Sources/HarnessLSP/LSPModels.swift": {
-    "mtime": 1781534134.0415866,
-    "ast_hash": "88612d06fa3f0142a0c089596b01f706",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessLSP/Sources/HarnessLSP/LSPClient.swift": {
-    "mtime": 1781534134.0412679,
-    "ast_hash": "bfb6148b0dd1db86513f99367ea7f226",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessLSP/Sources/HarnessLSP/LSPServerRegistry.swift": {
-    "mtime": 1781534134.0419273,
-    "ast_hash": "eba6122e657102e79af5b8bdee6cd023",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessLSP/Sources/HarnessLSP/LSPTransport.swift": {
-    "mtime": 1781534134.042872,
-    "ast_hash": "60e913f0c0dcf454b78dbfe9dba361a1",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalKit/Sources/HarnessTerminalKit/HarnessTerminalSurfaceView+SelectionAndLinks.swift": {
-    "mtime": 1781534134.066526,
-    "ast_hash": "ffef907cb94a87bc1691f1a5db944c6f",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalKit/Sources/HarnessTerminalKit/FrameSignposter.swift": {
-    "mtime": 1781534134.0635138,
-    "ast_hash": "0bee5dcea7f8a6952c36ae6389611362",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalKit/Sources/HarnessTerminalKit/TerminalScrollbarView.swift": {
-    "mtime": 1781534134.0711243,
-    "ast_hash": "19809500b70710858569d5dd4b0c3108",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalKit/Sources/HarnessTerminalKit/HarnessTerminalSurfaceView+Scrollback.swift": {
-    "mtime": 1781534134.0661519,
-    "ast_hash": "7708c6d40f985df3205a9b4dd475fcde",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalKit/Sources/HarnessTerminalKit/HarnessTerminalSurfaceView+Input.swift": {
-    "mtime": 1781534134.0658097,
-    "ast_hash": "33881d8e05a2923d271a4dac84a6e326",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalKit/Sources/HarnessTerminalKit/RenderScheduler.swift": {
-    "mtime": 1781534134.0686457,
-    "ast_hash": "b6160f4d637235795a98c314536abcf3",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalKit/Sources/HarnessTerminalKit/TerminalFindBar.swift": {
-    "mtime": 1781534134.070305,
-    "ast_hash": "f03bcb9629bbd906dbe1b9d4222be2c4",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalKit/Sources/HarnessTerminalKit/ThemeManager.swift": {
-    "mtime": 1781534134.071428,
-    "ast_hash": "4a70b616c52d8387997fbcceaa1cbb04",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalKit/Sources/HarnessTerminalKit/GridCompositor.swift": {
-    "mtime": 1781534134.0639548,
-    "ast_hash": "18b5d47a921695a6ee95f7b9f80b1feb",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalKit/Sources/HarnessTerminalKit/PasteController.swift": {
-    "mtime": 1781534134.0684094,
-    "ast_hash": "16de7c31b4179de156f8ef98d427cf29",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalKit/Sources/HarnessTerminalKit/ResizeHUDView.swift": {
-    "mtime": 1781534134.0697007,
-    "ast_hash": "048aa36c8fd9d081963fae5bd6e6906d",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalKit/Sources/HarnessTerminalKit/TerminalHostView.swift": {
-    "mtime": 1781534134.070975,
-    "ast_hash": "c36054ee4f764fe95fe8c77b4d61ca8d",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalKit/Sources/HarnessTerminalKit/HarnessTerminalSurfaceView+CopyMode.swift": {
-    "mtime": 1781534134.0645063,
-    "ast_hash": "6c8d8936db0013355c76e35bc9142fc2",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalKit/Sources/HarnessTerminalKit/LiveResizeGeometry.swift": {
-    "mtime": 1781534134.0680313,
-    "ast_hash": "7ad139edaab046b9fcdfd9d1d50ec48a",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalKit/Sources/HarnessTerminalKit/SelectionResolver.swift": {
-    "mtime": 1781534134.0700216,
-    "ast_hash": "95cab35966fdc15aae9db7e3b367297e",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalKit/Sources/HarnessTerminalKit/HarnessTerminalSurfaceView.swift": {
-    "mtime": 1781534794.7625327,
-    "ast_hash": "99b377e13ffb8b317bd13ecfed5bbfcf",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalKit/Sources/HarnessTerminalKit/HarnessTerminalSurfaceView+Find.swift": {
-    "mtime": 1781534134.0650587,
-    "ast_hash": "3c6bf4c5aadf2af3dd561213c1297b0b",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalRenderer/Sources/HarnessTerminalRenderer/TerminalMetalRenderer.swift": {
-    "mtime": 1781534749.4298155,
-    "ast_hash": "54798e335f50c4e90008c955951bd714",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalRenderer/Sources/HarnessTerminalRenderer/GlyphRasterizer.swift": {
-    "mtime": 1781534734.1784792,
-    "ast_hash": "92847452fffd01a56a40daa68f4f0a7c",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalRenderer/Sources/HarnessTerminalRenderer/GlyphAtlas.swift": {
-    "mtime": 1781534741.0438874,
-    "ast_hash": "3e4b609007f0c81fe8bdc6ef2c289fc2",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalRenderer/Sources/HarnessTerminalRenderer/ImageTextureCache.swift": {
-    "mtime": 1781534722.2683513,
-    "ast_hash": "39fdfeb5b790b6390643e532e6e1acbb",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalRenderer/Sources/HarnessTerminalRenderer/BoxDrawing.swift": {
-    "mtime": 1781534134.0721319,
-    "ast_hash": "4acfc2ffe7ad944c53d4f10826adf805",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalRenderer/Sources/HarnessTerminalRenderer/CellColorResolver.swift": {
-    "mtime": 1781534134.072257,
-    "ast_hash": "88880e73bad7e8bf14539e5b96ba066f",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalRenderer/Sources/HarnessTerminalRenderer/MetalShaders.swift": {
-    "mtime": 1781534134.0736015,
-    "ast_hash": "71c50a32637049434ec6bcf2998db71d",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalRenderer/Sources/HarnessTerminalRenderer/ANSIPalette.swift": {
-    "mtime": 1781534134.0718157,
-    "ast_hash": "5e99098daed0b0200c2087a3bae5b950",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalRenderer/Sources/HarnessTerminalRenderer/RenderColorConversion.swift": {
-    "mtime": 1781534134.0737698,
-    "ast_hash": "ad644005a33bf0880cae761441015a08",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalRenderer/Sources/HarnessTerminalRenderer/DynamicInstanceBuffer.swift": {
-    "mtime": 1781534134.0726995,
-    "ast_hash": "e1d427bdb3edfd02f20ba2655a69e908",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalRenderer/Sources/HarnessTerminalRenderer/TerminalFrame.swift": {
-    "mtime": 1781534134.0743077,
-    "ast_hash": "81ad1ab3fcd714bc1017e74f3045f3e5",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/TerminalIdentity.swift": {
-    "mtime": 1781534134.0320318,
-    "ast_hash": "e967dcc50cf5f39a92d8ef31645da6e8",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/HarnessVersion.swift": {
-    "mtime": 1781536030.9727144,
-    "ast_hash": "05755abff8199fda078060ab06e876a1",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Settings/JSONMerge.swift": {
-    "mtime": 1781534134.030464,
-    "ast_hash": "1a8ed68fd2f4170f6ded3ed731647c32",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Settings/ExperienceMode.swift": {
-    "mtime": 1781534134.0295599,
-    "ast_hash": "d0fd0c56634d197104b282f9b27a45ee",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Settings/NotificationEvent.swift": {
-    "mtime": 1781534134.0309453,
-    "ast_hash": "39d4e96bef486709f0a81a290d11afa3",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Settings/DefaultTerminalLaunchRequest.swift": {
-    "mtime": 1781534134.0294085,
-    "ast_hash": "0f203637ff4fad1cfbf0e69c59459715",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Settings/HarnessSettings.swift": {
-    "mtime": 1781534134.0300152,
-    "ast_hash": "846b682dbb5cc5155799cef69ca8c498",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Settings/TerminalConfigImporter.swift": {
-    "mtime": 1781534134.0310898,
-    "ast_hash": "54aeaf3e12730fe2bd21c2da6e2838f9",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Settings/NotchVisibilityMode.swift": {
-    "mtime": 1781534134.0306973,
-    "ast_hash": "f50fa56ed20abe63e83dfe6bb2f30cc2",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Options/EnvironmentStore.swift": {
-    "mtime": 1781534134.018759,
-    "ast_hash": "2ed0253823a5094c226deb489fd047a3",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Options/OptionStore.swift": {
-    "mtime": 1781534134.0208368,
-    "ast_hash": "c250a16b1cf77c17e3749c618008515e",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Options/PaneStyle.swift": {
-    "mtime": 1781534134.0209785,
-    "ast_hash": "6d81f540abbb0a115234ab4caa5b9be0",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Buffers/PasteBufferStore.swift": {
-    "mtime": 1781534133.9882703,
-    "ast_hash": "cbadb7e398fc7b88994b53a578a66cac",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Keybindings/ControlKeyNormalizer.swift": {
-    "mtime": 1781534134.0065846,
-    "ast_hash": "6083944239f04a0de06bd5ec1cf78856",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Keybindings/KeybindingsStore.swift": {
-    "mtime": 1781534134.008227,
-    "ast_hash": "b4b6a3e4bc550d2bb2b1e7e67081ba9e",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Keybindings/ShortcutRecorderSerializer.swift": {
-    "mtime": 1781534134.0083394,
-    "ast_hash": "5eabca000d3c319c42a028731679c6a3",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Keybindings/KeyTable.swift": {
-    "mtime": 1781534134.0073063,
-    "ast_hash": "56c5914dcda9a00dcca38ddd325f308a",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Keybindings/KeySpec.swift": {
-    "mtime": 1781534134.006933,
-    "ast_hash": "81b183af71c8102915e574fb0dcb065d",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Keybindings/KeyTokenParser.swift": {
-    "mtime": 1781534134.0079029,
-    "ast_hash": "e3bd98dbefaf53b1dfabdf9da7d9e8ef",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Board/BoardModel.swift": {
-    "mtime": 1781534133.9879415,
-    "ast_hash": "7e1172f3d652a43de845d0a0c08d49ce",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Shell/ShellRCWiring.swift": {
-    "mtime": 1781534134.0316143,
-    "ast_hash": "e7af3f7adc0e07e3672033879909c124",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Shell/ShellIntegration.swift": {
-    "mtime": 1781534134.031331,
-    "ast_hash": "e8427514995f4526d67ed6b04090a156",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Platform/ProcessScan.swift": {
-    "mtime": 1781534134.0250201,
-    "ast_hash": "55084b39483cc0e3359a20ebee8d2762",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Platform/PlatformSys.swift": {
-    "mtime": 1781534134.024792,
-    "ast_hash": "2c971886366a0007ab1d7a463c25d97c",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Paths/BinaryRefresher.swift": {
-    "mtime": 1781534134.021144,
-    "ast_hash": "22c9dce1b10901e3f2b293c5144c1f47",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Paths/HarnessPaths.swift": {
-    "mtime": 1781534134.0222578,
-    "ast_hash": "fbb14729587a7a4dbaac83859635a637",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Paths/ServiceInstaller.swift": {
-    "mtime": 1781534134.023661,
-    "ast_hash": "4ce5d321ade4b89dce2190241a6cc6fc",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Paths/LaunchAgentInstaller.swift": {
-    "mtime": 1781534134.0235384,
-    "ast_hash": "5f71d10db8a1857a01996e7c1ce46552",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Paths/ShellCompletionInstaller.swift": {
-    "mtime": 1781534134.0237937,
-    "ast_hash": "dbfcbf7370d177a86f746f3b8e42bf6c",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Paths/SystemdUserInstaller.swift": {
-    "mtime": 1781534134.0241046,
-    "ast_hash": "6f235f6c61543a6caa19623701ec8f9e",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Agents/AgentSnapshot.swift": {
-    "mtime": 1781534133.9872978,
-    "ast_hash": "d27a866314d8166ab64161053d875876",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Agents/AgentDetector.swift": {
-    "mtime": 1781534133.9856253,
-    "ast_hash": "e0d1e26fe181069aa1b95d8197991f31",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Agents/AgentHookStrategy.swift": {
-    "mtime": 1781534133.986368,
-    "ast_hash": "3ec959c7e1bd29e6b26f5e94ce70ccd2",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Agents/AgentSessionSummary.swift": {
-    "mtime": 1781534133.9867253,
-    "ast_hash": "2841c563ca787849c39d6c86984716e6",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Agents/HookNotificationParser.swift": {
-    "mtime": 1781534133.987534,
-    "ast_hash": "7ab76651c55df1d674ba78889f3388a1",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Agents/AgentHookInstaller.swift": {
-    "mtime": 1781534133.9860814,
-    "ast_hash": "f2d0d9c56f9aecc8bb858578a20e20bb",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Models/SplitDirection.swift": {
-    "mtime": 1781534134.012744,
-    "ast_hash": "a0234162c3a4c08060b9cf33e4ef352a",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Models/SessionGroup.swift": {
-    "mtime": 1781534134.0118651,
-    "ast_hash": "f0c756f3c832c9826b37f07954ba578d",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Models/Workspace.swift": {
-    "mtime": 1781534134.0167987,
-    "ast_hash": "0a70ebb0b79a581c41626b4dffeb2524",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Models/TabStatus.swift": {
-    "mtime": 1781534134.016297,
-    "ast_hash": "e6db9534230cf7474eeeb97209205576",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Models/PaneNode.swift": {
-    "mtime": 1781534134.011312,
-    "ast_hash": "40e43e5e76948aa98a69f77af69a11e2",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Models/Identifiers.swift": {
-    "mtime": 1781534134.0088809,
-    "ast_hash": "271445dcb72b20194e9263033c67d4df",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Models/Tab.swift": {
-    "mtime": 1781534134.0155911,
-    "ast_hash": "abb9fd2c3c1c40ddc651cae96004552a",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Models/SessionSnapshot.swift": {
-    "mtime": 1781534134.0126476,
-    "ast_hash": "e98e20bcb18e2a2c0e125b2184103d89",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/CLI/AttachInputBatcher.swift": {
-    "mtime": 1781534133.988592,
-    "ast_hash": "e7c7626b30fb338956c48aae07306a33",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/CLI/TerminalRecording.swift": {
-    "mtime": 1781534133.9901183,
-    "ast_hash": "2fa96adf1dfca14e88fec6fcb98574e7",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/CLI/CompletionGenerator.swift": {
-    "mtime": 1781534133.9897587,
-    "ast_hash": "5b05b2d7c6853a439686db60c66ce16f",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/CLI/CLICommandCatalog.swift": {
-    "mtime": 1781534133.9894874,
-    "ast_hash": "9b7599852ff5874124d96475ed645ed5",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Layouts/LayoutTemplate.swift": {
-    "mtime": 1781534134.0084853,
-    "ast_hash": "c3d49193e2fdaa263e1fd913830fa23a",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Workbench/PathTokenParser.swift": {
-    "mtime": 1781534134.0329163,
+  "/Users/supavit.cho/Git/Personal/harness-terminal/Packages/HarnessCore/Sources/HarnessCore/Workbench/PathTokenParser.swift": {
+    "mtime": 1781529784.6735537,
     "ast_hash": "a7707a42110d4322a41260a2f16a56b4",
     "semantic_hash": ""
   },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Workbench/WorkbenchContext.swift": {
-    "mtime": 1781534134.0339777,
-    "ast_hash": "01c10d6d6870a6ecfe20c36b60465692",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Workbench/WorkbenchCommand.swift": {
-    "mtime": 1781534134.0333943,
-    "ast_hash": "88e5edb8f52d1ca6390cc18cae5aeab2",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Persistence/SessionStore.swift": {
-    "mtime": 1781534134.024523,
-    "ast_hash": "08a4aed2f6faea9459b61700ee30356e",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Diagnostics/StartupMetrics.swift": {
-    "mtime": 1781534133.9941335,
-    "ast_hash": "c3e350181a2b33418ada86af7cb71edd",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Diagnostics/DoctorRunner.swift": {
-    "mtime": 1781534133.99373,
-    "ast_hash": "f65fd1730be93f5720b4d337a865e977",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Format/FormatString.swift": {
-    "mtime": 1781534133.9957857,
-    "ast_hash": "fdc68b5ccb49bcf188dded64c99c7bbd",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Format/DisplayWidth.swift": {
-    "mtime": 1781534133.9949107,
-    "ast_hash": "aa08bff820b122c782d9d44198a412be",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Format/AgentListFormatter.swift": {
-    "mtime": 1781534133.9947972,
-    "ast_hash": "998faf170197435d7fb01947bc0b0a17",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Format/SnapshotQueryFormatter.swift": {
-    "mtime": 1781534133.996646,
-    "ast_hash": "621196115d077cf29dc76673480a26bb",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Format/FormatStyledSegment.swift": {
-    "mtime": 1781534133.9960458,
-    "ast_hash": "17246498874ec783e31c0315b768799f",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Format/JSONOutputFormatter.swift": {
-    "mtime": 1781534133.9962788,
-    "ast_hash": "6d96f00b598bcf951a1fd6c21535d1af",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/IPC/DaemonStats.swift": {
-    "mtime": 1781534133.9994893,
-    "ast_hash": "4433a657c5c0ae25e3a95bd59fb7eb48",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/IPC/EndpointConnector.swift": {
-    "mtime": 1781534133.9999847,
-    "ast_hash": "47a392fe15bf8151ad0df3ee7087cbb7",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/IPC/IPCMessage.swift": {
-    "mtime": 1781534134.0059564,
-    "ast_hash": "9bb8781491b44f2c60e8348d991696d8",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/IPC/IPCCodec.swift": {
-    "mtime": 1781534134.0050116,
-    "ast_hash": "3755661ef50f611618836551813c64f0",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/IPC/DaemonSessionService.swift": {
-    "mtime": 1781534133.9990618,
-    "ast_hash": "41913e60d4f49021df4b9af010e74997",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/IPC/DaemonClient.swift": {
-    "mtime": 1781534133.9982307,
-    "ast_hash": "95dfaa17e3ab99f7fe0349b46188391f",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/IPC/DaemonClientActor.swift": {
-    "mtime": 1781534133.9988136,
-    "ast_hash": "53157e7a15b97e124a50d5ebf58eb69d",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/IPC/Endpoint.swift": {
-    "mtime": 1781534133.9997609,
-    "ast_hash": "04894e97e5a1102918056d3cc9a98dfc",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Commands/CommandExecutor.swift": {
-    "mtime": 1781534133.991324,
-    "ast_hash": "adcd817f2d3d463f749965e745797f49",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Commands/CommandParser.swift": {
-    "mtime": 1781534133.992278,
-    "ast_hash": "f03e8bb6f7b386cccb0a38b561fd6f17",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Commands/CommandIPCTranslator.swift": {
-    "mtime": 1781534133.9916406,
-    "ast_hash": "1fa7f415f071c683cfe520b351700e1a",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Commands/Command.swift": {
-    "mtime": 1781534133.9909434,
-    "ast_hash": "2204d61465d15e38876ad623fc2ac2c0",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Commands/FindWindowMatcher.swift": {
-    "mtime": 1781534133.9930544,
-    "ast_hash": "1d553ab83f22d292e1a7330a67af0600",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Commands/CopyModeAction.swift": {
-    "mtime": 1781534133.992759,
-    "ast_hash": "15ed811ab210c3e920360faf682607a3",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Commands/TargetSpec.swift": {
-    "mtime": 1781534133.993266,
-    "ast_hash": "148447c237767fcc3ba4aec0104ba5c4",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Events/HookRegistry.swift": {
-    "mtime": 1781534133.994342,
-    "ast_hash": "f1e9111af797924f7aabff34b995bf73",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/ReleaseNotes/ReleaseNotes.swift": {
-    "mtime": 1781534134.0255818,
-    "ast_hash": "dc15c4bd6663f461800dbe696fd5afbd",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/ReleaseNotes/GeneratedReleaseNotes.swift": {
-    "mtime": 1781536032.8406603,
-    "ast_hash": "ce93e5de330bafcce33bca7331cad7c6",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/ReleaseNotes/TerminalBanner.swift": {
-    "mtime": 1781534134.0258627,
-    "ast_hash": "578395d32be41846a54964708b523ec6",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/ACP/AgentConfig.swift": {
-    "mtime": 1781534133.9850776,
-    "ast_hash": "50d5fc4e992e0ef49ac9e1f0c910ae51",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/ACP/ACPClient.swift": {
-    "mtime": 1781534133.9837978,
-    "ast_hash": "1f848a5a3a283b5d595d346cb425571d",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/ACP/ACPTransport.swift": {
-    "mtime": 1781534133.9848776,
-    "ast_hash": "4ad4e456b9557d05f176266d40258bcd",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/ACP/ACPSession.swift": {
-    "mtime": 1781534133.9846275,
-    "ast_hash": "89ec2525b2a749dac8c94564baf96587",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/ACP/ACPProcess.swift": {
-    "mtime": 1781534133.9843833,
-    "ast_hash": "323e856d75c63111df7c8aa894af7099",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/ACP/ACPMessage.swift": {
-    "mtime": 1781534133.9840882,
-    "ast_hash": "b57cd3dac59c7f731db7420c12c88703",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Metadata/MetadataProvider.swift": {
-    "mtime": 1781534134.0086083,
-    "ast_hash": "98c3da22dddcfd33581b9ef6c60a9236",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Notifications/AgentNotification.swift": {
-    "mtime": 1781534134.0178344,
-    "ast_hash": "df13ca34e69709c8b260775f94a5c06d",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Notifications/NotificationBus.swift": {
-    "mtime": 1781534716.4352481,
-    "ast_hash": "2993188e2faefb553ac5c765d88c3160",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Remote/RemoteHostStore.swift": {
-    "mtime": 1781534134.026082,
-    "ast_hash": "33eb2a360ee4d8decd6d310a4d02347b",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Remote/SSHTunnelManager.swift": {
-    "mtime": 1781534134.0263004,
-    "ast_hash": "53d35f01ee9a62841d1d7622b2ca5336",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Session/PaneRectSolver.swift": {
-    "mtime": 1781534134.0269408,
-    "ast_hash": "cf22218ecf95ac112489660baf395847",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Session/SessionEditor.swift": {
-    "mtime": 1781534134.028139,
-    "ast_hash": "ec78dfc84b45acded3a6e4b4a7233dea",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCore/Sources/HarnessCore/Session/SGRMouse.swift": {
-    "mtime": 1781534134.027185,
-    "ast_hash": "71cd812151fe7f013718dd6fc4059775",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/CHarnessSys/shim.c": {
-    "mtime": 1781534133.9818828,
-    "ast_hash": "641092c8c1517e8084d76a950521e8a9",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/CHarnessSys/include/CHarnessSys.h": {
-    "mtime": 1781534133.9817026,
-    "ast_hash": "d2e531ad27e73447cddccfc5bc67de1d",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessOnboarding/Sources/HarnessOnboarding/OnboardingManager.swift": {
-    "mtime": 1781534134.046411,
-    "ast_hash": "0aa8f7620fa7c9cb4a6791f4db22e12e",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessOnboarding/Sources/HarnessOnboarding/OnboardingEnvironment.swift": {
-    "mtime": 1781534134.046311,
-    "ast_hash": "07cfec079d1f586632843017736ee173",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessOnboarding/Sources/HarnessOnboarding/UI/WelcomeStepView.swift": {
-    "mtime": 1781534134.0500567,
-    "ast_hash": "ecada49c3af9e53583fb092285e6b058",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessOnboarding/Sources/HarnessOnboarding/UI/DemoSession.swift": {
-    "mtime": 1781534134.049083,
-    "ast_hash": "1e8b9fcc0ef8cd08d6a2396ab246a698",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessOnboarding/Sources/HarnessOnboarding/UI/SetupStepView.swift": {
-    "mtime": 1781534134.0496838,
-    "ast_hash": "1aaf9d3a427336e087152bc70ce83c2f",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessOnboarding/Sources/HarnessOnboarding/UI/OnboardingWizardView.swift": {
-    "mtime": 1781534134.0494783,
-    "ast_hash": "5c89e6cf69507394293be6f5a2781ae2",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessOnboarding/Sources/HarnessOnboarding/UI/ImmersiveOnboardingWindowController.swift": {
-    "mtime": 1781534134.049356,
-    "ast_hash": "65674b56d4ea46611ff41b957fe75d9d",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessOnboarding/Sources/HarnessOnboarding/UI/ShellStepView.swift": {
-    "mtime": 1781534134.049847,
-    "ast_hash": "4bbb459c6164fc38e501fa0281fe0070",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessOnboarding/Sources/HarnessOnboarding/UI/DiscoverStepView.swift": {
-    "mtime": 1781534134.0492027,
-    "ast_hash": "036c6bc807d8b16bba0552652e27f2df",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessOnboarding/Sources/HarnessOnboarding/UI/ComposedTerminalView.swift": {
-    "mtime": 1781534134.0487177,
-    "ast_hash": "aa2da50dfa85924baf7b0438c52ed74f",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessOnboarding/Sources/HarnessOnboarding/UI/CompleteStepView.swift": {
-    "mtime": 1781534134.0485806,
-    "ast_hash": "cfbe1acb08a27912a816138801aac7a4",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessOnboarding/Sources/HarnessOnboarding/Design/WindowBlur.swift": {
-    "mtime": 1781534134.0449934,
-    "ast_hash": "80074ff7b6ff980f410a643dc4edd143",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessOnboarding/Sources/HarnessOnboarding/Design/Effects.swift": {
-    "mtime": 1781534134.044178,
-    "ast_hash": "7755cc911b098dcf1799d8bbed935959",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessOnboarding/Sources/HarnessOnboarding/Design/AgentMark.swift": {
-    "mtime": 1781534134.0436606,
-    "ast_hash": "56654e47650598d5f78eacc4c012108f",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessOnboarding/Sources/HarnessOnboarding/Design/AmbientBackground.swift": {
-    "mtime": 1781534134.0438652,
-    "ast_hash": "cd4480cd5825e721c9971c08e5fb95ba",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessOnboarding/Sources/HarnessOnboarding/Design/Components.swift": {
-    "mtime": 1781534134.044086,
-    "ast_hash": "006cb46a54d51020d5490ddccd43a9a9",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessOnboarding/Sources/HarnessOnboarding/Design/GlassEffectView.swift": {
-    "mtime": 1781534134.0445135,
-    "ast_hash": "6919ef271c16697e0cc9f248edac42b0",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessOnboarding/Sources/HarnessOnboarding/Design/ImmersivePalette.swift": {
-    "mtime": 1781534134.0446482,
-    "ast_hash": "80cf8aab48a7f03179dde2e3a56b9ac9",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessOnboarding/Sources/HarnessOnboarding/Install/NotificationPermission.swift": {
-    "mtime": 1781534134.0460775,
-    "ast_hash": "938e470e6fb5ea1a4e5fd2dd436da036",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessOnboarding/Sources/HarnessOnboarding/Install/ShellProfileInstaller.swift": {
-    "mtime": 1781534134.0462232,
-    "ast_hash": "469cf26427ed1c21100dfe92d23f2cd5",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessOnboarding/Sources/HarnessOnboarding/Install/BinaryInstaller.swift": {
-    "mtime": 1781534134.045311,
-    "ast_hash": "4a7c53bf7295e6bb0e7cc5249c727753",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessOnboarding/Sources/HarnessOnboarding/Install/HarnessCLIPaths.swift": {
-    "mtime": 1781534134.0454583,
-    "ast_hash": "0ae59ab7ecfee109ed509ac9c1429b4b",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessOnboarding/Sources/HarnessOnboarding/TerminalKit/TerminalGrid.swift": {
-    "mtime": 1781534134.0482328,
-    "ast_hash": "7e23da285b016ee78d3594bdbbb8f439",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessOnboarding/Sources/HarnessOnboarding/TerminalKit/GridCompositor.swift": {
-    "mtime": 1781534134.0473247,
-    "ast_hash": "b593e7b053701a0fbb5749758a5c6920",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessOnboarding/Sources/HarnessOnboarding/TerminalKit/FormatStyledSegment.swift": {
-    "mtime": 1781534134.0468283,
-    "ast_hash": "110d229c73ad68cae04adfcb861c97b6",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessOnboarding/Sources/HarnessOnboarding/TerminalKit/TerminalColor.swift": {
-    "mtime": 1781534134.0479398,
-    "ast_hash": "e6e76746fe1bfdf1530ce1de409270d5",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessOnboarding/Sources/HarnessOnboarding/TerminalKit/PaneLayout.swift": {
-    "mtime": 1781534134.047616,
-    "ast_hash": "e7eb7cefc76f02aa50f308843f970db0",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessDaemon/Sources/HarnessDaemonMain/main.swift": {
-    "mtime": 1781534134.0402927,
-    "ast_hash": "fd39bad237e20d20f318c63bf0245c97",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessDaemon/Sources/HarnessDaemon/AgentScanner.swift": {
-    "mtime": 1781534134.034637,
-    "ast_hash": "3c002d6594c843f96afad963cb853a1f",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessDaemon/Sources/HarnessDaemon/DaemonServer.swift": {
-    "mtime": 1781534134.0363781,
-    "ast_hash": "08b87c6de1a1c7985eba85801ecbdbde",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessDaemon/Sources/HarnessDaemon/HookExecutor.swift": {
-    "mtime": 1781534134.0371978,
-    "ast_hash": "c88f3497dd4f0a5c1c5d504d12aa184e",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessDaemon/Sources/HarnessDaemon/DaemonMetrics.swift": {
-    "mtime": 1781534134.0359359,
-    "ast_hash": "ab813142d5b70376a70d1e35f6182978",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessDaemon/Sources/HarnessDaemon/RealPty.swift": {
-    "mtime": 1781534134.0378265,
-    "ast_hash": "191c8adce445d35c19f6ab9b70d9d922",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessDaemon/Sources/HarnessDaemon/DaemonCommandExecutor.swift": {
-    "mtime": 1781534134.035572,
-    "ast_hash": "0412e66e34ca3759b75549254f91fb4e",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessDaemon/Sources/HarnessDaemon/DaemonLifecycle.swift": {
-    "mtime": 1781534134.0357895,
-    "ast_hash": "7b4d65332a5ea602c5cdd4c4b0a2f1e5",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessDaemon/Sources/HarnessDaemon/FormatContextBuilder.swift": {
-    "mtime": 1781534134.0368788,
-    "ast_hash": "d26fbdec20b6ccd421c52b9e2ef6b49b",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessDaemon/Sources/HarnessDaemon/VersionBannerState.swift": {
-    "mtime": 1781534134.0397227,
-    "ast_hash": "9a778cc784fd4d35553491cce0013738",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessDaemon/Sources/HarnessDaemon/SurfaceRegistry.swift": {
-    "mtime": 1781534134.0389767,
-    "ast_hash": "ebbc90029fc8b3fe629658a8e4480a59",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessDaemon/Sources/HarnessDaemon/WaitForRegistry.swift": {
-    "mtime": 1781534134.0400712,
-    "ast_hash": "21c867a3fa677ea5b37f87e2fa9cbf0b",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessDaemon/Sources/HarnessDaemon/ScrollbackFile.swift": {
-    "mtime": 1781534134.0382504,
-    "ast_hash": "e9362aa3da0677c0cc14ff6da3bce178",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalEngine/Sources/HarnessTerminalEngine/URLDetection.swift": {
-    "mtime": 1781534134.0623524,
-    "ast_hash": "37fc8b3729f608cef942d5f616435293",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalEngine/Sources/HarnessTerminalEngine/TerminalBufferSearch.swift": {
-    "mtime": 1781534134.061861,
-    "ast_hash": "addb582543ee1e372aa6092bff81ee7b",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalEngine/Sources/HarnessTerminalEngine/HarnessGridTerminal.swift": {
-    "mtime": 1781534134.056896,
-    "ast_hash": "14a9cd78ec87f1f5412753640b2c25eb",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalEngine/Sources/HarnessTerminalEngine/InputEncoder.swift": {
-    "mtime": 1781534134.059348,
-    "ast_hash": "e29772e12c2535f4b97d9aacf7c3bc11",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalEngine/Sources/HarnessTerminalEngine/Width/CharacterWidthTable.swift": {
-    "mtime": 1781534134.0628293,
-    "ast_hash": "f9d7e60cb8f415524b44dc603500636a",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalEngine/Sources/HarnessTerminalEngine/Width/CharacterWidth.swift": {
-    "mtime": 1781534134.0626292,
-    "ast_hash": "66346fc14658d1a1fa2359198c57a5ce",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalEngine/Sources/HarnessTerminalEngine/Images/ImageDecoder.swift": {
-    "mtime": 1781534134.0572855,
-    "ast_hash": "7dde189fcf991cbe9033d0e431f3e4e1",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalEngine/Sources/HarnessTerminalEngine/Images/SixelDecoder.swift": {
-    "mtime": 1781534134.0576634,
-    "ast_hash": "8dc6623e3e34418683918fed6095800b",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalEngine/Sources/HarnessTerminalEngine/Images/DecodedImage.swift": {
-    "mtime": 1781534134.057069,
-    "ast_hash": "b2fbed38502c5f0c6ca21a85325e7b4f",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalEngine/Sources/HarnessTerminalEngine/Images/KittyGraphicsProtocol.swift": {
-    "mtime": 1781534134.0574195,
-    "ast_hash": "f118044c3e765975622f613ab098f94f",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalEngine/Sources/HarnessTerminalEngine/Images/ITerm2InlineImage.swift": {
-    "mtime": 1781534134.0571878,
-    "ast_hash": "8826010b1bc5e5e821c66eff818be598",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalEngine/Sources/HarnessTerminalEngine/Parser/VTParser.swift": {
-    "mtime": 1781534134.0603004,
-    "ast_hash": "a600a733d071b85dd9d1a6226d4e5b83",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalEngine/Sources/HarnessTerminalEngine/Screen/HistoryRingBuffer.swift": {
-    "mtime": 1781535276.79933,
-    "ast_hash": "ab41e1c60b6b2aa2eb8999430673ee56",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalEngine/Sources/HarnessTerminalEngine/Screen/TerminalScreen.swift": {
-    "mtime": 1781534134.0613592,
-    "ast_hash": "42e51420b407bfaa5960b110210d5754",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalEngine/Sources/HarnessTerminalEngine/Model/TerminalGridModel.swift": {
-    "mtime": 1781534134.0601041,
-    "ast_hash": "928c13ff4d03db19d9e528a9deca3476",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalEngine/Sources/HarnessTerminalEngine/Model/TerminalDamage.swift": {
-    "mtime": 1781534134.059871,
-    "ast_hash": "798e7bdaca8feb21233219fdc0b46b31",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalEngine/Sources/HarnessTerminalEngine/Emulator/DECSpecialGraphics.swift": {
-    "mtime": 1781534134.0556536,
-    "ast_hash": "cae8c3641f1913bf3f0e247e4ba1edde",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalEngine/Sources/HarnessTerminalEngine/Emulator/TerminalEmulator.swift": {
-    "mtime": 1781534134.0563378,
-    "ast_hash": "236e84314fdf5a777f543c478894cf74",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessTerminalEngine/Sources/HarnessTerminalEngine/Emulator/TerminalProgressReport.swift": {
-    "mtime": 1781534134.0567398,
-    "ast_hash": "9ccd952089fa88660d51ec8e201b960b",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessSyntaxResources/Resources/TreeSitterGrammars/swift.json": {
-    "mtime": 1781534134.0536604,
-    "ast_hash": "bbd2bbd0b08944a8f19e11e732b29037",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessSyntaxResources/Resources/TreeSitterGrammars/go.json": {
-    "mtime": 1781534134.0506108,
-    "ast_hash": "c6b055117ff8a44865021363d3c41b79",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessSyntaxResources/Resources/TreeSitterGrammars/markdown.json": {
-    "mtime": 1781534134.0523176,
-    "ast_hash": "79b8e26cd36c739d80c614fcad4f253c",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessSyntaxResources/Resources/TreeSitterGrammars/yaml.json": {
-    "mtime": 1781534134.0547378,
-    "ast_hash": "7a0f4c6274f55b6489d291ddb107b68b",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessSyntaxResources/Resources/TreeSitterGrammars/rust.json": {
-    "mtime": 1781534134.0534065,
-    "ast_hash": "0cbb5054899c37e9f336d4336c5fbd5a",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessSyntaxResources/Resources/TreeSitterGrammars/javascript.json": {
-    "mtime": 1781534134.0510924,
-    "ast_hash": "7ad710b51c7ca1b50c898cc418942336",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessSyntaxResources/Resources/TreeSitterGrammars/json.json": {
-    "mtime": 1781534134.051823,
-    "ast_hash": "d0421a91097bc98773e4eb6599454ed7",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessSyntaxResources/Resources/TreeSitterGrammars/typescript.json": {
-    "mtime": 1781534134.0541732,
-    "ast_hash": "b0bb545edb240d806025557977d568f4",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessSyntaxResources/Resources/TreeSitterGrammars/python.json": {
-    "mtime": 1781534134.0527427,
-    "ast_hash": "e37666450e606c3b6508e42c5dc394d8",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessSyntaxResources/Sources/HarnessSyntaxResources/TreeSitterGrammarBundle.swift": {
-    "mtime": 1781534134.0553274,
-    "ast_hash": "026c324e84ff6bfdb38d63d8068ba750",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCopyMode/Sources/HarnessCopyMode/CopyModeState.swift": {
-    "mtime": 1781534133.983222,
-    "ast_hash": "068579b532decb514a9a18eccacfd671",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCopyMode/Sources/HarnessCopyMode/EngineConformances.swift": {
-    "mtime": 1781534133.9832995,
-    "ast_hash": "9d0e1a09d1147ecf243eb0c2e14e3f2e",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCopyMode/Sources/HarnessCopyMode/CopyModeGridSource.swift": {
-    "mtime": 1781534133.9824188,
-    "ast_hash": "0cdff82790481016a86e259985e2bd6d",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Packages/HarnessCopyMode/Sources/HarnessCopyMode/CopyModeReducer.swift": {
-    "mtime": 1781534133.9828615,
-    "ast_hash": "4ec150ca2f51373f3144650fd8abdbd2",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Resources/Assets.xcassets/Contents.json": {
-    "mtime": 1781534133.893319,
-    "ast_hash": "9deb2ada1cc834bbebf8bbad9c8978a1",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Resources/Assets.xcassets/AppIcon.appiconset/Contents.json": {
-    "mtime": 1781534133.883368,
-    "ast_hash": "cb25d8883ad1378004ad7385c2ca267d",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Resources/Assets.xcassets/HarnessLogo.imageset/Contents.json": {
-    "mtime": 1781534133.8936856,
-    "ast_hash": "8726de0e2cfccd109a384d55031e7374",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/AppDelegate.swift": {
-    "mtime": 1781575844.0327945,
-    "ast_hash": "cca518b65c9d6f48a4baeea5d1cee9a2",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/main.swift": {
-    "mtime": 1781534133.977267,
-    "ast_hash": "823e6ff59a930503bcabfaf9d401fb4d",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Notch/NotchShape.swift": {
-    "mtime": 1781534133.9684641,
-    "ast_hash": "f5dd341bba0130b8efb373e54308afc7",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Notch/NotchPanelController.swift": {
-    "mtime": 1781575821.0862381,
-    "ast_hash": "bf4800d78be5f871035a1c172a30b743",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Notch/AgentNotchViewModel.swift": {
-    "mtime": 1781534133.967505,
-    "ast_hash": "8b997a57929aad6d6b8efe18a4d95922",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Notch/NotchGeometry.swift": {
-    "mtime": 1781534133.967717,
-    "ast_hash": "e7f8e207bc07d5fcff4aa930553ae115",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Notch/AgentNotchPeekDecider.swift": {
-    "mtime": 1781534133.966179,
-    "ast_hash": "fe66d80bd50afa3c27b3c233721f3bac",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Notch/AgentNotchProjection.swift": {
-    "mtime": 1781534133.966483,
-    "ast_hash": "ee16670bdcb9087434e93e3b99c3fe23",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Notch/NotchLayoutMetrics.swift": {
-    "mtime": 1781534133.9681065,
-    "ast_hash": "0aea1f528941d085e43107c7382fd007",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Notch/NotchPanel.swift": {
-    "mtime": 1781534133.96828,
-    "ast_hash": "2820b2fd116ff62ea7fe9879599d0e50",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Notch/AgentNotchRootView.swift": {
-    "mtime": 1781534133.9668634,
-    "ast_hash": "9554867f37d1b02eface42e45b53ec89",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Sidebar/SidebarSessionRows.swift": {
-    "mtime": 1781534133.974774,
-    "ast_hash": "ebbe8954ee75a150e915b2ac83d699e7",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Sidebar/SidebarWorkspaceViews.swift": {
-    "mtime": 1781534133.9755926,
-    "ast_hash": "6d158c6b39ce4616c6281ee3cf34b1dd",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Sidebar/BoardViewController.swift": {
-    "mtime": 1781575815.5431473,
-    "ast_hash": "653b2ef8f31249e723eb1c661ffdd13c",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Sidebar/HarnessSidebarPanelViewController+SessionMenu.swift": {
-    "mtime": 1781534133.9740334,
-    "ast_hash": "1d03aee42208201c5e56fc97e49a1258",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Sidebar/HarnessSidebarPanelViewController.swift": {
-    "mtime": 1781574871.6283696,
-    "ast_hash": "e38534957fcaa229e5a7445baada0219",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Sidebar/HarnessSidebarPanelViewController+DragReorder.swift": {
-    "mtime": 1781534133.9733243,
-    "ast_hash": "e6e85cdb58ac37f2db044ab5dd2d6054",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Sidebar/HarnessSidebarPanelViewController+RecentProjects.swift": {
-    "mtime": 1781534133.9735634,
-    "ast_hash": "d800b74a0a5cdf05e4433d49658578c6",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/FileEditor/ViRegisters.swift": {
-    "mtime": 1781534133.9636,
-    "ast_hash": "9468335e14da23788346a018676081fa",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/FileEditor/ViOperators.swift": {
-    "mtime": 1781534133.9625406,
-    "ast_hash": "c2a65c78e5476f9f036308deb7f3bd07",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/FileEditor/SyntaxTextView.swift": {
-    "mtime": 1781534133.9609225,
-    "ast_hash": "361f7247758e1a4085da42d2824b16e0",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/FileEditor/FileEditorTabBarView.swift": {
-    "mtime": 1781534133.9586053,
-    "ast_hash": "64cb150851c571e49b5eb0587c6f7555",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/FileEditor/FuzzyPathResolver.swift": {
-    "mtime": 1781534133.960084,
-    "ast_hash": "82a087f5a07c21d67bb8437637b1caba",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/FileEditor/ViMotions.swift": {
-    "mtime": 1781534133.9621775,
-    "ast_hash": "0a347a59b34e502cbe567ddb02ea08dd",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/FileEditor/ViEngine.swift": {
-    "mtime": 1781534133.9612963,
-    "ast_hash": "ed05f12dcf2bb92deb2856eb395254e9",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/FileEditor/FileTabManager.swift": {
-    "mtime": 1781534133.9593897,
-    "ast_hash": "8a5ceb512be749912878445ea849a277",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/FileEditor/FileViewerViewController.swift": {
-    "mtime": 1781534133.9597952,
-    "ast_hash": "b57f76aa159de748372befda88058c9a",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/FileEditor/LSPFileSession.swift": {
-    "mtime": 1781534133.9605083,
-    "ast_hash": "00ff93a0ed0ada9856ed8d82d10a52aa",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/FileEditor/ViExCommands.swift": {
-    "mtime": 1781534133.9616418,
-    "ast_hash": "a252c6ed8ba256ed5cf2f08eb88f0364",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/FileEditor/FileEditorView.swift": {
-    "mtime": 1781534133.9589734,
-    "ast_hash": "3e27c354247475342dcd6d589b1c5558",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/FileTree/FileTreeSwiftUIView.swift": {
-    "mtime": 1781534133.9643483,
-    "ast_hash": "4b62c55412ded7320ad6f53dddfed4de",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/FileTree/FileTreeKeyboardNav.swift": {
-    "mtime": 1781534133.964033,
-    "ast_hash": "355e8bd6cef8e94a7a1e585fb9bbd672",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/FileTree/WorkspaceFileTreeView.swift": {
-    "mtime": 1781534133.9650455,
-    "ast_hash": "614de5f503601e5212dc68c2f673bd90",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Terminal/StatusLineView.swift": {
-    "mtime": 1781534133.9764836,
-    "ast_hash": "d8bbdb0a27654d64ab3d8bfedb4d8524",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Terminal/CompletionPopupView.swift": {
-    "mtime": 1781534133.9759703,
-    "ast_hash": "b18f2f5ab4062c020ab9600714b355db",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Terminal/TerminalTabBarView.swift": {
-    "mtime": 1781534133.9769266,
-    "ast_hash": "5da7241a6fca0269f7a08a921a8e8310",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Agents/AgentChatPanelView.swift": {
-    "mtime": 1781534133.9503376,
-    "ast_hash": "3a89676cf047b725a3a3a9459f45956a",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Agents/AgentIconRenderer.swift": {
-    "mtime": 1781534133.9515948,
-    "ast_hash": "8ea94ac4d57892d183e27d535e01bd34",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Agents/AgentIconArt.swift": {
-    "mtime": 1781534133.950915,
-    "ast_hash": "ee7ecc2c389503ca25fb2abab7973bff",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Shared/OnboardingController.swift": {
-    "mtime": 1781534133.9717858,
-    "ast_hash": "d2cb3af6dd35a00349b37a500b7942eb",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Shared/HarnessDesign.swift": {
-    "mtime": 1781534133.9716818,
-    "ast_hash": "2295d0bd5b8e3c72f6ece87360ea3046",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Shared/Phase67UI.swift": {
-    "mtime": 1781534133.9719877,
-    "ast_hash": "da0ef8030ceac8ca86107a36e86ac2ef",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Shared/DisplayPanesOverlay.swift": {
-    "mtime": 1781534133.9709728,
-    "ast_hash": "4418a4182a6746ef0443ae426029b916",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Shared/PrefixKeymap.swift": {
-    "mtime": 1781534133.9723265,
-    "ast_hash": "874acfcf8f122332ae1b26bb45d7035f",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Shared/HarnessControls.swift": {
-    "mtime": 1781534133.9712317,
-    "ast_hash": "2ca316f266e7082dafda7533e542cec3",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Shared/AboutPanelController.swift": {
-    "mtime": 1781534133.9706624,
-    "ast_hash": "25e83da6b7cf0b150ddca051bc3dfb68",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Shared/Toast.swift": {
-    "mtime": 1781534133.9725158,
-    "ast_hash": "9f2d4d2e37e75257164f0f31cf995789",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Search/SearchPanelView.swift": {
-    "mtime": 1781534133.9703171,
-    "ast_hash": "fef04917a1b550451d878daf47460a74",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Chrome/MainWindowController.swift": {
-    "mtime": 1781534133.9552984,
-    "ast_hash": "5d8514ec8ee9964ba2198da6bf2cdaa2",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Chrome/MenuBarController.swift": {
-    "mtime": 1781534133.9554937,
-    "ast_hash": "8935076e5138a7c70e7df6e36deea7dc",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Chrome/WindowBlur.swift": {
-    "mtime": 1781534133.955609,
-    "ast_hash": "513b921fc89adf3acc32277fa411ae85",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Chrome/ContentAreaViewController.swift": {
-    "mtime": 1781534133.9525702,
-    "ast_hash": "615b743b370d515fe7eef271e0f1afc7",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Chrome/HarnessChrome.swift": {
-    "mtime": 1781534133.9528968,
-    "ast_hash": "19921ba5f407e5b14b4a7e61a2c2f8a0",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Chrome/WindowTitleStripView.swift": {
-    "mtime": 1781534133.956198,
-    "ast_hash": "bce9108271644cc95c532b6aeb125cfa",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Chrome/BrowserPaneView.swift": {
-    "mtime": 1781534133.9520667,
-    "ast_hash": "0d0288407c1446328cdf96e4ba0b32b7",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Chrome/MainSplitViewController.swift": {
-    "mtime": 1781575809.7824798,
-    "ast_hash": "a30d6ca45faac950eac7ec671265a0fe",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Chrome/WindowBorderOverlayView.swift": {
-    "mtime": 1781534133.9558427,
-    "ast_hash": "d30c7b78c07170866121ef024a025bc8",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Chrome/MainMenuBuilder.swift": {
-    "mtime": 1781534133.9532917,
-    "ast_hash": "36891ea5f00b1d052ef5c1d5bb0ff657",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/CommandPalette/CommandHistorySearchController.swift": {
-    "mtime": 1781534133.9565725,
-    "ast_hash": "fe3e856f649d28631eec98a0bfc8641c",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/CommandPalette/CommandPromptController.swift": {
-    "mtime": 1781534133.9581866,
-    "ast_hash": "e3c4d191424a6cf2d5a46eb4a0f23551",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/CommandPalette/CommandPaletteController.swift": {
-    "mtime": 1781534133.9569764,
-    "ast_hash": "06a08e25b4cf7f5fe4f20b6ab741d10e",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Notifications/NotificationDropdownPanel.swift": {
-    "mtime": 1781534133.9698317,
-    "ast_hash": "7c28875ced171d4a8797d7a02556ae9d",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Notifications/AgentInboxPanelView.swift": {
-    "mtime": 1781534133.968986,
-    "ast_hash": "425d423f16c2021bfada9f58c4ed0888",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Notifications/NotificationBellButton.swift": {
-    "mtime": 1781534133.9693272,
-    "ast_hash": "a08b415a3c027c119ab81225b105d399",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/UI/Git/GitPanelView.swift": {
-    "mtime": 1781534133.9655888,
-    "ast_hash": "40f22577d7cea06fc04dab0ea78c46a6",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Settings/SettingsViewController+LiveApply.swift": {
-    "mtime": 1781534133.9477806,
-    "ast_hash": "81c8e172daeab872f5413e068311a414",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Settings/SettingsViewController+Advanced.swift": {
-    "mtime": 1781534133.946086,
-    "ast_hash": "0618c09ab1c91617bce915fac3e3d0cc",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Settings/SettingsViewController+Terminal.swift": {
-    "mtime": 1781534133.9494348,
-    "ast_hash": "3aafa2350e5503ea05c1a286fcd2fb89",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Settings/SettingsViewController+Keys.swift": {
-    "mtime": 1781534133.9474897,
-    "ast_hash": "846a4962b6529018ea3b2582bee9ba43",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Settings/SettingsViewController+Agents.swift": {
-    "mtime": 1781534133.9464579,
-    "ast_hash": "15c32ce9338e945fcf02557debb853bf",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Settings/SettingsViewController+Primitives.swift": {
-    "mtime": 1781534133.94806,
-    "ast_hash": "395310bb846dbae2194eb43773d1366f",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Settings/SettingsViewController+Colors.swift": {
-    "mtime": 1781534133.947105,
-    "ast_hash": "091dbd289ae8d31d27890dc95b997ef6",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Settings/KeyRecorderView.swift": {
-    "mtime": 1781534133.9456363,
-    "ast_hash": "25490334982e1b734aa7845aeaf0fed2",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Settings/SettingsViewController+Appearance.swift": {
-    "mtime": 1781534133.9468665,
-    "ast_hash": "4ba6d137ba4d6825cb4055808ec693e9",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Settings/SettingsViewController.swift": {
-    "mtime": 1781534133.9497778,
-    "ast_hash": "a50c091d24d7f7650110bf7d9e8bae33",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Scripting/ScriptConfigLocator.swift": {
-    "mtime": 1781534133.9330313,
-    "ast_hash": "efcb2e0f2fbeab2a492f68939e17ac3a",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Scripting/ScriptAPI.swift": {
-    "mtime": 1781534133.9325407,
-    "ast_hash": "c137c3581b95b5401355ea9cfc0f0dda",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Scripting/ScriptFileWatcher.swift": {
-    "mtime": 1781534133.9333751,
-    "ast_hash": "ad43af0f2504c44c69f407d4089873e5",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Scripting/ScriptSnapshotModels.swift": {
-    "mtime": 1781534133.9344537,
-    "ast_hash": "a501d3f3cd5a2a80fc02d7bc92597eb8",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Scripting/ScriptRuntime.swift": {
-    "mtime": 1781534133.934128,
-    "ast_hash": "faa2aed4645201b894698140751203a1",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Scripting/ScriptHookCoordinator.swift": {
-    "mtime": 1781534133.9337282,
-    "ast_hash": "bd8277f62de45676d02a96433964764d",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Services/AgentCatalog.swift": {
-    "mtime": 1781534133.9355652,
+  "/Users/supavit.cho/Git/Personal/harness-terminal/Apps/Harness/Sources/HarnessApp/Services/AgentCatalog.swift": {
+    "mtime": 1781532296.3302429,
     "ast_hash": "7c862e07ee4e038aa7152554274ef919",
     "semantic_hash": ""
   },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Services/AppIdleThrottle.swift": {
-    "mtime": 1781534849.9255266,
-    "ast_hash": "9c5713942a0e77be6499dfe04eee3102",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Services/WorkbenchMRU.swift": {
-    "mtime": 1781534133.9449666,
-    "ast_hash": "b0a49181b56108f01c3c5a078be1bc5d",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Services/ActivePaneService.swift": {
-    "mtime": 1781534133.9348962,
-    "ast_hash": "033c6909e637e1441209c8bc54141fc7",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Services/ThemeImportController.swift": {
-    "mtime": 1781534133.9443746,
-    "ast_hash": "5b5f4bdf5a9a8dbf45bca807a180dca8",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Services/SessionLifecycleService.swift": {
-    "mtime": 1781534133.942737,
-    "ast_hash": "afe1f130dfadbc2519743ea3a62af0ad",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Services/DefaultTerminalManager.swift": {
-    "mtime": 1781534133.9383583,
-    "ast_hash": "6426e5979dc176833ca6a712feb03a18",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Services/ThemeService.swift": {
-    "mtime": 1781534133.9447029,
-    "ast_hash": "2daa1e6d4839ad36b5ed437d4d7e3093",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Services/SurfaceProgressTracker.swift": {
-    "mtime": 1781534133.9435136,
-    "ast_hash": "8973cdff6fcb83509b95599e38f892b4",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Services/NotificationCoordinator.swift": {
-    "mtime": 1781534133.9408715,
-    "ast_hash": "39b9c05a92fa4d148706f0d3fb656a7e",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Services/AgentBridge.swift": {
-    "mtime": 1781534133.9353178,
+  "/Users/supavit.cho/Git/Personal/harness-terminal/Apps/Harness/Sources/HarnessApp/Services/AgentBridge.swift": {
+    "mtime": 1781530369.216738,
     "ast_hash": "a09fbb74a639a02a98836cf5e3be215d",
     "semantic_hash": ""
   },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Services/SessionCoordinator+HostDelegate.swift": {
-    "mtime": 1781534133.9416802,
-    "ast_hash": "640b0db8a215ce2936e499e786702ca0",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Services/MemoryPressureMonitor.swift": {
-    "mtime": 1781534813.3742068,
-    "ast_hash": "51594f17851536d7e88d2cebd8a07bd9",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Services/DaemonSyncService.swift": {
-    "mtime": 1781575802.2334,
-    "ast_hash": "950fff166bb6c9941e4d18f08c5a13a9",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Services/PerfCounters.swift": {
-    "mtime": 1781575876.1824572,
-    "ast_hash": "9b6302a7df90a2f2ddfca65a67d88443",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Services/DaemonLauncher.swift": {
-    "mtime": 1781534133.936864,
-    "ast_hash": "1f408d4fc3d5ed74a55e37c540f780ac",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Services/ProjectTaskDetector.swift": {
-    "mtime": 1781534133.9412453,
-    "ast_hash": "c3c39c919d047b84949cc19d3fbb1176",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Services/WorkspaceSymbolIndex.swift": {
-    "mtime": 1781534133.9453633,
-    "ast_hash": "7349f13378630ea7a8c13c5da6148486",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Services/TerminalPaneRegistry.swift": {
-    "mtime": 1781534133.9439898,
-    "ast_hash": "997616086f1db0f1fae062dc8a920747",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Services/SessionCoordinatorTypes.swift": {
-    "mtime": 1781534133.9423082,
-    "ast_hash": "5116e53a41135a1deefcb438ad6a034e",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Services/SessionCoordinator.swift": {
-    "mtime": 1781534133.9420364,
-    "ast_hash": "6d8415f00fad0c002159c28e4009b1f1",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Services/KeybindingsService.swift": {
-    "mtime": 1781534133.9400928,
-    "ast_hash": "5d0480841ac28a792b8b4c0caa2195cc",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Services/TerminalServicesProvider.swift": {
-    "mtime": 1781534133.944148,
-    "ast_hash": "263f9fd54686ef303c60e15699f95f33",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Services/RemoteHostsService.swift": {
-    "mtime": 1781534133.9413288,
-    "ast_hash": "179231b71add8d5dab2460e751f57c42",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Services/TerminalPaneRegistryAccess.swift": {
-    "mtime": 1781534133.944071,
-    "ast_hash": "7e42a0e49dfb088d0bea657328a80749",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Services/CLIInstaller.swift": {
-    "mtime": 1781534133.936217,
-    "ast_hash": "baaca6d43731b482f0eed6eacdaddb94",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Services/SparkleUpdater.swift": {
-    "mtime": 1781534133.942828,
-    "ast_hash": "ce434d058efde8b4ee3f63adb8f782b1",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Services/MainExecutor.swift": {
-    "mtime": 1781534133.9404678,
-    "ast_hash": "b07911a43262cb95cbbc128431c0ee78",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Services/SurfaceShellTracker.swift": {
-    "mtime": 1781575780.7732718,
-    "ast_hash": "7255261af7b68c9ecb4be4c332017ebe",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Services/SplitPaneCoordinator.swift": {
-    "mtime": 1781534133.943298,
-    "ast_hash": "d2c36d9880ee1a7a890907b256e20229",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Services/FileExplorer/FileChangeWatcher.swift": {
-    "mtime": 1781534133.938847,
-    "ast_hash": "443910306bad3cd995413e504e41cfe0",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Services/FileExplorer/FileTreeWatcher.swift": {
-    "mtime": 1781534133.9397442,
-    "ast_hash": "d79c1348605534368776f058893707ca",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Services/FileExplorer/GitStatusProvider.swift": {
-    "mtime": 1781534133.9400082,
-    "ast_hash": "7909d2e3491cf8510259340e1a74cfea",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Sources/HarnessApp/Services/FileExplorer/FileNode.swift": {
-    "mtime": 1781534133.9392078,
-    "ast_hash": "f34b8ae0979f3d08208c7bacd895afc6",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/CHANGELOG.md": {
-    "mtime": 1781535980.0504792,
-    "ast_hash": "1ec7f879757ace230b9542c5a654f99b",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/USAGE.md": {
-    "mtime": 1781534134.1665177,
-    "ast_hash": "c15b665cbf03d56a27dc0c258531e9b8",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/project.yml": {
-    "mtime": 1781534134.2285984,
-    "ast_hash": "0e8d511dbe5f320335e97f2dd3f692ae",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/README.md": {
-    "mtime": 1781534134.0797043,
-    "ast_hash": "3447eafeff6d59482ad4b159d535d47e",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/AGENTS.md": {
-    "mtime": 1781534133.8782303,
-    "ast_hash": "8bf7d47ab9b6631ed418f61bcc272896",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/CLAUDE.md": {
-    "mtime": 1781534133.978891,
-    "ast_hash": "719729fc3d3d4c9c6d378a10b5daf0f2",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/.aidlc/harness/command-history-search/PROGRESS.md": {
-    "mtime": 1781534133.8713026,
-    "ast_hash": "f6717fb7e818a63639ee3973d3cf1b9b",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/.aidlc/harness/command-history-search/audit.md": {
-    "mtime": 1781534133.871575,
-    "ast_hash": "1e8dc435219670fd80603f9adce87dfa",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/.aidlc/harness/command-history-search/planning/plans/00-inception-plan.md": {
-    "mtime": 1781534133.8723397,
-    "ast_hash": "3668b1798d32f26d3c4475717414a608",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/.aidlc/harness/command-history-search/planning/decisions/00-inception-decisions.md": {
-    "mtime": 1781534133.8720357,
-    "ast_hash": "4930471267a6d9c7a036d52069edb4b3",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/.aidlc/harness/acp/PROGRESS.md": {
-    "mtime": 1781534133.8663921,
-    "ast_hash": "ded019685083e34be842369a12d7cf21",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/.aidlc/harness/acp/audit.md": {
-    "mtime": 1781534133.866713,
-    "ast_hash": "cd373702f07ab319beb16863c9753de3",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/.aidlc/harness/acp/planning/plans/00-inception-plan.md": {
-    "mtime": 1781534133.8706288,
-    "ast_hash": "e8cdb1a3df8b470f8556bed44386dfa4",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/.aidlc/harness/acp/planning/plans/05-implementation.md": {
-    "mtime": 1781534133.870851,
-    "ast_hash": "328da8b792f83c41b5aa67948e07672f",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/.aidlc/harness/acp/planning/decisions/00-inception-decisions.md": {
-    "mtime": 1781534133.8704007,
-    "ast_hash": "711cb47cd3e94b58f79f72857a80ca6d",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/.aidlc/harness/acp/outputs/inception/brainstorming-summary.md": {
-    "mtime": 1781534133.867138,
-    "ast_hash": "5ffb5076051880888ca7c853a6c5c907",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/.aidlc/harness/acp/outputs/inception/logical-design.md": {
-    "mtime": 1781534133.8690314,
-    "ast_hash": "fd783f04e399325b57525769463666a8",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/.aidlc/harness/acp/outputs/inception/user-stories.md": {
-    "mtime": 1781534133.8693817,
-    "ast_hash": "719290e8c0243f3c6c978c4d88f6ac0b",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/.aidlc/harness/acp/outputs/inception/domain-decomposition.md": {
-    "mtime": 1781534133.868424,
-    "ast_hash": "71aa6f90bc5875a4a8a40d4077375846",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/.aidlc/harness/acp/outputs/inception/domain-design.md": {
-    "mtime": 1781534133.8686788,
-    "ast_hash": "948dd096d8af8ae594703077e32c620b",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/.aidlc/harness/ide-file-tree/PROGRESS.md": {
-    "mtime": 1781534133.8726692,
-    "ast_hash": "12c224f5161c670541fe1f18b5f3806b",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/.aidlc/harness/ide-file-tree/audit.md": {
-    "mtime": 1781534133.873042,
-    "ast_hash": "edf68c8a56fefec1319912c9d951d8da",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/.aidlc/harness/ide-file-tree/planning/plans/00-inception-plan.md": {
-    "mtime": 1781534133.875602,
-    "ast_hash": "990c3c6d58e33ad4b6068a4e1d4b4a0e",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/.aidlc/harness/ide-file-tree/planning/plans/05-implementation.md": {
-    "mtime": 1781534133.8759463,
-    "ast_hash": "4d144bef65e7c21edf260165cfa168ad",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/.aidlc/harness/ide-file-tree/planning/decisions/00-inception-decisions.md": {
-    "mtime": 1781534133.8753185,
-    "ast_hash": "5ce2ffec47ed10fe43d2ab73be7bea7c",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/.aidlc/harness/ide-file-tree/outputs/inception/brainstorming-summary.md": {
-    "mtime": 1781534133.873409,
-    "ast_hash": "9a43e9f75c701604cc6c3cd889d86481",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/.aidlc/harness/ide-file-tree/outputs/inception/logical-design.md": {
-    "mtime": 1781534133.8744285,
-    "ast_hash": "44834fe0e6ad7e248f483d7346e6f51d",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/.aidlc/harness/ide-file-tree/outputs/inception/user-stories.md": {
-    "mtime": 1781534133.8749833,
-    "ast_hash": "ee831645388d1f855291e09aa8286f15",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/.aidlc/harness/ide-file-tree/outputs/inception/domain-decomposition.md": {
-    "mtime": 1781534133.8737807,
-    "ast_hash": "2d54b714aa3de671a9d63d9d38b51bcb",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/.aidlc/harness/ide-file-tree/outputs/inception/domain-design.md": {
-    "mtime": 1781534133.874189,
-    "ast_hash": "c1629d0d8475103e0170b57944f0796f",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Tests/HarnessRobotTests/README.md": {
-    "mtime": 1781534134.1279197,
-    "ast_hash": "101b3ecd0fa1912fe453740d3d8f4bcb",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/docs/AGENT-HANDBOOK.md": {
-    "mtime": 1781534134.1852689,
-    "ast_hash": "20b943d4fa83249f253ab6a4804ca5b2",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/docs/TMUX_PARITY.md": {
-    "mtime": 1781534134.1894176,
-    "ast_hash": "0ffe994c42dc2dc9528621125d232617",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/docs/THIRD-PARTY-NOTICES.md": {
-    "mtime": 1781534134.1888695,
-    "ast_hash": "f761a7bd002ac8c83087c455201bff76",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/docs/COMMANDS.md": {
-    "mtime": 1781534134.185708,
-    "ast_hash": "5936549d38ce3f41d0f3ea613c97e186",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/docs/MIGRATION.md": {
-    "mtime": 1781534134.186867,
-    "ast_hash": "c3dd1e78571c50a107a9eee348a997e8",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/docs/RELEASE.md": {
-    "mtime": 1781534134.188765,
-    "ast_hash": "58b2921b6fb1a21164db0360b20eee6a",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/docs/MODES.md": {
-    "mtime": 1781534134.1876028,
-    "ast_hash": "50c67da425fa449e765f0c2a0d90d3f9",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/docs/KEYBINDINGS.md": {
-    "mtime": 1781534134.1862803,
-    "ast_hash": "f941f9a2039f5d87b66aa51e47948218",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/docs/MULTIPLEXER_GUIDE.md": {
-    "mtime": 1781534134.1880534,
-    "ast_hash": "8961cc4a552fae069e4b5ae9dbed5e0f",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/docs/agent-hooks/claude-code.md": {
-    "mtime": 1781534134.1901586,
-    "ast_hash": "5e70de93667b3ddbc068f7eb3faf6c52",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/docs/agent-hooks/cursor.md": {
-    "mtime": 1781534134.1913464,
-    "ast_hash": "e13d5c2ad29be74af73fe5ecd8871738",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/docs/agent-hooks/openclaw.md": {
-    "mtime": 1781534134.1924565,
-    "ast_hash": "60e53aa43a04174fa5526173ef934acd",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/docs/agent-hooks/README.md": {
-    "mtime": 1781534134.1897364,
-    "ast_hash": "4bc704ce6d12f3455501c1bfff10cdf7",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/docs/agent-hooks/codex.md": {
-    "mtime": 1781534134.191044,
-    "ast_hash": "7b5b36f266ed3eb9abc46a9baec41bfb",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/docs/agent-hooks/opencode.md": {
-    "mtime": 1781534134.1928132,
-    "ast_hash": "3ca4a7f1d1b39b7d56a82fba0d2d12e5",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/docs/agent-hooks/pi.md": {
-    "mtime": 1781534134.1931925,
-    "ast_hash": "45ff4fc90f12d14264f0faf458c17a2d",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/docs/agent-hooks/hermes.md": {
-    "mtime": 1781534134.1923387,
-    "ast_hash": "4ab1286a56694ffb6b8386ad67c8bd5f",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/docs/agent-hooks/grok.md": {
-    "mtime": 1781534134.1920686,
-    "ast_hash": "48fd2337c116b6992da970d7ddf4b9d0",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/docs/shell-integration/README.md": {
-    "mtime": 1781534134.1935039,
-    "ast_hash": "42f1789de18023b2049fed2ad144576f",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/results/log.html": {
-    "mtime": 1781534134.230251,
-    "ast_hash": "5518e45655f6a644fbda2b76a46ef6a0",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/results/report.html": {
-    "mtime": 1781534134.2322183,
-    "ast_hash": "26dbd6f0ae3707c4b1a3d750b2d23063",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Scripts/benchmarks/README.md": {
-    "mtime": 1781534134.0802631,
-    "ast_hash": "f4f82a821227970698fd955a9d65a8d5",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Scripts/cheatsheets/linux.txt": {
-    "mtime": 1781534134.082621,
-    "ast_hash": "c21358f32a2c45c9fdbae4637308affe",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Scripts/cheatsheets/vi.txt": {
-    "mtime": 1781534134.0832825,
-    "ast_hash": "cf943fabe8e79a1ee091600a5211ac63",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/.github/FUNDING.yml": {
-    "mtime": 1781534133.8762956,
-    "ast_hash": "360bfc8ba11c49a4f2210db14d216f0f",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/.github/workflows/release.yml": {
-    "mtime": 1781534133.8771582,
-    "ast_hash": "ce391c22360371a3fc50e8ab8175cbec",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/.github/workflows/ci.yml": {
-    "mtime": 1781534133.8766541,
-    "ast_hash": "d16d3e0c3432a23ada42721e9d430298",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/agent-memory/MANUAL_TEST_PLAN.md": {
-    "mtime": 1781534134.1673636,
+  "/Users/supavit.cho/Git/Personal/harness-terminal/agent-memory/MANUAL_TEST_PLAN.md": {
+    "mtime": 1781522273.069324,
     "ast_hash": "e09c11d2252bef8c8e793426d0b0e69c",
     "semantic_hash": ""
   },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/agent-memory/user-profile.md": {
-    "mtime": 1781534134.1842706,
-    "ast_hash": "c809877dfdb7b9335e6c3da1c48609ab",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/agent-memory/memory.md": {
-    "mtime": 1781534134.1732118,
-    "ast_hash": "ba60c27cbebe153dcf5fb29d343cf663",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/agent-memory/playbook.md": {
-    "mtime": 1781534134.1829052,
-    "ast_hash": "4bb18b2869ca8f4f2f1fc952c0e13aaf",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/agent-memory/skill-log.md": {
-    "mtime": 1781534134.183419,
-    "ast_hash": "ba34ac1f7d0838f1eb4ba8db16102de3",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/agent-memory/plans/p21-acp-agent-selection.md": {
-    "mtime": 1781534134.1811948,
+  "/Users/supavit.cho/Git/Personal/harness-terminal/agent-memory/plans/p21-acp-agent-selection.md": {
+    "mtime": 1781533923.91944,
     "ast_hash": "864ade5ed08b6d1d8124d640dfafa444",
     "semantic_hash": ""
   },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/agent-memory/plans/p19-terminal-workbench-migration.md": {
-    "mtime": 1781534134.1799932,
-    "ast_hash": "d74b57d9f161119f2e43aaefe6afcc38",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/agent-memory/plans/p17-structural-refactor.md": {
-    "mtime": 1781534134.1788707,
-    "ast_hash": "8404ceec420e623ec33b75016568a56f",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/agent-memory/plans/p11-scripting-config-api.md": {
-    "mtime": 1781534134.1753094,
-    "ast_hash": "a72c2ad4ef2ad86998c59e703ee62806",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/agent-memory/plans/p14-web-browser-pane.md": {
-    "mtime": 1781534134.177067,
-    "ast_hash": "fff676197fc530d32d532cdabb6cb697",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/agent-memory/plans/completed-archive.md": {
-    "mtime": 1781534134.1746871,
-    "ast_hash": "8ce849a01e5e226fafa392695d29c596",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/agent-memory/plans/p4-lsp-file-view.md": {
-    "mtime": 1781534134.1817133,
-    "ast_hash": "dbab637824444559054384f5dc304a77",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/agent-memory/plans/p8-macos27-adoption.md": {
-    "mtime": 1781534134.182315,
-    "ast_hash": "e569d1514f8060c8f1f28612e877d420",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/agent-memory/plans/p13-split-pane-parity.md": {
-    "mtime": 1781534134.1763942,
-    "ast_hash": "a46a0804b0d26d63c267a7ad1853d9a1",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/agent-memory/plans/p20-harness-term-agent.md": {
-    "mtime": 1781534134.1806612,
-    "ast_hash": "fc05749b6cb845ca45c3ea699c1c8eed",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/agent-memory/plans/p12-agent-orchestration-mcp.md": {
-    "mtime": 1781534134.1757643,
-    "ast_hash": "335ec092dccdc8469c41b1da197a8f28",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/agent-memory/plans/p18-ui-automation.md": {
-    "mtime": 1781534134.179465,
-    "ast_hash": "169106ce6c62d48b2e9b347611974f93",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/agent-memory/plans/p16-task-board.md": {
-    "mtime": 1781534134.1781423,
-    "ast_hash": "e4aa398575568dbb475dace69101cab6",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/agent-memory/plans/p15-integration-roadmap.md": {
-    "mtime": 1781534134.1775806,
-    "ast_hash": "2ac3bb6001de4d27878a536910b53c45",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/agent-memory/knowledge/browser-pane.md": {
-    "mtime": 1781534134.1697168,
-    "ast_hash": "a3fc1eb599665a567e8f19adf27e8137",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/agent-memory/knowledge/ipc-architecture.md": {
-    "mtime": 1781534134.1712134,
-    "ast_hash": "c21bf470951acf37deb82dcc3a2dfb3d",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/agent-memory/knowledge/acp-client.md": {
-    "mtime": 1781534134.1682496,
-    "ast_hash": "b32d72775669144a63a3f612015e6b8c",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/agent-memory/knowledge/service-decomposition.md": {
-    "mtime": 1781534134.1718853,
-    "ast_hash": "54e99491c1ded4e9e2009de235dfcbbf",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/agent-memory/knowledge/project-history.md": {
-    "mtime": 1781534134.1714807,
-    "ast_hash": "ab3be62cc3436d6d59e4f065d8ed4fe4",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/agent-memory/knowledge/session-tab-hierarchy.md": {
-    "mtime": 1781534134.1721911,
-    "ast_hash": "f5f0866cc818ef5ddcd1e8ce41ec5f76",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/agent-memory/knowledge/git-panel.md": {
-    "mtime": 1781534134.170512,
-    "ast_hash": "95461b194a83af881120797053de6a38",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/agent-memory/knowledge/split-panes.md": {
-    "mtime": 1781534134.1725075,
-    "ast_hash": "67782b425c644ee74334e98ad6426a94",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/agent-memory/knowledge/index.md": {
-    "mtime": 1781534134.170888,
-    "ast_hash": "b84184db6088b21477cf94f8bac1a1ea",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/agent-memory/knowledge/appkit-metal.md": {
-    "mtime": 1781534134.1693041,
-    "ast_hash": "baf7bb035ba1f6ca34e83afc392aa12e",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/agent-memory/knowledge/agent-session-board.md": {
-    "mtime": 1781534134.1688793,
-    "ast_hash": "f589513755f92f4455227d49488f189d",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/agent-memory/knowledge/fsevents-pattern.md": {
-    "mtime": 1781534134.1701312,
-    "ast_hash": "e36a05e176e42ef1d172c8745663a97d",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/agent-memory/knowledge/ui-automation.md": {
-    "mtime": 1781534134.1728628,
-    "ast_hash": "02c75a952274b2bd1cbf114f65707ec8",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Resources/Fonts/SymbolsNerdFont-LICENSE.txt": {
-    "mtime": 1781534133.9076207,
-    "ast_hash": "95075c92630bfc6c680b716728801b23",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Resources/AppIcon-1024.png": {
-    "mtime": 1781534133.8829284,
-    "ast_hash": "2fa93760da58cc8752b8b29912ad58e7",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Resources/HarnessLogo.png": {
-    "mtime": 1781534133.9283354,
-    "ast_hash": "77caf7441d21a7d0b166d4c50e94ce63",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Resources/icon-source/harnesscli-newicon.jpg": {
-    "mtime": 1781534133.931072,
-    "ast_hash": "e44b299c74fa852fd99dc35d2500d382",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Resources/icon-source/harnesscli-newicon-copy.jpg": {
-    "mtime": 1781534133.9302754,
-    "ast_hash": "989d13818e60b4be8206b29914f7a0c9",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Resources/Assets.xcassets/AppIcon.appiconset/icon_32x32@2x.png": {
-    "mtime": 1781534133.888291,
-    "ast_hash": "2cab0ba2d43888f29db45e4070636012",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Resources/Assets.xcassets/AppIcon.appiconset/icon_128x128.png": {
-    "mtime": 1781534133.8836286,
-    "ast_hash": "06b9a846ff3ffb0459085a70e1be6e2b",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Resources/Assets.xcassets/AppIcon.appiconset/icon_256x256@2x.png": {
-    "mtime": 1781534133.8875947,
-    "ast_hash": "2a2b600251fadd26e2cfc23c5ee94976",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Resources/Assets.xcassets/AppIcon.appiconset/icon_32x32.png": {
-    "mtime": 1781534133.8881598,
-    "ast_hash": "e2c69965036cabe3015ef905ff5ce107",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Resources/Assets.xcassets/AppIcon.appiconset/icon_512x512.png": {
-    "mtime": 1781534133.8888395,
-    "ast_hash": "2a2b600251fadd26e2cfc23c5ee94976",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Resources/Assets.xcassets/AppIcon.appiconset/icon_16x16.png": {
-    "mtime": 1781534133.8850281,
-    "ast_hash": "230499ebeedebce88dfc3868a2d33ffd",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Resources/Assets.xcassets/AppIcon.appiconset/icon_16x16@2x.png": {
-    "mtime": 1781534133.8851073,
-    "ast_hash": "e2c69965036cabe3015ef905ff5ce107",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Resources/Assets.xcassets/AppIcon.appiconset/icon_128x128@2x.png": {
-    "mtime": 1781534133.8838377,
-    "ast_hash": "dab0eb549860c1053df40edec548c42b",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Resources/Assets.xcassets/AppIcon.appiconset/icon_512x512@2x.png": {
-    "mtime": 1781534133.8928986,
-    "ast_hash": "2fa93760da58cc8752b8b29912ad58e7",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Resources/Assets.xcassets/AppIcon.appiconset/icon_256x256.png": {
-    "mtime": 1781534133.8852785,
-    "ast_hash": "dab0eb549860c1053df40edec548c42b",
-    "semantic_hash": ""
-  },
-  "/Users/supavit.cho/Git/Personal/harness-terminal/.claude/worktrees/fix-6hr-perf/Apps/Harness/Resources/Assets.xcassets/HarnessLogo.imageset/harness-logo.png": {
-    "mtime": 1781534133.9064198,
-    "ast_hash": "9062060cc2500487b5f62bff0265f8d1",
+  "/Users/supavit.cho/Git/Personal/harness-terminal/agent-memory/plans/p22-long-session-responsiveness.md": {
+    "mtime": 1781569000.0424714,
+    "ast_hash": "b923a4d2ac7d9865e8e5b948ae323357",
     "semantic_hash": ""
   }
 }

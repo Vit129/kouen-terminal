@@ -6,6 +6,16 @@ All notable changes to Harness are documented here. The format is based on
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/robzilla1738/harness-terminal/releases).
 
+## [3.1.2] - 2026-06-16
+
+### Fixed
+- **Tab bar status dot** now appears after the project name (`name •`) instead of at the pill's leading edge, matching the sidebar session card visual language.
+- **Branch label always visible** in inactive tab pills — previously hidden for `main`/`master` unless multiple tabs shared the same folder name.
+- **Drag-reorder phantom move** — cancels an in-flight tab drag when a structural reload fires (tab opened/closed elsewhere) instead of committing with a now-stale target index.
+
+### Performance
+- Eliminated redundant snapshot rebuilds on every 5-second metadata tick: `DaemonSyncService` skips `syncFromDaemon` when no git-branch deltas were detected; sidebar, Board view, and notch panel skip full card rebuilds on metadata-only ticks (reduces CPU load during long AI-agent sessions).
+
 ## [3.1.0] - 2026-06-15
 
 ### Added
