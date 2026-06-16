@@ -45,8 +45,19 @@ public enum TerminalBanner {
             lines += wrappedStep(number: index + 1, key: step.key, what: step.what, inner: inner)
         }
         lines.append([])
+        lines.append([Run("Native shortcuts", sgr: bold)])
+        let shortcuts: [(key: String, what: String)] = [
+            ("⌘\\",        "toggle sidebar"),
+            ("⌘⇧N / ⌘⇧W", "new / close session"),
+            ("⌘D / ⌘⇧D",  "split right / down"),
+            ("⌘W / ⌘⌥W",  "close tab / pane"),
+            ("⌘[ / ⌘]",   "prev / next session"),
+        ]
+        for shortcut in shortcuts {
+            lines += wrappedShortcut(key: shortcut.key, what: shortcut.what, inner: inner)
+        }
+        lines.append([])
         lines.append([Run("Docs: harnesscli.dev"), Run("  ·  ", sgr: dim), Run("Settings: ⌘,")])
-        lines += wrappedText("One-time tour — it won't print again.", sgr: dim, inner: inner)
         return render(lines: lines, columns: columns)
     }
 
@@ -118,6 +129,17 @@ public enum TerminalBanner {
         wrap(text, width: max(inner - 3, 10)).enumerated().map { index, line in
             index == 0 ? [Run(" • ", sgr: dim), Run(line)] : [Run("   "), Run(line)]
         }
+    }
+
+    /// A shortcut row: bullet + `key` in an aligned accent column, description beside it.
+    private static func wrappedShortcut(key: String, what: String, inner: Int) -> [[Run]] {
+        let lead = " • "
+        let keyColumn = 18
+        let descWidth = inner - lead.count - keyColumn
+        guard descWidth >= 16 else {
+            return [[Run(lead, sgr: dim), Run(key, sgr: accent), Run("  " + what)]]
+        }
+        return [[Run(lead, sgr: dim), Run(pad(key, to: keyColumn), sgr: accent), Run(what)]]
     }
 
     /// A numbered try-this step: `key` in an aligned accent column, the description
