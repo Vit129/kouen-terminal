@@ -1,16 +1,16 @@
 # Graph Report - harness-terminal  (2026-06-16)
 
 ## Corpus Check
-- 637 files · ~842,064 words
+- 639 files · ~843,853 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 15388 nodes · 26958 edges · 988 communities (718 shown, 270 thin omitted)
-- Extraction: 89% EXTRACTED · 11% INFERRED · 0% AMBIGUOUS · INFERRED: 2939 edges (avg confidence: 0.8)
+- 15536 nodes · 27391 edges · 991 communities (715 shown, 276 thin omitted)
+- Extraction: 89% EXTRACTED · 11% INFERRED · 0% AMBIGUOUS · INFERRED: 2983 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `4cfb5ddc`
+- Built from commit: `18e7f071`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -54,11 +54,13 @@
 - [[_COMMUNITY_HarnessCore Session  SessionEditor|HarnessCore: Session / SessionEditor]]
 - [[_COMMUNITY_Harness App UI  GitPanelView|Harness App: UI / GitPanelView]]
 - [[_COMMUNITY_Root Docs README|Root Docs: README]]
+- [[_COMMUNITY_HarnessCore Settings  HarnessSettings|HarnessCore: Settings / HarnessSettings]]
 - [[_COMMUNITY_Tests HarnessTerminalEngineTests  ParserRobustnessTests|Tests: HarnessTerminalEngineTests / ParserRobustnessTests]]
 - [[_COMMUNITY_Harness CLI HarnessCLI  WindowAttachClient|Harness CLI: HarnessCLI / WindowAttachClient]]
 - [[_COMMUNITY_Copy Mode HarnessCopyMode  CopyModeState|Copy Mode: HarnessCopyMode / CopyModeState]]
 - [[_COMMUNITY_Tests HarnessTerminalKitTests  RenderSchedulerTests|Tests: HarnessTerminalKitTests / RenderSchedulerTests]]
 - [[_COMMUNITY_Tests HarnessCoreTests  PaneRectSolverTests|Tests: HarnessCoreTests / PaneRectSolverTests]]
+- [[_COMMUNITY_HarnessCore Models  SessionSnapshot|HarnessCore: Models / SessionSnapshot]]
 - [[_COMMUNITY_HarnessCore Commands  CopyModeAction|HarnessCore: Commands / CopyModeAction]]
 - [[_COMMUNITY_Tests HarnessDaemonTests  SurfaceRegistryTests|Tests: HarnessDaemonTests / SurfaceRegistryTests]]
 - [[_COMMUNITY_HarnessCore Events  HookRegistry|HarnessCore: Events / HookRegistry]]
@@ -175,6 +177,7 @@
 - [[_COMMUNITY_Harness App UI  CommandPaletteController|Harness App: UI / CommandPaletteController]]
 - [[_COMMUNITY_Tests HarnessDaemonTests  VersionBannerTests|Tests: HarnessDaemonTests / VersionBannerTests]]
 - [[_COMMUNITY_Terminal Kit HarnessTerminalKit  TerminalFindBar|Terminal Kit: HarnessTerminalKit / TerminalFindBar]]
+- [[_COMMUNITY_Terminal Kit HarnessTerminalKit  TerminalHostView|Terminal Kit: HarnessTerminalKit / TerminalHostView]]
 - [[_COMMUNITY_Tests HarnessCoreTests  HarnessPathsTests|Tests: HarnessCoreTests / HarnessPathsTests]]
 - [[_COMMUNITY_Tests HarnessCoreTests  TerminalRecordingTests|Tests: HarnessCoreTests / TerminalRecordingTests]]
 - [[_COMMUNITY_HarnessCore Diagnostics  DoctorRunner|HarnessCore: Diagnostics / DoctorRunner]]
@@ -208,7 +211,6 @@
 - [[_COMMUNITY_Harness App UI  HarnessDesign|Harness App: UI / HarnessDesign]]
 - [[_COMMUNITY_Harness App UI  HarnessDesign|Harness App: UI / HarnessDesign]]
 - [[_COMMUNITY_Harness App UI  HarnessControls|Harness App: UI / HarnessControls]]
-- [[_COMMUNITY_HarnessCore CLI  TerminalRecording|HarnessCore: CLI / TerminalRecording]]
 - [[_COMMUNITY_Tests HarnessCoreTests  SessionPersistenceTests|Tests: HarnessCoreTests / SessionPersistenceTests]]
 - [[_COMMUNITY_Docs README|Docs: README]]
 - [[_COMMUNITY_HarnessCore Agents  AgentDetector|HarnessCore: Agents / AgentDetector]]
@@ -218,6 +220,7 @@
 - [[_COMMUNITY_Docs MIGRATION|Docs: MIGRATION]]
 - [[_COMMUNITY_HarnessCore ACP  ACPSession|HarnessCore: ACP / ACPSession]]
 - [[_COMMUNITY_Tests HarnessCoreTests  BinaryRefresherTests|Tests: HarnessCoreTests / BinaryRefresherTests]]
+- [[_COMMUNITY_HarnessCore Paths  HarnessPaths|HarnessCore: Paths / HarnessPaths]]
 - [[_COMMUNITY_Terminal Renderer HarnessTerminalRenderer  CellColorResolver|Terminal Renderer: HarnessTerminalRenderer / CellColorResolver]]
 - [[_COMMUNITY_Terminal Engine HarnessTerminalEngine  InputEncoder|Terminal Engine: HarnessTerminalEngine / InputEncoder]]
 - [[_COMMUNITY_Tests HarnessTerminalEngineTests  SemanticPromptTests|Tests: HarnessTerminalEngineTests / SemanticPromptTests]]
@@ -278,6 +281,7 @@
 - [[_COMMUNITY_Onboarding UI  ShellStepView|Onboarding: UI / ShellStepView]]
 - [[_COMMUNITY_Tests HarnessCoreTests  TmuxMigrationTests|Tests: HarnessCoreTests / TmuxMigrationTests]]
 - [[_COMMUNITY_Terminal Kit HarnessTerminalKit  FrameSignposter|Terminal Kit: HarnessTerminalKit / FrameSignposter]]
+- [[_COMMUNITY_Tests HarnessCoreTests  CompletionGeneratorTests|Tests: HarnessCoreTests / CompletionGeneratorTests]]
 - [[_COMMUNITY_Tests HarnessCoreTests  DefaultTerminalLaunchRequestTests|Tests: HarnessCoreTests / DefaultTerminalLaunchRequestTests]]
 - [[_COMMUNITY_Tests HarnessCoreTests  SGRMouseTests|Tests: HarnessCoreTests / SGRMouseTests]]
 - [[_COMMUNITY_Tests HarnessCoreTests  ShellCompletionInstallerTests|Tests: HarnessCoreTests / ShellCompletionInstallerTests]]
@@ -380,7 +384,6 @@
 - [[_COMMUNITY_Harness App UI  LSPFileSession|Harness App: UI / LSPFileSession]]
 - [[_COMMUNITY_HarnessCore Settings  JSONMerge|HarnessCore: Settings / JSONMerge]]
 - [[_COMMUNITY_Tests HarnessCoreTests  KeybindingsStoreTests|Tests: HarnessCoreTests / KeybindingsStoreTests]]
-- [[_COMMUNITY_Terminal Engine Images  SixelDecoder|Terminal Engine: Images / SixelDecoder]]
 - [[_COMMUNITY_Harness App Services  SparkleUpdater|Harness App: Services / SparkleUpdater]]
 - [[_COMMUNITY_Onboarding Design  WindowBlur|Onboarding: Design / WindowBlur]]
 - [[_COMMUNITY_Docs harness.bash|Docs: harness.bash]]
@@ -434,6 +437,7 @@
 - [[_COMMUNITY_Harness App UI  HarnessDesign|Harness App: UI / HarnessDesign]]
 - [[_COMMUNITY_Harness MCP HarnessMCP  StdioTransport|Harness MCP: HarnessMCP / StdioTransport]]
 - [[_COMMUNITY_Tests HarnessThemeTests  ThemeCatalogEmbedTests|Tests: HarnessThemeTests / ThemeCatalogEmbedTests]]
+- [[_COMMUNITY_Daemon HarnessDaemon  SurfaceRegistry|Daemon: HarnessDaemon / SurfaceRegistry]]
 - [[_COMMUNITY_Tests HarnessCoreTests  GroupedSessionTests|Tests: HarnessCoreTests / GroupedSessionTests]]
 - [[_COMMUNITY_Harness App UI  HarnessSidebarPanelViewController|Harness App: UI / HarnessSidebarPanelViewController]]
 - [[_COMMUNITY_Onboarding UI  OnboardingWizardView|Onboarding: UI / OnboardingWizardView]]
@@ -520,11 +524,9 @@
 - [[_COMMUNITY_HarnessCore ACP  ACPClient|HarnessCore: ACP / ACPClient]]
 - [[_COMMUNITY_Release Notes CHANGELOG|Release Notes: CHANGELOG]]
 - [[_COMMUNITY_Community 521|Community 521]]
-- [[_COMMUNITY_Daemon HarnessDaemon  SurfaceRegistry|Daemon: HarnessDaemon / SurfaceRegistry]]
 - [[_COMMUNITY_Release Notes CHANGELOG|Release Notes: CHANGELOG]]
 - [[_COMMUNITY_Release Notes CHANGELOG|Release Notes: CHANGELOG]]
 - [[_COMMUNITY_Community 525|Community 525]]
-- [[_COMMUNITY_Community 526|Community 526]]
 - [[_COMMUNITY_Community 527|Community 527]]
 - [[_COMMUNITY_Community 528|Community 528]]
 - [[_COMMUNITY_Release Notes CHANGELOG|Release Notes: CHANGELOG]]
@@ -596,6 +598,7 @@
 - [[_COMMUNITY_Community 597|Community 597]]
 - [[_COMMUNITY_Community 598|Community 598]]
 - [[_COMMUNITY_Community 599|Community 599]]
+- [[_COMMUNITY_Community 600|Community 600]]
 - [[_COMMUNITY_Community 601|Community 601]]
 - [[_COMMUNITY_Community 602|Community 602]]
 - [[_COMMUNITY_Community 603|Community 603]]
@@ -625,6 +628,7 @@
 - [[_COMMUNITY_Community 628|Community 628]]
 - [[_COMMUNITY_Community 629|Community 629]]
 - [[_COMMUNITY_Community 630|Community 630]]
+- [[_COMMUNITY_Community 631|Community 631]]
 - [[_COMMUNITY_Community 632|Community 632]]
 - [[_COMMUNITY_Community 633|Community 633]]
 - [[_COMMUNITY_Community 634|Community 634]]
@@ -638,13 +642,14 @@
 - [[_COMMUNITY_Community 642|Community 642]]
 - [[_COMMUNITY_Community 643|Community 643]]
 - [[_COMMUNITY_Community 644|Community 644]]
+- [[_COMMUNITY_Community 645|Community 645]]
 - [[_COMMUNITY_Community 646|Community 646]]
 - [[_COMMUNITY_Community 647|Community 647]]
-- [[_COMMUNITY_Community 648|Community 648]]
 - [[_COMMUNITY_Community 649|Community 649]]
 - [[_COMMUNITY_Community 650|Community 650]]
 - [[_COMMUNITY_Community 651|Community 651]]
 - [[_COMMUNITY_Community 652|Community 652]]
+- [[_COMMUNITY_Community 653|Community 653]]
 - [[_COMMUNITY_Community 654|Community 654]]
 - [[_COMMUNITY_Community 655|Community 655]]
 - [[_COMMUNITY_Community 656|Community 656]]
@@ -710,7 +715,6 @@
 - [[_COMMUNITY_Community 717|Community 717]]
 - [[_COMMUNITY_Community 718|Community 718]]
 - [[_COMMUNITY_Community 719|Community 719]]
-- [[_COMMUNITY_Community 720|Community 720]]
 - [[_COMMUNITY_Community 721|Community 721]]
 - [[_COMMUNITY_Community 722|Community 722]]
 - [[_COMMUNITY_Community 723|Community 723]]
@@ -971,6 +975,9 @@
 - [[_COMMUNITY_Community 985|Community 985]]
 - [[_COMMUNITY_Community 986|Community 986]]
 - [[_COMMUNITY_Community 987|Community 987]]
+- [[_COMMUNITY_Community 988|Community 988]]
+- [[_COMMUNITY_Community 989|Community 989]]
+- [[_COMMUNITY_Community 990|Community 990]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `HarnessTerminalSurfaceView` - 334 edges
@@ -991,56 +998,52 @@
   /Users/supavit.cho/Git/harness-terminal/Tools/harness/Sources/HarnessCLI/HarnessCLI+Server.swift → Apps/Harness/Sources/HarnessApp/UI/CommandPaletteController.swift
 - `vfork_and_exec()` --calls--> `Process`  [INFERRED]
   Tools/harness/Sources/HarnessCLI/HarnessCLI+Workbench.swift → Apps/Harness/Sources/HarnessApp/UI/CommandPalette/CommandPaletteController.swift
+- `tunnelSocketURL()` --calls--> `character`  [INFERRED]
+  /Users/supavit.cho/Git/harness-terminal/Packages/HarnessCore/Sources/HarnessCore/Paths/HarnessPaths.swift → Packages/HarnessTerminalKit/Sources/HarnessTerminalKit/HarnessTerminalSurfaceView.swift
 - `refresh()` --calls--> `character`  [INFERRED]
-  Apps/Harness/Sources/HarnessApp/UI/GitPanelView.swift → /Users/supavit.cho/Git/harness-terminal/Packages/HarnessTerminalKit/Sources/HarnessTerminalKit/HarnessTerminalSurfaceView.swift
-- `makeChangeRow()` --calls--> `character`  [INFERRED]
-  Apps/Harness/Sources/HarnessApp/UI/GitPanelView.swift → /Users/supavit.cho/Git/harness-terminal/Packages/HarnessTerminalKit/Sources/HarnessTerminalKit/HarnessTerminalSurfaceView.swift
+  /Users/supavit.cho/Git/harness-terminal/Apps/Harness/Sources/HarnessApp/UI/Git/GitPanelView.swift → Packages/HarnessTerminalKit/Sources/HarnessTerminalKit/HarnessTerminalSurfaceView.swift
 
-## Communities (988 total, 270 thin omitted)
+## Communities (991 total, 276 thin omitted)
 
 ### Community 0 - "Terminal Engine: Model / TerminalGridModel"
-Cohesion: 0.06
-Nodes (31): ANSIPalette, Appearance, AppearanceKind, dark, light, CodingKeys, appearance, applyToTerminalOutput (+23 more)
+Cohesion: 0.07
+Nodes (29): Appearance, AppearanceKind, dark, light, CodingKeys, appearance, applyToTerminalOutput, backgroundBlur (+21 more)
 
 ### Community 1 - "Harness CLI: HarnessCLI"
-Cohesion: 0.07
-Nodes (95): callingPaneTarget(), checkedRequest(), emit(), flagIsDangling(), flagValue(), handleAttach(), handleAttachWindow(), handleBindHook() (+87 more)
-
-### Community 2 - "Tests: HarnessTerminalRendererTests / MetalRendererTests"
-Cohesion: 0.09
-Nodes (4): GlyphKey, MetalRendererTests, RenderedFixture, TerminalDamage
-
-### Community 3 - "Terminal Engine: Screen / TerminalScreen"
-Cohesion: 0.05
-Nodes (6): HistoryLine, ImagePlacement, Pen, RewrapResult, SavedCursor, TerminalScreen
+Cohesion: 0.08
+Nodes (94): callingPaneTarget(), checkedRequest(), emit(), flagIsDangling(), flagValue(), handleAttach(), handleAttachWindow(), handleBindHook() (+86 more)
 
 ### Community 5 - "HarnessCore: IPC / IPCMessage"
 Cohesion: 0.02
 Nodes (103): IPCRequest, applyLayout, attachSurface, bindHook, breakPane, browserClose, browserInteract, browserNavigate (+95 more)
 
 ### Community 6 - "Terminal Renderer: HarnessTerminalRenderer / TerminalMetalRenderer"
-Cohesion: 0.03
-Nodes (64): [1.0.0] - [1.0.4] - 2026-06-01, [1.0.5] - 2026-06-01, [1.0.6] - 2026-06-02, [1.1.0] - 2026-06-02, [1.1.1] - 2026-06-02, [1.2.0] - 2026-06-03, [1.3.0] - 2026-06-04, [1.3.1] - 2026-06-04 (+56 more)
+Cohesion: 0.15
+Nodes (13): [1.0.0] - [1.0.4] - 2026-06-01, [1.0.5] - 2026-06-01, [1.1.1] - 2026-06-02, [1.6.0] - 2026-06-05, [1.9.0] - 2026-06-08, [2.2.3] - 2026-06-09, Added, Changed (+5 more)
 
 ### Community 7 - "HarnessCore: Commands / Command"
 Cohesion: 0.02
 Nodes (88): Command, bindKey, breakPane, choose, clearHistory, clockMode, commandPrompt, confirmBefore (+80 more)
 
 ### Community 8 - "Terminal Engine: Emulator / TerminalEmulator"
-Cohesion: 0.05
-Nodes (4): params, TerminalEmulator, CommandFinishedTests, TerminalProtocolCompatibilityTests
+Cohesion: 0.04
+Nodes (5): params, TerminalEmulator, TerminalProgressReport, CommandFinishedTests, TerminalProtocolCompatibilityTests
 
 ### Community 9 - "Harness App: Settings / SettingsViewController"
-Cohesion: 0.04
-Nodes (4): Settings, NSFontChanging, SettingsViewController, SettingsViewController
+Cohesion: 0.03
+Nodes (7): Settings, NSFontChanging, configureControls(), SettingsViewController, SettingsViewController, SettingsViewController, SettingsViewController
 
 ### Community 10 - "Tests: HarnessBenchmarks / PerformanceBenchmarks"
-Cohesion: 0.11
-Nodes (3): PerformanceBenchmarks, SurfaceMainThreadStallSample, SurfaceOffMainStallSample
+Cohesion: 0.10
+Nodes (4): PerformanceBenchmarks, SurfaceMainThreadStallSample, SurfaceOffMainStallSample, Colors
 
 ### Community 11 - "Harness App: UI / TerminalTabBarView"
 Cohesion: 0.11
 Nodes (3): tabAgentKind(), tabDisplayTitle(), TabPillView
+
+### Community 12 - "Harness App: UI / ContentAreaViewController"
+Cohesion: 0.05
+Nodes (5): ContentAreaViewController, EditorDividerView, HitTestPassthroughView, PaneContainerView, PaneSplitButtonsView
 
 ### Community 13 - "Tests: HarnessTerminalEngineTests / KittyKeyboardTests"
 Cohesion: 0.11
@@ -1051,16 +1054,16 @@ Cohesion: 0.07
 Nodes (17): CSIParams, State, csiEntry, csiIgnore, csiIntermediate, csiParam, escape, escapeIntermediate (+9 more)
 
 ### Community 15 - "Tests: HarnessCoreTests / FormatStringTests"
-Cohesion: 0.08
-Nodes (3): LegacySnapshot, LegacyWorkspace, SessionEditorTests
+Cohesion: 0.13
+Nodes (3): inputModes(), HarnessTerminalSurfaceView, RawSelection
 
 ### Community 16 - "Terminal Renderer: HarnessTerminalRenderer / GlyphRasterizer"
-Cohesion: 0.15
-Nodes (6): CellMetrics, GlyphRasterizer, RasterizedGlyph, ShapedGlyph, ShapedRunCacheStats, ShapedRunKey
+Cohesion: 0.06
+Nodes (9): CellMetrics, GlyphRasterizer, RasterizedGlyph, ShapedGlyph, ShapedRunCacheStats, ShapedRunKey, GlyphRasterizerTests, ShapedGlyphSignature (+1 more)
 
 ### Community 17 - "HarnessCore: ACP / ACPClient"
-Cohesion: 0.13
-Nodes (17): ACPClientDelegate, ACPToolCall, ACPToolCallUpdate, ClientError, noSession, notReady, timeout, State (+9 more)
+Cohesion: 0.09
+Nodes (18): ACPClient, ACPClientDelegate, ACPPermissionRequest, ACPToolCall, ACPToolCallUpdate, ClientError, noSession, notReady (+10 more)
 
 ### Community 18 - "Tests: HarnessDaemonTests / ScrollbackFileTests"
 Cohesion: 0.10
@@ -1074,17 +1077,17 @@ Nodes (48): SpecialKey, backspace, capsLock, deleteForward, down, end, enter, es
 Cohesion: 0.05
 Nodes (38): Acceptance Criteria, Allowlist / Control Gate, `closePane`, code:block1 (Agent shell process), code:json ({), code:json ({), code:json ({), code:json ({) (+30 more)
 
-### Community 21 - "Terminal Kit: HarnessTerminalKit / HarnessTerminalSurfaceView"
-Cohesion: 0.03
-Nodes (3): HarnessTerminalSurfaceView, RawSelection, NSTextInputClient
-
 ### Community 23 - "Daemon: HarnessDaemon / RealPty"
-Cohesion: 0.06
-Nodes (8): harness_pty_get_winsize(), PtyError, launchFailed, RealPty, ScrollbackEntry, ScrollbackReplaySegment, ShellLaunchProfile, RealPtyReapRecordTests
+Cohesion: 0.05
+Nodes (14): harness_open_pty_master(), harness_open_rdwr(), harness_peer_uid(), harness_pty_get_winsize(), harness_pty_make_controlling(), harness_pty_set_winsize(), harness_set_nonblocking(), PtyError (+6 more)
 
 ### Community 24 - "Tests: HarnessDaemonTests / DaemonRoundTripTests"
-Cohesion: 0.06
-Nodes (10): DaemonRoundTripTests, RawSocketError, connectFailed, writeFailed, RealPtyLifecycleTests, AtomicBox, AtomicCounter, OutputAccumulator (+2 more)
+Cohesion: 0.07
+Nodes (6): DaemonRoundTripTests, RawSocketError, connectFailed, writeFailed, DaemonClient, DaemonClientActor
+
+### Community 25 - "HarnessCore: Session / SessionEditor"
+Cohesion: 0.08
+Nodes (3): PanePipe, SurfaceMonitor, SurfaceRegistry
 
 ### Community 26 - "Docs: HARNESS_TMUX_CAPABILITIES"
 Cohesion: 0.05
@@ -1092,47 +1095,43 @@ Nodes (39): 10. Status line, mouse, and options, 11. Shell integration, 12. Agen
 
 ### Community 27 - "Tests: HarnessTerminalRendererTests / CellColorResolverTests"
 Cohesion: 0.05
-Nodes (8): ANSIPaletteTests, CellColorResolverTests, RGBColorTests, ANSIPalette, CellColorResolver, MochaTheme, ResolvedCellColors, RGBColor
+Nodes (9): ANSIPaletteTests, CellColorResolverTests, HarnessThemeDefinition, RGBColorTests, ANSIPalette, CellColorResolver, MochaTheme, ResolvedCellColors (+1 more)
 
 ### Community 28 - "Harness App: UI / GitPanelView"
-Cohesion: 0.09
-Nodes (44): addWorktreeAction(), Character, clearRoot(), commitAction(), copyCommitID(), copyCommitMessage(), copyCommitSummary(), debouncedRefresh() (+36 more)
+Cohesion: 0.05
+Nodes (49): addWorktreeAction(), ChangeRowView, Character, clearRoot(), commitAction(), CommitChangedFile, copyCommitID(), copyCommitMessage() (+41 more)
 
 ### Community 30 - "Harness App: UI / CommandPaletteController"
-Cohesion: 0.12
-Nodes (16): [1.0.0] - [1.0.4] - 2026-06-01, [1.0.5] - 2026-06-01, [1.0.6] - 2026-06-02, [1.1.1] - 2026-06-02, [1.6.0] - 2026-06-05, Added, Added, Changed (+8 more)
+Cohesion: 0.13
+Nodes (16): [1.0.0] - [1.0.4] - 2026-06-01, [1.0.5] - 2026-06-01, [1.1.1] - 2026-06-02, [1.6.0] - 2026-06-05, [2.2.3] - 2026-06-09, [2.2.4] - 2026-06-11, Added, Changed (+8 more)
 
 ### Community 32 - "Tests: HarnessCoreTests / JSONMergeTests"
-Cohesion: 0.05
-Nodes (10): HarnessSidebarPanelViewControllerTests, LaunchAgentInstallerTests, ServiceInstallerTests, OnboardingEnvironmentTests, CharacterWidthTests, HarnessTerminalSurfaceFocusTests, SpecialKeyMappingTests, TerminalHostViewTests (+2 more)
-
-### Community 33 - "Tests: HarnessTerminalEngineTests / EngineConformanceTests"
-Cohesion: 0.23
-Nodes (8): Comparable, AgentNotchPeekDecider, AgentNotchPeekEvent, Reason, errored, finished, needsInput, RowState
-
-### Community 34 - "Theme: HarnessTheme / ThemeDocument"
-Cohesion: 0.05
-Nodes (5): HarnessCLI, LSPDefinitionPayload, LSPDiagnosticsPayload, LSPStatusPayload, handleDetachClient()
+Cohesion: 0.04
+Nodes (10): HarnessSidebarPanelViewControllerTests, SearchPanelViewTests, CompletionGeneratorTests, ControlKeyNormalizerTests, RealPtyReplayTests, BinaryInstallerDisplayTests, HarnessTerminalSurfaceFocusTests, TerminalHostViewTests (+2 more)
 
 ### Community 35 - "Harness App: Settings / SettingsViewController"
-Cohesion: 0.06
-Nodes (3): retintAgentIcon(), configureControls(), SettingsViewController
+Cohesion: 0.10
+Nodes (5): BoardViewControllerTests, BoardCardView, BoardViewController, BoardCardView, BoardViewController
 
 ### Community 36 - "HarnessCore: Session / SessionEditor"
 Cohesion: 0.04
 Nodes (46): Acceptance Criteria, ✅ :agent ex command (ViExCommands.swift), ✅ AgentBridge (HarnessApp/Services/AgentBridge.swift), ✅ AgentCatalog (HarnessApp/Services/AgentCatalog.swift), App, Brand Rule, CLI, ✅ CLI: `harness agent send` (+38 more)
 
 ### Community 37 - "Harness App: UI / GitPanelView"
-Cohesion: 0.09
-Nodes (3): NSButton, CommitChangedFile, GitPanelView
+Cohesion: 0.07
+Nodes (5): NSButton, NSDraggingSource, GitChangeRowView, GitHistoryFileButton, GitPanelView
 
 ### Community 38 - "Root Docs: README"
-Cohesion: 0.07
-Nodes (36): Agent hooks, 🧠 Agent Memory System, 🧬 Architecture — CMUX + Zed in a Terminal, Build locally, CLI, 📐 CMUX (Split Panes), code:bash (git clone https://github.com/Vit129/harness-terminal.git), code:bash (/Applications/Harness.app/Contents/MacOS/harness-cli install) (+28 more)
+Cohesion: 0.10
+Nodes (19): 🧠 Agent Memory System, 📐 CMUX (Split Panes), 🔄 Daemon & Sessions, Docs, Documentation, Features, Features, 🌿 Git (Real-time) (+11 more)
 
 ### Community 40 - "Tests: HarnessTerminalEngineTests / ParserRobustnessTests"
-Cohesion: 0.10
-Nodes (4): NSTextFieldDelegate, HarnessSearchField, HarnessSegmented, HarnessTextField
+Cohesion: 0.06
+Nodes (7): NSTextFieldDelegate, HarnessColorPanelCoordinator, HarnessSearchField, HarnessSegmented, HarnessSlider, HarnessTextField, HarnessToggle
+
+### Community 41 - "Harness CLI: HarnessCLI / WindowAttachClient"
+Cohesion: 0.13
+Nodes (4): AsyncCLIResultBox, LSPDefinitionPayload, LSPDiagnosticsPayload, LSPStatusPayload
 
 ### Community 42 - "Copy Mode: HarnessCopyMode / CopyModeState"
 Cohesion: 0.06
@@ -1148,7 +1147,7 @@ Nodes (30): CopyModeAction, beginSelection, bottom, cancel, clearSelection, copy
 
 ### Community 47 - "Tests: HarnessDaemonTests / SurfaceRegistryTests"
 Cohesion: 0.03
-Nodes (66): [1.0.0] - [1.0.4] - 2026-06-01, [1.0.5] - 2026-06-01, [1.0.6] - 2026-06-02, [1.1.0] - 2026-06-02, [1.1.1] - 2026-06-02, [1.1.2] - 2026-06-02, [1.3.0] - 2026-06-04, [1.3.1] - 2026-06-04 (+58 more)
+Nodes (70): [1.0.0] - [1.0.4] - 2026-06-01, [1.0.5] - 2026-06-01, [1.0.6] - 2026-06-02, [1.1.1] - 2026-06-02, [1.1.2] - 2026-06-02, [1.2.0] - 2026-06-03, [1.3.0] - 2026-06-04, [1.3.1] - 2026-06-04 (+62 more)
 
 ### Community 48 - "HarnessCore: Events / HookRegistry"
 Cohesion: 0.06
@@ -1159,16 +1158,16 @@ Cohesion: 0.13
 Nodes (10): ClientRecord, CountBox, DaemonServer, PendingBrowserRequest, PendingWrite, WriteOutcome, complete, failed (+2 more)
 
 ### Community 50 - "HarnessCore: IPC / DaemonClient"
-Cohesion: 0.09
-Nodes (24): CustomStringConvertible, Error, DaemonError, alreadyRunning, bindFailed, listenFailed, socketFailed, DaemonClientError (+16 more)
+Cohesion: 0.13
+Nodes (14): Error, DaemonClientError, connectionFailed, timeout, unexpectedResponse, writeFailed, DecodedReplyFrame, output (+6 more)
 
 ### Community 51 - "Tests: HarnessTerminalKitTests / GridCompositorCopyModeTests"
-Cohesion: 0.07
-Nodes (8): PrefixKeymapFallbackTests, WindowInputRouter, WindowInputRouterTests, KeyTableTests, KeySpec, Modifiers, OptionSet, UInt8
+Cohesion: 0.06
+Nodes (8): PrefixKeymapFallbackTests, WindowInputRouterTests, KeyTableTests, ANSIPalette, KeySpec, Modifiers, OptionSet, UInt8
 
 ### Community 52 - "Harness App: UI / Phase67UI"
-Cohesion: 0.11
-Nodes (7): NSWindowDelegate, ClosureTarget, MenuActionTarget, OverlayWindow, Phase67UI, PopupWindow, WindowCloseProxy
+Cohesion: 0.12
+Nodes (6): ClosureTarget, MenuActionTarget, OverlayWindow, Phase67UI, PopupWindow, WindowCloseProxy
 
 ### Community 56 - "Tests: HarnessCoreTests / TargetSpecTests"
 Cohesion: 0.09
@@ -1179,8 +1178,8 @@ Cohesion: 0.13
 Nodes (3): WorkspacePillButton, WorkspaceSwitcherPanelView, WorkspaceSwitcherRow
 
 ### Community 58 - "Tests: HarnessCoreTests / PasteBufferStoreTests"
-Cohesion: 0.16
-Nodes (3): PasteBufferStore, PasteBufferStoreTests, buffers
+Cohesion: 0.09
+Nodes (6): Buffer, Configuration, PasteBufferStore, PasteBufferStoreTests, DynamicInstanceBuffer, buffers
 
 ### Community 59 - "Agent Memory: plans / panel-session-performance"
 Cohesion: 0.06
@@ -1199,20 +1198,20 @@ Cohesion: 0.13
 Nodes (8): ColorKind, bg, fg, underline, ComposedCell, ComposedFrame, CompositorPane, GridCompositor
 
 ### Community 63 - "Tests: HarnessTerminalKitTests / LiveResizeTests"
-Cohesion: 0.06
-Nodes (5): SettingsWindowCloseProxyTests, FluidityBenchmarks, LiveResizeTests, OcclusionTests, NSWindow
+Cohesion: 0.08
+Nodes (3): SettingsWindowCloseProxyTests, LiveResizeTests, NSWindow
 
 ### Community 64 - "Daemon: HarnessDaemon / SurfaceRegistry"
-Cohesion: 0.04
-Nodes (13): WindowBorderOverlayView, BoardViewControllerTests, ResizeHUDView, NSView, Toast, ToastLabel, BoardCardView, BoardViewController (+5 more)
+Cohesion: 0.03
+Nodes (18): WindowBorderOverlayView, FileEditorTabBarView, FileTabPill, ResizeHUDView, agentDetail(), AgentInboxPanelView, AgentInboxRowView, NSView (+10 more)
 
 ### Community 65 - "HarnessCore: IPC / IPCCodec"
-Cohesion: 0.08
-Nodes (5): FormatContext, FormatString, FormatStyle, ScrollbackFile, ScrollbackFileTests
+Cohesion: 0.06
+Nodes (12): FormatContext, FormatString, FormatStyle, ScrollbackFile, ScrollbackFileTests, Source, activePane, activeTab (+4 more)
 
 ### Community 66 - "Terminal Kit: HarnessTerminalKit / HarnessTerminalSurfaceView"
-Cohesion: 0.10
-Nodes (6): AgentSnapshot, AgentSessionSummaryTests, BoardModelTests, agents, AgentCatalog, AgentConfig
+Cohesion: 0.13
+Nodes (5): AgentSnapshot, AgentSessionSummaryTests, agents, AgentCatalog, AgentConfig
 
 ### Community 68 - "HarnessCore: ACP / ACPMessage"
 Cohesion: 0.08
@@ -1223,12 +1222,12 @@ Cohesion: 0.19
 Nodes (9): CommandParseError, emptyInput, expectedCommand, invalidArgument, missingArgument, missingFlag, unknownCommand, unterminatedString (+1 more)
 
 ### Community 71 - "Harness App: UI / MenuBarController"
-Cohesion: 0.16
-Nodes (3): AgentRow, MenuBarController, MenuRef
+Cohesion: 0.15
+Nodes (4): NSMenuDelegate, AgentRow, MenuBarController, MenuRef
 
 ### Community 72 - "Harness CLI: HarnessCLI / WindowAttachClient"
 Cohesion: 0.04
-Nodes (12): PresentAttempt, encodeFailure, nilDrawable, presented, RawSelection, SelectionGranularity, line, word (+4 more)
+Nodes (67): appendingPeekRow(), applyPointerShape(), applyPreferredFrameRateRange(), armSyncTimeout(), buildRenderer(), commitGridSize(), computeGridGeometry(), configureAppearance() (+59 more)
 
 ### Community 73 - "Tests: HarnessDaemonTests / HookFiringTests"
 Cohesion: 0.07
@@ -1236,23 +1235,23 @@ Nodes (29): ACP Client (shelved — code preserved for future), 🧠 Agent Memor
 
 ### Community 74 - "Tests: HarnessCoreTests / DoctorRunnerTests"
 Cohesion: 0.07
-Nodes (34): [1.6.0] - 2026-06-07, [2.5.0] - 2026-06-12, [2.6.0] - 2026-06-13, [2.6.1] - 2026-06-13, [2.6.2] - 2026-06-13, [2.6.3] - 2026-06-13, [2.7.0] - 2026-06-15, Added (+26 more)
+Nodes (37): [1.6.0] - 2026-06-07, [2.5.0] - 2026-06-12, [2.6.0] - 2026-06-13, [2.6.1] - 2026-06-13, [2.6.2] - 2026-06-13, [2.6.3] - 2026-06-13, [2.7.0] - 2026-06-15, Added (+29 more)
 
 ### Community 75 - "Terminal Kit: HarnessTerminalKit / GridCompositor"
 Cohesion: 0.15
 Nodes (13): [1.0.0] - [1.0.4] - 2026-06-01, [1.0.5] - 2026-06-01, [1.1.1] - 2026-06-02, [1.6.0] - 2026-06-05, [2.2.3] - 2026-06-09, [2.5.2] - 2026-06-12, Changed, Changelog (+5 more)
 
 ### Community 76 - "HarnessCore: Agents / AgentSnapshot"
-Cohesion: 0.04
-Nodes (39): AgentConfig, Codable, JSONOutputFormatterTests, HarnessThemeDefinition, ClientSummary, DaemonStats, Endpoint, tcp (+31 more)
+Cohesion: 0.02
+Nodes (76): Codable, ChooseScope, buffer, client, session, tree, window, MenuItem (+68 more)
 
 ### Community 77 - "AIDLC: harness / ide-file-tree / outputs / domain-design"
 Cohesion: 0.07
 Nodes (25): code:block1 (FileSelected {), code:block2 (GitCommitSelected {), code:block3 (WHEN FileSelected event is emitted), 1. Domain Overview, 2. Domain Entities, 3. Value Objects, 4. Aggregates, 5. Domain Events (+17 more)
 
 ### Community 79 - "HarnessCore: Keybindings / KeyTable"
-Cohesion: 0.07
-Nodes (14): RawSelection, SelectionResolver, BlockSelection, CursorRender, FrameBuilder, FrameImage, RenderCell, renderCursorStyle() (+6 more)
+Cohesion: 0.15
+Nodes (13): CursorRender, CursorStyle, bar, block, underline, FrameBuilder, FrameImage, RenderCell (+5 more)
 
 ### Community 80 - "Docs: AGENT-HANDBOOK"
 Cohesion: 0.09
@@ -1265,10 +1264,6 @@ Nodes (8): DaemonClientTests, FrameRecorder, makeUnixSocketPair(), posixBind(), 
 ### Community 83 - "HarnessCore: ACP / ACPTransport"
 Cohesion: 0.16
 Nodes (7): ACPTransport, TransportBuffer, TransportError, invalidContentLength, invalidUTF8Header, malformedHeader, missingContentLength
-
-### Community 85 - "Harness App: UI / SearchPanelView"
-Cohesion: 0.13
-Nodes (3): SearchPanelView, SearchResult, SpotlightNameMatcher
 
 ### Community 86 - "Harness App: UI / GitPanelView"
 Cohesion: 0.07
@@ -1283,8 +1278,8 @@ Cohesion: 0.13
 Nodes (4): RemoteHostStoreTests, MutationResult, RemoteHost, RemoteHostStore
 
 ### Community 90 - "Tests: HarnessCoreTests / AgentNotchProjectionTests"
-Cohesion: 0.07
-Nodes (7): AgentSessionSummary, AgentNotchProjectionTests, BoardCommandTests, AgentNotchProjectionTests, SessionGroup, SessionSnapshot, PaneLeaf
+Cohesion: 0.06
+Nodes (8): AgentSessionSummary, AgentNotchProjectionTests, BoardCommandTests, AgentNotchProjectionTests, SessionGroup, SessionSnapshot, Tab, PaneLeaf
 
 ### Community 92 - "Agent Memory: plans / p2-async-ipc-design"
 Cohesion: 0.07
@@ -1311,8 +1306,8 @@ Cohesion: 0.07
 Nodes (30): 1. User Story Mapping, 2. Non-Functional Requirements, 3. Project Structure, 4.1 Architecture Pattern, 4.2 Technology Stack, 4. Technical Architecture, 6. Frontend / UI Design, code:block1 (harness/) (+22 more)
 
 ### Community 100 - "Onboarding: Design / Components"
-Cohesion: 0.14
-Nodes (17): ButtonStyle, CommandRow, GlassCard, GlassPrimaryButtonStyle, GlassSecondaryButtonStyle, GlassSmallButtonStyle, GlassStatusButtonStyle, Motion (+9 more)
+Cohesion: 0.15
+Nodes (16): ButtonStyle, CommandRow, GlassCard, GlassPrimaryButtonStyle, GlassSecondaryButtonStyle, GlassSmallButtonStyle, GlassStatusButtonStyle, Motion (+8 more)
 
 ### Community 101 - "Agent Memory: plans / session-group-split-session"
 Cohesion: 0.10
@@ -1320,7 +1315,7 @@ Nodes (20): 1. Add Project Group Heuristics, 1. Keep Split State In Session/Tab 
 
 ### Community 105 - "Release Notes: CHANGELOG"
 Cohesion: 0.03
-Nodes (64): [1.0.0] - [1.0.4] - 2026-06-01, [1.0.5] - 2026-06-01, [1.0.6] - 2026-06-02, [1.1.1] - 2026-06-02, [1.1.2] - 2026-06-02, [1.2.0] - 2026-06-03, [1.3.0] - 2026-06-04, [1.3.1] - 2026-06-04 (+56 more)
+Nodes (68): [1.0.0] - [1.0.4] - 2026-06-01, [1.0.5] - 2026-06-01, [1.0.6] - 2026-06-02, [1.1.0] - 2026-06-02, [1.1.1] - 2026-06-02, [1.2.0] - 2026-06-03, [1.3.0] - 2026-06-04, [1.3.1] - 2026-06-04 (+60 more)
 
 ### Community 106 - "AIDLC: harness / acp / outputs / domain-design"
 Cohesion: 0.10
@@ -1331,16 +1326,16 @@ Cohesion: 0.17
 Nodes (7): AgentNotchPresentation, closed, open, peek, AgentNotchViewModel, AgentNotchWindowActivator, ObservableObject
 
 ### Community 108 - "Harness App: UI / HarnessControls"
-Cohesion: 0.09
-Nodes (23): [1.0.0] - [1.0.4] - 2026-06-01, [1.0.5] - 2026-06-01, [1.1.1] - 2026-06-02, [1.6.0] - 2026-06-05, [1.9.0] - 2026-06-08, [2.2.3] - 2026-06-09, [2.5.2] - 2026-06-12, [2.6.0] - 2026-06-13 (+15 more)
+Cohesion: 0.03
+Nodes (67): [1.0.0] - [1.0.4] - 2026-06-01, [1.0.5] - 2026-06-01, [1.1.1] - 2026-06-02, [1.1.2] - 2026-06-02, [1.3.0] - 2026-06-04, [1.3.1] - 2026-06-04, [1.3.2] - 2026-06-04, [1.4.1] - 2026-06-04 (+59 more)
 
 ### Community 109 - "Tests: HarnessCoreTests / PaneStyleTests"
 Cohesion: 0.14
 Nodes (3): PaneStyleTests, PaneStyle, PaneStyleSet
 
 ### Community 110 - "Harness CLI: HarnessCLI / AttachClient"
-Cohesion: 0.17
-Nodes (7): State, error, indeterminate, paused, remove, set, TerminalProgressReport
+Cohesion: 0.25
+Nodes (6): State, error, indeterminate, paused, remove, set
 
 ### Community 111 - "Tests: HarnessDaemonTests / WaitForRegistryTests"
 Cohesion: 0.06
@@ -1355,12 +1350,12 @@ Cohesion: 0.15
 Nodes (5): LaunchdServiceInstaller, ServiceInstaller, ServiceInstallers, ServiceInstallReport, SystemdUserInstaller
 
 ### Community 115 - "Harness App: UI / HarnessDesign"
-Cohesion: 0.10
-Nodes (19): ChromeRole, sidebar, tabBar, FontSize, IconSize, Kind, primary, secondary (+11 more)
+Cohesion: 0.11
+Nodes (17): ChromeRole, sidebar, tabBar, FontSize, IconSize, Kind, primary, secondary (+9 more)
 
 ### Community 117 - "Harness App: UI / WorkspaceFileTreeView"
-Cohesion: 0.08
-Nodes (19): CopyModeMatch, CopyModeSearch, CopyModeSelectionMode, block, char, line, none, CopyModeSideEffect (+11 more)
+Cohesion: 0.05
+Nodes (23): CopyModeReducer, CopyModeMatch, CopyModeSearch, CopyModeSelectionMode, block, char, line, none (+15 more)
 
 ### Community 119 - "Docs: COMMANDS"
 Cohesion: 0.08
@@ -1368,27 +1363,27 @@ Nodes (22): Attaching from a plain terminal, Bindings, Board and attention, Buff
 
 ### Community 120 - "Harness CLI: HarnessCLI"
 Cohesion: 0.07
-Nodes (28): [1.3.2] - 2026-06-04, Added, Added, Added, Added, Added, Added, Added (+20 more)
+Nodes (29): [1.3.2] - 2026-06-04, Added, Added, Added, Added, Added, Added, Added (+21 more)
 
 ### Community 122 - "Tests: HarnessTerminalEngineTests / ImageProtocolTests"
-Cohesion: 0.12
-Nodes (44): addWorktreeAction(), clearRoot(), commitAction(), copyCommitID(), copyCommitMessage(), copyCommitSummary(), debouncedRefresh(), doFetch() (+36 more)
+Cohesion: 0.07
+Nodes (48): addWorktreeAction(), clearRoot(), commitAction(), copyCommitID(), copyCommitMessage(), copyCommitSummary(), debouncedRefresh(), doFetch() (+40 more)
 
 ### Community 123 - "HarnessCore: Commands / Command"
-Cohesion: 0.08
-Nodes (25): IPCResponse, agentInfo, browserRequest, browserSuccess, buffer, clientID, daemonStats, data (+17 more)
+Cohesion: 0.07
+Nodes (30): [1.1.1] - 2026-06-06, [1.6.0] - 2026-06-05, Added, Added, Added, Added, Changed, Changed (+22 more)
 
 ### Community 124 - "HarnessCore: Options / EnvironmentStore"
-Cohesion: 0.12
-Nodes (4): GitStatusProvider, EnvironmentStoreTests, EnvironmentStore, Persisted
+Cohesion: 0.18
+Nodes (4): EnvironmentStoreTests, EnvironmentStore, Persisted, global
 
 ### Community 125 - "Terminal Engine: Screen / HistoryRingBuffer"
 Cohesion: 0.18
 Nodes (4): sequence, IteratorProtocol, HistoryRingBuffer, Iterator
 
 ### Community 126 - "Onboarding: Design / AgentMark"
-Cohesion: 0.16
-Nodes (8): AgentArt, AgentMark, AgentMarkShape, AgentVectorIcon, Scanner, SVGPath, NotchShape, Shape
+Cohesion: 0.24
+Nodes (6): AgentArt, AgentMark, AgentMarkShape, AgentVectorIcon, Scanner, SVGPath
 
 ### Community 127 - "Copy Mode: HarnessCopyMode / CopyModeReducer"
 Cohesion: 0.13
@@ -1403,16 +1398,16 @@ Cohesion: 0.07
 Nodes (29): ACP Client (shelved — code preserved for future), 🧠 Agent Memory System, 🤖 Agent System, 🧬 Architecture — CMUX + Zed in a Terminal, 📐 CMUX (Split Panes), code:block1 (┌─────────────────────────────────────────────────┐), code:bash (harness-cli list-surfaces), code:bash (make preview          # build + launch isolated preview app) (+21 more)
 
 ### Community 132 - "Terminal Kit: HarnessTerminalKit / TerminalHostView"
-Cohesion: 0.20
-Nodes (5): DaemonReconnectPolicy, Style, detached, reconnectingChip, TerminalFrameOverlayView
+Cohesion: 0.15
+Nodes (5): DetachedPaneOverlay, Style, detached, reconnectingChip, TerminalFrameOverlayView
 
 ### Community 134 - "HarnessCore: Remote / RemoteHostStore"
 Cohesion: 0.07
 Nodes (26): Acceptance Criteria, Architecture, code:js (// ~/.config/harness/init.js), code:block2 (HarnessApp launch), Config Location Contract, Current State, Goal, `harness.commands` (+18 more)
 
 ### Community 135 - "Harness App: Settings / SettingsViewController"
-Cohesion: 0.11
-Nodes (16): AdvKind, field, segment, toggle, buildSidebar(), ColorBinding, ColorFormMetrics, filterSections() (+8 more)
+Cohesion: 0.08
+Nodes (15): AdvKind, field, segment, toggle, buildSidebar(), ColorBinding, ColorFormMetrics, filterSections() (+7 more)
 
 ### Community 136 - "Harness App: UI / AgentIconRenderer"
 Cohesion: 0.20
@@ -1432,11 +1427,11 @@ Nodes (19): 1.1 โครงสร้างการทำงานของ Qui
 
 ### Community 141 - "HarnessCore: Diagnostics / StartupMetrics"
 Cohesion: 0.10
-Nodes (18): AgentRegistryStore, NSTextField, acpAgentToggled(), acpBinaryInfo(), addACPAgent(), agentRow(), chatToggleClicked(), copySetupPrompt() (+10 more)
+Nodes (18): AgentConfig, AgentRegistryStore, acpAgentToggled(), acpBinaryInfo(), addACPAgent(), agentRow(), chatToggleClicked(), copySetupPrompt() (+10 more)
 
 ### Community 142 - "Release Notes: CHANGELOG"
 Cohesion: 0.04
-Nodes (72): [1.0.0] - [1.0.4] - 2026-06-01, [1.1.1] - 2026-06-06, [1.1.2] - 2026-06-06, [1.2.0] - 2026-06-06, [1.3.0] - 2026-06-06, [2.0.0] - 2026-06-07, [2.1.0] - 2026-06-07, [2.5.1] - 2026-06-12 (+64 more)
+Nodes (76): [1.0.0] - [1.0.4] - 2026-06-01, [1.1.2] - 2026-06-06, [1.3.0] - 2026-06-06, [2.1.0] - 2026-06-07, [2.3.0] - 2026-06-11, [2.5.1] - 2026-06-12, [2.5.2] - 2026-06-12, [2.7.1] - 2026-06-15 (+68 more)
 
 ### Community 143 - "Tests: HarnessTerminalEngineTests / TerminalBufferSearchTests"
 Cohesion: 0.10
@@ -1454,10 +1449,6 @@ Nodes (3): HarnessThemeCatalogTests, ThemeDiagnosticsTests, ThemeDocumentTests
 Cohesion: 0.09
 Nodes (23): Decision Reference, Feature Implementation Plan, Future User Stories (Post-MVP), MVP User Stories (Must Implement), Objective, Status: Planning, Success Criteria (Implementation Validation), Technical Setup (+15 more)
 
-### Community 148 - "Harness App: Services / SessionCoordinator"
-Cohesion: 0.08
-Nodes (26): [1.5.0] - 2026-06-05, Added, Added, Added, Added, Added, Added, Added (+18 more)
-
 ### Community 149 - "Root Docs: README"
 Cohesion: 0.07
 Nodes (29): ACP Client (shelved — code preserved for future), 🧠 Agent Memory System, 🤖 Agent System, 🧬 Architecture — CMUX + Zed in a Terminal, 📐 CMUX (Split Panes), code:block1 (┌─────────────────────────────────────────────────┐), code:bash (harness-cli list-surfaces), code:bash (make preview          # build + launch isolated preview app) (+21 more)
@@ -1467,12 +1458,12 @@ Cohesion: 0.13
 Nodes (14): Architecture, Build & test, code:bash (swift build                                          # debug), code:bash (make debug        # build (debug) + package + sign + open Ha), Coding constraints, Communication: GUI ↔ Daemon ↔ CLI, Generated files (do not hand-edit), Graphify + agent-memory (+6 more)
 
 ### Community 152 - "HarnessCore: Format / FormatString"
-Cohesion: 0.08
-Nodes (26): [1.8.0] - 2026-06-07, Added, Added, Added, Added, Added, Added, Added (+18 more)
+Cohesion: 0.04
+Nodes (49): [1.8.0] - 2026-06-07, [2.2.2] - 2026-06-08, Added, Added, Added, Added, Added, Added (+41 more)
 
 ### Community 154 - "AIDLC: harness / ide-file-tree / outputs / logical-design"
-Cohesion: 0.05
-Nodes (40): 1. User Story Mapping, 2. Non-Functional Requirements, 3. Project Structure, 4.1 Architecture Pattern, 4.2 Technology Stack, 4. Technical Architecture, 6. Frontend / UI Design, code:block1 (harness/) (+32 more)
+Cohesion: 0.07
+Nodes (27): 1. User Story Mapping, 2. Non-Functional Requirements, 3. Project Structure, 4.1 Architecture Pattern, 4.2 Technology Stack, 4. Technical Architecture, 6. Frontend / UI Design, code:block1 (harness/) (+19 more)
 
 ### Community 156 - "HarnessCore: Notch / AgentNotchProjection"
 Cohesion: 0.13
@@ -1494,9 +1485,17 @@ Nodes (25): applyGitStatus(), expand(), FileTreeScanOptions, FileTreeWatcher, FS
 Cohesion: 0.15
 Nodes (7): PendingVersionBanner, welcome, whatsNew, State, VersionBannerStore, skipUnlessLiveDaemonTests(), VersionBannerTests
 
+### Community 166 - "HarnessCore: Diagnostics / DoctorRunner"
+Cohesion: 0.24
+Nodes (3): tooLarge, IPCCodec, header
+
 ### Community 167 - "HarnessCore: ACP / ACPSession"
-Cohesion: 0.09
-Nodes (17): ACPChatMessage, Role, assistant, thought, toolCall, user, Status, connecting (+9 more)
+Cohesion: 0.13
+Nodes (10): ACPChatMessage, Role, assistant, thought, toolCall, user, code:swift (struct ACPSession: Identifiable {), ACPSession (+2 more)
+
+### Community 170 - "Terminal Kit: HarnessTerminalKit / ThemeManager"
+Cohesion: 0.29
+Nodes (3): ResolvedCanvas, ThemeManager, ThemePreset
 
 ### Community 172 - "Agent Memory: plans / p4-lsp-file-view"
 Cohesion: 0.20
@@ -1507,8 +1506,8 @@ Cohesion: 0.22
 Nodes (6): InstallResult, Shell, bash, fish, zsh, ShellIntegration
 
 ### Community 174 - "Harness CLI: HarnessCLI"
-Cohesion: 0.13
-Nodes (15): [1.0.0] - [1.0.4] - 2026-06-01, [1.0.5] - 2026-06-01, [1.1.1] - 2026-06-02, [1.6.0] - 2026-06-05, [2.2.3] - 2026-06-09, [2.5.0] - 2026-06-12, [2.5.2] - 2026-06-12, Added (+7 more)
+Cohesion: 0.17
+Nodes (12): [1.0.0] - [1.0.4] - 2026-06-01, [1.0.5] - 2026-06-01, [1.1.1] - 2026-06-02, [1.6.0] - 2026-06-05, [2.2.3] - 2026-06-09, [2.5.2] - 2026-06-12, Changed, Changelog (+4 more)
 
 ### Community 175 - "HarnessCore: IPC / IPCMessage"
 Cohesion: 0.09
@@ -1516,15 +1515,11 @@ Nodes (21): H1: Metadata refresh is too expensive when nothing changed, H2: CWD 
 
 ### Community 176 - "Release Notes: CHANGELOG"
 Cohesion: 0.04
-Nodes (53): [1.6.0] - 2026-06-05, [1.7.0] - 2026-06-06, Added, Added, Added, Added, Added, Added (+45 more)
+Nodes (50): [1.2.0] - 2026-06-06, [1.7.0] - 2026-06-06, [2.0.0] - 2026-06-07, Added, Added, Added, Added, Added (+42 more)
 
 ### Community 177 - "AIDLC: harness / acp / outputs / user-stories"
 Cohesion: 0.16
 Nodes (15): Business Rules, MVP Scope, Non-Functional Requirements, PBIs (Product Backlog Items), PBI-ACP-001: ACP Agent Subprocess Lifecycle Management, PBI-ACP-002: ACP Session Bootstrap with Workspace Context, PBI-ACP-003: Prompt Sending & Streaming Response Rendering, Performance (+7 more)
-
-### Community 179 - "Onboarding: UI / WelcomeStepView"
-Cohesion: 0.11
-Nodes (7): Agent, OnboardingEnvironment, Identifiable, CompleteStepView, DiscoverStepView, Point, WelcomeStepView
 
 ### Community 180 - "Harness CLI: HarnessCLI / WindowAttachClient"
 Cohesion: 0.12
@@ -1542,21 +1537,17 @@ Nodes (19): Acceptance Criteria, cmux, Current Harness State, Goal, Implementati
 Cohesion: 0.28
 Nodes (6): InstallError, daemonNotFound, launchctlFailed, writeFailed, InstallReport, LaunchAgentInstaller
 
-### Community 185 - "Terminal Renderer: HarnessTerminalRenderer / TerminalFrame"
-Cohesion: 0.10
-Nodes (11): CommandPaletteController, FuzzyMatcher, PaletteAction, PaletteFuzzyMatcher, PaletteItemView, PaletteRowView, PaletteSectionHeaderView, PaletteViewController (+3 more)
-
 ### Community 186 - "Tests: HarnessTerminalEngineTests / ReflowCorpusTests"
-Cohesion: 0.12
-Nodes (8): NSTableRowView, NSTableViewDataSource, NSTableViewDelegate, HarnessSidebarPanelViewController, CommandHistorySearchController, HistoryItemView, HistoryRowView, SearchPanel
+Cohesion: 0.15
+Nodes (5): NSTableRowView, CommandHistorySearchController, HistoryItemView, HistoryRowView, SearchPanel
 
 ### Community 187 - "Tests: HarnessTerminalEngineTests / ScrollbackTests"
-Cohesion: 0.20
-Nodes (3): AppDelegate, QueuedExternalOpen, NSApplicationDelegate
+Cohesion: 0.13
+Nodes (4): AppDelegate, QueuedExternalOpen, NSApplicationDelegate, TerminalServicesProvider
 
 ### Community 188 - "Harness App: UI / ContentAreaViewController"
 Cohesion: 0.10
-Nodes (4): EditorDividerView, HitTestPassthroughView, PaneContainerView, PaneSplitButtonsView
+Nodes (20): [1.4.1] - 2026-06-04, Added, Added, Added, Added, Added, Added, Added (+12 more)
 
 ### Community 189 - "Agent Memory: plans / p5-acp-implementation"
 Cohesion: 0.12
@@ -1571,20 +1562,20 @@ Cohesion: 0.12
 Nodes (14): Objective, Status: Planning, Decision Reference, Phase 1.2: Domain Decomposition, Phase 1.4: Domain Design, Phase 1.6: Logical Design, Phase 1.8: Brainstorming (3 Amigos), Phase 1: Requirements Gathering (User Stories) (+6 more)
 
 ### Community 195 - "Harness App: UI / HarnessDesign"
-Cohesion: 0.18
-Nodes (4): type, ChromeBackdrop, HarnessOverlayBackground, RuntimeGlassEffectView
+Cohesion: 0.19
+Nodes (3): ChromeBackdrop, HarnessOverlayBackground, RuntimeGlassEffectView
 
 ### Community 199 - "Docs: README"
 Cohesion: 0.17
 Nodes (10): Agent hooks for Harness, CLI notification, code:bash (harness-cli notify --surface "$HARNESS_SURFACE" --title "Cla), code:bash (# Use the command palette (Cmd+P) → jump-notification), code:json ({), Example Claude Code hook, Jump to waiting agent, OSC sequences (from terminal output) (+2 more)
 
 ### Community 200 - "HarnessCore: Agents / AgentDetector"
-Cohesion: 0.06
-Nodes (55): addSession(), addSessionInGroup(), agentsButtonClicked(), applyChromeColors(), applySearchChrome(), closeGroupSessionsFromMenu(), columnKind(), confirmDeleteWorkspace() (+47 more)
+Cohesion: 0.07
+Nodes (48): applyChromeColors(), applySearchChrome(), closeGroupSessionsFromMenu(), columnKind(), confirmDeleteWorkspace(), deleteWorkspaceFromMenu(), dismissNotificationsDropdown(), highestBoardStatus() (+40 more)
 
 ### Community 201 - "HarnessCore: Agents / AgentDetector"
-Cohesion: 0.09
-Nodes (8): SettingsViewController, buildACPAgentsGroup(), buildAgentsPage(), SettingsViewController, SettingsViewController, SettingsViewController, layoutShell(), SettingsViewController
+Cohesion: 0.12
+Nodes (7): SettingsViewController, buildACPAgentsGroup(), buildAgentsPage(), SettingsViewController, SettingsViewController, SettingsViewController, layoutShell()
 
 ### Community 202 - "HarnessCore: Commands / CommandIPCTranslator"
 Cohesion: 0.23
@@ -1599,8 +1590,12 @@ Cohesion: 0.17
 Nodes (10): Bringing your `.tmux.conf` over, code:tmux (# ~/.harness.conf  — bindings + options + commands), code:block2 (:source-file ~/.harness.conf      # from the command prompt ), code:bash (harness-cli set-option -g status-left  " #{session_name} "), Deliberate divergences, From tmux, Import Terminal Colors And Fonts, Key-by-key translation (+2 more)
 
 ### Community 205 - "HarnessCore: ACP / ACPSession"
-Cohesion: 0.16
-Nodes (6): AtlasEntry, ClusterGlyphKey, GlyphAtlas, GlyphAtlasStats, ShapedGlyphKey, Hashable
+Cohesion: 0.14
+Nodes (7): AtlasEntry, ClusterGlyphKey, GlyphAtlas, GlyphAtlasStats, GlyphKey, ShapedGlyphKey, Hashable
+
+### Community 207 - "HarnessCore: Paths / HarnessPaths"
+Cohesion: 0.09
+Nodes (6): HarnessTerminalSurfaceView, emulatorSync(), HarnessTerminalSurfaceView, testingReadGridSnapshot(), testingScrollBy(), testingScrollByContinuous()
 
 ### Community 209 - "Terminal Engine: HarnessTerminalEngine / InputEncoder"
 Cohesion: 0.13
@@ -1634,6 +1629,10 @@ Nodes (7): ColorKind, bg, fg, underline, CompositorPane, GridCompositor, RenderC
 Cohesion: 0.12
 Nodes (16): code:block1 (Refactor `Tools/harness/Sources/HarnessCLI/HarnessCLI.swift`), code:block2 (Extract pure input-routing logic from `Tools/harness/Sources), code:block3, code:block4, code:block5 (Decompose `Packages/HarnessDaemon/Sources/HarnessDaemon/Surf), code:block6, code:block7, code:block8 (+8 more)
 
+### Community 222 - "Harness App: UI / NotificationBellButton"
+Cohesion: 0.12
+Nodes (3): NSStackView, NSTextField, AboutPanelController
+
 ### Community 223 - "AIDLC: harness / acp / outputs / domain-decomposition"
 Cohesion: 0.17
 Nodes (10): code:block1 ([AgentRegistry] ──config──► [ACPRuntime] ◄──context──[Sessio), 1. ACPRuntime, 2. AgentRegistry, 3. SessionContext, 4. ResponseRenderer, Bounded Contexts, Context Map, Data Ownership (+2 more)
@@ -1651,32 +1650,36 @@ Cohesion: 0.15
 Nodes (14): Background, Decision Summary, Next Steps, Outstanding Decisions, Status: Decided, Decision 1: Sidebar Layout & Integration, Decision 2: File Click Interaction (Editing & Previews), Decision 3: Git Tree and Commit History View (+6 more)
 
 ### Community 227 - "Harness CLI: HarnessCLI / RecordClient"
-Cohesion: 0.17
-Nodes (4): BranchSwitchHelper, FileTreeNode, FileTreeSwiftUIView, Notification.Name
+Cohesion: 0.11
+Nodes (5): GitStatusProvider, BranchSwitchHelper, FileTreeNode, FileTreeSwiftUIView, Notification.Name
 
 ### Community 228 - "Harness CLI: HarnessCLI / ControlModeClient"
 Cohesion: 0.23
 Nodes (7): ControlModeClient, ControlModeError, daemon, noMatch, noSnapshot, unresolved, Writer
 
 ### Community 229 - "Harness App: UI / SyntaxTextView"
-Cohesion: 0.08
-Nodes (7): NSTextView, NSTextViewDelegate, Notification.Name, SyntaxHighlighter, SyntaxLineNumberGutterView, SyntaxTextView, SyntaxTextViewInner
+Cohesion: 0.09
+Nodes (5): Notification.Name, SyntaxHighlighter, SyntaxLineNumberGutterView, SyntaxTextView, SyntaxTextViewInner
 
 ### Community 230 - "Tests: HarnessCoreTests / TabAlertTests"
 Cohesion: 0.30
 Nodes (16): placements(), scrollbackPlacements(), term_feedKitty(), testAltScreenIsolatesImages(), testImageDecoderDecodesPNG(), testImageEvictsWhenScrolledPastScrollbackCap(), testImageScrollsIntoScrollbackAndPersists(), testITerm2InlineImagePlaces() (+8 more)
+
+### Community 231 - "Harness App: UI / HarnessSidebarPanelViewController"
+Cohesion: 0.18
+Nodes (5): SearchMode, fileName, SearchResult, SearchResultCellView, SpotlightNameMatcher
 
 ### Community 232 - "HarnessCore: Models / Workspace"
 Cohesion: 0.11
 Nodes (17): 1. Add a `pendingReflowTask` field to `TerminalScreen`, 2. Split `reflow(toCols:rows:)` into two helpers, 3. In `resize(cols:rows:)`, use the fast path first, Background, code:swift (// In TerminalScreen), code:swift (// Fast path — reflow only viewport + lookahead), code:swift (mutating func resize(cols nc: Int, rows nr: Int) {), code:swift (// TerminalEmulator: add a "live resize in progress" flag) (+9 more)
 
 ### Community 234 - "Harness App: Services / SessionCoordinator"
-Cohesion: 0.18
-Nodes (8): ActiveTabCloseDisposition, session, tab, window, workspace, CloseConfirmationCopy, HarnessPathDisplay, NotificationEntry
+Cohesion: 0.12
+Nodes (10): ActiveTabCloseDisposition, session, tab, window, workspace, CloseConfirmationCopy, ForegroundPresenter, HarnessPathDisplay (+2 more)
 
 ### Community 235 - "Terminal Kit: HarnessTerminalKit / TerminalHostView"
-Cohesion: 0.06
-Nodes (33): [2.2.4] - 2026-06-11, [2.4.0] - 2026-06-12, Added, Added, Added, Added, Added, Added (+25 more)
+Cohesion: 0.04
+Nodes (50): [1.0.0] - 2026-06-05, [2.2.4] - 2026-06-11, [2.4.0] - 2026-06-12, Added, Added, Added, Added, Added (+42 more)
 
 ### Community 236 - "Harness App: Services / SessionCoordinator"
 Cohesion: 0.17
@@ -1685,6 +1688,10 @@ Nodes (3): QuickSelectLabelView, QuickSelectMatch, QuickSelectOverlayView
 ### Community 238 - "Tests: HarnessCoreTests / TerminalBannerTests"
 Cohesion: 0.12
 Nodes (3): TerminalBannerTests, ReleaseNotes, Section
+
+### Community 239 - "Harness App: UI / HarnessSidebarPanelViewController"
+Cohesion: 0.08
+Nodes (24): BgInstance, CursorCacheKey, DecoInstance, DecoKind, curly, dashed, dotted, double (+16 more)
 
 ### Community 242 - "HarnessCore: Metadata / MetadataProvider"
 Cohesion: 0.33
@@ -1695,7 +1702,7 @@ Cohesion: 0.20
 Nodes (8): AI-DLC Audit Trail - Iteration 1: Agent Client Protocol (ACP) — Harness ACP Client, Current State, Iteration Overview, Key Decisions, Knowledge Buffer, Notes, Phase History, Reflexion Log
 
 ### Community 244 - "Onboarding: Design / GlassEffectView"
-Cohesion: 0.18
+Cohesion: 0.19
 Nodes (4): BranchSwitchHelper, FileTreeNode, NodeRow, Notification.Name
 
 ### Community 246 - "Docs: MODES"
@@ -1714,10 +1721,6 @@ Nodes (7): DiagnosticCheck, DiagnosticStatus, fail, pass, warn, DoctorReport, Do
 Cohesion: 0.20
 Nodes (8): AI-DLC Audit Trail - Iteration 1: Zed-like File Tree & Git History, Current State, Iteration Overview, Key Decisions, Knowledge Buffer, Notes, Phase History, Reflexion Log
 
-### Community 254 - "HarnessCore: Paths / ShellCompletionInstaller"
-Cohesion: 0.14
-Nodes (8): BellScanState, esc, normal, string, stringEsc, SurfaceMonitor, AgentNotification, OSCNotificationParser
-
 ### Community 255 - "Scripts: release-hotfix.sh"
 Cohesion: 0.45
 Nodes (21): plist_set(), require_clean_tracked_worktree(), run(), update_readme_download(), usage(), workflow_run_id_for_head(), write_release_notes(), release-hotfix.sh script (+13 more)
@@ -1735,8 +1738,8 @@ Cohesion: 0.12
 Nodes (14): Architecture, Build & test, code:bash (swift build                                          # debug), code:bash (make run          # build + package + sign + open Harness.ap), Coding constraints, Communication: GUI ↔ Daemon ↔ CLI, Generated files (do not hand-edit), Graphify + agent-memory (+6 more)
 
 ### Community 263 - "Harness App: UI / FileViewerViewController"
-Cohesion: 0.18
-Nodes (4): HarnessOnboarding, ImmersiveOnboardingWindowController, ImmersivePanel, ImmersiveRootView
+Cohesion: 0.15
+Nodes (7): HarnessOnboarding, NSPanel, NSWindowController, PalettePanel, ImmersiveOnboardingWindowController, ImmersivePanel, ImmersiveRootView
 
 ### Community 264 - "Docs: claude-code"
 Cohesion: 0.22
@@ -1745,10 +1748,6 @@ Nodes (7): Claude Code → Harness, code:bash (harness-cli install-hooks claude-
 ### Community 265 - "Docs: cursor"
 Cohesion: 0.22
 Nodes (7): code:bash (harness-cli install-hooks cursor), code:json ({), code:bash (cursor_notify() { PATH="$HOME/Library/Application Support/Ha), Cursor Agent → Harness, Manual fallback, One-line install, What you'll see
-
-### Community 267 - "Onboarding: UI / ShellStepView"
-Cohesion: 0.12
-Nodes (3): HarnessColorPanelCoordinator, HarnessSwatchWell, HarnessToggle
 
 ### Community 268 - "Tests: HarnessCoreTests / TmuxMigrationTests"
 Cohesion: 0.10
@@ -1763,16 +1762,16 @@ Cohesion: 0.16
 Nodes (4): SGRMouseTests, Int, SGRMouse, SGRMouseEvent
 
 ### Community 273 - "Tests: HarnessCoreTests / ShellCompletionInstallerTests"
-Cohesion: 0.07
-Nodes (10): DECSpecialGraphics, Binding, CodingKeys, bindings, disabledSpecs, id, tables, KeyTable (+2 more)
+Cohesion: 0.06
+Nodes (7): DECSpecialGraphics, Phase6KeysTests, Binding, bindings, KeyTable, KeyTableSet, KeybindingsService
 
 ### Community 275 - "AIDLC: harness / ide-file-tree / PROGRESS.md / PROGRESS"
 Cohesion: 0.22
 Nodes (7): AI-DLC Progress: Zed-like File Tree & Git History, Current Phase: 3.1 Implementation, Metrics, PBI-001: Sidebar Layout & Navigation (Done), PBI-002: Context-Aware File Click Router (Pending), PBI-003: Native Git Commit History (Pending), Phase 3.1 Implementation Log
 
 ### Community 276 - "HarnessCore: Platform / PlatformSys"
-Cohesion: 0.08
-Nodes (9): DiffLineType, added, deleted, modified, Notification.Name, SyntaxHighlighter, SyntaxLineNumberGutterView, SyntaxTextView (+1 more)
+Cohesion: 0.07
+Nodes (11): DiffLineType, added, deleted, modified, Notification.Name, SyntaxHighlighter, SyntaxLineNumberGutterView, SyntaxTextView (+3 more)
 
 ### Community 278 - "Harness App: UI / ContentAreaViewController"
 Cohesion: 0.12
@@ -1780,15 +1779,15 @@ Nodes (7): HarnessSplitView, HarnessSplitViewTests, LayoutProbeView, NSSplitView
 
 ### Community 279 - "HarnessCore: Models / PaneNode"
 Cohesion: 0.09
-Nodes (23): [1.0.0] - [1.0.4] - 2026-06-01, [1.0.5] - 2026-06-01, [1.1.1] - 2026-06-02, [1.3.1] - 2026-06-04, [1.6.0] - 2026-06-05, [2.2.3] - 2026-06-09, [2.5.2] - 2026-06-12, [2.6.0] - 2026-06-13 (+15 more)
+Nodes (23): [1.0.0] - [1.0.4] - 2026-06-01, [1.0.5] - 2026-06-01, [1.1.1] - 2026-06-02, [1.6.0] - 2026-06-05, [1.8.0] - 2026-06-07, [2.2.3] - 2026-06-09, [2.5.2] - 2026-06-12, [2.6.0] - 2026-06-13 (+15 more)
 
 ### Community 280 - "Terminal Engine: Images / DecodedImage"
-Cohesion: 0.11
-Nodes (16): ChooseScope, buffer, client, session, tree, window, MenuItem, PaneTarget (+8 more)
+Cohesion: 0.19
+Nodes (9): BoardCard, BoardColumn, BoardColumnKind, done, error, idle, needsAttention, running (+1 more)
 
 ### Community 284 - "HarnessCore: Session / SessionEditor"
-Cohesion: 0.12
-Nodes (4): BrowserPaneView, LoadCompletionState, WKNavigationDelegate, WKUIDelegate
+Cohesion: 0.13
+Nodes (3): BrowserPaneView, WKNavigationDelegate, WKUIDelegate
 
 ### Community 285 - "LSP: HarnessLSP / LSPTransport"
 Cohesion: 0.08
@@ -1807,20 +1806,20 @@ Cohesion: 0.25
 Nodes (6): code:bash (make release), Local release path, One-time GitHub setup, Release runbook, Running a release from GitHub, What the workflow publishes
 
 ### Community 294 - "Terminal Engine: Width / CharacterWidth"
-Cohesion: 0.19
+Cohesion: 0.23
 Nodes (3): ConcurrentIndexSet, DaemonContentionTests, SubscriptionBox
 
 ### Community 295 - "Harness CLI: HarnessCLI / WindowAttachClient"
-Cohesion: 0.10
-Nodes (4): ChangeRowView, HistoryCardView, init(), StageToggleButton
+Cohesion: 0.14
+Nodes (13): CustomStringConvertible, DaemonError, alreadyRunning, bindFailed, listenFailed, socketFailed, Endpoint, tcp (+5 more)
 
 ### Community 296 - "Tests: HarnessCoreTests / EndpointTests"
 Cohesion: 0.13
 Nodes (14): Architecture, Build & test, code:bash (swift build                                          # debug), code:bash (make run          # build + package + sign + open Harness.ap), Coding constraints, Communication: GUI ↔ Daemon ↔ CLI, Generated files (do not hand-edit), Graphify + agent-memory (+6 more)
 
 ### Community 297 - "Tests: HarnessCoreTests / HookNotificationParserTests"
-Cohesion: 0.10
-Nodes (20): [1.1.0] - 2026-06-06, [1.5.0] - 2026-06-06, Added, Added, Added, Added, Added, Changed (+12 more)
+Cohesion: 0.08
+Nodes (25): [1.1.0] - 2026-06-06, [1.5.0] - 2026-06-06, [2.5.3] - 2026-06-13, Added, Added, Added, Added, Added (+17 more)
 
 ### Community 299 - "Release Notes: CHANGELOG"
 Cohesion: 0.13
@@ -1854,10 +1853,6 @@ Nodes (14): Architecture, Build & test, code:bash (swift build                  
 Cohesion: 0.14
 Nodes (4): AgentChipView, HarnessMotion, NSColor, StatusDotView
 
-### Community 312 - "Harness App: UI / Phase67UI"
-Cohesion: 0.18
-Nodes (3): ACPClient, ACPPermissionRequest, protocolError
-
 ### Community 313 - "Terminal Renderer: HarnessTerminalRenderer / RenderColorConversion"
 Cohesion: 0.15
 Nodes (11): Objective, Status: Planning, code:swift (var historyEntries: [String] { history }), code:swift (func presentSeeded(text: String) {), Implementation Plan — Command History Search Overlay, Phase 1: CommandPromptController & MainMenuBuilder Updates (Surgical Changes), Phase 2: CommandHistorySearchController Implementation, Phase 3: Verification (+3 more)
@@ -1882,13 +1877,9 @@ Nodes (14): Active Context, Architecture Notes, Completed Sprints, Current Sprin
 Cohesion: 0.29
 Nodes (5): code:bash (# In a Harness pane:), Cross-terminal output-stress benchmark, Run, The faithful scoreboard, What it measures — and what it does NOT
 
-### Community 319 - "Harness App: UI / Notch / NotchShape"
-Cohesion: 0.07
-Nodes (5): ViEngine, ScreenPos, bottom, middle, top
-
 ### Community 321 - "Harness App: UI / HarnessControls"
 Cohesion: 0.09
-Nodes (23): [1.0.0] - [1.0.4] - 2026-06-01, [1.0.5] - 2026-06-01, [1.1.1] - 2026-06-02, [1.6.0] - 2026-06-05, [1.7.1] - 2026-06-06, [2.2.3] - 2026-06-09, [2.5.2] - 2026-06-12, [2.6.0] - 2026-06-13 (+15 more)
+Nodes (23): [1.0.0] - [1.0.4] - 2026-06-01, [1.0.5] - 2026-06-01, [1.1.1] - 2026-06-02, [1.6.0] - 2026-06-05, [1.9.0] - 2026-06-08, [2.2.3] - 2026-06-09, [2.5.2] - 2026-06-12, [2.6.0] - 2026-06-13 (+15 more)
 
 ### Community 322 - "LSP: HarnessLSP / LSPClient"
 Cohesion: 0.17
@@ -1896,7 +1887,7 @@ Nodes (6): LSPClient, LSPClientError, missingPipe, processNotRunning, requestFai
 
 ### Community 323 - "Release Notes: CHANGELOG"
 Cohesion: 0.08
-Nodes (24): [2.0.0] - 2026-06-08, Added, Added, Added, Added, Added, Added, Added (+16 more)
+Nodes (25): [2.0.0] - 2026-06-08, Added, Added, Added, Added, Added, Added, Added (+17 more)
 
 ### Community 325 - "Harness CLI: HarnessCLI"
 Cohesion: 0.22
@@ -1920,27 +1911,27 @@ Nodes (11): Background, Decision Summary, Status: Decided, Decision 1: Overlay U
 
 ### Community 332 - "HarnessCore: Format / SnapshotQueryFormatter"
 Cohesion: 0.04
-Nodes (47): [1.9.0] - 2026-06-08, [2.1.0] - 2026-06-08, Added, Added, Added, Added, Added, Added (+39 more)
+Nodes (51): [1.9.0] - 2026-06-08, [2.1.0] - 2026-06-08, Added, Added, Added, Added, Added, Added (+43 more)
 
 ### Community 333 - "Agent Memory: plans / completed-archive"
 Cohesion: 0.13
 Nodes (13): Completed Plans Archive, P10 — Terminal Performance and Convenience, P1 — Sidebar Performance (v1.3.0), P2 — Async IPC Refactor, P3 — N-ary Split Panes (v1.5.0), P5 — ACP Client, P6 — File Editor Opacity Parity (v2.2.3 / Unreleased, 2026-06-09), P6 — UI Polish (v1.5.0) (+5 more)
+
+### Community 335 - "Harness App: UI / HarnessControls"
+Cohesion: 0.15
+Nodes (13): code:swift (struct FileNode: Identifiable {), code:swift (struct GitCommitNode: Identifiable {), code:block4 (1. Run `git log --graph --pretty=format:"%h|%p|%an|%ad|%s" -), 5.1 System APIs and IPC Protocols, 5.2 Core Data Models, 5.3 Business Logic (Pseudo-code), 5. Backend/Core Logic Design, FileNode (+5 more)
 
 ### Community 336 - "Scripts: run.sh"
 Cohesion: 0.28
 Nodes (17): kill_stale(), kill_stale_prod(), usage(), run.sh script, run.sh script, run.sh script, run.sh script, run.sh script (+9 more)
 
 ### Community 337 - "Harness App: UI / SyntaxTextView"
-Cohesion: 0.17
+Cohesion: 0.18
 Nodes (7): AgentNotchDashboardProjection, AgentNotchProjection, AgentNotchRowSummary, RowKind, agent, session, TabContext
-
-### Community 338 - "Harness App: UI / HarnessControls"
-Cohesion: 0.22
-Nodes (3): HarnessSliderTests, Recorder, HarnessSlider
 
 ### Community 339 - "Harness App: UI / HarnessControls"
 Cohesion: 0.03
-Nodes (66): [1.0.0] - [1.0.4] - 2026-06-01, [1.0.5] - 2026-06-01, [1.1.0] - 2026-06-02, [1.1.1] - 2026-06-02, [1.1.2] - 2026-06-02, [1.2.0] - 2026-06-03, [1.3.0] - 2026-06-04, [1.4.0] - 2026-06-04 (+58 more)
+Nodes (68): [1.0.0] - [1.0.4] - 2026-06-01, [1.0.5] - 2026-06-01, [1.0.6] - 2026-06-02, [1.1.1] - 2026-06-02, [1.1.2] - 2026-06-02, [1.3.0] - 2026-06-04, [1.3.1] - 2026-06-04, [1.3.2] - 2026-06-04 (+60 more)
 
 ### Community 340 - "Docs: openclaw"
 Cohesion: 0.33
@@ -1951,8 +1942,8 @@ Cohesion: 0.33
 Nodes (4): code:bash (harness-cli install-hooks pi), code:ts (// harness-managed — surfaces Pi session events in Harness. ), One-line install, Pi → Harness
 
 ### Community 342 - "Release Notes: CHANGELOG"
-Cohesion: 0.04
-Nodes (56): [1.4.0] - 2026-06-04, [1.4.1] - 2026-06-04, Added, Added, Added, Added, Added, Added (+48 more)
+Cohesion: 0.05
+Nodes (40): [1.4.0] - 2026-06-04, Added, Added, Added, Added, Added, Added, Added (+32 more)
 
 ### Community 343 - "Harness App: AppIcon.appiconset / Contents"
 Cohesion: 0.40
@@ -1974,10 +1965,6 @@ Nodes (4): images, info, author, version
 Cohesion: 0.50
 Nodes (4): [2.2.1] - 2026-06-08, Changed, Fixed, Fixed
 
-### Community 352 - "Terminal Kit: HarnessTerminalKit / TerminalHostView"
-Cohesion: 0.22
-Nodes (3): AnyObject, InputGate, TerminalHostDelegate
-
 ### Community 354 - "Harness App: UI / AgentInboxPanelView"
 Cohesion: 0.22
 Nodes (8): 1. Performance Optimization: Scrollback Reflow ($O(\text{history})$ Complexity), 2. convenient Features: Local completion & completion Gutter, 3. IDE Convenient: Keyboard-driven Layout Presets, 4. AI integration: Secure Local ACP Sidebar, Additional features shipped alongside:, Context, Implementation Status (2026-06-11), P10: Performance and Feature Roadmap (Terminal First, IDE Convenient)
@@ -1995,8 +1982,8 @@ Cohesion: 0.19
 Nodes (7): Array, FormatColor, none, palette, rgb, level(), StyledSegment
 
 ### Community 361 - "Harness App: UI / FileTreeSwiftUIView"
-Cohesion: 0.12
-Nodes (5): Process, FileTreeSwiftUIView, pipe, RunShell, Process
+Cohesion: 0.15
+Nodes (4): Process, pipe, RunShell, Process
 
 ### Community 362 - "Harness App: UI / HarnessDesign"
 Cohesion: 0.09
@@ -2015,8 +2002,8 @@ Cohesion: 0.40
 Nodes (3): info, author, version
 
 ### Community 366 - "Root Docs: README"
-Cohesion: 0.18
-Nodes (15): Build From Source, code:bash (swift build), code:bash (make release), code:bash (make prod), code:bash (make install-no-build), code:bash (/Applications/Harness.app/Contents/MacOS/harness-cli install), code:bash (harness-cli remote add --name devbox --ssh me@devbox --socke), Develop in Xcode (+7 more)
+Cohesion: 0.24
+Nodes (11): Build From Source, code:bash (swift build), code:bash (make release), code:bash (make prod), code:bash (make install-no-build), Develop in Xcode, Development Builds, 📊 Graphify (Knowledge Graph) (+3 more)
 
 ### Community 368 - "Claude Instructions: CLAUDE"
 Cohesion: 0.33
@@ -2083,8 +2070,8 @@ Cohesion: 0.12
 Nodes (14): package-app.sh script, package-app.sh script, package-app.sh script, package-app.sh script, package-app.sh script, package-app.sh script, package-app.sh script, package-app.sh script (+6 more)
 
 ### Community 407 - "Harness App: Services / ThemeImportController"
-Cohesion: 0.12
-Nodes (7): WorkspaceFileTreeView, NSMenuDelegate, NSOutlineViewDataSource, NSOutlineViewDelegate, FileTreeCellView, FileTreeItem, WorkspaceFileTreeView
+Cohesion: 0.13
+Nodes (6): WorkspaceFileTreeView, NSOutlineViewDataSource, NSOutlineViewDelegate, FileTreeCellView, FileTreeItem, WorkspaceFileTreeView
 
 ### Community 411 - "HarnessCore: Shell / ShellRCWiring"
 Cohesion: 0.10
@@ -2140,31 +2127,31 @@ Nodes (3): LSPTextLocationParserTests, ViPathTokenTests, character
 
 ### Community 426 - "Daemon: HarnessDaemon / DaemonLifecycle"
 Cohesion: 0.23
-Nodes (7): Source, activePane, activeTab, focusedPane, focusedSurface, WorkbenchContext, WorkbenchContextResolver
+Nodes (5): PaletteItemView, PaletteRowView, PaletteSectionHeaderView, Row, item
 
 ### Community 427 - "Harness App: UI / NotificationDropdownPanel"
-Cohesion: 0.27
-Nodes (3): GlassEffectView, RuntimeGlassEffectView, NSViewRepresentable
+Cohesion: 0.24
+Nodes (4): type, GlassEffectView, RuntimeGlassEffectView, NSViewRepresentable
 
 ### Community 428 - "Terminal Renderer: HarnessTerminalRenderer / TerminalMetalRenderer"
 Cohesion: 0.18
 Nodes (10): 1. HarnessTerminalSurfaceView (~2,320 LOC), 2. HarnessCLI.swift (~1,841 LOC), 3. WindowAttachClient (~1,566 LOC), 4. SurfaceRegistry (~1,848 LOC), 5. GridCompositor Duplication, Context, Execution Order, Execution Status (2026-06-11) (+2 more)
 
 ### Community 430 - "HarnessCore: Session / SessionEditor"
-Cohesion: 0.12
+Cohesion: 0.10
 Nodes (4): FlippedStackHost, HarnessSelect, HarnessSelectPopover, SelectRow
 
 ### Community 431 - "Agent Memory: plans / p6-editor-opacity-parity"
 Cohesion: 0.22
 Nodes (8): Actual Fix (2026-06-09), code:swift (panel.layer?.backgroundColor = c.terminalBackground), code:swift (private func refreshEditorPanelFill() {), Fix Approach, P6: File Editor Opacity Parity with Terminal, Problem, Root Cause (hypothesis), Status
 
-### Community 432 - "Harness App: UI / HarnessDesign"
-Cohesion: 0.10
-Nodes (6): SearchMode, fileName, SearchPanelView, SearchResult, SearchResultCellView, SpotlightNameMatcher
-
 ### Community 434 - "Tests: HarnessThemeTests / ThemeCatalogEmbedTests"
 Cohesion: 0.20
 Nodes (4): Decodable, HarnessBrowserTools, Document, ToolPolicy
+
+### Community 435 - "Daemon: HarnessDaemon / SurfaceRegistry"
+Cohesion: 0.23
+Nodes (12): 🧬 Architecture — CMUX + Zed in a Terminal, Build locally, code:bash (git clone https://github.com/Vit129/harness-terminal.git), code:bash (/Applications/Harness.app/Contents/MacOS/harness-cli install), code:bash (harness-cli doctor), Download, harness-cli, Install (+4 more)
 
 ### Community 436 - "Tests: HarnessCoreTests / GroupedSessionTests"
 Cohesion: 0.16
@@ -2183,16 +2170,16 @@ Cohesion: 0.13
 Nodes (14): Architecture, Build & test, code:bash (swift build                                          # debug), code:bash (make preview      # isolated preview build under .harness-pr), Coding constraints, Communication: GUI ↔ Daemon ↔ CLI, Generated files (do not hand-edit), Graphify + agent-memory (+6 more)
 
 ### Community 441 - "Community 441"
-Cohesion: 0.09
-Nodes (8): SSHTunnelManagerTests, SSHTunnelError, exitedEarly, invalidConfiguration, launchFailed, notReady, SSHTunnelManager, Tunnel
+Cohesion: 0.17
+Nodes (7): SSHTunnelError, exitedEarly, invalidConfiguration, launchFailed, notReady, SSHTunnelManager, Tunnel
 
 ### Community 442 - "Community 442"
 Cohesion: 0.14
 Nodes (13): 1. The narrow pane/session command facade, 2. The `PaneNode` split tree (P13 → P14, P4's file editor), 3. The app-side event bus (`harness.events`, `NotificationBus`, MCP visibility), Acceptance Criteria, Current State Snapshot (2026-06-14), Current State Snapshot (2026-06-14, updated after PRs #10/#13–#19 merged), Goal, Known Gap: Divergent P4 Docs (+5 more)
 
 ### Community 444 - "Community 444"
-Cohesion: 0.06
-Nodes (28): CommandPaletteController, PaletteAction, PaletteItemView, PaletteMode, errors, grep, normal, PalettePanel (+20 more)
+Cohesion: 0.07
+Nodes (25): CommandPaletteController, PaletteAction, PaletteItemView, PaletteMode, errors, grep, normal, PalettePanel (+17 more)
 
 ### Community 446 - "Agent Memory: knowledge / git-panel"
 Cohesion: 0.14
@@ -2214,13 +2201,17 @@ Nodes (5): DaemonLifecycle, PriorInstanceDecision, proceed, refuse, stale
 Cohesion: 0.24
 Nodes (4): RecordClient, RecordingWriter, RecordSession, Summary
 
+### Community 451 - "Community 451"
+Cohesion: 0.05
+Nodes (5): ContentAreaViewController, EditorDividerView, HitTestPassthroughView, PaneContainerView, PaneSplitButtonsView
+
 ### Community 452 - "Docs: TMUX_PARITY"
 Cohesion: 0.22
 Nodes (7): Adapted (same capability, Harness-shaped), At parity, Deferred (tracked, unimplemented), Implemented (previously deferred, now shipped), Invariants this ledger protects, Rejected (with rationale), tmux parity — status, adaptations, and deliberate divergences
 
 ### Community 457 - "Community 457"
 Cohesion: 0.03
-Nodes (73): CaseIterable, Mode, compatible, harness, TerminalIdentity, CursorStyle, bar, block (+65 more)
+Nodes (66): CaseIterable, Mode, compatible, harness, TerminalIdentity, InstallResult, Profile, Shell (+58 more)
 
 ### Community 458 - "Agent Memory: knowledge / appkit-metal"
 Cohesion: 0.18
@@ -2262,10 +2253,6 @@ Nodes (27): Acceptance Criteria, Architecture, code:block1 (PaneNode (HarnessCor
 Cohesion: 0.29
 Nodes (7): [1.1.0] - 2026-06-02, Added, Added, Changed, Changed, Fixed, Fixed
 
-### Community 471 - "Release Notes: CHANGELOG"
-Cohesion: 0.22
-Nodes (3): agentDetail(), AgentInboxPanelView, AgentInboxRowView
-
 ### Community 472 - "Community 472"
 Cohesion: 0.15
 Nodes (15): commit_and_push(), prepare_release(), start.sh script, start.sh script, start.sh script, start.sh script, start.sh script, start.sh script (+7 more)
@@ -2275,8 +2262,8 @@ Cohesion: 0.26
 Nodes (5): NotificationPermission, State, denied, granted, undetermined
 
 ### Community 476 - "Release Notes: CHANGELOG"
-Cohesion: 0.07
-Nodes (30): [1.5.1] - 2026-06-05, Changed, Changed, Changed, Changed, Changed, Changed, Changed (+22 more)
+Cohesion: 0.04
+Nodes (58): [1.5.0] - 2026-06-05, [1.5.1] - 2026-06-05, Added, Added, Added, Added, Added, Added (+50 more)
 
 ### Community 478 - "Tests: HarnessCoreTests / TerminalIdentityTests"
 Cohesion: 0.29
@@ -2286,21 +2273,25 @@ Nodes (7): [1.7.0] - 2026-06-06, Added, Added, Changed, Changed, Fixed, Fixed
 Cohesion: 0.18
 Nodes (9): 1. Board Sidebar Tab (GUI), 2. Harness CLI Command, 3. Scripting API, 4. Read-Only MCP Tool, Agent/Session Board (P16), Centralized Classification, Consumers, Data Model (PBI-BOARD-001) (+1 more)
 
+### Community 482 - "Root Docs: README"
+Cohesion: 0.11
+Nodes (3): HarnessSearchField, HarnessSegmented, HarnessTextField
+
 ### Community 483 - "Root Docs: README"
-Cohesion: 0.05
-Nodes (45): [2.2.1] - 2026-06-08, [2.2.2] - 2026-06-08, Added, Added, Added, Added, Added, Added (+37 more)
+Cohesion: 0.08
+Nodes (26): [2.2.1] - 2026-06-08, Changed, Changed, Changed, Changed, Changed, Changed, Changed (+18 more)
 
 ### Community 484 - "Release Notes: CHANGELOG"
-Cohesion: 0.05
-Nodes (43): [1.1.0] - 2026-06-02, Added, Added, Added, Added, Added, Added, Added (+35 more)
+Cohesion: 0.04
+Nodes (45): [1.1.0] - 2026-06-02, Added, Added, Added, Added, Added, Added, Added (+37 more)
 
 ### Community 487 - "Release Notes: CHANGELOG"
 Cohesion: 0.05
-Nodes (42): [1.1.2] - 2026-06-02, Added, Added, Added, Added, Added, Added, Added (+34 more)
+Nodes (43): [1.1.2] - 2026-06-02, Added, Added, Added, Added, Added, Added, Added (+35 more)
 
 ### Community 489 - "Release Notes: CHANGELOG"
 Cohesion: 0.05
-Nodes (39): [1.2.0] - 2026-06-03, Added, Added, Added, Added, Added, Added, Added (+31 more)
+Nodes (42): [1.2.0] - 2026-06-03, Added, Added, Added, Added, Added, Added, Added (+34 more)
 
 ### Community 490 - "Agent Memory: plans / p7-sidebar-ui-large-screen"
 Cohesion: 0.40
@@ -2327,12 +2318,12 @@ Cohesion: 0.25
 Nodes (13): LocalizedError, dispatchEvent(), evaluate(), handleAgentStateChanged(), handleConfigReloaded(), handleSnapshotChanged(), init(), registerNotificationBridge() (+5 more)
 
 ### Community 500 - "Community 500"
-Cohesion: 0.19
-Nodes (3): FileTreeKeyboardNavigator, FileTreeKeyboardState, WorkspaceFileTreeView
+Cohesion: 0.12
+Nodes (4): FileTreeKeyboardNavigator, FileTreeKeyboardState, FileTreeSwiftUIView, WorkspaceFileTreeView
 
 ### Community 501 - "Root Docs: README"
 Cohesion: 0.12
-Nodes (16): [1.0.5] - 2026-06-01, Fixed, Fixed, Fixed, Fixed, Fixed, Fixed, Fixed (+8 more)
+Nodes (17): [1.0.5] - 2026-06-01, Fixed, Fixed, Fixed, Fixed, Fixed, Fixed, Fixed (+9 more)
 
 ### Community 502 - "Community 502"
 Cohesion: 0.12
@@ -2347,20 +2338,20 @@ Cohesion: 0.15
 Nodes (12): Architecture, Build & test, code:bash (swift build                                          # debug), code:bash (make run          # build + package + sign + open Harness.ap), Coding constraints, Communication: GUI ↔ Daemon ↔ CLI, Generated files (do not hand-edit), IPC safety (+4 more)
 
 ### Community 505 - "Community 505"
-Cohesion: 0.17
-Nodes (17): BgInstance, CursorCacheKey, DecoInstance, EncodedFrameInstances, EncodedRowInstances, GlyphInstance, ImageInstance, ImageZBand (+9 more)
+Cohesion: 0.20
+Nodes (6): LayoutTemplate, evenHorizontal, evenVertical, mainHorizontal, mainVertical, tiled
 
 ### Community 506 - "Community 506"
 Cohesion: 0.12
 Nodes (13): BinaryInstaller, CopyOutcome, copied, keptNewerInstalled, skippedIdentical, DetectionStatus, found, notFound (+5 more)
 
 ### Community 507 - "Release Notes: CHANGELOG"
-Cohesion: 0.14
-Nodes (15): CLIInstallLocator, copyExecutable(), installCLI(), locateDaemonBinary(), handleAttach(), handleAttachWindow(), handleKillServer(), handleRecord() (+7 more)
+Cohesion: 0.23
+Nodes (12): handleAttach(), handleAttachWindow(), handleDetachClient(), handleKillServer(), handleRecord(), handleRemote(), handleReplay(), handleStartServer() (+4 more)
 
 ### Community 508 - "Community 508"
-Cohesion: 0.25
-Nodes (6): ⌘1-9 and ⌘[ / ⌘] = Session-level navigation (CASE-028), Data Model, Session/Tab/Pane Hierarchy & Top Bar (CASE-028), Sidebar Session Groups = One Header Per SessionGroup, Source Map, Top Bar = 1 Pill Per Session (not per-tab)
+Cohesion: 0.22
+Nodes (7): ⌘1-9 and ⌘[ / ⌘] = Session-level navigation (CASE-028), Data Model, Session/Tab/Pane Hierarchy & Top Bar (CASE-028), Sidebar Session Groups = One Header Per SessionGroup, Source Map, Tab Pill Visual Details, Top Bar = 1 Pill Per Session (not per-tab)
 
 ### Community 509 - "Community 509"
 Cohesion: 0.43
@@ -2374,13 +2365,9 @@ Nodes (3): NSTextFieldCell, HarnessTextFieldCell, HarnessTextFieldCell
 Cohesion: 0.11
 Nodes (3): tabAgentKind(), tabDisplayTitle(), TabPillView
 
-### Community 512 - "Harness App: UI / OnboardingController"
-Cohesion: 0.15
-Nodes (3): EditorDividerView, HitTestPassthroughView, PaneSplitButtonsView
-
 ### Community 513 - "Community 513"
-Cohesion: 0.10
-Nodes (9): PaneNodeBrowserTests, WorkbenchContextResolverTests, BrowserLeaf, PaneLeaf, PaneNode, branch, browser, leaf (+1 more)
+Cohesion: 0.14
+Nodes (7): WorkbenchContextResolverTests, PaneLeaf, PaneNode, branch, browser, leaf, PaneSurface
 
 ### Community 514 - "Onboarding: Design / Components"
 Cohesion: 0.30
@@ -2388,27 +2375,27 @@ Nodes (9): atomicWrite(), backupCorruptFile(), ensureDirectories(), fnv1aHex(), 
 
 ### Community 515 - "Release Notes: CHANGELOG"
 Cohesion: 0.06
-Nodes (31): [1.0.6] - 2026-06-02, Added, Added, Added, Added, Added, Added, Added (+23 more)
+Nodes (33): [1.0.6] - 2026-06-02, Added, Added, Added, Added, Added, Added, Added (+25 more)
 
 ### Community 516 - "Release Notes: CHANGELOG"
-Cohesion: 0.07
-Nodes (30): [1.3.0] - 2026-06-04, Added, Added, Added, Added, Added, Added, Added (+22 more)
+Cohesion: 0.06
+Nodes (32): [1.3.0] - 2026-06-04, Added, Added, Added, Added, Added, Added, Added (+24 more)
 
 ### Community 517 - "Release Notes: CHANGELOG"
-Cohesion: 0.07
-Nodes (29): [1.3.1] - 2026-06-04, Added, Added, Added, Added, Added, Added, Added (+21 more)
+Cohesion: 0.06
+Nodes (32): [1.3.1] - 2026-06-04, Added, Added, Added, Added, Added, Added, Added (+24 more)
 
 ### Community 519 - "HarnessCore: ACP / ACPClient"
 Cohesion: 0.40
 Nodes (3): AI-DLC Progress: Command History Search Overlay, Current Phase: 3.3 PR & Merge, Metrics
 
 ### Community 520 - "Release Notes: CHANGELOG"
-Cohesion: 0.12
-Nodes (16): Build from source, code:bash (make debug        # build (debug) + sign + open Harness.app), code:bash (git clone https://github.com/Vit129/harness-terminal), Docs, Harness, Quick start, Stack, Why Harness (+8 more)
+Cohesion: 0.22
+Nodes (8): Build from source, code:bash (make debug        # build (debug) + sign + open Harness.app), code:bash (git clone https://github.com/Vit129/harness-terminal), Docs, Harness, Quick start, Stack, Why Harness
 
-### Community 522 - "Daemon: HarnessDaemon / SurfaceRegistry"
-Cohesion: 0.06
-Nodes (36): [1.0.0] - 2026-06-05, [2.3.0] - 2026-06-11, Added, Added, Added, Added, Added, Added (+28 more)
+### Community 524 - "Release Notes: CHANGELOG"
+Cohesion: 0.09
+Nodes (5): HookFiringTests, RealPtyLifecycleTests, AtomicBox, AtomicCounter, OutputAccumulator
 
 ### Community 525 - "Community 525"
 Cohesion: 0.24
@@ -2419,20 +2406,20 @@ Cohesion: 0.12
 Nodes (15): WorkbenchCommand, ack, agent, attention, board, cd, copyPath, errors (+7 more)
 
 ### Community 528 - "Community 528"
-Cohesion: 0.13
-Nodes (15): [1.1.1] - 2026-06-02, Fixed, Fixed, Fixed, Fixed, Fixed, Fixed, Fixed (+7 more)
+Cohesion: 0.12
+Nodes (16): [1.1.1] - 2026-06-02, Fixed, Fixed, Fixed, Fixed, Fixed, Fixed, Fixed (+8 more)
 
 ### Community 529 - "Release Notes: CHANGELOG"
-Cohesion: 0.14
-Nodes (3): NSDraggingSource, GitChangeRowView, GitHistoryFileButton
+Cohesion: 0.20
+Nodes (9): Branch Label, Chrome Roles, code:block1 ([persistentIcon?][agentIcon?]   [titleLabel]•[statusDot]   [), Drag Reorder, File, Git Branch Detection, Pill Layout (TabPillView), Source Map (+1 more)
 
 ### Community 531 - "Release Notes: CHANGELOG"
 Cohesion: 0.60
 Nodes (3): emitArray(), hex(), referenceWidth()
 
 ### Community 532 - "Release Notes: CHANGELOG"
-Cohesion: 0.11
-Nodes (4): NSControl, HarnessSwatchWell, HarnessToggle, GitHistoryCommitCardView
+Cohesion: 0.06
+Nodes (8): NSControl, FlippedStackHost, HarnessColorPanelCoordinator, HarnessSlider, HarnessSwatchWell, HarnessToggle, SelectRow, GitHistoryCommitCardView
 
 ### Community 535 - "Release Notes: CHANGELOG"
 Cohesion: 0.29
@@ -2443,8 +2430,8 @@ Cohesion: 0.29
 Nodes (7): [1.2.0] - 2026-06-03, Added, Added, Changed, Changed, Fixed, Fixed
 
 ### Community 538 - "Community 538"
-Cohesion: 0.08
-Nodes (5): RotatableImageView, SessionCardRowView, SessionGroupHeaderRowView, SidebarTitlebarHeaderView, WorktreeRowView
+Cohesion: 0.07
+Nodes (8): addSession(), addSessionInGroup(), sessionRow(), RotatableImageView, SessionCardRowView, SessionGroupHeaderRowView, SidebarTitlebarHeaderView, WorktreeRowView
 
 ### Community 539 - "Scripts: install-app.sh"
 Cohesion: 0.13
@@ -2459,23 +2446,19 @@ Cohesion: 0.28
 Nodes (6): HarnessFilePreviewLoader, HarnessViewError, binaryOrUnsupportedEncoding, missingPath, tooLarge, unreadable
 
 ### Community 543 - "Community 543"
-Cohesion: 0.22
-Nodes (3): agentDetail(), AgentInboxPanelView, AgentInboxRowView
+Cohesion: 0.24
+Nodes (5): SearchMode, content, fileName, SearchResult, SpotlightNameMatcher
 
 ### Community 544 - "Community 544"
 Cohesion: 0.29
 Nodes (5): Current Shipped State, Direction, Non-Goals, P4 — Terminal-First Code Viewing + Lightweight LSP, Success Criteria
 
-### Community 545 - "Community 545"
-Cohesion: 0.18
-Nodes (7): harness_open_pty_master(), harness_open_rdwr(), harness_peer_uid(), harness_pty_make_controlling(), harness_pty_set_winsize(), harness_set_nonblocking(), ScriptConfigLocator
-
 ### Community 547 - "Community 547"
 Cohesion: 0.09
-Nodes (11): NSObject, ForegroundPresenter, center, ClosureTarget, MenuActionTarget, OverlayWindow, Phase67UI, PopupWindow (+3 more)
+Nodes (11): NSObject, NSWindowDelegate, center, SettingsWindowCloseProxy, ClosureTarget, MenuActionTarget, OverlayWindow, Phase67UI (+3 more)
 
 ### Community 549 - "Community 549"
-Cohesion: 0.26
+Cohesion: 0.24
 Nodes (4): PaneListRow, SessionListRow, SnapshotQueryFormatter, WindowListRow
 
 ### Community 550 - "Community 550"
@@ -2559,8 +2542,8 @@ Cohesion: 0.50
 Nodes (4): [1.1.2] - 2026-06-02, Added, Changed, Fixed
 
 ### Community 573 - "Community 573"
-Cohesion: 0.14
-Nodes (14): [2.2.3] - 2026-06-09, Fixed, Fixed, Fixed, Fixed, Fixed, Fixed, Fixed (+6 more)
+Cohesion: 0.13
+Nodes (15): [2.2.3] - 2026-06-09, Fixed, Fixed, Fixed, Fixed, Fixed, Fixed, Fixed (+7 more)
 
 ### Community 574 - "Community 574"
 Cohesion: 0.25
@@ -2588,18 +2571,18 @@ Nodes (12): Accessibility Requirements, code:block1 (Robot Framework 7.x), code:
 
 ### Community 587 - "Community 587"
 Cohesion: 0.06
-Nodes (25): CodingKey, CodingKeys, activeSurfaceID, daemonSurfaceID, id, surfaceID, surfaces, CodingKeys (+17 more)
+Nodes (29): CodingKey, CodingKeys, disabledSpecs, id, tables, CodingKeys, activeSurfaceID, daemonSurfaceID (+21 more)
 
 ### Community 588 - "Community 588"
 Cohesion: 0.25
 Nodes (8): Build from source, code:bash (make preview      # isolated preview (separate daemon socket), code:bash (git clone https://github.com/Vit129/harness-terminal), Docs, Harness, Quick start, Stack, Why Harness
 
 ### Community 589 - "Community 589"
-Cohesion: 0.05
-Nodes (32): ViDiagnosticNavigatorTests, CodingKeys, error, id, jsonrpc, method, params, result (+24 more)
+Cohesion: 0.06
+Nodes (25): ViDiagnosticNavigatorTests, CodingKeys, error, id, jsonrpc, method, params, result (+17 more)
 
 ### Community 590 - "Community 590"
-Cohesion: 0.26
+Cohesion: 0.23
 Nodes (3): LSPServerConfiguration, LSPServerRegistry, LSPSettings
 
 ### Community 592 - "Community 592"
@@ -2620,15 +2603,15 @@ Nodes (12): next_semver(), run(), usage(), prepare-release.sh script, prepare-re
 
 ### Community 598 - "Community 598"
 Cohesion: 0.29
-Nodes (5): Counter, DrainResult, DrainState, EchoRTT, PtyDrainCeilingBenchmark
+Nodes (4): ImagePlacement, Pen, RewrapResult, SavedCursor
 
 ### Community 599 - "Community 599"
 Cohesion: 0.05
-Nodes (4): HarnessGridTerminal, ClipboardOSCTests, ParserRobustnessTests, FrameBuilderTests
+Nodes (4): HarnessGridTerminal, ClipboardOSCTests, ParserRobustnessTests, UInt32
 
-### Community 601 - "Community 601"
+### Community 600 - "Community 600"
 Cohesion: 0.11
-Nodes (5): FlippedStackHost, HarnessColorPanelCoordinator, HarnessSelect, HarnessSelectPopover, SelectRow
+Nodes (3): HarnessTerminalSurfaceView, testingSetWindowIsKey(), NSTextInputClient
 
 ### Community 602 - "Community 602"
 Cohesion: 0.50
@@ -2644,11 +2627,11 @@ Nodes (10): Build from source, CLI, code:bash (make preview      # isolated prev
 
 ### Community 607 - "Community 607"
 Cohesion: 0.09
-Nodes (23): [1.0.0] - [1.0.4] - 2026-06-01, [1.0.5] - 2026-06-01, [1.1.1] - 2026-06-02, [1.6.0] - 2026-06-05, [1.9.0] - 2026-06-08, [2.2.3] - 2026-06-09, [2.5.2] - 2026-06-12, [2.6.0] - 2026-06-13 (+15 more)
+Nodes (23): [1.0.0] - [1.0.4] - 2026-06-01, [1.0.5] - 2026-06-01, [1.1.1] - 2026-06-02, [1.6.0] - 2026-06-05, [1.7.1] - 2026-06-06, [2.2.3] - 2026-06-09, [2.5.2] - 2026-06-12, [2.6.0] - 2026-06-13 (+15 more)
 
 ### Community 609 - "Community 609"
-Cohesion: 0.06
-Nodes (9): SessionCardRowView, SessionGroupHeaderRowView, SidebarSessionRow, groupHeader, session, SidebarTitlebarHeaderView, WorkspacePillButton, WorkspaceSwitcherPanelView (+1 more)
+Cohesion: 0.10
+Nodes (7): SidebarSessionRow, groupHeader, session, SidebarTitlebarHeaderView, WorkspacePillButton, WorkspaceSwitcherPanelView, WorkspaceSwitcherRow
 
 ### Community 610 - "Community 610"
 Cohesion: 0.40
@@ -2683,8 +2666,8 @@ Cohesion: 0.33
 Nodes (5): Build/test/run commands, Graphify + agent-memory, High-level architecture, Non-obvious constraints, Project context lookup
 
 ### Community 623 - "Community 623"
-Cohesion: 0.29
-Nodes (5): KeySpecDecode, complete, incomplete, invalid, literalPrefix
+Cohesion: 0.23
+Nodes (6): KeySpecDecode, complete, incomplete, invalid, literalPrefix, WindowInputRouter
 
 ### Community 626 - "Community 626"
 Cohesion: 0.09
@@ -2694,12 +2677,16 @@ Nodes (4): NotificationCoordinator, DesktopNotifier, HarnessPathDisplay, Notific
 Cohesion: 0.21
 Nodes (3): AgentIconRenderer, Scanner, SVGPathParser
 
+### Community 631 - "Community 631"
+Cohesion: 0.38
+Nodes (3): FuzzyMatcher, PaletteAction, PaletteFuzzyMatcher
+
 ### Community 633 - "Community 633"
-Cohesion: 0.09
-Nodes (21): AgentChipView, ChromeRole, sidebar, tabBar, FontSize, HarnessMotion, IconSize, Kind (+13 more)
+Cohesion: 0.13
+Nodes (19): AgentChipView, ChromeRole, sidebar, tabBar, FontSize, IconSize, Kind, primary (+11 more)
 
 ### Community 636 - "Community 636"
-Cohesion: 0.20
+Cohesion: 0.22
 Nodes (4): KeyTableID, RawRepresentable, register(), ScriptAPI
 
 ### Community 638 - "Community 638"
@@ -2715,12 +2702,16 @@ Cohesion: 0.36
 Nodes (3): InterruptFlag, ReplayClient, ReplayPlayer
 
 ### Community 643 - "Community 643"
-Cohesion: 0.22
-Nodes (7): OnboardingStep, complete, discover, setup, shell, welcome, OnboardingWizardView
+Cohesion: 0.12
+Nodes (10): CompleteStepView, DiscoverStepView, Point, OnboardingStep, complete, discover, setup, shell (+2 more)
 
 ### Community 644 - "Community 644"
 Cohesion: 0.18
 Nodes (9): clean-state.sh script, clean-state.sh script, clean-state.sh script, clean-state.sh script, clean-state.sh script, clean-state.sh script, clean-state.sh script, clean-state.sh script (+1 more)
+
+### Community 645 - "Community 645"
+Cohesion: 0.28
+Nodes (5): CLIInstallLocator, copyExecutable(), installCLI(), locateDaemonBinary(), runDaemonForeground()
 
 ### Community 649 - "Community 649"
 Cohesion: 0.25
@@ -2733,6 +2724,10 @@ Nodes (8): Build from source, code:bash (make preview      # isolated preview (s
 ### Community 651 - "Community 651"
 Cohesion: 0.18
 Nodes (9): Accessibility Identifiers Required, Architecture, code:bash (# Already installed:), code:bash (# All suites), code:block3 (Tests/HarnessRobotTests/), Harness Robot Framework Tests, Prerequisites, Run (+1 more)
+
+### Community 653 - "Community 653"
+Cohesion: 0.25
+Nodes (7): 1. SurfaceShellTracker (proc tree walk), 2. DaemonSyncService.startMetadataRefresh (5-s loop), 3. snapshotChanged Fanout, 4. PerfCounters — Instrumentation, Background Polling & Snapshot Fanout — P22, code:block1 (startMetadataRefresh()), Known Non-P22 Callers of syncFromDaemon
 
 ### Community 656 - "Community 656"
 Cohesion: 0.29
@@ -2750,21 +2745,25 @@ Nodes (3): RenderColorConversion, RenderColorConverter, RenderColor
 Cohesion: 0.33
 Nodes (5): Build/test/run commands, Graphify + agent-memory, High-level architecture, Non-obvious constraints, Project context lookup
 
+### Community 663 - "Community 663"
+Cohesion: 0.25
+Nodes (8): Build from source, code:bash (make preview      # isolated preview (separate daemon socket), code:bash (git clone https://github.com/Vit129/harness-terminal), Docs, Harness, Quick start, Stack, Why Harness
+
 ### Community 666 - "Community 666"
 Cohesion: 0.22
 Nodes (9): Style, accent, agent, agentWorking, done, error, idle, running (+1 more)
-
-### Community 667 - "Community 667"
-Cohesion: 0.16
-Nodes (3): MainWindowController, NSWindowController, MainWindowController
 
 ### Community 668 - "Community 668"
 Cohesion: 0.29
 Nodes (6): Architecture, Browser Pane (P14), CASE: applyLocalSnapshot re-injected closed browser panes (v2.7.1), CASE: collapsed errorBanner intercepted toolbar clicks (v2.7.1), Click-to-open localhost/LAN dev-server links, Open Browser Pane shortcut (⌘B)
 
 ### Community 669 - "Community 669"
-Cohesion: 0.48
-Nodes (5): escapedForJSON(), InstallError, notifyCommand(), notifyFromHookCommand(), resolveAgentName()
+Cohesion: 0.36
+Nodes (6): escapedForJSON(), InstallError, InstallResult, notifyCommand(), notifyFromHookCommand(), resolveAgentName()
+
+### Community 673 - "Community 673"
+Cohesion: 0.29
+Nodes (7): Status, connecting, disconnected, error, ready, streaming, waitingForApproval
 
 ### Community 674 - "Community 674"
 Cohesion: 0.67
@@ -2774,6 +2773,10 @@ Nodes (3): [1.3.1] - 2026-06-04, Added, Fixed
 Cohesion: 0.25
 Nodes (7): Anti-Patterns Avoided, Architecture, code:block1 (SessionCoordinator (397 LOC facade)), Key Design Decisions, Pattern, Service Decomposition — SessionCoordinator (P17), When to Apply This Pattern
 
+### Community 678 - "Community 678"
+Cohesion: 0.11
+Nodes (7): FileTab, FileTabManager, Agent, OnboardingEnvironment, Identifiable, FileTab, FileTabManager
+
 ### Community 679 - "Community 679"
 Cohesion: 0.29
 Nodes (3): BrowserPaneViewTests, MockWebView, WKWebView
@@ -2781,6 +2784,10 @@ Nodes (3): BrowserPaneViewTests, MockWebView, WKWebView
 ### Community 680 - "Community 680"
 Cohesion: 0.36
 Nodes (7): fuzzyFindFiles(), handleErrors(), handleFind(), handleGrep(), handleMake(), handleRecent(), vfork_and_exec()
+
+### Community 681 - "Community 681"
+Cohesion: 0.29
+Nodes (3): HorizontalInsetRect, NotchShape, Shape
 
 ### Community 683 - "Community 683"
 Cohesion: 0.67
@@ -2799,8 +2806,12 @@ Cohesion: 0.50
 Nodes (4): [1.1.0] - 2026-06-02, Added, Changed, Fixed
 
 ### Community 689 - "Community 689"
-Cohesion: 0.25
-Nodes (5): OptionStore.Value, Value, bool, int, string
+Cohesion: 0.29
+Nodes (7): Style, accent, agent, agentWorking, error, idle, waiting
+
+### Community 692 - "Community 692"
+Cohesion: 0.33
+Nodes (4): ScreenPos, bottom, middle, top
 
 ### Community 693 - "Community 693"
 Cohesion: 0.50
@@ -2809,10 +2820,6 @@ Nodes (4): [1.1.0] - 2026-06-02, Added, Changed, Fixed
 ### Community 694 - "Community 694"
 Cohesion: 0.50
 Nodes (4): [1.1.2] - 2026-06-02, Added, Changed, Fixed
-
-### Community 695 - "Community 695"
-Cohesion: 0.29
-Nodes (6): DecoKind, curly, dashed, dotted, double, solid
 
 ### Community 696 - "Community 696"
 Cohesion: 0.50
@@ -2851,8 +2858,8 @@ Cohesion: 0.50
 Nodes (4): [1.1.0] - 2026-06-02, Added, Changed, Fixed
 
 ### Community 712 - "Community 712"
-Cohesion: 0.50
-Nodes (4): [1.1.2] - 2026-06-02, Added, Changed, Fixed
+Cohesion: 0.33
+Nodes (4): NSTableViewDataSource, NSTableViewDelegate, HarnessSidebarPanelViewController, searchChanged()
 
 ### Community 713 - "Community 713"
 Cohesion: 0.50
@@ -2867,8 +2874,8 @@ Cohesion: 0.50
 Nodes (4): DiffLineType, added, deleted, modified
 
 ### Community 716 - "Community 716"
-Cohesion: 0.08
-Nodes (21): CodingKeys, cols, createdAt, dataBase64, rows, surfaceID, timeMs, version (+13 more)
+Cohesion: 0.07
+Nodes (22): CodingKeys, cols, createdAt, dataBase64, rows, surfaceID, timeMs, version (+14 more)
 
 ### Community 717 - "Community 717"
 Cohesion: 0.16
@@ -2931,8 +2938,8 @@ Cohesion: 0.67
 Nodes (3): [1.5.0] - 2026-06-05, Added, Fixed
 
 ### Community 735 - "Community 735"
-Cohesion: 0.03
-Nodes (78): InstallResult, BoardCard, BoardColumn, BoardColumnKind, done, error, idle, needsAttention (+70 more)
+Cohesion: 0.02
+Nodes (90): CLICommand, CLICommandCatalog, Comparable, Equatable, DetachKeys, absent, invalid, parsed (+82 more)
 
 ### Community 736 - "Community 736"
 Cohesion: 0.50
@@ -2988,7 +2995,7 @@ Nodes (3): [1.9.0] - 2026-06-08, Added, Fixed
 
 ### Community 752 - "Community 752"
 Cohesion: 0.40
-Nodes (5): OptionalUUID, absent, dangling, invalid, valid
+Nodes (5): [1.0.6] - 2026-06-02, Added, Added, Changed, Changed
 
 ### Community 753 - "Community 753"
 Cohesion: 0.67
@@ -3003,16 +3010,12 @@ Cohesion: 0.67
 Nodes (3): [2.2.2] - 2026-06-08, Added, Fixed
 
 ### Community 760 - "Community 760"
-Cohesion: 0.67
-Nodes (3): [1.3.0] - 2026-06-04, Added, Fixed
+Cohesion: 0.40
+Nodes (5): Agent hooks, CLI, code:bash (make preview), code:bash (/Applications/Harness.app/Contents/MacOS/harness-cli install), 📊 Graphify
 
 ### Community 761 - "Community 761"
 Cohesion: 0.67
 Nodes (3): [2.4.0] - 2026-06-12, Added, Fixed
-
-### Community 762 - "Community 762"
-Cohesion: 0.67
-Nodes (3): [1.3.2] - 2026-06-04, Added, Fixed
 
 ### Community 764 - "Community 764"
 Cohesion: 0.67
@@ -3027,8 +3030,8 @@ Cohesion: 0.67
 Nodes (3): [2.5.1] - 2026-06-12, Added, Fixed
 
 ### Community 769 - "Community 769"
-Cohesion: 0.67
-Nodes (3): [2.0.0] - 2026-06-08, Added, Changed
+Cohesion: 0.40
+Nodes (5): BellScanState, esc, normal, string, stringEsc
 
 ### Community 770 - "Community 770"
 Cohesion: 0.40
@@ -3045,14 +3048,6 @@ Nodes (3): [2.5.3] - 2026-06-13, Changed, Removed
 ### Community 774 - "Community 774"
 Cohesion: 0.15
 Nodes (11): LinePos, end, firstNonBlank, start, ViDiagnosticNavigator, ViMode, insert, normal (+3 more)
-
-### Community 775 - "Community 775"
-Cohesion: 0.67
-Nodes (3): [2.5.0] - 2026-06-12, Added, Changed
-
-### Community 776 - "Community 776"
-Cohesion: 0.67
-Nodes (3): [2.5.1] - 2026-06-12, Added, Fixed
 
 ### Community 777 - "Community 777"
 Cohesion: 0.33
@@ -3131,8 +3126,8 @@ Cohesion: 0.67
 Nodes (3): [1.5.1] - 2026-06-05, Changed, Fixed
 
 ### Community 798 - "Community 798"
-Cohesion: 0.21
-Nodes (8): ACP Client (shelved — code preserved for future), 🤖 Agent System, Detection (passive — zero config), Files, Git, 📁 IDE Sidebar, Notifications, Session Panel
+Cohesion: 0.50
+Nodes (4): ACP Client (shelved — code preserved for future), 🤖 Agent System, Detection (passive — zero config), Notifications
 
 ### Community 799 - "Community 799"
 Cohesion: 0.67
@@ -3191,12 +3186,8 @@ Cohesion: 0.67
 Nodes (3): [1.0.6] - 2026-06-02, Added, Changed
 
 ### Community 814 - "Community 814"
-Cohesion: 0.19
-Nodes (4): Group, ParsedShortcut, PrefixCheatsheetWindow, PrefixIndicatorWindow
-
-### Community 815 - "Community 815"
-Cohesion: 0.67
-Nodes (3): [1.9.0] - 2026-06-08, Added, Fixed
+Cohesion: 0.18
+Nodes (5): NSImageView, Group, ParsedShortcut, PrefixCheatsheetWindow, PrefixIndicatorWindow
 
 ### Community 818 - "Community 818"
 Cohesion: 0.67
@@ -3215,20 +3206,20 @@ Cohesion: 0.67
 Nodes (3): [2.2.1] - 2026-06-08, Changed, Fixed
 
 ### Community 823 - "Community 823"
-Cohesion: 0.40
-Nodes (5): [2.2.3] - 2026-06-09, [2.2.4] - 2026-06-11, Added, Fixed, Fixed
+Cohesion: 0.50
+Nodes (4): [1.1.0] - 2026-06-02, Added, Changed, Fixed
 
 ### Community 824 - "Community 824"
 Cohesion: 0.67
 Nodes (3): [2.2.2] - 2026-06-08, Added, Fixed
 
-### Community 826 - "Community 826"
-Cohesion: 0.21
-Nodes (3): object, LSPFileSession, SyntaxDefinitionTarget
+### Community 825 - "Community 825"
+Cohesion: 0.50
+Nodes (4): [1.2.0] - 2026-06-03, Added, Changed, Fixed
 
 ### Community 827 - "Community 827"
-Cohesion: 0.18
-Nodes (3): OptionStoreTests, OptionStore, ScopedKey
+Cohesion: 0.14
+Nodes (12): OptionStore, OptionStore.Value, Scope, pane, session, tab, workspace, ScopedKey (+4 more)
 
 ### Community 828 - "Community 828"
 Cohesion: 0.20
@@ -3237,6 +3228,10 @@ Nodes (10): Build from source, CLI, code:bash (make preview      # isolated prev
 ### Community 829 - "Community 829"
 Cohesion: 0.50
 Nodes (4): [1.1.2] - 2026-06-02, Added, Changed, Fixed
+
+### Community 832 - "Community 832"
+Cohesion: 0.50
+Nodes (4): [1.4.0] - 2026-06-04, Added, Fixed, Performance
 
 ### Community 833 - "Community 833"
 Cohesion: 0.67
@@ -3266,13 +3261,17 @@ Nodes (4): [1.1.2] - 2026-06-02, Added, Changed, Fixed
 Cohesion: 0.50
 Nodes (4): [1.2.0] - 2026-06-03, Added, Changed, Fixed
 
+### Community 842 - "Community 842"
+Cohesion: 0.50
+Nodes (4): [1.1.0] - 2026-06-02, Added, Changed, Fixed
+
 ### Community 843 - "Community 843"
 Cohesion: 0.25
 Nodes (8): Build from source, code:bash (make preview      # isolated preview (separate daemon socket), code:bash (git clone https://github.com/Vit129/harness-terminal), Docs, Harness, Quick start, Stack, Why Harness
 
 ### Community 844 - "Community 844"
-Cohesion: 0.40
-Nodes (5): Shadow, elevation1, elevation2, none, overlay
+Cohesion: 0.50
+Nodes (4): [1.1.0] - 2026-06-02, Added, Changed, Fixed
 
 ### Community 845 - "Community 845"
 Cohesion: 0.50
@@ -3332,11 +3331,11 @@ Nodes (4): [2.3.0] - 2026-06-11, Added, Changed, Fixed
 
 ### Community 865 - "Community 865"
 Cohesion: 0.50
-Nodes (4): DetachKeys, absent, invalid, parsed
+Nodes (4): [1.4.0] - 2026-06-04, Added, Fixed, Performance
 
 ### Community 866 - "Community 866"
 Cohesion: 0.50
-Nodes (4): [1.4.0] - 2026-06-04, Added, Fixed, Performance
+Nodes (4): [1.7.0] - 2026-06-06, Added, Changed, Fixed
 
 ### Community 867 - "Community 867"
 Cohesion: 0.50
@@ -3356,7 +3355,7 @@ Nodes (4): [1.4.0] - 2026-06-04, Added, Fixed, Performance
 
 ### Community 871 - "Community 871"
 Cohesion: 0.50
-Nodes (4): [1.7.0] - 2026-06-06, Added, Changed, Fixed
+Nodes (4): code:bash (harness-cli doctor), code:bash (harness-cli remote add --name devbox --ssh me@devbox --socke), Development preview, Remote And Headless
 
 ### Community 874 - "Community 874"
 Cohesion: 0.50
@@ -3379,8 +3378,8 @@ Cohesion: 0.50
 Nodes (4): [1.1.2] - 2026-06-02, Added, Changed, Fixed
 
 ### Community 880 - "Community 880"
-Cohesion: 0.67
-Nodes (3): [1.8.0] - 2026-06-07, Added, Fixed
+Cohesion: 0.50
+Nodes (4): Files, Git, 📁 IDE Sidebar, Session Panel
 
 ### Community 881 - "Community 881"
 Cohesion: 0.50
@@ -3416,7 +3415,7 @@ Nodes (3): [1.4.1] - 2026-06-04, Added, Performance
 
 ### Community 889 - "Community 889"
 Cohesion: 0.50
-Nodes (4): [1.1.0] - 2026-06-02, Added, Changed, Fixed
+Nodes (4): [1.1.2] - 2026-06-02, Added, Changed, Fixed
 
 ### Community 890 - "Community 890"
 Cohesion: 0.67
@@ -3427,8 +3426,8 @@ Cohesion: 0.67
 Nodes (3): [1.5.1] - 2026-06-05, Changed, Fixed
 
 ### Community 892 - "Community 892"
-Cohesion: 0.50
-Nodes (4): [1.7.0] - 2026-06-06, Added, Changed, Fixed
+Cohesion: 0.67
+Nodes (4): agentsButtonClicked(), dismissAgentsInbox(), installAgentsInboxMonitor(), showAgentsInbox()
 
 ### Community 893 - "Community 893"
 Cohesion: 0.67
@@ -3440,7 +3439,7 @@ Nodes (3): [1.7.1] - 2026-06-06, Added, Fixed
 
 ### Community 895 - "Community 895"
 Cohesion: 0.67
-Nodes (3): [1.3.1] - 2026-06-04, Added, Fixed
+Nodes (3): [1.3.0] - 2026-06-04, Added, Fixed
 
 ### Community 896 - "Community 896"
 Cohesion: 0.67
@@ -3448,7 +3447,7 @@ Nodes (3): [1.0.6] - 2026-06-02, Added, Changed
 
 ### Community 897 - "Community 897"
 Cohesion: 0.67
-Nodes (3): [1.4.1] - 2026-06-04, Added, Performance
+Nodes (3): [1.3.1] - 2026-06-04, Added, Fixed
 
 ### Community 898 - "Community 898"
 Cohesion: 0.67
@@ -3456,23 +3455,23 @@ Nodes (3): [1.3.2] - 2026-06-04, Added, Fixed
 
 ### Community 899 - "Community 899"
 Cohesion: 0.67
-Nodes (3): [2.1.0] - 2026-06-08, Added, Fixed
+Nodes (3): [1.4.1] - 2026-06-04, Added, Performance
 
 ### Community 900 - "Community 900"
 Cohesion: 0.67
-Nodes (3): [2.2.1] - 2026-06-08, Changed, Fixed
+Nodes (3): [1.5.0] - 2026-06-05, Added, Fixed
 
 ### Community 901 - "Community 901"
 Cohesion: 0.67
-Nodes (3): [2.2.4] - 2026-06-11, Added, Fixed
+Nodes (3): [1.5.1] - 2026-06-05, Changed, Fixed
 
 ### Community 902 - "Community 902"
 Cohesion: 0.67
-Nodes (3): [2.4.0] - 2026-06-12, Added, Fixed
+Nodes (3): [1.7.1] - 2026-06-06, Added, Fixed
 
 ### Community 903 - "Community 903"
 Cohesion: 0.67
-Nodes (3): [2.5.3] - 2026-06-13, Changed, Removed
+Nodes (3): [1.8.0] - 2026-06-07, Added, Fixed
 
 ### Community 904 - "Community 904"
 Cohesion: 0.67
@@ -3492,15 +3491,15 @@ Nodes (3): [2.1.0] - 2026-06-08, Added, Fixed
 
 ### Community 908 - "Community 908"
 Cohesion: 0.67
-Nodes (3): [1.4.1] - 2026-06-04, Added, Performance
+Nodes (3): [2.0.0] - 2026-06-08, Added, Changed
 
 ### Community 909 - "Community 909"
 Cohesion: 0.67
-Nodes (3): [1.5.1] - 2026-06-05, Changed, Fixed
+Nodes (3): [2.1.0] - 2026-06-08, Added, Fixed
 
 ### Community 910 - "Community 910"
 Cohesion: 0.67
-Nodes (3): [2.2.4] - 2026-06-11, Added, Fixed
+Nodes (3): [2.2.1] - 2026-06-08, Changed, Fixed
 
 ### Community 911 - "Community 911"
 Cohesion: 0.67
@@ -3672,11 +3671,11 @@ Nodes (3): [1.5.1] - 2026-06-05, Changed, Fixed
 
 ### Community 969 - "Community 969"
 Cohesion: 0.67
-Nodes (3): [1.8.0] - 2026-06-07, Added, Fixed
+Nodes (3): [2.2.2] - 2026-06-08, Added, Fixed
 
 ### Community 970 - "Community 970"
 Cohesion: 0.67
-Nodes (3): [1.7.1] - 2026-06-06, Added, Fixed
+Nodes (3): [2.5.0] - 2026-06-12, Added, Changed
 
 ### Community 971 - "Community 971"
 Cohesion: 0.67
@@ -3742,25 +3741,37 @@ Nodes (3): [2.5.3] - 2026-06-13, Changed, Removed
 Cohesion: 0.67
 Nodes (3): code:block12 (project-root/.agent-brain/), code:bash (:agent skills list                # see learned skills), P21.3: Persistent Agent Brain
 
+### Community 988 - "Community 988"
+Cohesion: 0.67
+Nodes (3): [1.9.0] - 2026-06-08, Added, Fixed
+
+### Community 989 - "Community 989"
+Cohesion: 0.67
+Nodes (3): [1.7.1] - 2026-06-06, Added, Fixed
+
+### Community 990 - "Community 990"
+Cohesion: 0.67
+Nodes (3): [1.9.0] - 2026-06-08, Added, Fixed
+
 ## Knowledge Gaps
-- **4048 isolated node(s):** `complete`, `incomplete`, `literalPrefix`, `invalid`, `missingPath` (+4043 more)
+- **4098 isolated node(s):** `complete`, `incomplete`, `literalPrefix`, `invalid`, `missingPath` (+4093 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **270 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **276 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `ReleaseNotesGuardTests` connect `Tests: HarnessCoreTests / ReleaseNotesGuardTests` to `Tests: HarnessCoreTests / JSONMergeTests`?**
-  _High betweenness centrality (0.172) - this node is a cross-community bridge._
-- **Why does `Changelog` connect `Release Notes: CHANGELOG` to `Release Notes: CHANGELOG`, `Release Notes: CHANGELOG`, `Release Notes: CHANGELOG`, `Daemon: HarnessDaemon / SurfaceRegistry`, `Community 528`, `Harness App: Services / SessionCoordinator`, `HarnessCore: Format / FormatString`, `Tests: HarnessCoreTests / HookNotificationParserTests`, `Release Notes: CHANGELOG`, `Community 573`, `Release Notes: CHANGELOG`, `Tests: HarnessCoreTests / ReleaseNotesGuardTests`, `Tests: HarnessCoreTests / DoctorRunnerTests`, `HarnessCore: Format / SnapshotQueryFormatter`, `Release Notes: CHANGELOG`, `Release Notes: CHANGELOG`, `Root Docs: README`, `Release Notes: CHANGELOG`, `Release Notes: CHANGELOG`, `Release Notes: CHANGELOG`, `Release Notes: CHANGELOG`, `Terminal Kit: HarnessTerminalKit / TerminalHostView`, `Release Notes: CHANGELOG`, `Root Docs: README`, `Harness CLI: HarnessCLI`?**
-  _High betweenness centrality (0.074) - this node is a cross-community bridge._
-- **Why does `HarnessTerminalSurfaceView` connect `Terminal Kit: HarnessTerminalKit / HarnessTerminalSurfaceView` to `Daemon: HarnessDaemon / SurfaceRegistry`, `Tests: HarnessCoreTests / JSONMergeTests`, `Terminal Kit: HarnessTerminalKit / TerminalHostView`, `Harness CLI: HarnessCLI / WindowAttachClient`, `Harness App: UI / FileTreeSwiftUIView`, `Tests: HarnessBenchmarks / PerformanceBenchmarks`, `Tests: HarnessTerminalKitTests / ScrollReuseTests`, `Harness App: Services / SessionCoordinator`, `HarnessCore: Models / SessionSnapshot`, `HarnessCore: ACP / ACPSession`, `HarnessCore: Paths / HarnessPaths`, `HarnessCore: Keybindings / KeyTable`, `Daemon: HarnessDaemon / SurfaceRegistry`, `Community 600`, `Tests: HarnessTerminalKitTests / HarnessTerminalSurfaceWorkerTests`, `Tests: HarnessTerminalKitTests / LiveResizeTests`, `Tests: HarnessCoreTests / AgentDetectorTests`?**
-  _High betweenness centrality (0.041) - this node is a cross-community bridge._
+  _High betweenness centrality (0.170) - this node is a cross-community bridge._
+- **Why does `Changelog` connect `Release Notes: CHANGELOG` to `Release Notes: CHANGELOG`, `Release Notes: CHANGELOG`, `Release Notes: CHANGELOG`, `Community 528`, `HarnessCore: Format / FormatString`, `Tests: HarnessCoreTests / HookNotificationParserTests`, `Release Notes: CHANGELOG`, `Harness App: UI / ContentAreaViewController`, `Community 573`, `Release Notes: CHANGELOG`, `Tests: HarnessCoreTests / ReleaseNotesGuardTests`, `Tests: HarnessCoreTests / DoctorRunnerTests`, `HarnessCore: Format / SnapshotQueryFormatter`, `Release Notes: CHANGELOG`, `Release Notes: CHANGELOG`, `Root Docs: README`, `Release Notes: CHANGELOG`, `Release Notes: CHANGELOG`, `Release Notes: CHANGELOG`, `Release Notes: CHANGELOG`, `Terminal Kit: HarnessTerminalKit / TerminalHostView`, `Release Notes: CHANGELOG`, `Root Docs: README`, `Harness CLI: HarnessCLI`, `HarnessCore: Commands / Command`?**
+  _High betweenness centrality (0.068) - this node is a cross-community bridge._
+- **Why does `HarnessTerminalSurfaceView` connect `HarnessCore: Models / SessionSnapshot` to `Tests: HarnessCoreTests / JSONMergeTests`, `Daemon: HarnessDaemon / SurfaceRegistry`, `Terminal Kit: HarnessTerminalKit / TerminalHostView`, `HarnessCore: CLI / TerminalRecording`, `Harness CLI: HarnessCLI / WindowAttachClient`, `Harness App: UI / FileTreeSwiftUIView`, `Tests: HarnessBenchmarks / PerformanceBenchmarks`, `Tests: HarnessTerminalKitTests / ScrollReuseTests`, `Harness App: Services / SessionCoordinator`, `Tests: HarnessCoreTests / FormatStringTests`, `HarnessCore: Paths / HarnessPaths`, `Harness App: Services / SessionCoordinator`, `Terminal Kit: HarnessTerminalKit / HarnessTerminalSurfaceView`, `Community 600`, `Community 665`, `Tests: HarnessTerminalKitTests / HarnessTerminalSurfaceWorkerTests`, `Community 637`, `Tests: HarnessTerminalKitTests / LiveResizeTests`?**
+  _High betweenness centrality (0.064) - this node is a cross-community bridge._
 - **Are the 31 inferred relationships involving `HarnessTerminalSurfaceView` (e.g. with `.makeHostedView()` and `.testOnBecameFocusedFiresOncePerFocusInTransition()`) actually correct?**
   _`HarnessTerminalSurfaceView` has 31 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `complete`, `incomplete`, `literalPrefix` to the rest of the system?**
-  _4060 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _4110 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Terminal Engine: Model / TerminalGridModel` be split into smaller, more focused modules?**
-  _Cohesion score 0.06387921022067364 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.07207207207207207 - nodes in this community are weakly interconnected._
 - **Should `Harness CLI: HarnessCLI` be split into smaller, more focused modules?**
-  _Cohesion score 0.07396622015142691 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.08201754385964913 - nodes in this community are weakly interconnected._

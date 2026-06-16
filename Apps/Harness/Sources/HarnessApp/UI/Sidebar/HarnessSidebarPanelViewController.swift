@@ -121,8 +121,6 @@ final class HarnessSidebarPanelViewController: NSViewController {
             }
         }
 
-        let activeSessionID = SessionCoordinator.shared.snapshot.activeWorkspace?.activeSessionID
-
         cachedSidebarRows = groups
             .sorted { $0.firstIndex < $1.firstIndex }
             .flatMap { group -> [SidebarSessionRow] in
@@ -133,17 +131,8 @@ final class HarnessSidebarPanelViewController: NSViewController {
                     return [header]
                 } else {
                     var rows: [SidebarSessionRow] = [header]
-                    let branches = group.sessions.map { ($0.activeTab ?? $0.tabs.first)?.gitBranch ?? "" }
-                    let allSameBranch = branches.allSatisfy { $0 == branches.first }
-
-                    if allSameBranch {
-                        if let firstSession = group.sessions.first(where: { $0.id == activeSessionID }) ?? group.sessions.first {
-                            rows.append(.session(firstSession))
-                        }
-                    } else {
-                        for session in group.sessions {
-                            rows.append(.session(session))
-                        }
+                    for session in group.sessions {
+                        rows.append(.session(session))
                     }
                     return rows
                 }
@@ -1024,6 +1013,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
         }
         // Rebuild cache once; iterate the stored result — no redundant recomputation.
         rebuildSidebarRows()
+        selectActiveSessionRowIfVisible(scroll: false)
         let rows = cachedSidebarRows
         for row in 0 ..< rows.count {
             if let cell = sessionTable.view(atColumn: 0, row: row, makeIfNecessary: false) as? WorktreeRowView {

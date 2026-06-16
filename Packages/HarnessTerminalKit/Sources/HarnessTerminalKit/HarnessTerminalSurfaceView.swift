@@ -382,7 +382,7 @@ public final class HarnessTerminalSurfaceView: NSView {
     var cursorBlinkEnabled = true
     /// Blink phase: false hides the cursor on the off-beat. Reset to true on activity.
     var cursorBlinkVisible = true
-    var blinkTimer: Timer?
+    nonisolated(unsafe) var blinkTimer: Timer?
     /// First-responder state — the cursor only blinks while focused.
     var focused = false
     /// Whether the host window is key. Combined with `focused` for the user-visible focus
@@ -467,7 +467,7 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// Main-thread display-cadence source (macOS 14+ `NSView.displayLink(target:selector:)`). Created
     /// when the view enters a window, paused while idle, invalidated on detach. nil when not in a
     /// window. Named `renderLink` so it doesn't shadow the `NSView.displayLink(...)` factory.
-    private var renderLink: CADisplayLink?
+    private nonisolated(unsafe) var renderLink: CADisplayLink?
     /// True once the grid has been sized from a real layout — the first sizing commits
     /// immediately (so the terminal opens at the right size); later changes coalesce.
     private var hasSizedGrid = false
@@ -1181,11 +1181,14 @@ public final class HarnessTerminalSurfaceView: NSView {
 
     // MARK: - Layout & rendering
 
-    // No deinit teardown for the display link: a CADisplayLink strongly retains its target, so the
-    // link keeps this view alive until `stopDisplayLink()` calls `invalidate()` (which also nils
-    // `renderLink`). deinit therefore only runs once the link is already gone — accessing the
-    // main-actor-isolated `renderLink` from a nonisolated deinit would also be a Swift 6 error.
-    // `viewDidMoveToWindow(nil)` is the teardown hook (AppKit always calls it before dealloc).
+    // Invalidating the display link in deinit is critical because the CADisplayLink created via
+    // NSView.displayLink(target:selector:) does NOT strongly retain the target view (or holds an
+    // unsafe/weak reference to it). If the view is deallocated without invalidating the display link,
+    // the display link remains active in the run loop and fires on the deallocated view, causing a crash.
+    deinit {
+        renderLink?.invalidate()
+        blinkTimer?.invalidate()
+    }
 
     public override func viewDidMoveToWindow() {
         fputs("BLINKDBG viewDidMoveToWindow: surface=\(ObjectIdentifier(self)) window=\(window != nil)\n", harnessStderr)

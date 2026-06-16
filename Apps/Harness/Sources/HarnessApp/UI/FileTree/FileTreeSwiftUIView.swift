@@ -413,6 +413,7 @@ struct FileTreeSwiftUIView: View {
     }
 
     private func loadRoot() async {
+        refreshGitBranch()
         let statusProvider = GitStatusProvider()
         async let gitStatusTask  = statusProvider.status(rootPath: rootPath)
         async let rawNodesTask   = (try? watcher.scan(rootPath: rootPath, options: scanOptions)) ?? []

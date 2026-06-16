@@ -1,5 +1,37 @@
 # AppKit + Metal Patterns
 
+## CADisplayLink Lifetime on macOS (CASE-031)
+
+**Critical difference from iOS:** On macOS, `NSView.displayLink(target:selector:)` does NOT
+strongly retain the target view. If the view is deallocated while the display link is still
+scheduled in the run loop, the link fires on a dangling pointer → EXC_BAD_ACCESS.
+
+On iOS, `CADisplayLink(target:selector:)` strongly retains its target, so deinit never runs
+while the link is active. The macOS factory (added in macOS 14) behaves differently — it uses
+an unsafe/weak reference internally.
+
+**Pattern:** Always add a `deinit` that invalidates the display link and any scheduled timers:
+```swift
+nonisolated(unsafe) var blinkTimer: Timer?
+private nonisolated(unsafe) var renderLink: CADisplayLink?
+
+deinit {
+    renderLink?.invalidate()
+    blinkTimer?.invalidate()
+}
+```
+
+**Why `nonisolated(unsafe)`:** Swift 6 strict concurrency forbids accessing `@MainActor`-isolated
+stored properties from a nonisolated `deinit`. Marking them `nonisolated(unsafe)` opts out of
+the isolation check. This is safe because deinit runs after all references are gone — no
+concurrent access is possible.
+
+**When this crashes:** Rapid session create/close cycles (especially with welcome banner
+injection on every new surface) increase the chance that `viewDidMoveToWindow(nil)` is skipped
+or races with deallocation. The deinit is the last-resort safety net.
+
+**Files:** `HarnessTerminalSurfaceView.swift`
+
 ## Metal Surface Lifecycle (CASE-003)
 
 Terminal uses Metal/CADisplayLink for rendering. When a pane tree is rebuilt (removeFromSuperview + re-add in same window), the Metal surface goes black.
