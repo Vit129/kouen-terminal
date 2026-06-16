@@ -127,12 +127,14 @@ final class FileTreeNode: Identifiable {
 ///   main actor after a 500 ms debounce.
 @MainActor
 struct FileTreeSwiftUIView: View {
-    let rootPath: String
-    let sessionID: SessionID?
+    @Bindable var context: FileTreeContext
     let watcher: FileTreeWatcher
     /// Keyboard navigation state — written by AppKit, read here for highlight + scroll.
     let keyboard: FileTreeKeyboardState
     let onPreview: (FileNode) -> Void
+
+    private var rootPath: String { context.rootPath }
+    private var sessionID: SessionID? { context.sessionID }
     @State private var rootNodes: [FileTreeNode] = []
     @State private var searchResultNodes: [FileTreeNode] = []
     @State private var gitBranch: String?
@@ -227,7 +229,7 @@ struct FileTreeSwiftUIView: View {
         .task(id: "\(taskID)|search|\(trimmedSearchText)") { await loadSearchResults(query: trimmedSearchText) }
         // FSEvents live watcher: starts alongside loadRoot, auto-cancelled on
         // key change (session/path switch) or view disappearance.
-        .task(id: taskID) {
+        .task(id: "\(taskID)|watcher") {
             await watcher.startWatching(rootPath: rootPath) {
                 // Called on @MainActor after 500ms debounce.
                 Task { await loadRoot() }
@@ -309,12 +311,13 @@ struct FileTreeSwiftUIView: View {
     }
 
     private func listBranches() async -> [String] {
-        await withCheckedContinuation { continuation in
+        let path = rootPath
+        return await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 let process = Process()
                 process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
                 process.arguments = ["branch", "--format=%(refname:short)"]
-                process.currentDirectoryURL = URL(fileURLWithPath: rootPath)
+                process.currentDirectoryURL = URL(fileURLWithPath: path)
                 let pipe = Pipe()
                 process.standardOutput = pipe
                 process.standardError = Pipe()
@@ -333,12 +336,13 @@ struct FileTreeSwiftUIView: View {
     }
 
     private func getCurrentBranch() async -> String? {
-        await withCheckedContinuation { continuation in
+        let path = rootPath
+        return await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 let process = Process()
                 process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
                 process.arguments = ["rev-parse", "--abbrev-ref", "HEAD"]
-                process.currentDirectoryURL = URL(fileURLWithPath: rootPath)
+                process.currentDirectoryURL = URL(fileURLWithPath: path)
                 let pipe = Pipe()
                 process.standardOutput = pipe
                 process.standardError = Pipe()

@@ -182,7 +182,7 @@ final class CommandPromptController: NSObject, NSTextFieldDelegate {
         prompt.font = HarnessDesign.Typography.kbd
         prompt.textColor = HarnessChrome.current.accent
 
-        field.placeholderString = "command (e.g. split-window -h ; copy-mode)"
+        field.placeholderString = "command (e.g. find, grep, cd, rename-window)"
         field.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
         field.textColor = HarnessChrome.current.textPrimary
         field.bezelStyle = .roundedBezel

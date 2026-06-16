@@ -608,7 +608,11 @@ public final class SurfaceRegistry: @unchecked Sendable {
             if let uuid = UUID(uuidString: surfaceID),
                optionStore.get("allow-rename")?.boolValue ?? true,
                automaticRenameEnabled(forSurfaceKey: surfaceID) {
-                editor.updateTabTitle(surfaceID: uuid, title: title)
+                // Strip tool-injected suffixes like " (kiro-cli-term)" that Kiro
+                // appends to the shell title via OSC 2 — they leak internal process
+                // names into the UI and add no user value.
+                let cleaned = title.replacing(#/ \(kiro-cli[^)]*\)/#, with: "")
+                editor.updateTabTitle(surfaceID: uuid, title: cleaned)
                 commit()
                 fireHookLocked(.windowRenamed, surfaceKey: surfaceID)
             }

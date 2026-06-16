@@ -149,7 +149,7 @@ public final class OptionStore: @unchecked Sendable {
         // row carved from each pane's border. Read by the GUI (`TerminalHostView`) and the ssh
         // compositor (`PaneRectSolver` + `GridCompositor`).
         "pane-border-status": .string("off"),
-        "pane-border-format": .string(" #{pane_index} #{pane_title} "),
+        "pane-border-format": .string(" #{pane_index} "),
         // Lifecycle/timing. `remain-on-exit` on (Harness's safe default; tmux defaults off)
         // keeps a pane's dead leaf so `respawn-pane` can revive it; off closes the pane (or
         // its tab when last) when the shell exits — read in the daemon's PTY-exit handler.
@@ -192,6 +192,10 @@ public final class OptionStore: @unchecked Sendable {
         ],
         "status-right": [
             .string(" #{cwd_basename}#{?git_branch, · #{git_branch},} · %H:%M "),
+        ],
+        "pane-border-format": [
+            .string(" #{pane_index} #{pane_title} "),
+            .string(" #{?agent_kind,#{agent_chip},#{pane_index}} "),
         ],
     ]
 

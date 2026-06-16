@@ -391,7 +391,7 @@ private func tabDisplayTitle(_ tab: Tab) -> String {
 /// when proc-tree detection misses the agent (e.g. Claude Code via Node).
 @MainActor
 private func tabAgentKind(for tab: Tab) -> AgentKind? {
-    tab.agent?.kind ?? AgentTitleInference.kind(from: tab.title)
+    tab.effectiveAgentKind
 }
 
 @MainActor

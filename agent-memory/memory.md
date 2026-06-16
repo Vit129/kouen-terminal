@@ -5,7 +5,7 @@
 - **Fork:** Vit129/harness-terminal (fork of robzilla1738/harness-terminal)
 - **Working branch:** `main`
 - **Preview:** `make preview` (uses `.harness-preview/` dir)
-- **Latest release:** v3.1.1 (build 139 — P22 long-session responsiveness: renderer cache purge on memory pressure, scrollback ring shrink, shell-tracker backoff, unconditional metadata sync fix, snapshot fanout narrowing, hot-path instrumentation)
+- **Latest release:** v3.1.5 (build 143 — agent icon in sidebar cards, Tab.effectiveAgentKind centralized, welcome banner unified shortcuts, pane-border-format strips kiro-cli, FileTreeSwiftUIView @Bindable UAF fix)
 
 ## Current Sprint — Post-v2.1.0 Polish & Shelving
 
@@ -94,6 +94,8 @@
 | 76 | P22.1 instrumentation: PerfCounters singleton (@MainActor, 30-min stderr dump) wired into SurfaceShellTracker ticks/cwdChanges, DaemonSyncService wakeups/gitProbes/syncFired/syncSkipped, applySnapshot structural/metadataOnly counts, snapshotChanged fanout per-consumer counts. Knowledge file: agent-memory/knowledge/background-polling.md. | ✅ Done |
 | 77 | Fix sidebar session list collapsing/hiding (remove allSameBranch) + active session synchronization on terminal switch + file tree git branch update (CASE-030) | ✅ Done |
 | 78 | Fix app crash: CADisplayLink use-after-free in HarnessTerminalSurfaceView — added deinit to invalidate renderLink + blinkTimer; marked nonisolated(unsafe) for Swift 6 deinit access (CASE-031) | ✅ Done |
+| 79 | v3.1.5: Agent icon in sidebar session cards (NSImageView 14pt, same as tab bar); Tab.effectiveAgentKind centralized (tab.agent?.kind ?? AgentTitleInference); agent_chip format variable; pane-border-format default strips pane_title (kiro-cli); kiro-cli-term OSC title suffix stripped in daemon; welcome banner unified to single Shortcuts section with native macOS shortcuts; FileTreeSwiftUIView @Bindable UAF fix | ✅ Done |
+| 79 | Fix file tree crash (EXC_BAD_ACCESS in swift_getObjectType): replaced `hostingView.rootView` replacement pattern with `FileTreeContext` @Observable class — `updateRoot` now mutates context instead of replacing the SwiftUI struct, eliminating UAF during layout pass. Fixed duplicate `.task(id: taskID)` shadowing (watcher task given unique key). v3.1.4 build 142 (CASE-032) | ✅ Done |
 
 
 

@@ -345,7 +345,8 @@ final class SessionCoordinator: NSObject {
             paneID: surfaceID.uuidString, paneTitle: owningTab?.title, paneCwd: owningTab?.cwd,
             paneActive: surfaceID == activeSurfaceID, paneIndex: paneIndex,
             tabName: owningTab?.title, workspaceName: snapshot.activeWorkspace?.name,
-            agentKind: owningTab?.agent?.kind.rawValue, gitBranch: owningTab?.gitBranch, clientName: "Harness.app"
+            agentKind: owningTab?.agent?.kind.rawValue, agentChip: owningTab?.agent?.kind.chip,
+            gitBranch: owningTab?.gitBranch, clientName: "Harness.app"
         )
     }
 
@@ -359,7 +360,8 @@ final class SessionCoordinator: NSObject {
             sessionName: session?.name.isEmpty == false ? session?.name : nil,
             tabName: tab?.title, tabIndex: session?.tabs.firstIndex(where: { $0.id == tab?.id }),
             workspaceName: workspace?.name, agentKind: tab?.agent?.kind.rawValue,
-            agentActivity: tab?.agent?.activity.rawValue, gitBranch: tab?.gitBranch, clientName: "Harness.app"
+            agentActivity: tab?.agent?.activity.rawValue, agentChip: tab?.agent?.kind.chip,
+            gitBranch: tab?.gitBranch, clientName: "Harness.app"
         )
         context.paneCurrentCommand = tab?.currentCommand
         context.paneDead = tab.map { $0.exitStatus != nil }

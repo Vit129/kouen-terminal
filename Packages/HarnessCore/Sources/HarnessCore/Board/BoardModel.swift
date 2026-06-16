@@ -122,7 +122,7 @@ public enum BoardModel {
                         gitBranch: tab.gitBranch,
                         currentCommand: tab.currentCommand,
                         exitStatus: tab.exitStatus,
-                        agentKind: tab.agent?.kind,
+                        agentKind: tab.effectiveAgentKind,
                         agentActivity: tab.agent?.activity,
                         column: column
                     )

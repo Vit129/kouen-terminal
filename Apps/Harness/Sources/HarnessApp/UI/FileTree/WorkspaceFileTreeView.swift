@@ -1,6 +1,22 @@
 import AppKit
+import Observation
 import SwiftUI
 import HarnessCore
+
+/// Mutable context observed by `FileTreeSwiftUIView`.
+/// Mutating this is safe during a layout pass because SwiftUI will re-render
+/// on the next cycle rather than replacing the hosting view's root struct.
+@Observable
+@MainActor
+final class FileTreeContext {
+    var rootPath: String
+    var sessionID: SessionID?
+
+    init(rootPath: String, sessionID: SessionID?) {
+        self.rootPath = rootPath
+        self.sessionID = sessionID
+    }
+}
 
 /// NSView wrapper that hosts `FileTreeSwiftUIView` inside the sidebar.
 ///
@@ -12,22 +28,21 @@ import HarnessCore
 @MainActor
 final class WorkspaceFileTreeView: NSView {
     private let watcher = FileTreeWatcher()
-    private var rootPath: String
-    private var lastSessionID: SessionID?
+    private let context: FileTreeContext
     private var hostingView: NSHostingView<FileTreeSwiftUIView>!
     let keyboard = FileTreeKeyboardNavigator()
 
     var onFilePreview: ((FileNode) -> Void)?
 
     init(rootPath: String? = nil) {
-        self.rootPath = rootPath
+        let initialPath = rootPath
             ?? SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd
             ?? NSHomeDirectory()
-        self.lastSessionID = SessionCoordinator.shared.snapshot.activeWorkspace?.activeSessionID
+        let initialSessionID = SessionCoordinator.shared.snapshot.activeWorkspace?.activeSessionID
+        self.context = FileTreeContext(rootPath: initialPath, sessionID: initialSessionID)
         super.init(frame: .zero)
         self.hostingView = NSHostingView(rootView: FileTreeSwiftUIView(
-            rootPath: self.rootPath,
-            sessionID: self.lastSessionID,
+            context: context,
             watcher: watcher,
             keyboard: keyboard.state,
             onPreview: { [weak self] node in self?.onFilePreview?(node) }
@@ -71,16 +86,12 @@ final class WorkspaceFileTreeView: NSView {
     }
 
     func updateRoot(path: String, sessionID: SessionID?) {
-        guard path != rootPath || sessionID != lastSessionID else { return }
-        rootPath = path
-        lastSessionID = sessionID
-        hostingView.rootView = FileTreeSwiftUIView(
-            rootPath: path,
-            sessionID: sessionID,
-            watcher: watcher,
-            keyboard: keyboard.state,
-            onPreview: { [weak self] node in self?.onFilePreview?(node) }
-        )
+        guard path != context.rootPath || sessionID != context.sessionID else { return }
+        // Mutate the shared context instead of replacing hostingView.rootView.
+        // Replacing rootView mid-layout-pass can leave AttributeGraph holding
+        // stale @Observable references, causing a UAF crash in swift_getObjectType.
+        context.rootPath = path
+        context.sessionID = sessionID
     }
 
     private func setup() {

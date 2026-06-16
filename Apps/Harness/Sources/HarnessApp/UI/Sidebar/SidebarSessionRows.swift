@@ -204,6 +204,7 @@ final class WorktreeRowView: NSView {
     private let textLabel = NSTextField(labelWithString: "")
     private let statusDot = NSView()
     private let statusLabel = NSTextField(labelWithString: "")
+    private let agentIconView = NSImageView()
     private let closeButton = NSButton()
     private var isSelected = false
     private var isHovered = false
@@ -237,6 +238,10 @@ final class WorktreeRowView: NSView {
         statusLabel.setContentHuggingPriority(.required, for: .horizontal)
         statusLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
 
+        agentIconView.translatesAutoresizingMaskIntoConstraints = false
+        agentIconView.imageScaling = .scaleProportionallyUpOrDown
+        agentIconView.isHidden = true
+
         closeButton.title = "×"
         closeButton.bezelStyle = .accessoryBarAction
         closeButton.isBordered = false
@@ -250,6 +255,7 @@ final class WorktreeRowView: NSView {
         fill.addSubview(textLabel)
         fill.addSubview(statusDot)
         fill.addSubview(statusLabel)
+        fill.addSubview(agentIconView)
         fill.addSubview(closeButton)
 
         NSLayoutConstraint.activate([
@@ -269,6 +275,11 @@ final class WorktreeRowView: NSView {
 
             statusLabel.centerYAnchor.constraint(equalTo: fill.centerYAnchor),
             statusLabel.trailingAnchor.constraint(equalTo: closeButton.leadingAnchor, constant: -4),
+
+            agentIconView.centerYAnchor.constraint(equalTo: fill.centerYAnchor),
+            agentIconView.trailingAnchor.constraint(equalTo: closeButton.leadingAnchor, constant: -4),
+            agentIconView.widthAnchor.constraint(equalToConstant: 14),
+            agentIconView.heightAnchor.constraint(equalToConstant: 14),
 
             closeButton.centerYAnchor.constraint(equalTo: fill.centerYAnchor),
             closeButton.trailingAnchor.constraint(equalTo: fill.trailingAnchor, constant: -6),
@@ -331,9 +342,22 @@ final class WorktreeRowView: NSView {
         // Status indicator: derive from all tabs in the session
         let status = highestStatus(for: session)
         let (dotColor, labelText) = statusAppearance(for: status, tab: tab)
-        statusDot.layer?.backgroundColor = dotColor.cgColor
-        statusLabel.stringValue = labelText
-        statusLabel.textColor = dotColor.withAlphaComponent(0.8)
+
+        // Show agent icon (same as tab bar) when agent detected; fallback to dot+label
+        if let kind = tab.effectiveAgentKind {
+            agentIconView.image = AgentIconRenderer.templateOrMonogramImage(for: kind, size: 14)
+            agentIconView.contentTintColor = NSColor.fromHex(SessionCoordinator.shared.settings.agentColorHex(for: kind))
+            agentIconView.isHidden = false
+            statusDot.isHidden = true
+            statusLabel.isHidden = true
+        } else {
+            agentIconView.isHidden = true
+            statusDot.isHidden = false
+            statusLabel.isHidden = false
+            statusDot.layer?.backgroundColor = dotColor.cgColor
+            statusLabel.stringValue = labelText
+            statusLabel.textColor = dotColor.withAlphaComponent(0.8)
+        }
 
         setSelected(isSelected)
     }
@@ -362,6 +386,9 @@ final class WorktreeRowView: NSView {
         switch status {
         case .needsAttention: return (color, "waiting")
         case .running:
+            if let agent = tab.effectiveAgentKind {
+                return (color, agent.displayName)
+            }
             let cmd = tab.currentCommand ?? ""
             let shortCmd = BoardModel.shellNames.contains(cmd.lowercased()) ? "" : cmd
             return (color, shortCmd.isEmpty ? "running" : shortCmd)
