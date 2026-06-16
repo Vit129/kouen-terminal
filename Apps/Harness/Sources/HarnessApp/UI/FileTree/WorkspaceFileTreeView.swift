@@ -14,7 +14,7 @@ final class WorkspaceFileTreeView: NSView {
     private let watcher = FileTreeWatcher()
     private var rootPath: String
     private var lastSessionID: SessionID?
-    private let hostingView: NSHostingView<FileTreeSwiftUIView>
+    private var hostingView: NSHostingView<FileTreeSwiftUIView>!
     let keyboard = FileTreeKeyboardNavigator()
 
     var onFilePreview: ((FileNode) -> Void)?
@@ -24,21 +24,14 @@ final class WorkspaceFileTreeView: NSView {
             ?? SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd
             ?? NSHomeDirectory()
         self.lastSessionID = SessionCoordinator.shared.snapshot.activeWorkspace?.activeSessionID
-        self.hostingView = NSHostingView(rootView: FileTreeSwiftUIView(
-            rootPath: self.rootPath,
-            sessionID: self.lastSessionID,
-            watcher: watcher,
-            keyboard: FileTreeKeyboardState(),
-            onPreview: { _ in }
-        ))
         super.init(frame: .zero)
-        hostingView.rootView = FileTreeSwiftUIView(
+        self.hostingView = NSHostingView(rootView: FileTreeSwiftUIView(
             rootPath: self.rootPath,
             sessionID: self.lastSessionID,
             watcher: watcher,
             keyboard: keyboard.state,
             onPreview: { [weak self] node in self?.onFilePreview?(node) }
-        )
+        ))
         keyboard.onOpenFile = { [weak self] path in
             guard let self else { return }
             let url = URL(fileURLWithPath: path)
