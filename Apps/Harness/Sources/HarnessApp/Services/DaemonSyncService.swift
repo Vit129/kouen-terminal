@@ -273,6 +273,12 @@ final class DaemonSyncService {
         coord.syncWaitingRings()
         coord.notificationCoordinator.updateDockBadge(from: remote)
         coord.reflectRemoteActivePane()
+        PerfCounters.shared.snapshotApplied += 1
+        if metadataOnly {
+            PerfCounters.shared.snapshotAppliedMetadataOnly += 1
+        } else if structureChanged {
+            PerfCounters.shared.snapshotAppliedStructural += 1
+        }
         NotificationCenter.default.post(
             name: NotificationBus.shared.snapshotChanged,
             object: nil,
@@ -377,9 +383,13 @@ final class DaemonSyncService {
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 5_000_000_000)
                 let work = await MainActor.run { () -> [(WorkspaceID, Tab)] in
-                    guard let self,
-                          !AppIdleThrottle.shared.isSuspended,
-                          let workspace = self.snapshot.activeWorkspace else { return [] }
+                    guard let self else { return [] }
+                    PerfCounters.shared.metadataRefreshWakeups += 1
+                    guard !AppIdleThrottle.shared.isSuspended,
+                          let workspace = self.snapshot.activeWorkspace else {
+                        PerfCounters.shared.metadataRefreshSkippedIdle += 1
+                        return []
+                    }
                     return workspace.sessions.flatMap { $0.tabs }.map { (workspace.id, $0) }
                 }
                 var probedCWDs = Set<String>()
@@ -387,9 +397,17 @@ final class DaemonSyncService {
                     let cwd = tab.cwd
                     guard !probedCWDs.contains(cwd) else { return nil }
                     probedCWDs.insert(cwd)
+                    PerfCounters.shared.metadataRefreshGitChecks += 1
                     let updated = git.refresh(tab: tab)
                     guard updated.gitBranch != tab.gitBranch else { return nil }
                     return (workspaceID, tab.id, updated.gitBranch)
+                }
+                await MainActor.run {
+                    if updates.isEmpty {
+                        PerfCounters.shared.metadataRefreshSyncSkipped += 1
+                    } else {
+                        PerfCounters.shared.metadataRefreshSyncFired += 1
+                    }
                 }
                 guard !updates.isEmpty else { continue }
                 await MainActor.run { [weak self] in

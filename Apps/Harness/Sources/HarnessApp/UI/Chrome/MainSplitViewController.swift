@@ -204,9 +204,13 @@ final class MainSplitViewController: NSViewController {
             ChromeBackdrop.crossfadeNextUpdate = false
         }
         if metadataOnly {
+            PerfCounters.shared.fanoutSidebarMetadata += 1
+            PerfCounters.shared.fanoutTabBarMetadata += 1
             sidebar.refreshMetadata()
             content.refreshTabBarMetadata()
         } else {
+            PerfCounters.shared.fanoutSidebarReload += 1
+            PerfCounters.shared.fanoutTabBarReload += 1
             sidebar.reload()
             content.reloadTabBar()
         }

@@ -46,6 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         PrefixKeymap.shared.install()
         AppIdleThrottle.shared.install()
         SurfaceShellTracker.shared.start()
+        PerfCounters.shared.start()
         MemoryPressureMonitor.shared.start()
         ScriptHookCoordinator.shared.start()
         // Follow the macOS system appearance for auto light/dark theme switching. The startup

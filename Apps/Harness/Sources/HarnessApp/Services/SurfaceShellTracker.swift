@@ -68,6 +68,7 @@ final class SurfaceShellTracker {
 
     private func tick() {
         guard !scanning else { return }
+        PerfCounters.shared.shellTrackerTicks += 1
         scanning = true
         Self.scanQueue.async { [weak self] in
             let cwds = Self.computeSurfaceCwds() // all blocking syscalls happen here, off-main
@@ -89,6 +90,7 @@ final class SurfaceShellTracker {
         let coordinator = SessionCoordinator.shared
         for (surfaceID, cwd) in cwds where lastReportedCwd[surfaceID] != cwd {
             lastReportedCwd[surfaceID] = cwd
+            PerfCounters.shared.shellTrackerCwdChanges += 1
             guard let uuid = UUID(uuidString: surfaceID) else { continue }
             coordinator.surfaceShellTrackerDidUpdateCwd(uuid, cwd: cwd)
         }

@@ -76,6 +76,7 @@ final class BoardViewController: NSViewController {
 
     @objc private func snapshotChanged(_ note: Notification) {
         guard note.userInfo?["metadataOnly"] as? Bool != true else { return }
+        PerfCounters.shared.fanoutBoardReload += 1
         reload()
     }
 
