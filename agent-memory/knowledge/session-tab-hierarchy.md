@@ -64,9 +64,19 @@ need arises, it requires a new visible affordance first (the underlying `selectT
 elsewhere, e.g. `closeTab`, agent notch, command palette tab list — only the *menu-level
 keyboard shortcut* layer was removed).
 
+## Tab Pill Visual Details
+
+Pill label = `tabDisplayTitle(tab)` (folder name → custom title → "Terminal").
+Branch label = `tab.gitBranch` shown below title as `"⎇ <branch>"` when non-empty (always).
+Status dot (6×6) = `BoardColumnKind` color, anchored after title text.
+
+For full pill layout, drag reorder, and git branch detection details see [[tab-bar]].
+
 ## Source Map
 
-- `ContentAreaViewController.swift` — `reloadTabBar()` (pill construction)
+- `ContentAreaViewController.swift` — `reloadTabBar()` (pill construction), `tabBarDidReorder()` (→ reorderSession)
 - `MainMenuBuilder.swift` — `⌘1-9` → `selectWorkspaceNumber`, `⌘[`/`⌘]` → `previousSession`/`nextSession`
 - `SessionCoordinator.swift` — `selectSession`, `selectTab`, `selectAdjacentSession`
 - `SessionEditor.swift` — `selectSession(workspaceID:sessionID:)`, `selectTab(workspaceID:tabID:)`
+- `TerminalTabBarView.swift` — `TabPillView`, `shouldShowBranch`, drag reorder
+- `DaemonSyncService.swift:375` — git branch polling (5s interval, `GitMetadataProvider`)
