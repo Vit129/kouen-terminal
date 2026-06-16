@@ -235,12 +235,6 @@ final class HarnessSidebarPanelViewController: NSViewController {
 
         NotificationCenter.default.addObserver(
             self,
-            selector: #selector(reload),
-            name: NotificationBus.shared.snapshotChanged,
-            object: nil
-        )
-        NotificationCenter.default.addObserver(
-            self,
             selector: #selector(refreshMetadata),
             name: Notification.Name("HarnessActiveTabGitBranchDidChange"),
             object: nil

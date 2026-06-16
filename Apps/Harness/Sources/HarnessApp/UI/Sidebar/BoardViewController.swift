@@ -61,7 +61,7 @@ final class BoardViewController: NSViewController {
         HarnessDesign.makeClear(scrollView)
         reload()
         NotificationCenter.default.addObserver(
-            self, selector: #selector(reload),
+            self, selector: #selector(snapshotChanged(_:)),
             name: NotificationBus.shared.snapshotChanged, object: nil
         )
         // PBI-BOARD-004: live card movement on agent state change
@@ -73,6 +73,11 @@ final class BoardViewController: NSViewController {
 
     /// PBI-BOARD-006: dismissed card IDs (runtime-only, not persisted).
     private var dismissedCardIDs: Set<TabID> = []
+
+    @objc private func snapshotChanged(_ note: Notification) {
+        guard note.userInfo?["metadataOnly"] as? Bool != true else { return }
+        reload()
+    }
 
     /// Recomputes columns from the live snapshot and rebuilds the card stacks.
     @objc func reload() {
