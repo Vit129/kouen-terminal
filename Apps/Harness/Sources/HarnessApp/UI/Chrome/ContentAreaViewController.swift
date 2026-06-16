@@ -986,7 +986,8 @@ final class HarnessSplitView: NSSplitView, NSSplitViewDelegate {
 
     override var dividerColor: NSColor { HarnessChrome.current.border }
 
-    override func layout() {
+    override nonisolated func layout() {
+        MainActor.assumeIsolated {
         super.layout()
         guard !appliedRatio, !isApplyingPositions else { return }
         let count = subviews.count
@@ -1014,6 +1015,7 @@ final class HarnessSplitView: NSSplitView, NSSplitViewDelegate {
         subviews.forEach {
             $0.needsLayout = true
             $0.layoutSubtreeIfNeeded()
+        }
         }
     }
 

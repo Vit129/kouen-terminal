@@ -444,9 +444,11 @@ final class SoftIconButton: NSButton {
     override func mouseEntered(with event: NSEvent) { isHovered = true }
     override func mouseExited(with event: NSEvent) { isHovered = false }
 
-    override func layout() {
+    override nonisolated func layout() {
+        MainActor.assumeIsolated {
         super.layout()
         applyChrome()
+        }
     }
 
     func setSymbol(
@@ -643,11 +645,13 @@ final class ChromeBackdrop: NSView {
         update(role: role)
     }
 
-    override func layout() {
+    override nonisolated func layout() {
+        MainActor.assumeIsolated {
         super.layout()
         // Manual frame (CALayer, not Auto Layout); AppKit suppresses implicit
         // animations during the layout pass so this doesn't slide on resize.
         hairline.frame = CGRect(x: 0, y: 0, width: bounds.width, height: 1)
+        }
     }
 
     /// Picks the best available backdrop layer:
@@ -765,10 +769,12 @@ final class HarnessOverlayBackground: NSView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 
-    override func layout() {
+    override nonisolated func layout() {
+        MainActor.assumeIsolated {
         super.layout()
         // Manual frame (CALayer); implicit anim suppressed during layout.
         topHighlight.frame = CGRect(x: 1, y: bounds.height - 1, width: bounds.width - 2, height: 1)
+        }
     }
 
     private static func makeBackdrop() -> NSView {
@@ -856,7 +862,8 @@ final class StatusDotView: NSView {
         applyStyle()
     }
 
-    override func layout() {
+    override nonisolated func layout() {
+        MainActor.assumeIsolated {
         super.layout()
         let dotSize: CGFloat = diameter * 0.5
         let haloSize: CGFloat = diameter
@@ -874,6 +881,7 @@ final class StatusDotView: NSView {
             height: haloSize
         )
         halo.cornerRadius = haloSize / 2
+        }
     }
 
     func applyStyle() {
@@ -933,9 +941,11 @@ final class AgentChipView: NSView {
         NSSize(width: iconSize, height: iconSize)
     }
 
-    override func layout() {
+    override nonisolated func layout() {
+        MainActor.assumeIsolated {
         super.layout()
         layer?.cornerRadius = 0
+        }
     }
 
     func configure(kind: AgentKind, hex: String) {

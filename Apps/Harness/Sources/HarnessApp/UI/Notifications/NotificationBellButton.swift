@@ -79,9 +79,11 @@ final class NotificationBellButton: NSControl {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 
-    override func layout() {
-        super.layout()
-        applyChrome() // keep the circular corner radius correct once bounds are known
+    override nonisolated func layout() {
+        MainActor.assumeIsolated {
+            super.layout()
+            applyChrome()
+        }
     }
 
     override func updateTrackingAreas() {
