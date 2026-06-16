@@ -58,6 +58,9 @@ final class HarnessSidebarPanelViewController: NSViewController {
     /// when the CWD is the same (e.g. two sessions sharing the same repo root).
     var lastFileTreeSessionID: SessionID?
     var lastFileTreeGitBranch: String?
+    /// Last sessions array passed to refreshMetadata — used to skip rebuild when nothing changed.
+    private var lastRefreshedSessions: [SessionGroup] = []
+    private var lastRefreshedActiveID: SessionID?
 
     /// Sessions after applying the search filter. Drag-reorder is disabled while a
     /// filter is active (see the data source), so callers that reorder still use the
@@ -1011,13 +1014,19 @@ final class HarnessSidebarPanelViewController: NSViewController {
             gitPanelView.clearRoot()
         }
         // Rebuild cache once; iterate the stored result — no redundant recomputation.
-        rebuildSidebarRows()
-        selectActiveSessionRowIfVisible(scroll: false)
-        let rows = cachedSidebarRows
-        for row in 0 ..< rows.count {
-            if let cell = sessionTable.view(atColumn: 0, row: row, makeIfNecessary: false) as? WorktreeRowView {
-                guard case let .session(session) = rows[row] else { continue }
-                cell.configure(session: session, isSelected: session.id == activeID)
+        // Skip entirely when session data hasn't changed (common on metadata-only ticks).
+        let sessionsChanged = newSessions != lastRefreshedSessions || activeID != lastRefreshedActiveID
+        if sessionsChanged {
+            lastRefreshedSessions = newSessions
+            lastRefreshedActiveID = activeID
+            rebuildSidebarRows()
+            selectActiveSessionRowIfVisible(scroll: false)
+            let rows = cachedSidebarRows
+            for row in 0 ..< rows.count {
+                if let cell = sessionTable.view(atColumn: 0, row: row, makeIfNecessary: false) as? WorktreeRowView {
+                    guard case let .session(session) = rows[row] else { continue }
+                    cell.configure(session: session, isSelected: session.id == activeID)
+                }
             }
         }
     }
