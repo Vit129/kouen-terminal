@@ -114,9 +114,13 @@ final class TerminalTabBarView: NSView {
     override var mouseDownCanMoveWindow: Bool { true }
 
     func reload(tabs: [Tab], activeTabID: TabID?) {
-        // A metadata-driven reload can land mid-drag (agent status updates fire often);
-        // commit the in-flight reorder first instead of silently discarding the gesture.
-        if let dragging = draggingPill { handleDragEnded(dragging) }
+        // A structural reload (tab added/removed) cancels any in-flight drag so an
+        // external tab-order change doesn't commit the drag to a now-stale target index.
+        if let dragging = draggingPill {
+            dragging.layer?.zPosition = 0
+            draggingPill = nil
+            dragTargetIndex = nil
+        }
         self.tabs = tabs
         self.activeTabID = activeTabID
         for pill in orderedPills { pill.removeFromSuperview() }
@@ -147,11 +151,7 @@ final class TerminalTabBarView: NSView {
 
     private func shouldShowBranch(for tab: Tab) -> Bool {
         guard let branch = tab.gitBranch, !branch.isEmpty else { return false }
-        if branch != "main" && branch != "master" {
-            return true
-        }
-        let folder = tabDisplayTitle(tab)
-        return tabs.filter { tabDisplayTitle($0) == folder }.count > 1
+        return true
     }
 
     /// Update titles/status of existing pills without rebuilding, for live PWD /
@@ -588,9 +588,9 @@ private final class TabPillView: NSView {
             // MCP badge: trailing edge of title, center Y
             mcpBadge.leadingAnchor.constraint(equalTo: titleLabel.trailingAnchor, constant: 3),
             mcpBadge.centerYAnchor.constraint(equalTo: centerYAnchor),
-            // Status dot: leading edge of pill (before agent icon), 6×6
-            statusDot.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 6),
-            statusDot.centerYAnchor.constraint(equalTo: centerYAnchor),
+            // Status dot: trailing edge of title text — "name •" matching the sidebar style
+            statusDot.leadingAnchor.constraint(equalTo: titleLabel.trailingAnchor, constant: 4),
+            statusDot.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor),
             statusDot.widthAnchor.constraint(equalToConstant: 6),
             statusDot.heightAnchor.constraint(equalToConstant: 6),
         ])
