@@ -44,6 +44,9 @@ final class TerminalTabBarView: NSView {
     private var activeTabID: TabID?
     private var pillsByID: [TabID: TabPillView] = [:]
     private var orderedPills: [TabPillView] = []
+    /// Retired pills kept alive for one runloop tick so AppKit's pending tracking-area
+    /// and layout passes complete before ARC frees them (prevents UAF crash).
+    private var retiredPills: [TabPillView] = []
 
     // Layout metrics.
     private let edgeInset: CGFloat = 10
@@ -123,11 +126,16 @@ final class TerminalTabBarView: NSView {
         }
         self.tabs = tabs
         self.activeTabID = activeTabID
-        for pill in orderedPills { pill.removeFromSuperview() }
+        let oldPills = orderedPills
+        for pill in oldPills { pill.removeFromSuperview() }
         orderedPills.removeAll(keepingCapacity: true)
         pillsByID.removeAll(keepingCapacity: true)
         draggingPill = nil
         dragTargetIndex = nil
+        // Defer dealloc: AppKit may still have pending tracking-area or layout
+        // dispatches targeting the removed pills. Keep them alive one tick.
+        retiredPills = oldPills
+        DispatchQueue.main.async { [weak self] in self?.retiredPills.removeAll() }
 
         for (index, tab) in tabs.enumerated() {
             let id = tab.id
@@ -222,10 +230,16 @@ final class TerminalTabBarView: NSView {
     // MARK: - Layout
 
     override nonisolated func layout() {
-        MainActor.assumeIsolated {
-            super.layout()
-            guard draggingPill == nil else { return }
-            layoutPills()
+        if Thread.isMainThread {
+            MainActor.assumeIsolated {
+                super.layout()
+                guard draggingPill == nil else { return }
+                layoutPills()
+            }
+        } else {
+            DispatchQueue.main.async { [weak self] in
+                self?.needsLayout = true
+            }
         }
     }
 

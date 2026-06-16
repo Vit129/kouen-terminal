@@ -6,6 +6,13 @@ All notable changes to Harness are documented here. The format is based on
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/robzilla1738/harness-terminal/releases).
 
+## [3.2.1] - 2026-06-16
+
+### Fixed
+- **UAF crash on pane rebuild** — `ContentAreaViewController` now retains the old `PaneContainerView` for one runloop tick after removal, preventing AppKit from dispatching layout/display to freed views during structural rebuild.
+- **UAF crash on tab bar rebuild** — `TerminalTabBarView` defers deallocation of removed `TabPillView` instances so pending tracking-area and layout dispatches complete safely.
+- **Off-main-thread `layout()` crash** — added `Thread.isMainThread` guard to all remaining `nonisolated override func layout()` call sites (`HarnessSplitView`, `WindowBorderOverlayView`, `NotificationBellButton`, `HarnessTextField`, `HarnessSearchField`, `HarnessToggle`, `HarnessSlider`, `HarnessSwatchWell`, `HarnessSegmented`, `HarnessSelect`, `SoftIconButton`, `ChromeBackdrop`, `HarnessOverlayBackground`, `StatusDotView`, `AgentChipView`). If called from a background thread, defers to main via `needsLayout = true`.
+
 ## [3.2.0] - 2026-06-16
 
 ### Fixed
