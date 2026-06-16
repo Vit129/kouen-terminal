@@ -204,6 +204,7 @@ final class WorktreeRowView: NSView {
     private let textLabel = NSTextField(labelWithString: "")
     private let statusDot = NSView()
     private let statusLabel = NSTextField(labelWithString: "")
+    private var cachedAgentKind: AgentKind?
     private let agentIconView = NSImageView()
     private let closeButton = NSButton()
     private var isSelected = false
@@ -345,12 +346,16 @@ final class WorktreeRowView: NSView {
 
         // Show agent icon (same as tab bar) when agent detected; fallback to dot+label
         if let kind = tab.effectiveAgentKind {
-            agentIconView.image = AgentIconRenderer.templateOrMonogramImage(for: kind, size: 14)
-            agentIconView.contentTintColor = NSColor.fromHex(SessionCoordinator.shared.settings.agentColorHex(for: kind))
+            if kind != cachedAgentKind {
+                agentIconView.image = AgentIconRenderer.templateOrMonogramImage(for: kind, size: 14)
+                agentIconView.contentTintColor = NSColor.fromHex(SessionCoordinator.shared.settings.agentColorHex(for: kind))
+                cachedAgentKind = kind
+            }
             agentIconView.isHidden = false
             statusDot.isHidden = true
             statusLabel.isHidden = true
         } else {
+            cachedAgentKind = nil
             agentIconView.isHidden = true
             statusDot.isHidden = false
             statusLabel.isHidden = false
