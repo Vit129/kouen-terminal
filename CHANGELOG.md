@@ -6,6 +6,15 @@ All notable changes to Harness are documented here. The format is based on
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/robzilla1738/harness-terminal/releases).
 
+## [3.1.3] - 2026-06-16
+
+### Fixed
+- **App crash (EXC_BAD_ACCESS) on rapid session close/create** — `CADisplayLink` fired on a deallocated `HarnessTerminalSurfaceView`. macOS `NSView.displayLink(target:selector:)` does not strongly retain its target (unlike iOS); if `viewDidMoveToWindow(nil)` raced or was skipped during teardown, the link fired on a dangling pointer. Added `deinit` to unconditionally invalidate the display link and blink timer as a safety net.
+- **Sidebar session tooltip showed full path** — session card tooltip now shows the shortened display path (e.g. `⎇ main  ~/Git/P…`) instead of the raw full path.
+- **Sessions on same branch hidden in sidebar** — removed `allSameBranch` collapsing logic; all sessions in a group are always visible as separate rows.
+- **Sidebar selection not synced on session switch** — `selectActiveSessionRowIfVisible` now called on every metadata refresh so the highlighted row tracks the active terminal.
+- **File tree branch chip stale after tree refresh** — `refreshGitBranch()` now called inside `loadRoot()`.
+
 ## [3.1.2] - 2026-06-16
 
 ### Fixed
