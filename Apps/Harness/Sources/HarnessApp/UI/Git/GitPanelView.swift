@@ -12,6 +12,16 @@ final class GitPanelView: NSView {
     private nonisolated(unsafe) var contextPointer: UnsafeMutableRawPointer?
     private nonisolated(unsafe) var watchDebounce: DispatchWorkItem?
 
+    deinit {
+        if let stream = watchStream {
+            FSEventStreamStop(stream)
+            FSEventStreamInvalidate(stream)
+            FSEventStreamRelease(stream)
+        }
+        if let ptr = contextPointer { Unmanaged<WatcherContext>.fromOpaque(ptr).release() }
+        watchDebounce?.cancel()
+    }
+
     private final class WatcherContext: @unchecked Sendable {
         let onChange: @MainActor () -> Void
         init(onChange: @MainActor @escaping () -> Void) {

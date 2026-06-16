@@ -862,6 +862,7 @@ public final class TerminalHostView: NSView {
 
     deinit {
         outputSubscription?.cancel()
+        NotificationCenter.default.removeObserver(self)
     }
 }
 

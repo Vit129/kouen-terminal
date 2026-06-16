@@ -16,7 +16,7 @@ final class StatusLineView: NSView {
     private var heightConstraint: NSLayoutConstraint!
     private static let mainRowHeight: CGFloat = 26
     private static let extraRowHeight: CGFloat = 22
-    private var refreshTimer: Timer?
+    private nonisolated(unsafe) var refreshTimer: Timer?
 
     init() {
         super.init(frame: .zero)
@@ -99,6 +99,8 @@ final class StatusLineView: NSView {
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    deinit { refreshTimer?.invalidate() }
 
     func applyChrome() {
         // Re-run the backdrop install so it re-reads HarnessChrome.backgroundOpacity.
