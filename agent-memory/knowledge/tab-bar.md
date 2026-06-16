@@ -63,6 +63,19 @@ Idle: transparent.
 
 `applyChrome(isActive:)` handles all three states including `workingDot` color (tracks `titleLabel.textColor`).
 
+## Agent Detection
+
+`tabAgentKind(for:)` in `TerminalTabBarView.swift` delegates to `tab.effectiveAgentKind`:
+
+```swift
+// Tab+effectiveAgentKind (HarnessCore/Models/Tab.swift)
+public var effectiveAgentKind: AgentKind? {
+    agent?.kind ?? AgentTitleInference.kind(from: title)
+}
+```
+
+**Single source of truth** — tab bar, sidebar `WorktreeRowView`, `BoardModel`, `MenuBarController`, and `NotificationCoordinator` all use `tab.effectiveAgentKind`. Do not inline `tab.agent?.kind ?? AgentTitleInference.kind(from: tab.title)` at call sites.
+
 ## Source Map
 
 | Symbol | File |
