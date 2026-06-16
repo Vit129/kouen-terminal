@@ -231,19 +231,26 @@ final class DaemonSyncService {
         let structureChanged = structureFingerprint(remote) != structureFingerprint(snapshot)
         var merged = remote
         if preserveBrowserPanes {
-            // Preserve app-only browser pane nodes — daemon doesn't know about them.
-            for (wIdx, ws) in snapshot.workspaces.enumerated() {
-                guard wIdx < merged.workspaces.count else { continue }
-                for (sIdx, session) in ws.sessions.enumerated() {
-                    guard sIdx < merged.workspaces[wIdx].sessions.count else { continue }
-                    for (tIdx, tab) in session.tabs.enumerated() {
-                        guard tIdx < merged.workspaces[wIdx].sessions[sIdx].tabs.count else { continue }
-                        let browserLeaves = tab.rootPane.allBrowserLeaves()
-                        guard !browserLeaves.isEmpty else { continue }
-                        // Re-inject: if the incoming tab has no browser nodes, keep the current pane tree
-                        let incomingBrowserLeaves = merged.workspaces[wIdx].sessions[sIdx].tabs[tIdx].rootPane.allBrowserLeaves()
-                        if incomingBrowserLeaves.isEmpty {
-                            merged.workspaces[wIdx].sessions[sIdx].tabs[tIdx].rootPane = tab.rootPane
+            // Fast path: skip the O(W×S×T) merge entirely when no browser panes exist
+            // in the current snapshot — the common case for non-browser-pane users.
+            let hasBrowserPanes = snapshot.workspaces.contains { ws in
+                ws.sessions.contains { session in
+                    session.tabs.contains { !$0.rootPane.allBrowserLeaves().isEmpty }
+                }
+            }
+            if hasBrowserPanes {
+                for (wIdx, ws) in snapshot.workspaces.enumerated() {
+                    guard wIdx < merged.workspaces.count else { continue }
+                    for (sIdx, session) in ws.sessions.enumerated() {
+                        guard sIdx < merged.workspaces[wIdx].sessions.count else { continue }
+                        for (tIdx, tab) in session.tabs.enumerated() {
+                            guard tIdx < merged.workspaces[wIdx].sessions[sIdx].tabs.count else { continue }
+                            let browserLeaves = tab.rootPane.allBrowserLeaves()
+                            guard !browserLeaves.isEmpty else { continue }
+                            let incomingBrowserLeaves = merged.workspaces[wIdx].sessions[sIdx].tabs[tIdx].rootPane.allBrowserLeaves()
+                            if incomingBrowserLeaves.isEmpty {
+                                merged.workspaces[wIdx].sessions[sIdx].tabs[tIdx].rootPane = tab.rootPane
+                            }
                         }
                     }
                 }
@@ -262,7 +269,10 @@ final class DaemonSyncService {
         }
         coord.notificationCoordinator.pushNewRemoteNotifications(from: remote)
         coord.notificationCoordinator.pushAgentActivityNotifications(from: remote)
-        coord.surfaceIndex = buildSurfaceIndex(remote)
+        // Surface index only needs rebuild when pane tree changes.
+        if structureChanged {
+            coord.surfaceIndex = buildSurfaceIndex(remote)
+        }
         if !metadataOnly {
             let themeKey = "\(remote.themeName)|\(coord.settings.backgroundOpacity)|\(coord.settings.backgroundBlur)|\(coord.settings.customBackgroundHex ?? "")|\(coord.settings.customForegroundHex ?? "")|\(coord.settings.customCursorHex ?? "")"
             if themeKey != coord.appliedThemeKey {

@@ -640,11 +640,16 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
     }
 
     private func layoutFileEditorSplitSynchronously() {
+        // Set presentsWithTransaction on all visible terminal surfaces so Metal
+        // doesn't flash black while the constraint change resizes them (CASE-025 / task-51).
+        let hosts = SessionCoordinator.shared.terminalHosts.allHosts()
+        hosts.forEach { $0.setPresentsWithTransaction(true) }
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         view.layoutSubtreeIfNeeded()
         terminalHost.layoutSubtreeIfNeeded()
         CATransaction.commit()
+        hosts.forEach { $0.setPresentsWithTransaction(false) }
     }
 
     private func persistEditorState() {
