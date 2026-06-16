@@ -5,7 +5,7 @@
 
 extension ReleaseNotes {
     public static let current = ReleaseNotes(
-        version: "3.1.4",
+        version: "3.2.0",
         changelogDigest: "1829ac274cec80db",
         sections: [
             Section(title: "Fixed", items: [

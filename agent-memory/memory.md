@@ -5,7 +5,7 @@
 - **Fork:** Vit129/harness-terminal (fork of robzilla1738/harness-terminal)
 - **Working branch:** `main`
 - **Preview:** `make preview` (uses `.harness-preview/` dir)
-- **Latest release:** v3.1.5 (build 143 — agent icon in sidebar cards, Tab.effectiveAgentKind centralized, welcome banner unified shortcuts, pane-border-format strips kiro-cli, FileTreeSwiftUIView @Bindable UAF fix)
+- **Latest release:** v3.2.0 (build 144 — perf: adaptive shell tracker 500ms→2s idle, sidebar/tabbar skip-on-idle via isStableEqual, surfaceIndex conditional rebuild, browser pane fast-path; crash: nonisolated layout()/viewDidMoveToWindow() on all 21 overrides, file-preview presentsWithTransaction fix)
 
 ## Current Sprint — Post-v2.1.0 Polish & Shelving
 
@@ -45,6 +45,7 @@
 | 77 | Fix sidebar session list collapsing/hiding (remove allSameBranch) + active session synchronization on terminal switch + file tree git branch update (CASE-030) | ✅ Done |
 | 78 | Fix app crash: CADisplayLink use-after-free in HarnessTerminalSurfaceView — added deinit to invalidate renderLink + blinkTimer; marked nonisolated(unsafe) for Swift 6 deinit access (CASE-031) | ✅ Done |
 | 79 | v3.1.5: Agent icon in sidebar session cards (NSImageView 14pt, same as tab bar); Tab.effectiveAgentKind centralized (tab.agent?.kind ?? AgentTitleInference); agent_chip format variable; pane-border-format default strips pane_title (kiro-cli); kiro-cli-term OSC title suffix stripped in daemon; welcome banner unified to single Shortcuts section with native macOS shortcuts; FileTreeSwiftUIView @Bindable UAF fix | ✅ Done |
+| 80 | v3.2.0: Performance — adaptive SurfaceShellTracker (500ms→2s idle), sidebar/tabbar skip-on-idle (isStableEqual ignoring volatile fields), buildSurfaceIndex conditional, browser pane merge fast-path, agent icon cache, duplicate fileTreeView.updateRoot eliminated. Crash — nonisolated all 21 layout()/viewDidMoveToWindow() overrides (CASE-034); file-preview flash fix (presentsWithTransaction). | ✅ Done |
 | 79 | Fix file tree crash (EXC_BAD_ACCESS in swift_getObjectType): replaced `hostingView.rootView` replacement pattern with `FileTreeContext` @Observable class — `updateRoot` now mutates context instead of replacing the SwiftUI struct, eliminating UAF during layout pass. Fixed duplicate `.task(id: taskID)` shadowing (watcher task given unique key). v3.1.4 build 142 (CASE-032) | ✅ Done |
 
 

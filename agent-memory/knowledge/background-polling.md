@@ -87,3 +87,29 @@ These callers are intentional (user-triggered, wake-from-sleep, etc.) and should
 - `SessionLifecycleService` — session create/close/select
 - `HarnessSidebarPanelViewController+SessionMenu` — user-triggered session actions
 - `ScriptAPI` — scripted `harness.commands.run`
+
+---
+
+## 5. Performance Lessons (v3.2.0)
+
+### Skip-on-idle pattern
+
+All UI consumers of `snapshotChanged` should compare incoming data against cached state BEFORE doing work. Use `isStableEqual` (ignoring volatile daemon-polled fields like `currentCommand`, `lastMCPControlAt`) to avoid false-positive "changed" signals every 1.5s.
+
+- **Tab bar:** `tabs.isStableEqual(to: self.tabs)` → skip `pill.update()` loop
+- **Sidebar:** `newSessions.isStableEqual(to: lastRefreshedSessions)` → skip `rebuildSidebarRows()` + `configure()`
+- **buildSurfaceIndex:** guard on `structureChanged` only
+
+### Adaptive polling
+
+`SurfaceShellTracker` uses `idleTicks` counter:
+- Active: 500ms (≤4 consecutive no-change ticks)
+- Idle: 2s (>4 ticks without CWD change)
+- Reset: `bumpScan()` on new tab/session creation
+
+### Volatile fields in Tab/SessionGroup
+
+These fields change every ~1.5s from daemon metadata scan and should NOT trigger UI rebuilds:
+- `Tab.currentCommand` — foreground process name
+- `Tab.lastMCPControlAt` — MCP badge timer
+- `Tab.activity`/`silence`/`bell` — monitoring alerts (clear on view)
