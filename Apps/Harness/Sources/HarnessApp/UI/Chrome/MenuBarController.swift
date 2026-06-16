@@ -133,7 +133,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         item.attributedTitle = title
 
         if let tab = session.activeTab ?? session.tabs.first,
-           let kind = tab.agent?.kind ?? AgentTitleInference.kind(from: tab.title) {
+           let kind = tab.effectiveAgentKind {
             let tint = NSColor.fromHex(SessionCoordinator.shared.settings.agentColorHex(for: kind)) ?? .secondaryLabelColor
             item.image = AgentIconRenderer.coloredOrMonogramImage(for: kind, size: 13, color: tint)
         }
@@ -158,7 +158,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             for session in workspace.sessions {
                 var best: (AgentKind, AgentActivity)?
                 for tab in session.tabs {
-                    guard let kind = tab.agent?.kind ?? AgentTitleInference.kind(from: tab.title) else { continue }
+                    guard let kind = tab.effectiveAgentKind else { continue }
                     let activity = tab.agent?.activity ?? (tab.status == .waiting ? .awaiting : .idle)
                     if best == nil || rank(activity) > rank(best!.1) { best = (kind, activity) }
                 }

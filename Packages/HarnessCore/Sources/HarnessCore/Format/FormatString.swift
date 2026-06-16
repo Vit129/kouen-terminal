@@ -360,6 +360,7 @@ public enum FormatString {
         case "workspace_name": return context.workspaceName ?? ""
         case "agent_kind": return context.agentKind ?? ""
         case "agent_activity": return context.agentActivity ?? ""
+        case "agent_chip": return context.agentChip ?? ""
         case "git_branch": return context.gitBranch ?? ""
         case "client_name": return context.clientName ?? ""
         case "client_width": return context.clientWidth.map(String.init) ?? ""
@@ -401,6 +402,7 @@ public struct FormatContext: Sendable {
     public var workspaceName: String?
     public var agentKind: String?
     public var agentActivity: String?
+    public var agentChip: String?
     public var gitBranch: String?
     public var clientName: String?
     /// tmux-style window flags: `Z` zoomed, `*` active, `#` activity, `!` bell, `M` marked.
@@ -447,6 +449,7 @@ public struct FormatContext: Sendable {
         workspaceName: String? = nil,
         agentKind: String? = nil,
         agentActivity: String? = nil,
+        agentChip: String? = nil,
         gitBranch: String? = nil,
         clientName: String? = nil,
         windowFlags: String? = nil,
@@ -463,6 +466,7 @@ public struct FormatContext: Sendable {
         self.workspaceName = workspaceName
         self.agentKind = agentKind
         self.agentActivity = agentActivity
+        self.agentChip = agentChip
         self.gitBranch = gitBranch
         self.clientName = clientName
         self.windowFlags = windowFlags

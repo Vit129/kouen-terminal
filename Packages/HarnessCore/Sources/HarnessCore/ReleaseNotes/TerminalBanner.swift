@@ -33,28 +33,22 @@ public enum TerminalBanner {
             lines += wrappedBullet(bullet, inner: inner)
         }
         lines.append([])
-        lines.append([Run("Try this, in order", sgr: bold)])
+        lines.append([Run("Shortcuts", sgr: bold)])
         let steps: [(key: String, what: String)] = [
-            ("ctrl-a c", "open a second tab"),
-            ("ctrl-a %", "split this pane · \" splits across"),
-            ("ctrl-a ?", "every keybinding, searchable"),
-            ("ctrl-a :", "command prompt · try: rename-window"),
+            ("⌘⇧N / ⌘⇧W",  "new / close session"),
+            ("⌘D / ⌘⇧D",   "split right / split down"),
+            ("⌘W / ⌘⌥W",   "close tab / close pane"),
+            ("⌘[ / ⌘]",    "previous / next session"),
+            ("⌘1 … ⌘9",    "switch to session 1–9"),
+            ("⌘P",          "fuzzy file search"),
+            ("⌘F",          "find in files"),
+            ("⌘B",          "browser pane"),
+            ("⌘;",          "command prompt · try: find, grep, cd"),
+            ("⌘\\",         "toggle sidebar"),
             ("harness-cli ping", "script Harness from any shell"),
         ]
         for (index, step) in steps.enumerated() {
             lines += wrappedStep(number: index + 1, key: step.key, what: step.what, inner: inner)
-        }
-        lines.append([])
-        lines.append([Run("Native shortcuts", sgr: bold)])
-        let shortcuts: [(key: String, what: String)] = [
-            ("⌘\\",        "toggle sidebar"),
-            ("⌘⇧N / ⌘⇧W", "new / close session"),
-            ("⌘D / ⌘⇧D",  "split right / down"),
-            ("⌘W / ⌘⌥W",  "close tab / pane"),
-            ("⌘[ / ⌘]",   "prev / next session"),
-        ]
-        for shortcut in shortcuts {
-            lines += wrappedShortcut(key: shortcut.key, what: shortcut.what, inner: inner)
         }
         lines.append([])
         lines.append([Run("Docs: harnesscli.dev"), Run("  ·  ", sgr: dim), Run("Settings: ⌘,")])

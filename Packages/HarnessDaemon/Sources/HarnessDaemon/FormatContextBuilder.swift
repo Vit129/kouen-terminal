@@ -49,6 +49,7 @@ enum FormatContextBuilder {
             workspaceName: workspace?.name,
             agentKind: tab?.agent?.kind.rawValue,
             agentActivity: tab?.agent?.activity.rawValue,
+            agentChip: tab?.agent?.kind.chip,
             gitBranch: tab?.gitBranch,
             clientName: clientName,
             windowFlags: tab.map { ($0.zoomedPaneID != nil ? "Z" : "") + $0.alertFlags }

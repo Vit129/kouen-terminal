@@ -89,6 +89,12 @@ public struct Tab: Codable, Sendable, Identifiable, Equatable {
         self.lastMCPControlAt = lastMCPControlAt
     }
 
+    /// Effective agent kind — daemon-detected first, then inferred from OSC title.
+    /// Same logic used by tab bar, sidebar, and board.
+    public var effectiveAgentKind: AgentKind? {
+        agent?.kind ?? AgentTitleInference.kind(from: title)
+    }
+
     public var displaySubtitle: String {
         if let branch = gitBranch, !branch.isEmpty {
             return branch

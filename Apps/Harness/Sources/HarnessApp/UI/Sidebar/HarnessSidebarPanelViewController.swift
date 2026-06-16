@@ -365,7 +365,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
                         tabID: tab.id,
                         tabTitle: tab.title.isEmpty ? tab.cwd : tab.title,
                         surfaceID: tab.id,
-                        agentKind: tab.agent?.kind,
+                        agentKind: tab.effectiveAgentKind,
                         body: body
                     )
                     entries.append(entry)

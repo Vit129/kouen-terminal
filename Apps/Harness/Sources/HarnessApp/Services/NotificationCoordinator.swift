@@ -250,6 +250,6 @@ final class NotificationCoordinator {
     }
 
     private func effectiveAgentKind(for tab: Tab) -> AgentKind? {
-        tab.agent?.kind ?? AgentTitleInference.kind(from: tab.title)
+        tab.effectiveAgentKind
     }
 }

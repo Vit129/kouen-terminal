@@ -6,6 +6,28 @@ All notable changes to Harness are documented here. The format is based on
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/robzilla1738/harness-terminal/releases).
 
+## [3.1.5] - 2026-06-16
+
+### Added
+- **Agent icon in sidebar session cards** — when an agent (Kiro, Claude Code, Codex, etc.) is detected on a tab, the sidebar session card now shows the same NSImage brand icon used in the tab bar instead of a generic dot+label. Falls back to dot+label for non-agent sessions.
+- **`Tab.effectiveAgentKind` centralized** — single computed property (`tab.agent?.kind ?? AgentTitleInference.kind(from: title)`) used by tab bar, sidebar, board, menu bar, and notification coordinator. All views now use the same agent detection logic including OSC title inference fallback.
+- **`agent_chip` format variable** — new `#{agent_chip}` in status/pane-border format strings returns the 2-letter chip (e.g. `KR`, `CC`) for the active agent.
+
+### Changed
+- **Welcome banner unified shortcuts** — merged "Try this" and "Native shortcuts" into a single "Shortcuts" section with 11 Harness-native shortcuts (`⌘⇧N`, `⌘D/⌘⇧D`, `⌘P`, `⌘F`, `⌘B`, `⌘;` etc.). Removed all `ctrl-a` prefix references.
+- **`pane-border-format` default** — changed from `#{pane_index} #{pane_title}` to `#{pane_index}`, eliminating tool-injected process names (e.g. `kiro-cli`) from the pane border label. Old value auto-migrated.
+- **Command prompt placeholder** — updated from tmux-style `split-window -h ; copy-mode` to Harness-first `find, grep, cd, rename-window`.
+
+### Fixed
+- **`FileTreeSwiftUIView` UAF crash** — `context` property changed from `let` to `@Bindable`, ensuring SwiftUI holds a strong reference to the `@Observable FileTreeContext` object throughout the render cycle. Previously SwiftUI could drop the reference mid-layout causing `EXC_BAD_ACCESS` in `swift_getObjectType`.
+- **`kiro-cli-term` leaking into sidebar** — daemon now strips ` (kiro-cli…)` suffix from OSC 2 title before storing, preventing Kiro's internal process name from appearing as the session title.
+
+## [3.1.4] - 2026-06-16
+
+### Fixed
+- **File tree crash (EXC_BAD_ACCESS in swift_getObjectType)** — `WorkspaceFileTreeView.updateRoot` replaced `hostingView.rootView` with a new `FileTreeSwiftUIView` struct. When this happened mid-layout-pass (triggered by the 500ms shell-tracker poll or a git-branch-change notification), AttributeGraph held a stale observation reference to the old body closure; the subsequent `@MainActor` isolation check inside `@Observable` dereferenced freed memory. Introduced `FileTreeContext` (`@Observable` class) holding `rootPath`/`sessionID`; `updateRoot` now mutates context properties instead of replacing the root view — eliminates the race entirely.
+- **Duplicate `.task(id: taskID)` in FileTreeSwiftUIView** — the FSEvents watcher task shadowed the `loadRoot` task (same task ID); `loadRoot` was never called from the task modifier. Gave the watcher task a unique `"\(taskID)|watcher"` key.
+
 ## [3.1.3] - 2026-06-16
 
 ### Fixed

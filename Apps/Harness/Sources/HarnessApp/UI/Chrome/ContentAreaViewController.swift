@@ -54,7 +54,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
             titleStrip.setPath("")
             return
         }
-        let agentActive = tab.agent != nil || AgentTitleInference.kind(from: tab.title) != nil
+        let agentActive = tab.effectiveAgentKind != nil
         titleStrip.setPath(agentActive ? "" : tab.cwd, gitBranch: tab.gitBranch)
     }
 
