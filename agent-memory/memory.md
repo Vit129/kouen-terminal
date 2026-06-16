@@ -1,143 +1,23 @@
-# Memory — Harness Terminal
+# Memory — harness-terminal
 
-## Active Context
-- **Project:** harness-terminal (Swift/AppKit macOS terminal emulator)
-- **Fork:** Vit129/harness-terminal (fork of robzilla1738/harness-terminal)
-- **Working branch:** `main`
-- **Preview:** `make preview` (uses `.harness-preview/` dir)
-- **Latest release:** v3.2.0 (build 144 — perf: adaptive shell tracker 500ms→2s idle, sidebar/tabbar skip-on-idle via isStableEqual, surfaceIndex conditional rebuild, browser pane fast-path; crash: nonisolated layout()/viewDidMoveToWindow() on all 21 overrides, file-preview presentsWithTransaction fix)
+## Decisions
+- ACP shelved — re-enable when adapters ship with agent CLIs natively
+- CWD tracking: daemon polls proc_pidinfo 500ms — no shell integration needed
+- File preview: constraint-based sibling panel, never reparent terminal views
+- ⌘1–9: `selectSession(workspaceID:sessionID:)` — not `selectWorkspace`
+- vi mode: `ViEngine` `@MainActor final class` in `ViNormalMode.swift`
 
-## Current Sprint — Post-v2.1.0 Polish & Shelving
+## Lessons
+- RL-004: Never reparent Metal terminal surfaces — 1-2s black screen (CASE-003)
+- RL-010: `NSView.displayLink` does NOT strongly retain target — always `deinit { displayLink?.invalidate() }`
+- RL-021: Pure transparent window fails on bright bg — use `window.backgroundColor = themeColor.withAlphaComponent(opacity)`
+- RL-030: Every `snapshotChanged` consumer must check `metadataOnly` flag before rebuilding
+- RL-031: Double-subscription — parent routes to child AND child has own observer = fires twice
 
-### Task_Ledger
+## Conventions
+- Build: `make preview`
+- Test: `swift build` + all test targets
+- Services: unowned back-reference to coordinator, lazy init
 
-| # | Task | Status |
-|---|------|--------|
-| (Tasks 1–50 archived → [completed-tasks-archive.md](completed-tasks-archive.md)) | | |
-| 51 | Investigate terminal panel black-flash when opening file preview from Git Changes/History/file-tree (even fresh tabs); not last-line scroll after preview open | 🔍 In progress |
-| 74 | Tab bar bug fixes (worktree giggly-sprouting-hellman): (1) statusDot moved from pill leading-edge to after titleLabel (matching sidebar "name • status" style); (2) `shouldShowBranch` always returns true when branch exists — removed "only show if non-main or duplicate folder" logic; (3) drag-cancel on structural reload instead of committing with stale target index | ✅ Done |
-| 52 | P13 Split Pane Parity (PBI-SPLIT-001..005): removed SessionCoordinator vertical-split gate, added "Split Down" UI affordances (hover, tab/sidebar menus, main menu, command palette), wired ratio/firstPaneID/secondPaneID for stacked NSSplitView, axis-aware adjustRatio fix in SessionEditor, docs updated for split-window/join-pane/move-pane -v. Build + 560/560 HarnessCoreTests + 63/63 HarnessAppTests pass. Merged via PR #10 | ✅ Done |
-| 53 | P12 PBI-ORCH-001: harness-mcp `harnessList` + `readPaneOutput` read-only tools (HarnessDaemonTools.swift) | ✅ Done |
-| 54 | P12 PBI-ORCH-002/003: harness-mcp env-gated pane/session control tools plus waitForPaneOutput | ✅ Done |
-| 55 | P12 PBI-ORCH-004/005: persisted MCP tool policy for mutating tools; scoped UI visibility design note only | ✅ Done |
-| 56 | P4 Track 1 Syntax Highlighting: verified and structured. Integrated SyntaxTextView highlighting (regex-based heuristics supporting 30+ languages) in FileViewerViewController; preserved size guards, binary/non-UTF8 placeholders, copy/select and scroll behaviors; added SyntaxHighlighterTests.swift verifying correctness; noted CLI cat/view commands absence. | ✅ Done |
-| 57 | P15 plan: integration roadmap for P4+P10+P11+P12+P13/P14 — maps shared primitives (pane/session command facade, PaneNode split tree, harness.events bridge), flags divergent P4 docs, recommends merge/sequencing order. P16 plan: Kanban-style Agent/Session Board (Jira/Trello/Devin-Windsurf parity) for GUI sidebar + `harness board` CLI + harness.board scripting + harnessBoard MCP, backed by shared HarnessCore BoardModel; PBI-BOARD-001..006. Docs only, no code changes. | ✅ Done |
-| 58 | Fix ⌘\\ "Toggle Sidebar" first-press bug: toggleSidebar() previously coupled sidebar visibility with the file-editor split via a "focus mode" (isFocusModeActive/preFocusSidebarVisible/preFocusFileEditorVisible) — if a file editor split was open on a freshly-opened window, the first ⌘\\ press hid both sidebar and editor split instead of opening the sidebar. Decoupled: toggleSidebar() now purely flips settings.sidebarVisible; removed resetFocusMode() and the resetFocusMode: params on ContentAreaViewController.showFileEditorSplit/hideFileEditorSplit. Build + 67/67 HarnessAppTests + 1529/1529 full suite pass. | ✅ Done |
-| 59 | P11 Scripting & Config API (PBI-SCRIPT-001/002/003): added JavaScriptCore-backed `ScriptRuntime`/`ScriptConfigLocator`/`ScriptHookCoordinator`/`ScriptFileWatcher`/`ScriptAPI`/`ScriptSnapshotModels` under Apps/Harness/Sources/HarnessApp/Scripting/. Config search order ($HARNESS_CONFIG_FILE → $XDG_CONFIG_HOME/harness/init.js → ~/.config/harness/init.js → ~/.harness.js), silent no-file startup, toast on reload/error with last-good-runtime retained, RL-011-style file watcher with debounce/re-arm, and read-only `harness.sessions.list()`/`harness.panes.list()`/`harness.commands.parse()` bridge. Fixed `ScriptRuntime` exceptionHandler to also set `context.exception` and `ScriptAPI.commands.parse` to use `String(describing:)` instead of `localizedDescription` so `CommandParseError` messages surface to JS. PBI-SCRIPT-004/005 not started (004 needs allowlisted config/keybinding writes; 005 gated behind P12 MCP pane-control per plan). Build + 74/74 HarnessAppTests pass. | ✅ Done |
-| 67 | P11 PBI-SCRIPT-004/005 + P15 step 3 events bridge (worktree-p11-script-004-005): `harness.config.get/set` (allowlisted: theme/fontFamily/fontSize/backgroundOpacity/backgroundBlur/windowPaddingX/windowPaddingY/defaultShell/defaultCWD/systemNotificationsEnabled/notificationSoundEnabled) + `harness.keys.bind/unbind/reload` persist through `HarnessSettings.save()` + `KeybindingsService`; `harness.commands.run` (Promise-wrapped __runSync via MainExecutor); pane mutators `sendText/split/close` + session `spawn` via IPC; `harness.events.on/off` bridge `snapshotChanged`/`configReloaded` from `NotificationBus`. Fixed `NSApp!` crash in `NotificationCoordinator.updateDockBadge` (guard NSApp nil for test safety). 1601/1601 tests pass. | ✅ Done |
-| 60 | P4 Track 2/3: LSP CLI (`harness lsp start/status/hover/definition/diagnostics`) and `harness view` done; vi `:view/:edit/:split/:vsplit` done; fuzzy `:find`/partial path resolution partial (best-match, no picker); PBI-VI-001 partial (`gf` only, `gd`/`K`/diagnostic jumps not wired). Build + CLI/App/Completion tests pass. | ✅ Done |
-| 61 | P4 Track 2 follow-up: completed PBI-VI-001 (`gd`, `K`, `]d`, `[d` wired through existing `LSPFileSession`/`SyntaxTextView` callbacks with graceful no-LSP/no-result status messages) and PBI-VI-003 ambiguous fuzzy handling (`:find`, `:edit <partial>`, `:view <partial>` list ranked ambiguous matches instead of opening first). Added App tests for fuzzy resolution and diagnostic navigation; `swift build`, HarnessAppTests, and HarnessCLITests pass. | ✅ Done |
-| 62 | P16 Agent/Session Board (PBI-BOARD-001/002/003/005): new shared `BoardModel.classify(snapshot:) -> [BoardColumn]` in HarnessCore (5 canonical columns: Needs Attention/Running/Idle/Done/Error, ported P10 state-dot precedence; "Needs Attention" = `agent?.activity == .awaiting` only — no notification-ack signal exists yet). New `harness board [--watch]` CLI command, new "Board" sidebar tab (`BoardViewController`, 4th segment after Sessions/Files/Git — no "Task Board" name collision found), new `harness.board.list()` ScriptAPI namespace, and read-only `harnessBoard` MCP tool. Fixed a pre-existing `NSLayoutConstraint` cross-hierarchy activation bug in `BoardViewController.loadView()` (documentView.heightAnchor must be activated after `scrollView.documentView =` assignment). PBI-BOARD-004 (live event-bridge updates) and PBI-BOARD-006 (ack/dismiss) deferred — both depend on the not-yet-built `harness.events`/NotificationBus bridge (P15 step 3). 571/571 HarnessCoreTests, 88/88 HarnessAppTests, 51/51 HarnessCLITests, 9/9 HarnessMCPTests, full `swift build` pass. | ✅ Done |
-| 63 | Bug fixes + performance: close button ทับ ⌘N badge (CASE-028 regression — reset alphaValue in TabPillView.update(tab:isActive:) when !isHovered); AppIdleThrottle (screen sleep/wake throttle — suspends SurfaceShellTracker + StatusLineView timer on screensDidSleep, resumes with single syncFromDaemon on screensDidWake, scheduleSnapshotRefresh skips while suspended); session short ID changed to 7-char lowercase hex (git-style). Build pass. | ✅ Done |
-| 64 | P4 unit tests: ViPathAndLSPTests.swift (23 tests — stripLineColumnSuffix, isPathTokenChar including surrogate safety, LSPTextLocationParser edge cases). Made ViEngine.stripLineColumnSuffix + isPathTokenChar internal for testability. 244 tests pass. | ✅ Done |
-| 65 | Docs: README updated (P11 scripting, P12 MCP, CLI section, stack table, Manual Test Plan link); docs/MANUAL_TEST_PLAN.md created (P4/P11/P12/P13/P16 manual test steps with mock data setup); agent-memory/plans/p17-structural-refactor.md and p18-ui-automation.md (Robot Framework) created; skill-log.md updated with P18 RF entry. Commit 06f0d56 pushed. | ✅ Done |
-| 66 | P17 PBI-REFACTOR-001 complete: SessionCoordinator 2050→397 LOC (target <500 ✅). Services: DaemonSyncService(233), NotificationCoordinator(247), SessionLifecycleService(360), SplitPaneCoordinator(157), ThemeService(178), ActivePaneService(197), SessionCoordinator+HostDelegate(86), SessionCoordinatorTypes(47). All 8 files use unowned coordinator back-reference. Build pass. | ✅ Done |
-| 67 | P12 PBI-ORCH-005: MCP-controlled indicator on tab bar. Tab.lastMCPControlAt field; IPCMessage.notifyMCPActivity; SessionEditor.stampMCPActivity; SurfaceRegistry handler; harness-mcp posts after sendPaneText/sendPaneKeys succeed; TabPillView shows "MCP" badge (blue, 5s). Build pass. | ✅ Done |
-| 68 | P14 PBI-BROWSER-001..005: Embedded browser pane (WKWebView) in split tree, toolbar controls, URL persistence, and MCP tools (Open/Navigate/Wait/Snapshot/Interact/Close) with security policy. | ✅ Done |
-| 69 | P17 PBI-REFACTOR-002, 003, 005 complete: organized UI/ into feature subfolders, decomposed ViNormalMode.swift into 5 modular files, wrapped shelved ACP code in compilation flag `#if HARNESS_ACP` (PBI-REFACTOR-004 deferred). | ✅ Done |
-| 70 | P18 UI Automation: implemented 25 automated UI test cases across P4/P11/P12/P13/P16 using Robot Framework + custom `HarnessUILibrary.py` (via AppleScript/osascript and CLI verification). | ✅ Done |
-| 71 | P19 Terminal Workbench: completed PBI-WB-001..007 (Command facade, `:recent`, `:copy-path`, task detector/runner, `:grep`/`:errors`, attention workflow, and `ide-migrant-terminal` scriptable profile). | ✅ Done |
-| 72 | Post-browser polish: Browser pane URL local LAN dev-server links opening support, Cmd+B shortcut, close/refresh toolbar buttons bugfixes, and sidebar visibility expanding bugfix. | ✅ Done |
-| 73 | Fix: first-launch sidebar toggle bug (MainSplitViewController.swift) — initial `applySidebarVisibility` ran in `viewDidLoad`'s `DispatchQueue.main.async` while `split.bounds.width == 0`, collapsing the sidebar to 0pt while also hiding the ⌘\\ toggle icon (`sidebarToggle.isHidden = sidebarVisible`). Moved initial state application to first `viewDidLayout()` with `split.bounds.width > 0` via new `applyInitialSidebarState()` + `didApplyInitialSidebarState` flag. Build pass. | ✅ Done |
-| 74 | v3.1.0 (build 138): renderer cache purge on memory pressure (DispatchSource DISPATCH_SOURCE_TYPE_MEMORYPRESSURE in MemoryPressureMonitor → glyph atlas + shaped-run cache + image texture cache), HistoryRingBuffer.shrinkIfNeeded() (halve backing at <25% fill, floor 64), SurfaceShellTracker background backoff (500ms→2s when not key app). | ✅ Done |
-| 75 | v3.1.1 (build 139) — P22 investigation + fixes: (1) DaemonSyncService.startMetadataRefresh unconditional syncFromDaemon every 5s even with no git delta (guard !updates.isEmpty + idle guard); (2) HarnessSidebarPanelViewController double-subscription bug (had own snapshotChanged→reload observer alongside MainSplitViewController routing — removed); (3) BoardViewController/NotchPanelController always rebuilding on metadataOnly ticks (added guard); (4) BLINKDBG fputs in MainSplitViewController removed. CHANGELOG + version bump + local tag v3.1.1. | ✅ Done |
-| 76 | P22.1 instrumentation: PerfCounters singleton (@MainActor, 30-min stderr dump) wired into SurfaceShellTracker ticks/cwdChanges, DaemonSyncService wakeups/gitProbes/syncFired/syncSkipped, applySnapshot structural/metadataOnly counts, snapshotChanged fanout per-consumer counts. Knowledge file: agent-memory/knowledge/background-polling.md. | ✅ Done |
-| 77 | Fix sidebar session list collapsing/hiding (remove allSameBranch) + active session synchronization on terminal switch + file tree git branch update (CASE-030) | ✅ Done |
-| 78 | Fix app crash: CADisplayLink use-after-free in HarnessTerminalSurfaceView — added deinit to invalidate renderLink + blinkTimer; marked nonisolated(unsafe) for Swift 6 deinit access (CASE-031) | ✅ Done |
-| 79 | v3.1.5: Agent icon in sidebar session cards (NSImageView 14pt, same as tab bar); Tab.effectiveAgentKind centralized (tab.agent?.kind ?? AgentTitleInference); agent_chip format variable; pane-border-format default strips pane_title (kiro-cli); kiro-cli-term OSC title suffix stripped in daemon; welcome banner unified to single Shortcuts section with native macOS shortcuts; FileTreeSwiftUIView @Bindable UAF fix | ✅ Done |
-| 80 | v3.2.0: Performance — adaptive SurfaceShellTracker (500ms→2s idle), sidebar/tabbar skip-on-idle (isStableEqual ignoring volatile fields), buildSurfaceIndex conditional, browser pane merge fast-path, agent icon cache, duplicate fileTreeView.updateRoot eliminated. Crash — nonisolated all 21 layout()/viewDidMoveToWindow() overrides (CASE-034); file-preview flash fix (presentsWithTransaction). | ✅ Done |
-| 79 | Fix file tree crash (EXC_BAD_ACCESS in swift_getObjectType): replaced `hostingView.rootView` replacement pattern with `FileTreeContext` @Observable class — `updateRoot` now mutates context instead of replacing the SwiftUI struct, eliminating UAF during layout pass. Fixed duplicate `.task(id: taskID)` shadowing (watcher task given unique key). v3.1.4 build 142 (CASE-032) | ✅ Done |
-
-
-
-### Removed / Reverted Features
-- **Task Board sidebar** — was added in sprint #32 but has since been **removed**. Not present in current codebase.
-- **Focus Mode (⌘P)** — status unclear; no TaskBoardView or FocusMode symbol found in source scan. Verify before documenting.
-- **⌘1–9** — `selectSessionNumber` was renamed to `selectWorkspaceNumber` in v2.5.2. Confirmed CASE-028: it calls `selectSession(workspaceID:sessionID:)` over `workspace.sessions[index]` — switches the Session pill within the active workspace (matches the top bar 1:1), not workspaces/windows. See [[session-tab-hierarchy]].
-
-
-### Recent_Lessons
-
-- **RL-001:** ACP requires adapter binaries; can't ship reliably in .app bundle (PATH issues)
-- **RL-002:** Shell tracker can't read env vars from /bin/zsh (macOS hardened runtime blocks KERN_PROCARGS2). CWD tracking relies on daemon-side proc_pidinfo polling only.
-- **RL-003:** sortOrder must persist to UserDefaults on every drag, not just on quit
-- **RL-004:** Never reparent Metal terminal surfaces for file preview split — causes 1-2s black screen (CASE-003). Use constraint-based sibling panel instead.
-- **RL-005:** DispatchSource on .main queue directly (not .global with async hop) for Swift 6 MainActor isolation.
-- **RL-006:** AppKit panels alongside Metal surfaces must apply opacity explicitly to their CALayer, but file editor/preview panels need a denser compensated alpha (`opacity + (1 - opacity) * 0.55`) rather than raw opacity. Metal handles terminal canvas alpha and terminal programs may paint opaque cell backgrounds, while preview text sits over mostly transparent AppKit canvas; raw parity can look too transparent. Hook into `applyChrome()` + panel-creation site. (CASE-011)
-- **RL-007:** DispatchSource.makeFileSystemObjectSource on a directory is non-recursive — only detects root-level changes. Use FSEventStreamCreate with kFSEventStreamCreateFlagFileEvents for recursive watching. (CASE-016, CASE-021)
-- **RL-008:** Swift actor + FSEvents C callback: use WatcherContext class (@unchecked Sendable) + Unmanaged.passRetained to pass onChange closure via FSEventStreamContext.info. Release in stopWatching via Unmanaged.fromOpaque().release(). (CASE-016)
-- **RL-009:** SwiftUI @State in list rows resets on every view reconciliation. State that must survive tree refresh belongs in the @Observable model, not the View. (CASE-017)
-- **RL-010:** macOS `NSView.displayLink(target:selector:)` does NOT strongly retain the target view (unlike iOS `CADisplayLink(target:selector:)`). Always add `deinit { displayLink?.invalidate() }` as a safety net — `viewDidMoveToWindow(nil)` can race or be skipped during rapid teardown. Mark the property `nonisolated(unsafe)` for deinit access under Swift 6 strict concurrency. (CASE-031)
-- **RL-010:** NSView wrapping NSTextView must forward mouseDown/mouseDragged/mouseUp to the inner textView explicitly — super.mouseDown doesn't cascade to child views. (CASE-018)
-- **RL-011:** For watching a single file (not a directory), plain `DispatchSource.makeFileSystemObjectSource(O_EVTONLY)` is sufficient — no need for FSEvents recursion (RL-007 only applies to directories). Re-arm by reopening the path on every reload to survive atomic-save-by-rename. For a reused `QLPreviewView`, call `refreshPreviewItem()` instead of re-setting an unchanged `previewItem` (QuickLook caches by URL). (CASE-022)
-- **RL-012:** When a forced visual state on launch (e.g. collapse) diverges from the persisted toggle-state field, sync the persisted field too — otherwise the first user toggle computes against stale state and is a no-op. (CASE-024)
-- **RL-013:** `TerminalModes.resetForShellPrompt()` (OSC 133;D) must only reset *input* modes (mouse tracking, bracketed paste, kitty keyboard, etc.), never `synchronizedOutput` — a sub-command's 133;D can fire mid-batch inside an outer TUI's `?2026h`/`?2026l` redraw, and clearing it there causes the renderer to present a half-applied frame (interleaved garbled rows). The 150ms sync-timeout in `HarnessTerminalSurfaceView` already handles a program that never sends `?2026l`. (CASE-023)
-- **RL-014:** When extracting logic from large AppKit views: prefer standalone `enum` types with static methods for pure logic (geometry, validation, resolution). Keep the original method signature as a thin delegate — preserves the public API and test seams. Don't over-extract tightly-coupled state machines that would need large delegate protocols; those are better served by extension files.
-- **RL-015:** Pure GUI-side states (like file editor tab lists and IDE mode visibility) should be persisted via `UserDefaults.standard` rather than modifying the shared daemon settings struct `HarnessSettings`, preventing binary compatibility issues.
-- **RL-016:** On macOS/AppKit, to prevent click-gesture recognizers on parent stack views from intercepting clicks on child buttons, use `gestureRecognizer(_:shouldAttemptToRecognizeWith:)` of `NSGestureRecognizerDelegate` to selectively disable gesture recognition.
-- **RL-017:** SwiftUI `List` in `NSHostingView` doesn't forward `keyDown` to the parent NSView. Add `acceptsFirstResponder = true` + `keyDown` override on the hosting NSView wrapper, then post notifications to SwiftUI rows via `NotificationCenter` for state changes (expand/collapse).
-- **RL-018:** Modal vi engine inside `NSTextView`: set `isEditable = false` in normal mode and restore it only in insert mode. This prevents AppKit from consuming keystrokes meant for the vi engine. Use a `@MainActor final class` engine that holds `weak var textView: NSTextView?` and dispatches all mutations via `tv.isEditable = true; tv.replaceCharacters(...); tv.isEditable = false`.
-- **RL-019:** `SyntaxLineNumberGutterView.draw()` receives a locally-unwrapped non-optional `textView` (from `guard let textView, ...`) — inside the draw closure `textView` is `NSTextView`, not `NSTextView?`. Conditional binding `if let tv2 = textView` inside that closure will fail to compile because it's already non-optional.
-- **RL-020:** `window-size` vote aggregation: DaemonServer tracks per-client surface sizes; `applyEffectiveSize` picks the winning vote. Reading `registry.optionStore.get("window-size")` inside DaemonServer is correct since `optionStore` is `public let` on SurfaceRegistry.
-- **RL-021:** "Pure transparent + always readable" is impossible without a tint layer. Apple proved this across iOS/macOS 26→27 (Liquid Glass): pure `.clear` window background fails when the content behind is bright. Fix: `window.backgroundColor = themeColor.withAlphaComponent(opacity)` instead of `.clear` — theme colour acts as tint at user-chosen strength, CGS blur still applies on top. iOS 27 added a user-facing transparency slider (ultra clear → fully tinted) as the definitive solution.
-- **RL-022:** `selectSessionNumber` (⌘1–9) must call `selectSession(workspaceID:sessionID:)` not `selectWorkspace(byIndex:)`. The latter is a no-op when only one workspace exists (index 0 already active), and out-of-bounds for index ≥ 1. Always navigate workspace → sessions array → select by ID.
-- **RL-023:** The async `syncFromDaemon` variant must mirror every side-effect of the sync variant — including `terminalHosts.prune(keeping:)` on structure changes. Missing it causes dead TerminalHostViews (and their Metal surfaces) to accumulate for the app lifetime because the `scheduleSnapshotRefresh()` path always uses the async variant.
-- **RL-024:** `unichar` (UInt16) can hold surrogate code units (0xD800–0xDFFF). `UnicodeScalar(unichar)` returns nil for those — force-unwrapping it crashes on malformed clipboard content. Always `guard let scalar = UnicodeScalar(c) else { return <safe_default> }` when converting unichar → Character.
-- **RL-025:** Any per-cell state tied to terminal content (selection, marks, cursors held across frames) must be stored in **virtual-line space** (`historyCount - scrollOffset + viewportRow`, 0 = oldest retained line), not viewport-relative `(row, column)`. Viewport-relative coordinates silently go stale the moment `scrollOffset` changes. Copy mode (`CopyModePosition`/`CopyModeGridSource`) already used this convention; mouse selection didn't, causing scroll to clear/misplace selections (CASE-029). `TerminalEmulator.line(_:)`/`bufferLine(_:)` are virtual-line indexed and return blank rows out-of-range — safe to read without clamping for display/copy purposes.
-- **RL-026:** `SurfaceRegistry.sessions` (the PTY-session dict consulted by `send`/`capturePane`/`capturePaneRange`/etc.) is keyed by the layout `PaneLeaf.activeSurfaceID` (or `.surfaceID`) `.uuidString` — the same `SurfaceID` UUID used in `PaneNode`/`Tab`. `PaneSurface.daemonSurfaceID` is a separate optional field that is *not* populated in current snapshots; don't use it as the IPC surface key (CASE: P12 PBI-ORCH-001, `harnessList`'s `surfaceId`).
-- **RL-027:** Appium Mac2Driver requires Appium 3.x (RC). On Appium 2.19.0 `appium driver install mac2` fails with version mismatch. Workaround for native macOS UI automation: use `osascript` (System Events AppleScript) + Robot Framework custom Python keywords. No Appium server needed — simpler, zero extra deps, grants accessibility via System Settings. (P18)
-- **RL-028:** When decomposing a @MainActor god object into services: use `private(set)` only for fields the coordinator owns exclusively. Fields that services need to write must be `var` (internal setter). Lazy service properties with `unowned let coord` back-reference avoid retain cycles while keeping the facade pattern intact.
-- **RL-029:** Tab bar `TabPillView` layout patterns: (a) `statusDot` must anchor to `titleLabel.trailingAnchor` (not `leadingAnchor`) to match the sidebar "name • status" visual language. (b) `shouldShowBranch` should return `true` whenever `tab.gitBranch` is non-empty — the old "main/master only if duplicates" logic makes branch invisible on the most common branch. (c) When `TerminalTabBarView.reload()` fires mid-drag (due to structural tab changes), cancel the drag (`zPosition = 0`, nil both state vars) rather than committing — committing uses a stale `dragTargetIndex` relative to the old tab count. `refreshMetadata()` is the correct path for in-place updates that don't change tab order.
-- **RL-030:** When a notification has a `metadataOnly` flag, every consumer that does non-trivial work (subview teardown/rebuild, panel geometry update, model reclassification) must check `note.userInfo?["metadataOnly"] as? Bool != true` before proceeding. Unconditional consumers silently make every metadata tick as expensive as a structural update — invisible in dev sessions but compounds badly in 6h+ sessions. (P22, BoardViewController, NotchPanelController, BLINKDBG removal)
-- **RL-031:** A double-subscription bug looks like: parent controller P subscribes to notification N and routes to child C (via `c.reload()` or `c.refreshMetadata()`), AND child C also has its own `addObserver(selector: #selector(reload), name: N)`. This causes every notification to trigger C twice. Fix: remove child's own observer, rely on parent routing. Pattern found in HarnessSidebarPanelViewController / MainSplitViewController. Before removing, verify parent actually covers all cases — specifically check that parent distinguishes metadataOnly vs. structural and routes both. (P22.4)
-- **RL-032:** Before fixing a suspected performance bug, always check if a "prove first" step exists in the plan. P22 plan explicitly said "prove the expensive loop first, then narrow the fix" (P22.1 instrument before P22.2/P22.4 code changes). Skipping P22.1 meant the fixes were correct-by-code-inspection but not confirmed-by-data. Always run the instrument step, even briefly, to catch surprises (e.g. the real culprit being something else entirely).
-
-### Decisions_In_Force
-
-- **ACP shelved** — re-enable when adapters ship with agent CLIs natively
-- **Agent tab hidden** — 4th sidebar segment commented out, code preserved
-- **CWD tracking** — daemon polls proc_pidinfo every 500ms (lightweight); no shell integration needed
-- **File preview** — constraint-based sibling panel (never reparent terminal views)
-- **vi mode** — `ViNormalMode.swift` is a self-contained engine (`@MainActor final class ViEngine`); `SyntaxTextView` owns the instance and wires callbacks. Notifications used for cross-layer actions (:q → `viQuitCommand`, :e → `viOpenFileCommand`, :bn/:bp → `viNextBufferCommand`).
-- **⌘1–9** — switches Session pills (top bar) within the active workspace via `selectSession`; **⌘[ / ⌘]** — Previous/Next Session via `selectAdjacentSession` (CASE-028). "Tab within Session" has no visible UI and its menu shortcuts/dead code were removed — see [[session-tab-hierarchy]].
-- **Keyboard file tree** — `FileTreeKeyboardNav.swift` holds `FileTreeKeyboardState` (@Observable); AppKit (`WorkspaceFileTreeView.keyDown`) writes, SwiftUI (`NodeRow`) reads for highlight; `updateVisiblePaths()` keeps flat ordered list in sync
-
-## Known Issues
-- **Split right 4+ panes slightly uneven** — NSSplitView default resize compresses middle panes. Tolerable.
-- **CWD detection latency** — up to 500ms after `cd` for sidebar to update (daemon poll interval). Acceptable.
-
-## Strategic Backlog (Competitive Gap Analysis, 2026-06-13)
-WezTerm/tmux/cmux comparison surfaced 3 capability gaps. Image protocols (Kitty/iTerm2/Sixel)
-checked and confirmed already at parity with WezTerm — no plan needed there.
-
-- `plans/p11-scripting-config-api.md` — P3, scriptable config/event-hooks (WezTerm Lua parity), JavaScriptCore-based. **PBI-SCRIPT-001..005 done**
-- `plans/p12-agent-orchestration-mcp.md` — P2, extend `harness-mcp` with pane control tools (cmux socket-API parity); also addresses ACP's "no tool control" blocker via PBI-ORCH-004. **PBI-ORCH-001 through PBI-ORCH-005 done**
-- `plans/p14-web-browser-pane.md` — P3, WKWebView pane as new `PaneNode` leaf (cmux embedded browser parity). **PBI-BROWSER-001..005 done**
-
-P11, P12, and P14 fully implemented.
-
-## Completed Sprints
-- **v1.3.0** — IDE-like Sidebar (PBI-001): Files tab, Git tab, session tabs, recent projects
-- **v1.4.0** — Git panel: Commit ▼ menu, Sync button with per-remote options
-- **v1.5.0** — CMUX split panes, N-ary flatten, host reuse, split down removed
-- **v2.0.0** — File preview, sidebar polish, agent icon art
-- **v2.1.0** — ACP Client, real-time Git, history→file editor
-
-## Architecture Notes
-- Sidebar: `HarnessSidebarPanelViewController` — tabs (Sessions/Files/Git) via NSSegmentedControl (Agent tab hidden)
-- Sidebar position: `MainSplitViewController.updateSidebarPlacement()` — reorders NSSplitView subviews
-- File tree: `WorkspaceFileTreeView` → `FileTreeSwiftUIView` (SwiftUI) with `FileTreeWatcher` (FSEvents); keyboard nav via `FileTreeKeyboardNavigator` + `FileTreeKeyboardState` (@Observable)
-- Git panel: `GitPanelView` — changes/history/worktrees; FSEvents recursive watcher on rootPath (utility queue, 500ms debounce)
-- Split panes: `PaneContainerView` builds from `PaneNode` binary tree; `HarnessSplitView` per branch node
-- Sessions: `SessionCoordinator.shared` — async IPC, snapshot notifications via `NotificationBus.shared.snapshotChanged`
-- File preview: `ContentAreaViewController.showFileEditorSplit()` — constraint-based sibling panel (40% editor / 60% terminal), never reparents terminal views; `refreshEditorPanelFill()` uses compensated opacity so editor preview visually matches terminal density
-- File preview live reload: `FileChangeWatcher` (Services/FileExplorer) — single-file DispatchSource, 0.3s debounce, used by `FileEditorView` and `FileViewerViewController` to reload on external edits
-- File editor vi mode: `ViEngine` in `ViNormalMode.swift` — `@MainActor final class`, wired via `SyntaxTextView.vi`; callbacks: `onSave`, `onQuit`, `onOpenFile`, `onSetOption`, `onNextBuffer`, `onSearchHighlight`; ex commands post notifications (`viQuitCommand`, `viOpenFileCommand`, `viNextBufferCommand`)
-- LSP: `LSPFileSession` in `HarnessApp/UI/` wraps `HarnessLSP.LSPClient`; auto-detects Swift/TS/Python/Rust/Go by project markers; hover + go-to-def + diagnostics wired in `FileEditorView`
-- CWD tracking: `AgentScanner.cwdTimer` (500ms) → `SurfaceRegistry.refreshCwdOnly()` (proc_pidinfo) → `snapshotChanged` → sidebar reload
-- ACP Client: SHELVED — code intact (`ACPClient`, `ACPSession`, `AgentChatPanelView`, `AgentConfig`)
-- Preview uses `.harness-preview/` — socket path max 103 bytes (use `/tmp/hp` symlink for worktree)
-- SoftIconButton: supports `rightMouseDown` → pops up assigned `.menu`
-- ⌘1–9: `MenuTarget.selectWorkspaceNumber` → `SessionCoordinator.selectSession(workspaceID:sessionID:)` over `workspace.sessions[index]` (renamed from selectSessionNumber in v2.5.1; confirmed CASE-028 — not `selectWorkspace(byIndex:)`)
-- fzf: installed at `/opt/homebrew/bin/fzf` (v0.73.1); shell integration sourced via `source <(fzf --zsh)` in ~/.zshrc — Ctrl+R history, Ctrl+T files, Option+C cd. Terminal input pipeline sends ESC-prefix for Option keys natively.
-- tmux: `window-size` option read in `DaemonServer.applyEffectiveSize`; `list-*` commands in `MainExecutor` render `-F` format strings and `--json` arrays
+## Tech Debt
+- PBI-REFACTOR-004: `#if HARNESS_ACP` deferred
