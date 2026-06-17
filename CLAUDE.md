@@ -34,7 +34,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project context (auto-loaded every session)
 
-- @graphify-out/GRAPH_SUMMARY.md
 - @agent-memory/CONTEXT.md
 - @agent-memory/index.md
 
