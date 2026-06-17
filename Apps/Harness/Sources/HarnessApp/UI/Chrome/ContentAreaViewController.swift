@@ -74,9 +74,17 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
     private func refreshTerminalHostFill() {
         terminalHost.wantsLayer = true
         let opacity = HarnessSettings.clampedOpacity(SessionCoordinator.shared.settings.backgroundOpacity)
-        terminalHost.layer?.backgroundColor = opacity >= 1
-            ? HarnessChrome.current.terminalBackground.cgColor
-            : NSColor.clear.cgColor
+        if opacity >= 1 {
+            terminalHost.layer?.backgroundColor = HarnessChrome.current.terminalBackground.cgColor
+        } else {
+            // Minimum tint so text stays readable over bright backgrounds.
+            // Light themes need a higher floor; dark themes are already legible at low alpha.
+            let isDark = HarnessChrome.current.isDark
+            let minTint: CGFloat = isDark ? 0.3 : 0.5
+            let effectiveAlpha = max(CGFloat(opacity), minTint)
+            terminalHost.layer?.backgroundColor = HarnessChrome.current.terminalBackground
+                .withAlphaComponent(effectiveAlpha).cgColor
+        }
     }
 
     private func refreshEditorPanelFill() {
