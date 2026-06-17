@@ -3,41 +3,41 @@ _Auto-generated from graphify-out/GRAPH_REPORT.md · do not edit manually_
 _Regen: `~/.claude/scripts/generate-graph-summary.sh .` after `graphify update .`_
 
 ## Summary
-- 15753 nodes · 27659 edges · 1046 communities (769 shown, 277 thin omitted)
-- Extraction: 89% EXTRACTED · 11% INFERRED · 0% AMBIGUOUS · INFERRED: 2987 edges (avg confidence: 0.8)
+- 17680 nodes · 33790 edges · 907 communities (867 shown, 40 thin omitted)
+- Extraction: 92% EXTRACTED · 8% INFERRED · 0% AMBIGUOUS · INFERRED: 2748 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 
 ## Graph Freshness
-- Built from commit: `b6c97baf`
+- Built from commit: `5885bf35`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 
 ## God Nodes (most connected - your core abstractions)
-1. `HarnessTerminalSurfaceView` - 334 edges
-2. `SettingsViewController` - 259 edges
-3. `SessionEditor` - 162 edges
-4. `TerminalEmulator` - 154 edges
-5. `SessionCoordinator` - 147 edges
-6. `HarnessCLI` - 130 edges
-7. `IPCRequest` - 105 edges
-8. `SurfaceRegistry` - 103 edges
-9. `ViEngine` - 94 edges
-10. `HarnessSidebarPanelViewController` - 94 edges
+1. `HarnessTerminalSurfaceView` - 362 edges
+2. `SettingsViewController` - 278 edges
+3. `SessionEditor` - 163 edges
+4. `SessionCoordinator` - 160 edges
+5. `TerminalEmulator` - 157 edges
+6. `HarnessCLI` - 120 edges
+7. `SurfaceRegistry` - 115 edges
+8. `IPCRequest` - 107 edges
+9. `ViEngine` - 104 edges
+10. `TerminalScreen` - 97 edges
 
 
 ## Surprising Connections (you probably didn't know these)
-- `handleStartServer()` --calls--> `Process`  [INFERRED]
-  /Users/supavit.cho/Git/harness-terminal/Tools/harness/Sources/HarnessCLI/HarnessCLI+Server.swift → Apps/Harness/Sources/HarnessApp/UI/CommandPalette/CommandPaletteController.swift
-- `handleStartServer()` --calls--> `Process`  [INFERRED]
-  /Users/supavit.cho/Git/harness-terminal/Tools/harness/Sources/HarnessCLI/HarnessCLI+Server.swift → Apps/Harness/Sources/HarnessApp/UI/CommandPaletteController.swift
+- `ACPSession` --inherits--> `ACPClientDelegate`  [EXTRACTED]
+  .aidlc/harness/acp/outputs/inception/domain-design.md → Packages/HarnessCore/Sources/HarnessCore/ACP/ACPClient.swift
+- `connectAgentIfNeeded()` --calls--> `AgentRegistryStore`  [INFERRED]
+  Apps/Harness/Sources/HarnessApp/UI/Sidebar/HarnessSidebarPanelViewController.swift → Packages/HarnessCore/Sources/HarnessCore/ACP/AgentConfig.swift
+- `register()` --calls--> `KeyTableID`  [INFERRED]
+  Apps/Harness/Sources/HarnessApp/Scripting/ScriptAPI.swift → Packages/HarnessCore/Sources/HarnessCore/Keybindings/KeyTable.swift
 - `vfork_and_exec()` --calls--> `Process`  [INFERRED]
   Tools/harness/Sources/HarnessCLI/HarnessCLI+Workbench.swift → Apps/Harness/Sources/HarnessApp/UI/CommandPalette/CommandPaletteController.swift
-- `tunnelSocketURL()` --calls--> `character`  [INFERRED]
-  /Users/supavit.cho/Git/harness-terminal/Packages/HarnessCore/Sources/HarnessCore/Paths/HarnessPaths.swift → Packages/HarnessTerminalKit/Sources/HarnessTerminalKit/HarnessTerminalSurfaceView.swift
-- `refresh()` --calls--> `character`  [INFERRED]
-  Apps/Harness/Sources/HarnessApp/UI/Git/GitPanelView.swift → Packages/HarnessTerminalKit/Sources/HarnessTerminalKit/HarnessTerminalSurfaceView.swift
+- `runGit()` --calls--> `pipe`  [INFERRED]
+  Apps/Harness/Sources/HarnessApp/UI/Git/GitPanelView.swift → Packages/HarnessCopyMode/Sources/HarnessCopyMode/CopyModeState.swift
 
 
 ## Community Hubs (top 25)
