@@ -797,6 +797,17 @@ final class HarnessSidebarPanelViewController: NSViewController {
         selectSidebarTab(index: 2)
     }
 
+    /// Switches the sidebar to the Files tab and reveals `path` in the file tree
+    /// (expands ancestors, highlights the row, and scrolls to it).
+    func selectFilesTab(revealPath path: String) {
+        sidebarTabs.selectedSegment = 1
+        selectSidebarTab(index: 1)
+        // Ensure the tree is shown, not the inline file viewer.
+        fileViewerVC.view.isHidden = true
+        fileTreeView.isHidden = false
+        fileTreeView.revealFileInTree(path: path)
+    }
+
     func previewFile(path: String) {
         sidebarTabs.selectedSegment = 1
         selectSidebarTab(index: 1)

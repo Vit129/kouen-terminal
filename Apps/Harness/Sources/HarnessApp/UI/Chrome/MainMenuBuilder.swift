@@ -452,7 +452,9 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
     }
 
     @objc func toggleSidebar() {
-        if let split = NSApp.keyWindow?.contentViewController as? MainSplitViewController {
+        let win = NSApp.keyWindow ?? NSApp.mainWindow
+            ?? NSApp.windows.first(where: { $0.contentViewController is MainSplitViewController })
+        if let split = win?.contentViewController as? MainSplitViewController {
             split.toggleSidebar()
         }
     }

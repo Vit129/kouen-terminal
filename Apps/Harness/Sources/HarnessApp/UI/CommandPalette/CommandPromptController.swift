@@ -39,8 +39,14 @@ final class CommandPromptController: NSObject, NSTextFieldDelegate {
     func present() {
         let panel = window ?? build()
         window = panel
-        guard let keyWindow = NSApp.keyWindow else { return }
-        let frame = keyWindow.frame
+        // NSPanel doesn't take main-window status, so mainWindow is always the terminal
+        // window — even when the prompt panel holds key focus on the 2nd+ invocation.
+        // Using keyWindow here caused the panel to drift upward on each re-open because
+        // it positioned 64pt above its own frame instead of the parent window.
+        let anchor = NSApp.mainWindow
+            ?? NSApp.windows.first(where: { $0 !== panel && $0.isVisible && !($0 is NSPanel) })
+        guard let anchor else { return }
+        let frame = anchor.frame
         let size = NSSize(width: 520, height: 36)
         panel.setFrame(
             NSRect(
@@ -87,7 +93,7 @@ final class CommandPromptController: NSObject, NSTextFieldDelegate {
         moveInsertionPointToEnd()
     }
 
-    func dismiss() {
+    @objc func dismiss() {
         guard let window else { return }
         HarnessMotion.animate(HarnessDesign.Motion.fast, timing: HarnessDesign.Motion.exit) { _ in
             window.animator().alphaValue = 0
@@ -191,16 +197,31 @@ final class CommandPromptController: NSObject, NSTextFieldDelegate {
         field.focusRingType = .none
         field.delegate = self
 
+        let closeButton = NSButton()
+        closeButton.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: "Close")?
+            .withSymbolConfiguration(.init(pointSize: 10, weight: .semibold))
+        closeButton.isBordered = false
+        closeButton.contentTintColor = HarnessChrome.current.textTertiary
+        closeButton.target = self
+        closeButton.action = #selector(dismiss)
+        closeButton.translatesAutoresizingMaskIntoConstraints = false
+
         let stack = NSStackView(views: [prompt, field])
         stack.orientation = .horizontal
         stack.spacing = 8
         stack.alignment = .centerY
         stack.translatesAutoresizingMaskIntoConstraints = false
         overlay.contentView.addSubview(stack)
+        overlay.contentView.addSubview(closeButton)
         NSLayoutConstraint.activate([
             stack.leadingAnchor.constraint(equalTo: overlay.contentView.leadingAnchor, constant: 12),
-            stack.trailingAnchor.constraint(equalTo: overlay.contentView.trailingAnchor, constant: -12),
+            stack.trailingAnchor.constraint(equalTo: closeButton.leadingAnchor, constant: -8),
             stack.centerYAnchor.constraint(equalTo: overlay.contentView.centerYAnchor),
+
+            closeButton.trailingAnchor.constraint(equalTo: overlay.contentView.trailingAnchor, constant: -10),
+            closeButton.centerYAnchor.constraint(equalTo: overlay.contentView.centerYAnchor),
+            closeButton.widthAnchor.constraint(equalToConstant: 16),
+            closeButton.heightAnchor.constraint(equalToConstant: 16),
         ])
 
         panel.contentView = overlay

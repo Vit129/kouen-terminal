@@ -934,6 +934,8 @@ public final class TerminalMetalRenderer {
             )
         }
 
+        // Per-build memo: only a salvage pass in THIS build may populate it.
+        salvageRowKeys = nil
         let cursorKey = CursorCacheKey(
             row: frame.cursor.row,
             column: frame.cursor.column,
@@ -1024,7 +1026,8 @@ public final class TerminalMetalRenderer {
                 )
                 fresh.contentKey = (cursorKey.invertsGlyph && cursorKey.row == row)
                     ? 0
-                    : Self.rowContentKey(frame, row: row)
+                    : (salvageRowKeys?[row]
+                        ?? Self.rowContentKey(frame, row: row))
                 let old = rowSeg[row]
                 let oldStats = rowInstanceCache.rowInstances[row]
                 flatBgSpans += fresh.bgSpans - (oldStats?.bgSpans ?? 0)
@@ -1097,7 +1100,8 @@ public final class TerminalMetalRenderer {
                     // color, so they are NOT a pure function of the row content alone.
                     fresh.contentKey = (cursorKey.invertsGlyph && cursorKey.row == row)
                         ? 0
-                        : Self.rowContentKey(frame, row: row)
+                        : (salvageRowKeys?[row]
+                            ?? Self.rowContentKey(frame, row: row))
                     rowInstances = fresh
                     rowInstanceCache.rowInstances[row] = rowInstances
                     encoded.encodedRows += 1
@@ -1308,6 +1312,12 @@ public final class TerminalMetalRenderer {
     /// cache isn't geometry-compatible (everything except `columns` must match — origin, rows,
     /// ligatures, atlas epoch, cell metrics) or when fewer than half the rows match (a near-total
     /// change isn't worth the bookkeeping — fall back to the plain full reset).
+    /// Row content keys computed for the CURRENT frame by `salvageRowInstances`, so the encode
+    /// pass that follows in the same build stamps salvage-missed rows without re-hashing them
+    /// (the key is O(columns) per row). Reset at the top of every build; entries exist only for
+    /// rows whose key salvage actually computed against this frame.
+    private var salvageRowKeys: [UInt64?]?
+
     private func salvageRowInstances(
         _ frame: TerminalFrame, origin: (x: Int, y: Int), ligatures: Bool, cursorKey: CursorCacheKey
     ) -> [EncodedRowInstances?]? {
@@ -1321,6 +1331,7 @@ public final class TerminalMetalRenderer {
               cache.rowInstances.count == frame.rows
         else { return nil }
         var salvaged: [EncodedRowInstances?] = Array(repeating: nil, count: frame.rows)
+        var frameKeys: [UInt64?] = Array(repeating: nil, count: frame.rows)
         var hits = 0
         for row in 0 ..< frame.rows {
             // Cursor-affected rows never salvage: cached instances baked the OLD cursor's glyph
@@ -1328,12 +1339,16 @@ public final class TerminalMetalRenderer {
             // cursor-row dirtying on the incremental path.)
             if let previous = cache.previousCursor, previous.invertsGlyph, previous.row == row { continue }
             if cursorKey.invertsGlyph, cursorKey.row == row { continue }
-            guard let cached = cache.rowInstances[row], cached.contentKey != 0,
-                  cached.contentKey == Self.rowContentKey(frame, row: row)
-            else { continue }
+            guard let cached = cache.rowInstances[row], cached.contentKey != 0 else { continue }
+            let frameKey = Self.rowContentKey(frame, row: row)
+            frameKeys[row] = frameKey
+            guard cached.contentKey == frameKey else { continue }
             salvaged[row] = cached
             hits += 1
         }
+        // The keys were hashed against THIS frame, so the encode pass can reuse them whether or
+        // not salvage clears the hit-rate floor (missed rows re-encode + stamp either way).
+        salvageRowKeys = frameKeys
         guard hits * 2 >= frame.rows else { return nil }
         return salvaged
     }
