@@ -71,7 +71,7 @@ See [USAGE.md](USAGE.md) for the full install, run, CLI, and remote/headless gui
 - `harness-cli` automation for creating sessions, sending keys, capturing panes, installing hooks, and driving remote/headless daemons.
 - Agent detection and notifications for Claude Code, Codex, Cursor, Grok, Pi, Hermes, OpenClaw, OpenCode, Aider, Gemini, Goose, and generic agents.
 - Optional tmux-style controls: prefix key, status line, copy mode, paste buffers, hooks, command prompt, and many tmux-compatible commands.
-- Sidebar tools for sessions, file navigation, real-time Git workflows, command palette, and editor/LSP flows.
+- Sidebar tools for sessions, file navigation, real-time Git workflows, command palette, and editor/LSP flows. ⌘-clicking a file path in the terminal opens it in the editor and reveals it in the file tree.
 
 ## How It Feels
 
