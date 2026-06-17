@@ -26,7 +26,43 @@ public enum AgentCatalog {
         public let acpFlag: String?
     }
 
-    public static let agents: [AgentKind: AgentConfig] = [
+    public static let agents: [AgentKind: AgentConfig] = loadCatalog()
+
+    private static func loadCatalog() -> [AgentKind: AgentConfig] {
+        if let loaded = loadFromDisk() { return loaded }
+        return defaultAgents
+    }
+
+    private struct DiskAgentConfig: Codable {
+        let id: String
+        let binary: String
+        let models: [String]
+        let effortLevels: [String]?
+        let modelFlag: String
+        let effortFlag: String?
+        let defaultEffort: String?
+        let acpFlag: String?
+    }
+
+    private static func loadFromDisk() -> [AgentKind: AgentConfig]? {
+        let file = HarnessPaths.applicationSupport.appendingPathComponent("agent-catalog.json")
+        guard let data = try? Data(contentsOf: file),
+              let entries = try? JSONDecoder().decode([DiskAgentConfig].self, from: data),
+              !entries.isEmpty else { return nil }
+        var result: [AgentKind: AgentConfig] = [:]
+        for entry in entries {
+            guard let kind = AgentKind(rawValue: entry.id) else { continue }
+            result[kind] = AgentConfig(
+                id: kind, binary: entry.binary, models: entry.models,
+                effortLevels: entry.effortLevels, modelFlag: entry.modelFlag,
+                effortFlag: entry.effortFlag, defaultEffort: entry.defaultEffort,
+                acpFlag: entry.acpFlag
+            )
+        }
+        return result.isEmpty ? nil : result
+    }
+
+    private static let defaultAgents: [AgentKind: AgentConfig] = [
         .claudeCode: AgentConfig(
             id: .claudeCode,
             binary: "claude",

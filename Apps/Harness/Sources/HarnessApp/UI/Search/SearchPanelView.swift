@@ -329,12 +329,15 @@ final class SearchPanelView: NSView, NSTextFieldDelegate, NSTableViewDataSource,
         }
     }
 
-    nonisolated private static let excludedSearchDirectoryNames: Set<String> = [
-        ".git",
-        "node_modules",
-        ".build",
-        "DerivedData",
-    ]
+    nonisolated private static let excludedSearchDirectoryNames: Set<String> = loadSearchExcludes()
+
+    nonisolated private static func loadSearchExcludes() -> Set<String> {
+        let file = HarnessPaths.applicationSupport.appendingPathComponent("search-excludes.json")
+        if let data = try? Data(contentsOf: file),
+           let list = try? JSONDecoder().decode([String].self, from: data),
+           !list.isEmpty { return Set(list) }
+        return [".git", "node_modules", ".build", "DerivedData"]
+    }
 
     /// Spotlight-style name search over basename and project-relative path.
     nonisolated static func spotlightMatch(

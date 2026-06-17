@@ -276,7 +276,7 @@ public final class RealPty: @unchecked Sendable {
         var environment = ProcessInfo.processInfo.environment
         let lang = environment["LANG"] ?? ""
         if lang.isEmpty || lang == "C" || lang == "POSIX" || lang == "C.UTF-8" || !lang.lowercased().contains("utf") {
-            let baseLang = (Locale.current.languageCode ?? "en").lowercased()
+            let baseLang = (Locale.current.language.languageCode?.identifier ?? "en").lowercased()
             let resolved: String
             switch baseLang {
             case "zh": resolved = "zh_CN.UTF-8"
@@ -499,7 +499,7 @@ public final class RealPty: @unchecked Sendable {
         var environment = ProcessInfo.processInfo.environment
         let lang = environment["LANG"] ?? ""
         if lang.isEmpty || lang == "C" || lang == "POSIX" || lang == "C.UTF-8" || !lang.lowercased().contains("utf") {
-            let baseLang = (Locale.current.languageCode ?? "en").lowercased()
+            let baseLang = (Locale.current.language.languageCode?.identifier ?? "en").lowercased()
             let resolved: String
             switch baseLang {
             case "zh": resolved = "zh_CN.UTF-8"

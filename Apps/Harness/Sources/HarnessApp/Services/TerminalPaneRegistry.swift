@@ -15,7 +15,10 @@ final class TerminalPaneRegistry {
     }
 
     func removeHost(for surfaceID: SurfaceID) {
-        hosts.removeValue(forKey: surfaceID)
+        if let host = hosts.removeValue(forKey: surfaceID) {
+            host.resignIfFirstResponder()
+            host.removeFromSuperview()
+        }
     }
 
     func allHosts() -> [TerminalHostView] {
@@ -25,7 +28,12 @@ final class TerminalPaneRegistry {
     func prune(keeping surfaceIDs: Set<SurfaceID>) {
         let removed = hosts.keys.filter { !surfaceIDs.contains($0) }
         for id in removed {
-            hosts.removeValue(forKey: id)
+            if let host = hosts.removeValue(forKey: id) {
+                // Ensure the surface resigns first responder before dealloc — a zombie
+                // first responder crashes on the next key event (CASE-037).
+                host.resignIfFirstResponder()
+                host.removeFromSuperview()
+            }
         }
     }
 }

@@ -147,171 +147,91 @@ enum CommandPaletteController {
         UserDefaults.standard.stringArray(forKey: recentDefaultsKey) ?? []
     }
 
+    // MARK: - Configurable palette commands
+
+    private struct PaletteCommandConfig: Codable {
+        let id: String
+        let title: String
+        let subtitle: String
+        let symbol: String
+        let shortcut: String
+        let section: String
+    }
+
+    private static func loadPaletteConfig() -> [PaletteCommandConfig]? {
+        let file = HarnessPaths.applicationSupport.appendingPathComponent("palette-commands.json")
+        guard let data = try? Data(contentsOf: file),
+              let configs = try? JSONDecoder().decode([PaletteCommandConfig].self, from: data),
+              !configs.isEmpty else { return nil }
+        return configs
+    }
+
+    private static func sectionFromString(_ str: String) -> PaletteAction.Section {
+        switch str {
+        case "actions": return .actions
+        case "navigation": return .navigation
+        case "tabs": return .tabs
+        case "projects": return .projects
+        default: return .actions
+        }
+    }
+
     private static func buildActions() -> [PaletteAction] {
         let coordinator = SessionCoordinator.shared
         let snapshot = coordinator.snapshot
 
         var actions: [PaletteAction] = []
 
-        // MARK: - Actions
-        actions.append(contentsOf: [
-            PaletteAction(
-                id: "action.newSession",
-                title: "New Session",
-                subtitle: "Create a fresh session",
-                symbol: "rectangle.stack.badge.plus",
-                shortcut: "⇧⌘N",
-                section: .actions
-            ) {
-                if let id = coordinator.snapshot.activeWorkspaceID { coordinator.addSession(to: id) }
-            },
-            PaletteAction(
-                id: "action.newTab",
-                title: "New Tab",
-                subtitle: "Open a new shell in the active session",
-                symbol: "plus.rectangle.on.rectangle",
-                shortcut: "",
-                section: .actions
-            ) {
-                if let id = coordinator.snapshot.activeWorkspaceID {
-                    coordinator.addTab(to: id)
-                }
-            },
-            PaletteAction(
-                id: "action.splitH",
-                title: "Split Right",
-                subtitle: "Split the active pane to the right",
-                symbol: "square.split.2x1",
-                shortcut: "⌘D",
-                section: .actions
-            ) {
-                coordinator.splitActivePane(direction: .horizontal)
-            },
-            PaletteAction(
-                id: "action.splitV",
-                title: "Split Down",
-                subtitle: "Split the active pane down",
-                symbol: "square.split.1x2",
-                shortcut: "⌘⇧D",
-                section: .actions
-            ) {
-                coordinator.splitActivePane(direction: .vertical)
-            },
-            PaletteAction(
-                id: "action.zoomPane",
-                title: "Zoom Pane",
-                subtitle: "Toggle full-tab zoom on the active pane",
-                symbol: "arrow.up.left.and.arrow.down.right",
-                shortcut: "Prefix z",
-                section: .actions
-            ) {
-                coordinator.zoomActivePane()
-            },
-            PaletteAction(
-                id: "action.killPane",
-                title: "Kill Pane",
-                subtitle: "Close the active pane and its shell",
-                symbol: "xmark.square",
-                shortcut: "Prefix x",
-                section: .actions
-            ) {
-                coordinator.killActivePane()
-            },
-            PaletteAction(
-                id: "action.copyMode",
-                title: "Toggle Copy Mode",
-                subtitle: "Enter scrollback / selection mode",
-                symbol: "doc.on.clipboard",
-                shortcut: "Prefix [",
-                section: .actions
-            ) {
-                coordinator.toggleCopyMode()
-            },
-            PaletteAction(
-                id: "action.renameTab",
-                title: "Rename Active Tab",
-                subtitle: "Set a custom title for the current tab",
-                symbol: "pencil",
-                shortcut: "Prefix ,",
-                section: .actions
-            ) {
-                coordinator.beginRenameActiveTab()
-            },
-            PaletteAction(
-                id: "action.installCLI",
-                title: "Install harness-cli to PATH",
-                subtitle: "Copy the CLI to Application Support",
-                symbol: "arrow.down.app",
-                shortcut: "",
-                section: .actions
-            ) {
-                CLIInstaller.install()
-            },
-            PaletteAction(
-                id: "action.settings",
-                title: "Open Settings",
-                subtitle: "Theme, font, agents, key bindings",
-                symbol: "gearshape",
-                shortcut: "⌘,",
-                section: .actions
-            ) {
-                SettingsWindowController.show()
-            },
-            PaletteAction(
-                id: "action.reimport",
-                title: "Re-import Terminal Config",
-                subtitle: "Reload theme, colors & font from your terminal config",
-                symbol: "arrow.triangle.2.circlepath",
-                shortcut: "Prefix r",
-                section: .actions
-            ) {
-                coordinator.reimportTerminalConfig()
-            },
-        ])
+        // Handler registry — keyed by action ID. Display metadata comes from config or defaults.
+        let handlers: [String: () -> Void] = [
+            "action.newSession": { if let id = coordinator.snapshot.activeWorkspaceID { coordinator.addSession(to: id) } },
+            "action.newTab": { if let id = coordinator.snapshot.activeWorkspaceID { coordinator.addTab(to: id) } },
+            "action.splitH": { coordinator.splitActivePane(direction: .horizontal) },
+            "action.splitV": { coordinator.splitActivePane(direction: .vertical) },
+            "action.zoomPane": { coordinator.zoomActivePane() },
+            "action.killPane": { coordinator.killActivePane() },
+            "action.copyMode": { coordinator.toggleCopyMode() },
+            "action.renameTab": { coordinator.beginRenameActiveTab() },
+            "action.installCLI": { CLIInstaller.install() },
+            "action.settings": { SettingsWindowController.show() },
+            "action.reimport": { coordinator.reimportTerminalConfig() },
+            "nav.jumpNotification": { coordinator.jumpToLatestNotification() },
+            "nav.prevSession": { coordinator.selectAdjacentSession(offset: -1) },
+            "nav.nextSession": { coordinator.selectAdjacentSession(offset: 1) },
+            "nav.cyclePane": { coordinator.cycleActivePane(forward: true) },
+        ]
 
-        // MARK: - Navigation
-        actions.append(contentsOf: [
-            PaletteAction(
-                id: "nav.jumpNotification",
-                title: "Jump to Notification",
-                subtitle: "Focus the next tab waiting on input",
-                symbol: "bell.badge",
-                shortcut: "⇧⌘U",
-                section: .navigation
-            ) {
-                coordinator.jumpToLatestNotification()
-            },
-            PaletteAction(
-                id: "nav.prevSession",
-                title: "Previous Session",
-                subtitle: "Cycle to the previous session",
-                symbol: "chevron.left.square",
-                shortcut: "⌘[",
-                section: .navigation
-            ) {
-                coordinator.selectAdjacentSession(offset: -1)
-            },
-            PaletteAction(
-                id: "nav.nextSession",
-                title: "Next Session",
-                subtitle: "Cycle to the next session",
-                symbol: "chevron.right.square",
-                shortcut: "⌘]",
-                section: .navigation
-            ) {
-                coordinator.selectAdjacentSession(offset: 1)
-            },
-            PaletteAction(
-                id: "nav.cyclePane",
-                title: "Cycle Pane",
-                subtitle: "Move focus to the next pane in the tab",
-                symbol: "rectangle.3.group",
-                shortcut: "Prefix o",
-                section: .navigation
-            ) {
-                coordinator.cycleActivePane(forward: true)
-            },
-        ])
+        let defaultConfigs: [PaletteCommandConfig] = [
+            .init(id: "action.newSession",    title: "New Session",               subtitle: "Create a fresh session",                         symbol: "rectangle.stack.badge.plus",         shortcut: "⇧⌘N",      section: "actions"),
+            .init(id: "action.newTab",        title: "New Tab",                   subtitle: "Open a new shell in the active session",         symbol: "plus.rectangle.on.rectangle",        shortcut: "",          section: "actions"),
+            .init(id: "action.splitH",        title: "Split Right",               subtitle: "Split the active pane to the right",             symbol: "square.split.2x1",                   shortcut: "⌘D",       section: "actions"),
+            .init(id: "action.splitV",        title: "Split Down",                subtitle: "Split the active pane down",                     symbol: "square.split.1x2",                   shortcut: "⌘⇧D",      section: "actions"),
+            .init(id: "action.zoomPane",      title: "Zoom Pane",                 subtitle: "Toggle full-tab zoom on the active pane",        symbol: "arrow.up.left.and.arrow.down.right",  shortcut: "Prefix z",  section: "actions"),
+            .init(id: "action.killPane",      title: "Kill Pane",                 subtitle: "Close the active pane and its shell",            symbol: "xmark.square",                       shortcut: "Prefix x",  section: "actions"),
+            .init(id: "action.copyMode",      title: "Toggle Copy Mode",          subtitle: "Enter scrollback / selection mode",              symbol: "doc.on.clipboard",                   shortcut: "Prefix [",  section: "actions"),
+            .init(id: "action.renameTab",     title: "Rename Active Tab",         subtitle: "Set a custom title for the current tab",         symbol: "pencil",                             shortcut: "Prefix ,",  section: "actions"),
+            .init(id: "action.installCLI",    title: "Install harness-cli to PATH", subtitle: "Copy the CLI to Application Support",          symbol: "arrow.down.app",                     shortcut: "",          section: "actions"),
+            .init(id: "action.settings",      title: "Open Settings",             subtitle: "Theme, font, agents, key bindings",              symbol: "gearshape",                          shortcut: "⌘,",       section: "actions"),
+            .init(id: "action.reimport",      title: "Re-import Terminal Config", subtitle: "Reload theme, colors & font from your terminal config", symbol: "arrow.triangle.2.circlepath", shortcut: "Prefix r",  section: "actions"),
+            .init(id: "nav.jumpNotification", title: "Jump to Notification",      subtitle: "Focus the next tab waiting on input",            symbol: "bell.badge",                         shortcut: "⇧⌘U",      section: "navigation"),
+            .init(id: "nav.prevSession",      title: "Previous Session",          subtitle: "Cycle to the previous session",                  symbol: "chevron.left.square",                shortcut: "⌘[",       section: "navigation"),
+            .init(id: "nav.nextSession",      title: "Next Session",              subtitle: "Cycle to the next session",                      symbol: "chevron.right.square",               shortcut: "⌘]",       section: "navigation"),
+            .init(id: "nav.cyclePane",        title: "Cycle Pane",                subtitle: "Move focus to the next pane in the tab",         symbol: "rectangle.3.group",                  shortcut: "Prefix o",  section: "navigation"),
+        ]
+
+        let configs = loadPaletteConfig() ?? defaultConfigs
+        for config in configs {
+            guard let handler = handlers[config.id] else { continue }
+            actions.append(PaletteAction(
+                id: config.id,
+                title: config.title,
+                subtitle: config.subtitle,
+                symbol: config.symbol,
+                shortcut: config.shortcut,
+                section: sectionFromString(config.section),
+                handler: handler
+            ))
+        }
 
         // MARK: - Tabs in active workspace (every session, not just the active one — the
         // palette is the only flat "jump anywhere" surface, so all tabs must be reachable).

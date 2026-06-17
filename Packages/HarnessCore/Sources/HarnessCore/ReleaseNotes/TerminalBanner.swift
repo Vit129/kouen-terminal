@@ -22,33 +22,14 @@ public enum TerminalBanner {
         lines += wrappedText("The native terminal with a multiplexer built in.", sgr: dim, inner: inner)
         lines.append([])
         lines.append([Run("Why it's different", sgr: bold)])
-        let bullets = [
-            "GPU-native renderer — instant, pixel-smooth output and 490 built-in themes",
-            "Your shells outlive the window — a background daemon keeps every session running across closes and restarts",
-            "tmux workflows, no tmux — tabs, splits, prefix keys, copy mode, scriptable from harness-cli",
-            "Agent-aware — Claude Code, Codex & friends show live working / needs-attention status on their tab",
-            "Remote-ready — run the daemon on a Linux box or server and attach from here over SSH",
-        ]
-        for bullet in bullets {
+        let welcome = loadWelcomeConfig()
+        for bullet in welcome.bullets {
             lines += wrappedBullet(bullet, inner: inner)
         }
         lines.append([])
         lines.append([Run("Shortcuts", sgr: bold)])
-        let steps: [(key: String, what: String)] = [
-            ("⌘⇧N / ⌘⇧W",  "new / close session"),
-            ("⌘D / ⌘⇧D",   "split right / split down"),
-            ("⌘W / ⌘⌥W",   "close tab / close pane"),
-            ("⌘[ / ⌘]",    "previous / next session"),
-            ("⌘1 … ⌘9",    "switch to session 1–9"),
-            ("⌘P",          "fuzzy file search"),
-            ("⌘F",          "find in files"),
-            ("⌘B",          "browser pane"),
-            ("⌘;",          "command prompt · try: find, grep, cd"),
-            ("⌘\\",         "toggle sidebar"),
-            ("harness-cli ping", "script Harness from any shell"),
-        ]
-        for (index, step) in steps.enumerated() {
-            lines += wrappedStep(number: index + 1, key: step.key, what: step.what, inner: inner)
+        for (index, step) in welcome.shortcuts.enumerated() {
+            lines += wrappedStep(number: index + 1, key: step.key, what: step.description, inner: inner)
         }
         lines.append([])
         lines.append([Run("Docs: harnesscli.dev"), Run("  ·  ", sgr: dim), Run("Settings: ⌘,")])
@@ -243,4 +224,49 @@ public enum TerminalBanner {
     static func displayWidth(_ text: String) -> Int {
         DisplayWidth.columns(of: text)
     }
+
+    // MARK: - Configurable welcome content
+
+    private struct WelcomeConfig: Codable {
+        let bullets: [String]
+        let shortcuts: [BannerShortcut]
+    }
+
+    private struct BannerShortcut: Codable {
+        let key: String
+        let description: String
+    }
+
+    private static func loadWelcomeConfig() -> WelcomeConfig {
+        let file = HarnessPaths.applicationSupport.appendingPathComponent("welcome.json")
+        if let data = try? Data(contentsOf: file),
+           let config = try? JSONDecoder().decode(WelcomeConfig.self, from: data) {
+            return config
+        }
+        return defaultWelcomeConfig
+    }
+
+    private static let defaultWelcomeConfig = WelcomeConfig(
+        bullets: [
+            "GPU-native renderer — instant, pixel-smooth output and 490 built-in themes",
+            "Your shells outlive the window — a background daemon keeps every session running across closes and restarts",
+            "tmux workflows, no tmux — tabs, splits, prefix keys, copy mode, scriptable from harness-cli",
+            "Agent-aware — Claude Code, Codex & friends show live working / needs-attention status on their tab",
+            "Remote-ready — run the daemon on a Linux box or server and attach from here over SSH",
+        ],
+        shortcuts: [
+            .init(key: "⌘⇧N / ⌘⇧W",      description: "new / close session"),
+            .init(key: "⌘D / ⌘⇧D",       description: "split right / split down"),
+            .init(key: "⌘W / ⌘⌥W",       description: "close tab / close pane"),
+            .init(key: "⌘[ / ⌘]",        description: "previous / next session"),
+            .init(key: "⌘← / ⌘→",       description: "reorder session in tab bar"),
+            .init(key: "⌘1 … ⌘9",        description: "switch to session 1–9"),
+            .init(key: "⌘P",              description: "fuzzy file search"),
+            .init(key: "⌘F",              description: "find in files"),
+            .init(key: "⌘B",              description: "browser pane"),
+            .init(key: "⌘;",              description: "command prompt · try: find, grep, cd"),
+            .init(key: "⌘\\",             description: "toggle sidebar"),
+            .init(key: "harness-cli ping", description: "script Harness from any shell"),
+        ]
+    )
 }

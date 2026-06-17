@@ -220,7 +220,7 @@ final class MainExecutor: CommandExecutor {
             for ws in snap.workspaces {
                 for (si, session) in ws.sessions.enumerated() {
                     var ctx = FormatContext()
-                    ctx.sessionName = session.name ?? ws.name
+                    ctx.sessionName = session.name
                     ctx.sessionID = session.id.uuidString
                     ctx.sessionWindows = session.tabs.count
                     ctx.windowActive = session.id == ws.activeSessionID

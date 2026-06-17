@@ -217,8 +217,16 @@ final class FileViewerViewController: NSViewController {
 
     override var acceptsFirstResponder: Bool { true }
 
-    private static let quickLookExtensions: Set<String> = [
-        "png", "jpg", "jpeg", "gif", "webp", "svg", "ico", "bmp", "tiff", "heic",
-        "pdf", "rtf", "rtfd", "doc", "docx", "pages", "key", "keynote", "numbers",
-    ]
+    private static let quickLookExtensions: Set<String> = loadQuickLookExtensions()
+
+    private static func loadQuickLookExtensions() -> Set<String> {
+        let file = HarnessPaths.applicationSupport.appendingPathComponent("quicklook-extensions.json")
+        if let data = try? Data(contentsOf: file),
+           let list = try? JSONDecoder().decode([String].self, from: data),
+           !list.isEmpty { return Set(list) }
+        return [
+            "png", "jpg", "jpeg", "gif", "webp", "svg", "ico", "bmp", "tiff", "heic",
+            "pdf", "rtf", "rtfd", "doc", "docx", "pages", "key", "keynote", "numbers",
+        ]
+    }
 }

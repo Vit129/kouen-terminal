@@ -95,17 +95,46 @@ if [[ -z "$version" ]]; then
       version="$next_patch"
       echo "No TTY available; defaulting to patch bump ($plist_version -> $version)."
     else
+      options=("patch ($plist_version -> $next_patch)" "minor ($plist_version -> $next_minor)" "major ($plist_version -> $next_major)")
+      values=("$next_patch" "$next_minor" "$next_major")
+      selected=0
+
+      # Hide cursor
+      tput civis 2>/dev/null || true
+
+      display_menu() {
+        # Move cursor up to redraw
+        if [[ ${1:-0} -eq 1 ]]; then printf '\033[%dA' "${#options[@]}"; fi
+        for i in "${!options[@]}"; do
+          if [[ $i -eq $selected ]]; then
+            printf '\r\033[K  \033[1;36m❯ %s\033[0m\n' "${options[$i]}"
+          else
+            printf '\r\033[K    %s\n' "${options[$i]}"
+          fi
+        done
+      }
+
       echo "Select version bump:"
-      echo "  1) patch ($plist_version -> $next_patch)"
-      echo "  2) minor ($plist_version -> $next_minor)"
-      echo "  3) major ($plist_version -> $next_major)"
-      read -rp "Enter choice [1]: " version_choice
-      case "${version_choice:-1}" in
-        1) version="$next_patch" ;;
-        2) version="$next_minor" ;;
-        3) version="$next_major" ;;
-        *) echo "Invalid version choice" >&2; exit 1 ;;
-      esac
+      display_menu 0
+
+      while true; do
+        IFS= read -rsn1 key
+        case "$key" in
+          $'\x1b')
+            read -rsn2 key
+            case "$key" in
+              '[A') selected=$(( (selected - 1 + ${#options[@]}) % ${#options[@]} )); display_menu 1 ;;
+              '[B') selected=$(( (selected + 1) % ${#options[@]} )); display_menu 1 ;;
+            esac
+            ;;
+          '') break ;;  # Enter
+        esac
+      done
+
+      tput cnorm 2>/dev/null || true
+      version="${values[$selected]}"
+      echo ""
+      echo "✅ Selected: ${options[$selected]}"
     fi
   fi
 fi
@@ -198,7 +227,7 @@ run make release-notes
 
 echo ""
 echo "Changed release files:"
-git diff -- "$INFO_PLIST" "$HARNESS_VERSION_SWIFT" "$RELEASE_NOTES_SWIFT" CHANGELOG.md || true
+git --no-pager diff -- "$INFO_PLIST" "$HARNESS_VERSION_SWIFT" "$RELEASE_NOTES_SWIFT" CHANGELOG.md || true
 
 echo ""
 echo "Release metadata prepared. Next:"
