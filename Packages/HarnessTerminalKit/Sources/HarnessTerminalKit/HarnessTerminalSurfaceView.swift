@@ -1258,8 +1258,6 @@ public final class HarnessTerminalSurfaceView: NSView {
         if Thread.isMainThread {
             link?.invalidate()
             timer?.invalidate()
-            // Discard cursor rects so AppKit's display-link doesn't fire resetCursorRects
-            // on this zombie. Must happen on main (NSView method).
             self.discardCursorRects()
         } else {
             DispatchQueue.main.sync {
@@ -1283,6 +1281,12 @@ public final class HarnessTerminalSurfaceView: NSView {
             // invalidateCursorRects asynchronously — if the view is deallocated between the
             // invalidation and the callback, resetCursorRects fires on a zombie.
             discardCursorRects()
+            // Remove tracking area — NSTrackingArea does NOT retain its owner, so
+            // mouseMoved dispatches to a zombie if the area outlives the view.
+            if let trackingArea {
+                removeTrackingArea(trackingArea)
+                self.trackingArea = nil
+            }
         }
     }
 

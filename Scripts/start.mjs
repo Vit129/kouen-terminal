@@ -139,7 +139,18 @@ async function main() {
       }
     ];
 
-    const choice = await selectWithArrows(options);
+    // Direct argument: `node start.mjs 1` or `node start.mjs preview`
+    const arg = process.argv[2];
+    let choice;
+    if (arg) {
+      const byNumber = { '1': 'commit-push-merge', '2': 'preview', '3': 'prod', '4': 'full-cycle' };
+      const byName = { 'commit-push-merge': 'commit-push-merge', 'preview': 'preview', 'prod': 'prod', 'full-cycle': 'full-cycle' };
+      choice = byNumber[arg] || byName[arg];
+      if (!choice) { console.error(`❌ Unknown option: ${arg}`); process.exit(1); }
+      console.log(`\n✅ Selected: ${options.find(o => o.value === choice)?.display}\n`);
+    } else {
+      choice = await selectWithArrows(options);
+    }
 
     if (choice === 'commit-push-merge') {
       await runCommand('Scripts/commit-push-merge.sh', []);

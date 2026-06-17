@@ -10,23 +10,23 @@ prod:
 	./Scripts/run.sh prod
 
 start:
-	./Scripts/start.sh
+	./Scripts/start.sh $(filter-out $@,$(MAKECMDGOALS))
 
 # Direct shortcuts (skip interactive menu):
 #   make s1  → commit + push + merge
-#   make s2  → preview build
+#   make s2  → clean preview build
 #   make s3  → bump + prod build
 #   make s4  → full cycle (bump + commit + push + prod)
 s1:
-	Scripts/commit-push-merge.sh
+	./Scripts/start.sh 1
 s2:
 	-$(MAKE) preview-stop
 	$(MAKE) preview-clean
-	./Scripts/run.sh preview
+	./Scripts/start.sh 2
 s3:
-	./Scripts/prepare-release.sh && ./Scripts/run.sh prod
+	./Scripts/start.sh 3
 s4:
-	Scripts/full-cycle.sh
+	./Scripts/start.sh 4
 
 # Clear persisted session/scrollback state for debug builds (HarnessDebug home only —
 # never touches the production app's real session state).
