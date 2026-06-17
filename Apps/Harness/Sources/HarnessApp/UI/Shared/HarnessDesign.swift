@@ -699,9 +699,15 @@ final class ChromeBackdrop: NSView {
         // vibrancy/glass material is hidden — the tint alone (bg × opacity) lets the
         // shared blurred backdrop show through, matching the terminal exactly. When
         // opaque, the solid tint covers everything, so the material is moot.
+        //
+        // Exception: macOS 26+ Liquid Glass stays visible during translucent mode —
+        // it adapts to bright/dark backgrounds automatically (the whole point of
+        // Liquid Glass), providing readable contrast that a pure tint cannot.
         let translucent = opacity < 0.999
         if RuntimeGlassEffectView.isGlass(backdrop) {
-            backdrop.isHidden = translucent
+            backdrop.isHidden = false  // Glass always visible — adapts to background
+            backdrop.alphaValue = translucent ? CGFloat(opacity) : 1.0
+            RuntimeGlassEffectView.setTintColor(baseColor.withAlphaComponent(opacity), on: backdrop)
         } else if let vibrancy = backdrop as? NSVisualEffectView {
             vibrancy.material = material(for: role)
             vibrancy.isHidden = translucent
