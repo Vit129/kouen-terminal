@@ -61,21 +61,56 @@ final class ScrollbackFile: @unchecked Sendable {
     /// Read the persisted tail (at most `maxBytes`) for seeding `RealPty`'s in-memory ring on
     /// startup. Returns the most recent bytes — the oldest are what the ring would have evicted.
     static func loadTail(url: URL, maxBytes: Int) -> Data {
-        guard let data = try? Data(contentsOf: url), !data.isEmpty else { return Data() }
-        guard data.count > maxBytes else { return data }
-        // `suffix` yields a slice whose indices are offset from the parent; wrap in `Data` so the
-        // result is 0-indexed and safe to `subdata(in:)` against.
-        return Data(data.suffix(maxBytes))
+        readTail(url: url, maxBytes: maxBytes)
+    }
+
+    /// Seek-read at most the last `maxBytes` of the file — never the whole log.
+    private static func readTail(url: URL, maxBytes: Int) -> Data {
+        guard maxBytes > 0, let handle = try? FileHandle(forReadingFrom: url) else { return Data() }
+        defer { try? handle.close() }
+        guard let size = try? handle.seekToEnd(), size > 0 else { return Data() }
+        let start = size > UInt64(maxBytes) ? size - UInt64(maxBytes) : 0
+        guard (try? handle.seek(toOffset: start)) != nil else { return Data() }
+        return (try? handle.readToEnd()) ?? Data()
     }
 
     private static func compactExistingLogIfNeeded(url: URL, retentionCap: Int) -> Int {
         let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int) ?? 0
-        guard size > retentionCap, let data = try? Data(contentsOf: url) else { return size }
-        let tail = Data(data.suffix(retentionCap))
-        guard HarnessPaths.atomicWrite(tail, to: url, label: "HarnessDaemon scrollback") else {
-            return size
+        guard size > retentionCap else { return size }
+        return compactToTail(url: url, retentionCap: retentionCap) ?? size
+    }
+
+    /// Stream the last `retentionCap` bytes to a temp file in 4 MiB chunks, then atomic rename.
+    /// Peak RAM is one chunk, not the whole retention cap.
+    private static func compactToTail(url: URL, retentionCap: Int) -> Int? {
+        let tmp = url.appendingPathExtension("compact-tmp")
+        do {
+            guard let reader = try? FileHandle(forReadingFrom: url) else { return nil }
+            defer { try? reader.close() }
+            let size = try reader.seekToEnd()
+            guard size > UInt64(retentionCap) else { return nil }
+            try reader.seek(toOffset: size - UInt64(retentionCap))
+            guard FileManager.default.createFile(atPath: tmp.path, contents: nil,
+                                                 attributes: [.posixPermissions: 0o600]),
+                  let writer = try? FileHandle(forWritingTo: tmp)
+            else { return nil }
+            defer { try? writer.close() }
+            let chunkSize = 4 * 1024 * 1024
+            var written = 0
+            while let chunk = try reader.read(upToCount: chunkSize), !chunk.isEmpty {
+                try writer.write(contentsOf: chunk)
+                written += chunk.count
+            }
+            _ = fsync(writer.fileDescriptor)
+            guard rename(tmp.path, url.path) == 0 else {
+                throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+            }
+            return written
+        } catch {
+            fputs("HarnessDaemon scrollback: compaction failed for \(url.lastPathComponent): \(error)\n", harnessStderr)
+            try? FileManager.default.removeItem(at: tmp)
+            return nil
         }
-        return tail.count
     }
 
     /// Queue a chunk of output for persistence. Cheap on the caller (the PTY read loop): append
@@ -188,10 +223,8 @@ final class ScrollbackFile: @unchecked Sendable {
     /// Trim the log back to the retention cap by rewriting just its tail. Atomic (temp + rename)
     /// so a crash mid-compaction leaves the previous complete log intact.
     private func compact() {
-        guard let data = try? Data(contentsOf: url), data.count > retentionCap else { return }
-        let tail = data.suffix(retentionCap)
-        if HarnessPaths.atomicWrite(Data(tail), to: url, label: "HarnessDaemon scrollback") {
-            fileBytes = tail.count
+        if let newSize = Self.compactToTail(url: url, retentionCap: retentionCap) {
+            fileBytes = newSize
         }
     }
 }

@@ -859,14 +859,25 @@ public final class TerminalMetalRenderer {
         }
     }
 
+    /// Memoized sorted form of the last-seen prompt gutter — rebuild only when changed.
+    private var promptGutterKeyCache: (gutter: [Int: RenderColor], keys: [PromptGutterUploadKey])?
+
     private func instanceUploadCacheKey(
         frame: TerminalFrame,
         origin: (x: Int, y: Int),
         ligatures: Bool
     ) -> InstanceUploadCacheKey {
-        let gutter = frame.promptGutter
-            .map { PromptGutterUploadKey(row: $0.key, color: $0.value) }
-            .sorted { $0.row < $1.row }
+        let gutter: [PromptGutterUploadKey]
+        if frame.promptGutter.isEmpty {
+            gutter = []
+        } else if let cached = promptGutterKeyCache, cached.gutter == frame.promptGutter {
+            gutter = cached.keys
+        } else {
+            gutter = frame.promptGutter
+                .map { PromptGutterUploadKey(row: $0.key, color: $0.value) }
+                .sorted { $0.row < $1.row }
+            promptGutterKeyCache = (frame.promptGutter, gutter)
+        }
         return InstanceUploadCacheKey(
             columns: frame.columns,
             rows: frame.rows,
@@ -971,9 +982,10 @@ public final class TerminalMetalRenderer {
                 previousCursor: nil
             )
             if let salvaged {
-                dirtyRows = IndexSet(
-                    (0 ..< frame.rows).filter { salvaged[$0] == nil }
-                )
+                dirtyRows = IndexSet()
+                for row in 0 ..< frame.rows where salvaged[row] == nil {
+                    dirtyRows.insert(row)
+                }
             } else {
                 dirtyRows = IndexSet(integersIn: 0 ..< frame.rows)
             }
@@ -1040,9 +1052,9 @@ public final class TerminalMetalRenderer {
                         )
                     }
                 }
-                bgSpansDirty.append(rowSeg[row].bg)
-                glSpansDirty.append(rowSeg[row].glyph)
-                deSpansDirty.append(rowSeg[row].deco)
+                if !rowSeg[row].bg.isEmpty { bgSpansDirty.append(rowSeg[row].bg) }
+                if !rowSeg[row].glyph.isEmpty { glSpansDirty.append(rowSeg[row].glyph) }
+                if !rowSeg[row].deco.isEmpty { deSpansDirty.append(rowSeg[row].deco) }
                 if bgDelta != 0 { bgShifted = min(bgShifted, rowSeg[row].bg.lowerBound) }
                 if glDelta != 0 { glShifted = min(glShifted, rowSeg[row].glyph.lowerBound) }
                 if deDelta != 0 { deShifted = min(deShifted, rowSeg[row].deco.lowerBound) }
@@ -1053,12 +1065,12 @@ public final class TerminalMetalRenderer {
             // A count change moved every later byte in that stream — those bytes must upload
             // too, so the moved suffix joins the dirty list (count-preserving scattered damage
             // keeps its separate row-sized spans; this is the win over the single-union range).
-            if bgShifted != Int.max { bgSpansDirty.append(bgShifted ..< flatBg.count) }
-            if glShifted != Int.max { glSpansDirty.append(glShifted ..< flatGlyph.count) }
-            if deShifted != Int.max { deSpansDirty.append(deShifted ..< flatDeco.count) }
-            encoded.bgDirty = DynamicInstanceBuffer.merge([], adding: bgSpansDirty.filter { !$0.isEmpty })
-            encoded.glyphDirty = DynamicInstanceBuffer.merge([], adding: glSpansDirty.filter { !$0.isEmpty })
-            encoded.decoDirty = DynamicInstanceBuffer.merge([], adding: deSpansDirty.filter { !$0.isEmpty })
+            if bgShifted != Int.max, bgShifted < flatBg.count { bgSpansDirty.append(bgShifted ..< flatBg.count) }
+            if glShifted != Int.max, glShifted < flatGlyph.count { glSpansDirty.append(glShifted ..< flatGlyph.count) }
+            if deShifted != Int.max, deShifted < flatDeco.count { deSpansDirty.append(deShifted ..< flatDeco.count) }
+            encoded.bgDirty = DynamicInstanceBuffer.merge([], adding: bgSpansDirty)
+            encoded.glyphDirty = DynamicInstanceBuffer.merge([], adding: glSpansDirty)
+            encoded.decoDirty = DynamicInstanceBuffer.merge([], adding: deSpansDirty)
         } else {
             // Full rebuild: clear the flats and lay every row back down (cached rows are still
             // REUSED — only their flat-array copy is redone, not their encode). This is the
@@ -1634,6 +1646,11 @@ public final class TerminalMetalRenderer {
     /// Ligature path: shape each maximal same-style/same-color run with CoreText, then place
     /// every shaped glyph on its *source* cell so the monospace grid stays aligned (a
     /// ligature spanning N cells lands on its first cell). The cursor cell is shaped alone.
+    /// Scratch for run accumulation, reused across runs/rows/frames. Encoding is single-threaded
+    /// per renderer, so these avoid per-run-per-dirty-row-per-frame allocation pairs.
+    private var ligatureRunText = ""
+    private var ligatureUTF16ToColumn: [Int] = []
+
     private func emitLigatedGlyphs(
         row: Int, frame: TerminalFrame, ox: Float, oy: Float,
         cursorCell: (row: Int, column: Int)?, cursorTextColor: RenderColor,
@@ -1685,8 +1702,8 @@ public final class TerminalMetalRenderer {
                 continue
             }
             // Accumulate a run of contiguous, same-style, same-color glyph cells.
-            var runText = ""
-            var utf16ToColumn: [Int] = []
+            ligatureRunText.removeAll(keepingCapacity: true)
+            ligatureUTF16ToColumn.removeAll(keepingCapacity: true)
             let bold = cell.bold, italic = cell.italic, fg = cell.foreground
             var c = col
             while c < cols, let rc = frame.cell(row: row, column: c) {
@@ -1699,17 +1716,17 @@ public final class TerminalMetalRenderer {
                 if let cur = cursorCell, cur.row == row, cur.column == c { break }
                 if rc.bold != bold || rc.italic != italic || rc.foreground != fg { break }
                 let scalar = Unicode.Scalar(rc.codepoint) ?? " "
-                let before = runText.utf16.count
-                runText.unicodeScalars.append(scalar)
-                for _ in before ..< runText.utf16.count { utf16ToColumn.append(c) }
+                let before = ligatureRunText.utf16.count
+                ligatureRunText.unicodeScalars.append(scalar)
+                for _ in before ..< ligatureRunText.utf16.count { ligatureUTF16ToColumn.append(c) }
                 c += 1
             }
-            if utf16ToColumn.isEmpty { col += 1; continue }
+            if ligatureUTF16ToColumn.isEmpty { col += 1; continue }
             let color = vector(fg)
-            for shaped in atlas.shape(runText, bold: bold, italic: italic) {
+            for shaped in atlas.shape(ligatureRunText, bold: bold, italic: italic) {
                 guard let entry = atlas.entry(forShaped: shaped.glyph, font: shaped.font) else { continue }
-                let idx = min(max(0, shaped.utf16Index), utf16ToColumn.count - 1)
-                let cellColumn = utf16ToColumn[idx]
+                let idx = min(max(0, shaped.utf16Index), ligatureUTF16ToColumn.count - 1)
+                let cellColumn = ligatureUTF16ToColumn[idx]
                 glyphs.append(glyphInstance(
                     entry,
                     originX: ox + Float(cellColumn * cellPixelWidth),
