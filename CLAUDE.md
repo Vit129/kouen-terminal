@@ -32,10 +32,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Theme catalog regeneration: `EXPORT_THEMES=1 swift test --filter ThemeCatalogEmbedTests` rewrites `Packages/HarnessTheme/Sources/HarnessTheme/BundledThemesData.swift` from `Packages/HarnessTheme/Sources/HarnessTheme/Resources/themes.json`.
 - Character width table regeneration is manual, not part of the build: `swift Scripts/generate-width-table.swift > Packages/HarnessTerminalEngine/Sources/HarnessTerminalEngine/Width/CharacterWidthTable.swift`.
 
+## Project context (auto-loaded every session)
+
+- @graphify-out/GRAPH_SUMMARY.md
+- @agent-memory/CONTEXT.md
+- @agent-memory/index.md
+
 ## Project context lookup
 
+- `graphify-out/GRAPH_SUMMARY.md` — capped 70-line digest (god nodes, community hubs, freshness). Auto-loaded above.
 - `graphify-out/graph.json` — machine-readable project knowledge graph. Use Graphify queries before broad source browsing.
-- `graphify-out/GRAPH_REPORT.md` — human-readable navigation guide for broad architecture review or when a query is not enough.
+- `graphify-out/GRAPH_REPORT.md` — full navigation guide (4000+ lines). Use only when query/path/explain isn't enough.
 - `graphify-out/.graphify_labels.json` — readable community labels for the graph.
 - `agent-memory/CONTEXT.md` — current session state: active task, plan, key files (rewrite every session).
 - `agent-memory/MEMORY.md` — persistent decisions + lessons (append-only).
@@ -45,13 +52,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Graphify + agent-memory
 
-For codebase questions, first run `graphify query "<question>"` when `graphify-out/graph.json` exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused context. These commands return scoped graph context and should usually come before broad grep or reading many files.
+For codebase questions, use `graphify query "<question>"`, `graphify path "<A>" "<B>"`, or `graphify explain "<concept>"` — GRAPH_SUMMARY.md already gives you god nodes and community hubs to orient from.
 
 - For implementation work, read `agent-memory/CONTEXT.md` for current task, `agent-memory/MEMORY.md` for past decisions, then use Graphify to find both implementation files and matching `agent-memory/knowledge/*.md` durable knowledge docs.
 
 Dirty `graphify-out/` files are expected after hooks or incremental updates; dirty graph files are not a reason to skip Graphify. Only skip Graphify if the task is specifically about stale or incorrect graph output, or the user explicitly says not to use it.
 
-Read `graphify-out/GRAPH_REPORT.md` only for broad architecture review or when `query`/`path`/`explain` do not surface enough context. After modifying code, architecture-relevant docs, rules, or `agent-memory/knowledge/`, run `graphify update . --force` to keep the graph current.
+Read `graphify-out/GRAPH_REPORT.md` only for broad architecture review or when `query`/`path`/`explain` do not surface enough context. After modifying code or architecture-relevant docs, run `graphify update . --force && ~/.claude/scripts/generate-graph-summary.sh .` to keep both the graph and summary current.
 
 ## High-level architecture
 
