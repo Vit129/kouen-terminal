@@ -457,6 +457,7 @@ final class GitPanelView: NSView {
             pathField.widthAnchor.constraint(equalToConstant: 240),
         ])
         alert.accessoryView = accessory
+        alert.window.initialFirstResponder = pathField
 
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         let worktreePath = pathField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)

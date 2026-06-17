@@ -7,6 +7,7 @@ import HarnessTerminalKit
 @MainActor
 final class SessionLifecycleService {
     private unowned let coord: SessionCoordinator
+    private var isShowingCloseConfirmation = false
 
     init(coordinator: SessionCoordinator) {
         self.coord = coordinator
@@ -147,25 +148,34 @@ final class SessionLifecycleService {
     }
 
     func closeActiveTabWithConfirmation() {
+        guard !isShowingCloseConfirmation else { return }
         guard let disposition = activeTabCloseDisposition(),
               let copy = closeConfirmationCopy(for: disposition)
         else { return }
+        isShowingCloseConfirmation = true
         let alert = NSAlert()
         alert.messageText = copy.message
         alert.informativeText = copy.informative
         alert.alertStyle = .warning
         alert.addButton(withTitle: copy.button)
         alert.addButton(withTitle: "Cancel")
+        // No default button — neither is auto-triggered by Enter. User must
+        // Tab to select a button, then press Space to confirm.
+        alert.buttons[0].keyEquivalent = ""
+        alert.buttons[1].keyEquivalent = ""
 
         if let window = NSApp.keyWindow ?? NSApp.mainWindow {
             alert.beginSheetModal(for: window) { [weak self, weak window] response in
-                guard response == .alertFirstButtonReturn else { return }
                 Task { @MainActor in
+                    self?.isShowingCloseConfirmation = false
+                    guard response == .alertFirstButtonReturn else { return }
                     self?.performClose(disposition, closingWindow: window)
                 }
             }
         } else {
-            guard alert.runModal() == .alertFirstButtonReturn else { return }
+            let response = alert.runModal()
+            isShowingCloseConfirmation = false
+            guard response == .alertFirstButtonReturn else { return }
             performClose(disposition)
         }
     }

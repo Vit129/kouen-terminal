@@ -164,6 +164,8 @@ extension HarnessSidebarPanelViewController {
         alert.alertStyle = .warning
         alert.addButton(withTitle: "Close Session")
         alert.addButton(withTitle: "Cancel")
+        alert.buttons[0].keyEquivalent = ""
+        alert.buttons[1].keyEquivalent = ""
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         // Close by ID — selecting first and then closing "the active session" could
         // close the wrong session if the selection IPC failed or raced a snapshot change

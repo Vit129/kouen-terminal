@@ -267,11 +267,6 @@ extension HarnessTerminalSurfaceView {
 
     func pasteText(_ raw: String) {
         let normalized = PasteController.normalizedForPaste(raw)
-        let bracketed = inputModes().bracketedPaste
-        if pasteProtection, !bracketed, PasteController.isUnsafePaste(normalized), let window {
-            confirmPaste(normalized, in: window)
-            return
-        }
         deliverPaste(normalized)
     }
 
@@ -279,21 +274,6 @@ extension HarnessTerminalSurfaceView {
         snapToBottom()
         clearSelection()
         emit(inputEncoder.encodePaste(normalized, modes: inputModes()))
-    }
-
-    /// Unsafe = contains a line break (would run as a command without bracketed paste) or another
-    private func confirmPaste(_ normalized: String, in window: NSWindow) {
-        let lineCount = normalized.split(separator: "\r", omittingEmptySubsequences: false).count
-        let alert = NSAlert()
-        alert.alertStyle = .warning
-        alert.messageText = lineCount > 1 ? "Paste \(lineCount) lines into the terminal?" : "Paste into the terminal?"
-        alert.informativeText = "The clipboard contains line breaks or control characters that can run commands immediately. Review before pasting."
-        alert.addButton(withTitle: "Paste")
-        alert.addButton(withTitle: "Cancel")
-        alert.beginSheetModal(for: window) { [weak self] response in
-            guard response == .alertFirstButtonReturn else { return }
-            self?.deliverPaste(normalized)
-        }
     }
 
     /// Select the entire visible viewport (Edit ▸ Select All / ⌘A).

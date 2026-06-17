@@ -1102,6 +1102,8 @@ final class HarnessSidebarPanelViewController: NSViewController {
         alert.alertStyle = .warning
         alert.addButton(withTitle: "Delete")
         alert.addButton(withTitle: "Cancel")
+        alert.buttons[0].keyEquivalent = ""
+        alert.buttons[1].keyEquivalent = ""
         if alert.runModal() == .alertFirstButtonReturn {
             SessionCoordinator.shared.closeWorkspace(id: id)
         }
@@ -1154,6 +1156,8 @@ final class HarnessSidebarPanelViewController: NSViewController {
         alert.alertStyle = .warning
         alert.addButton(withTitle: "Close All")
         alert.addButton(withTitle: "Cancel")
+        alert.buttons[0].keyEquivalent = ""
+        alert.buttons[1].keyEquivalent = ""
         
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         
