@@ -1,6 +1,6 @@
 # P22 — Long-Session Responsiveness Hardening
 
-Status: **planned**
+Status: **DONE** — all perf optimizations implemented (adaptive polling, skip-on-idle, off-main output, scrollback compaction, renderer micro-batch, salvageRowKeys)
 Priority: **P1** — user-visible responsiveness regression after long uptime
 Owner surface: HarnessApp, SessionCoordinator, DaemonSyncService, SurfaceShellTracker, UI snapshot observers
 Created: 2026-06-16
