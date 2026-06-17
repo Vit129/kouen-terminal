@@ -1,15 +1,15 @@
-# Graph Summary — harness-terminal
+# Graph Summary — .
 _Auto-generated from graphify-out/GRAPH_REPORT.md · do not edit manually_
 _Regen: `~/.claude/scripts/generate-graph-summary.sh .` after `graphify update .`_
 
 ## Summary
-- 17680 nodes · 33790 edges · 907 communities (867 shown, 40 thin omitted)
+- 17515 nodes · 33708 edges · 815 communities (775 shown, 40 thin omitted)
 - Extraction: 92% EXTRACTED · 8% INFERRED · 0% AMBIGUOUS · INFERRED: 2748 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 
 ## Graph Freshness
-- Built from commit: `5885bf35`
+- Built from commit: `cbfb5257`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -36,8 +36,8 @@ _Regen: `~/.claude/scripts/generate-graph-summary.sh .` after `graphify update .
   Apps/Harness/Sources/HarnessApp/Scripting/ScriptAPI.swift → Packages/HarnessCore/Sources/HarnessCore/Keybindings/KeyTable.swift
 - `vfork_and_exec()` --calls--> `Process`  [INFERRED]
   Tools/harness/Sources/HarnessCLI/HarnessCLI+Workbench.swift → Apps/Harness/Sources/HarnessApp/UI/CommandPalette/CommandPaletteController.swift
-- `runGit()` --calls--> `pipe`  [INFERRED]
-  Apps/Harness/Sources/HarnessApp/UI/Git/GitPanelView.swift → Packages/HarnessCopyMode/Sources/HarnessCopyMode/CopyModeState.swift
+- `firstMatch()` --calls--> `NSRegularExpression`  [INFERRED]
+  Scripts/generate-release-notes.swift → Packages/HarnessCopyMode/Sources/HarnessCopyMode/CopyModeReducer.swift
 
 
 ## Community Hubs (top 25)
