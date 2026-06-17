@@ -1,18 +1,18 @@
 # Context — harness-terminal
 
 ## Now
-- **Task:** Investigate terminal panel black-flash when opening file preview (Task 51)
-- **Plan:** [p22-long-session-responsiveness](plans/p22-long-session-responsiveness.md)
+- **Task:** None active — ready for next session
 - **Branch:** main
-- **Latest release:** v3.2.0 (build 144)
-- **Status:** in progress
+- **Latest release:** v3.2.3 (build 147)
+- **Status:** idle
 
 ## Open Questions
-- Black-flash root cause not yet confirmed — may be related to Metal surface reparenting
+- (none)
 
 ## Key Files
-- `HarnessApp/UI/ContentAreaViewController.swift` — file preview split logic
-- `HarnessTerminalKit/HarnessTerminalSurfaceView.swift` — Metal surface
+- `HarnessApp/UI/FileTree/WorkspaceFileTreeView.swift` — file tree context + reveal logic
+- `HarnessApp/UI/Sidebar/HarnessSidebarPanelViewController.swift` — sidebar tab switching
+- `HarnessApp/UI/Chrome/MainSplitViewController.swift` — cmd+click handler, sidebar visibility
 
 ## Session Notes
 - Build: `make preview` (uses `.harness-preview/` dir)
