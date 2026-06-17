@@ -1258,12 +1258,10 @@ public final class HarnessTerminalSurfaceView: NSView {
         if Thread.isMainThread {
             link?.invalidate()
             timer?.invalidate()
-            self.discardCursorRects()
         } else {
             DispatchQueue.main.sync {
                 link?.invalidate()
                 timer?.invalidate()
-                self.discardCursorRects()
             }
         }
     }
