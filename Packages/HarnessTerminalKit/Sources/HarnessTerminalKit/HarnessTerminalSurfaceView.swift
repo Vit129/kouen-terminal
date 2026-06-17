@@ -1199,11 +1199,31 @@ public final class HarnessTerminalSurfaceView: NSView {
         if Thread.isMainThread {
             link?.invalidate()
             timer?.invalidate()
+            // Discard cursor rects so AppKit's display-link doesn't fire resetCursorRects
+            // on this zombie. Must happen on main (NSView method).
+            self.discardCursorRects()
         } else {
             DispatchQueue.main.sync {
                 link?.invalidate()
                 timer?.invalidate()
+                self.discardCursorRects()
             }
+        }
+    }
+
+    public override func viewWillMove(toWindow newWindow: NSWindow?) {
+        super.viewWillMove(toWindow: newWindow)
+        if newWindow == nil, let window {
+            // Resign first responder before leaving the window. If the view is deallocated
+            // while still the window's firstResponder, the next key event dispatches to a
+            // zombie (EXC_CRASH SIGABRT in lookUpImpOrForward from keyDown @objc thunk).
+            if window.firstResponder === self {
+                window.makeFirstResponder(nil)
+            }
+            // Discard pending cursor rect callbacks. AppKit's internal display link services
+            // invalidateCursorRects asynchronously — if the view is deallocated between the
+            // invalidation and the callback, resetCursorRects fires on a zombie.
+            discardCursorRects()
         }
     }
 
@@ -1230,16 +1250,20 @@ public final class HarnessTerminalSurfaceView: NSView {
             windowKeyObservers.append(nc.addObserver(
                 forName: NSWindow.didBecomeKeyNotification, object: window, queue: .main
             ) { [weak self] _ in
-                guard let self else { return }
-                self.windowIsKey = true
-                self.focusStateChanged()
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    self.windowIsKey = true
+                    self.focusStateChanged()
+                }
             })
             windowKeyObservers.append(nc.addObserver(
                 forName: NSWindow.didResignKeyNotification, object: window, queue: .main
             ) { [weak self] _ in
-                guard let self else { return }
-                self.windowIsKey = false
-                self.focusStateChanged()
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    self.windowIsKey = false
+                    self.focusStateChanged()
+                }
             })
             // Track occlusion (covered / minimized / other Space): an invisible pane must not
             // acquire drawables or present — Apple guidance, and it keeps a backgrounded build
@@ -1251,8 +1275,10 @@ public final class HarnessTerminalSurfaceView: NSView {
             windowKeyObservers.append(nc.addObserver(
                 forName: NSWindow.didChangeOcclusionStateNotification, object: window, queue: .main
             ) { [weak self] _ in
-                guard let self, let window = self.window else { return }
-                self.setWindowOccluded(!window.occlusionState.contains(.visible))
+                MainActor.assumeIsolated {
+                    guard let self, let window = self.window else { return }
+                    self.setWindowOccluded(!window.occlusionState.contains(.visible))
+                }
             })
             window.makeFirstResponder(self)
             focusStateChanged()

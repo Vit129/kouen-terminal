@@ -1,4 +1,5 @@
 import AppKit
+import HarnessCore
 import HarnessLSP
 
 struct SyntaxDefinitionTarget {
@@ -620,6 +621,19 @@ enum SyntaxHighlighter {
     }
 
     private static func keywords(for ext: String) -> [String] {
+        if let custom = loadSyntaxKeywords(), let kw = custom[ext] { return kw }
+        return defaultKeywords(for: ext)
+    }
+
+    private static func loadSyntaxKeywords() -> [String: [String]]? {
+        let file = HarnessPaths.applicationSupport.appendingPathComponent("syntax-keywords.json")
+        guard let data = try? Data(contentsOf: file),
+              let dict = try? JSONDecoder().decode([String: [String]].self, from: data),
+              !dict.isEmpty else { return nil }
+        return dict
+    }
+
+    private static func defaultKeywords(for ext: String) -> [String] {
         switch ext {
         case "swift":
             return ["import", "func", "var", "let", "class", "struct", "enum", "protocol", "extension", "if", "else", "guard", "return", "switch", "case", "for", "while", "in", "where", "self", "Self", "nil", "true", "false", "private", "public", "internal", "final", "static", "override", "init", "deinit", "throw", "throws", "try", "catch", "await", "async", "actor", "some", "any", "weak", "unowned", "mutating", "typealias"]

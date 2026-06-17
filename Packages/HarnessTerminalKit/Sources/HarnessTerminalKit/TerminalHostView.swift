@@ -96,6 +96,20 @@ public final class TerminalHostView: NSView {
         applyNativeAppearance()
     }
 
+    /// If the hosted surface is currently the window's first responder, resign it so the
+    /// window doesn't dispatch events to a view that's about to be deallocated.
+    /// Also discards cursor rects to prevent AppKit's display-link from dispatching
+    /// resetCursorRects on a zombie view.
+    public func resignIfFirstResponder() {
+        if let window = nativeView.window {
+            if window.firstResponder === nativeView {
+                window.makeFirstResponder(nil)
+            }
+            nativeView.discardCursorRects()
+            window.invalidateCursorRects(for: nativeView)
+        }
+    }
+
     /// `pane-border-format` label, overlaid on the top/bottom edge above the terminal. The GUI
     /// overlays it (the surface keeps full size) rather than reserving a row like the grid
     /// compositor — surface-appropriate, same shared format/options underneath.

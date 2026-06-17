@@ -24,14 +24,12 @@ extension HarnessTerminalSurfaceView {
         blinkGeneration &+= 1
         let expectedGen = blinkGeneration
         let timer = Timer(timeInterval: 0.53, repeats: true) { [weak self] _ in
-            // Generation check BEFORE strong-refing self — avoids accessing fields on a
-            // partially-deallocated object (the FAR=0x1e crash). nonisolated(unsafe) read
-            // is acceptable: worst case is one stale fire that sees the old generation.
-            guard let self, self.blinkGeneration == expectedGen else { return }
-            // Timer fires on RunLoop.main — we ARE on MainActor already. No assumeIsolated needed.
-            guard self.effectivelyFocused else { return }
-            self.cursorBlinkVisible.toggle()
-            self.scheduleRender()
+            MainActor.assumeIsolated {
+                guard let self, self.blinkGeneration == expectedGen else { return }
+                guard self.effectivelyFocused else { return }
+                self.cursorBlinkVisible.toggle()
+                self.scheduleRender()
+            }
         }
         RunLoop.main.add(timer, forMode: .common)
         blinkTimer = timer

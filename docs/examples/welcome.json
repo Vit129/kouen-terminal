@@ -1,0 +1,23 @@
+{
+  "bullets": [
+    "GPU-native renderer — instant, pixel-smooth output and 490 built-in themes",
+    "Your shells outlive the window — a background daemon keeps every session running across closes and restarts",
+    "tmux workflows, no tmux — tabs, splits, prefix keys, copy mode, scriptable from harness-cli",
+    "Agent-aware — Claude Code, Codex & friends show live working / needs-attention status on their tab",
+    "Remote-ready — run the daemon on a Linux box or server and attach from here over SSH"
+  ],
+  "shortcuts": [
+    {"key": "⌘⇧N / ⌘⇧W",      "description": "new / close session"},
+    {"key": "⌘D / ⌘⇧D",       "description": "split right / split down"},
+    {"key": "⌘W / ⌘⌥W",       "description": "close tab / close pane"},
+    {"key": "⌘[ / ⌘]",        "description": "previous / next session"},
+    {"key": "⌘← / ⌘→",       "description": "reorder session in tab bar"},
+    {"key": "⌘1 … ⌘9",        "description": "switch to session 1–9"},
+    {"key": "⌘P",              "description": "fuzzy file search"},
+    {"key": "⌘F",              "description": "find in files"},
+    {"key": "⌘B",              "description": "browser pane"},
+    {"key": "⌘;",              "description": "command prompt · try: find, grep, cd"},
+    {"key": "⌘\\",             "description": "toggle sidebar"},
+    {"key": "harness-cli ping", "description": "script Harness from any shell"}
+  ]
+}

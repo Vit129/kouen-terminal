@@ -1,0 +1,7 @@
+{
+  "swift": ["import", "func", "var", "let", "class", "struct", "enum", "protocol", "extension", "if", "else", "guard", "return", "switch", "case", "for", "while", "in", "where", "self", "Self", "nil", "true", "false", "private", "public", "internal", "final", "static", "override", "init", "deinit", "throw", "throws", "try", "catch", "await", "async", "actor", "some", "any", "weak", "unowned", "mutating", "typealias"],
+  "ts": ["import", "export", "from", "function", "const", "let", "var", "class", "interface", "type", "if", "else", "return", "switch", "case", "for", "while", "of", "in", "this", "null", "undefined", "true", "false", "new", "async", "await", "try", "catch", "throw", "extends", "implements", "default", "break", "continue"],
+  "py": ["import", "from", "def", "class", "if", "elif", "else", "return", "for", "while", "in", "is", "not", "and", "or", "True", "False", "None", "self", "with", "as", "try", "except", "finally", "raise", "yield", "async", "await", "pass", "lambda"],
+  "rs": ["fn", "let", "mut", "const", "struct", "enum", "impl", "trait", "pub", "use", "mod", "if", "else", "match", "for", "while", "loop", "return", "self", "Self", "true", "false", "async", "await", "move", "where", "type", "unsafe"],
+  "go": ["package", "import", "func", "var", "const", "type", "struct", "interface", "if", "else", "for", "range", "switch", "case", "return", "go", "defer", "chan", "map", "nil", "true", "false", "select", "break", "continue"]
+}

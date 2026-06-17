@@ -1,0 +1,52 @@
+[
+  {
+    "id": "claudeCode",
+    "binary": "claude",
+    "models": ["claude-opus-4.8", "claude-opus-4.7", "claude-opus-4.6", "claude-sonnet-4.6", "claude-sonnet-4.5", "claude-sonnet-4.0", "claude-haiku-4.5"],
+    "effortLevels": null,
+    "modelFlag": "--model",
+    "effortFlag": null,
+    "defaultEffort": null,
+    "acpFlag": null
+  },
+  {
+    "id": "codex",
+    "binary": "codex",
+    "models": ["gpt-5.4", "o3", "o4-mini", "gpt-4.1"],
+    "effortLevels": ["low", "medium", "high"],
+    "modelFlag": "--model",
+    "effortFlag": "-c model_reasoning_effort=",
+    "defaultEffort": "medium",
+    "acpFlag": null
+  },
+  {
+    "id": "kiro",
+    "binary": "kiro-cli",
+    "models": ["auto", "claude-opus-4.8", "claude-opus-4.7", "claude-opus-4.6", "claude-sonnet-4.6", "claude-sonnet-4.5", "claude-sonnet-4.0", "claude-haiku-4.5", "deepseek-3.2", "minimax-m2.5", "glm-5", "qwen3-coder-next"],
+    "effortLevels": ["low", "medium", "high", "xhigh", "max"],
+    "modelFlag": "--model",
+    "effortFlag": "--effort",
+    "defaultEffort": "medium",
+    "acpFlag": "--acp"
+  },
+  {
+    "id": "gemini",
+    "binary": "gemini",
+    "models": ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash"],
+    "effortLevels": null,
+    "modelFlag": "--model",
+    "effortFlag": null,
+    "defaultEffort": null,
+    "acpFlag": "--acp"
+  },
+  {
+    "id": "cursor",
+    "binary": "cursor",
+    "models": ["claude-sonnet-4.5", "gpt-4.1", "gemini-2.5-pro"],
+    "effortLevels": ["auto", "normal", "max"],
+    "modelFlag": "--model",
+    "effortFlag": "--effort",
+    "defaultEffort": "normal",
+    "acpFlag": "--acp"
+  }
+]
