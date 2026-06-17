@@ -130,11 +130,11 @@ async function main() {
         value: 'preview'
       },
       {
-        display: `3) Bump version, then build repo-root production app (make prod)${nextVersions}`,
+        display: '3) Production build only, no version bump (make prod)',
         value: 'prod'
       },
       {
-        display: `4) Full cycle: bump version -> commit+push -> make prod${nextVersions}`,
+        display: `4) Full cycle: build → bump → commit+push → prod${nextVersions}`,
         value: 'full-cycle'
       }
     ];
@@ -157,7 +157,6 @@ async function main() {
     } else if (choice === 'preview') {
       await runCommand('./Scripts/run.sh', ['preview']);
     } else if (choice === 'prod') {
-      await runCommand('./Scripts/prepare-release.sh', []);
       await runCommand('./Scripts/run.sh', ['prod']);
     } else if (choice === 'full-cycle') {
       await runCommand('Scripts/full-cycle.sh', []);

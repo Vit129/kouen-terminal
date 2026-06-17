@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Full cycle: bump version -> commit+push (merging into main first if run from
-# a worktree) -> repo-root prod build.
+# Full cycle: build first (verify) -> bump version -> commit+push -> open app.
+# If build fails AFTER bump, version files are rolled back automatically.
 #
 # Usage:
 #   Scripts/full-cycle.sh [patch|minor|major] [--version X.Y.Z] [--build N]
@@ -15,10 +15,12 @@ Usage:
   Scripts/full-cycle.sh [patch|minor|major] [--version X.Y.Z] [--build N]
 
 Runs:
-  1. Bump release metadata.
-  2. Commit and push changes.
-  3. Merge to main first when launched from a worktree.
-  4. Build and open the repo-root production app.
+  1. Pre-build verification (swift build).
+  2. Bump release metadata.
+  3. Build production app.
+  4. If prod build fails → rollback version bump.
+  5. Commit and push.
+  6. Open the app.
 USAGE
 }
 
@@ -29,30 +31,50 @@ case "${1:-}" in
     ;;
 esac
 
-git_dir="$(git rev-parse --git-dir)"
-merged_from_worktree=0
+# Step 1: Pre-build verification — catch compile errors BEFORE bumping version.
+echo ""
+echo "▶ Step 1: Verifying build..."
+if ! swift build 2>&1 | tail -3; then
+  echo ""
+  echo "❌ Build failed — fix errors before releasing."
+  exit 1
+fi
+echo "✅ Build verified."
 
+# Step 2: Bump version.
+echo ""
+echo "▶ Step 2: Bumping version..."
 ./Scripts/prepare-release.sh "$@"
 
+# Step 3: Build production app. Rollback on failure.
+echo ""
+echo "▶ Step 3: Building production app..."
+if ! ./Scripts/run.sh prod; then
+  echo ""
+  echo "❌ Production build failed — rolling back version bump..."
+  git checkout -- \
+    Apps/Harness/Sources/HarnessApp/Resources/Info.plist \
+    Packages/HarnessCore/Sources/HarnessCore/HarnessVersion.swift \
+    Packages/HarnessCore/Sources/HarnessCore/ReleaseNotes/GeneratedReleaseNotes.swift \
+    CHANGELOG.md
+  echo "↩️  Version files restored. Fix the build and try again."
+  exit 1
+fi
+
+# Step 4: Commit and push.
+git_dir="$(git rev-parse --git-dir)"
 if [[ "$git_dir" == *"worktrees"* ]]; then
   echo "Detected: running in a worktree — merging into main first."
   ./Scripts/commit-push-merge.sh
 
   common_dir="$(git rev-parse --git-common-dir)"
   main_repo="$(cd "$(dirname "$common_dir")" && pwd)"
-
-  echo ""
-  echo "Code merged to main. Continuing build from:"
-  echo "  $main_repo"
+  echo "Code merged to main."
   cd "$main_repo"
   git pull --ff-only origin main
-  merged_from_worktree=1
-fi
-
-if [[ "$merged_from_worktree" == "0" ]]; then
+else
   ./Scripts/commit-push.sh
 fi
 
 echo ""
-echo "Building repo-root production app..."
-exec ./Scripts/run.sh prod
+echo "✅ Full cycle complete."

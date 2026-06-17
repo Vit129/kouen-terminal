@@ -15,8 +15,8 @@ start:
 # Direct shortcuts (skip interactive menu):
 #   make s1  → commit + push + merge
 #   make s2  → clean preview build
-#   make s3  → bump + prod build
-#   make s4  → full cycle (bump + commit + push + prod)
+#   make s3  → production build only (no version bump)
+#   make s4  → full cycle (build → bump → commit + push + prod)
 s1:
 	./Scripts/start.sh 1
 s2:
@@ -24,7 +24,7 @@ s2:
 	$(MAKE) preview-clean
 	./Scripts/start.sh 2
 s3:
-	./Scripts/start.sh 3
+	./Scripts/run.sh prod
 s4:
 	./Scripts/start.sh 4
 
