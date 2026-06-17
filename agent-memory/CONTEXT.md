@@ -7,7 +7,7 @@
 - **Status:** idle
 
 ## Open Questions
-- (none)
+- [open] 3 remaining crashes on 2026-06-17: 2× layout()+assumeIsolated, 1× keyDown — likely zombie-view (same mechanism as resetCursorRects, 0xa3 free-fill). Root path not yet identified.
 
 ## Key Files
 - `HarnessApp/UI/FileTree/WorkspaceFileTreeView.swift` — file tree context + reveal logic
