@@ -1258,10 +1258,17 @@ public final class HarnessTerminalSurfaceView: NSView {
         if Thread.isMainThread {
             link?.invalidate()
             timer?.invalidate()
+            // Cancel pending cursor rect callbacks (safety net for viewWillMove race).
+            // AppKit queues resetCursorRects via an async display link — if this view is
+            // freed between the queue and the callback, the call lands on a zombie.
+            // Swift 6 nonisolated deinit cannot call @MainActor discardCursorRects()
+            // directly; use ObjC messaging to bypass the isolation check.
+            _ = perform(NSSelectorFromString("discardCursorRects"))
         } else {
             DispatchQueue.main.sync {
                 link?.invalidate()
                 timer?.invalidate()
+                _ = self.perform(NSSelectorFromString("discardCursorRects"))
             }
         }
     }
