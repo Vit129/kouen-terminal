@@ -260,6 +260,11 @@ public final class TerminalHostView: NSView {
             self.hostDelegate?.terminalHostDidRequestDesktopNotification(
                 title: title ?? "Harness", body: body, surfaceID: self.surfaceID)
         }
+        native.onOutputTrigger = { [weak self] pattern, title in
+            guard let self else { return }
+            self.hostDelegate?.terminalHostDidRequestDesktopNotification(
+                title: title ?? "Output Trigger", body: "Matched: \(pattern)", surfaceID: self.surfaceID)
+        }
         native.onBecameFocused = { [weak self] in
             guard let self else { return }
             // Focusing a pane (click, ⌘-Tab back to the app, window key) clears its pending

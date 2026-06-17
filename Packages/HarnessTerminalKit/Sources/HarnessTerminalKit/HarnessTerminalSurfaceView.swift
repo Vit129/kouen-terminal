@@ -336,6 +336,8 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// Desktop notification requested by a program (OSC 9 → nil title; OSC 777 → title+body)
     /// — the host forwards this to its delegate.
     public var onDesktopNotification: ((_ title: String?, _ body: String) -> Void)?
+    /// Fired when terminal output matches a user-configured trigger pattern.
+    public var onOutputTrigger: ((_ trigger: String, _ title: String?) -> Void)?
     /// This surface became effectively focused (first responder × key window). The host
     /// bridges it to the focus delegate so focusing a pane by click or app re-activation —
     /// not only a programmatic tab switch — clears its pending notification.
@@ -650,6 +652,7 @@ public final class HarnessTerminalSurfaceView: NSView {
         }
         let beforeHistory = emulatorState.emulator.historyCount
         emulatorState.emulator.feed(data)
+        scanOutputTriggers(data)
         // If the user is scrolled up, stay anchored on the same content as new lines push
         // into history; at the bottom (offset 0) we naturally follow new output.
         if scrollOffset > 0 {
@@ -730,6 +733,18 @@ public final class HarnessTerminalSurfaceView: NSView {
     }
 
     public func receive(_ text: String) { receive(Data(text.utf8)) }
+
+    /// Scan raw output bytes for user-configured trigger patterns.
+    private func scanOutputTriggers(_ data: Data) {
+        let triggers = OutputTriggerStore.load()
+        guard !triggers.isEmpty else { return }
+        guard let text = String(data: data, encoding: .utf8) else { return }
+        for trigger in triggers {
+            if text.localizedCaseInsensitiveContains(trigger.pattern) {
+                onOutputTrigger?(trigger.pattern, trigger.title)
+            }
+        }
+    }
 
     func testingReadGridSnapshot() -> TerminalGridSnapshot {
         emulatorSync { $0.readGrid() }
