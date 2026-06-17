@@ -108,6 +108,11 @@ public final class TerminalHostView: NSView {
             nativeView.discardCursorRects()
             window.invalidateCursorRects(for: nativeView)
         }
+        // Remove tracking area — NSTrackingArea does NOT retain its owner.
+        if let ta = nativeView.trackingArea {
+            nativeView.removeTrackingArea(ta)
+            nativeView.trackingArea = nil
+        }
     }
 
     /// `pane-border-format` label, overlaid on the top/bottom edge above the terminal. The GUI
