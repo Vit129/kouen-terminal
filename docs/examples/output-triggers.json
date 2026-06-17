@@ -1,0 +1,7 @@
+[
+  {"pattern": "BUILD FAILED", "title": "Build Failed", "sound": true},
+  {"pattern": "BUILD SUCCEEDED", "title": "Build Succeeded", "sound": false},
+  {"pattern": "ERROR", "title": "Error detected", "sound": true},
+  {"pattern": "SIGTERM", "title": "Process terminated", "sound": true},
+  {"pattern": "All tests passed", "title": "Tests Passed", "sound": false}
+]

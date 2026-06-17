@@ -153,7 +153,9 @@ final class AgentNotchViewModel: ObservableObject {
     private func considerPeek() {
         let (events, next) = AgentNotchPeekDecider.decide(previous: peekStates, rows: rows)
         peekStates = next
-        guard !events.isEmpty, !isOpen, !NSApp.isActive else { return }
+        guard !events.isEmpty, !isOpen else { return }
+        // Allow peek even when Harness is frontmost (user sees the notch pop for attention
+        // events regardless of app focus — the tab dot alone is too subtle).
         let now = Date()
         guard let event = events.first(where: { event in
             guard let last = lastPeekAt[event.row.id] else { return true }
