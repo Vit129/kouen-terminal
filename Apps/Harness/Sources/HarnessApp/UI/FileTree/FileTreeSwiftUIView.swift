@@ -191,29 +191,38 @@ struct FileTreeSwiftUIView: View {
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 5)
-            List {
-                if let gitBranch, !gitBranch.isEmpty {
-                    branchChip(gitBranch)
+            ScrollViewReader { proxy in
+                List {
+                    if let gitBranch, !gitBranch.isEmpty {
+                        branchChip(gitBranch)
+                    }
+                    ForEach(filteredNodes) { node in
+                        NodeRow(
+                            node: node,
+                            rootPath: rootPath,
+                            watcher: watcher,
+                            scanOptions: scanOptions,
+                            gitStatus: currentGitStatus,
+                            keyboard: keyboard,
+                            onPreview: onPreview,
+                            isSearching: !trimmedSearchText.isEmpty
+                        )
+                    }
                 }
-                ForEach(filteredNodes) { node in
-                    NodeRow(
-                        node: node,
-                        rootPath: rootPath,
-                        watcher: watcher,
-                        scanOptions: scanOptions,
-                        gitStatus: currentGitStatus,
-                        keyboard: keyboard,
-                        onPreview: onPreview,
-                        isSearching: !trimmedSearchText.isEmpty
-                    )
+                .listStyle(.sidebar)
+                .scrollContentBackground(.hidden)
+                .onChange(of: filteredNodes.map(\.node.path)) { _, _ in
+                    updateVisiblePaths()
+                }
+                .onAppear { updateVisiblePaths() }
+                .onChange(of: context.revealPath) { _, path in
+                    guard let path else { return }
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        proxy.scrollTo(path, anchor: .center)
+                    }
+                    context.revealPath = nil
                 }
             }
-            .listStyle(.sidebar)
-            .scrollContentBackground(.hidden)
-            .onChange(of: filteredNodes.map(\.node.path)) { _, _ in
-                updateVisiblePaths()
-            }
-            .onAppear { updateVisiblePaths() }
         }
         .onAppear { refreshGitBranch(); updateVisiblePaths() }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("HarnessActiveTabGitBranchDidChange"))) { _ in

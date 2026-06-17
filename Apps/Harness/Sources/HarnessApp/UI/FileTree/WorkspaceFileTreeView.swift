@@ -11,6 +11,8 @@ import HarnessCore
 final class FileTreeContext {
     var rootPath: String
     var sessionID: SessionID?
+    /// Set to scroll-and-highlight a file path in the tree; cleared after the scroll fires.
+    var revealPath: String?
 
     init(rootPath: String, sessionID: SessionID?) {
         self.rootPath = rootPath
@@ -83,6 +85,31 @@ final class WorkspaceFileTreeView: NSView {
     override func keyDown(with event: NSEvent) {
         if keyboard.handle(event) { return }
         super.keyDown(with: event)
+    }
+
+    /// Expands all ancestor directories of `path`, highlights it in the keyboard navigator,
+    /// then signals the SwiftUI list to scroll to it after a short delay for child loading.
+    func revealFileInTree(path: String) {
+        let rootPrefix = context.rootPath.hasSuffix("/") ? context.rootPath : context.rootPath + "/"
+        if path.hasPrefix(rootPrefix) {
+            let relative = String(path.dropFirst(rootPrefix.count))
+            let parentRelative = (relative as NSString).deletingLastPathComponent
+            let components = parentRelative.components(separatedBy: "/").filter { !$0.isEmpty }
+            var accumulated = context.rootPath
+            for component in components {
+                accumulated = (accumulated as NSString).appendingPathComponent(component)
+                NotificationCenter.default.post(
+                    name: .fileTreeToggleExpand,
+                    object: nil,
+                    userInfo: ["path": accumulated, "action": "expand"]
+                )
+            }
+        }
+        keyboard.state.focusedPath = path
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+            guard let self else { return }
+            self.context.revealPath = path
+        }
     }
 
     func updateRoot(path: String, sessionID: SessionID?) {

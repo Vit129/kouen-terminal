@@ -152,6 +152,8 @@ final class MainSplitViewController: NSViewController {
     @objc private func openFilePreviewFromTerminal(_ notification: Notification) {
         guard let path = notification.userInfo?["path"] as? String else { return }
         contentVC.openFileTab(path: path)
+        setSidebarVisible(true, animated: true)
+        sidebar.selectFilesTab(revealPath: path)
     }
 
     @objc private func openLocalhostURLFromTerminal(_ notification: Notification) {
