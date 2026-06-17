@@ -155,6 +155,8 @@ async function main() {
     if (choice === 'commit-push-merge') {
       await runCommand('Scripts/commit-push-merge.sh', []);
     } else if (choice === 'preview') {
+      await runCommand('make', ['preview-stop']).catch(() => {});
+      await runCommand('make', ['preview-clean']);
       await runCommand('./Scripts/run.sh', ['preview']);
     } else if (choice === 'prod') {
       await runCommand('./Scripts/run.sh', ['prod']);
