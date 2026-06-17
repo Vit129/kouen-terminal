@@ -6,6 +6,17 @@ All notable changes to Harness are documented here. The format is based on
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/robzilla1738/harness-terminal/releases).
 
+## [3.2.3] - 2026-06-16
+
+### Fixed
+- **Paste protection dialog removed** — Paste now executes immediately without confirmation, regardless of clipboard content (multi-line, control chars).
+- **Close confirmation dialog keyboard behavior** — Removed default button so Enter no longer always triggers "Close Session" when Cancel is Tab-focused. Both buttons now require explicit Space activation after Tab selection.
+- **Command Prompt (⌘;) not accepting keyboard input** — Panel used plain `NSPanel` which returns `canBecomeKey = false` for borderless style. Replaced with `KeyablePanel` subclass that overrides `canBecomeKey { true }`.
+- **Close confirmation re-entrancy** — Added guard to prevent `closeActiveTabWithConfirmation` from being called multiple times while a sheet is already displayed.
+
+### Changed
+- **Add Worktree dialog** — Set `initialFirstResponder` to path field for immediate keyboard input on open.
+
 ## [3.2.2] - 2026-06-16
 
 ### Fixed

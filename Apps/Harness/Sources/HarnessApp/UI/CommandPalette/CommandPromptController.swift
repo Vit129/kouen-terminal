@@ -162,7 +162,7 @@ final class CommandPromptController: NSObject, NSTextFieldDelegate {
     }
 
     private func build() -> NSPanel {
-        let panel = NSPanel(
+        let panel = KeyablePanel(
             contentRect: NSRect(x: 0, y: 0, width: 520, height: 36),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
@@ -206,4 +206,8 @@ final class CommandPromptController: NSObject, NSTextFieldDelegate {
         panel.contentView = overlay
         return panel
     }
+}
+
+private final class KeyablePanel: NSPanel {
+    override var canBecomeKey: Bool { true }
 }

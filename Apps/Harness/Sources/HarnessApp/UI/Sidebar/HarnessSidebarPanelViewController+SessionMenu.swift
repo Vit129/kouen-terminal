@@ -159,6 +159,8 @@ extension HarnessSidebarPanelViewController {
         alert.alertStyle = .warning
         alert.addButton(withTitle: "Close Others")
         alert.addButton(withTitle: "Cancel")
+        alert.buttons[0].keyEquivalent = ""
+        alert.buttons[1].keyEquivalent = ""
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         for session in others {
             // Through closeSession (not raw IPC) so each session's terminal hosts are

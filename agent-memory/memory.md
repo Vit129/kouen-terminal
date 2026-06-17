@@ -13,6 +13,8 @@
 - RL-021: Pure transparent window fails on bright bg — use `window.backgroundColor = themeColor.withAlphaComponent(opacity)`
 - RL-030: Every `snapshotChanged` consumer must check `metadataOnly` flag before rebuilding
 - RL-031: Double-subscription — parent routes to child AND child has own observer = fires twice
+- RL-032: NSAlert first button auto-gets `keyEquivalent = "\r"` — Enter ALWAYS fires it regardless of Tab focus. Clear it for destructive dialogs.
+- RL-033: Borderless NSPanel `canBecomeKey` defaults to `false` — must subclass and override to accept keyboard input.
 
 ## Conventions
 - Build: `make preview`
