@@ -1,6 +1,6 @@
 # P20 — Harness-Term Agent
 
-Status: **Partially implemented** — core agent workflow done; `harness chat` first-party branding deferred
+Status: **Shelved** — current terminal-first flow (kiro-cli/claude/codex typed directly) sufficient; revisit when pain point emerges
 Priority: **P2** — first-party agent experience for P19 without exposing runtime vendor names
 Owner surface: HarnessApp, HarnessCLI, HarnessCore agent runtime adapters, harness-mcp integration
 Created: 2026-06-14

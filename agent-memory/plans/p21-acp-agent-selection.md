@@ -1,6 +1,6 @@
 # P21 — Hermes-Inspired Agent Platform (ACP + Multi-Provider + Learning + Orchestration)
 
-Status: **PBI-ACP-001 planned; PBI-ACP-002/003 partially done via AgentCatalog+AgentBridge**
+Status: **Shelved** — ACP adapters not publicly available; direct terminal agent invocation covers all current needs
 Priority: **P1** — foundational AI-first workflow (terminal-first, no panel)
 Owner surface: HarnessApp, HarnessCore, harness-cli, agent-memory/, execution backends
 Created: 2026-06-15
