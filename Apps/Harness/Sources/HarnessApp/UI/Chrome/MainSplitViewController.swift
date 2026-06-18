@@ -426,6 +426,11 @@ final class MainSplitViewController: NSViewController {
 
     private func setSidebarWidth(_ width: CGFloat) {
         let totalWidth = split.bounds.width
+        guard totalWidth > 0 else {
+            // Not yet laid out — defer until first layout fires
+            DispatchQueue.main.async { [weak self] in self?.setSidebarWidth(width) }
+            return
+        }
         let sidebarOnRight = SessionCoordinator.shared.settings.sidebarOnRight
         let position: CGFloat
         if sidebarOnRight {

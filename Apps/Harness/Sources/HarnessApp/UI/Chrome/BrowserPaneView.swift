@@ -71,10 +71,6 @@ public final class BrowserPaneView: NSView {
         NSLog("[BrowserPane] deinit \(uuid)")
     }
 
-    override public func removeFromSuperview() {
-        super.removeFromSuperview()
-    }
-
     override public func viewWillMove(toWindow newWindow: NSWindow?) {
         super.viewWillMove(toWindow: newWindow)
         if newWindow == nil {
