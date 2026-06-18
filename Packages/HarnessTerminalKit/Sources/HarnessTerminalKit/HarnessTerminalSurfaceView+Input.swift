@@ -179,7 +179,8 @@ extension HarnessTerminalSurfaceView {
             // ⌘ + an editing key drives readline line-editing (⌘ is otherwise reserved for the
             // app), matching macOS terminal convention: ⌘⌫ = delete to line start (^U), ⌘← / ⌘→ =
             // line start / end (^A / ^E). Other ⌘ keys keep falling through to the app.
-            if let special = Self.specialKey(for: event) {
+            // ⌘⌥ combinations are reserved for pane navigation — skip readline intercept.
+            if !event.modifierFlags.contains(.option), let special = Self.specialKey(for: event) {
                 let lineEdit: [UInt8]?
                 switch special {
                 case .backspace: lineEdit = [0x15] // ^U

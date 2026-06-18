@@ -257,8 +257,9 @@ public enum TerminalBanner {
         shortcuts: [
             .init(key: "⌘⇧N / ⌘⇧W",      description: "new / close session"),
             .init(key: "⌘D / ⌘⇧D",       description: "split right / split down"),
-            .init(key: "⌘W / ⌘⌥W",       description: "close tab / close pane"),
-            .init(key: "⌘[ / ⌘]",        description: "previous / next session"),
+            .init(key: "⌘W / ⌘⇧W",       description: "close pane / close tab"),
+            .init(key: "⌘[ / ⌘]",        description: "previous / next pane"),
+            .init(key: "⌘⇧[ / ⌘⇧]",     description: "previous / next session"),
             .init(key: "⌘← / ⌘→",       description: "reorder session in tab bar"),
             .init(key: "⌘1 … ⌘9",        description: "switch to session 1–9"),
             .init(key: "⌘P",              description: "fuzzy file search"),

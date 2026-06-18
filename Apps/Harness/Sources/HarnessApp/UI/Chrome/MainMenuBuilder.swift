@@ -57,10 +57,10 @@ enum MainMenuBuilder {
         newSessionItem.target = MenuTarget.shared
         workspace.submenu?.addItem(newSessionItem)
         let closeTab = NSMenuItem(title: "Close Tab", action: #selector(MenuTarget.closeTab), keyEquivalent: "w")
+        closeTab.keyEquivalentModifierMask = [.command, .shift]
         closeTab.target = MenuTarget.shared
         workspace.submenu?.addItem(closeTab)
-        let closeSession = NSMenuItem(title: "Close Session", action: #selector(MenuTarget.closeSession), keyEquivalent: "W")
-        closeSession.keyEquivalentModifierMask = [.command, .shift]
+        let closeSession = NSMenuItem(title: "Close Session", action: #selector(MenuTarget.closeSession), keyEquivalent: "")
         closeSession.target = MenuTarget.shared
         workspace.submenu?.addItem(closeSession)
         workspace.submenu?.addItem(.separator())
@@ -75,11 +75,11 @@ enum MainMenuBuilder {
             workspace.submenu?.addItem(item)
         }
         let prevSession = NSMenuItem(title: "Previous Session", action: #selector(MenuTarget.previousSession), keyEquivalent: "[")
-        prevSession.keyEquivalentModifierMask = [.command]
+        prevSession.keyEquivalentModifierMask = [.command, .shift]
         prevSession.target = MenuTarget.shared
         workspace.submenu?.addItem(prevSession)
         let nextSession = NSMenuItem(title: "Next Session", action: #selector(MenuTarget.nextSession), keyEquivalent: "]")
-        nextSession.keyEquivalentModifierMask = [.command]
+        nextSession.keyEquivalentModifierMask = [.command, .shift]
         nextSession.target = MenuTarget.shared
         workspace.submenu?.addItem(nextSession)
         workspace.submenu?.addItem(.separator())
@@ -105,25 +105,34 @@ enum MainMenuBuilder {
         view.submenu?.addItem(splitVItem)
         view.submenu?.addItem(.separator())
 
+        let prevPane = NSMenuItem(title: "Previous Pane", action: #selector(MenuTarget.previousPane), keyEquivalent: "[")
+        prevPane.keyEquivalentModifierMask = [.command]
+        prevPane.target = MenuTarget.shared
+        view.submenu?.addItem(prevPane)
+        let nextPane = NSMenuItem(title: "Next Pane", action: #selector(MenuTarget.nextPane), keyEquivalent: "]")
+        nextPane.keyEquivalentModifierMask = [.command]
+        nextPane.target = MenuTarget.shared
+        view.submenu?.addItem(nextPane)
+        view.submenu?.addItem(.separator())
+
         let focusLeft = NSMenuItem(title: "Focus Pane Left", action: #selector(MenuTarget.focusPaneLeft), keyEquivalent: "\u{F702}")
-        focusLeft.keyEquivalentModifierMask = [.command, .option]
+        focusLeft.keyEquivalentModifierMask = [.command, .shift]
         focusLeft.target = MenuTarget.shared
         view.submenu?.addItem(focusLeft)
         let focusRight = NSMenuItem(title: "Focus Pane Right", action: #selector(MenuTarget.focusPaneRight), keyEquivalent: "\u{F703}")
-        focusRight.keyEquivalentModifierMask = [.command, .option]
+        focusRight.keyEquivalentModifierMask = [.command, .shift]
         focusRight.target = MenuTarget.shared
         view.submenu?.addItem(focusRight)
         let focusUp = NSMenuItem(title: "Focus Pane Up", action: #selector(MenuTarget.focusPaneUp), keyEquivalent: "\u{F700}")
-        focusUp.keyEquivalentModifierMask = [.command, .option]
+        focusUp.keyEquivalentModifierMask = [.command, .shift]
         focusUp.target = MenuTarget.shared
         view.submenu?.addItem(focusUp)
         let focusDown = NSMenuItem(title: "Focus Pane Down", action: #selector(MenuTarget.focusPaneDown), keyEquivalent: "\u{F701}")
-        focusDown.keyEquivalentModifierMask = [.command, .option]
+        focusDown.keyEquivalentModifierMask = [.command, .shift]
         focusDown.target = MenuTarget.shared
         view.submenu?.addItem(focusDown)
 
         let closePane = NSMenuItem(title: "Close Pane", action: #selector(MenuTarget.closePane), keyEquivalent: "w")
-        closePane.keyEquivalentModifierMask = [.command, .option]
         closePane.target = MenuTarget.shared
         view.submenu?.addItem(closePane)
         view.submenu?.addItem(.separator())
@@ -408,6 +417,9 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
     @objc func focusPaneUp() { SessionCoordinator.shared.focusPaneDirectional(.up) }
     @objc func focusPaneDown() { SessionCoordinator.shared.focusPaneDirectional(.down) }
     @objc func closePane() { SessionCoordinator.shared.killActivePane() }
+
+    @objc func previousPane() { SessionCoordinator.shared.cycleActivePane(forward: false) }
+    @objc func nextPane() { SessionCoordinator.shared.cycleActivePane(forward: true) }
 
     @objc func detachPane() {
         SessionCoordinator.shared.detachActiveSurface()
