@@ -1,7 +1,7 @@
 # Zombie View Crashes on macOS 26.5 + Swift 6.3.2
 
 > Covers CASE-034 (superseded), CASE-037, CASE-038, CASE-039, CASE-040.
-> Promoted from playbook — recurring pattern (40 crashes, Jun 13–18 2026).
+> Promoted from playbook — recurring pattern (63 crashes, Jun 13–18 2026).
 
 ## Root Cause
 
@@ -157,6 +157,8 @@ On Jun 16, an AI agent (Codex) saw `_checkExpectedExecutor` in the crash stack a
 | Jun 18 13:55 | 100ms retire insufficient — launch rebuild race | build 154 |
 | Jun 18 14:12 | Script crash loop — old app crashes during install | build 154 |
 | Jun 18 14:15 | All fixes complete: 500ms + script kill-first | main |
+| Jun 18 17:32 | Confirmed use-after-free: `self` (x0) not in any VM region | build 154 |
+| Jun 18 20:02 | 63 total crash reports; 3 distinct variants confirmed | build 154 |
 
 ## Why It Took So Long
 
@@ -201,3 +203,42 @@ NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .keyUp, .mouseMoved, .mous
 **Why this is the definitive fix:** All other fixes (resign, retire, tracking area guard) operate at the *receiver side* — they try to prevent the view from being a target. But the crash occurs at the `@objc` thunk *before* any receiver code runs. The local event monitor fires *before* AppKit dispatches the event, allowing us to cancel it if the target is a zombie. This is the only approach that prevents the crash at source.
 
 **Applied in:** `AppDelegate.applicationDidFinishLaunching` — runs once at app startup, protects all views for the app's lifetime.
+
+### 9. Guard `keyDown`/`keyUp` against windowless view (defense-in-depth)
+
+```swift
+public override func keyDown(with event: NSEvent) {
+    guard window != nil else { return }
+    // ...
+}
+public override func keyUp(with event: NSEvent) {
+    guard window != nil else { return }
+    // ...
+}
+```
+
+**Why:** Even with the event monitor (fix #8), if `self` is alive but detached (window == nil), the `@objc` thunk's executor check may still succeed on the alive-but-orphaned object, allowing execution to reach the method body. The body then crashes on dangling references. This guard prevents any processing on a detached view.
+
+**Limitation:** Does NOT help when `self` is truly freed (use-after-free) — the crash happens at the thunk before any Swift code runs.
+
+**Applied in:** `HarnessTerminalSurfaceView+Input.swift` (build 154+).
+
+## Use-After-Free Confirmation (Jun 18 2026)
+
+Analysis of crash report `Harness-2026-06-18-173225.ips`:
+- `x0` (self) = `0x3e1aa0103e8`
+- FAR (faulting address) = `0x3e1aa010408` (offset +32 from self — type metadata read)
+- VM region info: "not in any region" — **object is freed memory**
+- This proves a true use-after-free, not merely a detached-but-alive scenario
+
+### Three distinct crash variants confirmed:
+
+1. **keyDown thunk** (most frequent): `swift_getObjectType → swift_task_isCurrentExecutorWithFlagsImpl → @objc keyDown`
+2. **[NSView subviews]** walk: `objc_class::realizeIfNeeded → class_createInstance → [NSView subviews]` — freed view hierarchy
+3. **BrowserPaneView.removeFromSuperview()** thunk: executor check on `@MainActor` view during removal
+
+All three share the same root: the Swift 6.3.2 runtime on macOS 26.5 crashes when verifying MainActor isolation on freed objects. The event monitor (fix #8) is the primary defense; the retire delay (fix #1) is the secondary defense. If both fail (race condition during rapid rebuild + dealloc), the crash is unavoidable at the Swift runtime level.
+
+## Open: Remaining Crash Sources
+
+The `ContentAreaViewController.detachHosts(in:)` method calls `host.removeFromSuperview()` directly (bypassing `TerminalPaneRegistry.retire()`). While hosts are retained by `existingHosts` dictionary during rebuild, a timing race can leave them briefly orphaned. Consider routing this through the registry's retire path as well.

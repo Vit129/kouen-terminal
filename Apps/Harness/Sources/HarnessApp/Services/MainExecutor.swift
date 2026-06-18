@@ -470,13 +470,12 @@ final class MainExecutor: CommandExecutor {
             let resolved = expanded.hasPrefix("/") ? expanded : ((context?.cwd ?? FileManager.default.currentDirectoryPath) + "/" + expanded)
             let url = URL(fileURLWithPath: resolved, isDirectory: true)
             let canonical = url.standardized.path
-            // Find any tab whose cwd matches and switch to it, else just display a message.
-            if let ws = coordinator.snapshot.workspaces.first,
-               let tab = ws.tabs.first(where: { $0.cwd.hasPrefix(canonical) }) {
-                coordinator.selectTab(workspaceID: ws.id, tabID: tab.id)
-            } else {
-                DisplayMessage.show("cd: \(canonical)")
+            // Send cd command to the active terminal shell.
+            guard let surfaceID = coordinator.activeSurfaceID else {
+                DisplayMessage.show("cd: no active terminal")
+                return
             }
+            coordinator.requestDaemon(.sendKeys(surfaceID: surfaceID.uuidString, keys: ["cd \(canonical)", "Enter"]))
         case let .mark(name, path):
             throw CommandExecutionError.unsupportedInThisContext("mark '\(name)' '\(path)' not supported in GUI context yet")
         case let .view(path):

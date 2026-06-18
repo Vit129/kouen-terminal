@@ -3,6 +3,14 @@ import HarnessCore
 
 @MainActor
 enum MainMenuBuilder {
+    /// Create an NSMenuItem from a registry Keybinding.
+    private static func menuItem(_ title: String, action: Selector, binding: Keybinding) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: binding.keyChar)
+        item.keyEquivalentModifierMask = binding.modifiers.modifierFlags
+        item.target = MenuTarget.shared
+        return item
+    }
+
     static func build() -> NSMenu {
         let main = NSMenu()
 
@@ -52,13 +60,9 @@ enum MainMenuBuilder {
 
         let workspace = NSMenuItem()
         workspace.submenu = NSMenu(title: "Session")
-        let newSessionItem = NSMenuItem(title: "New Session", action: #selector(MenuTarget.newSession), keyEquivalent: "N")
-        newSessionItem.keyEquivalentModifierMask = [.command, .shift]
-        newSessionItem.target = MenuTarget.shared
+        let newSessionItem = menuItem("New Session", action: #selector(MenuTarget.newSession), binding: BannerShortcutRegistry.newSession)
         workspace.submenu?.addItem(newSessionItem)
-        let closeTab = NSMenuItem(title: "Close Tab", action: #selector(MenuTarget.closeTab), keyEquivalent: "w")
-        closeTab.keyEquivalentModifierMask = [.command, .shift]
-        closeTab.target = MenuTarget.shared
+        let closeTab = menuItem("Close Tab", action: #selector(MenuTarget.closeTab), binding: BannerShortcutRegistry.closeTab)
         workspace.submenu?.addItem(closeTab)
         let closeSession = NSMenuItem(title: "Close Session", action: #selector(MenuTarget.closeSession), keyEquivalent: "")
         closeSession.target = MenuTarget.shared
@@ -74,44 +78,29 @@ enum MainMenuBuilder {
             item.target = MenuTarget.shared
             workspace.submenu?.addItem(item)
         }
-        let prevSession = NSMenuItem(title: "Previous Session", action: #selector(MenuTarget.previousSession), keyEquivalent: "[")
-        prevSession.keyEquivalentModifierMask = [.command, .shift]
-        prevSession.target = MenuTarget.shared
+        let prevSession = menuItem("Previous Session", action: #selector(MenuTarget.previousSession), binding: BannerShortcutRegistry.previousSession)
         workspace.submenu?.addItem(prevSession)
-        let nextSession = NSMenuItem(title: "Next Session", action: #selector(MenuTarget.nextSession), keyEquivalent: "]")
-        nextSession.keyEquivalentModifierMask = [.command, .shift]
-        nextSession.target = MenuTarget.shared
+        let nextSession = menuItem("Next Session", action: #selector(MenuTarget.nextSession), binding: BannerShortcutRegistry.nextSession)
         workspace.submenu?.addItem(nextSession)
         workspace.submenu?.addItem(.separator())
-        let moveSessionLeft = NSMenuItem(title: "Move Session Left", action: #selector(MenuTarget.moveSessionLeft), keyEquivalent: "\u{F702}")
-        moveSessionLeft.keyEquivalentModifierMask = [.command]
-        moveSessionLeft.target = MenuTarget.shared
+        let moveSessionLeft = menuItem("Move Session Left", action: #selector(MenuTarget.moveSessionLeft), binding: BannerShortcutRegistry.moveSessionLeft)
         workspace.submenu?.addItem(moveSessionLeft)
-        let moveSessionRight = NSMenuItem(title: "Move Session Right", action: #selector(MenuTarget.moveSessionRight), keyEquivalent: "\u{F703}")
-        moveSessionRight.keyEquivalentModifierMask = [.command]
-        moveSessionRight.target = MenuTarget.shared
+        let moveSessionRight = menuItem("Move Session Right", action: #selector(MenuTarget.moveSessionRight), binding: BannerShortcutRegistry.moveSessionRight)
         workspace.submenu?.addItem(moveSessionRight)
         main.addItem(workspace)
 
         let view = NSMenuItem()
         view.submenu = NSMenu(title: "View")
-        let splitHItem = NSMenuItem(title: "Split Right", action: #selector(MenuTarget.splitH), keyEquivalent: "d")
-        splitHItem.target = MenuTarget.shared
+        let splitHItem = menuItem("Split Right", action: #selector(MenuTarget.splitH), binding: BannerShortcutRegistry.splitRight)
         view.submenu?.addItem(splitHItem)
 
-        let splitVItem = NSMenuItem(title: "Split Down", action: #selector(MenuTarget.splitV), keyEquivalent: "d")
-        splitVItem.keyEquivalentModifierMask = [.command, .shift]
-        splitVItem.target = MenuTarget.shared
+        let splitVItem = menuItem("Split Down", action: #selector(MenuTarget.splitV), binding: BannerShortcutRegistry.splitDown)
         view.submenu?.addItem(splitVItem)
         view.submenu?.addItem(.separator())
 
-        let prevPane = NSMenuItem(title: "Previous Pane", action: #selector(MenuTarget.previousPane), keyEquivalent: "[")
-        prevPane.keyEquivalentModifierMask = [.command]
-        prevPane.target = MenuTarget.shared
+        let prevPane = menuItem("Previous Pane", action: #selector(MenuTarget.previousPane), binding: BannerShortcutRegistry.previousPane)
         view.submenu?.addItem(prevPane)
-        let nextPane = NSMenuItem(title: "Next Pane", action: #selector(MenuTarget.nextPane), keyEquivalent: "]")
-        nextPane.keyEquivalentModifierMask = [.command]
-        nextPane.target = MenuTarget.shared
+        let nextPane = menuItem("Next Pane", action: #selector(MenuTarget.nextPane), binding: BannerShortcutRegistry.nextPane)
         view.submenu?.addItem(nextPane)
         view.submenu?.addItem(.separator())
 
@@ -132,8 +121,7 @@ enum MainMenuBuilder {
         focusDown.target = MenuTarget.shared
         view.submenu?.addItem(focusDown)
 
-        let closePane = NSMenuItem(title: "Close Pane", action: #selector(MenuTarget.closePane), keyEquivalent: "w")
-        closePane.target = MenuTarget.shared
+        let closePane = menuItem("Close Pane", action: #selector(MenuTarget.closePane), binding: BannerShortcutRegistry.closePane)
         view.submenu?.addItem(closePane)
         view.submenu?.addItem(.separator())
 
@@ -148,28 +136,19 @@ enum MainMenuBuilder {
         jumpItem.keyEquivalentModifierMask = [.command, .shift]
         jumpItem.target = MenuTarget.shared
         view.submenu?.addItem(jumpItem)
-        let paletteItem = NSMenuItem(title: "Command Palette", action: #selector(MenuTarget.commandPalette), keyEquivalent: "p")
-        paletteItem.target = MenuTarget.shared
+        let paletteItem = menuItem("Command Palette", action: #selector(MenuTarget.commandPalette), binding: BannerShortcutRegistry.commandPalette)
         view.submenu?.addItem(paletteItem)
-        let promptItem = NSMenuItem(title: "Command Prompt", action: #selector(MenuTarget.commandPrompt), keyEquivalent: ";")
-        promptItem.keyEquivalentModifierMask = [.command]
-        promptItem.target = MenuTarget.shared
+        let promptItem = menuItem("Command Prompt", action: #selector(MenuTarget.commandPrompt), binding: BannerShortcutRegistry.commandPrompt)
         view.submenu?.addItem(promptItem)
         let searchHistoryItem = NSMenuItem(title: "Search Command History...", action: #selector(MenuTarget.searchCommandHistory), keyEquivalent: "r")
         searchHistoryItem.keyEquivalentModifierMask = [.control]
         searchHistoryItem.target = MenuTarget.shared
         view.submenu?.addItem(searchHistoryItem)
-        let findItem = NSMenuItem(title: "Find in Files…", action: #selector(MenuTarget.findInFiles), keyEquivalent: "f")
-        findItem.keyEquivalentModifierMask = [.command]
-        findItem.target = MenuTarget.shared
+        let findItem = menuItem("Find in Files…", action: #selector(MenuTarget.findInFiles), binding: BannerShortcutRegistry.findInFiles)
         view.submenu?.addItem(findItem)
-        let sidebarItem = NSMenuItem(title: "Toggle Sidebar", action: #selector(MenuTarget.toggleSidebar), keyEquivalent: "\\")
-        sidebarItem.keyEquivalentModifierMask = [.command]
-        sidebarItem.target = MenuTarget.shared
+        let sidebarItem = menuItem("Toggle Sidebar", action: #selector(MenuTarget.toggleSidebar), binding: BannerShortcutRegistry.toggleSidebar)
         view.submenu?.addItem(sidebarItem)
-        let gitPanelItem = NSMenuItem(title: "Show Git Panel", action: #selector(MenuTarget.showGitPanel), keyEquivalent: "g")
-        gitPanelItem.keyEquivalentModifierMask = [.command]
-        gitPanelItem.target = MenuTarget.shared
+        let gitPanelItem = menuItem("Show Git Panel", action: #selector(MenuTarget.showGitPanel), binding: BannerShortcutRegistry.gitPanel)
         view.submenu?.addItem(gitPanelItem)
         let sidebarPosItem = NSMenuItem(title: "Move Sidebar to Right", action: #selector(MenuTarget.toggleSidebarPosition), keyEquivalent: "")
         sidebarPosItem.target = MenuTarget.shared
@@ -222,13 +201,11 @@ enum MainMenuBuilder {
         fastFullScreen.keyEquivalentModifierMask = [.command, .control, .shift]
         windowMenu.addItem(fastFullScreen)
         windowMenu.addItem(.separator())
-        let openBrowserItem = NSMenuItem(
-            title: "Open Browser Pane",
+        let openBrowserItem = menuItem(
+            "Open Browser Pane",
             action: #selector(MenuTarget.openBrowserPane),
-            keyEquivalent: "b"
+            binding: BannerShortcutRegistry.browserPane
         )
-        openBrowserItem.keyEquivalentModifierMask = [.command]
-        openBrowserItem.target = MenuTarget.shared
         windowMenu.addItem(openBrowserItem)
         windowMenu.addItem(.separator())
         windowMenu.addItem(NSMenuItem(title: "Bring All to Front", action: #selector(NSApplication.arrangeInFront(_:)), keyEquivalent: ""))
@@ -420,7 +397,14 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
     @objc func focusPaneRight() { SessionCoordinator.shared.focusPaneDirectional(.right) }
     @objc func focusPaneUp() { SessionCoordinator.shared.focusPaneDirectional(.up) }
     @objc func focusPaneDown() { SessionCoordinator.shared.focusPaneDirectional(.down) }
-    @objc func closePane() { SessionCoordinator.shared.killActivePane() }
+    @objc func closePane() {
+        let coord = SessionCoordinator.shared
+        if case .leaf = coord.snapshot.activeWorkspace?.activeTab?.rootPane {
+            coord.closeActiveTab()
+        } else {
+            coord.killActivePane()
+        }
+    }
 
     @objc func previousPane() { SessionCoordinator.shared.cycleActivePane(forward: false) }
     @objc func nextPane() { SessionCoordinator.shared.cycleActivePane(forward: true) }

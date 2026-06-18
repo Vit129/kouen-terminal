@@ -309,7 +309,10 @@ enum CommandPaletteController {
                     shortcut: "",
                     section: .projects
                 ) {
-                    if let wsID = coordinator.snapshot.activeWorkspaceID {
+                    // cd active terminal to this directory (IDE-like Switch Project).
+                    if let surfaceID = coordinator.activeSurfaceID {
+                        coordinator.requestDaemon(.sendKeys(surfaceID: surfaceID.uuidString, keys: ["cd \(capturedRoot)", "Enter"]))
+                    } else if let wsID = coordinator.snapshot.activeWorkspaceID {
                         coordinator.addSession(to: wsID, cwd: capturedRoot)
                     }
                 })

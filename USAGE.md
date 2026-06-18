@@ -237,6 +237,37 @@ File editor opens when you click a file in the sidebar, or via `:view <path>` / 
 :split path/to/file    → open file in a new split pane
 ```
 
+### Recommended Shell Tools
+
+Harness works best with these CLI tools installed. They power `⌘P` directory jump and fast navigation:
+
+```bash
+brew install zoxide fzf ripgrep bat
+```
+
+Add to `~/.zshrc`:
+
+```bash
+eval "$(zoxide init zsh)"
+source <(fzf --zsh)
+alias cat="bat --paging=never"
+```
+
+| Tool | What it does | Harness integration |
+|------|-------------|---------------------|
+| `zoxide` | Smart cd — learns your frequent directories | `⌘P` shows zoxide frecency list, select to cd |
+| `fzf` | Fuzzy finder for files, history, directories | `ctrl+r` history, `alt+c` cd, `ctrl+t` file |
+| `ripgrep` (`rg`) | Fast grep (10x faster than grep) | `:grep` uses rg when available |
+| `bat` | cat with syntax highlighting | Better `cat` output in terminal |
+
+After install, `z <keyword>` jumps to any directory you've visited:
+
+```bash
+z myproject     # cd to ~/Git/Personal/My-Project
+z plans         # cd to .../agent-memory/plans
+z downloads     # cd to ~/Downloads
+```
+
 ## More Docs
 
 - [docs/MULTIPLEXER_GUIDE.md](docs/MULTIPLEXER_GUIDE.md) - panes, sessions, copy mode, attach, remote workflows

@@ -28,8 +28,16 @@ public enum TerminalBanner {
         }
         lines.append([])
         lines.append([Run("Shortcuts", sgr: bold)])
-        for (index, step) in welcome.shortcuts.enumerated() {
-            lines += wrappedStep(number: index + 1, key: step.key, what: step.description, inner: inner)
+        var stepNumber = 0
+        for step in welcome.shortcuts {
+            if step.key.isEmpty {
+                // Section header
+                lines.append([])
+                lines.append([Run("── \(step.description) ──", sgr: dim)])
+            } else {
+                stepNumber += 1
+                lines += wrappedStep(number: stepNumber, key: step.key, what: step.description, inner: inner)
+            }
         }
         lines.append([])
         lines.append([Run("Docs: harnesscli.dev"), Run("  ·  ", sgr: dim), Run("Settings: ⌘,")])
