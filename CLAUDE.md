@@ -47,7 +47,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `agent-memory/CONTEXT.md` — current session state: active task, plan, key files (rewrite every session).
 - `agent-memory/MEMORY.md` — persistent decisions + lessons (append-only).
 - `agent-memory/index.md` — catalog of plans + knowledge.
-- `agent-memory/playbook.md` — reusable fix patterns and prevention notes (on-demand).
+- `agent-memory/PLAYBOOK.md` — reusable fix patterns and prevention notes (on-demand).
 - `agent-memory/knowledge/` — durable domain notes for architecture areas such as IPC, AppKit/Metal, ACP, split panes, and git panel behavior.
 
 ## Graphify + agent-memory
