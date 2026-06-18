@@ -79,12 +79,9 @@ final class NotificationBellButton: NSControl {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 
-    override nonisolated func layout() {
-        if !Thread.isMainThread { DispatchQueue.main.async { [weak self] in self?.needsLayout = true }; return }
-        MainActor.assumeIsolated {
-            super.layout()
-            applyChrome()
-        }
+    override func layout() {
+        super.layout()
+        applyChrome()
     }
 
     override func updateTrackingAreas() {

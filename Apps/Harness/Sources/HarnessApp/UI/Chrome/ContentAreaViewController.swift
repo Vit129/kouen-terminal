@@ -425,7 +425,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         let oldContainer = paneContainer
         paneContainer?.removeFromSuperview()
         retiredContainer = oldContainer
-        DispatchQueue.main.async { [weak self] in self?.retiredContainer = nil }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in self?.retiredContainer = nil }
 
         let container = PaneContainerView(
             node: displayNode,
@@ -1004,9 +1004,7 @@ final class HarnessSplitView: NSSplitView, NSSplitViewDelegate {
 
     override var dividerColor: NSColor { HarnessChrome.current.border }
 
-    override nonisolated func layout() {
-        if !Thread.isMainThread { DispatchQueue.main.async { [weak self] in self?.needsLayout = true }; return }
-        MainActor.assumeIsolated {
+    override func layout() {
         super.layout()
         guard !appliedRatio, !isApplyingPositions else { return }
         let count = subviews.count
@@ -1034,7 +1032,6 @@ final class HarnessSplitView: NSSplitView, NSSplitViewDelegate {
         subviews.forEach {
             $0.needsLayout = true
             $0.layoutSubtreeIfNeeded()
-        }
         }
     }
 
@@ -1072,7 +1069,7 @@ final class HarnessSplitView: NSSplitView, NSSplitViewDelegate {
         // Coalesce the stream of drag events into one write after the drag settles.
         ratioDebounce?.cancel()
         let work = DispatchWorkItem {
-            MainActor.assumeIsolated {
+            Task { @MainActor in
                 SessionCoordinator.shared.setSplitRatio(
                     tabID: tabID,
                     firstPaneID: firstPaneID,

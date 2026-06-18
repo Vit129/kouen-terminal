@@ -24,7 +24,7 @@ extension HarnessTerminalSurfaceView {
         blinkGeneration &+= 1
         let expectedGen = blinkGeneration
         let timer = Timer(timeInterval: 0.53, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated {
+            Task { @MainActor in
                 guard let self, self.blinkGeneration == expectedGen else { return }
                 guard self.effectivelyFocused else { return }
                 self.cursorBlinkVisible.toggle()

@@ -23,7 +23,7 @@ enum DesktopNotifier {
         if withSound { DispatchQueue.main.async { NSSound(named: "Glass")?.play() } }
     }
     static func authorizationStatus(_ completion: @escaping @MainActor (UNAuthorizationStatus) -> Void) {
-        DispatchQueue.main.async { MainActor.assumeIsolated { completion(.notDetermined) } }
+        Task { @MainActor in completion(.notDetermined) }
     }
     static func requestOrOpenSettings() { openSystemNotificationSettings() }
     static func openSystemNotificationSettings() {

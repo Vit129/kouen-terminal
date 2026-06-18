@@ -131,4 +131,13 @@ final class WorkspaceFileTreeView: NSView {
             hostingView.bottomAnchor.constraint(equalTo: bottomAnchor),
         ])
     }
+
+    override func viewWillMove(toWindow newWindow: NSWindow?) {
+        super.viewWillMove(toWindow: newWindow)
+        if newWindow == nil {
+            // Detach the hosting view so SwiftUI stops re-evaluating the body
+            // after the backing context is freed (zombie @Observable access → crash).
+            hostingView?.removeFromSuperview()
+        }
+    }
 }

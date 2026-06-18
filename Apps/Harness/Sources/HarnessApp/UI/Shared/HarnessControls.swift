@@ -72,12 +72,10 @@ final class HarnessTextField: NSTextField {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 
-    override nonisolated func layout() {
-        if !Thread.isMainThread { DispatchQueue.main.async { [weak self] in self?.needsLayout = true }; return }
-        MainActor.assumeIsolated {
-            super.layout()
-            applyChrome()
-        }}
+    override func layout() {
+        super.layout()
+        applyChrome()
+    }
 
     override func becomeFirstResponder() -> Bool {
         let ok = super.becomeFirstResponder()
@@ -162,12 +160,10 @@ final class HarnessSearchField: NSView, NSTextFieldDelegate {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 
-    override nonisolated func layout() {
-        if !Thread.isMainThread { DispatchQueue.main.async { [weak self] in self?.needsLayout = true }; return }
-        MainActor.assumeIsolated {
-            super.layout()
-            applyChrome()
-        }}
+    override func layout() {
+        super.layout()
+        applyChrome()
+    }
 
     // Forward focus to the inner field so clicking/`makeFirstResponder` lands in the
     // editable text (the container itself is non-editable).
@@ -258,9 +254,7 @@ final class HarnessToggle: NSControl {
         return NSSize(width: Self.trackWidth + labelWidth, height: Self.trackHeight)
     }
 
-    override nonisolated func layout() {
-        if !Thread.isMainThread { DispatchQueue.main.async { [weak self] in self?.needsLayout = true }; return }
-        MainActor.assumeIsolated {
+    override func layout() {
         super.layout()
         let y = (bounds.height - Self.trackHeight) / 2
         track.frame = NSRect(x: 0, y: y, width: Self.trackWidth, height: Self.trackHeight)
@@ -268,7 +262,6 @@ final class HarnessToggle: NSControl {
         knob.cornerRadius = Self.knobSize / 2
         positionKnob(animated: false)
         applyChrome()
-        }
     }
 
     private func positionKnob(animated: Bool) {
@@ -375,9 +368,7 @@ final class HarnessSlider: NSControl {
         return span <= 0 ? 0 : CGFloat((value - minValue) / span)
     }
 
-    override nonisolated func layout() {
-        if !Thread.isMainThread { DispatchQueue.main.async { [weak self] in self?.needsLayout = true }; return }
-        MainActor.assumeIsolated {
+    override func layout() {
         super.layout()
         let midY = bounds.midY
         let usable = bounds.width - Self.knobSize
@@ -394,7 +385,6 @@ final class HarnessSlider: NSControl {
         knob.cornerRadius = Self.knobSize / 2
         CATransaction.commit()
         applyChrome()
-        }
     }
 
     override func updateTrackingAreas() {
@@ -478,16 +468,13 @@ final class HarnessSwatchWell: NSControl {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 
-    override nonisolated func layout() {
-        if !Thread.isMainThread { DispatchQueue.main.async { [weak self] in self?.needsLayout = true }; return }
-        MainActor.assumeIsolated {
+    override func layout() {
         super.layout()
         CATransaction.begin(); CATransaction.setDisableActions(true)
         swatch.frame = bounds
         swatch.cornerRadius = HarnessDesign.Radius.control
         CATransaction.commit()
         applyChrome()
-        }
     }
 
     override func updateTrackingAreas() {
@@ -629,9 +616,7 @@ final class HarnessSegmented: NSControl {
         return NSSize(width: max(1, CGFloat(titles.count)) * perSegment, height: 26)
     }
 
-    override nonisolated func layout() {
-        if !Thread.isMainThread { DispatchQueue.main.async { [weak self] in self?.needsLayout = true }; return }
-        MainActor.assumeIsolated {
+    override func layout() {
         super.layout()
         guard !titles.isEmpty else { return }
         let w = bounds.width / CGFloat(titles.count)
@@ -646,7 +631,6 @@ final class HarnessSegmented: NSControl {
                                      width: max(0, w - 8), height: textHeight)
         }
         applyChrome()
-        }
     }
 
     override func updateTrackingAreas() {
@@ -754,12 +738,10 @@ final class HarnessSelect: NSControl {
         setAccessibilityValue(title)
     }
 
-    override nonisolated func layout() {
-        if !Thread.isMainThread { DispatchQueue.main.async { [weak self] in self?.needsLayout = true }; return }
-        MainActor.assumeIsolated {
-            super.layout()
-            applyChrome()
-        }}
+    override func layout() {
+        super.layout()
+        applyChrome()
+    }
 
     /// Leaving the window (e.g. the Settings window closing) must tear down any open popover
     /// so its child panel + event monitor can't outlive the control.

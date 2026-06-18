@@ -51,7 +51,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // application happens post-daemon-sync below (so the theme change reaches a ready daemon);
         // this observer handles every later Light/Dark flip.
         appearanceObservation = NSApp.observe(\.effectiveAppearance, options: [.new]) { [weak self] _, _ in
-            MainActor.assumeIsolated {
+            Task { @MainActor in
                 SessionCoordinator.shared.applyAutoThemeForCurrentAppearance()
                 self?.mainWindowController?.applyChrome()
             }

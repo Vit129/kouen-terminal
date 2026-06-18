@@ -76,11 +76,11 @@ final class SessionCoordinator: NSObject {
             do { resolved = try RemoteHostsService.shared.connect(named: name) }
             catch { failureMessage = "\(error)" }
             let endpoint = resolved; let message = failureMessage
-            DispatchQueue.main.async { MainActor.assumeIsolated {
+            Task { @MainActor in
                 guard let self else { return }
                 if let endpoint { self.applyEndpointSwitch(endpoint) }
                 else { self.noteDaemonError(DaemonSessionError.daemonError(message ?? "connection failed")) }
-            }}
+            }
         }
     }
 

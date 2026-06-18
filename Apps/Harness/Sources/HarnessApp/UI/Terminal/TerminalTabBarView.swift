@@ -229,18 +229,10 @@ final class TerminalTabBarView: NSView {
 
     // MARK: - Layout
 
-    override nonisolated func layout() {
-        if Thread.isMainThread {
-            MainActor.assumeIsolated {
-                super.layout()
-                guard draggingPill == nil else { return }
-                layoutPills()
-            }
-        } else {
-            DispatchQueue.main.async { [weak self] in
-                self?.needsLayout = true
-            }
-        }
+    override func layout() {
+        super.layout()
+        guard draggingPill == nil else { return }
+        layoutPills()
     }
 
     private func layoutPills() {

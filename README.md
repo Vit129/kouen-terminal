@@ -49,19 +49,6 @@ For an isolated dev/test app that does not touch production Harness state:
 make preview
 ```
 
-For a release-style app at the repository root without copying to `/Applications`:
-
-```bash
-make prod
-open Harness.app
-```
-
-If you already ran `make prod` and only want to copy that existing app to `/Applications`:
-
-```bash
-make install-no-build
-```
-
 See [USAGE.md](USAGE.md) for the full install, run, CLI, and remote/headless guide.
 
 ## Why Harness

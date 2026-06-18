@@ -42,7 +42,7 @@ final class MainExecutor: CommandExecutor {
             try execute(command)
         } catch {
             let message = "error: \(error)"
-            DispatchQueue.main.async { MainActor.assumeIsolated { DisplayMessage.show(message) } }
+            Task { @MainActor in DisplayMessage.show(message) }
         }
     }
 
@@ -810,7 +810,7 @@ enum RunShell {
                 try process.run()
             } catch {
                 // A launch failure (bad shell path) is rare but otherwise invisible — surface it.
-                DispatchQueue.main.async { MainActor.assumeIsolated { DisplayMessage.show("run-shell failed: \(error.localizedDescription)") } }
+                Task { @MainActor in DisplayMessage.show("run-shell failed: \(error.localizedDescription)") }
                 return
             }
             let data = out?.fileHandleForReading.readDataToEndOfFile() ?? Data()
@@ -843,7 +843,7 @@ enum RunShell {
             } else {
                 success = false
             }
-            DispatchQueue.main.async { MainActor.assumeIsolated { completion(success) } }
+            Task { @MainActor in completion(success) }
         }
     }
 }
