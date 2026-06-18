@@ -679,10 +679,49 @@ final class GitPanelView: NSView {
 
     private func runAndRefresh(_ args: [String], clearField: Bool = false) {
         guard let path = currentPath else { return }
+        let label = args.first?.capitalized ?? "Git"
+        syncButton.isEnabled = false
+        syncButton.title = "\(label)…"
         Task {
-            _ = await runGit(args, in: path)
-            if clearField { commitField.stringValue = "" }
+            let result = await runGitWithStatus(args, in: path)
+            syncButton.isEnabled = true
+            syncButton.title = "Sync ▾"
+            if result.success {
+                if clearField { commitField.stringValue = "" }
+                Toast.show("✓ \(label) complete", in: self)
+            } else {
+                let msg = result.stderr.prefix(120)
+                Toast.show("✗ \(label) failed: \(msg)", in: self, hold: 3.0)
+            }
             await refresh()
+        }
+    }
+
+    private struct GitResult { let output: String; let stderr: String; let success: Bool }
+
+    private func runGitWithStatus(_ args: [String], in directory: String) async -> GitResult {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+                process.arguments = args
+                process.currentDirectoryURL = URL(fileURLWithPath: directory)
+                let outPipe = Pipe()
+                let errPipe = Pipe()
+                process.standardOutput = outPipe
+                process.standardError = errPipe
+                do {
+                    try process.run()
+                    let outData = outPipe.fileHandleForReading.readDataToEndOfFile()
+                    let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
+                    process.waitUntilExit()
+                    let output = String(data: outData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                    let stderr = String(data: errData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                    continuation.resume(returning: GitResult(output: output, stderr: stderr, success: process.terminationStatus == 0))
+                } catch {
+                    continuation.resume(returning: GitResult(output: "", stderr: error.localizedDescription, success: false))
+                }
+            }
         }
     }
 
