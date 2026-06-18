@@ -110,6 +110,19 @@ if let val = optional { x = someMethod(val) }
 else { x = fallback }
 ```
 
+### 6. Guard `updateTrackingAreas()` against windowless views
+
+```swift
+override public func updateTrackingAreas() {
+    super.updateTrackingAreas()
+    if let trackingArea { removeTrackingArea(trackingArea) }
+    guard window != nil else { trackingArea = nil; return }
+    // ... create and add new tracking area ...
+}
+```
+
+**Why:** AppKit calls `updateTrackingAreas()` during layout/dealloc cycles even AFTER `viewWillMove(toWindow: nil)` removed the tracking area. Without this guard, the tracking area is re-created on a windowless view → view deallocates → `mouseMoved` dispatches to zombie via the orphaned tracking area.
+
 ## The Misdiagnosis (CASE-034)
 
 On Jun 16, an AI agent (Codex) saw `_checkExpectedExecutor` in the crash stack and diagnosed it as "AppKit calling layout from a non-main executor context." The prescribed fix was `override nonisolated func layout() { MainActor.assumeIsolated { ... } }`.
