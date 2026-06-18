@@ -81,7 +81,7 @@ final class BoardViewController: NSViewController {
 
     /// Recomputes columns from the live snapshot and rebuilds the card stacks.
     @objc func reload() {
-        columns = BoardModel.classify(snapshot: SessionCoordinator.shared.snapshot)
+        let newColumns = BoardModel.classify(snapshot: SessionCoordinator.shared.snapshot)
             .map { col in
                 // Filter dismissed cards from Needs Attention column only.
                 var c = col
@@ -90,6 +90,8 @@ final class BoardViewController: NSViewController {
                 }
                 return c
             }
+        guard newColumns != columns else { return }
+        columns = newColumns
 
         columnsStack.subviews.forEach { $0.removeFromSuperview() }
         for column in columns {
