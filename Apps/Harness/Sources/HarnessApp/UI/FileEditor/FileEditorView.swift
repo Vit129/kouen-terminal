@@ -280,7 +280,16 @@ final class FileEditorView: NSView {
         syntaxView.isHidden = true
         messageLabel.isHidden = true
         quickLookContainer.isHidden = false
-        quickLookContainer.subviews.forEach { $0.removeFromSuperview() }
+
+        if let existing = quickLookContainer.subviews.first as? QLPreviewView {
+            // Reuse existing preview view — avoids blink on file switch
+            if existing.previewItem?.previewItemURL == url {
+                existing.refreshPreviewItem()
+            } else {
+                existing.previewItem = url as NSURL
+            }
+            return
+        }
 
         guard let preview = QLPreviewView(frame: .zero, style: .normal) else {
             showMessage("Unable to start Quick Look preview.")
