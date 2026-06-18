@@ -232,11 +232,6 @@ public enum TerminalBanner {
         let shortcuts: [BannerShortcut]
     }
 
-    private struct BannerShortcut: Codable {
-        let key: String
-        let description: String
-    }
-
     private static func loadWelcomeConfig() -> WelcomeConfig {
         let file = HarnessPaths.applicationSupport.appendingPathComponent("welcome.json")
         if let data = try? Data(contentsOf: file),
@@ -254,20 +249,6 @@ public enum TerminalBanner {
             "Agent-aware — Claude Code, Codex & friends show live working / needs-attention status on their tab",
             "Remote-ready — run the daemon on a Linux box or server and attach from here over SSH",
         ],
-        shortcuts: [
-            .init(key: "⌘⇧N / ⌘⇧W",      description: "new / close session"),
-            .init(key: "⌘D / ⌘⇧D",       description: "split right / split down"),
-            .init(key: "⌘W / ⌘⇧W",       description: "close pane / close tab"),
-            .init(key: "⌘[ / ⌘]",        description: "previous / next pane"),
-            .init(key: "⌘⇧[ / ⌘⇧]",     description: "previous / next session"),
-            .init(key: "⌘← / ⌘→",       description: "reorder session in tab bar"),
-            .init(key: "⌘1 … ⌘9",        description: "switch to session 1–9"),
-            .init(key: "⌘P",              description: "fuzzy file search"),
-            .init(key: "⌘F",              description: "find in files"),
-            .init(key: "⌘B",              description: "browser pane"),
-            .init(key: "⌘;",              description: "command prompt · try: find, grep, cd"),
-            .init(key: "⌘\\",             description: "toggle sidebar"),
-            .init(key: "harness-cli ping", description: "script Harness from any shell"),
-        ]
+        shortcuts: BannerShortcutRegistry.bannerShortcuts
     )
 }
