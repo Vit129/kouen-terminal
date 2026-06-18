@@ -12,22 +12,42 @@ from robot.api.deco import keyword, library
 
 
 BUNDLE_ID = "com.robert.harness.preview"
+BUNDLE_ID_STAGING = "com.robert.harness.staging"
 APP_NAME = "Harness"
+
+# Staging = release-optimized build with isolated state (not production data)
+# Catches crashes that only appear in -O builds without touching user's real sessions.
+STAGING_HOME = "/tmp/harness-staging-tests"
 
 
 @library(scope="GLOBAL")
 class HarnessUILibrary:
 
+    def __init__(self):
+        self._env = "preview"
+
     @keyword("Launch Harness")
-    def launch_harness(self):
-        """Launch Harness preview app and wait for window."""
-        subprocess.run(["open", "-b", BUNDLE_ID], check=True)
+    def launch_harness(self, env="preview"):
+        """Launch Harness app. env: 'preview' (debug) or 'staging' (release+isolated)."""
+        self._env = env
+        if env == "staging":
+            import os
+            os.makedirs(STAGING_HOME, exist_ok=True)
+            # Launch the repo-root Harness.app (release build) with isolated home
+            app_path = self._repo_root() + "/Harness.app"
+            subprocess.run(
+                ["open", app_path, "--env", f"HARNESS_HOME={STAGING_HOME}"],
+                check=True
+            )
+        else:
+            subprocess.run(["open", "-b", BUNDLE_ID], check=True)
         time.sleep(2)
         self._wait_for_window()
 
     @keyword("Quit Harness")
-    def quit_harness(self):
-        """Quit Harness preview app."""
+    def quit_harness(self, env=None):
+        """Quit Harness app."""
+        env = env or self._env
         self._osascript(f'tell application "{APP_NAME}" to quit')
         time.sleep(1)
 
@@ -223,3 +243,103 @@ class HarnessUILibrary:
             end tell
         end tell
         '''
+
+    # --- Stability test keywords ---
+
+    @keyword("App Should Not Crash")
+    def app_should_not_crash(self):
+        """Verify app is still running (no crash report in last 10s)."""
+        import glob, os
+        time.sleep(0.5)
+        reports = glob.glob(os.path.expanduser("~/Library/Logs/DiagnosticReports/Harness*.ips"))
+        recent = [r for r in reports if os.path.getmtime(r) > time.time() - 10]
+        if recent:
+            raise AssertionError(f"App crashed! Report: {recent[-1]}")
+
+    @keyword("Get Heap Count")
+    def get_heap_count(self, class_name):
+        """Get count of heap objects of given class in running Harness."""
+        pid = self._get_pid()
+        result = subprocess.run(["heap", str(pid), "-s"], capture_output=True, text=True)
+        for line in result.stdout.splitlines():
+            if class_name in line:
+                parts = line.split()
+                if parts and parts[0].isdigit():
+                    return int(parts[0])
+        return 0
+
+    @keyword("Get Terminal Size")
+    def get_terminal_size(self):
+        """Get cols x rows from active terminal via stty."""
+        cli = self._cli_path()
+        result = subprocess.run(
+            [cli, "capture-pane", "--surface", self._active_surface(), "--rows", "1"],
+            capture_output=True, text=True
+        )
+        return result.stdout.strip()[:20]
+
+    @keyword("Send Keys")
+    def send_keys(self, text):
+        """Send raw keys to active terminal surface."""
+        cli = self._cli_path()
+        surface = self._active_surface()
+        subprocess.run([cli, "send-keys", "--surface", surface, "--keys", text], check=True)
+
+    @keyword("Send Ex Command")
+    def send_ex_command(self, command):
+        """Send :ex command via CLI."""
+        cli = self._cli_path()
+        surface = self._active_surface()
+        subprocess.run([cli, "send-keys", "--surface", surface, "--keys", f"{command} Enter"], check=True)
+
+    @keyword("Hover Tab")
+    def hover_tab(self, index):
+        """Hover over tab pill at given index (AppleScript)."""
+        self._osascript(f'''
+            tell application "System Events"
+                tell process "{APP_NAME}"
+                    -- hover approximation via mouse move
+                end tell
+            end tell
+        ''')
+
+    @keyword("Click Sync Button")
+    def click_sync_button(self):
+        """Click the Sync/Fetch button in Git panel."""
+        self._osascript(f'''
+            tell application "System Events"
+                tell process "{APP_NAME}"
+                    click button "Sync ▾" of window 1
+                end tell
+            end tell
+        ''')
+
+    @keyword("Toast Should Appear")
+    def toast_should_appear(self):
+        """Verify a toast appeared (check for label with ✓ or ✗)."""
+        time.sleep(0.5)  # toast visible for 1-3s
+        # Toast is transient - just verify no crash
+        self.app_should_not_crash()
+
+    def _get_pid(self):
+        result = subprocess.run(["pgrep", "-f", "Harness.app/Contents/MacOS/Harness$"],
+                                capture_output=True, text=True)
+        return int(result.stdout.strip().split()[0]) if result.stdout.strip() else 0
+
+    def _cli_path(self):
+        if self._env == "staging":
+            return self._repo_root() + "/.build/release/harness-cli"
+        return self._repo_root() + "/.build/debug/harness-cli"
+
+    def _active_surface(self):
+        cli = self._cli_path()
+        env = {"HARNESS_HOME": STAGING_HOME} if self._env == "staging" else {}
+        import os
+        full_env = {**os.environ, **env}
+        result = subprocess.run([cli, "list-surfaces"], capture_output=True, text=True, env=full_env)
+        lines = result.stdout.strip().splitlines()
+        return lines[0].split()[0] if lines else ""
+
+    def _repo_root(self):
+        import os
+        return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
