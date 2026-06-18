@@ -76,5 +76,23 @@ else
   ./Scripts/commit-push.sh
 fi
 
+# Step 5: Tag + GitHub release.
 echo ""
-echo "✅ Full cycle complete."
+echo "▶ Step 5: Tagging and creating GitHub release..."
+NEW_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$ROOT/Apps/Harness/Sources/HarnessApp/Resources/Info.plist")"
+TAG="v${NEW_VERSION}"
+
+# Read changelog for this version (between first two ## headers)
+NOTES="$(sed -n "/^## \[${NEW_VERSION}\]/,/^## \[/{/^## \[${NEW_VERSION}\]/d;/^## \[/d;p}" CHANGELOG.md 2>/dev/null)" || NOTES=""
+if [[ -z "$NOTES" ]]; then
+  NOTES="Release ${TAG}"
+fi
+
+git tag -f "$TAG" -m "$TAG"
+git push origin main --tags --force
+gh release create "$TAG" --title "$TAG" --notes "$NOTES" 2>/dev/null \
+  || gh release edit "$TAG" --title "$TAG" --notes "$NOTES" 2>/dev/null \
+  || echo "⚠️  GitHub release skipped (gh CLI not configured or tag exists)"
+
+echo ""
+echo "✅ Full cycle complete. Version: $TAG"
