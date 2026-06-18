@@ -15,6 +15,48 @@ Key sessions:
 
 ---
 
+## Phase 0 — Swift 6.3+ Concurrency Safety (P0, LESSONS FROM macOS 26.5 CRASH SAGA)
+
+Critical findings from the 40-crash zombie incident (Jun 16–18, 2026).
+These MUST be maintained on any macOS 27 SDK upgrade.
+
+### Rules (enforced, not optional)
+
+1. **Never use `nonisolated` on AppKit overrides** (`layout()`, `viewDidMoveToWindow()`, etc.)
+   - Swift 6.3+ allows `@MainActor` class to override without `nonisolated`
+   - `nonisolated` causes `@objc` thunk to add runtime executor check → crash on zombie
+
+2. **Never use `MainActor.assumeIsolated`** in Timer/NotificationCenter/completion callbacks
+   - Use `Task { @MainActor in }` instead
+   - `assumeIsolated` can dereference NULL task context on macOS 26.5+
+
+3. **Always `guard window != nil` in `updateTrackingAreas()`**
+   - AppKit calls it during dealloc/layout after view left window
+   - Without guard: tracking area re-created → event dispatched to zombie
+
+4. **Deferred dealloc (500ms) for terminal hosts**
+   - `TerminalPaneRegistry.retire()` holds host alive after removal
+   - Covers keyUp, mouseMoved, resetCursorRects that arrive in later event iterations
+
+5. **Avoid `Optional.map {}` closures in `@MainActor` code**
+   - Closure triggers executor check → NULL if no task context
+   - Use `if let` instead
+
+6. **Kill app BEFORE build in install scripts**
+   - Prevents crash loop where old binary crashes repeatedly during build
+
+### Verification checklist for macOS 27 beta
+
+- [ ] Run `grep -rn "override nonisolated" Apps/ Packages/` — must return 0 results
+- [ ] Run `grep -rn "MainActor.assumeIsolated" Apps/` — only allowed in TerminalHostView hot path (with [weak self]+guard)
+- [ ] Run app for 2+ hours without crash
+- [ ] Check `heap <PID> | grep NSTextField` — count should be stable (no growth)
+- [ ] Confirm `updateTrackingAreas` all have `guard window != nil`
+
+See: `agent-memory/knowledge/bugs/zombie-crash-macos26.md` for full details.
+
+---
+
 ## Phase 1 — Compatibility (P0)
 
 Ensure Harness builds and runs correctly on macOS 27 beta without regressions.
