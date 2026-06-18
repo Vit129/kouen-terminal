@@ -101,3 +101,7 @@ video-render:
 
 video-doctor:
 	cd marketing/video && npx hyperframes doctor
+
+cheatsheet:
+	node Scripts/generate-cheatsheet.js
+	@echo "Open: open sheet-cheat.html"

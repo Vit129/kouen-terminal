@@ -61,6 +61,7 @@ let platformTargets: [Target] = [
     // dependencies (deliberately isolated, mirrors install paths via its own helpers).
     .target(
         name: "HarnessOnboarding",
+        dependencies: ["HarnessCore"],
         path: "Packages/HarnessOnboarding/Sources/HarnessOnboarding"
     ),
     .executableTarget(

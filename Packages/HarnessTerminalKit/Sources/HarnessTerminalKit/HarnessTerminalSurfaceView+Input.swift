@@ -168,6 +168,11 @@ extension HarnessTerminalSurfaceView {
     }
 
     public override func keyDown(with event: NSEvent) {
+        // RL-040: AppKit can deliver a queued keyDown after the view leaves its window
+        // (zombie). The @objc thunk crashes in swift_task_isCurrentExecutorWithFlagsImpl
+        // when the runtime context is partially torn down. Bail immediately.
+        guard window != nil else { return }
+
         // Copy mode is modal: it consumes every key (motions, search entry, copy/cancel)
         // and nothing reaches the PTY. ⌘ shortcuts still fall through to the app.
         if copyMode != nil, !event.modifierFlags.contains(.command) {
@@ -275,6 +280,10 @@ extension HarnessTerminalSurfaceView {
     }
 
     public override func keyUp(with event: NSEvent) {
+        // RL-040/RL-041: keyUp arrives in a later event loop iteration than keyDown.
+        // Guard against zombie dispatch after the view leaves its window.
+        guard window != nil else { return }
+
         // Terminals never report key release — except under the Kitty keyboard protocol's "report
         // event types" flag (0b10), which a program must explicitly enable. No-op otherwise.
         let modes = inputModes()

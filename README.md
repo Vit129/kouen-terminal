@@ -58,7 +58,8 @@ See [USAGE.md](USAGE.md) for the full install, run, CLI, and remote/headless gui
 - `harness-cli` automation for creating sessions, sending keys, capturing panes, installing hooks, and driving remote/headless daemons.
 - Agent detection and notifications for Claude Code, Codex, Cursor, Grok, Pi, Hermes, OpenClaw, OpenCode, Aider, Gemini, Goose, and generic agents.
 - Optional tmux-style controls: prefix key, status line, copy mode, paste buffers, hooks, command prompt, and many tmux-compatible commands.
-- Sidebar tools for sessions, file navigation, real-time Git workflows, command palette, and editor/LSP flows. ⌘-clicking a file path in the terminal opens it in the editor and reveals it in the file tree.
+- IDE-like navigation — double-click folders to cd, ⌘P fuzzy jump to any directory via zoxide frecency, ⌘-click file paths, and `:cd` from the command prompt.
+- Sidebar tools for sessions, file navigation with folder cd, real-time Git workflows, command palette, and editor/LSP flows. ⌘-clicking a file path in the terminal opens it in the editor and reveals it in the file tree.
 
 ## How It Feels
 
@@ -128,6 +129,7 @@ harness-cli capture-pane --host devbox --surface <id>
 - [docs/MIGRATION.md](docs/MIGRATION.md) - migrating from tmux or another terminal setup
 - [docs/COMMANDS.md](docs/COMMANDS.md) - full command reference including workbench commands (`:find`, `:grep`, `:make`, `:errors`, `:recent`)
 - [docs/KEYBINDINGS.md](docs/KEYBINDINGS.md) - shortcuts, key bindings, and vi ex command quick reference (IDE-like navigation)
+- [sheet-cheat.html](sheet-cheat.html) - interactive cheat sheet (shell tools, unix, vim, Harness) — regenerate with `make cheatsheet`
 - [docs/shell-integration/README.md](docs/shell-integration/README.md) - shell integration
 - [docs/agent-hooks/README.md](docs/agent-hooks/README.md) - agent notification hooks
 - [docs/MULTIPLEXER_GUIDE.md](docs/MULTIPLEXER_GUIDE.md) - sessions, panes, prefix key, attach, copy mode

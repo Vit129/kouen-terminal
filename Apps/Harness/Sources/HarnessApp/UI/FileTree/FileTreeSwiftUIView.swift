@@ -533,6 +533,13 @@ private struct NodeRow: View {
                     .contentShape(Rectangle())
                     .background(isFocused ? Color.accentColor.opacity(0.2) : Color.clear)
                     .cornerRadius(4)
+                    .onTapGesture(count: 2) {
+                        // Double-click folder → cd terminal to this path
+                        let coord = SessionCoordinator.shared
+                        if let surfaceID = coord.activeSurfaceID {
+                            coord.requestDaemon(.sendKeys(surfaceID: surfaceID.uuidString, keys: ["cd \(node.node.path)", "Enter"]))
+                        }
+                    }
                     .onTapGesture {
                         keyboard.focusedPath = node.node.path
                         node.isExpanded.toggle()
