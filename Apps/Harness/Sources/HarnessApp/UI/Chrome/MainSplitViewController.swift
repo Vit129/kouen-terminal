@@ -360,6 +360,10 @@ final class MainSplitViewController: NSViewController {
 
     /// Toggles sidebar visibility (⌘\).
     func toggleSidebar() {
+        if !didApplyInitialSidebarState {
+            didApplyInitialSidebarState = true
+            applyInitialSidebarState()
+        }
         let visible = SessionCoordinator.shared.settings.sidebarVisible
         setSidebarVisible(!visible, animated: true)
     }
