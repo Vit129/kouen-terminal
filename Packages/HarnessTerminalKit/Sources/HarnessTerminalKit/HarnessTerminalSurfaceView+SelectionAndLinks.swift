@@ -360,6 +360,7 @@ extension HarnessTerminalSurfaceView {
     override public func updateTrackingAreas() {
         super.updateTrackingAreas()
         if let trackingArea { removeTrackingArea(trackingArea) }
+        guard window != nil else { trackingArea = nil; return }
         let area = NSTrackingArea(
             rect: bounds,
             options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect],
