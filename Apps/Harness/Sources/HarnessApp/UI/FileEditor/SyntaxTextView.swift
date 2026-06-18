@@ -245,13 +245,9 @@ final class SyntaxTextView: NSView {
         textView.mouseDown(with: event)
     }
 
-    override func mouseDragged(with event: NSEvent) {
-        textView.mouseDragged(with: event)
-    }
-
-    override func mouseUp(with event: NSEvent) {
-        textView.mouseUp(with: event)
-    }
+    // mouseDragged/mouseUp not forwarded: NSTextView's mouseDown installs a tracking
+    // loop that captures drag and up events internally. Forwarding mouseUp from here
+    // causes infinite recursion via the responder chain (stack overflow crash).
 
     private func setup() {
         wantsLayer = true
