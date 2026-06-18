@@ -214,9 +214,9 @@ enum CommandPaletteController {
             .init(id: "action.settings",      title: "Open Settings",             subtitle: "Theme, font, agents, key bindings",              symbol: "gearshape",                          shortcut: "⌘,",       section: "actions"),
             .init(id: "action.reimport",      title: "Re-import Terminal Config", subtitle: "Reload theme, colors & font from your terminal config", symbol: "arrow.triangle.2.circlepath", shortcut: "Prefix r",  section: "actions"),
             .init(id: "nav.jumpNotification", title: "Jump to Notification",      subtitle: "Focus the next tab waiting on input",            symbol: "bell.badge",                         shortcut: "⇧⌘U",      section: "navigation"),
-            .init(id: "nav.prevSession",      title: "Previous Session",          subtitle: "Cycle to the previous session",                  symbol: "chevron.left.square",                shortcut: "⌘[",       section: "navigation"),
-            .init(id: "nav.nextSession",      title: "Next Session",              subtitle: "Cycle to the next session",                      symbol: "chevron.right.square",               shortcut: "⌘]",       section: "navigation"),
-            .init(id: "nav.cyclePane",        title: "Cycle Pane",                subtitle: "Move focus to the next pane in the tab",         symbol: "rectangle.3.group",                  shortcut: "Prefix o",  section: "navigation"),
+            .init(id: "nav.prevSession",      title: "Previous Session",          subtitle: "Cycle to the previous session",                  symbol: "chevron.left.square",                shortcut: "⌘⇧[",     section: "navigation"),
+            .init(id: "nav.nextSession",      title: "Next Session",              subtitle: "Cycle to the next session",                      symbol: "chevron.right.square",               shortcut: "⌘⇧]",     section: "navigation"),
+            .init(id: "nav.cyclePane",        title: "Cycle Pane",                subtitle: "Move focus to the next pane in the tab",         symbol: "rectangle.3.group",                  shortcut: "⌘]",       section: "navigation"),
         ]
 
         let configs = loadPaletteConfig() ?? defaultConfigs
