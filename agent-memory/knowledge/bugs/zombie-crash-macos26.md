@@ -33,20 +33,20 @@ This means **no guard code inside the method body can prevent the crash** — it
 
 ## Fixes Applied
 
-### 1. `TerminalPaneRegistry.retire()` — deferred dealloc (100ms)
+### 1. `TerminalPaneRegistry.retire()` — deferred dealloc (500ms)
 
 ```swift
 private func retire(_ host: TerminalHostView) {
     host.resignIfFirstResponder()
     host.removeFromSuperview()
     retired.append(host)
-    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
         self?.retired.removeAll { $0 === host }
     }
 }
 ```
 
-**Why 100ms:** `keyUp` arrives in a LATER event loop iteration than `keyDown`. A single async tick (1 run loop pass) is insufficient. 100ms covers the full key press/release cycle and any pending layout/hit-test passes.
+**Why 500ms:** `keyUp` arrives in a LATER event loop iteration than `keyDown`. A single async tick (1 run loop pass) is insufficient. 500ms covers the full key press/release cycle and any pending layout/hit-test passes.
 
 **Also applied to:** `retiredContainer` in `ContentAreaViewController.reloadIfNeeded`.
 
@@ -137,7 +137,7 @@ On Jun 16, an AI agent (Codex) saw `_checkExpectedExecutor` in the crash stack a
 
 1. **Never use `nonisolated` on AppKit overrides** in `@MainActor` classes on Swift 6.3+.
 2. **Never use `MainActor.assumeIsolated`** in Timer/NotificationCenter/completion callbacks — use `Task { @MainActor in }` instead.
-3. **Always defer view dealloc** when removing terminal hosts — use `retire()` with ≥100ms delay.
+3. **Always defer view dealloc** when removing terminal hosts — use `retire()` with ≥500ms delay.
 4. **Detach NSHostingView** in `viewWillMove(toWindow: nil)` for any NSView-hosted SwiftUI that references `@Observable` objects.
 5. **Avoid closures** (`map`, `flatMap`, `compactMap`) on properties inside `@MainActor` code when the closure body calls instance methods — use `if let` / `guard let` instead.
 
@@ -152,7 +152,28 @@ On Jun 16, an AI agent (Codex) saw `_checkExpectedExecutor` in the crash stack a
 | Jun 16-17 | 40 crashes total across all categories | v3.2.0-3.2.7 |
 | Jun 18 08:10 | Optional.map crash discovered | preview |
 | Jun 18 08:13 | keyUp timing discovered (1 tick insufficient) | preview |
-| Jun 18 08:39 | All fixes committed — `9102192` | main |
+| Jun 18 11:00 | updateTrackingAreas re-add after removal discovered | preview |
+| Jun 18 12:08 | TabPillView same pattern (18 total sites fixed) | build 153 |
+| Jun 18 13:55 | 100ms retire insufficient — launch rebuild race | build 154 |
+| Jun 18 14:12 | Script crash loop — old app crashes during install | build 154 |
+| Jun 18 14:15 | All fixes complete: 500ms + script kill-first | main |
+
+## Why It Took So Long
+
+1. **macOS 26.5 + Swift 6.3.2** changed executor check → exposed latent zombies that never crashed before
+2. **Codex misdiagnosis** (CASE-034) added `nonisolated+assumeIsolated` which made things worse
+3. **Multiple free paths**: `registry.prune`, `detachHostsOnly`, `retiredContainer`, `removeHost` — each needed separate handling
+4. **Timing sensitivity**: 1 async tick → 100ms → 500ms — had to empirically find the right delay
+5. **`updateTrackingAreas`** re-creates tracking areas after removal — required fixing all 18 sites
+6. **Script ordering**: `make install` opened app before build finished → crash loop masked the real fix
+7. **Binary mismatch**: fixes pushed to git but installed app still ran old binary → false "still crashing"
+
+## Script Fix (Crash Loop Prevention)
+
+Old order: `build → kill → open` (app crashes during build)
+New order: `kill → wait 1s → build → install → open`
+
+Applied to: `Scripts/run.sh` (prod), `Scripts/install-app.sh`
 
 ### 7. Guard NSTableView delegate against stale row index
 
