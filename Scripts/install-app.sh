@@ -28,11 +28,19 @@ for arg in "$@"; do
   esac
 done
 
+# --- Stop production runtime FIRST (old binary can crash during build) ---
+echo "==> Stopping production runtime..."
+launchctl bootout "gui/$(id -u)" "$LAUNCH_AGENT" 2>/dev/null || true
+launchctl bootout "gui/$(id -u)/com.robert.harness.daemon" 2>/dev/null || true
+"$ROOT/Harness.app/Contents/MacOS/harness-cli" daemon stop 2>/dev/null || true
+pkill -f "/Applications/Harness.app/Contents/MacOS/HarnessDaemon" 2>/dev/null || true
+pkill -f "$APP_SUPPORT_BIN/HarnessDaemon" 2>/dev/null || true
+pkill -x Harness 2>/dev/null || true
+sleep 1
+
 # --- Build ---
 if [[ $NO_BUILD -eq 0 ]]; then
   echo "==> Building release (optimized)..."
-  # `swift build` only honors the last `--product` flag, not all of them — build
-  # everything in release config (mirrors `debug`'s `make build`).
   swift build -c release
   echo "==> Packaging..."
   Scripts/package-app.sh release
@@ -44,19 +52,6 @@ if [[ ! -d "$ROOT/Harness.app" ]]; then
   echo "error: Harness.app not found at $ROOT/Harness.app — run without --no-build" >&2
   exit 1
 fi
-
-# --- Stop production runtime (old app/daemon binaries can be held by launchd) ---
-echo "==> Stopping production runtime..."
-launchctl bootout "gui/$(id -u)" "$LAUNCH_AGENT" 2>/dev/null || true
-launchctl bootout "gui/$(id -u)/com.robert.harness.daemon" 2>/dev/null || true
-"$ROOT/Harness.app/Contents/MacOS/harness-cli" daemon stop 2>/dev/null || true
-pkill -f "/Applications/Harness.app/Contents/MacOS/HarnessDaemon" 2>/dev/null || true
-pkill -f "$APP_SUPPORT_BIN/HarnessDaemon" 2>/dev/null || true
-sleep 0.5
-
-# Kill any lingering Harness process so macOS releases the old bundle
-pkill -x Harness 2>/dev/null || true
-sleep 0.3
 
 # --- Install ---
 echo "==> Installing to $DEST..."

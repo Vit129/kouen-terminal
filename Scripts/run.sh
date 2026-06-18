@@ -59,13 +59,13 @@ case "$command" in
     exec make preview
     ;;
   prod)
-    # `swift build` only honors the last `--product` flag, not all of them — build
-    # everything in release config (mirrors `debug`'s `make build`).
+    # Kill FIRST so the old binary isn't holding files/sockets during build.
+    kill_stale_prod
     swift build -c release
     Scripts/package-app.sh release
     codesign --force --sign - --deep Harness.app >/dev/null
-    kill_stale_prod
     Scripts/clear-runtime-state.sh
+    sleep 0.3
     open Harness.app
     ;;
   run)
