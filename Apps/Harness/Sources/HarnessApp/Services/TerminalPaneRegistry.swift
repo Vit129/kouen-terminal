@@ -40,10 +40,11 @@ final class TerminalPaneRegistry {
     private func retire(_ host: TerminalHostView) {
         host.resignIfFirstResponder()
         host.removeFromSuperview()
-        // Keep alive long enough for paired keyUp/mouseUp events to drain.
-        // A single async tick isn't enough — keyUp arrives in a later event loop iteration.
+        // Keep alive long enough for ALL pending AppKit events to drain.
+        // 100ms wasn't enough — key events can queue across multiple run loop iterations
+        // during rapid rebuilds (initial launch, session switch). 500ms covers worst case.
         retired.append(host)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             self?.retired.removeAll { $0 === host }
         }
     }

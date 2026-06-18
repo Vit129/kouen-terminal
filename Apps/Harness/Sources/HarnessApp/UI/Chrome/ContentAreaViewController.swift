@@ -431,7 +431,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         let oldContainer = paneContainer
         paneContainer?.removeFromSuperview()
         retiredContainer = oldContainer
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in self?.retiredContainer = nil }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.retiredContainer = nil }
 
         let container = PaneContainerView(
             node: displayNode,
