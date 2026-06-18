@@ -17,10 +17,10 @@ final class AppIdleThrottle {
         let nc = NSWorkspace.shared.notificationCenter
         observers.append(nc.addObserver(
             forName: NSWorkspace.screensDidSleepNotification, object: nil, queue: .main
-        ) { [weak self] _ in MainActor.assumeIsolated { self?.suspend() } })
+        ) { [weak self] _ in Task { @MainActor in self?.suspend() } })
         observers.append(nc.addObserver(
             forName: NSWorkspace.screensDidWakeNotification, object: nil, queue: .main
-        ) { [weak self] _ in MainActor.assumeIsolated { self?.resume() } })
+        ) { [weak self] _ in Task { @MainActor in self?.resume() } })
     }
 
     private func suspend() {

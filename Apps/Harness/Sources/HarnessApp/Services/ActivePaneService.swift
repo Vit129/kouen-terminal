@@ -20,7 +20,9 @@ final class ActivePaneService {
         }
         coord.activeSurfaceID = surfaceID
         refreshPaneStyles()
-        let showBorder = surfaceID.map { paneCount(forSurface: $0) > 1 } ?? false
+        let showBorder: Bool
+        if let surfaceID { showBorder = paneCount(forSurface: surfaceID) > 1 }
+        else { showBorder = false }
         for host in coord.terminalHosts.allHosts() {
             host.showsActiveBorder = showBorder && host.surfaceID == surfaceID
         }

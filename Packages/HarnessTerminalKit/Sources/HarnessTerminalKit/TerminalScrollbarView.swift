@@ -64,7 +64,7 @@ final class TerminalScrollbarView: NSView {
                 ctx.duration = 0.4
                 self.animator().alphaValue = 0
             }, completionHandler: { [weak self] in
-                MainActor.assumeIsolated {
+                Task { @MainActor in
                     // A new show() during the fade re-snaps alpha to 1; don't hide it then.
                     guard let self, self.alphaValue == 0 else { return }
                     self.isHidden = true

@@ -306,7 +306,7 @@ final class MainSplitViewController: NSViewController {
             return
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0 / 60.0) { [weak self] in
-            MainActor.assumeIsolated {
+            Task { @MainActor in
                 self?.animateSidebar(from: start, to: target, t0: t0, visible: visible, token: token)
             }
         }
