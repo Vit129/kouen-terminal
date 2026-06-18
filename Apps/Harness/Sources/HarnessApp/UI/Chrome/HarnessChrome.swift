@@ -39,7 +39,7 @@ struct HarnessChromePalette {
     /// Build a palette directly from explicit hex strings (used when the user has
     /// set `background`/`foreground` in their terminal config — we want to honor
     /// the exact black-and-white look rather than a named theme's tinted palette).
-    static func from(backgroundHex: String, foregroundHex: String, cursorHex: String? = nil) -> HarnessChromePalette {
+    static func from(backgroundHex: String, foregroundHex: String, cursorHex: String? = nil, opacity: CGFloat = 1) -> HarnessChromePalette {
         let background = color(from: backgroundHex)
         let foreground = color(from: foregroundHex)
         let accent = cursorHex.map { color(from: $0) } ?? blend(foreground, toward: NSColor(srgbRed: 0.55, green: 0.7, blue: 1.0, alpha: 1), fraction: 0.3)
@@ -55,7 +55,8 @@ struct HarnessChromePalette {
             waiting: waiting,
             danger: danger,
             success: success,
-            idle: idle
+            idle: idle,
+            opacity: opacity
         )
     }
 
@@ -66,7 +67,8 @@ struct HarnessChromePalette {
         waiting: NSColor,
         danger: NSColor,
         success: NSColor,
-        idle: NSColor
+        idle: NSColor,
+        opacity: CGFloat = 1
     ) -> HarnessChromePalette {
         let isDark = perceivedBrightness(of: background) < 0.5
         // One consistent surface: the chrome (sidebar, tab strip, status line, overlays)
@@ -79,6 +81,12 @@ struct HarnessChromePalette {
         // borders and hover states are effectively invisible on a bright surface.
         let elevated = foreground.withAlphaComponent(isDark ? 0.07 : 0.08)
 
+        // When the window is transparent, chrome text at reduced alpha becomes invisible
+        // against bright wallpapers. Boost alpha proportional to transparency.
+        let alphaBoost = 1 - min(1, max(0, opacity))  // 0 when opaque, up to 1 when fully transparent
+        let secondaryAlpha = min(1.0, 0.66 + alphaBoost * 0.34)
+        let tertiaryAlpha = min(1.0, 0.40 + alphaBoost * 0.60)
+
         return HarnessChromePalette(
             isDark: isDark,
             terminalBackground: background,
@@ -90,8 +98,8 @@ struct HarnessChromePalette {
             accentSoft: accent.withAlphaComponent(0.16),
             focusRing: accent,
             textPrimary: foreground,
-            textSecondary: foreground.withAlphaComponent(0.66),
-            textTertiary: foreground.withAlphaComponent(0.40),
+            textSecondary: foreground.withAlphaComponent(secondaryAlpha),
+            textTertiary: foreground.withAlphaComponent(tertiaryAlpha),
             rowSelectedFill: foreground.withAlphaComponent(isDark ? 0.08 : 0.10),
             rowHoverFill: foreground.withAlphaComponent(isDark ? 0.045 : 0.065),
             iconHoverFill: foreground.withAlphaComponent(isDark ? 0.08 : 0.10),
@@ -171,7 +179,8 @@ enum HarnessChrome {
         current = HarnessChromePalette.from(
             backgroundHex: canvas.backgroundHex,
             foregroundHex: canvas.foregroundHex,
-            cursorHex: canvas.cursorHex
+            cursorHex: canvas.cursorHex,
+            opacity: max(0, min(1, opacity))
         )
         backgroundOpacity = max(0, min(1, opacity))
         backgroundBlur = max(0, min(100, blur))

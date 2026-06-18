@@ -359,7 +359,7 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         resizeOverlay: ResizeOverlayMode = .afterFirst,
         resizeOverlayPosition: ResizeOverlayPosition = .center,
         windowPaddingBalance: Bool = true,
-        minimumContrast: Double = 1,
+        minimumContrast: Double = 3.5,
         lightThemeName: String? = nil,
         darkThemeName: String? = nil,
         lightThemeOpacity: Float? = nil,
