@@ -1190,8 +1190,8 @@
     "semantic_hash": ""
   },
   "Packages/HarnessTerminalKit/Sources/HarnessTerminalKit/HarnessTerminalSurfaceView+SelectionAndLinks.swift": {
-    "mtime": 1781511609.1664045,
-    "ast_hash": "ffef907cb94a87bc1691f1a5db944c6f",
+    "mtime": 1781755354.9493365,
+    "ast_hash": "4ad26a8eeae8c1f77467f51b6ac649b3",
     "semantic_hash": ""
   },
   "Packages/HarnessTerminalKit/Sources/HarnessTerminalKit/FrameSignposter.swift": {
@@ -2250,8 +2250,8 @@
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/UI/Sidebar/BoardViewController.swift": {
-    "mtime": 1781577198.4381378,
-    "ast_hash": "f4a3cdc20cd5f53485c82a1f41f9c837",
+    "mtime": 1781749283.364405,
+    "ast_hash": "0d3d0e0512c1b97f09343c9c3c68e1da",
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/UI/Sidebar/HarnessSidebarPanelViewController+SessionMenu.swift": {
@@ -2330,8 +2330,8 @@
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/UI/FileEditor/FileEditorView.swift": {
-    "mtime": 1781514917.1967335,
-    "ast_hash": "3e27c354247475342dcd6d589b1c5558",
+    "mtime": 1781756408.4820347,
+    "ast_hash": "8c1b0d6e97e6276b5262d9b84242d1bf",
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/UI/FileTree/FileTreeSwiftUIView.swift": {
@@ -2505,8 +2505,8 @@
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/UI/Git/GitPanelView.swift": {
-    "mtime": 1781707992.5922508,
-    "ast_hash": "3be27b3d1239a670e59f0cbaf8863061",
+    "mtime": 1781755558.5911868,
+    "ast_hash": "ad56c874b814600ec33495ba8d8f54b1",
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/Settings/SettingsViewController+LiveApply.swift": {
@@ -2750,8 +2750,8 @@
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1781676154.9885004,
-    "ast_hash": "24ff45b2d51622d2dbfbec6ed5dcfbd2",
+    "mtime": 1781746677.6678305,
+    "ast_hash": "938226422904a431e9eb1674003fd7f7",
     "semantic_hash": ""
   },
   "AGENTS.md": {
@@ -3025,8 +3025,8 @@
     "semantic_hash": ""
   },
   "agent-memory/playbook.md": {
-    "mtime": 1781746015.079636,
-    "ast_hash": "63a4793a6928ff85d71c36a782bfa705",
+    "mtime": 1781747629.8608737,
+    "ast_hash": "c18d67958346f38ef463afc14eedb6f0",
     "semantic_hash": ""
   },
   "agent-memory/skill-log.md": {
@@ -3099,64 +3099,9 @@
     "ast_hash": "2ac3bb6001de4d27878a536910b53c45",
     "semantic_hash": ""
   },
-  "agent-memory/knowledge/ipc-architecture.md": {
-    "mtime": 1780884357.15999,
-    "ast_hash": "c21bf470951acf37deb82dcc3a2dfb3d",
-    "semantic_hash": ""
-  },
-  "agent-memory/knowledge/acp-client.md": {
-    "mtime": 1780884385.6490326,
-    "ast_hash": "b32d72775669144a63a3f612015e6b8c",
-    "semantic_hash": ""
-  },
-  "agent-memory/knowledge/service-decomposition.md": {
-    "mtime": 1781446870.3991225,
-    "ast_hash": "54e99491c1ded4e9e2009de235dfcbbf",
-    "semantic_hash": ""
-  },
-  "agent-memory/knowledge/project-history.md": {
-    "mtime": 1781514917.2080932,
-    "ast_hash": "ab3be62cc3436d6d59e4f065d8ed4fe4",
-    "semantic_hash": ""
-  },
-  "agent-memory/knowledge/session-tab-hierarchy.md": {
-    "mtime": 1781576658.242824,
-    "ast_hash": "697b69885bfe7cf8cdb6709ef9ed34f6",
-    "semantic_hash": ""
-  },
-  "agent-memory/knowledge/git-panel.md": {
-    "mtime": 1781060746.1954427,
-    "ast_hash": "95461b194a83af881120797053de6a38",
-    "semantic_hash": ""
-  },
-  "agent-memory/knowledge/split-panes.md": {
-    "mtime": 1781432384.6993167,
-    "ast_hash": "67782b425c644ee74334e98ad6426a94",
-    "semantic_hash": ""
-  },
   "agent-memory/knowledge/index.md": {
-    "mtime": 1781605455.9764528,
-    "ast_hash": "5178a277eb227ab4d0da3b087b5b44b2",
-    "semantic_hash": ""
-  },
-  "agent-memory/knowledge/appkit-metal.md": {
-    "mtime": 1781583713.2526908,
-    "ast_hash": "681abbf375b4fe591463daf0c2de833e",
-    "semantic_hash": ""
-  },
-  "agent-memory/knowledge/agent-session-board.md": {
-    "mtime": 1781432384.6984093,
-    "ast_hash": "f589513755f92f4455227d49488f189d",
-    "semantic_hash": ""
-  },
-  "agent-memory/knowledge/fsevents-pattern.md": {
-    "mtime": 1781167622.2827845,
-    "ast_hash": "e36a05e176e42ef1d172c8745663a97d",
-    "semantic_hash": ""
-  },
-  "agent-memory/knowledge/ui-automation.md": {
-    "mtime": 1781446886.202508,
-    "ast_hash": "02c75a952274b2bd1cbf114f65707ec8",
+    "mtime": 1781747813.494925,
+    "ast_hash": "49faf4ff19ff8bfef1cca21766a99a1a",
     "semantic_hash": ""
   },
   "Apps/Harness/Resources/Fonts/SymbolsNerdFont-LICENSE.txt": {
@@ -3264,11 +3209,6 @@
     "ast_hash": "26dbd6f0ae3707c4b1a3d750b2d23063",
     "semantic_hash": ""
   },
-  "agent-memory/knowledge/browser-pane.md": {
-    "mtime": 1781511609.167369,
-    "ast_hash": "a3fc1eb599665a567e8f19adf27e8137",
-    "semantic_hash": ""
-  },
   "Tools/harness/Sources/HarnessCLI/HarnessCLI+Agent.swift": {
     "mtime": 1781530026.2677305,
     "ast_hash": "4cb67a69b74011f6ce53b87bd29d0167",
@@ -3302,16 +3242,6 @@
   "agent-memory/plans/p22-long-session-responsiveness.md": {
     "mtime": 1781685704.4986534,
     "ast_hash": "4966d58edadcfb9d70dd1d4f499d5399",
-    "semantic_hash": ""
-  },
-  "agent-memory/knowledge/tab-bar.md": {
-    "mtime": 1781605444.5784607,
-    "ast_hash": "befe54ac95b93f735335837479b438bd",
-    "semantic_hash": ""
-  },
-  "agent-memory/knowledge/background-polling.md": {
-    "mtime": 1781608286.280022,
-    "ast_hash": "51220f23eea18cef9fde173fd77ea08d",
     "semantic_hash": ""
   },
   "docs/examples/syntax-keywords.json": {
@@ -3380,8 +3310,8 @@
     "semantic_hash": ""
   },
   "agent-memory/plans/index.md": {
-    "mtime": 1781608673.9158602,
-    "ast_hash": "2063bdd151caa190fec966117c740106",
+    "mtime": 1781754674.4776216,
+    "ast_hash": "7396bcb589dda5e823cc147a41614ee9",
     "semantic_hash": ""
   },
   "Packages/HarnessCore/Sources/HarnessCore/OutputTrigger/OutputTriggerStore.swift": {
@@ -3392,6 +3322,91 @@
   "docs/examples/output-triggers.json": {
     "mtime": 1781679405.154214,
     "ast_hash": "b31f104097cae67e81b956afdee3b749",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/architecture/background-polling.md": {
+    "mtime": 1781608286.280022,
+    "ast_hash": "51220f23eea18cef9fde173fd77ea08d",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/architecture/ipc-architecture.md": {
+    "mtime": 1780884357.15999,
+    "ast_hash": "c21bf470951acf37deb82dcc3a2dfb3d",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/architecture/service-decomposition.md": {
+    "mtime": 1781446870.3991225,
+    "ast_hash": "54e99491c1ded4e9e2009de235dfcbbf",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/architecture/session-tab-hierarchy.md": {
+    "mtime": 1781576658.242824,
+    "ast_hash": "697b69885bfe7cf8cdb6709ef9ed34f6",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/bugs/nstextfield-leak-board.md": {
+    "mtime": 1781753910.4583783,
+    "ast_hash": "9c71f788d0de0e10ef40024af2fefc25",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/bugs/zombie-crash-macos26.md": {
+    "mtime": 1781755653.3447022,
+    "ast_hash": "28139296cc1ef5841adcb98210912063",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/meta/project-history.md": {
+    "mtime": 1781514917.2080932,
+    "ast_hash": "ab3be62cc3436d6d59e4f065d8ed4fe4",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/patterns/acp-client.md": {
+    "mtime": 1780884385.6490326,
+    "ast_hash": "b32d72775669144a63a3f612015e6b8c",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/patterns/fsevents-pattern.md": {
+    "mtime": 1781167622.2827845,
+    "ast_hash": "e36a05e176e42ef1d172c8745663a97d",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/patterns/ui-automation.md": {
+    "mtime": 1781446886.202508,
+    "ast_hash": "02c75a952274b2bd1cbf114f65707ec8",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/ui/agent-session-board.md": {
+    "mtime": 1781432384.6984093,
+    "ast_hash": "f589513755f92f4455227d49488f189d",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/ui/appkit-metal.md": {
+    "mtime": 1781583713.2526908,
+    "ast_hash": "681abbf375b4fe591463daf0c2de833e",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/ui/browser-pane.md": {
+    "mtime": 1781511609.167369,
+    "ast_hash": "a3fc1eb599665a567e8f19adf27e8137",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/ui/git-panel.md": {
+    "mtime": 1781060746.1954427,
+    "ast_hash": "95461b194a83af881120797053de6a38",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/ui/split-panes.md": {
+    "mtime": 1781432384.6993167,
+    "ast_hash": "67782b425c644ee74334e98ad6426a94",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/ui/tab-bar.md": {
+    "mtime": 1781605444.5784607,
+    "ast_hash": "befe54ac95b93f735335837479b438bd",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/p23-ssh-remote-ui.md": {
+    "mtime": 1781754674.477901,
+    "ast_hash": "24d0d07afbb372e0dc471271791caec7",
     "semantic_hash": ""
   }
 }
