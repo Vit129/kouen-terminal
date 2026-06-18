@@ -17,7 +17,7 @@
 | browser-pane.md | AppKit/WebKit | WKWebView, BrowserLeaf, applyLocalSnapshot, hit-testing, URLDetection, localhost | 2/0 | P14 embedded Browser Pane: architecture, applyLocalSnapshot re-injection bug (close button no-op), collapsed errorBanner hit-testing bug, ⌘B shortcut, click-to-open localhost/LAN dev-server links |
 | tab-bar.md | AppKit/UI | TabPillView, statusDot, branchLabel, gitBranch, drag, reorder, pill, shouldShowBranch, effectiveAgentKind, agentIcon | 1/0 | Tab bar pill layout; `Tab.effectiveAgentKind` centralized agent detection (daemon + OSC title inference); agent icon in sidebar cards; drag-reorder cancel-on-structural-reload |
 | background-polling.md | Performance | SurfaceShellTracker, DaemonSyncService, metadataRefresh, snapshotChanged, fanout, PerfCounters, metadataOnly, double-subscription | 1/0 | P22 background polling architecture: SurfaceShellTracker proc-tree walk, 5-s metadata refresh loop, snapshotChanged fanout consumers and gate logic, PerfCounters instrumentation, known non-P22 syncFromDaemon callers |
-| zombie-crash-macos26.md | Swift/AppKit | zombie, macOS26, Swift6.3, executor, nonisolated, layout, retire, assumeIsolated, @objc, thunk, CASE-034-040 | 5/0 | macOS 26.5 + Swift 6.3.2 zombie view crashes: @objc thunk executor check dereferences freed self. Fixes: retire() 100ms, remove nonisolated, avoid Optional.map closures, detach NSHostingView |
+| bugs/zombie-crash-macos26.md | Swift/AppKit | zombie, macOS26, Swift6.3, executor, nonisolated, layout, retire, assumeIsolated, @objc, thunk, CASE-034-040 | 5/0 | macOS 26.5 + Swift 6.3.2 zombie view crashes: @objc thunk executor check dereferences freed self. Fixes: retire() 100ms, remove nonisolated, avoid Optional.map closures, detach NSHostingView |
 
 ## Source Map
 
@@ -33,7 +33,7 @@
 | browser-pane.md | `HarnessApp/UI/Chrome/BrowserPaneView.swift`, `HarnessApp/Services/SplitPaneCoordinator.swift`, `HarnessApp/Services/DaemonSyncService.swift`, `HarnessApp/UI/Chrome/MainMenuBuilder.swift`, `HarnessApp/UI/Chrome/ContentAreaViewController.swift`, `HarnessApp/UI/Chrome/MainSplitViewController.swift`, `HarnessTerminalEngine/URLDetection.swift`, `HarnessTerminalKit/HarnessTerminalSurfaceView+SelectionAndLinks.swift` |
 | tab-bar.md | `HarnessApp/UI/Terminal/TerminalTabBarView.swift`, `HarnessCore/Metadata/MetadataProvider.swift`, `HarnessApp/Services/DaemonSyncService.swift`, `HarnessApp/UI/Chrome/ContentAreaViewController.swift` |
 | background-polling.md | `HarnessApp/Services/SurfaceShellTracker.swift`, `HarnessApp/Services/DaemonSyncService.swift`, `HarnessApp/Services/PerfCounters.swift`, `HarnessApp/UI/Chrome/MainSplitViewController.swift`, `HarnessApp/UI/Sidebar/BoardViewController.swift`, `HarnessApp/UI/Notch/NotchPanelController.swift`, `HarnessApp/UI/Sidebar/HarnessSidebarPanelViewController.swift` |
-| zombie-crash-macos26.md | `HarnessApp/Services/TerminalPaneRegistry.swift`, `HarnessApp/UI/Chrome/ContentAreaViewController.swift`, `HarnessApp/UI/FileTree/WorkspaceFileTreeView.swift`, `HarnessApp/Services/ActivePaneService.swift`, `HarnessTerminalKit/HarnessTerminalSurfaceView+Scrollback.swift`, `HarnessTerminalKit/TerminalScrollbarView.swift`, `HarnessTerminalKit/ResizeHUDView.swift` |
+| bugs/zombie-crash-macos26.md | `HarnessApp/Services/TerminalPaneRegistry.swift`, `HarnessApp/UI/Chrome/ContentAreaViewController.swift`, `HarnessApp/UI/FileTree/WorkspaceFileTreeView.swift`, `HarnessApp/Services/ActivePaneService.swift`, `HarnessTerminalKit/HarnessTerminalSurfaceView+Scrollback.swift`, `HarnessTerminalKit/TerminalScrollbarView.swift`, `HarnessTerminalKit/ResizeHUDView.swift` |
 
 ## Edges
 
@@ -48,9 +48,9 @@
 | browser-pane.md | ipc-architecture.md | DaemonSyncService, snapshot, applySnapshot |
 | tab-bar.md | session-tab-hierarchy.md | reloadTabBar, TabPillView, SessionGroup, pill-per-session |
 | tab-bar.md | agent-session-board.md | statusDot, BoardColumnKind, tab status classification |
-| zombie-crash-macos26.md | appkit-metal.md | NSView lifecycle, zombie, removeFromSuperview |
-| zombie-crash-macos26.md | background-polling.md | snapshotChanged fanout, timing, view rebuild |
-| zombie-crash-macos26.md | tab-bar.md | TerminalTabBarView.layout(), zombie crash |
+| bugs/zombie-crash-macos26.md | appkit-metal.md | NSView lifecycle, zombie, removeFromSuperview |
+| bugs/zombie-crash-macos26.md | background-polling.md | snapshotChanged fanout, timing, view rebuild |
+| bugs/zombie-crash-macos26.md | tab-bar.md | TerminalTabBarView.layout(), zombie crash |
 
 ## Search Instructions
 
