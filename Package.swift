@@ -251,7 +251,8 @@ let package = Package(
         .testTarget(
             name: "HarnessTerminalEngineTests",
             dependencies: ["HarnessTerminalEngine"],
-            path: "Tests/HarnessTerminalEngineTests"
+            path: "Tests/HarnessTerminalEngineTests",
+            resources: [.copy("ReflowGolden")]
         ),
         .testTarget(
             name: "HarnessCopyModeTests",

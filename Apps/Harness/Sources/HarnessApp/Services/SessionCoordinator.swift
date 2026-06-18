@@ -158,6 +158,15 @@ final class SessionCoordinator: NSObject {
     func splitTab(workspaceID: WorkspaceID, tabID: TabID, direction: SplitDirection) { splitPaneCoordinator.splitTab(workspaceID: workspaceID, tabID: tabID, direction: direction) }
     func splitSession(workspaceID: WorkspaceID, sessionID: SessionID, direction: SplitDirection) { splitPaneCoordinator.splitSession(workspaceID: workspaceID, sessionID: sessionID, direction: direction) }
     func killActivePane() { splitPaneCoordinator.killActivePane() }
+
+    /// Close active pane (⌘W behavior): if single pane → close tab; otherwise kill pane.
+    func closeActivePane() {
+        if case .leaf = snapshot.activeWorkspace?.activeTab?.rootPane {
+            closeActiveTab()
+        } else {
+            killActivePane()
+        }
+    }
     func killPane(paneID: PaneID) { splitPaneCoordinator.killPane(paneID: paneID) }
     func paneID(for surfaceID: SurfaceID, in node: PaneNode) -> PaneID? { splitPaneCoordinator.paneID(for: surfaceID, in: node) }
     func firstSurfaceID(forTab tabID: TabID) -> SurfaceID? { splitPaneCoordinator.firstSurfaceID(forTab: tabID) }

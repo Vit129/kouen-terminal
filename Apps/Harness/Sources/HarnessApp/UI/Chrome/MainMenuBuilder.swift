@@ -344,7 +344,7 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
     }
 
     @objc func closeTab() {
-        SessionCoordinator.shared.closeActiveTabWithConfirmation()
+        SessionCoordinator.shared.closeActiveTab()
     }
 
     @objc func reopenClosedTab() {
@@ -398,12 +398,7 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
     @objc func focusPaneUp() { SessionCoordinator.shared.focusPaneDirectional(.up) }
     @objc func focusPaneDown() { SessionCoordinator.shared.focusPaneDirectional(.down) }
     @objc func closePane() {
-        let coord = SessionCoordinator.shared
-        if case .leaf = coord.snapshot.activeWorkspace?.activeTab?.rootPane {
-            coord.closeActiveTab()
-        } else {
-            coord.killActivePane()
-        }
+        SessionCoordinator.shared.closeActivePane()
     }
 
     @objc func previousPane() { SessionCoordinator.shared.cycleActivePane(forward: false) }
