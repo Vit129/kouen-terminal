@@ -6,6 +6,20 @@ All notable changes to Harness are documented here. The format is based on
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/robzilla1738/harness-terminal/releases).
 
+## [3.3.0] - 2026-06-18
+
+### Added
+- Single source of truth for keybindings (BannerShortcutRegistry.Keybinding)
+- ⌘W close pane/tab (iTerm2/Warp pattern), ⌘T new tab
+- IDE-like navigation: folder double-click cd, ⌘P zoxide jump, :cd to shell
+- Interactive cheat sheet (make cheatsheet)
+- Welcome banner with categorized shortcuts (Sessions/Navigation/Search & Navigate/Shell)
+- Robot Framework: keybinding_crash_regression.robot
+
+### Fixed
+- Zombie crash (RL-040/041): guard window != nil in keyDown/keyUp
+- full-cycle.sh now auto-tags + creates GitHub release
+
 ## [3.2.11] - 2026-06-18
 
 ### Fixed
