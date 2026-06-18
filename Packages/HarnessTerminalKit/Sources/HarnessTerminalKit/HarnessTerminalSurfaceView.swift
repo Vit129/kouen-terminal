@@ -969,10 +969,21 @@ public final class HarnessTerminalSurfaceView: NSView {
         self.copyOnSelect = copyOnSelect
         self.pasteProtection = pasteProtection
         colorProviderState.update(foreground: fg, background: bg, cursor: cursor, palette: palette)
+        // When the window is transparent, the actual visible background is a blend of the
+        // theme bg and whatever is behind the window (wallpaper, other apps). Assume a
+        // mid-gray desktop for contrast purposes so minimum-contrast enforcement doesn't
+        // underestimate the real background lightness.
+        let contrastBg: RGBColor
+        if self.canvasOpacity < 1 {
+            let midGray = RGBColor(red: 128, green: 128, blue: 128)
+            contrastBg = bg.blended(toward: midGray, fraction: Double(1 - self.canvasOpacity))
+        } else {
+            contrastBg = bg
+        }
         let resolver = CellColorResolver(
             palette: ANSIPalette(base16: palette),
             defaultForeground: fg,
-            defaultBackground: bg,
+            defaultBackground: contrastBg,
             boldBrightens: boldIsBright,
             minimumContrast: minimumContrast
         )
@@ -1202,6 +1213,7 @@ public final class HarnessTerminalSurfaceView: NSView {
     }
 
     override public func resetCursorRects() {
+        guard window != nil else { return }
         if let programPointerCursor {
             addCursorRect(bounds, cursor: programPointerCursor)
         } else {

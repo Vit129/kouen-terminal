@@ -135,7 +135,7 @@ final class TerminalTabBarView: NSView {
         // Defer dealloc: AppKit may still have pending tracking-area or layout
         // dispatches targeting the removed pills. Keep them alive one tick.
         retiredPills = oldPills
-        DispatchQueue.main.async { [weak self] in self?.retiredPills.removeAll() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.retiredPills.removeAll() }
 
         for (index, tab) in tabs.enumerated() {
             let id = tab.id
@@ -231,6 +231,7 @@ final class TerminalTabBarView: NSView {
 
     override func layout() {
         super.layout()
+        guard window != nil else { return }
         guard draggingPill == nil else { return }
         layoutPills()
     }
