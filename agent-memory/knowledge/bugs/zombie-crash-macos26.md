@@ -153,3 +153,14 @@ On Jun 16, an AI agent (Codex) saw `_checkExpectedExecutor` in the crash stack a
 | Jun 18 08:10 | Optional.map crash discovered | preview |
 | Jun 18 08:13 | keyUp timing discovered (1 tick insufficient) | preview |
 | Jun 18 08:39 | All fixes committed — `9102192` | main |
+
+### 7. Guard NSTableView delegate against stale row index
+
+```swift
+func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+    guard row < cachedSidebarRows.count else { return nil }
+    // ...
+}
+```
+
+**Why:** NSTableView can call delegate methods with a row index based on a stale `numberOfRows` count if the data source was rebuilt between the count query and the delegate call (classic AppKit race during rapid snapshot changes).
