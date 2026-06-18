@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import HarnessCore
 
 /// Final ready state. Clean text, a few practical commands, and one in-app handoff.
 struct CompleteStepView: View {
@@ -21,6 +22,14 @@ struct CompleteStepView: View {
                 CommandRow("harness-cli ping", "Check the daemon")
                 CommandRow("harness-cli list-surfaces", "List your sessions")
                 CommandRow("harness-cli attach-window --tab <id>", "Attach to a tab")
+            }
+            .frame(maxWidth: 420)
+
+            VStack(spacing: 8) {
+                ShortcutRow(key: BannerShortcutRegistry.newSession.displayKey, action: "New tab")
+                ShortcutRow(key: BannerShortcutRegistry.commandPalette.displayKey, action: "Command palette")
+                ShortcutRow(key: BannerShortcutRegistry.commandPrompt.displayKey, action: "Command prompt")
+                ShortcutRow(key: "Double-click folder", action: "cd terminal")
             }
             .frame(maxWidth: 420)
 

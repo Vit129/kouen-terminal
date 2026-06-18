@@ -205,6 +205,25 @@ struct CommandRow: View {
     }
 }
 
+struct ShortcutRow: View {
+    let key: String
+    let action: String
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(key)
+                .font(.system(size: 12, weight: .medium, design: .monospaced))
+                .foregroundStyle(Color.white.opacity(0.88))
+                .frame(width: 60, alignment: .trailing)
+            Text(action)
+                .font(.system(size: 11.5))
+                .foregroundStyle(Color.white.opacity(0.44))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 1)
+    }
+}
+
 struct StatusPill: View {
     enum Tone { case neutral, pending, success, danger }
     let text: String

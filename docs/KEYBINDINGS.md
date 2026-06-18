@@ -74,10 +74,10 @@ These are fixed `NSMenuItem` bindings defined in `MainMenuBuilder` — not prefi
 
 | Action | Shortcut |
 |--------|----------|
-| New session (workspace) | `⌘⇧N` |
+| New session (workspace) | `⌘T` |
 | Close session (workspace) | `⌘⇧W` |
 | Switch to session 1–9 | `⌘1` … `⌘9` |
-| Close tab | `⌘W` |
+| Close pane (or tab if single pane) | `⌘W` |
 | Previous / Next session | `⌘[` / `⌘]` |
 | Split Right | `⌘D` |
 | Split Down | `⌘⇧D` |
