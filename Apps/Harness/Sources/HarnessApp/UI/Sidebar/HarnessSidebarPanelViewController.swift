@@ -1194,6 +1194,7 @@ extension HarnessSidebarPanelViewController: NSTableViewDataSource, NSTableViewD
     }
 
     func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
+        guard row < cachedSidebarRows.count else { return 28 }
         switch cachedSidebarRows[row] {
         case .groupHeader:
             return 28
@@ -1211,6 +1212,7 @@ extension HarnessSidebarPanelViewController: NSTableViewDataSource, NSTableViewD
     }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+        guard row < cachedSidebarRows.count else { return nil }
         switch cachedSidebarRows[row] {
         case let .groupHeader(name, rootPath, isCollapsed, status):
             let header = SessionGroupHeaderRowView()
