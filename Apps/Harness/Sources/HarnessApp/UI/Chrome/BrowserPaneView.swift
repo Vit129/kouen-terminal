@@ -73,7 +73,13 @@ public final class BrowserPaneView: NSView {
 
     override public func removeFromSuperview() {
         super.removeFromSuperview()
-        BrowserPaneRegistry.shared.unregister(self.paneID)
+    }
+
+    override public func viewWillMove(toWindow newWindow: NSWindow?) {
+        super.viewWillMove(toWindow: newWindow)
+        if newWindow == nil {
+            BrowserPaneRegistry.shared.unregister(self.paneID)
+        }
     }
 
     private func setupUI() {
