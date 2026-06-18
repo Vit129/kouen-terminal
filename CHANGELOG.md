@@ -6,6 +6,20 @@ All notable changes to Harness are documented here. The format is based on
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/robzilla1738/harness-terminal/releases).
 
+## [3.2.11] - 2026-06-18
+
+### Fixed
+- **Eliminate macOS 26.5 zombie view crashes** — 40+ crashes resolved via NSEvent local monitor, deferred dealloc (500ms), tracking area guards (18 sites), layout override cleanup (16 sites), and first-responder resign before rebuild.
+- **Memory leak** — BoardViewController NSTextField leak (21GB over 11hrs) fixed with column-diff guard.
+- **Image preview blink** — reuse QLPreviewView instead of recreating on each file click.
+- **Sidebar tableView crash** — bounds-check row index in delegate methods.
+- **⌘\\ sidebar toggle on first launch** — force apply initial sidebar state if not yet run.
+- **Git panel Fetch/Pull/Push** — add loading indicator, success/error toast, ahead/behind count on sync button.
+
+### Changed
+- Build scripts kill app before build to prevent crash loop during install.
+- Retire delay increased to 500ms to cover full key press/release cycle.
+
 ## [3.2.10] - 2026-06-18
 
 ### Added

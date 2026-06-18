@@ -185,3 +185,19 @@ func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, ro
 ```
 
 **Why:** NSTableView can call delegate methods with a row index based on a stale `numberOfRows` count if the data source was rebuilt between the count query and the delegate call (classic AppKit race during rapid snapshot changes).
+
+### 8. NSEvent local monitor — the definitive fix (sender-side prevention)
+
+```swift
+NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .keyUp, .mouseMoved, .mouseEntered, .mouseExited]) { event in
+    guard let window = event.window else { return event }
+    if let responder = window.firstResponder as? NSView, responder.window == nil {
+        return nil // swallow — target view is no longer in a window
+    }
+    return event
+}
+```
+
+**Why this is the definitive fix:** All other fixes (resign, retire, tracking area guard) operate at the *receiver side* — they try to prevent the view from being a target. But the crash occurs at the `@objc` thunk *before* any receiver code runs. The local event monitor fires *before* AppKit dispatches the event, allowing us to cancel it if the target is a zombie. This is the only approach that prevents the crash at source.
+
+**Applied in:** `AppDelegate.applicationDidFinishLaunching` — runs once at app startup, protects all views for the app's lifetime.
