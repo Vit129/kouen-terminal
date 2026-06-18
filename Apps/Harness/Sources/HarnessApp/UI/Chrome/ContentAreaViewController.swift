@@ -416,6 +416,12 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         fputs("BLINKDBG reloadIfNeeded REBUILD: force=\(force) oldKey=\(lastStructureKey) newKey=\(key)\n", harnessStderr)
         lastStructureKey = key
 
+        // Resign first responder BEFORE detaching so any in-flight key events
+        // dispatched during the rebuild target nil, not a soon-to-be-freed surface.
+        if let window = view.window, window.firstResponder is HarnessTerminalSurfaceView {
+            window.makeFirstResponder(nil)
+        }
+
         // Incremental update: detach existing terminal hosts from old container
         // (without removing them from window) then rebuild container around them.
         let existingHosts = paneContainer?.collectTerminalHosts() ?? [:]
@@ -755,8 +761,9 @@ final class PaneContainerView: NSView {
 
     private func detachHosts(in view: NSView) {
         for sub in view.subviews {
-            if sub is TerminalHostView {
-                sub.removeFromSuperview()
+            if let host = sub as? TerminalHostView {
+                host.resignIfFirstResponder()
+                host.removeFromSuperview()
             } else {
                 detachHosts(in: sub)
             }
