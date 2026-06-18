@@ -41,6 +41,13 @@ kill_stale() {
 # `preview` uses an isolated HARNESS_HOME and never goes through this path.
 kill_stale_prod() {
   kill_stale
+
+  # When running inside Harness, skip killing /Applications instance + its daemon —
+  # that would destroy our own terminal session mid-script.
+  if [[ "${TERM_PROGRAM:-}" == "Harness" ]]; then
+    return
+  fi
+
   pkill -f "/Applications/Harness.app/Contents/MacOS/HarnessDaemon" 2>/dev/null || true
   pkill -f "/Applications/Harness.app/Contents/MacOS/Harness\$" 2>/dev/null || true
   launchctl bootout "gui/$(id -u)/com.robert.harness.daemon" 2>/dev/null || true
@@ -59,14 +66,15 @@ case "$command" in
     exec make preview
     ;;
   prod)
-    # Kill FIRST so the old binary isn't holding files/sockets during build.
-    kill_stale_prod
     swift build -c release
     Scripts/package-app.sh release
     codesign --force --sign - --deep Harness.app >/dev/null
-    Scripts/clear-runtime-state.sh
+    kill_stale_prod
+    if [[ "${TERM_PROGRAM:-}" != "Harness" ]]; then
+      Scripts/clear-runtime-state.sh
+    fi
     sleep 0.3
-    open Harness.app
+    open -n Harness.app
     ;;
   run)
     if [[ ! -d Harness.app ]]; then
@@ -74,8 +82,10 @@ case "$command" in
       exit 1
     fi
     kill_stale_prod
-    Scripts/clear-runtime-state.sh
-    open Harness.app
+    if [[ "${TERM_PROGRAM:-}" != "Harness" ]]; then
+      Scripts/clear-runtime-state.sh
+    fi
+    open -n Harness.app
     ;;
   build)
     exec make build

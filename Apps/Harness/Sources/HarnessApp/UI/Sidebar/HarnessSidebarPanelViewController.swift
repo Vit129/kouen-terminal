@@ -1306,7 +1306,8 @@ extension HarnessSidebarPanelViewController: NSTableViewDataSource, NSTableViewD
                 isSelected: session.id == SessionCoordinator.shared.snapshot.activeWorkspace?.activeSessionID
             )
             cell.onClose = { [weak self] in
-                self?.confirmCloseSession(session)
+                guard self != nil else { return }
+                SessionCoordinator.shared.closeSession(session)
             }
             cell.onContextMenu = { [weak self] in
                 self?.sessionActionsMenu(for: session)
