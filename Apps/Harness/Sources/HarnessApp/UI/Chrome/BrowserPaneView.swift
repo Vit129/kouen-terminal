@@ -71,10 +71,31 @@ public final class BrowserPaneView: NSView {
         NSLog("[BrowserPane] deinit \(uuid)")
     }
 
+    override public func viewDidMoveToSuperview() {
+        super.viewDidMoveToSuperview()
+        // When the browser pane is reattached after a pane tree rebuild, WKWebView
+        // may show a blank/pink frame until the next draw cycle. Force a
+        // display to ensure the web content process repaints.
+        if superview != nil, window != nil {
+            webView.setNeedsDisplay(webView.bounds)
+            // Also nudge the web content process by evaluating a trivial script
+            // — this is the most reliable way to wake WKWebView's compositor.
+            webView.evaluateJavaScript("void(0)") { _, _ in }
+        }
+    }
+
     override public func viewWillMove(toWindow newWindow: NSWindow?) {
         super.viewWillMove(toWindow: newWindow)
         if newWindow == nil {
-            BrowserPaneRegistry.shared.unregister(self.paneID)
+            // Defer unregister: during pane tree rebuilds, the view is briefly detached
+            // then re-attached in the same runloop cycle. Only unregister if still
+            // windowless after the rebuild completes.
+            let id = paneID
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                if BrowserPaneRegistry.shared.get(id)?.window == nil {
+                    BrowserPaneRegistry.shared.unregister(id)
+                }
+            }
         }
     }
 

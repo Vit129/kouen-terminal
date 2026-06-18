@@ -31,6 +31,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `make dmg`, `make sign`, `make appcast`, `make finalize`, and `make hotfix-release` call the corresponding scripts; release order is `make release` -> `make sign` -> `make dmg` -> `make finalize`.
 - Theme catalog regeneration: `EXPORT_THEMES=1 swift test --filter ThemeCatalogEmbedTests` rewrites `Packages/HarnessTheme/Sources/HarnessTheme/BundledThemesData.swift` from `Packages/HarnessTheme/Sources/HarnessTheme/Resources/themes.json`.
 - Character width table regeneration is manual, not part of the build: `swift Scripts/generate-width-table.swift > Packages/HarnessTerminalEngine/Sources/HarnessTerminalEngine/Width/CharacterWidthTable.swift`.
+- **Robot Framework regression tests (run BEFORE every build):** `Tests/robot/run.sh`. These verify critical bug-fix invariants remain intact. If any test fails, fix the regression before running `swift build`.
 
 ## Project context (auto-loaded every session)
 

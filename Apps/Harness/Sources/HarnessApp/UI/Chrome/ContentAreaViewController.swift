@@ -341,8 +341,10 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
     }
 
     func tabBarDidRequestNewTab() {
-        guard let workspaceID = SessionCoordinator.shared.snapshot.activeWorkspaceID else { return }
-        SessionCoordinator.shared.addSession(to: workspaceID)
+        let coordinator = SessionCoordinator.shared
+        coordinator.syncFromDaemon()
+        guard let workspaceID = coordinator.snapshot.activeWorkspaceID else { return }
+        coordinator.addSession(to: workspaceID)
     }
 
     func tabBarDidRequestClose(tabID: TabID) {
@@ -425,6 +427,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         // Incremental update: detach existing terminal hosts from old container
         // (without removing them from window) then rebuild container around them.
         let existingHosts = paneContainer?.collectTerminalHosts() ?? [:]
+        let existingBrowserPanes = paneContainer?.collectBrowserPanes() ?? [:]
         paneContainer?.detachHostsOnly()
         // Keep the old container alive past this runloop tick so AppKit's pending
         // layout/display passes that reference its subviews complete before dealloc.
@@ -437,7 +440,8 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
             node: displayNode,
             cwd: tab.cwd,
             themeName: coordinator.snapshot.themeName,
-            existingHosts: existingHosts
+            existingHosts: existingHosts,
+            existingBrowserPanes: existingBrowserPanes
         )
         container.translatesAutoresizingMaskIntoConstraints = false
         terminalHost.addSubview(container)
@@ -718,9 +722,11 @@ final class PaneContainerView: NSView {
     private let coordinator = SessionCoordinator.shared
     private let tabID: TabID?
     private var existingHosts: [SurfaceID: TerminalHostView]
+    private var existingBrowserPanes: [PaneID: BrowserPaneView]
 
-    init(node: PaneNode, cwd: String, themeName: String, existingHosts: [SurfaceID: TerminalHostView] = [:]) {
+    init(node: PaneNode, cwd: String, themeName: String, existingHosts: [SurfaceID: TerminalHostView] = [:], existingBrowserPanes: [PaneID: BrowserPaneView] = [:]) {
         self.existingHosts = existingHosts
+        self.existingBrowserPanes = existingBrowserPanes
         self.tabID = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.id
         super.init(frame: .zero)
         HarnessDesign.makeClear(self)
@@ -743,6 +749,13 @@ final class PaneContainerView: NSView {
         return result
     }
 
+    /// Collect all browser panes keyed by paneID before teardown.
+    func collectBrowserPanes() -> [PaneID: BrowserPaneView] {
+        var result: [PaneID: BrowserPaneView] = [:]
+        collectBrowsers(in: self, into: &result)
+        return result
+    }
+
     private func collectHosts(in view: NSView, into result: inout [SurfaceID: TerminalHostView]) {
         for sub in view.subviews {
             if let host = sub as? TerminalHostView {
@@ -753,10 +766,21 @@ final class PaneContainerView: NSView {
         }
     }
 
+    private func collectBrowsers(in view: NSView, into result: inout [PaneID: BrowserPaneView]) {
+        for sub in view.subviews {
+            if let browser = sub as? BrowserPaneView {
+                result[browser.paneID] = browser
+            } else {
+                collectBrowsers(in: sub, into: &result)
+            }
+        }
+    }
+
     /// Remove terminal hosts from the view hierarchy without triggering dealloc —
     /// they'll be re-inserted into the new container.
     func detachHostsOnly() {
         detachHosts(in: self)
+        detachBrowsers(in: self)
     }
 
     private func detachHosts(in view: NSView) {
@@ -766,6 +790,16 @@ final class PaneContainerView: NSView {
                 host.removeFromSuperview()
             } else {
                 detachHosts(in: sub)
+            }
+        }
+    }
+
+    private func detachBrowsers(in view: NSView) {
+        for sub in view.subviews {
+            if sub is BrowserPaneView {
+                sub.removeFromSuperview()
+            } else {
+                detachBrowsers(in: sub)
             }
         }
     }
@@ -788,7 +822,12 @@ final class PaneContainerView: NSView {
     private func build(node: PaneNode, cwd: String, into parent: NSView) {
         switch node {
         case let .browser(bl):
-            let bv = BrowserPaneView(url: bl.url, paneID: bl.id)
+            let bv: BrowserPaneView
+            if let existing = existingBrowserPanes.removeValue(forKey: bl.id) {
+                bv = existing
+            } else {
+                bv = BrowserPaneView(url: bl.url, paneID: bl.id)
+            }
             let paneIDCopy = bl.id
             bv.onClosePaneRequested = {
                 SessionCoordinator.shared.splitPaneCoordinator.closeBrowserPane(paneID: paneIDCopy)
