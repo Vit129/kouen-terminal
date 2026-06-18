@@ -33,18 +33,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         StartupMetrics.shared.mark(.firstWindow)
         NSApp.activate(ignoringOtherApps: true)
         NSApp.mainMenu = MainMenuBuilder.build()
-
-        // Swallow key/mouse events targeting a surface view that has no window.
-        // On macOS 26.5+/Swift 6.3, the @objc thunk executor check dereferences
-        // self's type metadata — if the view is freed, the app crashes before our
-        // code runs. This monitor fires BEFORE dispatch and returns nil to cancel.
-        NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .keyUp, .mouseMoved, .mouseEntered, .mouseExited]) { event in
-            guard let window = event.window else { return event }
-            if let responder = window.firstResponder as? NSView, responder.window == nil {
-                return nil // swallow — target view is no longer in a window
-            }
-            return event
-        }
         // Finder folder right-click "New Harness Tab/Window Here" (declared in Info.plist NSServices).
         // NSApp.servicesProvider does not retain the provider, so hold it for the app's lifetime.
         let servicesProvider = TerminalServicesProvider()
