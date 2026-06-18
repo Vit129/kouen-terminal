@@ -733,6 +733,7 @@ final class GitPanelView: NSView {
         let generation = refreshGeneration
 
         let branch = await runGit(["branch", "--show-current"], in: path)
+        let aheadBehind = await runGit(["rev-list", "--left-right", "--count", "@{upstream}...HEAD"], in: path)
         let numstat = await runGit(["diff", "--numstat", "HEAD"], in: path)
         let porcelain = await runGit(["status", "--porcelain"], in: path)
         let log = await runGit(["log", "--format=%H|%an|%ar|%s", "-25"], in: path)
@@ -743,6 +744,20 @@ final class GitPanelView: NSView {
         guard generation == refreshGeneration else { return }
 
         branchLabel.stringValue = "⎇ " + (branch.isEmpty ? "detached" : branch)
+
+        // Update sync button to reflect ahead/behind state
+        let parts = aheadBehind.components(separatedBy: "\t")
+        let behind = Int(parts.first ?? "") ?? 0
+        let ahead = Int(parts.last ?? "") ?? 0
+        if ahead > 0 && behind > 0 {
+            syncButton.title = "↑\(ahead) ↓\(behind)"
+        } else if ahead > 0 {
+            syncButton.title = "Push ↑\(ahead)"
+        } else if behind > 0 {
+            syncButton.title = "Pull ↓\(behind)"
+        } else {
+            syncButton.title = "Sync ▾"
+        }
 
         let changeCount = porcelain.components(separatedBy: "\n").filter { !$0.isEmpty }.count
         tabSelector.setLabel("Changes (\(changeCount))", forSegment: 0)
