@@ -4,6 +4,7 @@
 
 | File | Title | Status |
 |------|-------|--------|
+| [p23-ssh-remote-ui.md](p23-ssh-remote-ui.md) | P23 — SSH Remote Host Manager (PuTTY-style UI) | Planning |
 | [p22-long-session-responsiveness.md](p22-long-session-responsiveness.md) | P22 — Long-Session Responsiveness Hardening | Active |
 | [p21-acp-agent-selection.md](p21-acp-agent-selection.md) | P21 — Hermes-Inspired Agent Platform (ACP + Multi-Provider) | Active |
 | [p20-harness-term-agent.md](p20-harness-term-agent.md) | P20 — Harness-Term Agent | Active |
