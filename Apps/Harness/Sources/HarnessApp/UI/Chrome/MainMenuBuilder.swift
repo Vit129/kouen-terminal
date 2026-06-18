@@ -354,8 +354,12 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
     }
 
     @objc func newSession() {
-        guard let id = SessionCoordinator.shared.snapshot.activeWorkspaceID else { return }
-        SessionCoordinator.shared.addSession(to: id)
+        let coordinator = SessionCoordinator.shared
+        // Force a sync to ensure activeSession/activeTab reflect the currently visible tab,
+        // not a stale snapshot from before the user's last tab switch.
+        coordinator.syncFromDaemon()
+        guard let id = coordinator.snapshot.activeWorkspaceID else { return }
+        coordinator.addSession(to: id)
     }
 
     @objc func closeSession() {
