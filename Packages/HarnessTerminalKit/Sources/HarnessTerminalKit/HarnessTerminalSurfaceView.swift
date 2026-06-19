@@ -1294,6 +1294,11 @@ public final class HarnessTerminalSurfaceView: NSView {
             if window.firstResponder === self {
                 window.makeFirstResponder(nil)
             }
+            // Invalidate input context so NSTextInputContext releases its reference to
+            // this view. Without this, hasMarkedText/insertText dispatch to a zombie
+            // after the view is deallocated (RL-040: EXC_BAD_ACCESS in @objc thunk).
+            inputContext?.discardMarkedText()
+            inputContext?.invalidateCharacterCoordinates()
             // Discard pending cursor rect callbacks. AppKit's internal display link services
             // invalidateCursorRects asynchronously — if the view is deallocated between the
             // invalidation and the callback, resetCursorRects fires on a zombie.
