@@ -257,6 +257,7 @@ final class MainSplitViewController: NSViewController {
             panel?.isHidden = false              // unhide so setPosition can size it to 0
             setSidebarWidth(target)
             panel?.isHidden = !visible
+            if visible { panel?.layoutSubtreeIfNeeded() }
             splitDelegate.allowFullCollapse = false
             edgeDivider.isHidden = !visible
             updateContentLeadingInset()
@@ -265,6 +266,9 @@ final class MainSplitViewController: NSViewController {
 
         // Unhide before the slide so the panel is visible as it shrinks/grows.
         panel.isHidden = false
+        // Force subview layout after unhide — NSSegmentedControl (sidebarTabs) can
+        // have a stale zero intrinsicContentSize if the panel was hidden since launch.
+        panel.layoutSubtreeIfNeeded()
         // Show/hide the inner hairline immediately so it never strands over the terminal.
         edgeDivider.isHidden = !visible
         let start = panel.frame.width

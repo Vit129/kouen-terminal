@@ -5,7 +5,7 @@ import HarnessCore
 @MainActor
 final class HarnessSidebarPanelViewController: NSViewController {
     enum SidebarSessionRow {
-        case groupHeader(name: String, rootPath: String, isCollapsed: Bool, status: BoardColumnKind)
+        case groupHeader(name: String, rootPath: String, count: Int, isCollapsed: Bool, status: BoardColumnKind)
         case session(SessionGroup)
     }
 
@@ -129,7 +129,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
             .flatMap { group -> [SidebarSessionRow] in
                 let isCollapsed = collapsedGroups.contains(group.rootPath)
                 let status = highestBoardStatus(for: group.sessions)
-                let header = SidebarSessionRow.groupHeader(name: group.name, rootPath: group.rootPath, isCollapsed: isCollapsed, status: status)
+                let header = SidebarSessionRow.groupHeader(name: group.name, rootPath: group.rootPath, count: group.sessions.count, isCollapsed: isCollapsed, status: status)
                 if isCollapsed {
                     return [header]
                 } else {
@@ -1199,7 +1199,7 @@ extension HarnessSidebarPanelViewController: NSTableViewDataSource, NSTableViewD
         case .groupHeader:
             return 28
         case .session:
-            return 30
+            return HarnessDesign.sessionRowHeight
         }
     }
 
@@ -1214,9 +1214,9 @@ extension HarnessSidebarPanelViewController: NSTableViewDataSource, NSTableViewD
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         guard row < cachedSidebarRows.count else { return nil }
         switch cachedSidebarRows[row] {
-        case let .groupHeader(name, rootPath, isCollapsed, status):
+        case let .groupHeader(name, rootPath, count, isCollapsed, status):
             let header = SessionGroupHeaderRowView()
-            header.configure(name: name, isCollapsed: isCollapsed, status: status)
+            header.configure(name: name, count: count, isCollapsed: isCollapsed, status: status)
             header.onAdd = { [weak self] in
                 self?.addSessionInGroup(rootPath: rootPath)
             }
@@ -1236,7 +1236,7 @@ extension HarnessSidebarPanelViewController: NSTableViewDataSource, NSTableViewD
                 
                 // Find the index of the group header in oldRows
                 guard let headerIndex = oldRows.firstIndex(where: {
-                    if case .groupHeader(_, let path, _, _) = $0 { return path == rootPath }
+                    if case .groupHeader(_, let path, _, _, _) = $0 { return path == rootPath }
                     return false
                 }) else {
                     self.sessionTable.reloadData()
@@ -1248,7 +1248,7 @@ extension HarnessSidebarPanelViewController: NSTableViewDataSource, NSTableViewD
                 if wasCollapsed {
                     // We expanded.
                     guard let newHeaderIndex = newRows.firstIndex(where: {
-                        if case .groupHeader(_, let path, _, _) = $0 { return path == rootPath }
+                        if case .groupHeader(_, let path, _, _, _) = $0 { return path == rootPath }
                         return false
                     }) else {
                         self.sessionTable.endUpdates()
@@ -1288,10 +1288,10 @@ extension HarnessSidebarPanelViewController: NSTableViewDataSource, NSTableViewD
                 
                 // Update the header view's collapsed state without recreating it
                 if let headerView = self.sessionTable.view(atColumn: 0, row: headerIndex, makeIfNecessary: false) as? SessionGroupHeaderRowView {
-                    if case let .groupHeader(_, _, freshIsCollapsed, freshStatus) = newRows[headerIndex] {
-                        headerView.configure(name: name, isCollapsed: freshIsCollapsed, status: freshStatus)
+                    if case let .groupHeader(_, _, freshCount, freshIsCollapsed, freshStatus) = newRows[headerIndex] {
+                        headerView.configure(name: name, count: freshCount, isCollapsed: freshIsCollapsed, status: freshStatus)
                     } else {
-                        headerView.configure(name: name, isCollapsed: !wasCollapsed, status: status)
+                        headerView.configure(name: name, count: count, isCollapsed: !wasCollapsed, status: status)
                     }
                 }
             }
