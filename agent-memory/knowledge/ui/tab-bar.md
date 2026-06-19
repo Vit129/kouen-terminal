@@ -86,3 +86,21 @@ public var effectiveAgentKind: AgentKind? {
 | `DaemonSyncService.metadataTask` | `HarnessApp/Services/DaemonSyncService.swift:375` |
 | `ContentAreaViewController.reloadTabBar` | `UI/Chrome/ContentAreaViewController.swift` |
 | `ContentAreaViewController.tabBarDidReorder` | `UI/Chrome/ContentAreaViewController.swift:345` |
+
+## Sidebar 2-Line Session Row Layout (P24)
+
+Each `SessionRowView` in `SidebarSessionRows.swift` displays 2 lines:
+- **Line 1:** branch name (12pt semibold) — `tab.gitBranch`, falls back to session name/path
+- **Line 2:** short cwd (10pt, dimmed 60%) — `HarnessDesign.shortenPath(tab.cwd)`
+
+Layout: `titleLabel.topAnchor` (not centerY) + `subtitleLabel` below with 1pt gap.
+
+## Top Bar Always Shows Branch
+
+`WindowTitleStripView.setPath(_:gitBranch:)` handles 3 states:
+- cwd + branch: `· dirname (⎇ branch)`
+- branch only (agent active): `· ⎇ branch`
+- cwd only (no git): `· dirname`
+
+`ContentAreaViewController` passes empty cwd when agent active but always passes
+`tab.gitBranch` — branch is never hidden from the user.
