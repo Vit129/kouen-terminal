@@ -41,7 +41,17 @@ public struct ProjectConfig: Codable, Sendable, Equatable {
     }
 
     /// Reads `harness.json` from the given directory, returning nil if not found or unparseable.
+    /// Personal override: `~/.config/harness/projects/<repo-folder-name>.json` takes precedence.
     public static func load(from directory: String) -> ProjectConfig? {
+        // Check personal override first
+        let repoName = (directory as NSString).lastPathComponent
+        let overridePath = NSHomeDirectory() + "/.config/harness/projects/\(repoName).json"
+        if FileManager.default.fileExists(atPath: overridePath),
+           let data = FileManager.default.contents(atPath: overridePath),
+           let config = try? JSONDecoder().decode(ProjectConfig.self, from: data) {
+            return config
+        }
+        // Fall back to repo-local harness.json
         let path = (directory as NSString).appendingPathComponent("harness.json")
         guard FileManager.default.fileExists(atPath: path),
               let data = FileManager.default.contents(atPath: path)
