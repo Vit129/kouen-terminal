@@ -14,6 +14,11 @@
 - IDE-like navigation: double-click folder in sidebar sends `cd <path>` to active terminal
 - `:cd` command now sends actual `cd` to shell (not just switch tabs)
 - `⌘P` palette zoxide entries cd active terminal instead of creating new session
+- P24 Complete: all 4 phases shipped (ProjectConfig, agent badges, worktree auto-isolate/archive, GitHub PR/CI inline, browser multi-tab, :make/:recent scoped)
+- Browser multi-tab: WKWebView tab bar always visible, target=_blank opens new tab, persistent cookies
+- GitHub URLs in terminal open in browser pane (not external Safari)
+- CI status shown in PR badge (✓/✗/○)
+- Personal project config override: ~/.config/harness/projects/<name>.json
 
 ## Lessons
 - RL-004: Never reparent Metal terminal surfaces — 1-2s black screen (CASE-003)
@@ -32,6 +37,7 @@
 - RL-038: `NSPanel` never takes `mainWindow` status — use `NSApp.mainWindow` (not `keyWindow`) to anchor floating panels; on 2nd+ open `keyWindow` points at the panel itself and the anchor drifts each time.
 - RL-039: Menu `@objc` actions fail before first user click (`keyWindow=nil` on launch). Always chain: `keyWindow ?? mainWindow ?? windows.first(where: { $0.contentViewController is MainSplitViewController })`.
 - RL-042: `KeyModifiers` name exists in HarnessTerminalEngine (InputEncoder) — adding same name in HarnessCore causes ambiguity. Used `MenuModifiers` to avoid collision.
+- RL-043: NSClickGestureRecognizer on parent view intercepts child NSButton clicks — check click location in handler or use mouseUp override instead
 
 ## Conventions
 - Build: `make preview`
