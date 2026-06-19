@@ -155,9 +155,12 @@ final class HarnessSidebarPanelViewController: NSViewController {
 
     private func resolveGitRepoRoot(for path: String) async -> String? {
         guard !path.isEmpty, FileManager.default.fileExists(atPath: path) else { return nil }
+        // Use --git-common-dir to get the shared .git dir — this is the same for all
+        // worktrees of the same repo, making it a reliable group key.
+        // Then derive the repo name from the main worktree's toplevel.
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-        process.arguments = ["-C", path, "rev-parse", "--show-toplevel"]
+        process.arguments = ["-C", path, "rev-parse", "--path-format=absolute", "--git-common-dir"]
         let pipe = Pipe()
         process.standardOutput = pipe
         process.standardError = Pipe()
@@ -188,7 +191,12 @@ final class HarnessSidebarPanelViewController: NSViewController {
         if rootPath == "Other" {
             return "Other"
         }
-        return URL(fileURLWithPath: rootPath).lastPathComponent
+        // rootPath is git-common-dir (e.g. ~/project/.git) — use parent dir name
+        let url = URL(fileURLWithPath: rootPath)
+        if url.lastPathComponent == ".git" {
+            return url.deletingLastPathComponent().lastPathComponent
+        }
+        return url.lastPathComponent
     }
 
     private static var cachedGhPath: String? = {
