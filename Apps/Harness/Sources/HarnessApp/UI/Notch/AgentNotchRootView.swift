@@ -239,6 +239,7 @@ struct AgentNotchRootView: View {
 
     private func statusDot(kind: AgentKind?, waiting: Bool, working: Bool) -> some View {
         NotchStatusDot(
+            chip: kind?.chip,
             color: dotColor(kind: kind, waiting: waiting),
             working: working,
             waiting: waiting,
@@ -485,6 +486,7 @@ private struct NotchRowButtonStyle: ButtonStyle {
 /// and is a calm static dot otherwise. The breathing is the closed-view "agent is still working"
 /// signal that pairs with the red waiting badge.
 private struct NotchStatusDot: View {
+    let chip: String?
     let color: Color
     let working: Bool
     let waiting: Bool
@@ -494,15 +496,25 @@ private struct NotchStatusDot: View {
     private var animates: Bool { working && !reduceMotion }
 
     var body: some View {
-        Circle()
-            .fill(color)
-            .frame(width: 9, height: 9)
-            .scaleEffect(animates && pulse ? 1.18 : 1.0)
-            .opacity(animates && pulse ? 0.62 : 1.0)
-            .shadow(color: color.opacity(waiting ? 0.6 : 0.25), radius: waiting ? 5 : 2)
-            .onAppear { syncPulse() }
-            .onChange(of: working) { _, _ in syncPulse() }
-            .onChange(of: reduceMotion) { _, _ in syncPulse() }
+        Group {
+            if let chip {
+                Text(chip)
+                    .font(.system(size: 8, weight: .heavy, design: .rounded))
+                    .foregroundStyle(.white)
+                    .frame(width: 20, height: 14)
+                    .background(color, in: RoundedRectangle(cornerRadius: 4, style: .continuous))
+            } else {
+                Circle()
+                    .fill(color)
+                    .frame(width: 9, height: 9)
+            }
+        }
+        .scaleEffect(animates && pulse ? 1.18 : 1.0)
+        .opacity(animates && pulse ? 0.62 : 1.0)
+        .shadow(color: color.opacity(waiting ? 0.6 : 0.25), radius: waiting ? 5 : 2)
+        .onAppear { syncPulse() }
+        .onChange(of: working) { _, _ in syncPulse() }
+        .onChange(of: reduceMotion) { _, _ in syncPulse() }
     }
 
     private func syncPulse() {
