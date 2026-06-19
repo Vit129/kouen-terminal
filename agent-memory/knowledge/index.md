@@ -19,6 +19,10 @@
 | architecture/background-polling.md | Performance | SurfaceShellTracker, DaemonSyncService, metadataRefresh, snapshotChanged, fanout, PerfCounters, metadataOnly, double-subscription | 1/0 | P22 background polling architecture: SurfaceShellTracker proc-tree walk, 5-s metadata refresh loop, snapshotChanged fanout consumers and gate logic, PerfCounters instrumentation, known non-P22 syncFromDaemon callers |
 | bugs/zombie-crash-macos26.md | Swift/AppKit | zombie, macOS26, Swift6.3, executor, nonisolated, layout, retire, assumeIsolated, @objc, thunk, CASE-034-040 | 5/0 | macOS 26.5 + Swift 6.3.2 zombie view crashes: @objc thunk executor check dereferences freed self. Fixes: retire() 100ms, remove nonisolated, avoid Optional.map closures, detach NSHostingView |
 | bugs/focus-persistence.md | AppKit/Focus | activeSurfaceID, ensureActivePane, reflectRemoteActivePane, selectTab, selectWorkspace, MainExecutor, RL-043 | 0/0 | Per-session-tab pane focus not restored on switch: stale GUI activeSurfaceID wins over daemon activePaneID. Partial fix: nil activeSurfaceID before syncFromDaemon in all select* paths. Not fully verified. |
+| bugs/browser-tab-close-unresponsive.md | AppKit/UI | NSClickGestureRecognizer, BrowserTabButton, closeBtn, hit-test, P24 | 0/0 | Browser tab close button unresponsive — gesture recognizer intercepts click before NSButton action fires. Fix: check click location in gesture handler, return early if in close button rect. |
+| bugs/nstextfield-leak-board.md | AppKit/Perf | NSTextField, leak, BoardViewController, agentStateChanged, snapshotChanged, removeFromSuperview, P20 | 1/0 | 21GB memory leak from unconditional board UI rebuild on every notification — NSTextField internal observers prevent deallocation. Fix: diff columns before rebuild. |
+| patterns/build-self-kill-protection.md | Build/Scripts | TERM_PROGRAM, kill_stale_prod, run.sh, self-kill, Harness-hosted | 1/0 | Build scripts killing Harness while running inside Harness. Fix: detect TERM_PROGRAM=Harness, skip kill of /Applications instance and runtime state clear. |
+| patterns/fsevents-pattern.md | Swift/FSEvents | FSEventStreamCreate, recursive, DispatchSource, WatcherContext, Unmanaged, CASE-016, CASE-021 | 1/0 | Reusable FSEvents recursive watcher pattern for Swift actors — replaces non-recursive DispatchSource for nested directory watching. |
 
 ## Source Map
 
@@ -35,6 +39,10 @@
 | ui/tab-bar.md | `HarnessApp/UI/Terminal/TerminalTabBarView.swift`, `HarnessCore/Metadata/MetadataProvider.swift`, `HarnessApp/Services/DaemonSyncService.swift`, `HarnessApp/UI/Chrome/ContentAreaViewController.swift` |
 | architecture/background-polling.md | `HarnessApp/Services/SurfaceShellTracker.swift`, `HarnessApp/Services/DaemonSyncService.swift`, `HarnessApp/Services/PerfCounters.swift`, `HarnessApp/UI/Chrome/MainSplitViewController.swift`, `HarnessApp/UI/Sidebar/BoardViewController.swift`, `HarnessApp/UI/Notch/NotchPanelController.swift`, `HarnessApp/UI/Sidebar/HarnessSidebarPanelViewController.swift` |
 | bugs/focus-persistence.md | `HarnessApp/Services/ActivePaneService.swift`, `HarnessApp/Services/SessionLifecycleService.swift`, `HarnessApp/Services/MainExecutor.swift`, `HarnessApp/Services/DaemonSyncService.swift`, `HarnessApp/UI/Chrome/ContentAreaViewController.swift` |
+| bugs/browser-tab-close-unresponsive.md | `HarnessApp/UI/Chrome/BrowserPaneView.swift` |
+| bugs/nstextfield-leak-board.md | `HarnessApp/UI/Sidebar/BoardViewController.swift`, `HarnessCore/Notifications/NotificationBus.swift`, `HarnessApp/Services/NotificationCoordinator.swift` |
+| patterns/build-self-kill-protection.md | `Scripts/run.sh`, `Scripts/clear-runtime-state.sh` |
+| patterns/fsevents-pattern.md | `HarnessApp/Services/FileExplorer/FileTreeWatcher.swift`, `HarnessApp/UI/Git/GitPanelView.swift` |
 | bugs/zombie-crash-macos26.md | `HarnessApp/Services/TerminalPaneRegistry.swift`, `HarnessApp/UI/Chrome/ContentAreaViewController.swift`, `HarnessApp/UI/FileTree/WorkspaceFileTreeView.swift`, `HarnessApp/Services/ActivePaneService.swift`, `HarnessTerminalKit/HarnessTerminalSurfaceView+Scrollback.swift`, `HarnessTerminalKit/TerminalScrollbarView.swift`, `HarnessTerminalKit/ResizeHUDView.swift` |
 
 ## Edges
@@ -53,6 +61,10 @@
 | bugs/zombie-crash-macos26.md | ui/appkit-metal.md | NSView lifecycle, zombie, removeFromSuperview |
 | bugs/zombie-crash-macos26.md | architecture/background-polling.md | snapshotChanged fanout, timing, view rebuild |
 | bugs/zombie-crash-macos26.md | ui/tab-bar.md | TerminalTabBarView.layout(), zombie crash |
+| bugs/browser-tab-close-unresponsive.md | ui/browser-pane.md | BrowserPaneView, BrowserTabButton, close button |
+| bugs/nstextfield-leak-board.md | ui/agent-session-board.md | BoardViewController, reload, agentStateChanged |
+| bugs/nstextfield-leak-board.md | architecture/background-polling.md | snapshotChanged, notification frequency |
+| patterns/fsevents-pattern.md | ui/git-panel.md | FSEvents, recursive watch, real-time |
 
 ## Search Instructions
 

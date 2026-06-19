@@ -4,7 +4,8 @@
 
 | File | Title | Status |
 |------|-------|--------|
-| [p24-supacode-competitive-features.md](p24-supacode-competitive-features.md) | P24 — Supacode-Inspired Competitive Features (Consolidated) | Phase 3 Complete |
+| [p25-ios-ipados-support.md](p25-ios-ipados-support.md) | P25 — iOS/iPadOS Support | Planning |
+| [p24-supacode-competitive-features.md](p24-supacode-competitive-features.md) | P24 — Supacode-Inspired Competitive Features (Consolidated) | Complete |
 | [p23-ssh-remote-ui.md](p23-ssh-remote-ui.md) | P23 — SSH Remote Host Manager (PuTTY-style UI) | Planning |
 | [p8-macos27-adoption.md](p8-macos27-adoption.md) | P8 — macOS 27 Golden Gate Adoption | Active |
 
