@@ -206,7 +206,7 @@ final class SessionGroupHeaderRowView: NSView {
 
     private func refresh() {
         let c = HarnessDesign.chrome
-        label.textColor = isHovered ? c.textPrimary : c.textSecondary
+        label.textColor = c.textPrimary
         disclosureImage.contentTintColor = isHovered ? c.textPrimary : c.textSecondary
         boardStatusLabel.textColor = isHovered ? c.textSecondary : c.textTertiary
         addButton.alphaValue = isHovered ? 1 : 0
@@ -363,10 +363,13 @@ final class WorktreeRowView: NSView {
         let (dotColor, dotTooltip) = agentDotAppearance(for: session)
         agentStatusDot.layer?.backgroundColor = dotColor.cgColor
         agentStatusDot.toolTip = dotTooltip
+        // Branch icon matches agent status color for visual pop
+        branchIcon.contentTintColor = dotColor
 
         if let metadata {
             if let pr = metadata.prNumber {
-                prBadge.configure(text: "#\(pr)", color: c.accent)
+                let prColor: NSColor = (metadata.aheadCount ?? 0) > 0 ? .systemGreen : c.accent
+                prBadge.configure(text: "#\(pr)", color: prColor)
                 prBadge.isHidden = false
             } else {
                 prBadge.isHidden = true
