@@ -17,6 +17,8 @@ public struct ProjectConfig: Codable, Sendable, Equatable {
     public var agent: String?
     /// Default base ref for worktree creation (e.g. "origin/main").
     public var baseRef: String?
+    /// When true, agent-detected sessions auto-get their own worktree for branch isolation.
+    public var isolateAgents: Bool?
 
     public init(
         setupScript: String? = nil,
@@ -25,7 +27,8 @@ public struct ProjectConfig: Codable, Sendable, Equatable {
         workspace: String? = nil,
         env: [String: String]? = nil,
         agent: String? = nil,
-        baseRef: String? = nil
+        baseRef: String? = nil,
+        isolateAgents: Bool? = nil
     ) {
         self.setupScript = setupScript
         self.runScript = runScript
@@ -34,6 +37,7 @@ public struct ProjectConfig: Codable, Sendable, Equatable {
         self.env = env
         self.agent = agent
         self.baseRef = baseRef
+        self.isolateAgents = isolateAgents
     }
 
     /// Reads `harness.json` from the given directory, returning nil if not found or unparseable.

@@ -38,6 +38,11 @@ public struct Tab: Codable, Sendable, Identifiable, Equatable {
     /// Set by the daemon when a mutating MCP tool last controlled this tab's pane.
     /// Cleared after 10s by the daemon's metadata scan. Drives the "MCP" badge in the UI.
     public var lastMCPControlAt: Date?
+    /// Non-nil when this tab's shell runs inside an isolated git worktree.
+    /// The path points to the worktree directory (e.g. `.harness-worktrees/<short-id>/`).
+    public var worktreePath: String?
+    /// The parent repository root that owns the worktree. Used for cleanup and branch display.
+    public var parentRepoPath: String?
 
     /// The tmux activity/silence/bell portion of `#{window_flags}`.
     public var alertFlags: String {
@@ -64,7 +69,9 @@ public struct Tab: Codable, Sendable, Identifiable, Equatable {
         exitStatus: Int? = nil,
         currentCommand: String? = nil,
         persistent: Bool = false,
-        lastMCPControlAt: Date? = nil
+        lastMCPControlAt: Date? = nil,
+        worktreePath: String? = nil,
+        parentRepoPath: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -87,6 +94,8 @@ public struct Tab: Codable, Sendable, Identifiable, Equatable {
         self.currentCommand = currentCommand
         self.persistent = persistent
         self.lastMCPControlAt = lastMCPControlAt
+        self.worktreePath = worktreePath
+        self.parentRepoPath = parentRepoPath
     }
 
     /// Effective agent kind — daemon-detected first, then inferred from OSC title.
@@ -133,6 +142,9 @@ public struct Tab: Codable, Sendable, Identifiable, Equatable {
         persistent = try container.decodeIfPresent(Bool.self, forKey: .persistent) ?? false
         // MCP control timestamp — absent in older layout.json; nil = not recently MCP-controlled.
         lastMCPControlAt = try container.decodeIfPresent(Date.self, forKey: .lastMCPControlAt)
+        // Worktree isolation — absent in older layout.json; nil = shared repo (no isolation).
+        worktreePath = try container.decodeIfPresent(String.self, forKey: .worktreePath)
+        parentRepoPath = try container.decodeIfPresent(String.self, forKey: .parentRepoPath)
     }
 }
 

@@ -40,8 +40,24 @@ extension HarnessCLI {
             return
         }
         guard let workspaceID = try resolveWorkspaceID(args, client: client) else {
-            fputs("Usage: harness-cli new-session --workspace <name|uuid> [--cwd path] [--name name] [--worktree <branch>] [--repo <path>] [--group-with <session>]\n", harnessStderr)
+            fputs("Usage: harness-cli new-session --workspace <name|uuid> [--cwd path] [--name name] [--isolate [--branch <branch>]] [--worktree <branch>] [--repo <path>] [--group-with <session>]\n", harnessStderr)
             exit(1)
+        }
+        // --isolate [--branch <branch>] [--base-ref <ref>]: create session in its own worktree
+        if args.contains("--isolate") {
+            let repo = flagValue(args, flag: "--repo") ?? flagValue(args, flag: "--cwd") ?? FileManager.default.currentDirectoryPath
+            let branch = flagValue(args, flag: "--branch")
+            let baseRef = flagValue(args, flag: "--base-ref")
+            let sessionShort = UUID().uuidString.prefix(8).lowercased()
+            let mgr = WorktreeManager()
+            guard let wtPath = mgr.create(repoPath: repo, sessionID: String(sessionShort), branch: branch, baseRef: baseRef) else {
+                fputs("new-session: failed to create worktree in '\(repo)'\n", harnessStderr)
+                exit(1)
+            }
+            let sessionName = name ?? branch ?? "wt-\(sessionShort)"
+            let response = try checkedRequest(client, .newSession(workspaceID: workspaceID, cwd: wtPath, name: sessionName, worktreePath: wtPath, parentRepoPath: repo))
+            if case let .sessionID(id) = response { print(id.uuidString) }
+            return
         }
         // --worktree <branch>: create a git worktree then session with cwd pointing to it
         if let worktreeBranch = flagValue(args, flag: "--worktree") {

@@ -293,9 +293,12 @@ public final class SurfaceRegistry: @unchecked Sendable {
             let id = editor.addWorkspace(name: name)
             commit()
             return .workspaceID(id)
-        case let .newSession(workspaceID, cwd, name, shell):
+        case let .newSession(workspaceID, cwd, name, shell, worktreePath, parentRepoPath):
             guard let sessionID = editor.addSession(to: workspaceID, cwd: cwd, name: name) else {
                 return .error("Workspace not found")
+            }
+            if let wt = worktreePath {
+                editor.setWorktree(sessionID: sessionID, worktreePath: wt, parentRepoPath: parentRepoPath)
             }
             ensureSessionSurfaces(sessionID: sessionID, shell: shell)
             commit()
@@ -491,6 +494,11 @@ public final class SurfaceRegistry: @unchecked Sendable {
             let closedSurfaces = closingSession?
                 .tabs
                 .flatMap { $0.rootPane.allSurfaceIDs().map(\.uuidString) } ?? []
+            // Capture worktree metadata before close for cleanup.
+            let worktreeInfo: (path: String, parent: String?)? = closingSession?.tabs.first.flatMap {
+                guard let wt = $0.worktreePath else { return nil }
+                return (wt, $0.parentRepoPath)
+            }
             // Hook context captured BEFORE the close: `#{session_name}` must describe
             // the session that closed, not whatever survives it.
             let closedContext = buildFormatContext(
@@ -499,6 +507,14 @@ public final class SurfaceRegistry: @unchecked Sendable {
             )
             guard editor.closeSession(sessionID) else { return .error("Session not found") }
             closeSurfaces(closedSurfaces)
+            // Clean up the worktree if it's not dirty.
+            if let wt = worktreeInfo {
+                let mgr = WorktreeManager()
+                let repoPath = wt.parent ?? mgr.repoRoot(for: wt.path) ?? wt.path
+                if !mgr.isDirty(worktreePath: wt.path) {
+                    mgr.remove(repoPath: repoPath, worktreePath: wt.path)
+                }
+            }
             // Drop the session's per-session env so entries don't accumulate in environment.json.
             environmentStore.clearSession(sessionID.uuidString)
             ensureAllSnapshotSurfaces()

@@ -56,6 +56,19 @@ public struct SessionEditor: Sendable {
         return session.id
     }
 
+    /// Tags the first tab of a session with worktree isolation metadata.
+    public mutating func setWorktree(sessionID: SessionID, worktreePath: String, parentRepoPath: String?) {
+        for wi in snapshot.workspaces.indices {
+            if let si = snapshot.workspaces[wi].sessions.firstIndex(where: { $0.id == sessionID }) {
+                if !snapshot.workspaces[wi].sessions[si].tabs.isEmpty {
+                    snapshot.workspaces[wi].sessions[si].tabs[0].worktreePath = worktreePath
+                    snapshot.workspaces[wi].sessions[si].tabs[0].parentRepoPath = parentRepoPath
+                }
+                return
+            }
+        }
+    }
+
     public mutating func addTab(to workspaceID: WorkspaceID, cwd: String? = nil) -> TabID? {
         guard let workspaceIndex = snapshot.workspaces.firstIndex(where: { $0.id == workspaceID }) else {
             return nil
