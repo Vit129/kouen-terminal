@@ -136,6 +136,10 @@ enum MainMenuBuilder {
         jumpItem.keyEquivalentModifierMask = [.command, .shift]
         jumpItem.target = MenuTarget.shared
         view.submenu?.addItem(jumpItem)
+        let notchItem = NSMenuItem(title: "Show Agent Notch", action: #selector(MenuTarget.showAgentNotch), keyEquivalent: "i")
+        notchItem.keyEquivalentModifierMask = [.command]
+        notchItem.target = MenuTarget.shared
+        view.submenu?.addItem(notchItem)
         let paletteItem = menuItem("Command Palette", action: #selector(MenuTarget.commandPalette), binding: BannerShortcutRegistry.commandPalette)
         view.submenu?.addItem(paletteItem)
         let promptItem = menuItem("Command Prompt", action: #selector(MenuTarget.commandPrompt), binding: BannerShortcutRegistry.commandPrompt)
@@ -429,6 +433,10 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
         if let split = window?.contentViewController as? MainSplitViewController {
             split.showNotificationsDropdown()
         }
+    }
+
+    @objc func showAgentNotch() {
+        NotchPanelController.shared.openFromMenu()
     }
 
     @objc func showOnboarding() {
