@@ -167,10 +167,6 @@ public enum BannerShortcutRegistry {
         id: "toggleSidebar", title: "Toggle Sidebar",
         modifiers: .command, keyChar: "\\")
 
-    public static let gitPanel = Keybinding(
-        id: "gitPanel", title: "Show Git Panel",
-        modifiers: [.command, .shift], keyChar: "g")
-
     public static let runScript = Keybinding(
         id: "runScript", title: "Run Script",
         modifiers: .command, keyChar: "r")
