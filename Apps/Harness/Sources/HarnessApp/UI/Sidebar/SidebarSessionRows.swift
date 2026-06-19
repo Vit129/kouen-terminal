@@ -8,6 +8,7 @@ final class SessionGroupHeaderRowView: NSView {
     var onAdd: (() -> Void)?
     var onToggleCollapse: (() -> Void)?
     var onOptions: ((NSView) -> Void)?
+    var onContextMenu: (() -> NSMenu?)?
 
     private let leftStack = NSStackView()
     private let rightStack = NSStackView()
@@ -31,7 +32,7 @@ final class SessionGroupHeaderRowView: NSView {
         disclosureImage.translatesAutoresizingMaskIntoConstraints = false
         disclosureImage.setContentHuggingPriority(.required, for: .horizontal)
 
-        label.font = .systemFont(ofSize: 13, weight: .semibold)
+        label.font = .systemFont(ofSize: 13, weight: .bold)
         label.alignment = .left
         label.lineBreakMode = .byTruncatingTail
         label.translatesAutoresizingMaskIntoConstraints = false
@@ -103,10 +104,26 @@ final class SessionGroupHeaderRowView: NSView {
             optionsButton.widthAnchor.constraint(equalToConstant: 20),
             optionsButton.heightAnchor.constraint(equalToConstant: 20),
         ])
+
+        let press = NSPressGestureRecognizer(target: self, action: #selector(handleLongPress(_:)))
+        press.minimumPressDuration = 0.5
+        addGestureRecognizer(press)
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        return onContextMenu?()
+    }
+
+    @objc private func handleLongPress(_ gesture: NSPressGestureRecognizer) {
+        guard gesture.state == .began else { return }
+        if let menu = onContextMenu?() {
+            let point = gesture.location(in: self)
+            menu.popUp(positioning: nil, at: point, in: self)
+        }
+    }
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
@@ -204,11 +221,14 @@ final class WorktreeRowView: NSView {
 
     private let fill = NSView()
     private let agentStatusDot = NSView()
+    private let branchIcon = NSImageView()
     private let titleLabel = NSTextField(labelWithString: "")
     private let prBadge = SidebarBadgeView()
+    private let aheadBadge = SidebarBadgeView()
+    private let behindBadge = SidebarBadgeView()
     private let notificationBadge = SidebarBadgeView()
-    private let metaLabel = NSTextField(labelWithString: "")
     private let closeButton = NSButton()
+    private let badgeStack = NSStackView()
     private var isSelected = false
     private var isHovered = false
     private var trackingArea: NSTrackingArea?
@@ -231,23 +251,23 @@ final class WorktreeRowView: NSView {
         agentStatusDot.setContentHuggingPriority(.required, for: .horizontal)
         agentStatusDot.setContentCompressionResistancePriority(.required, for: .horizontal)
 
+        branchIcon.image = NSImage(systemSymbolName: "arrow.triangle.branch", accessibilityDescription: nil)?
+            .withSymbolConfiguration(HarnessDesign.symbolConfig(pointSize: 10, weight: .semibold))
+        branchIcon.contentTintColor = HarnessDesign.chrome.textTertiary
+        branchIcon.translatesAutoresizingMaskIntoConstraints = false
+        branchIcon.setContentHuggingPriority(.required, for: .horizontal)
+        branchIcon.setContentCompressionResistancePriority(.required, for: .horizontal)
+
         titleLabel.font = .systemFont(ofSize: 12, weight: .semibold)
         titleLabel.usesSingleLineMode = true
         titleLabel.lineBreakMode = .byTruncatingTail
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-        prBadge.configure(text: "#42 ✓", color: HarnessDesign.chrome.accent)
         prBadge.isHidden = true
-
-        notificationBadge.configure(text: "", color: HarnessDesign.chrome.danger)
+        aheadBadge.isHidden = true
+        behindBadge.isHidden = true
         notificationBadge.isHidden = true
-
-        metaLabel.font = .systemFont(ofSize: 10, weight: .regular)
-        metaLabel.usesSingleLineMode = true
-        metaLabel.lineBreakMode = .byTruncatingMiddle
-        metaLabel.alphaValue = 0.7
-        metaLabel.translatesAutoresizingMaskIntoConstraints = false
 
         closeButton.title = "×"
         closeButton.bezelStyle = .accessoryBarAction
@@ -257,14 +277,24 @@ final class WorktreeRowView: NSView {
         closeButton.action = #selector(closeClicked)
         closeButton.toolTip = "Close session"
         closeButton.alphaValue = 0
+        closeButton.setContentHuggingPriority(.required, for: .horizontal)
+        closeButton.setContentCompressionResistancePriority(.required, for: .horizontal)
+
+        badgeStack.orientation = .horizontal
+        badgeStack.alignment = .centerY
+        badgeStack.spacing = 4
+        badgeStack.translatesAutoresizingMaskIntoConstraints = false
+        badgeStack.addArrangedSubview(prBadge)
+        badgeStack.addArrangedSubview(aheadBadge)
+        badgeStack.addArrangedSubview(behindBadge)
+        badgeStack.addArrangedSubview(notificationBadge)
+        badgeStack.addArrangedSubview(closeButton)
 
         addSubview(fill)
         fill.addSubview(agentStatusDot)
+        fill.addSubview(branchIcon)
         fill.addSubview(titleLabel)
-        fill.addSubview(prBadge)
-        fill.addSubview(notificationBadge)
-        fill.addSubview(metaLabel)
-        fill.addSubview(closeButton)
+        fill.addSubview(badgeStack)
 
         NSLayoutConstraint.activate([
             fill.topAnchor.constraint(equalTo: topAnchor, constant: 1),
@@ -273,26 +303,22 @@ final class WorktreeRowView: NSView {
             fill.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -(HarnessDesign.horizontalInset - 4)),
 
             agentStatusDot.leadingAnchor.constraint(equalTo: fill.leadingAnchor, constant: 8),
-            agentStatusDot.topAnchor.constraint(equalTo: fill.topAnchor, constant: 13),
+            agentStatusDot.centerYAnchor.constraint(equalTo: fill.centerYAnchor),
             agentStatusDot.widthAnchor.constraint(equalToConstant: 6),
             agentStatusDot.heightAnchor.constraint(equalToConstant: 6),
 
-            titleLabel.leadingAnchor.constraint(equalTo: agentStatusDot.trailingAnchor, constant: 7),
-            titleLabel.topAnchor.constraint(equalTo: fill.topAnchor, constant: 7),
-            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: prBadge.leadingAnchor, constant: -6),
+            branchIcon.leadingAnchor.constraint(equalTo: agentStatusDot.trailingAnchor, constant: 6),
+            branchIcon.centerYAnchor.constraint(equalTo: fill.centerYAnchor),
+            branchIcon.widthAnchor.constraint(equalToConstant: 12),
+            branchIcon.heightAnchor.constraint(equalToConstant: 12),
 
-            prBadge.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor),
-            prBadge.trailingAnchor.constraint(equalTo: notificationBadge.leadingAnchor, constant: -4),
+            titleLabel.leadingAnchor.constraint(equalTo: branchIcon.trailingAnchor, constant: 6),
+            titleLabel.centerYAnchor.constraint(equalTo: fill.centerYAnchor),
+            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: badgeStack.leadingAnchor, constant: -6),
 
-            notificationBadge.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor),
-            notificationBadge.trailingAnchor.constraint(equalTo: closeButton.leadingAnchor, constant: -4),
-
-            metaLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
-            metaLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 1),
-            metaLabel.trailingAnchor.constraint(equalTo: closeButton.leadingAnchor, constant: -6),
-
-            closeButton.centerYAnchor.constraint(equalTo: fill.centerYAnchor),
-            closeButton.trailingAnchor.constraint(equalTo: fill.trailingAnchor, constant: -6),
+            badgeStack.trailingAnchor.constraint(equalTo: fill.trailingAnchor, constant: -6),
+            badgeStack.centerYAnchor.constraint(equalTo: fill.centerYAnchor),
+            
             closeButton.widthAnchor.constraint(equalToConstant: 18),
             closeButton.heightAnchor.constraint(equalToConstant: 18),
         ])
@@ -319,25 +345,16 @@ final class WorktreeRowView: NSView {
         trackingArea = area
     }
 
-    func configure(session: SessionGroup, isSelected: Bool) {
+    func configure(session: SessionGroup, isSelected: Bool, metadata: RepoGitMetadata?) {
         let tab = session.activeTab ?? session.tabs.first ?? Tab()
         let c = HarnessDesign.chrome
 
         let title = session.name.isEmpty ? HarnessDesign.pathDisplayName(tab.cwd) : session.name
-        titleLabel.stringValue = title
+        let branch = tab.gitBranch?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        titleLabel.stringValue = branch.isEmpty ? title : branch
         titleLabel.textColor = isSelected ? c.textPrimary : c.textSecondary
-
-        let branch = tab.gitBranch?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let branchName: String
-        if let branch, !branch.isEmpty {
-            branchName = branch
-        } else {
-            branchName = "no branch"
-        }
-        let shortenedCwd = HarnessDesign.shortenPath(tab.cwd)
-        metaLabel.stringValue = "\(branchName) · \(shortenedCwd)"
-        metaLabel.textColor = isSelected ? c.textPrimary : c.textSecondary
-        toolTip = "\(title)\n\(metaLabel.stringValue)"
+        
+        toolTip = "\(title)\n\(tab.cwd)"
 
         let waitingCount = session.tabs.filter { $0.status == .waiting }.count
         notificationBadge.configure(text: "\(waitingCount)", color: c.danger)
@@ -347,6 +364,33 @@ final class WorktreeRowView: NSView {
         agentStatusDot.layer?.backgroundColor = dotColor.cgColor
         agentStatusDot.toolTip = dotTooltip
 
+        if let metadata {
+            if let pr = metadata.prNumber {
+                prBadge.configure(text: "#\(pr)", color: c.accent)
+                prBadge.isHidden = false
+            } else {
+                prBadge.isHidden = true
+            }
+            
+            if let ahead = metadata.aheadCount, ahead > 0 {
+                aheadBadge.configure(text: "+\(ahead)", color: .systemGreen)
+                aheadBadge.isHidden = false
+            } else {
+                aheadBadge.isHidden = true
+            }
+            
+            if let behind = metadata.behindCount, behind > 0 {
+                behindBadge.configure(text: "-\(behind)", color: .systemRed)
+                behindBadge.isHidden = false
+            } else {
+                behindBadge.isHidden = true
+            }
+        } else {
+            prBadge.isHidden = true
+            aheadBadge.isHidden = true
+            behindBadge.isHidden = true
+        }
+
         setSelected(isSelected)
     }
 
@@ -354,6 +398,12 @@ final class WorktreeRowView: NSView {
         let tabsWithAgents = session.tabs.filter { $0.effectiveAgentKind != nil }
         guard !tabsWithAgents.isEmpty else {
             return (HarnessDesign.chrome.idleStatus, "No agent")
+        }
+        if tabsWithAgents.contains(where: { $0.agent?.activity == .errored }) {
+            return (.systemRed, "Agent errored")
+        }
+        if tabsWithAgents.contains(where: { $0.agent?.activity == .awaiting }) {
+            return (.systemOrange, "Agent waiting for input")
         }
         if tabsWithAgents.contains(where: { $0.agent?.activity == .working }) {
             return (.systemGreen, "Agent active")
@@ -462,4 +512,282 @@ final class SidebarTitlebarHeaderView: NSView {
         }
         super.mouseUp(with: event)
     }
+}
+
+@MainActor
+final class SessionWorktreeHeaderRowView: NSView {
+    var onToggleCollapse: (() -> Void)?
+
+    private let leftStack = NSStackView()
+    private let disclosureImage = NSImageView()
+    private let label = NSTextField(labelWithString: "WORKTREES")
+    private let countLabel = NSTextField(labelWithString: "")
+    private var isCollapsed = false
+    private var isHovered = false
+    private var trackingArea: NSTrackingArea?
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        layer?.backgroundColor = NSColor.clear.cgColor
+
+        disclosureImage.image = NSImage(systemSymbolName: "chevron.right", accessibilityDescription: nil)?
+            .withSymbolConfiguration(HarnessDesign.symbolConfig(pointSize: HarnessDesign.IconSize.tiny, weight: .regular))
+        disclosureImage.translatesAutoresizingMaskIntoConstraints = false
+        disclosureImage.setContentHuggingPriority(.required, for: .horizontal)
+
+        label.font = .systemFont(ofSize: 10.5, weight: .bold)
+        label.alignment = .left
+        label.lineBreakMode = .byTruncatingTail
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.setContentHuggingPriority(.defaultLow, for: .horizontal)
+
+        countLabel.font = .monospacedDigitSystemFont(ofSize: 10, weight: .medium)
+        countLabel.translatesAutoresizingMaskIntoConstraints = false
+        countLabel.setContentHuggingPriority(.required, for: .horizontal)
+
+        leftStack.orientation = .horizontal
+        leftStack.alignment = .centerY
+        leftStack.spacing = 6
+        leftStack.translatesAutoresizingMaskIntoConstraints = false
+        leftStack.addArrangedSubview(disclosureImage)
+        leftStack.addArrangedSubview(label)
+        leftStack.addArrangedSubview(countLabel)
+
+        addSubview(leftStack)
+
+        NSLayoutConstraint.activate([
+            leftStack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: HarnessDesign.horizontalInset + 8),
+            leftStack.centerYAnchor.constraint(equalTo: centerYAnchor),
+            leftStack.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -8),
+
+            disclosureImage.widthAnchor.constraint(equalToConstant: 10),
+            disclosureImage.heightAnchor.constraint(equalToConstant: 10),
+        ])
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let trackingArea { removeTrackingArea(trackingArea) }
+        guard window != nil else { trackingArea = nil; return }
+        let area = NSTrackingArea(
+            rect: bounds,
+            options: [.mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(area)
+        trackingArea = area
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        isHovered = true
+        refresh()
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        isHovered = false
+        refresh()
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        onToggleCollapse?()
+    }
+
+    func configure(count: Int, isCollapsed: Bool) {
+        self.isCollapsed = isCollapsed
+        disclosureImage.image = NSImage(
+            systemSymbolName: isCollapsed ? "chevron.right" : "chevron.down",
+            accessibilityDescription: isCollapsed ? "Collapsed" : "Expanded"
+        )?.withSymbolConfiguration(HarnessDesign.symbolConfig(pointSize: HarnessDesign.IconSize.tiny, weight: .regular))
+        countLabel.stringValue = "\(count)"
+        refresh()
+    }
+
+    private func refresh() {
+        let c = HarnessDesign.chrome
+        label.textColor = isHovered ? c.textPrimary : c.textSecondary
+        disclosureImage.contentTintColor = isHovered ? c.textPrimary : c.textSecondary
+        countLabel.textColor = isHovered ? c.textSecondary : c.textTertiary
+    }
+}
+
+@MainActor
+final class SessionWorktreeRowView: NSView {
+    var onSelect: (() -> Void)?
+
+    private let fill = NSView()
+    private let branchIcon = NSImageView()
+    private let titleLabel = NSTextField(labelWithString: "")
+    private let prBadge = SidebarBadgeView()
+    private let aheadBadge = SidebarBadgeView()
+    private let behindBadge = SidebarBadgeView()
+    private let badgeStack = NSStackView()
+    private var isHovered = false
+    private var trackingArea: NSTrackingArea?
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+
+        fill.wantsLayer = true
+        fill.layer?.cornerRadius = HarnessDesign.Radius.card
+        fill.layer?.cornerCurve = .continuous
+        fill.layer?.borderWidth = 1
+        fill.layer?.borderColor = NSColor.clear.cgColor
+        fill.translatesAutoresizingMaskIntoConstraints = false
+
+        branchIcon.image = NSImage(systemSymbolName: "arrow.triangle.branch", accessibilityDescription: nil)?
+            .withSymbolConfiguration(HarnessDesign.symbolConfig(pointSize: 10, weight: .semibold))
+        branchIcon.contentTintColor = HarnessDesign.chrome.textTertiary
+        branchIcon.translatesAutoresizingMaskIntoConstraints = false
+        branchIcon.setContentHuggingPriority(.required, for: .horizontal)
+        branchIcon.setContentCompressionResistancePriority(.required, for: .horizontal)
+
+        titleLabel.font = .systemFont(ofSize: 12, weight: .regular)
+        titleLabel.usesSingleLineMode = true
+        titleLabel.lineBreakMode = .byTruncatingTail
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        prBadge.isHidden = true
+        aheadBadge.isHidden = true
+        behindBadge.isHidden = true
+
+        badgeStack.orientation = .horizontal
+        badgeStack.alignment = .centerY
+        badgeStack.spacing = 4
+        badgeStack.translatesAutoresizingMaskIntoConstraints = false
+        badgeStack.addArrangedSubview(prBadge)
+        badgeStack.addArrangedSubview(aheadBadge)
+        badgeStack.addArrangedSubview(behindBadge)
+
+        addSubview(fill)
+        fill.addSubview(branchIcon)
+        fill.addSubview(titleLabel)
+        fill.addSubview(badgeStack)
+
+        NSLayoutConstraint.activate([
+            fill.topAnchor.constraint(equalTo: topAnchor, constant: 1),
+            fill.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -1),
+            fill.leadingAnchor.constraint(equalTo: leadingAnchor, constant: HarnessDesign.horizontalInset + 12),
+            fill.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -(HarnessDesign.horizontalInset - 4)),
+
+            branchIcon.leadingAnchor.constraint(equalTo: fill.leadingAnchor, constant: 8),
+            branchIcon.centerYAnchor.constraint(equalTo: fill.centerYAnchor),
+            branchIcon.widthAnchor.constraint(equalToConstant: 12),
+            branchIcon.heightAnchor.constraint(equalToConstant: 12),
+
+            titleLabel.leadingAnchor.constraint(equalTo: branchIcon.trailingAnchor, constant: 6),
+            titleLabel.centerYAnchor.constraint(equalTo: fill.centerYAnchor),
+            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: badgeStack.leadingAnchor, constant: -6),
+
+            badgeStack.trailingAnchor.constraint(equalTo: fill.trailingAnchor, constant: -6),
+            badgeStack.centerYAnchor.constraint(equalTo: fill.centerYAnchor),
+        ])
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let trackingArea { removeTrackingArea(trackingArea) }
+        guard window != nil else { trackingArea = nil; return }
+        let area = NSTrackingArea(
+            rect: bounds,
+            options: [.mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(area)
+        trackingArea = area
+    }
+
+    func configure(path: String, branch: String, metadata: RepoGitMetadata?) {
+        titleLabel.stringValue = branch.isEmpty ? (path as NSString).lastPathComponent : branch
+        toolTip = "Click to open session\n\(path)"
+        
+        let c = HarnessDesign.chrome
+        
+        if let metadata {
+            if let pr = metadata.prNumber {
+                prBadge.configure(text: "#\(pr)", color: c.accent)
+                prBadge.isHidden = false
+            } else {
+                prBadge.isHidden = true
+            }
+            
+            if let ahead = metadata.aheadCount, ahead > 0 {
+                aheadBadge.configure(text: "+\(ahead)", color: .systemGreen)
+                aheadBadge.isHidden = false
+            } else {
+                aheadBadge.isHidden = true
+            }
+            
+            if let behind = metadata.behindCount, behind > 0 {
+                behindBadge.configure(text: "-\(behind)", color: .systemRed)
+                behindBadge.isHidden = false
+            } else {
+                behindBadge.isHidden = true
+            }
+        } else {
+            prBadge.isHidden = true
+            aheadBadge.isHidden = true
+            behindBadge.isHidden = true
+        }
+        
+        refresh()
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        onSelect?()
+    }
+
+    private func refresh() {
+        let c = HarnessDesign.chrome
+        titleLabel.textColor = c.textSecondary
+        branchIcon.contentTintColor = c.textTertiary
+        
+        if isHovered {
+            fill.layer?.backgroundColor = c.rowHoverFill.cgColor
+            fill.layer?.borderColor = NSColor.clear.cgColor
+        } else {
+            fill.layer?.backgroundColor = NSColor.clear.cgColor
+            fill.layer?.borderColor = NSColor.clear.cgColor
+        }
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        isHovered = true
+        HarnessMotion.animate(HarnessDesign.Motion.microFast) { _ in
+            self.refresh()
+        }
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        isHovered = false
+        HarnessMotion.animate(HarnessDesign.Motion.microFast) { _ in
+            self.refresh()
+        }
+    }
+}
+
+@MainActor
+final class SessionDividerRowView: NSView {
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        let line = HarnessDesign.divider()
+        addSubview(line)
+        NSLayoutConstraint.activate([
+            line.leadingAnchor.constraint(equalTo: leadingAnchor, constant: HarnessDesign.horizontalInset + 8),
+            line.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -(HarnessDesign.horizontalInset - 4)),
+            line.centerYAnchor.constraint(equalTo: centerYAnchor)
+        ])
+    }
+    
+    required init?(coder: NSCoder) { fatalError() }
 }

@@ -150,6 +150,11 @@ enum MainMenuBuilder {
         view.submenu?.addItem(sidebarItem)
         let gitPanelItem = menuItem("Show Git Panel", action: #selector(MenuTarget.showGitPanel), binding: BannerShortcutRegistry.gitPanel)
         view.submenu?.addItem(gitPanelItem)
+        view.submenu?.addItem(.separator())
+        let runItem = menuItem("Run Script", action: #selector(MenuTarget.runScript), binding: BannerShortcutRegistry.runScript)
+        view.submenu?.addItem(runItem)
+        let stopItem = menuItem("Stop Script", action: #selector(MenuTarget.stopScript), binding: BannerShortcutRegistry.stopScript)
+        view.submenu?.addItem(stopItem)
         let sidebarPosItem = NSMenuItem(title: "Move Sidebar to Right", action: #selector(MenuTarget.toggleSidebarPosition), keyEquivalent: "")
         sidebarPosItem.target = MenuTarget.shared
         view.submenu?.addItem(sidebarPosItem)
@@ -391,6 +396,14 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
 
     @objc func splitV() {
         SessionCoordinator.shared.splitActivePane(direction: .vertical)
+    }
+
+    @objc func runScript() {
+        SessionCoordinator.shared.runProjectScript()
+    }
+
+    @objc func stopScript() {
+        SessionCoordinator.shared.stopProjectScript()
     }
 
     @objc func focusPaneLeft() { SessionCoordinator.shared.focusPaneDirectional(.left) }
