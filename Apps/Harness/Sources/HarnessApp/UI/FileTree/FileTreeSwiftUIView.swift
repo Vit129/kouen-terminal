@@ -138,6 +138,9 @@ struct FileTreeSwiftUIView: View {
     @State private var rootNodes: [FileTreeNode] = []
     @State private var searchResultNodes: [FileTreeNode] = []
     @State private var gitBranch: String?
+    /// RL-040: Hold old nodes for one render cycle so SwiftUI closures that captured
+    /// them don't dereference freed @Observable objects mid-body evaluation.
+    @State private var retiredNodes: [FileTreeNode] = []
     /// Kept alive across expands so child nodes inherit the same status map.
     @State private var currentGitStatus: [String: GitStatusType] = [:]
     @AppStorage("HarnessFileTreeShowsHiddenFiles") private var showsHiddenFiles = false
@@ -459,6 +462,12 @@ struct FileTreeSwiftUIView: View {
             }
         }
         rootNodes = reconciled
+        // RL-040: Keep removed nodes alive until the next render cycle completes,
+        // preventing SwiftUI closures from dereferencing freed @Observable objects.
+        retiredNodes = Array(existingByID.values.filter { existing in
+            !reconciled.contains { $0 === existing }
+        })
+        Task { @MainActor in retiredNodes = [] }
         if !trimmedSearchText.isEmpty {
             await loadSearchResults(query: trimmedSearchText)
         }
