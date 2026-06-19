@@ -157,7 +157,17 @@ final class ActivePaneService {
     func ensureActivePane(for tab: Tab) {
         let surfaces = tab.rootPane.allSurfaceIDs()
         guard !surfaces.isEmpty else { return }
-        let target = coord.activeSurfaceID.flatMap { surfaces.contains($0) ? $0 : nil } ?? surfaces.first
+        // Prefer current activeSurfaceID if it belongs to this tab; otherwise
+        // restore the tab's daemon-authoritative activePaneID (survives tab switches).
+        let target: SurfaceID?
+        if let active = coord.activeSurfaceID, surfaces.contains(active) {
+            target = active
+        } else if let paneID = tab.activePaneID,
+                  let sid = surfaceID(forPane: paneID, in: tab.rootPane) {
+            target = sid
+        } else {
+            target = surfaces.first
+        }
         setActiveSurface(target)
         if let target { coord.terminalHosts.host(for: target)?.focusTerminal() }
     }
