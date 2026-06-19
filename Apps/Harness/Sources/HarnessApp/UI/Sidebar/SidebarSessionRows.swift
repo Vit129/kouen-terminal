@@ -143,7 +143,7 @@ final class SessionGroupHeaderRowView: NSView {
         }
     }
 
-    func configure(name: String, isCollapsed: Bool, status: BoardColumnKind) {
+    func configure(name: String, count: Int, isCollapsed: Bool, status: BoardColumnKind) {
         label.stringValue = name
         toolTip = name
         self.isCollapsed = isCollapsed
@@ -173,7 +173,8 @@ final class SessionGroupHeaderRowView: NSView {
             statusText = "Idle"
         }
         boardStatusDot.layer?.backgroundColor = dotColor.cgColor
-        boardStatusLabel.stringValue = statusText
+        boardStatusLabel.stringValue = "\(count) \(count == 1 ? "worktree" : "worktrees")"
+        boardStatusLabel.toolTip = statusText
 
         refresh()
     }
@@ -202,11 +203,11 @@ final class WorktreeRowView: NSView {
     var onClose: (() -> Void)?
 
     private let fill = NSView()
-    private let textLabel = NSTextField(labelWithString: "")
-    private let statusDot = NSView()
-    private let statusLabel = NSTextField(labelWithString: "")
-    private var cachedAgentKind: AgentKind?
-    private let agentIconView = NSImageView()
+    private let agentStatusDot = NSView()
+    private let titleLabel = NSTextField(labelWithString: "")
+    private let prBadge = SidebarBadgeView()
+    private let notificationBadge = SidebarBadgeView()
+    private let metaLabel = NSTextField(labelWithString: "")
     private let closeButton = NSButton()
     private var isSelected = false
     private var isHovered = false
@@ -223,26 +224,30 @@ final class WorktreeRowView: NSView {
         fill.layer?.masksToBounds = false
         fill.translatesAutoresizingMaskIntoConstraints = false
 
-        textLabel.font = .systemFont(ofSize: 12, weight: .regular)
-        textLabel.usesSingleLineMode = true
-        textLabel.lineBreakMode = .byTruncatingTail
-        textLabel.translatesAutoresizingMaskIntoConstraints = false
-        textLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        agentStatusDot.wantsLayer = true
+        agentStatusDot.layer?.cornerRadius = 3
+        agentStatusDot.layer?.cornerCurve = .continuous
+        agentStatusDot.translatesAutoresizingMaskIntoConstraints = false
+        agentStatusDot.setContentHuggingPriority(.required, for: .horizontal)
+        agentStatusDot.setContentCompressionResistancePriority(.required, for: .horizontal)
 
-        statusDot.wantsLayer = true
-        statusDot.layer?.cornerRadius = 3
-        statusDot.layer?.cornerCurve = .continuous
-        statusDot.translatesAutoresizingMaskIntoConstraints = false
+        titleLabel.font = .systemFont(ofSize: 12, weight: .semibold)
+        titleLabel.usesSingleLineMode = true
+        titleLabel.lineBreakMode = .byTruncatingTail
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-        statusLabel.font = .systemFont(ofSize: 10, weight: .medium)
-        statusLabel.usesSingleLineMode = true
-        statusLabel.translatesAutoresizingMaskIntoConstraints = false
-        statusLabel.setContentHuggingPriority(.required, for: .horizontal)
-        statusLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+        prBadge.configure(text: "#42 ✓", color: HarnessDesign.chrome.accent)
+        prBadge.isHidden = true
 
-        agentIconView.translatesAutoresizingMaskIntoConstraints = false
-        agentIconView.imageScaling = .scaleProportionallyUpOrDown
-        agentIconView.isHidden = true
+        notificationBadge.configure(text: "", color: HarnessDesign.chrome.danger)
+        notificationBadge.isHidden = true
+
+        metaLabel.font = .systemFont(ofSize: 10, weight: .regular)
+        metaLabel.usesSingleLineMode = true
+        metaLabel.lineBreakMode = .byTruncatingMiddle
+        metaLabel.alphaValue = 0.7
+        metaLabel.translatesAutoresizingMaskIntoConstraints = false
 
         closeButton.title = "×"
         closeButton.bezelStyle = .accessoryBarAction
@@ -254,10 +259,11 @@ final class WorktreeRowView: NSView {
         closeButton.alphaValue = 0
 
         addSubview(fill)
-        fill.addSubview(textLabel)
-        fill.addSubview(statusDot)
-        fill.addSubview(statusLabel)
-        fill.addSubview(agentIconView)
+        fill.addSubview(agentStatusDot)
+        fill.addSubview(titleLabel)
+        fill.addSubview(prBadge)
+        fill.addSubview(notificationBadge)
+        fill.addSubview(metaLabel)
         fill.addSubview(closeButton)
 
         NSLayoutConstraint.activate([
@@ -266,22 +272,24 @@ final class WorktreeRowView: NSView {
             fill.leadingAnchor.constraint(equalTo: leadingAnchor, constant: HarnessDesign.horizontalInset + 8),
             fill.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -(HarnessDesign.horizontalInset - 4)),
 
-            textLabel.leadingAnchor.constraint(equalTo: fill.leadingAnchor, constant: 8),
-            textLabel.centerYAnchor.constraint(equalTo: fill.centerYAnchor),
-            textLabel.trailingAnchor.constraint(lessThanOrEqualTo: statusDot.leadingAnchor, constant: -6),
+            agentStatusDot.leadingAnchor.constraint(equalTo: fill.leadingAnchor, constant: 8),
+            agentStatusDot.topAnchor.constraint(equalTo: fill.topAnchor, constant: 13),
+            agentStatusDot.widthAnchor.constraint(equalToConstant: 6),
+            agentStatusDot.heightAnchor.constraint(equalToConstant: 6),
 
-            statusDot.centerYAnchor.constraint(equalTo: fill.centerYAnchor),
-            statusDot.trailingAnchor.constraint(equalTo: statusLabel.leadingAnchor, constant: -4),
-            statusDot.widthAnchor.constraint(equalToConstant: 6),
-            statusDot.heightAnchor.constraint(equalToConstant: 6),
+            titleLabel.leadingAnchor.constraint(equalTo: agentStatusDot.trailingAnchor, constant: 7),
+            titleLabel.topAnchor.constraint(equalTo: fill.topAnchor, constant: 7),
+            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: prBadge.leadingAnchor, constant: -6),
 
-            statusLabel.centerYAnchor.constraint(equalTo: fill.centerYAnchor),
-            statusLabel.trailingAnchor.constraint(equalTo: closeButton.leadingAnchor, constant: -4),
+            prBadge.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor),
+            prBadge.trailingAnchor.constraint(equalTo: notificationBadge.leadingAnchor, constant: -4),
 
-            agentIconView.centerYAnchor.constraint(equalTo: fill.centerYAnchor),
-            agentIconView.trailingAnchor.constraint(equalTo: closeButton.leadingAnchor, constant: -4),
-            agentIconView.widthAnchor.constraint(equalToConstant: 14),
-            agentIconView.heightAnchor.constraint(equalToConstant: 14),
+            notificationBadge.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor),
+            notificationBadge.trailingAnchor.constraint(equalTo: closeButton.leadingAnchor, constant: -4),
+
+            metaLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
+            metaLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 1),
+            metaLabel.trailingAnchor.constraint(equalTo: closeButton.leadingAnchor, constant: -6),
 
             closeButton.centerYAnchor.constraint(equalTo: fill.centerYAnchor),
             closeButton.trailingAnchor.constraint(equalTo: fill.trailingAnchor, constant: -6),
@@ -313,96 +321,44 @@ final class WorktreeRowView: NSView {
 
     func configure(session: SessionGroup, isSelected: Bool) {
         let tab = session.activeTab ?? session.tabs.first ?? Tab()
-        let shortenedCwd = HarnessDesign.shortenPath(tab.cwd)
-
-        let branchText: String
-        if let branch = tab.gitBranch, !branch.isEmpty {
-            branchText = "⎇ \(branch)  "
-        } else {
-            branchText = ""
-        }
-
-        let attributedString = NSMutableAttributedString()
         let c = HarnessDesign.chrome
 
-        if !branchText.isEmpty {
-            let branchAttrs: [NSAttributedString.Key: Any] = [
-                .foregroundColor: isSelected ? c.textPrimary : c.accent,
-                .font: NSFont.systemFont(ofSize: 11.5, weight: .medium)
-            ]
-            attributedString.append(NSAttributedString(string: branchText, attributes: branchAttrs))
-        }
+        let title = session.name.isEmpty ? HarnessDesign.pathDisplayName(tab.cwd) : session.name
+        titleLabel.stringValue = title
+        titleLabel.textColor = isSelected ? c.textPrimary : c.textSecondary
 
-        let cwdAttrs: [NSAttributedString.Key: Any] = [
-            .foregroundColor: isSelected ? c.textPrimary : c.textSecondary,
-            .font: NSFont.monospacedSystemFont(ofSize: 11.5, weight: .regular)
-        ]
-        attributedString.append(NSAttributedString(string: shortenedCwd, attributes: cwdAttrs))
-
-        textLabel.attributedStringValue = attributedString
-        toolTip = branchText.isEmpty ? shortenedCwd : "\(branchText)\(shortenedCwd)"
-
-        // Status indicator: derive from all tabs in the session
-        let status = highestStatus(for: session)
-        let (dotColor, labelText) = statusAppearance(for: status, tab: tab)
-
-        // Show agent icon (same as tab bar) when agent detected; fallback to dot+label
-        if let kind = tab.effectiveAgentKind {
-            if kind != cachedAgentKind {
-                agentIconView.image = AgentIconRenderer.templateOrMonogramImage(for: kind, size: 14)
-                agentIconView.contentTintColor = NSColor.fromHex(SessionCoordinator.shared.settings.agentColorHex(for: kind))
-                cachedAgentKind = kind
-            }
-            agentIconView.isHidden = false
-            statusDot.isHidden = true
-            statusLabel.isHidden = true
+        let branch = tab.gitBranch?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let branchName: String
+        if let branch, !branch.isEmpty {
+            branchName = branch
         } else {
-            cachedAgentKind = nil
-            agentIconView.isHidden = true
-            statusDot.isHidden = false
-            statusLabel.isHidden = false
-            statusDot.layer?.backgroundColor = dotColor.cgColor
-            statusLabel.stringValue = labelText
-            statusLabel.textColor = dotColor.withAlphaComponent(0.8)
+            branchName = "no branch"
         }
+        let shortenedCwd = HarnessDesign.shortenPath(tab.cwd)
+        metaLabel.stringValue = "\(branchName) · \(shortenedCwd)"
+        metaLabel.textColor = isSelected ? c.textPrimary : c.textSecondary
+        toolTip = "\(title)\n\(metaLabel.stringValue)"
+
+        let waitingCount = session.tabs.filter { $0.status == .waiting }.count
+        notificationBadge.configure(text: "\(waitingCount)", color: c.danger)
+        notificationBadge.isHidden = waitingCount == 0
+
+        let (dotColor, dotTooltip) = agentDotAppearance(for: session)
+        agentStatusDot.layer?.backgroundColor = dotColor.cgColor
+        agentStatusDot.toolTip = dotTooltip
 
         setSelected(isSelected)
     }
 
-    private func highestStatus(for session: SessionGroup) -> BoardColumnKind {
-        var highest = BoardColumnKind.idle
-        for tab in session.tabs {
-            let s = BoardModel.columnKind(for: tab)
-            if priority(s) > priority(highest) { highest = s }
+    private func agentDotAppearance(for session: SessionGroup) -> (NSColor, String) {
+        let tabsWithAgents = session.tabs.filter { $0.effectiveAgentKind != nil }
+        guard !tabsWithAgents.isEmpty else {
+            return (HarnessDesign.chrome.idleStatus, "No agent")
         }
-        return highest
-    }
-
-    private func priority(_ s: BoardColumnKind) -> Int {
-        switch s {
-        case .needsAttention: return 4
-        case .running:        return 3
-        case .error:          return 2
-        case .done:           return 1
-        case .idle:           return 0
+        if tabsWithAgents.contains(where: { $0.agent?.activity == .working }) {
+            return (.systemGreen, "Agent active")
         }
-    }
-
-    private func statusAppearance(for status: BoardColumnKind, tab: Tab) -> (NSColor, String) {
-        let color = status.color
-        switch status {
-        case .needsAttention: return (color, "waiting")
-        case .running:
-            if let agent = tab.effectiveAgentKind {
-                return (color, agent.displayName)
-            }
-            let cmd = tab.currentCommand ?? ""
-            let shortCmd = BoardModel.shellNames.contains(cmd.lowercased()) ? "" : cmd
-            return (color, shortCmd.isEmpty ? "running" : shortCmd)
-        case .done:    return (color, "done")
-        case .error:   return (color, "error")
-        case .idle:    return (color, "idle")
-        }
+        return (.systemYellow, "Agent idle")
     }
 
     override func menu(for event: NSEvent) -> NSMenu? {
@@ -453,6 +409,43 @@ final class WorktreeRowView: NSView {
         HarnessMotion.animate(HarnessDesign.Motion.microFast) { _ in
             self.refresh()
         }
+    }
+}
+
+@MainActor
+private final class SidebarBadgeView: NSView {
+    private let label = NSTextField(labelWithString: "")
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        layer?.cornerRadius = HarnessDesign.Radius.badge
+        layer?.cornerCurve = .continuous
+        translatesAutoresizingMaskIntoConstraints = false
+        setContentHuggingPriority(.required, for: .horizontal)
+        setContentCompressionResistancePriority(.required, for: .horizontal)
+
+        label.font = .monospacedDigitSystemFont(ofSize: 9, weight: .bold)
+        label.alignment = .center
+        label.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(label)
+
+        NSLayoutConstraint.activate([
+            heightAnchor.constraint(equalToConstant: 16),
+            widthAnchor.constraint(greaterThanOrEqualToConstant: 18),
+            label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 5),
+            label.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -5),
+            label.centerYAnchor.constraint(equalTo: centerYAnchor),
+        ])
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError() }
+
+    func configure(text: String, color: NSColor) {
+        label.stringValue = text
+        label.textColor = color
+        layer?.backgroundColor = color.withAlphaComponent(0.16).cgColor
     }
 }
 

@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Terminal Power Tools — Interactive Cheat Sheet</title>
+<style>
+:root {
+    --bg: #1a1b26;
+    --panel: #24283b;
+    --panel-2: #292e42;
+    --border: #3b4261;
+    --muted: #565f89;
+    --text: #c0caf5;
+    --blue: #7aa2f7;
+    --purple: #bb9af7;
+    --green: #9ece6a;
+    --yellow: #e0af68;
+    --red: #f7768e;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { color-scheme: dark; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Mono", Menlo, Consolas, monospace;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: clamp(1rem, 3vw, 2rem);
+    line-height: 1.5;
+}
+main { max-width: 1180px; margin: 0 auto; }
+h1 { color: var(--blue); margin-bottom: 0.5rem; font-size: clamp(1.6rem, 4vw, 2.4rem); line-height: 1.1; }
+h2 { color: var(--purple); margin: 2rem 0 1rem; font-size: 1.2rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+h3 { line-height: 1.35; }
+a { color: var(--blue); }
+.subtitle { color: var(--muted); margin-bottom: 0.3rem; }
+.source { color: var(--muted); font-size: 0.85rem; margin-bottom: 1.5rem; }
+.tabs { display: flex; gap: 0.5rem; margin: 0 0 1.5rem; flex-wrap: wrap; }
+.tab {
+    padding: 0.55rem 0.9rem;
+    border-radius: 6px;
+    cursor: pointer;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--blue);
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+    font: inherit;
+}
+.tab:hover, .tab:focus-visible { background: var(--panel-2); outline: none; border-color: var(--blue); }
+.tab.active { background: var(--blue); color: var(--bg); border-color: var(--blue); }
+.section { display: none; }
+.section.active { display: block; }
+.table-wrap { overflow-x: auto; border: 1px solid rgba(59, 66, 97, 0.65); border-radius: 8px; margin-bottom: 1.5rem; }
+table { width: 100%; border-collapse: collapse; min-width: 620px; }
+th { text-align: left; padding: 0.65rem 1rem; background: var(--panel); color: var(--purple); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; }
+td { padding: 0.6rem 1rem; border-top: 1px solid var(--panel-2); vertical-align: top; }
+td:first-child { color: var(--green); font-family: "SF Mono", Menlo, Consolas, monospace; white-space: nowrap; }
+tr:hover { background: rgba(41, 46, 66, 0.65); }
+kbd { background: var(--border); color: var(--text); padding: 0.12rem 0.38rem; border-radius: 4px; font-size: 0.85rem; box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.35); }
+.note { color: var(--muted); font-size: 0.88rem; margin: -0.4rem 0 1rem; max-width: 78ch; }
+.quiz-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
+.quiz-box { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; min-height: 176px; }
+.quiz-box h3 { color: var(--yellow); margin-bottom: 0.9rem; font-size: 0.95rem; }
+.workflow-card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
+.workflow-card h3 { color: var(--yellow); margin-bottom: 0.75rem; font-size: 0.98rem; }
+.workflow-card ol { padding-left: 1.35rem; }
+.workflow-card li { margin: 0.45rem 0; }
+.quiz-input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 0.55rem 0.75rem;
+    border-radius: 5px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.95rem;
+    width: 100%;
+}
+.quiz-input:focus { outline: 2px solid transparent; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(122, 162, 247, 0.18); }
+.quiz-input.correct { border-color: var(--green); background: rgba(158, 206, 106, 0.1); }
+.quiz-input.wrong { border-color: var(--red); background: rgba(247, 118, 142, 0.1); }
+.hint { color: var(--muted); font-size: 0.85rem; margin-top: 0.55rem; }
+.score {
+    position: sticky;
+    top: 1rem;
+    z-index: 2;
+    float: right;
+    background: rgba(36, 40, 59, 0.95);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.65rem 1rem;
+    backdrop-filter: blur(8px);
+}
+.score span { color: var(--green); font-weight: bold; }
+.practice-terminal {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+}
+.practice-terminal-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 0.65rem 0.85rem;
+}
+.practice-terminal-dot {
+    width: 0.72rem;
+    height: 0.72rem;
+    border-radius: 50%;
+    background: var(--muted);
+}
+.practice-terminal-title {
+    color: var(--muted);
+    font-size: 0.82rem;
+    margin-left: 0.35rem;
+}
+.practice-terminal-output {
+    height: 400px;
+    overflow-y: auto;
+    padding: 1rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+.practice-terminal-line {
+    min-height: 1.5rem;
+}
+.practice-terminal-command {
+    color: var(--text);
+}
+.practice-terminal-response {
+    color: var(--text);
+}
+.practice-terminal-muted {
+    color: var(--muted);
+}
+.practice-terminal-input-line {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    border-top: 1px solid var(--border);
+    background: var(--panel);
+    padding: 0.75rem 1rem;
+}
+.practice-terminal-prompt {
+    color: var(--green);
+    white-space: nowrap;
+}
+.practice-terminal-input {
+    flex: 1;
+    min-width: 0;
+    background: transparent;
+    border: 0;
+    color: var(--text);
+    caret-color: transparent;
+    font: inherit;
+}
+.practice-terminal-input:focus {
+    outline: none;
+}
+.practice-terminal-cursor {
+    width: 0.62rem;
+    height: 1.15rem;
+    background: var(--green);
+    display: inline-block;
+    animation: terminal-cursor-blink 1s steps(1, end) infinite;
+}
+@keyframes terminal-cursor-blink {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0; }
+}
+@media (max-width: 720px) {
+    .score { float: none; display: inline-block; margin-bottom: 1rem; }
+    .tab { flex: 1 1 100%; text-align: left; }
+    table { min-width: 540px; }
+}
+</style>
+</head>
+<body>
+<main>
+<h1>⌁ Terminal Power Tools</h1>
+<p class="subtitle">Interactive cheat sheet — practice mode included</p>
+<p class="source">Generated from: <a href="docs/KEYBINDINGS.md">docs/KEYBINDINGS.md</a> · <a href="USAGE.md">USAGE.md</a></p>
+<div class="score" aria-live="polite">Score: <span id="score">0</span> / <span id="total">0</span></div>
+
+<div class="tabs" role="tablist" aria-label="Cheat sheet sections">
+<button class="tab active" type="button" role="tab" aria-selected="true" aria-controls="shell" data-tab="shell">Shell (fd/fzf/z/rg/bat/eza/jq)</button>
+<button class="tab" type="button" role="tab" aria-selected="false" aria-controls="unix" data-tab="unix">Unix Essentials</button>
+<button class="tab" type="button" role="tab" aria-selected="false" aria-controls="vim" data-tab="vim">Vim / Copy Mode</button>
+<button class="tab" type="button" role="tab" aria-selected="false" aria-controls="harness" data-tab="harness">Harness Shortcuts</button>
+<button class="tab" type="button" role="tab" aria-selected="false" aria-controls="workflows" data-tab="workflows">Workflows</button>
+<button class="tab" type="button" role="tab" aria-selected="false" aria-controls="practice" data-tab="practice">🎯 Practice</button>
+<button class="tab" type="button" role="tab" aria-selected="false" aria-controls="practice-terminal" data-tab="practice-terminal">Practice Terminal</button>
+</div>
+
+<div class="section active" id="shell" role="tabpanel">
+
+<h2>fzf — Fuzzy Finder</h2>
+<table>
+<tr><th>Shortcut</th><th>What it does</th><th>Example</th></tr>
+<tr><td>ctrl+r</td><td>Fuzzy search command history</td><td>Pick and rerun <code>swift build</code></td></tr>
+<tr><td>ctrl+t</td><td>Fuzzy pick file → paste path</td><td>Insert <code>Sources/App.swift</code> at the prompt</td></tr>
+<tr><td>alt+c</td><td>Fuzzy pick subdirectory → cd</td><td>Jump into <code>Packages/HarnessCore</code></td></tr>
+<tr><td>cmd | fzf</td><td>Pipe anything into fuzzy filter</td><td><code>git branch | fzf</code> selects a branch</td></tr>
+</table>
+
+<h2>zoxide — Smart cd</h2>
+<table>
+<tr><th>Command</th><th>What it does</th><th>Example</th></tr>
+<tr><td>z keyword</td><td>Jump to frecent directory</td><td><code>z harness</code> opens the Harness repo</td></tr>
+<tr><td>z keyword1 keyword2</td><td>Narrow with multiple words</td><td><code>z personal harness</code></td></tr>
+<tr><td>zi</td><td>Interactive mode (fzf picker)</td><td>Choose from visited directories in <code>fzf</code></td></tr>
+<tr><td>z -</td><td>Jump back to previous dir</td><td>Return from <code>Packages/</code> to repo root</td></tr>
+</table>
+
+<h2>ripgrep (rg) — Fast Search</h2>
+<table>
+<tr><th>Command</th><th>What it does</th><th>Example</th></tr>
+<tr><td>rg "pattern"</td><td>Search current dir recursively</td><td><code>rg "TODO"</code> prints matching lines</td></tr>
+<tr><td>rg "pattern" path/</td><td>Search specific directory</td><td><code>rg "IPC" Packages/</code></td></tr>
+<tr><td>rg -t swift "pattern"</td><td>Filter by file type</td><td><code>rg -t swift "Sendable"</code></td></tr>
+<tr><td>rg -l "pattern"</td><td>List only filenames</td><td><code>rg -l "TODO"</code> lists files only</td></tr>
+<tr><td>rg -i "pattern"</td><td>Case insensitive</td><td><code>rg -i "daemon"</code> matches <code>Daemon</code></td></tr>
+<tr><td>rg -C 3 "pattern"</td><td>Show 3 lines context</td><td><code>rg -C 3 "resize"</code></td></tr>
+</table>
+
+<h2>fd — Modern find</h2>
+<table>
+<tr><th>Command</th><th>What it does</th><th>Example</th></tr>
+<tr><td>fd pattern</td><td>Find files matching pattern (recursive, respects .gitignore)</td><td><code>fd settings</code> finds matching paths</td></tr>
+<tr><td>fd -t d pattern</td><td>Find directories only</td><td><code>fd -t d Sources</code></td></tr>
+<tr><td>fd -t f -e swift</td><td>Find files with .swift extension</td><td><code>fd -t f -e swift</code> lists Swift files</td></tr>
+<tr><td>fd -H pattern</td><td>Include hidden files (.dotfiles)</td><td><code>fd -H env</code> can find <code>.env</code></td></tr>
+<tr><td>fd pattern path/</td><td>Search under specific directory</td><td><code>fd View Apps/</code></td></tr>
+<tr><td>fd -x cmd {}</td><td>Execute command on each result</td><td><code>fd -e log -x rm {}</code></td></tr>
+<tr><td>fd -E node_modules</td><td>Exclude a directory</td><td><code>fd test -E node_modules</code></td></tr>
+</table>
+
+<h2>🔗 Combo Patterns — Power Moves</h2>
+<table>
+<tr><th>Combo</th><th>What it does</th><th>Example</th></tr>
+<tr><td>fd -t f | fzf</td><td>Find all files → fuzzy pick one</td><td>Select <code>README.md</code> from all files</td></tr>
+<tr><td>cd $(fd -t d | fzf)</td><td>Fuzzy pick a directory → cd into it (+ zoxide learns it)</td><td>Pick <code>Packages/HarnessCore</code> and enter it</td></tr>
+<tr><td>fd -e swift | xargs rg "pattern"</td><td>Search only in Swift files found by fd</td><td><code>fd -e swift | xargs rg "Actor"</code></td></tr>
+<tr><td>fd . ~/Code --max-depth 1 -t d | fzf</td><td>Pick a project from ~/Code</td><td>Choose <code>~/Code/harness-terminal</code></td></tr>
+<tr><td>z keyword → fd pattern</td><td>Jump to zone first, then find files within</td><td><code>z harness</code>, then <code>fd settings</code></td></tr>
+<tr><td>fd -t f -e md | fzf --preview 'head -20 {}'</td><td>Fuzzy pick markdown with preview</td><td>Preview <code>USAGE.md</code> before opening</td></tr>
+</table>
+
+<h2>💡 When to Use What</h2>
+<table>
+<tr><th>Situation</th><th>Tool</th><th>Example</th></tr>
+<tr><td>Know where to go (been there before)</td><td><kbd>z</kbd></td><td><code>z harness</code></td></tr>
+<tr><td>Don't know where it is (first time)</td><td><kbd>fd</kbd></td><td><code>fd Package.swift</code></td></tr>
+<tr><td>Looking at text content inside files</td><td><kbd>rg</kbd></td><td><code>rg "CommandPalette"</code></td></tr>
+<tr><td>Need to narrow from many results</td><td>pipe to <kbd>fzf</kbd></td><td><code>fd -t f | fzf</code></td></tr>
+<tr><td>Quick file path insert at prompt</td><td><kbd>ctrl+t</kbd> (fzf widget)</td><td>Paste <code>docs/COMMANDS.md</code></td></tr>
+</table>
+
+<h2>bat — Better cat</h2>
+<table>
+<tr><th>Command</th><th>What it does</th><th>Example</th></tr>
+<tr><td>bat file</td><td>View file with syntax highlighting + line numbers</td><td><code>bat Package.swift</code></td></tr>
+<tr><td>bat -l swift file</td><td>Force language for highlighting</td><td><code>bat -l json config</code></td></tr>
+<tr><td>bat --diff file</td><td>Show git diff inline</td><td><code>bat --diff Sources/App.swift</code></td></tr>
+<tr><td>bat -p file</td><td>Plain mode (no line numbers/header)</td><td><code>bat -p .env</code></td></tr>
+<tr><td>cmd | bat -l json</td><td>Highlight piped output</td><td><code>curl api | bat -l json</code></td></tr>
+</table>
+
+<h2>eza — Better ls</h2>
+<table>
+<tr><th>Command</th><th>What it does</th><th>Example</th></tr>
+<tr><td>eza</td><td>List files with colors + icons</td><td>Colorized file list</td></tr>
+<tr><td>eza -la</td><td>Long format + hidden files</td><td>Like <code>ls -la</code> but prettier</td></tr>
+<tr><td>eza --tree</td><td>Tree view</td><td><code>eza --tree --level 2</code></td></tr>
+<tr><td>eza --git</td><td>Show git status per file</td><td>M/A/? markers next to filenames</td></tr>
+<tr><td>eza -la --git --icons</td><td>Full power view</td><td>All info + icons + git at a glance</td></tr>
+</table>
+
+<h2>jq — JSON Swiss Knife</h2>
+<table>
+<tr><th>Command</th><th>What it does</th><th>Example</th></tr>
+<tr><td>cat file | jq .</td><td>Pretty-print JSON</td><td><code>cat response.json | jq .</code></td></tr>
+<tr><td>jq '.key'</td><td>Extract a field</td><td><code>jq '.name'</code> → <code>"harness"</code></td></tr>
+<tr><td>jq '.items[]'</td><td>Iterate array items</td><td><code>jq '.dependencies[]'</code></td></tr>
+<tr><td>jq '.[] | .name'</td><td>Map — extract field from each item</td><td>List all names from array</td></tr>
+<tr><td>jq -r</td><td>Raw output (no quotes)</td><td><code>jq -r '.version'</code> → <code>3.3.0</code></td></tr>
+<tr><td>jq 'select(.age > 30)'</td><td>Filter items by condition</td><td>Only items matching predicate</td></tr>
+</table>
+
+</div>
+
+<div class="section" id="unix" role="tabpanel" hidden>
+
+<h2>Navigation</h2>
+<table>
+<tr><th>Command</th><th>What it does</th><th>Example</th></tr>
+<tr><td>pwd</td><td>Print the current directory</td><td>Shows <code>/Users/me/project</code></td></tr>
+<tr><td>ls -la</td><td>List all files with details, including dotfiles</td><td>Shows <code>.git</code>, permissions, and sizes</td></tr>
+<tr><td>cd -</td><td>Go back to previous directory</td><td>Toggle between <code>Apps/</code> and repo root</td></tr>
+<tr><td>pushd / popd</td><td>Stack-based directory history</td><td><code>pushd Packages</code>, then <code>popd</code></td></tr>
+<tr><td>find . -name "*.ext"</td><td>Find files by name (use fd instead)</td><td><code>find . -name "*.swift"</code></td></tr>
+<tr><td>!!</td><td>Repeat last command</td><td>Runs the previous <code>swift build</code> again</td></tr>
+<tr><td>sudo !!</td><td>Re-run the previous command with sudo</td><td>Turns <code>make install</code> into <code>sudo make install</code></td></tr>
+<tr><td>!$</td><td>Last argument of previous command</td><td>Reuse <code>Package.swift</code> from the prior command</td></tr>
+</table>
+
+<h2>Pipes &amp; Redirection</h2>
+<table>
+<tr><th>Syntax</th><th>What it does</th><th>Example</th></tr>
+<tr><td>cmd1 | cmd2</td><td>Pipe output to next command</td><td><code>ls | fzf</code></td></tr>
+<tr><td>cmd > file</td><td>Write output to file (overwrite)</td><td><code>swift build &gt; build.log</code></td></tr>
+<tr><td>cmd >> file</td><td>Append output to file</td><td><code>date &gt;&gt; notes.log</code></td></tr>
+<tr><td>cmd 2> err.log</td><td>Write stderr to a file</td><td><code>swift test 2&gt; err.log</code></td></tr>
+<tr><td>cmd &gt; out.log 2&gt;&amp;1</td><td>Write stdout and stderr to one file</td><td><code>make preview &gt; out.log 2&gt;&amp;1</code></td></tr>
+<tr><td>cmd1 &amp;&amp; cmd2</td><td>Run cmd2 only if cmd1 succeeds</td><td><code>swift build &amp;&amp; make run</code></td></tr>
+<tr><td>cmd1 || cmd2</td><td>Run cmd2 only if cmd1 fails</td><td><code>swift build || open build.log</code></td></tr>
+<tr><td>xargs</td><td>Turn piped lines into command arguments</td><td><code>fd -e log | xargs rm</code></td></tr>
+</table>
+
+<h2>Process Control</h2>
+<table>
+<tr><th>Command</th><th>What it does</th><th>Example</th></tr>
+<tr><td>ctrl+c</td><td>Interrupt the foreground process</td><td>Stop a running <code>swift test</code></td></tr>
+<tr><td>ctrl+z / bg / fg</td><td>Suspend / background / foreground a job</td><td><kbd>ctrl+z</kbd>, then <code>fg</code> to resume</td></tr>
+<tr><td>cmd &amp;</td><td>Run in background</td><td><code>make preview &amp;</code></td></tr>
+<tr><td>jobs</td><td>List jobs in the current shell</td><td>Shows <code>[1]+ Running make preview</code></td></tr>
+<tr><td>ps aux | rg name</td><td>Find running process</td><td><code>ps aux | rg Harness</code></td></tr>
+<tr><td>kill PID</td><td>Ask a process to terminate</td><td><code>kill 12345</code></td></tr>
+</table>
+
+<h2>Line Editing</h2>
+<table>
+<tr><th>Shortcut</th><th>What it does</th><th>Example</th></tr>
+<tr><td>ctrl+a / ctrl+e</td><td>Move to start / end of line</td><td>Jump around <code>swift build --product Harness</code></td></tr>
+<tr><td>ctrl+u / ctrl+k</td><td>Delete from cursor to start / end of line</td><td>Clear half of a long command line</td></tr>
+<tr><td>ctrl+w</td><td>Delete the word before the cursor</td><td>Remove <code>HarnessDaemon</code> before Enter</td></tr>
+<tr><td>ctrl+l</td><td>Clear the screen</td><td>Leaves a clean prompt visible</td></tr>
+<tr><td>ctrl+d</td><td>Send EOF; exits an empty shell prompt</td><td>Close the current shell when prompt is empty</td></tr>
+</table>
+
+</div>
+
+<div class="section" id="vim" role="tabpanel" hidden>
+<h2>Copy Mode (vi-style, in Harness)</h2>
+<p class="note">Enter with <kbd>ctrl+a</kbd> then <kbd>[</kbd>. Defaults follow vi-style copy mode and can be rebound.</p>
+<table>
+<tr><th>Key</th><th>Action</th><th>Example</th></tr>
+<tr><td>h / j / k / l</td><td>Move left / down / up / right</td><td><kbd>j</kbd> moves one row down</td></tr>
+<tr><td>0 / $</td><td>Move to line start / end</td><td><kbd>$</kbd> jumps to the line end</td></tr>
+<tr><td>g / G</td><td>Jump to top / bottom of scrollback</td><td><kbd>G</kbd> returns to latest output</td></tr>
+<tr><td>w / b</td><td>Move to next / previous word</td><td><kbd>w</kbd> moves across <code>swift build</code></td></tr>
+<tr><td>PageUp / PageDown</td><td>Move one page up / down</td><td><kbd>PageUp</kbd> scans older output</td></tr>
+<tr><td>C-u / C-d</td><td>Move half a page up / down</td><td><kbd>C-u</kbd> scrolls half a page up</td></tr>
+<tr><td>v / V / C-v</td><td>Start character / line / rectangular selection</td><td><kbd>V</kbd> selects whole output lines</td></tr>
+<tr><td>/ / ?</td><td>Search forward / backward</td><td><code>/error</code> finds the next error</td></tr>
+<tr><td>n / N</td><td>Move to next / previous search match</td><td><kbd>n</kbd> advances to the next match</td></tr>
+<tr><td>[ / ]</td><td>Jump to previous / next OSC 133 prompt mark</td><td><kbd>[</kbd> jumps to the prior prompt</td></tr>
+<tr><td>y / Enter</td><td>Yank selection to clipboard and paste buffer; exit copy mode</td><td><kbd>y</kbd> copies selected log text</td></tr>
+<tr><td>p</td><td>Paste the most recent buffer into the surface; exit copy mode</td><td><kbd>p</kbd> pastes the copied command</td></tr>
+<tr><td>q / Escape</td><td>Exit copy mode</td><td><kbd>Escape</kbd> returns to live terminal input</td></tr>
+</table>
+
+<h2>Vi Ex Commands (file editor)</h2>
+<table>
+<tr><th>Command</th><th>IDE equivalent</th><th>Example</th></tr>
+<tr><td>:find &lt;partial&gt;</td><td>Find file, similar to Cmd+P</td><td><code>:find Settings</code> opens a matching file</td></tr>
+<tr><td>:recent</td><td>Open recently used files</td><td>Pick from recently edited files</td></tr>
+<tr><td>:copy-path</td><td>Copy relative file path</td><td>Copies <code>Apps/Harness/App.swift</code></td></tr>
+<tr><td>:copy-path absolute</td><td>Copy absolute file path</td><td>Copies <code>/Users/me/project/file.swift</code></td></tr>
+<tr><td>:grep &lt;query&gt;</td><td>Search across the project</td><td><code>:grep TerminalHostView</code></td></tr>
+<tr><td>:errors</td><td>Open diagnostics / problems</td><td>Shows current compiler diagnostics</td></tr>
+<tr><td>]d / [d</td><td>Go to next / previous diagnostic</td><td><kbd>]d</kbd> jumps to the next error</td></tr>
+<tr><td>gd</td><td>Go to definition</td><td><kbd>gd</kbd> opens the symbol definition</td></tr>
+<tr><td>K</td><td>Show hover / type info</td><td><kbd>K</kbd> shows type details</td></tr>
+<tr><td>gf</td><td>Open path under cursor</td><td><kbd>gf</kbd> opens <code>README.md</code></td></tr>
+<tr><td>:make / :make test</td><td>Run build / tests in a task pane</td><td><code>:make test</code> starts tests</td></tr>
+<tr><td>:board / :attention</td><td>Open session board / jump to attention-needed session</td><td><code>:attention</code> focuses a waiting session</td></tr>
+<tr><td>:split &lt;path&gt;</td><td>Open file in side-by-side pane</td><td><code>:split README.md</code> opens left | right</td></tr>
+<tr><td>:vsplit &lt;path&gt;</td><td>Open file in top/bottom pane</td><td><code>:vsplit README.md</code> opens top / bottom</td></tr>
+</table>
+
+</div>
+
+<div class="section" id="harness" role="tabpanel" hidden>
+<h2>Global Menu Shortcuts</h2>
+<p class="note">These are app menu shortcuts, separate from the multiplexer prefix table.</p>
+<table>
+<tr><th>Action</th><th>Shortcut</th><th>Example</th></tr>
+<tr><td>New session / close session</td><td><kbd>⌘T</kbd> / <kbd>⌘⇧W</kbd></td><td><kbd>⌘T</kbd> opens a fresh terminal session</td></tr>
+<tr><td>Switch to session 1-9</td><td><kbd>⌘1</kbd> ... <kbd>⌘9</kbd></td><td><kbd>⌘2</kbd> jumps to session 2</td></tr>
+<tr><td>Close pane or tab</td><td><kbd>⌘W</kbd></td><td>Close the active pane or tab</td></tr>
+<tr><td>Previous / next session</td><td><kbd>⌘[</kbd> / <kbd>⌘]</kbd></td><td><kbd>⌘]</kbd> moves to the next session</td></tr>
+<tr><td>Split right / split down</td><td><kbd>⌘D</kbd> / <kbd>⌘⇧D</kbd></td><td><kbd>⌘D</kbd> creates <code>left | right</code></td></tr>
+<tr><td>Close pane</td><td><kbd>⌘⌥W</kbd></td><td>Close only the focused pane</td></tr>
+<tr><td>Focus pane direction</td><td><kbd>⌘⌥←</kbd> / <kbd>⌘⌥→</kbd> / <kbd>⌘⌥↑</kbd> / <kbd>⌘⌥↓</kbd></td><td><kbd>⌘⌥→</kbd> focuses the pane on the right</td></tr>
+<tr><td>Find file / find in files</td><td><kbd>⌘P</kbd> / <kbd>⌘F</kbd></td><td><kbd>⌘P</kbd> quick-opens <code>README.md</code></td></tr>
+<tr><td>Command prompt</td><td><kbd>⌘;</kbd></td><td>Open the prompt for commands like <code>:split</code></td></tr>
+<tr><td>Search command history</td><td><kbd>⌃R</kbd></td><td>Find a previous <code>swift test</code></td></tr>
+<tr><td>Toggle sidebar / show Git panel</td><td><kbd>⌘\</kbd> / <kbd>⌘G</kbd></td><td><kbd>⌘G</kbd> opens Git status</td></tr>
+<tr><td>Notifications inbox / browser pane</td><td><kbd>⌘⇧I</kbd> / <kbd>⌘B</kbd></td><td><kbd>⌘B</kbd> opens the browser pane</td></tr>
+<tr><td>Settings</td><td><kbd>⌘,</kbd></td><td>Open app preferences</td></tr>
+<tr><td>Font size up / down / reset</td><td><kbd>⌘+</kbd> / <kbd>⌘-</kbd> / <kbd>⌘0</kbd></td><td><kbd>⌘0</kbd> restores default terminal size</td></tr>
+<tr><td>Toggle fast full screen</td><td><kbd>⌃⌘⇧F</kbd></td><td>Switch the window into fast full screen</td></tr>
+</table>
+
+<h2>Prefix Table (after ctrl+a)</h2>
+<p class="note">Tap the prefix, release, then press the listed key.</p>
+<table>
+<tr><th>Key</th><th>Command</th><th>Example</th></tr>
+<tr><td>c</td><td>New tab / window</td><td><kbd>ctrl+a</kbd>, <kbd>c</kbd> creates a new tab</td></tr>
+<tr><td>% / "</td><td>Split side-by-side / top-bottom</td><td><kbd>%</kbd> creates <code>left | right</code></td></tr>
+<tr><td>x / z</td><td>Kill pane / zoom pane</td><td><kbd>z</kbd> makes the pane fill the tab</td></tr>
+<tr><td>&amp;</td><td>Kill window / tab</td><td>Close the current tab/window</td></tr>
+<tr><td>o / ;</td><td>Select next / previous pane</td><td><kbd>o</kbd> cycles to the next pane</td></tr>
+<tr><td>l</td><td>Select most-recently-active pane</td><td>Toggle back to the last pane</td></tr>
+<tr><td>Left / Right / Up / Down</td><td>Select pane in that direction</td><td><kbd>Right</kbd> focuses the right pane</td></tr>
+<tr><td>Shift + arrows</td><td>Resize pane; repeatable while prefix remains armed</td><td><kbd>Shift+Right</kbd> widens the pane</td></tr>
+<tr><td>q</td><td>Display pane numbers; press a digit to jump</td><td>Press <kbd>q</kbd>, then <kbd>2</kbd></td></tr>
+<tr><td>m / M</td><td>Mark / unmark the active pane</td><td><kbd>m</kbd> marks a pane for join</td></tr>
+<tr><td>j</td><td>Join the marked pane into the active one</td><td>Move a marked pane into this tab</td></tr>
+<tr><td>S</td><td>Toggle synchronize-panes for the tab</td><td>Type one command into every pane</td></tr>
+<tr><td>n / p</td><td>Next / previous tab</td><td><kbd>n</kbd> advances to the next tab</td></tr>
+<tr><td>,</td><td>Rename tab / window</td><td>Name the tab <code>build</code></td></tr>
+<tr><td>0-9</td><td>Select workspace by number</td><td><kbd>1</kbd> selects workspace 1</td></tr>
+<tr><td>[</td><td>Enter copy mode</td><td><kbd>ctrl+a</kbd>, <kbd>[</kbd> starts scrollback selection</td></tr>
+<tr><td>d</td><td>Detach client</td><td>Leave the session running in the daemon</td></tr>
+<tr><td>?</td><td>Show live cheatsheet</td><td>Display shortcuts inside Harness</td></tr>
+<tr><td>r</td><td>Source config / re-import terminal config</td><td>Reload updated keybindings</td></tr>
+<tr><td>:</td><td>Open command prompt</td><td>Type commands like <code>:split README.md</code></td></tr>
+</table>
+
+</div>
+
+<div class="section" id="workflows" role="tabpanel" hidden>
+<h2>Workflows</h2>
+
+<div class="workflow-card">
+<h3>Start a new session and name it</h3>
+<ol>
+<li>Press <kbd>⌘T</kbd> to create a new terminal session.</li>
+<li>Press <kbd>ctrl+a</kbd>, then <kbd>,</kbd> to rename the tab/window.</li>
+<li>Enter a short name such as <code>build</code> or <code>tests</code>.</li>
+</ol>
+</div>
+
+<div class="workflow-card">
+<h3>Split pane and navigate between panes</h3>
+<ol>
+<li>Press <kbd>⌘D</kbd> for a right split or <kbd>⌘⇧D</kbd> for a down split.</li>
+<li>Use <kbd>⌘⌥←</kbd> / <kbd>⌘⌥→</kbd> / <kbd>⌘⌥↑</kbd> / <kbd>⌘⌥↓</kbd> to focus a pane by direction.</li>
+<li>Use <kbd>ctrl+a</kbd>, then <kbd>Shift+arrows</kbd> to resize the active pane.</li>
+<li>Press <kbd>⌘⌥W</kbd> to close only the focused pane.</li>
+</ol>
+</div>
+
+<div class="workflow-card">
+<h3>Detach from a session and reattach</h3>
+<ol>
+<li>Press <kbd>ctrl+a</kbd>, then <kbd>d</kbd> to detach the client while the session keeps running.</li>
+<li>Open Harness again or return to the session list.</li>
+<li>Use <kbd>⌘1</kbd> ... <kbd>⌘9</kbd> or <kbd>⌘[</kbd> / <kbd>⌘]</kbd> to reselect the session.</li>
+</ol>
+</div>
+
+<div class="workflow-card">
+<h3>Copy text in copy mode</h3>
+<ol>
+<li>Press <kbd>ctrl+a</kbd>, then <kbd>[</kbd> to enter copy mode.</li>
+<li>Move with <kbd>h</kbd> / <kbd>j</kbd> / <kbd>k</kbd> / <kbd>l</kbd>, <kbd>PageUp</kbd>, or <kbd>PageDown</kbd>.</li>
+<li>Press <kbd>v</kbd>, <kbd>V</kbd>, or <kbd>C-v</kbd> to begin a selection.</li>
+<li>Press <kbd>y</kbd> or <kbd>Enter</kbd> to yank to clipboard and exit copy mode.</li>
+</ol>
+</div>
+
+<div class="workflow-card">
+<h3>Open and use the command palette</h3>
+<ol>
+<li>Press <kbd>⌘;</kbd> to open the command prompt.</li>
+<li>Use commands such as <code>:split README.md</code>, <code>:vsplit README.md</code>, or <code>:grep TerminalHostView</code>.</li>
+<li>Use <code>:board</code> to open the session board or <code>:attention</code> to jump to a session needing attention.</li>
+</ol>
+</div>
+
+<div class="workflow-card">
+<h3>Find a file and inspect project text</h3>
+<ol>
+<li>Press <kbd>⌘P</kbd> to find a file, or use <kbd>ctrl+t</kbd> to paste a fuzzy-picked path at the shell prompt.</li>
+<li>Run <code>rg "pattern"</code> to search text across the project.</li>
+<li>Use <code>rg -l "pattern"</code> when you only need matching filenames.</li>
+<li>Pipe file candidates through <code>fd -t f | fzf</code> when the result set is large.</li>
+</ol>
+</div>
+
+</div>
+
+<div class="section" id="practice" role="tabpanel" hidden>
+<h2>🎯 Practice Mode — Type the Answer</h2>
+<p class="hint" style="margin-bottom:1.5rem">Real scenarios. Type the command/shortcut you'd use. Press Enter to check.</p>
+
+<h3 style="color:#7aa2f7;margin:1.5rem 0 1rem">🔰 Basics</h3>
+<div class="quiz-grid">
+<div class="quiz-box" data-answer="z"><h3>Jump to a directory you've visited before (smart cd)</h3><input class="quiz-input" placeholder="Type command..."><p class="hint">Hint: 1 letter command</p></div>
+<div class="quiz-box" data-answer="ctrl+r"><h3>Search your command history with fuzzy matching</h3><input class="quiz-input" placeholder="Type shortcut..."><p class="hint">Hint: ctrl + ?</p></div>
+<div class="quiz-box" data-answer="rg"><h3>Search text across all files recursively (fast)</h3><input class="quiz-input" placeholder="Type command..."><p class="hint">Hint: 2-letter, short for ripgrep</p></div>
+<div class="quiz-box" data-answer="fd"><h3>Find files by name (modern replacement for find)</h3><input class="quiz-input" placeholder="Type command..."><p class="hint">Hint: 2-letter, short for "find"</p></div>
+<div class="quiz-box" data-answer="ctrl+t"><h3>Fuzzy pick a file and paste its path at your cursor</h3><input class="quiz-input" placeholder="Type shortcut..."><p class="hint">Hint: ctrl + ?</p></div>
+<div class="quiz-box" data-answer="alt+c"><h3>Fuzzy pick a subdirectory and cd into it</h3><input class="quiz-input" placeholder="Type shortcut..."><p class="hint">Hint: alt + ?</p></div>
+</div>
+
+<h3 style="color:#7aa2f7;margin:1.5rem 0 1rem">🎯 Scenario Combos</h3>
+<div class="quiz-grid">
+<div class="quiz-box" data-answer="fd -t d"><h3>You need to find a folder but don't know where it is. Find only directories.</h3><input class="quiz-input" placeholder="Type command + flags..."><p class="hint">Hint: fd + type flag + "d" for directory</p></div>
+<div class="quiz-box" data-answer="fd -H"><h3>Find dotfiles (like .kiro, .env) that fd normally ignores</h3><input class="quiz-input" placeholder="Type command + flag..."><p class="hint">Hint: fd + hidden flag</p></div>
+<div class="quiz-box" data-answer="fd -e swift"><h3>Find all Swift source files in the project</h3><input class="quiz-input" placeholder="Type command + flags..."><p class="hint">Hint: fd + extension flag</p></div>
+<div class="quiz-box" data-answer="zi"><h3>Can't remember the directory name? Browse your zoxide history interactively</h3><input class="quiz-input" placeholder="Type command..."><p class="hint">Hint: z + interactive = 2 letters</p></div>
+<div class="quiz-box" data-answer="rg -l"><h3>Find which files contain "TODO" but only show filenames (not content)</h3><input class="quiz-input" placeholder="Type command + flag..."><p class="hint">Hint: rg + flag for "list files"</p></div>
+<div class="quiz-box" data-answer="fd -t f | fzf"><h3>List all files, then fuzzy-narrow to the one you want</h3><input class="quiz-input" placeholder="Type the pipeline..."><p class="hint">Hint: fd type-f piped to fuzzy finder</p></div>
+</div>
+
+<h3 style="color:#7aa2f7;margin:1.5rem 0 1rem">🔥 Power User</h3>
+<div class="quiz-grid">
+<div class="quiz-box" data-answer="sudo !!" data-alt="!!"><h3>You forgot sudo. Repeat last command with sudo in front.</h3><input class="quiz-input" placeholder="Type the history shortcut..."><p class="hint">Hint: sudo __ (2 chars that repeat last cmd)</p></div>
+<div class="quiz-box" data-answer="rg -t swift"><h3>Search only in Swift files (without piping)</h3><input class="quiz-input" placeholder="Type command + flags..."><p class="hint">Hint: rg + type filter flag</p></div>
+<div class="quiz-box" data-answer="zoxide add"><h3>Register a new path with zoxide without actually cd'ing there</h3><input class="quiz-input" placeholder="Type command..."><p class="hint">Hint: zoxide ___ (add it manually)</p></div>
+<div class="quiz-box" data-answer="fd -x rm"><h3>Find files and delete each one (fd + execute)</h3><input class="quiz-input" placeholder="Type command + flags..."><p class="hint">Hint: fd + execute flag + remove command</p></div>
+<div class="quiz-box" data-answer="bat"><h3>View a file with syntax highlighting and line numbers (like cat but better)</h3><input class="quiz-input" placeholder="Type command..."><p class="hint">Hint: 3-letter animal 🦇</p></div>
+<div class="quiz-box" data-answer="eza --git"><h3>List files with their git status (modified/added/untracked)</h3><input class="quiz-input" placeholder="Type command + flag..."><p class="hint">Hint: modern ls + git flag</p></div>
+<div class="quiz-box" data-answer="jq '.'" data-alt="jq ."><h3>Pretty-print a JSON file</h3><input class="quiz-input" placeholder="Type command..."><p class="hint">Hint: json query tool + identity filter</p></div>
+<div class="quiz-box" data-answer="jq -r"><h3>Extract a JSON value without surrounding quotes</h3><input class="quiz-input" placeholder="Type command + flag..."><p class="hint">Hint: jq + raw output flag</p></div>
+<div class="quiz-box" data-answer="eza --tree"><h3>Show directory structure as a tree with colors</h3><input class="quiz-input" placeholder="Type command + flag..."><p class="hint">Hint: modern ls + tree flag</p></div>
+<div class="quiz-box" data-answer="⌘P" data-alt="cmd+p,command+p"><h3>(Harness) Fuzzy jump to file or directory via zoxide</h3><input class="quiz-input" placeholder="Type shortcut..."><p class="hint">Hint: like VS Code quick-open</p></div>
+<div class="quiz-box" data-answer="⌘W" data-alt="cmd+w,command+w"><h3>(Harness) Close the active pane or tab</h3><input class="quiz-input" placeholder="Type shortcut..."><p class="hint">Hint: universal close</p></div>
+<div class="quiz-box" data-answer="v"><h3>(Copy mode) Start character selection</h3><input class="quiz-input" placeholder="Type key..."><p class="hint">Hint: same as vim visual</p></div>
+<div class="quiz-box" data-answer=":grep"><h3>(Vi ex) Search across the project from editor</h3><input class="quiz-input" placeholder="Type ex command..."><p class="hint">Hint: colon + search tool name</p></div>
+<div class="quiz-box" data-answer="gd"><h3>(Vi ex) Go to definition of symbol under cursor</h3><input class="quiz-input" placeholder="Type keys..."><p class="hint">Hint: g + d</p></div>
+</div>
+</div>
+
+<div class="section" id="practice-terminal" role="tabpanel" hidden>
+<h2>Practice Terminal</h2>
+<div class="practice-terminal" aria-label="Simulated Harness terminal">
+<div class="practice-terminal-bar">
+<span class="practice-terminal-dot"></span>
+<span class="practice-terminal-dot"></span>
+<span class="practice-terminal-dot"></span>
+<span class="practice-terminal-title">Harness Practice Terminal</span>
+</div>
+<div class="practice-terminal-output" id="practice-terminal-output" aria-live="polite"></div>
+<div class="practice-terminal-input-line">
+<span class="practice-terminal-prompt">harness ❯</span>
+<input class="practice-terminal-input" id="practice-terminal-input" type="text" autocomplete="off" spellcheck="false" aria-label="Practice terminal command">
+<span class="practice-terminal-cursor" aria-hidden="true"></span>
+</div>
+</div>
+</div>
+
+<script>
+(() => {
+    const panel = document.getElementById('practice-terminal');
+    const output = panel.querySelector('#practice-terminal-output');
+    const input = panel.querySelector('#practice-terminal-input');
+    const promptText = 'harness ❯ ';
+    const history = [];
+    let historyIndex = 0;
+
+    function appendLine(text, className = 'practice-terminal-response') {
+        const line = document.createElement('div');
+        line.className = `practice-terminal-line ${className}`;
+        line.textContent = text;
+        output.appendChild(line);
+        output.scrollTop = output.scrollHeight;
+    }
+
+    function welcome() {
+        appendLine('Welcome to Harness Practice Terminal', 'practice-terminal-muted');
+        appendLine("Type 'help' to see available commands.", 'practice-terminal-muted');
+        appendLine('─────────────────────────────────────', 'practice-terminal-muted');
+    }
+
+    function responseFor(command) {
+        const parts = command.split(/\s+/);
+        const name = parts.slice(2).join(' ');
+
+        if (command === 'help') {
+            return [
+                'Available commands:',
+                '',
+                '  Shell Tools:',
+                '    fd <pattern>         find files by name',
+                '    fd -t d <pattern>    find directories only',
+                '    fd -e <ext>          find by extension',
+                '    rg <pattern>         search file contents',
+                '    rg -l <pattern>      list files containing pattern',
+                '    bat <file>           view file with syntax highlighting',
+                '    eza                  list files (modern ls)',
+                '    eza --tree           tree view',
+                '    eza --git            show git status',
+                '    jq \'.<key>\'          query JSON',
+                '    z <dir>             smart cd (zoxide)',
+                '    zi                  interactive zoxide',
+                '',
+                '  Harness:',
+                '    harness ls           list sessions',
+                '    harness new <name>   create session',
+                '    harness attach <n>   attach to session',
+                '    harness split        split pane',
+                '    harness detach       detach from session',
+                '    harness kill <name>  kill session',
+                '',
+                '  Misc:',
+                '    help    clear    pwd    ls'
+            ].join('\n');
+        }
+        if (command === 'clear') return null;
+        if (command === 'pwd') return '/Users/you/Code/harness-terminal';
+        if (command === 'ls') return 'Apps/  Packages/  Makefile  Package.swift  README.md  terminal-cheat-sheet.html';
+
+        // fd
+        if (parts[0] === 'fd') {
+            if (parts.includes('-t') && parts.includes('d')) {
+                return 'Apps/\nPackages/HarnessCore/\nPackages/HarnessTerminalKit/\nPackages/HarnessDaemon/';
+            }
+            if (parts.includes('-e')) {
+                const ext = parts[parts.indexOf('-e') + 1] || 'swift';
+                return `Sources/App.${ext}\nSources/Main.${ext}\nPackages/Core/Settings.${ext}`;
+            }
+            if (parts.includes('-H')) {
+                return '.kiro/\n.env\n.gitignore\n.github/';
+            }
+            const pattern = parts[1] || '';
+            if (pattern) return `Apps/Harness/Sources/${pattern}.swift\nPackages/HarnessCore/${pattern}/\nPackages/${pattern}.swift`;
+            return 'Usage: fd <pattern> [path]\n  -t d    directories only\n  -t f    files only\n  -e ext  filter by extension\n  -H      include hidden\n  -x cmd  execute on each result';
+        }
+
+        // rg
+        if (parts[0] === 'rg') {
+            if (parts.includes('-l')) {
+                return 'Sources/SessionCoordinator.swift\nSources/DaemonClient.swift\nPackages/HarnessCore/IPC/IPCCodec.swift';
+            }
+            const pattern = parts.find(p => p.startsWith('"') || (!p.startsWith('-') && p !== 'rg')) || 'TODO';
+            return `Sources/App.swift:42:    // ${pattern} - fix this later\nPackages/Core.swift:108:    let ${pattern} = true\nTests/AppTests.swift:15:    func test${pattern}() {`;
+        }
+
+        // bat
+        if (parts[0] === 'bat') {
+            const file = parts[1] || '';
+            if (!file) return 'Usage: bat <file>\n  -l lang   force language\n  -p        plain (no decorations)\n  --diff    show git changes';
+            return `───────┬─────────────────────────────\n       │ File: ${file}\n───────┼─────────────────────────────\n   1   │ import Foundation\n   2   │ \n   3   │ struct App {\n   4   │     let name = "Harness"\n   5   │     let version = "3.3.0"\n   6   │ }\n───────┴─────────────────────────────`;
+        }
+
+        // eza
+        if (parts[0] === 'eza') {
+            if (parts.includes('--tree')) {
+                return '.\n├── Apps/\n│   └── Harness/\n│       └── Sources/\n├── Packages/\n│   ├── HarnessCore/\n│   ├── HarnessTerminalKit/\n│   └── HarnessDaemon/\n├── Package.swift\n└── README.md';
+            }
+            if (parts.includes('--git')) {
+                return ' M Apps/Harness/ContentArea.swift\n M Packages/HarnessCore/Banner.swift\n   Package.swift\n   README.md\n A terminal-cheat-sheet.html';
+            }
+            return 'Apps/  Packages/  Makefile  Package.swift  README.md  docs/  terminal-cheat-sheet.html';
+        }
+
+        // jq
+        if (parts[0] === 'jq') {
+            const filter = parts[1] || '.';
+            if (filter === '.') return '{\n  "name": "harness-terminal",\n  "version": "3.3.0",\n  "tools": ["swift", "metal", "appkit"]\n}';
+            if (filter.includes('.name')) return '"harness-terminal"';
+            if (filter.includes('.version')) return '"3.3.0"';
+            if (filter.includes('.tools') || filter.includes('[]')) return '"swift"\n"metal"\n"appkit"';
+            if (filter.includes('-r')) return 'harness-terminal';
+            return `null (filter: ${filter})`;
+        }
+
+        // z / zoxide
+        if (parts[0] === 'z') {
+            if (parts[1] === '-') return '→ /Users/you/Code (previous directory)';
+            if (parts[1]) return `→ /Users/you/Code/${parts[1]} (matched by zoxide)`;
+            return 'Usage: z <keyword>  — jump to frecent directory\n       zi           — interactive picker\n       z -          — go back';
+        }
+        if (command === 'zi') return '❯ /Users/you/Code/harness-terminal    (score: 48)\n  /Users/you/.kiro                     (score: 24)\n  /Users/you/Code/other-project        (score: 12)';
+
+        // harness commands
+        if (command === 'harness ls') {
+            return [
+                'main    attached    3 panes',
+                'dev     running     2 panes',
+                'logs    idle        1 pane'
+            ].join('\n');
+        }
+        if (parts[0] === 'harness' && parts[1] === 'new' && name) {
+            return `Session '${name}' created.`;
+        }
+        if (parts[0] === 'harness' && parts[1] === 'attach' && name) {
+            return `Attached to session '${name}'.`;
+        }
+        if (command === 'harness split') {
+            return 'Pane split horizontally. Use ⌘D (vertical) or ⌘⇧D (horizontal).';
+        }
+        if (command === 'harness detach') {
+            return 'Detached from session.';
+        }
+        if (parts[0] === 'harness' && parts[1] === 'kill' && name) {
+            return `Session '${name}' killed.`;
+        }
+        return `command not found: ${command}. Type 'help' for available commands.`;
+    }
+
+    function runCommand(rawCommand) {
+        const command = rawCommand.trim();
+        appendLine(`${promptText}${rawCommand}`, 'practice-terminal-command');
+        if (!command) return;
+        history.push(command);
+        historyIndex = history.length;
+        if (command === 'clear') {
+            output.replaceChildren();
+            return;
+        }
+        const resp = responseFor(command);
+        if (resp) resp.split('\n').forEach(l => appendLine(l));
+    }
+
+    input.addEventListener('keydown', event => {
+        if (event.ctrlKey && event.key.toLowerCase() === 'c') {
+            event.preventDefault();
+            appendLine(`${promptText}${input.value}^C`, 'practice-terminal-command');
+            input.value = '';
+            historyIndex = history.length;
+            return;
+        }
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            runCommand(input.value);
+            input.value = '';
+            return;
+        }
+        if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            if (history.length === 0) return;
+            historyIndex = Math.max(0, historyIndex - 1);
+            input.value = history[historyIndex];
+            return;
+        }
+        if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            if (history.length === 0) return;
+            historyIndex = Math.min(history.length, historyIndex + 1);
+            input.value = historyIndex === history.length ? '' : history[historyIndex];
+        }
+    });
+
+    panel.querySelector('.practice-terminal').addEventListener('click', () => input.focus());
+    welcome();
+})();
+</script>
+
+<script>
+document.querySelectorAll('table').forEach(table => {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'table-wrap';
+    table.parentNode.insertBefore(wrapper, table);
+    wrapper.appendChild(table);
+});
+
+document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => {
+            t.classList.remove('active');
+            t.setAttribute('aria-selected', 'false');
+        });
+        document.querySelectorAll('.section').forEach(s => {
+            s.classList.remove('active');
+            s.hidden = true;
+        });
+        tab.classList.add('active');
+        tab.setAttribute('aria-selected', 'true');
+        const panel = document.getElementById(tab.dataset.tab);
+        panel.classList.add('active');
+        panel.hidden = false;
+    });
+});
+let score = 0, total = 0;
+document.querySelectorAll('.quiz-box').forEach(box => {
+    const input = box.querySelector('.quiz-input');
+    const answers = [box.dataset.answer, ...(box.dataset.alt || '').split(',')]
+        .filter(Boolean)
+        .map(answer => answer.trim().toLowerCase());
+    input.addEventListener('keydown', e => {
+        if (e.key !== 'Enter') return;
+        const val = input.value.trim().toLowerCase();
+        total++;
+        if (answers.includes(val)) {
+            input.classList.add('correct');
+            score++;
+            box.querySelector('.hint').textContent = 'Correct.';
+            box.querySelector('.hint').style.color = '#9ece6a';
+        }
+        else {
+            input.classList.add('wrong');
+            const hint = box.querySelector('.hint');
+            hint.textContent = 'Answer: ';
+            const key = document.createElement('kbd');
+            key.textContent = box.dataset.answer;
+            hint.appendChild(key);
+            hint.style.color = '#f7768e';
+        }
+        document.getElementById('score').textContent = score;
+        document.getElementById('total').textContent = total;
+        input.disabled = true;
+    });
+});
+</script>
+</main>
+</body>
+</html>

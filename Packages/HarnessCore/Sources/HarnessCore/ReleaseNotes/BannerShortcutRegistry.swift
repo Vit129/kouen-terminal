@@ -188,7 +188,14 @@ public enum BannerShortcutRegistry {
         .init(key: "\(commandPrompt.displayKey)", description: "command prompt · try: find, grep, cd"),
         .init(key: "", description: "Shell", showInBanner: true),
         .init(key: "z <dir>", description: "smart cd — learns your frequent dirs"),
+        .init(key: "fd <pattern>", description: "find files by name (respects .gitignore)"),
+        .init(key: "rg <pattern>", description: "search file contents (ripgrep)"),
+        .init(key: "bat <file>", description: "cat with syntax highlighting + line numbers"),
+        .init(key: "eza --git", description: "modern ls — colors, icons, git status"),
+        .init(key: "jq '.key'", description: "parse & query JSON"),
         .init(key: "ctrl+r", description: "fuzzy shell history search (fzf)"),
+        .init(key: "ctrl+t", description: "fuzzy pick file → paste path (fzf)"),
+        .init(key: "fd | fzf", description: "find → narrow — pipe anything into fzf"),
         .init(key: "harness-cli ping", description: "script Harness from any shell"),
     ]
 
