@@ -378,7 +378,7 @@ final class WorktreeRowView: NSView {
         let agentKind = session.tabs.compactMap({ $0.effectiveAgentKind }).first
         if let agentKind {
             agentIconView.image = AgentIconRenderer.templateOrMonogramImage(for: agentKind, size: 14)
-            agentIconView.contentTintColor = dotColor
+            agentIconView.contentTintColor = NSColor.fromHex(agentKind.dotHex) ?? dotColor
             agentIconView.isHidden = false
             agentStatusDot.isHidden = true
         } else {
