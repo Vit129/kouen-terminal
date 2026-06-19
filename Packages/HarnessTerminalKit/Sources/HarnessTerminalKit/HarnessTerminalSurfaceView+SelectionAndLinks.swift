@@ -238,6 +238,18 @@ extension HarnessTerminalSurfaceView {
             return
         }
 
+        // GitHub PR/issue URLs open in the in-app Browser Pane.
+        if ["http", "https"].contains(scheme),
+           let host = url.host,
+           host.contains("github.com") {
+            NotificationCenter.default.post(
+                name: Notification.Name("HarnessOpenLocalhostURL"),
+                object: nil,
+                userInfo: ["url": url]
+            )
+            return
+        }
+
         NSWorkspace.shared.open(url)
     }
 

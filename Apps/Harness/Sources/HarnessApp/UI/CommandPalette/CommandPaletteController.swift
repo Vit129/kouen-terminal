@@ -199,6 +199,27 @@ enum CommandPaletteController {
             "nav.prevSession": { coordinator.selectAdjacentSession(offset: -1) },
             "nav.nextSession": { coordinator.selectAdjacentSession(offset: 1) },
             "nav.cyclePane": { coordinator.cycleActivePane(forward: true) },
+            "pr.openInBrowser": {
+                guard let cwd = coordinator.snapshot.activeWorkspace?.activeTab?.cwd else { return }
+                let client = GitHubCLIClient()
+                DispatchQueue.global(qos: .userInitiated).async {
+                    guard let pr = client.prForCurrentBranch(repoPath: cwd),
+                          let url = URL(string: pr.url) else { return }
+                    DispatchQueue.main.async {
+                        coordinator.splitPaneCoordinator.openBrowserPane(url: url, direction: .horizontal)
+                    }
+                }
+            },
+            "pr.rerunFailed": {
+                guard let cwd = coordinator.snapshot.activeWorkspace?.activeTab?.cwd else { return }
+                let client = GitHubCLIClient()
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let runs = client.ciRuns(repoPath: cwd, limit: 1)
+                    if let failedRun = runs.first(where: { $0.conclusion == "failure" }) {
+                        client.rerunFailed(repoPath: cwd, runID: failedRun.id)
+                    }
+                }
+            },
         ]
 
         let defaultConfigs: [PaletteCommandConfig] = [
@@ -217,6 +238,8 @@ enum CommandPaletteController {
             .init(id: "nav.prevSession",      title: "Previous Session",          subtitle: "Cycle to the previous session",                  symbol: "chevron.left.square",                shortcut: "⌘⇧[",     section: "navigation"),
             .init(id: "nav.nextSession",      title: "Next Session",              subtitle: "Cycle to the next session",                      symbol: "chevron.right.square",               shortcut: "⌘⇧]",     section: "navigation"),
             .init(id: "nav.cyclePane",        title: "Cycle Pane",                subtitle: "Move focus to the next pane in the tab",         symbol: "rectangle.3.group",                  shortcut: "⌘]",       section: "navigation"),
+            .init(id: "pr.openInBrowser",    title: "Open PR in Browser Pane",   subtitle: "View the current branch's PR inline",            symbol: "arrow.up.right.square",              shortcut: "⌃⌘G",      section: "actions"),
+            .init(id: "pr.rerunFailed",      title: "Re-run Failed CI",          subtitle: "Re-run failed jobs for the latest workflow run",  symbol: "arrow.clockwise",                    shortcut: "",          section: "actions"),
         ]
 
         let configs = loadPaletteConfig() ?? defaultConfigs
