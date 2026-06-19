@@ -1,12 +1,21 @@
 import AppKit
 import HarnessCore
 
+struct RepoGitMetadata: Sendable, Equatable {
+    let prNumber: Int?
+    let aheadCount: Int?
+    let behindCount: Int?
+}
+
 /// Left session rail — workspace pill, sessions list, and a quiet footer.
 @MainActor
 final class HarnessSidebarPanelViewController: NSViewController {
     enum SidebarSessionRow {
         case groupHeader(name: String, rootPath: String, count: Int, isCollapsed: Bool, status: BoardColumnKind)
         case session(SessionGroup)
+        case worktreeHeader(rootPath: String, count: Int, isCollapsed: Bool)
+        case worktree(SidebarWorktreeEntry, rootPath: String)
+        case divider
     }
 
     private let chromeHeader = SidebarTitlebarHeaderView()
@@ -27,7 +36,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
     /// Wraps the search field so it gets the same radius-7 elevated-surface chrome as
     /// the workspace pill and session cards.
     private let searchContainer = NSView()
-    private let sidebarTabs = NSSegmentedControl(labels: ["Sessions", "Files", "Git"], trackingMode: .selectOne, target: nil, action: nil)
+    private let sidebarTabs = NSSegmentedControl(labels: ["Sessions", "Files"], trackingMode: .selectOne, target: nil, action: nil)
 #if HARNESS_ACP
     private let agentChatPanel = AgentChatPanelView()
 #endif
@@ -61,6 +70,18 @@ final class HarnessSidebarPanelViewController: NSViewController {
     /// Last sessions array passed to refreshMetadata — used to skip rebuild when nothing changed.
     private var lastRefreshedSessions: [SessionGroup] = []
     private var lastRefreshedActiveID: SessionID?
+    private var projectWorktrees: [String: [SidebarWorktreeEntry]] = [:]
+    private var collapsedWorktreeGroups = Set<String>()
+    private var lastWorktreeFetchTime: [String: Date] = [:]
+
+    var pinnedRepos: Set<String> = {
+        let array = UserDefaults.standard.stringArray(forKey: "harness.sidebar.pinnedRepos") ?? []
+        return Set(array)
+    }()
+    private var repoRootCache: [String: (repoRoot: String?, fetchedAt: Date)] = [:]
+    private var repoRootUpdatesInProgress: Set<String> = []
+    private var gitMetadataCache: [String: (metadata: RepoGitMetadata, fetchedAt: Date)] = [:]
+    private var gitMetadataUpdatesInProgress: Set<String> = []
 
     /// Sessions after applying the search filter. Drag-reorder is disabled while a
     /// filter is active (see the data source), so callers that reorder still use the
@@ -110,12 +131,207 @@ final class HarnessSidebarPanelViewController: NSViewController {
     /// Rebuild `cachedSidebarRows` from the current `displayedSessions` and
     /// `collapsedGroups`. O(N×G) but only called from explicit invalidation
     /// sites, not from every NSTableViewDelegate callback.
+    // Cache for repo roots
+    private func gitRepoRoot(for path: String) -> String? {
+        let now = Date()
+        if let cached = repoRootCache[path], now.timeIntervalSince(cached.fetchedAt) < 60.0 {
+            return cached.repoRoot
+        }
+        
+        if repoRootUpdatesInProgress.insert(path).inserted {
+            Task {
+                let root = await resolveGitRepoRoot(for: path)
+                await MainActor.run {
+                    self.repoRootCache[path] = (repoRoot: root, fetchedAt: Date())
+                    self.repoRootUpdatesInProgress.remove(path)
+                    self.rebuildSidebarRows()
+                    self.sessionTable.reloadData()
+                }
+            }
+        }
+        
+        return repoRootCache[path]?.repoRoot
+    }
+
+    private func resolveGitRepoRoot(for path: String) async -> String? {
+        guard !path.isEmpty, FileManager.default.fileExists(atPath: path) else { return nil }
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        process.arguments = ["-C", path, "rev-parse", "--show-toplevel"]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = Pipe()
+        do {
+            try process.run()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            if process.terminationStatus == 0,
+               let repoRoot = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !repoRoot.isEmpty {
+                return repoRoot
+            }
+        } catch {
+            // ignore
+        }
+        return nil
+    }
+
+    private func repoRootForSession(_ session: SessionGroup) -> String {
+        let path = (session.activeTab ?? session.tabs.first)?.cwd ?? ""
+        if let gitRoot = gitRepoRoot(for: path) {
+            return gitRoot
+        }
+        return "Other"
+    }
+
+    private func groupName(forRootPath rootPath: String) -> String {
+        if rootPath == "Other" {
+            return "Other"
+        }
+        return URL(fileURLWithPath: rootPath).lastPathComponent
+    }
+
+    private static var cachedGhPath: String? = {
+        let paths = [
+            "/opt/homebrew/bin/gh",
+            "/usr/local/bin/gh",
+            "/usr/bin/gh"
+        ]
+        for path in paths {
+            if FileManager.default.fileExists(atPath: path) {
+                return path
+            }
+        }
+        
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/which")
+        process.arguments = ["gh"]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        do {
+            try process.run()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            if process.terminationStatus == 0,
+               let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !path.isEmpty,
+               FileManager.default.fileExists(atPath: path) {
+                return path
+            }
+        } catch {}
+        
+        return nil
+    }()
+
+    func gitMetadata(forPath path: String, branch: String) -> RepoGitMetadata? {
+        guard !branch.isEmpty else { return nil }
+        let key = "\(path)|\(branch)"
+        let now = Date()
+        if let cached = gitMetadataCache[key], now.timeIntervalSince(cached.fetchedAt) < 60.0 {
+            return cached.metadata
+        }
+        
+        if gitMetadataUpdatesInProgress.insert(key).inserted {
+            Task {
+                let metadata = await fetchGitMetadata(for: path, branch: branch)
+                await MainActor.run {
+                    self.gitMetadataCache[key] = (metadata: metadata, fetchedAt: Date())
+                    self.gitMetadataUpdatesInProgress.remove(key)
+                    self.rebuildSidebarRows()
+                    self.sessionTable.reloadData()
+                }
+            }
+        }
+        
+        return gitMetadataCache[key]?.metadata
+    }
+
+    private func fetchHasRemote(for path: String) async -> Bool {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        process.arguments = ["remote"]
+        process.currentDirectoryURL = URL(fileURLWithPath: path)
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = Pipe()
+        do {
+            try process.run()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            if process.terminationStatus == 0 {
+                let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                return !output.isEmpty
+            }
+        } catch {}
+        return false
+    }
+
+    private func fetchGitMetadata(for path: String, branch: String) async -> RepoGitMetadata {
+        guard let ghPath = Self.cachedGhPath else {
+            return RepoGitMetadata(prNumber: nil, aheadCount: nil, behindCount: nil)
+        }
+        
+        let hasRemote = await fetchHasRemote(for: path)
+        guard hasRemote else {
+            return RepoGitMetadata(prNumber: nil, aheadCount: nil, behindCount: nil)
+        }
+        
+        // Fetch PR number
+        var prNumber: Int? = nil
+        let prProcess = Process()
+        prProcess.executableURL = URL(fileURLWithPath: ghPath)
+        prProcess.arguments = ["pr", "view", "--json", "number"]
+        prProcess.currentDirectoryURL = URL(fileURLWithPath: path)
+        let prPipe = Pipe()
+        prProcess.standardOutput = prPipe
+        prProcess.standardError = Pipe()
+        do {
+            try prProcess.run()
+            let data = prPipe.fileHandleForReading.readDataToEndOfFile()
+            prProcess.waitUntilExit()
+            if prProcess.terminationStatus == 0,
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let number = json["number"] as? Int {
+                prNumber = number
+            }
+        } catch {}
+        
+        // Fetch Ahead/Behind count
+        var aheadCount: Int? = nil
+        var behindCount: Int? = nil
+        let revProcess = Process()
+        revProcess.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        revProcess.arguments = ["rev-list", "--left-right", "--count", "HEAD...origin/\(branch)"]
+        revProcess.currentDirectoryURL = URL(fileURLWithPath: path)
+        let revPipe = Pipe()
+        revProcess.standardOutput = revPipe
+        revProcess.standardError = Pipe()
+        do {
+            try revProcess.run()
+            let data = revPipe.fileHandleForReading.readDataToEndOfFile()
+            revProcess.waitUntilExit()
+            if revProcess.terminationStatus == 0,
+               let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !output.isEmpty {
+                let parts = output.components(separatedBy: CharacterSet.whitespacesAndNewlines).filter { !$0.isEmpty }
+                if parts.count == 2,
+                   let ahead = Int(parts[0]),
+                   let behind = Int(parts[1]) {
+                    aheadCount = ahead
+                    behindCount = behind
+                }
+            }
+        } catch {}
+        
+        return RepoGitMetadata(prNumber: prNumber, aheadCount: aheadCount, behindCount: behindCount)
+    }
+
     private func rebuildSidebarRows() {
         var groupMap: [String: Int] = [:]   // rootPath → index in `groups`
         var groups: [(name: String, rootPath: String, firstIndex: Int, sessions: [SessionGroup])] = []
         for (index, session) in displayedSessions.enumerated() {
-            let name = projectGroupName(for: session)
-            let rootPath = projectGroupRootPath(for: session)
+            let rootPath = repoRootForSession(session)
+            let name = groupName(forRootPath: rootPath)
             if let groupIndex = groupMap[rootPath] {
                 groups[groupIndex].sessions.append(session)
             } else {
@@ -124,22 +340,45 @@ final class HarnessSidebarPanelViewController: NSViewController {
             }
         }
 
-        cachedSidebarRows = groups
-            .sorted { $0.firstIndex < $1.firstIndex }
-            .flatMap { group -> [SidebarSessionRow] in
-                let isCollapsed = collapsedGroups.contains(group.rootPath)
-                let status = highestBoardStatus(for: group.sessions)
-                let header = SidebarSessionRow.groupHeader(name: group.name, rootPath: group.rootPath, count: group.sessions.count, isCollapsed: isCollapsed, status: status)
-                if isCollapsed {
-                    return [header]
-                } else {
-                    var rows: [SidebarSessionRow] = [header]
-                    for session in group.sessions {
-                        rows.append(.session(session))
-                    }
-                    return rows
+        let sortedGroups = groups.sorted { g1, g2 in
+            let pin1 = pinnedRepos.contains(g1.rootPath)
+            let pin2 = pinnedRepos.contains(g2.rootPath)
+            if pin1 != pin2 {
+                return pin1
+            }
+            return g1.firstIndex < g2.firstIndex
+        }
+
+        var rows: [SidebarSessionRow] = []
+        let pinnedGroups = sortedGroups.filter { pinnedRepos.contains($0.rootPath) }
+        let unpinnedGroups = sortedGroups.filter { !pinnedRepos.contains($0.rootPath) }
+
+        func appendGroupRows(for group: (name: String, rootPath: String, firstIndex: Int, sessions: [SessionGroup])) {
+            let isCollapsed = collapsedGroups.contains(group.rootPath)
+            let status = highestBoardStatus(for: group.sessions)
+            let header = SidebarSessionRow.groupHeader(name: group.name, rootPath: group.rootPath, count: group.sessions.count, isCollapsed: isCollapsed, status: status)
+            rows.append(header)
+
+            if !isCollapsed {
+                for session in group.sessions {
+                    rows.append(.session(session))
                 }
             }
+        }
+
+        for group in pinnedGroups {
+            appendGroupRows(for: group)
+        }
+
+        if !pinnedGroups.isEmpty && !unpinnedGroups.isEmpty {
+            rows.append(.divider)
+        }
+
+        for group in unpinnedGroups {
+            appendGroupRows(for: group)
+        }
+
+        cachedSidebarRows = rows
     }
 
     private func sessionMatches(_ session: SessionGroup, query: String) -> Bool {
@@ -153,13 +392,11 @@ final class HarnessSidebarPanelViewController: NSViewController {
     }
 
     func projectGroupName(for session: SessionGroup) -> String {
-        let path = (session.activeTab ?? session.tabs.first)?.cwd ?? ""
-        return HarnessDesign.projectGroupName(for: path)
+        return repoRootForSession(session)
     }
 
     private func projectGroupRootPath(for session: SessionGroup) -> String {
-        let path = (session.activeTab ?? session.tabs.first)?.cwd ?? ""
-        return HarnessDesign.projectGroupRootPath(for: path)
+        return repoRootForSession(session)
     }
 
     func sessionRow(at tableRow: Int) -> SessionGroup? {
@@ -181,7 +418,46 @@ final class HarnessSidebarPanelViewController: NSViewController {
     }
 
     func sessionGroupName(for sessionID: SessionID) -> String? {
-        sessions.first(where: { $0.id == sessionID }).map(projectGroupName(for:))
+        guard let session = sessions.first(where: { $0.id == sessionID }) else { return nil }
+        return repoRootForSession(session)
+    }
+
+    private func groupActionsMenu(for rootPath: String, name: String) -> NSMenu {
+        let menu = NSMenu()
+        let isPinned = pinnedRepos.contains(rootPath)
+        let pinItem = NSMenuItem(
+            title: isPinned ? "Unpin Repo" : "Pin Repo",
+            action: #selector(togglePinRepo(_:)),
+            keyEquivalent: ""
+        )
+        pinItem.target = self
+        pinItem.representedObject = rootPath
+        menu.addItem(pinItem)
+        
+        menu.addItem(NSMenuItem.separator())
+        
+        let closeGroup = NSMenuItem(
+            title: "Close all sessions in \(name)",
+            action: #selector(closeGroupSessionsFromMenu(_:)),
+            keyEquivalent: ""
+        )
+        closeGroup.target = self
+        closeGroup.representedObject = rootPath
+        menu.addItem(closeGroup)
+        
+        return menu
+    }
+
+    @objc private func togglePinRepo(_ sender: NSMenuItem) {
+        guard let rootPath = sender.representedObject as? String else { return }
+        if pinnedRepos.contains(rootPath) {
+            pinnedRepos.remove(rootPath)
+        } else {
+            pinnedRepos.insert(rootPath)
+        }
+        UserDefaults.standard.set(Array(pinnedRepos), forKey: "harness.sidebar.pinnedRepos")
+        rebuildSidebarRows()
+        sessionTable.reloadData()
     }
 
     private func selectActiveSessionRowIfVisible(scroll: Bool) {
@@ -859,12 +1135,14 @@ final class HarnessSidebarPanelViewController: NSViewController {
         switch index {
         case 1:
             sectionLabel.stringValue = "FILES"
+            sectionLabel.font = HarnessDesign.Typography.sectionLabel
             if let cwd = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd {
                 let activeSessionID = SessionCoordinator.shared.snapshot.activeWorkspace?.activeSessionID
                 fileTreeView.updateRoot(path: cwd, sessionID: activeSessionID)
             }
         case 2:
             sectionLabel.stringValue = "GIT"
+            sectionLabel.font = HarnessDesign.Typography.sectionLabel
             if let cwd = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd {
                 gitPanelView.updateRoot(path: cwd)
             } else {
@@ -872,17 +1150,20 @@ final class HarnessSidebarPanelViewController: NSViewController {
             }
         case 3:
             sectionLabel.stringValue = "SEARCH"
+            sectionLabel.font = HarnessDesign.Typography.sectionLabel
             if let cwd = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd {
                 searchPanelView.updateRoot(path: cwd)
             }
         case 4:
             sectionLabel.stringValue = "AGENT"
+            sectionLabel.font = HarnessDesign.Typography.sectionLabel
             // [ACP SHELVED] connectAgentIfNeeded()
         default:
             // Switching back to Sessions tab: rebuild cache so heightOfRow/viewFor
             // read O(1) cachedSidebarRows if sessions changed while tab was hidden.
             rebuildSidebarRows()
-            sectionLabel.stringValue = "SESSIONS"
+            sectionLabel.font = .systemFont(ofSize: 11.5, weight: .bold)
+            updateRepoSectionHeader()
         }
     }
 
@@ -988,6 +1269,8 @@ final class HarnessSidebarPanelViewController: NSViewController {
         } else {
             gitPanelView.clearRoot()
         }
+        updateRepoSectionHeader()
+        updateWorktrees()
     }
 
     /// Updates session card labels in place (title/cwd/branch/agent) without
@@ -1036,10 +1319,15 @@ final class HarnessSidebarPanelViewController: NSViewController {
             for row in 0 ..< rows.count {
                 if let cell = sessionTable.view(atColumn: 0, row: row, makeIfNecessary: false) as? WorktreeRowView {
                     guard case let .session(session) = rows[row] else { continue }
-                    cell.configure(session: session, isSelected: session.id == activeID)
+                    let tab = session.activeTab ?? session.tabs.first ?? Tab()
+                    let branch = tab.gitBranch ?? ""
+                    let metadata = self.gitMetadata(forPath: tab.cwd, branch: branch)
+                    cell.configure(session: session, isSelected: session.id == activeID, metadata: metadata)
                 }
             }
         }
+        updateRepoSectionHeader()
+        updateWorktrees()
     }
 
     @objc func addWorkspace() {
@@ -1177,6 +1465,114 @@ final class HarnessSidebarPanelViewController: NSViewController {
         }
         SessionCoordinator.shared.syncFromDaemon()
     }
+
+    // MARK: - Git & Worktrees Helpers
+
+    private func fetchRepoName(for path: String) async -> String {
+        let folderName = HarnessDesign.projectGroupName(for: path)
+        guard !path.isEmpty, FileManager.default.fileExists(atPath: path) else { return folderName }
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        process.arguments = ["config", "--get", "remote.origin.url"]
+        process.currentDirectoryURL = URL(fileURLWithPath: path)
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = Pipe()
+        do {
+            try process.run()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            if process.terminationStatus == 0,
+               let urlString = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !urlString.isEmpty {
+                let lastPathComponent = (urlString as NSString).lastPathComponent
+                var repo = lastPathComponent
+                if repo.hasSuffix(".git") {
+                    repo = String(repo.dropLast(4))
+                }
+                if !repo.isEmpty {
+                    return repo
+                }
+            }
+        } catch {
+            // fallback
+        }
+        return folderName
+    }
+
+    private func fetchWorktrees(for rootPath: String) async -> [SidebarWorktreeEntry] {
+        guard !rootPath.isEmpty, FileManager.default.fileExists(atPath: rootPath) else { return [] }
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        process.arguments = ["worktree", "list", "--porcelain"]
+        process.currentDirectoryURL = URL(fileURLWithPath: rootPath)
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = Pipe()
+        do {
+            try process.run()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0 else { return [] }
+            let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return output.components(separatedBy: "\n\n").enumerated().compactMap { index, block -> SidebarWorktreeEntry? in
+                let lines = block.components(separatedBy: "\n").filter { !$0.isEmpty }
+                guard let worktreeLine = lines.first(where: { $0.hasPrefix("worktree ") }),
+                      let headLine = lines.first(where: { $0.hasPrefix("HEAD ") }) else { return nil }
+                let worktreePath = String(worktreeLine.dropFirst("worktree ".count))
+                let head = String(headLine.dropFirst("HEAD ".count))
+                let branchLine = lines.first(where: { $0.hasPrefix("branch ") })
+                let branch = branchLine.map { line in
+                    let ref = String(line.dropFirst("branch ".count))
+                    return ref.hasPrefix("refs/heads/") ? String(ref.dropFirst("refs/heads/".count)) : ref
+                } ?? "detached"
+                let isLocked = lines.contains { line in
+                    line == "locked" || line.hasPrefix("locked ")
+                }
+                return SidebarWorktreeEntry(path: worktreePath, head: head, branch: branch, isMain: index == 0, isLocked: isLocked)
+            }
+        } catch {
+            return []
+        }
+    }
+
+    private func updateRepoSectionHeader() {
+        guard sidebarTabs.selectedSegment == 0 else { return }
+        let path = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd ?? ""
+        if path.isEmpty {
+            self.sectionLabel.stringValue = "SESSIONS"
+            return
+        }
+        Task {
+            let repoName = await fetchRepoName(for: path)
+            await MainActor.run {
+                if self.sidebarTabs.selectedSegment == 0 {
+                    self.sectionLabel.stringValue = repoName.hasSuffix("/") ? repoName : "\(repoName)/"
+                }
+            }
+        }
+    }
+
+    private func updateWorktrees(force: Bool = false) {
+        let rootPaths = Set(sessions.map { projectGroupRootPath(for: $0) })
+        let now = Date()
+        for rootPath in rootPaths {
+            if !force, let lastFetch = lastWorktreeFetchTime[rootPath], now.timeIntervalSince(lastFetch) < 3.0 {
+                continue
+            }
+            lastWorktreeFetchTime[rootPath] = now
+            Task {
+                let worktrees = await fetchWorktrees(for: rootPath)
+                await MainActor.run {
+                    if self.projectWorktrees[rootPath] != worktrees {
+                        self.projectWorktrees[rootPath] = worktrees
+                        self.rebuildSidebarRows()
+                        self.sessionTable.reloadData()
+                    }
+                }
+            }
+        }
+    }
 }
 
 extension HarnessSidebarPanelViewController: NSTextFieldDelegate {
@@ -1198,8 +1594,12 @@ extension HarnessSidebarPanelViewController: NSTableViewDataSource, NSTableViewD
         switch cachedSidebarRows[row] {
         case .groupHeader:
             return 28
-        case .session:
-            return HarnessDesign.sessionRowHeight
+        case .worktreeHeader:
+            return 24
+        case .session, .worktree:
+            return 28
+        case .divider:
+            return 10
         }
     }
 
@@ -1261,6 +1661,9 @@ extension HarnessSidebarPanelViewController: NSTableViewDataSource, NSTableViewD
                         if case .groupHeader = newRows[i] {
                             break
                         }
+                        if case .divider = newRows[i] {
+                            break
+                        }
                         insertedCount += 1
                     }
                     
@@ -1273,6 +1676,9 @@ extension HarnessSidebarPanelViewController: NSTableViewDataSource, NSTableViewD
                     var removedCount = 0
                     for i in (headerIndex + 1)..<oldRows.count {
                         if case .groupHeader = oldRows[i] {
+                            break
+                        }
+                        if case .divider = oldRows[i] {
                             break
                         }
                         removedCount += 1
@@ -1295,15 +1701,25 @@ extension HarnessSidebarPanelViewController: NSTableViewDataSource, NSTableViewD
                     }
                 }
             }
+            header.onContextMenu = { [weak self] in
+                self?.groupActionsMenu(for: rootPath, name: name)
+            }
             header.onOptions = { [weak self] anchor in
-                self?.showGroupActionsMenu(for: rootPath, name: name, anchor: anchor)
+                guard let self else { return }
+                let menu = self.groupActionsMenu(for: rootPath, name: name)
+                let point = NSPoint(x: anchor.bounds.width / 2, y: anchor.bounds.height + 4)
+                menu.popUp(positioning: nil, at: point, in: anchor)
             }
             return header
         case let .session(session):
             let cell = WorktreeRowView()
+            let tab = session.activeTab ?? session.tabs.first ?? Tab()
+            let branch = tab.gitBranch ?? ""
+            let metadata = self.gitMetadata(forPath: tab.cwd, branch: branch)
             cell.configure(
                 session: session,
-                isSelected: session.id == SessionCoordinator.shared.snapshot.activeWorkspace?.activeSessionID
+                isSelected: session.id == SessionCoordinator.shared.snapshot.activeWorkspace?.activeSessionID,
+                metadata: metadata
             )
             cell.onClose = { [weak self] in
                 guard self != nil else { return }
@@ -1313,6 +1729,35 @@ extension HarnessSidebarPanelViewController: NSTableViewDataSource, NSTableViewD
                 self?.sessionActionsMenu(for: session)
             }
             return cell
+        case let .worktreeHeader(rootPath, count, isCollapsed):
+            let header = SessionWorktreeHeaderRowView()
+            header.configure(count: count, isCollapsed: isCollapsed)
+            header.onToggleCollapse = { [weak self] in
+                guard let self else { return }
+                if self.collapsedWorktreeGroups.contains(rootPath) {
+                    self.collapsedWorktreeGroups.remove(rootPath)
+                } else {
+                    self.collapsedWorktreeGroups.insert(rootPath)
+                }
+                self.rebuildSidebarRows()
+                self.sessionTable.reloadData()
+            }
+            return header
+        case let .worktree(entry, _):
+            let cell = SessionWorktreeRowView()
+            let metadata = self.gitMetadata(forPath: entry.path, branch: entry.branch)
+            cell.configure(path: entry.path, branch: entry.branch, metadata: metadata)
+            cell.onSelect = { [weak self] in
+                guard let self else { return }
+                if let workspaceID = self.activeWorkspaceID {
+                    Self.recordRecentProject(entry.path)
+                    SessionCoordinator.shared.addSession(to: workspaceID, cwd: entry.path, name: (entry.path as NSString).lastPathComponent)
+                    self.updateWorktrees(force: true)
+                }
+            }
+            return cell
+        case .divider:
+            return SessionDividerRowView()
         }
     }
 
@@ -1320,4 +1765,12 @@ extension HarnessSidebarPanelViewController: NSTableViewDataSource, NSTableViewD
         guard !isProgrammaticSelection else { return }
         selectSessionRow()
     }
+}
+
+struct SidebarWorktreeEntry: Sendable, Equatable, Hashable {
+    let path: String
+    let head: String
+    let branch: String
+    let isMain: Bool
+    let isLocked: Bool
 }
