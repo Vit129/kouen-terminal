@@ -6,6 +6,18 @@ All notable changes to Harness are documented here. The format is based on
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/robzilla1738/harness-terminal/releases).
 
+## [3.4.0] - 2026-06-19
+
+### Added
+- GitHub PR/CI integration — sidebar badge click opens PR in browser pane, CI status indicators (✓/✗/○)
+- Browser pane multi-tab support (tab bar, new tab, close tab, target=_blank handling)
+- Auto-isolate worktrees on branch switch (when `harness.json` `isolateAgents=true`)
+- Auto-archive worktrees on session close when branch merged
+- Personal project config override (`~/.config/harness/projects/`)
+- `:recent` scoped to current worktree, `:make` uses `harness.json` `runScript`
+- Hover-to-reveal pane controls with button hover highlight
+- ⌘-click GitHub URLs opens in browser pane (not external browser)
+
 ## [3.3.0] - 2026-06-18
 
 ### Added
