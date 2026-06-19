@@ -77,3 +77,82 @@ All plans below are **done** and merged into main.
 ## P7 — Sidebar UI Polish
 - Large-screen sidebar group header button visibility/alignment completed
 - Session card spacing and file editor tab bar overlap polish completed
+
+## P4 — Terminal-First Code Viewing + LSP
+- Track 1 (Syntax Highlighting): `SyntaxTextView` regex-based, 30+ languages, wired into `FileViewerViewController`
+- Track 2 (Vi Navigation): `gf` path-under-cursor, `gd`/`K`/`]d`/`[d` LSP-backed, `:view`/`:edit`/`:split`/`:vsplit`/`:find`, `harness view` CLI
+- Track 3 (LSP Command API): `harness lsp start/status/hover/definition/diagnostics`
+- Follow-ups (`:recent`, `:grep`, `:make`) moved to P24
+
+## P21 — Hermes-Inspired Agent Platform (Shelved → P24 partial)
+- Status: Shelved — ACP adapters not publicly available
+- Actionable UX layer (agent auto-start, status badges, selection via config) absorbed into P24
+- Remaining layers (ACP sideband, multi-provider, brain, orchestration, execution backends) stay shelved for future re-enable
+- AgentCatalog + `:agent` ex command + AgentBridge partially implemented and preserved
+
+## P22 — Long-Session Responsiveness Hardening
+- Adaptive polling (skip-on-idle when no PTY output for 10s)
+- Off-main output processing for metadata refresh
+- Scrollback compaction (trim to N lines when idle)
+- Renderer micro-batch (coalesce rapid redraws)
+- `salvageRowKeys` optimization for grid diff
+- Snapshot fanout: `metadataOnly` flag prevents unnecessary UI rebuilds
+
+## P11 — Scripting & Config API (WezTerm parity)
+- `harness.config.get/set` (11 allowlisted keys)
+- `harness.keys.bind/unbind/reload`
+- `harness.commands.run` (Promise-based)
+- Pane mutators: `sendText/split/close`, session `spawn`
+- `harness.events.on/off` bridge (snapshotChanged/configReloaded)
+- All in `ScriptAPI.swift`
+
+## P12 — Agent Orchestration via MCP
+- PBI-ORCH-001–005 complete
+- `harness-mcp` server exposes session/pane/surface tools
+- MCP badge on tab bar via `lastMCPControlAt`
+- Tool policy gating for agent actions
+
+## P13 — Split Pane Parity
+- PBI-SPLIT-001–005 implemented
+- Same-direction flatten, equal distribution, resize handles
+- Pane zoom/unzoom, rotate, swap
+- tmux-compatible split commands (`:sp`, `:vsp`)
+- Merged via PR #10
+
+## P15 — Integration Roadmap
+- Sequencing plan for P4+P11+P12+P13+P14+P16
+- All steps complete — coordination artifact, not a feature itself
+
+## P16 — Agent/Session Board
+- PBI-BOARD-001–005 complete (006 closed — auto-clear sufficient)
+- Sidebar board tab: session cards with agent status, timing, output summary
+- CLI: `harness-cli board`
+- MCP read-only exposure
+
+## P17 — Structural Refactor
+- PBI-001/002/003/005 complete
+- SessionCoordinator decomposed into services
+- UI/ subfolder reorganization
+- PBI-004 deferred (build time 9s, not worth risk)
+
+## P18 — UI Automation (Robot Framework)
+- 25 automated tests via Robot Framework + osascript (System Events)
+- CLI verification paths
+- No Appium/XCUITest dependency
+- Accessibility identifiers added to key UI elements
+
+## P19 — Terminal Workbench Migration Layer
+- PBI-WB-001–007 fully implemented
+- `:find`, `:grep`, `:make`, `:errors`, `:recent` workbench commands
+- IDE migrant bridge (VS Code-like workflows in terminal)
+
+## P20 — Harness-Term Agent (Shelved)
+- Shelved — terminal-first flow sufficient (kiro-cli/claude/codex typed directly)
+- Revisit when pain point emerges
+- Design docs preserved for future re-enable
+
+## P14 — Embedded Browser Pane
+- PBI-BROWSER-001–005 implemented
+- WKWebView pane for localhost preview
+- harness-mcp browser tools (navigate, screenshot, evaluate)
+- Post-release fixes in v2.7.1
