@@ -303,6 +303,8 @@ done
 | 19 | Personal override config (`~/.config/harness/projects/`) |
 | 20 | `:recent` scoped to worktree |
 | 21 | `:make` alias for runScript |
+| 22 | Sidebar 2-line layout (branch + short cwd subtitle) |
+| 23 | Top bar always shows branch even when agent active |
 
 ---
 

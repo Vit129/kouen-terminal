@@ -63,6 +63,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
             return
         }
         let agentActive = tab.effectiveAgentKind != nil
+        // Always show branch; hide cwd path when agent is active (less noise)
         titleStrip.setPath(agentActive ? "" : tab.cwd, gitBranch: tab.gitBranch)
     }
 

@@ -19,6 +19,8 @@
 - GitHub URLs in terminal open in browser pane (not external Safari)
 - CI status shown in PR badge (✓/✗/○)
 - Personal project config override: ~/.config/harness/projects/<name>.json
+- Sidebar 2-line layout: Line 1 = branch (bold), Line 2 = short cwd (dimmed) — Supacode-style info density
+- Top bar always shows branch (⎇) even when agent active — only hides cwd path
 
 ## Lessons
 - RL-004: Never reparent Metal terminal surfaces — 1-2s black screen (CASE-003)
