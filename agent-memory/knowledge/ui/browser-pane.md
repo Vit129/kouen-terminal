@@ -122,3 +122,4 @@ those on the close button.
 and returns early — letting the button's own target-action fire. Alternative
 approach if this still fails: use `gestureRecognizer(_:shouldRequireFailureOf:)`
 or remove the gesture and use `mouseUp` override instead.
+
