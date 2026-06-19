@@ -230,8 +230,8 @@ final class TerminalTabBarView: NSView {
     // MARK: - Layout
 
     override func layout() {
-        super.layout()
         guard window != nil else { return }
+        super.layout()
         guard draggingPill == nil else { return }
         layoutPills()
     }
