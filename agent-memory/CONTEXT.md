@@ -8,6 +8,7 @@
 
 ## Open Questions
 - [open] 3 remaining crashes on 2026-06-17: 2× layout()+assumeIsolated, 1× keyDown — likely zombie-view (same mechanism as resetCursorRects, 0xa3 free-fill). Root path not yet identified.
+- [open] RL-043: Per-session-tab focus not restored on cmd+1/2/3 or cmd+shift+[/] switch. Partial fix in `SessionLifecycleService` + `MainExecutor` (nil activeSurfaceID before sync) — compiles but not verified working. Deep investigation in `knowledge/focus-persistence.md`.
 
 ## Key Files
 - `HarnessApp/UI/FileTree/WorkspaceFileTreeView.swift` — file tree context + reveal logic

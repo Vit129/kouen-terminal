@@ -106,6 +106,7 @@ final class SessionLifecycleService {
 
     func selectWorkspace(_ id: WorkspaceID) {
         coord.requestDaemon(.selectWorkspace(id: id))
+        coord.activeSurfaceID = nil
         coord.syncFromDaemon()
     }
 
@@ -115,6 +116,7 @@ final class SessionLifecycleService {
             return
         }
         coord.requestDaemon(.selectSession(workspaceID: workspaceID, sessionID: sessionID))
+        coord.activeSurfaceID = nil
         coord.syncFromDaemon()
     }
 
@@ -124,6 +126,7 @@ final class SessionLifecycleService {
             return
         }
         coord.requestDaemon(.selectTab(workspaceID: workspaceID, tabID: tabID))
+        coord.activeSurfaceID = nil
         coord.syncFromDaemon()
     }
 

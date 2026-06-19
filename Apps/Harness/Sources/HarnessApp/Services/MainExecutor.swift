@@ -296,6 +296,7 @@ final class MainExecutor: CommandExecutor {
                 return
             }
             _ = coordinator.requestDaemon(.selectTab(workspaceID: match.workspaceID, tabID: match.tabID))
+            coordinator.activeSurfaceID = nil
             coordinator.syncFromDaemon()
         case .reloadKeybindings:
             KeybindingsService.shared.reload()
@@ -715,6 +716,7 @@ final class MainExecutor: CommandExecutor {
         else { return }
         let nextIdx = (currentIdx + (forward ? 1 : -1) + session.tabs.count) % session.tabs.count
         coordinator.requestDaemon(.selectTab(workspaceID: workspace.id, tabID: session.tabs[nextIdx].id))
+        coordinator.activeSurfaceID = nil
         coordinator.syncFromDaemon()
     }
 
@@ -725,6 +727,7 @@ final class MainExecutor: CommandExecutor {
               index >= 0, index < session.tabs.count
         else { return }
         coordinator.requestDaemon(.selectTab(workspaceID: workspace.id, tabID: session.tabs[index].id))
+        coordinator.activeSurfaceID = nil
         coordinator.syncFromDaemon()
     }
 
