@@ -989,7 +989,27 @@ final class HarnessSidebarPanelViewController: NSViewController {
         ])
         fileTreeView.onFilePreview = { [weak self] node in
             guard let self, let split = self.view.window?.contentViewController as? MainSplitViewController else { return }
-            split.contentVC.openFileTab(path: node.path)
+            let coordinator = SessionCoordinator.shared
+            let action = coordinator.settings.fileClickAction
+            if action == "preview" {
+                self.previewFile(path: node.path)
+            } else if action == "editor" {
+                split.contentVC.openFileTab(path: node.path)
+            } else if action == "cat" || action == "vi" || action == "terminalOnly" {
+                guard let surfaceID = coordinator.activeSurfaceID else { return }
+                let cmd: String
+                if action == "cat" {
+                    cmd = "cat \(node.path)\r"
+                } else if action == "vi" {
+                    cmd = "vi \(node.path)\r"
+                } else {
+                    // terminalOnly does nothing on single click to prevent navigation command spam
+                    return
+                }
+                coordinator.requestDaemon(.sendData(surfaceID: surfaceID.uuidString, data: Data(cmd.utf8)))
+            } else {
+                split.contentVC.openFileTab(path: node.path)
+            }
         }
     }
 

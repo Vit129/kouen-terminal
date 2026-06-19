@@ -427,12 +427,13 @@ final class MainExecutor: CommandExecutor {
         case let .make(target):
             let cwd = context?.cwd ?? "."
             let task = ProjectTaskDetector.detect(at: cwd)
+            let projectRunScript = ProjectConfig.load(from: cwd)?.runScript
             let runCmd: String
             switch target {
             case "build": runCmd = task?.buildCmd ?? "swift build"
             case "test": runCmd = task?.testCmd ?? "swift test"
-            case "last": runCmd = lastMakeCommand ?? task?.defaultCmd ?? "swift build"
-            default: runCmd = task?.defaultCmd ?? task?.buildCmd ?? "swift build"
+            case "last": runCmd = lastMakeCommand ?? projectRunScript ?? task?.defaultCmd ?? "swift build"
+            default: runCmd = projectRunScript ?? task?.defaultCmd ?? task?.buildCmd ?? "swift build"
             }
             lastMakeCommand = runCmd
             coordinator.splitActivePaneAndRun(direction: .horizontal, command: runCmd)

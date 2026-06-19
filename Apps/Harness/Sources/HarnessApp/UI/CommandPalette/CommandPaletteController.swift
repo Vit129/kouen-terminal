@@ -800,7 +800,11 @@ final class PaletteViewController: NSViewController, NSTableViewDataSource, NSTa
                     ), score: 0))
                 }
                 let recentFiles = WorkbenchMRU.shared.entries
-                for file in recentFiles {
+                let scopePath = SessionCoordinator.shared.activeTabCWD
+                let scopedFiles = scopePath != nil
+                    ? recentFiles.filter { $0.hasPrefix(scopePath!) }
+                    : recentFiles
+                for file in scopedFiles {
                     let filename = (file as NSString).lastPathComponent
                     let relativePath = HarnessDesign.shortenPath(file)
                     matches.append((action: PaletteAction(
