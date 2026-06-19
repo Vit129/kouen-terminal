@@ -979,6 +979,9 @@ private final class PaneSplitButtonsView: NSView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 
+    private var paneTrackingArea: NSTrackingArea?
+    private weak var paneTrackingOwner: NSView?
+
     private func setup() {
         wantsLayer = true
         layer?.backgroundColor = NSColor.black.withAlphaComponent(0.5).cgColor
@@ -994,6 +997,7 @@ private final class PaneSplitButtonsView: NSView {
         let splitDown = makeButton("square.split.1x2", tooltip: "Split Down (⌘⇧D)", action: #selector(splitV))
         let openBrowser = makeButton("safari", tooltip: "Open Browser Pane (⌘B)", action: #selector(openBrowserPane))
         let closeBtn = makeButton("xmark", tooltip: "Close Pane (⌥⇧⌘W)", action: #selector(closePane))
+
         stack.addArrangedSubview(splitRight)
         stack.addArrangedSubview(splitDown)
         stack.addArrangedSubview(openBrowser)
@@ -1006,11 +1010,47 @@ private final class PaneSplitButtonsView: NSView {
             stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -5),
         ])
 
-        alphaValue = 1
+        alphaValue = 0
+    }
+
+    override func viewDidMoveToSuperview() {
+        super.viewDidMoveToSuperview()
+        // Remove old tracking area from previous parent
+        if let old = paneTrackingArea {
+            paneTrackingOwner?.removeTrackingArea(old)
+            paneTrackingArea = nil
+            paneTrackingOwner = nil
+        }
+        guard let parent = superview else { return }
+        let area = NSTrackingArea(
+            rect: .zero,
+            options: [.mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect],
+            owner: self
+        )
+        parent.addTrackingArea(area)
+        paneTrackingArea = area
+        paneTrackingOwner = parent
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        guard window != nil else { return }
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.15
+            animator().alphaValue = 1
+        }
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        guard window != nil else { return }
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.25
+            animator().alphaValue = 0
+        }
     }
 
     private func makeButton(_ symbol: String, tooltip: String, action: Selector) -> NSButton {
-        let btn = NSButton(frame: .zero)
+        let btn = PaneHoverButton(frame: .zero)
+        btn.wantsLayer = true
         btn.bezelStyle = .inline
         btn.isBordered = false
         btn.image = NSImage(systemSymbolName: symbol, accessibilityDescription: tooltip)?
@@ -1043,6 +1083,35 @@ private final class PaneSplitButtonsView: NSView {
 
     @objc private func closePane() {
         SessionCoordinator.shared.killPane(paneID: paneID)
+    }
+}
+
+private final class PaneHoverButton: NSButton {
+    private var trackingArea_: NSTrackingArea?
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let old = trackingArea_ { removeTrackingArea(old) }
+        let area = NSTrackingArea(
+            rect: bounds,
+            options: [.mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect],
+            owner: self
+        )
+        addTrackingArea(area)
+        trackingArea_ = area
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        guard window != nil else { return }
+        contentTintColor = .white
+        layer?.backgroundColor = NSColor.white.withAlphaComponent(0.15).cgColor
+        layer?.cornerRadius = 4
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        guard window != nil else { return }
+        contentTintColor = .white.withAlphaComponent(0.7)
+        layer?.backgroundColor = nil
     }
 }
 
