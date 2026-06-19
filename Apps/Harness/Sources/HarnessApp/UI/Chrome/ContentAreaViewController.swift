@@ -18,6 +18,9 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
     /// subviews) complete before ARC deallocates the view tree. Without this, a structural
     /// rebuild can free views that AppKit still dispatches layout()/isFlipped/mouseMoved to.
     private var retiredContainer: PaneContainerView?
+    /// Hosts detached during rebuild — held for 500ms so in-flight AppKit events
+    /// (mouseMoved via tracking area, queued keyDown) drain before ARC frees them (RL-040).
+    private var retiredHosts: [TerminalHostView] = []
     private let fileTabManager = FileTabManager()
     private var fileEditorView: FileEditorView?
     var activeDiagnostics: [LSPDiagnostic] { fileEditorView?.activeDiagnostics ?? [] }
@@ -429,6 +432,15 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         let existingHosts = paneContainer?.collectTerminalHosts() ?? [:]
         let existingBrowserPanes = paneContainer?.collectBrowserPanes() ?? [:]
         paneContainer?.detachHostsOnly()
+        // RL-040: Hold detached hosts for 500ms so in-flight AppKit events
+        // (mouseMoved via tracking area, queued keyDown/keyUp) drain before
+        // ARC frees any host that isn't reused by the new container.
+        let detached = Array(existingHosts.values)
+        retiredHosts.append(contentsOf: detached)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            guard let self else { return }
+            self.retiredHosts.removeAll { host in detached.contains { $0 === host } }
+        }
         // Keep the old container alive past this runloop tick so AppKit's pending
         // layout/display passes that reference its subviews complete before dealloc.
         let oldContainer = paneContainer

@@ -371,6 +371,7 @@ extension HarnessTerminalSurfaceView {
     }
 
     public override func mouseMoved(with event: NSEvent) {
+        guard window != nil else { return }
         super.mouseMoved(with: event)
         updateLinkHover(at: event.locationInWindow, modifiers: event.modifierFlags)
     }
