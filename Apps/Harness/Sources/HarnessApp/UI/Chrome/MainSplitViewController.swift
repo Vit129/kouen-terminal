@@ -350,11 +350,6 @@ final class MainSplitViewController: NSViewController {
     }
 
     /// Shows the sidebar (if hidden) and switches it to the Git tab (⌘G).
-    func showGitPanel() {
-        setSidebarVisible(true, animated: true)
-        sidebar.selectGitTab()
-    }
-
     /// Pops up the notifications dropdown. Works regardless of sidebar visibility;
     /// the dropdown positions itself relative to the bell when it's on-screen and
     /// falls back to the top-left corner of the window when the sidebar is hidden.

@@ -148,8 +148,6 @@ enum MainMenuBuilder {
         view.submenu?.addItem(findItem)
         let sidebarItem = menuItem("Toggle Sidebar", action: #selector(MenuTarget.toggleSidebar), binding: BannerShortcutRegistry.toggleSidebar)
         view.submenu?.addItem(sidebarItem)
-        let gitPanelItem = menuItem("Show Git Panel", action: #selector(MenuTarget.showGitPanel), binding: BannerShortcutRegistry.gitPanel)
-        view.submenu?.addItem(gitPanelItem)
         view.submenu?.addItem(.separator())
         let runItem = menuItem("Run Script", action: #selector(MenuTarget.runScript), binding: BannerShortcutRegistry.runScript)
         view.submenu?.addItem(runItem)
@@ -464,14 +462,6 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
             ?? NSApp.windows.first(where: { $0.contentViewController is MainSplitViewController })
         if let split = win?.contentViewController as? MainSplitViewController {
             split.toggleSidebar()
-        }
-    }
-
-    @objc func showGitPanel() {
-        let win = NSApp.keyWindow ?? NSApp.mainWindow
-            ?? NSApp.windows.first(where: { $0.contentViewController is MainSplitViewController })
-        if let split = win?.contentViewController as? MainSplitViewController {
-            split.showGitPanel()
         }
     }
 
