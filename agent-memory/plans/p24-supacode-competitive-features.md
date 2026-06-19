@@ -1,6 +1,6 @@
 # P24 — Supacode-Inspired Competitive Features (Consolidated)
 
-Status: **Planning**
+Status: **Phase 3 Complete**
 Priority: **P1** — competitive parity + agent-first UX
 Owner surface: HarnessApp, HarnessCore, HarnessDaemonCore, harness-cli
 Created: 2026-06-19

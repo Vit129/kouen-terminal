@@ -5,7 +5,23 @@ import HarnessCore
 @MainActor
 public final class BrowserPaneView: NSView {
     public let paneID: PaneID
-    public let webView: WKWebView
+    public private(set) var webView: WKWebView
+
+    // MARK: - Tab Model
+
+    struct BrowserTab {
+        let id: UUID
+        let webView: WKWebView
+        var title: String
+    }
+
+    private var tabs: [BrowserTab] = []
+    private var activeTabIndex: Int = 0
+    private var activeTab: BrowserTab? { tabs.indices.contains(activeTabIndex) ? tabs[activeTabIndex] : nil }
+
+    private let tabBar = NSScrollView()
+    private let tabBarStack = NSStackView()
+    private let newTabButton = NSButton()
 
     private let toolbar = NSView()
     private let backButton = NSButton()
@@ -35,21 +51,21 @@ public final class BrowserPaneView: NSView {
         self.webView = webView
 
         super.init(frame: .zero)
-
-        // Layer-backed so the toolbar sits above the WKWebView in z-order
-        // and receives mouse events correctly.
         wantsLayer = true
 
+        // Create first tab
+        let firstTab = BrowserTab(id: UUID(), webView: webView, title: "New Tab")
+        tabs.append(firstTab)
+
         setupUI()
+        setupTabBar()
         setupConstraints()
 
         webView.navigationDelegate = self
         webView.uiDelegate = self
 
-        // Register in the registry
         BrowserPaneRegistry.shared.register(self)
 
-        // Load the initial URL (or restore it from UserDefaults if available)
         let resolvedURL: URL
         if let savedURLString = UserDefaults.standard.string(forKey: "browserPane.\(paneID.uuidString).url"),
            let savedURL = URL(string: savedURLString) {
@@ -195,13 +211,110 @@ public final class BrowserPaneView: NSView {
         webView.translatesAutoresizingMaskIntoConstraints = false
     }
 
+    private func setupTabBar() {
+        tabBar.translatesAutoresizingMaskIntoConstraints = false
+        tabBar.hasHorizontalScroller = false
+        tabBar.hasVerticalScroller = false
+        tabBar.drawsBackground = false
+        tabBar.wantsLayer = true
+        tabBar.layer?.backgroundColor = HarnessDesign.chrome.sidebarBackground.cgColor
+
+        tabBarStack.orientation = .horizontal
+        tabBarStack.spacing = 1
+        tabBarStack.translatesAutoresizingMaskIntoConstraints = false
+        tabBar.documentView = tabBarStack
+
+        newTabButton.translatesAutoresizingMaskIntoConstraints = false
+        newTabButton.image = NSImage(systemSymbolName: "plus", accessibilityDescription: "New Tab")
+        newTabButton.isBordered = false
+        newTabButton.target = self
+        newTabButton.action = #selector(addNewTab)
+        newTabButton.widthAnchor.constraint(equalToConstant: 20).isActive = true
+        tabBarStack.addArrangedSubview(newTabButton)
+
+        refreshTabBar()
+    }
+
+    private func refreshTabBar() {
+        // Remove existing tab views (keep newTabButton)
+        for view in tabBarStack.arrangedSubviews where view !== newTabButton {
+            tabBarStack.removeArrangedSubview(view)
+            view.removeFromSuperview()
+        }
+        // Add tab buttons
+        for (i, tab) in tabs.enumerated() {
+            let btn = BrowserTabButton(
+                title: tab.title,
+                isActive: i == activeTabIndex,
+                onSelect: { [weak self] in self?.selectTab(at: i) },
+                onClose: { [weak self] in self?.closeTab(at: i) }
+            )
+            tabBarStack.insertArrangedSubview(btn, at: i)
+        }
+        // Always show tab bar (like Chrome/Safari)
+        tabBar.isHidden = false
+    }
+
+    @objc private func addNewTab() {
+        createTab(url: URL(string: "about:blank")!)
+    }
+
+    func createTab(url: URL, configuration: WKWebViewConfiguration? = nil) {
+        let config = configuration ?? WKWebViewConfiguration()
+        if configuration == nil { config.limitsNavigationsToAppBoundDomains = false }
+        let newWeb = WKWebView(frame: webView.frame, configuration: config)
+        newWeb.navigationDelegate = self
+        newWeb.uiDelegate = self
+        newWeb.translatesAutoresizingMaskIntoConstraints = false
+
+        let tab = BrowserTab(id: UUID(), webView: newWeb, title: "New Tab")
+        tabs.append(tab)
+        selectTab(at: tabs.count - 1)
+        newWeb.load(URLRequest(url: url))
+    }
+
+    private var mainStack: NSStackView!
+
+    private func selectTab(at index: Int) {
+        guard tabs.indices.contains(index) else { return }
+        let oldWeb = webView
+        activeTabIndex = index
+        let newWeb = tabs[index].webView
+
+        if oldWeb !== newWeb {
+            // Swap webView in the stack
+            if let stackIndex = mainStack.arrangedSubviews.firstIndex(of: oldWeb) {
+                mainStack.removeArrangedSubview(oldWeb)
+                oldWeb.removeFromSuperview()
+                newWeb.translatesAutoresizingMaskIntoConstraints = false
+                mainStack.insertArrangedSubview(newWeb, at: stackIndex)
+            }
+            webView = newWeb
+        }
+        urlTextField.stringValue = newWeb.url?.absoluteString ?? ""
+        refreshTabBar()
+    }
+
+    private func closeTab(at index: Int) {
+        guard tabs.count > 1 else {
+            // Last tab — close the pane
+            closePaneClicked()
+            return
+        }
+        tabs[index].webView.removeFromSuperview()
+        tabs.remove(at: index)
+        let newIndex = min(activeTabIndex, tabs.count - 1)
+        selectTab(at: newIndex)
+    }
+
     private func setupConstraints() {
-        let mainStack = NSStackView(views: [toolbar, errorBanner, webView])
+        let mainStack = NSStackView(views: [tabBar, toolbar, errorBanner, webView])
         mainStack.orientation = .vertical
         mainStack.spacing = 0
         mainStack.alignment = .width
         mainStack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(mainStack)
+        self.mainStack = mainStack
 
         errorBannerHeightConstraint = errorBanner.heightAnchor.constraint(equalToConstant: 0)
         errorBanner.isHidden = true
@@ -213,6 +326,7 @@ public final class BrowserPaneView: NSView {
             mainStack.bottomAnchor.constraint(equalTo: bottomAnchor),
 
             toolbar.heightAnchor.constraint(equalToConstant: 32),
+            tabBar.heightAnchor.constraint(equalToConstant: 28),
             errorBannerHeightConstraint!
         ])
     }
@@ -385,6 +499,12 @@ extension BrowserPaneView: WKNavigationDelegate {
             urlTextField.stringValue = url.absoluteString
             UserDefaults.standard.set(url.absoluteString, forKey: "browserPane.\(paneID.uuidString).url")
         }
+        // Update tab title
+        if let idx = tabs.firstIndex(where: { $0.webView === webView }) {
+            let title = webView.title ?? webView.url?.host ?? "Tab"
+            tabs[idx].title = String(title.prefix(20))
+            refreshTabBar()
+        }
         completeLoading()
     }
 
@@ -409,7 +529,8 @@ extension BrowserPaneView: WKNavigationDelegate {
 extension BrowserPaneView: WKUIDelegate {
     public func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
         if navigationAction.targetFrame == nil {
-            webView.load(navigationAction.request)
+            let url = navigationAction.request.url ?? URL(string: "about:blank")!
+            createTab(url: url, configuration: configuration)
         }
         return nil
     }
@@ -460,4 +581,70 @@ private final class LoadCompletionState: @unchecked Sendable {
         }
         continuation = nil
     }
+}
+
+// MARK: - Browser Tab Button
+
+@MainActor
+private final class BrowserTabButton: NSView {
+    private let label = NSTextField(labelWithString: "")
+    private let closeBtn = NSButton()
+    private var onSelect: () -> Void
+    private var onClose: () -> Void
+
+    init(title: String, isActive: Bool, onSelect: @escaping () -> Void, onClose: @escaping () -> Void) {
+        self.onSelect = onSelect
+        self.onClose = onClose
+        super.init(frame: .zero)
+        wantsLayer = true
+        layer?.cornerRadius = 4
+        layer?.backgroundColor = isActive
+            ? NSColor.white.withAlphaComponent(0.1).cgColor
+            : NSColor.clear.cgColor
+        translatesAutoresizingMaskIntoConstraints = false
+
+        label.stringValue = title.isEmpty ? "Tab" : title
+        label.font = .systemFont(ofSize: 11)
+        label.textColor = isActive ? .white : .white.withAlphaComponent(0.6)
+        label.lineBreakMode = .byTruncatingTail
+        label.translatesAutoresizingMaskIntoConstraints = false
+
+        closeBtn.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: "Close Tab")?
+            .withSymbolConfiguration(.init(pointSize: 8, weight: .medium))
+        closeBtn.isBordered = false
+        closeBtn.target = self
+        closeBtn.action = #selector(closeTapped)
+        closeBtn.translatesAutoresizingMaskIntoConstraints = false
+        closeBtn.contentTintColor = .white.withAlphaComponent(0.5)
+
+        addSubview(label)
+        addSubview(closeBtn)
+
+        NSLayoutConstraint.activate([
+            heightAnchor.constraint(equalToConstant: 24),
+            widthAnchor.constraint(greaterThanOrEqualToConstant: 60),
+            widthAnchor.constraint(lessThanOrEqualToConstant: 150),
+            label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
+            label.centerYAnchor.constraint(equalTo: centerYAnchor),
+            label.trailingAnchor.constraint(lessThanOrEqualTo: closeBtn.leadingAnchor, constant: -4),
+            closeBtn.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -4),
+            closeBtn.centerYAnchor.constraint(equalTo: centerYAnchor),
+            closeBtn.widthAnchor.constraint(equalToConstant: 14),
+            closeBtn.heightAnchor.constraint(equalToConstant: 14),
+        ])
+
+        let click = NSClickGestureRecognizer(target: self, action: #selector(selectTapped(_:)))
+        addGestureRecognizer(click)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError() }
+
+    @objc private func selectTapped(_ gesture: NSClickGestureRecognizer) {
+        let loc = gesture.location(in: self)
+        // Don't intercept clicks on the close button
+        if closeBtn.frame.contains(loc) { return }
+        onSelect()
+    }
+    @objc private func closeTapped() { onClose() }
 }

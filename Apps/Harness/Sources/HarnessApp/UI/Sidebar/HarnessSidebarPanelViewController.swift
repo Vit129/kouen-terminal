@@ -3,6 +3,7 @@ import HarnessCore
 
 struct RepoGitMetadata: Sendable, Equatable {
     let prNumber: Int?
+    let prURL: String?
     let aheadCount: Int?
     let behindCount: Int?
 }
@@ -276,23 +277,24 @@ final class HarnessSidebarPanelViewController: NSViewController {
 
     private func fetchGitMetadata(for path: String, branch: String) async -> RepoGitMetadata {
         guard let ghPath = Self.cachedGhPath else {
-            return RepoGitMetadata(prNumber: nil, aheadCount: nil, behindCount: nil)
+            return RepoGitMetadata(prNumber: nil, prURL: nil, aheadCount: nil, behindCount: nil)
         }
         
         let hasRemote = await fetchHasRemote(for: path)
         guard hasRemote else {
-            return RepoGitMetadata(prNumber: nil, aheadCount: nil, behindCount: nil)
+            return RepoGitMetadata(prNumber: nil, prURL: nil, aheadCount: nil, behindCount: nil)
         }
         
         // Fetch PR number
         var prNumber: Int? = nil
         let prProcess = Process()
         prProcess.executableURL = URL(fileURLWithPath: ghPath)
-        prProcess.arguments = ["pr", "view", "--json", "number"]
+        prProcess.arguments = ["pr", "view", "--json", "number,url"]
         prProcess.currentDirectoryURL = URL(fileURLWithPath: path)
         let prPipe = Pipe()
         prProcess.standardOutput = prPipe
         prProcess.standardError = Pipe()
+        var prURL: String? = nil
         do {
             try prProcess.run()
             let data = prPipe.fileHandleForReading.readDataToEndOfFile()
@@ -301,6 +303,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
                let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                let number = json["number"] as? Int {
                 prNumber = number
+                prURL = json["url"] as? String
             }
         } catch {}
         
@@ -331,7 +334,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
             }
         } catch {}
         
-        return RepoGitMetadata(prNumber: prNumber, aheadCount: aheadCount, behindCount: behindCount)
+        return RepoGitMetadata(prNumber: prNumber, prURL: prURL, aheadCount: aheadCount, behindCount: behindCount)
     }
 
     private func rebuildSidebarRows() {
@@ -1732,6 +1735,12 @@ extension HarnessSidebarPanelViewController: NSTableViewDataSource, NSTableViewD
             cell.onClose = { [weak self] in
                 guard self != nil else { return }
                 SessionCoordinator.shared.closeSession(session)
+            }
+            cell.onPRClick = {
+                guard let url = metadata?.prURL.flatMap({ URL(string: $0) }) else { return }
+                SessionCoordinator.shared.splitPaneCoordinator.openBrowserPane(
+                    url: url, direction: .horizontal
+                )
             }
             cell.onContextMenu = { [weak self] in
                 self?.sessionActionsMenu(for: session)

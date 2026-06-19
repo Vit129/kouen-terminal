@@ -218,6 +218,7 @@ final class SessionGroupHeaderRowView: NSView {
 final class WorktreeRowView: NSView {
     var onContextMenu: (() -> NSMenu?)?
     var onClose: (() -> Void)?
+    var onPRClick: (() -> Void)?
 
     private let fill = NSView()
     private let agentStatusDot = NSView()
@@ -270,6 +271,8 @@ final class WorktreeRowView: NSView {
         titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
         prBadge.isHidden = true
+        let prClick = NSClickGestureRecognizer(target: self, action: #selector(handlePRClick))
+        prBadge.addGestureRecognizer(prClick)
         aheadBadge.isHidden = true
         behindBadge.isHidden = true
         notificationBadge.isHidden = true
@@ -337,6 +340,10 @@ final class WorktreeRowView: NSView {
 
     @objc private func closeClicked() {
         onClose?()
+    }
+
+    @objc private func handlePRClick() {
+        onPRClick?()
     }
 
     @available(*, unavailable)
