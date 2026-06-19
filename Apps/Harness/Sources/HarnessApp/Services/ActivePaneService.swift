@@ -168,7 +168,18 @@ final class ActivePaneService {
         } else {
             target = surfaces.first
         }
+        // Suppress daemon sync when restoring from the daemon's own activePaneID —
+        // we're reflecting the daemon state, not originating a new focus change.
+        // Without this, the feedback loop can pick a stale/wrong surface during
+        // session switch and overwrite the daemon's correct activePaneID (RL-040).
+        let wasAlreadyFromDaemon = coord.activeSurfaceID.map { !surfaces.contains($0) } ?? true
+        if wasAlreadyFromDaemon {
+            coord.suppressActivePaneSync = true
+        }
         setActiveSurface(target)
+        if wasAlreadyFromDaemon {
+            coord.suppressActivePaneSync = false
+        }
         if let target { coord.terminalHosts.host(for: target)?.focusTerminal() }
     }
 
