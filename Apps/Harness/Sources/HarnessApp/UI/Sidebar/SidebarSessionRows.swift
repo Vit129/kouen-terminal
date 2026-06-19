@@ -221,6 +221,7 @@ final class WorktreeRowView: NSView {
 
     private let fill = NSView()
     private let agentStatusDot = NSView()
+    private let agentIconView = NSImageView()
     private let branchIcon = NSImageView()
     private let titleLabel = NSTextField(labelWithString: "")
     private let prBadge = SidebarBadgeView()
@@ -250,6 +251,10 @@ final class WorktreeRowView: NSView {
         agentStatusDot.translatesAutoresizingMaskIntoConstraints = false
         agentStatusDot.setContentHuggingPriority(.required, for: .horizontal)
         agentStatusDot.setContentCompressionResistancePriority(.required, for: .horizontal)
+
+        agentIconView.imageScaling = .scaleProportionallyUpOrDown
+        agentIconView.translatesAutoresizingMaskIntoConstraints = false
+        agentIconView.isHidden = true
 
         branchIcon.image = NSImage(systemSymbolName: "arrow.triangle.branch", accessibilityDescription: nil)?
             .withSymbolConfiguration(HarnessDesign.symbolConfig(pointSize: 10, weight: .semibold))
@@ -292,6 +297,7 @@ final class WorktreeRowView: NSView {
 
         addSubview(fill)
         fill.addSubview(agentStatusDot)
+        fill.addSubview(agentIconView)
         fill.addSubview(branchIcon)
         fill.addSubview(titleLabel)
         fill.addSubview(badgeStack)
@@ -306,6 +312,11 @@ final class WorktreeRowView: NSView {
             agentStatusDot.centerYAnchor.constraint(equalTo: fill.centerYAnchor),
             agentStatusDot.widthAnchor.constraint(equalToConstant: 6),
             agentStatusDot.heightAnchor.constraint(equalToConstant: 6),
+
+            agentIconView.leadingAnchor.constraint(equalTo: fill.leadingAnchor, constant: 5),
+            agentIconView.centerYAnchor.constraint(equalTo: fill.centerYAnchor),
+            agentIconView.widthAnchor.constraint(equalToConstant: 14),
+            agentIconView.heightAnchor.constraint(equalToConstant: 14),
 
             branchIcon.leadingAnchor.constraint(equalTo: agentStatusDot.trailingAnchor, constant: 6),
             branchIcon.centerYAnchor.constraint(equalTo: fill.centerYAnchor),
@@ -363,6 +374,17 @@ final class WorktreeRowView: NSView {
         let (dotColor, dotTooltip) = agentDotAppearance(for: session)
         agentStatusDot.layer?.backgroundColor = dotColor.cgColor
         agentStatusDot.toolTip = dotTooltip
+        // Show agent brand icon when detected, hide plain dot
+        let agentKind = session.tabs.compactMap({ $0.effectiveAgentKind }).first
+        if let agentKind {
+            agentIconView.image = AgentIconRenderer.templateOrMonogramImage(for: agentKind, size: 14)
+            agentIconView.contentTintColor = dotColor
+            agentIconView.isHidden = false
+            agentStatusDot.isHidden = true
+        } else {
+            agentIconView.isHidden = true
+            agentStatusDot.isHidden = false
+        }
         // Branch icon matches agent status color for visual pop
         branchIcon.contentTintColor = dotColor
 
