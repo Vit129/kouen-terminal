@@ -1,6 +1,7 @@
 import AppKit
 import HarnessCore
 import QuickLookUI
+import HarnessLSP
 
 /// Read-only preview of a file's contents, hosted in the sidebar in place of
 /// the file tree.
@@ -16,9 +17,8 @@ final class FileViewerViewController: NSViewController {
     private let quickLookView = QLPreviewView(frame: .zero, style: .normal)
     private let messageLabel = NSTextField(labelWithString: "")
     private let fileWatcher = FileChangeWatcher()
-    // TODO: LSP integration (hover, go-to-definition, diagnostics) — disabled for now.
-    // Enable by uncommenting and setting lspAutoStart = true in settings.
-    // private let lspSession = LSPFileSession()
+    // LSP integration (hover, go-to-definition, diagnostics) enabled.
+    private let lspSession = LSPFileSession()
 
     /// Invoked when the user taps the back button.
     var onBack: (() -> Void)?
@@ -116,12 +116,12 @@ final class FileViewerViewController: NSViewController {
             try? text.write(toFile: expanded, atomically: true, encoding: .utf8)
             DisplayMessage.show("Saved \((path as NSString).lastPathComponent)")
         }
-        // LSP hooks — disabled (see TODO above)
-        // syntaxView.onHover = { [weak self] position in await self?.lspSession.hover(position: position) }
-        // syntaxView.onDefinition = { [weak self] position in await self?.lspSession.definition(position: position) }
-        // syntaxView.onNavigateToDefinition = { [weak self] target in
-        //     self?.load(path: target.url.path)
-        // }
+        // LSP hooks
+        syntaxView.onHover = { [weak self] position in await self?.lspSession.hover(position: position) }
+        syntaxView.onDefinition = { [weak self] position in await self?.lspSession.definition(position: position) }
+        syntaxView.onNavigateToDefinition = { [weak self] target in
+            self?.load(path: target.url.path)
+        }
         view.addSubview(syntaxView)
 
         if let quickLookView {
@@ -131,10 +131,10 @@ final class FileViewerViewController: NSViewController {
             view.addSubview(quickLookView)
         }
 
-        // LSP diagnostics — disabled
-        // lspSession.onDiagnostics = { [weak self] diagnostics in
-        //     self?.syntaxView.setDiagnostics(diagnostics)
-        // }
+        // LSP diagnostics
+        lspSession.onDiagnostics = { [weak self] diagnostics in
+            self?.syntaxView.setDiagnostics(diagnostics)
+        }
 
         var constraints = [
             syntaxView.topAnchor.constraint(equalTo: header.bottomAnchor),
@@ -176,11 +176,11 @@ final class FileViewerViewController: NSViewController {
         quickLookView?.isHidden = true
         syntaxView.isHidden = false
         syntaxView.load(text: text, fileExtension: ext, resetScroll: resetScroll)
-        // lspSession.open(url: url, text: text, fileExtension: ext)
+        lspSession.open(url: url, text: text, fileExtension: ext)
     }
 
     private func showQuickLook(_ url: URL) {
-        // lspSession.close()
+        lspSession.close()
         guard let quickLookView else {
             showMessage("Unable to start Quick Look preview.")
             return
@@ -196,7 +196,7 @@ final class FileViewerViewController: NSViewController {
     }
 
     private func showMessage(_ message: String) {
-        // lspSession.close()
+        lspSession.close()
         syntaxView.isHidden = true
         quickLookView?.isHidden = true
         messageLabel.isHidden = false
