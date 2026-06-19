@@ -57,6 +57,15 @@ final class SessionLifecycleService {
                workspace.sessions.firstIndex(where: { $0.id == sessionID }) != targetIndex {
                 coord.reorderSession(workspaceID: workspaceID, sessionID: sessionID, toIndex: targetIndex)
             }
+            // P24: Auto-execute setupScript from harness.json
+            if let config = ProjectConfig.load(from: resolvedCWD), let setup = config.setupScript, !setup.isEmpty {
+                if let tab = coord.snapshot.activeWorkspace?.sessions.first(where: { $0.id == sessionID })?.tabs.first,
+                   let surfaceID = tab.rootPane.allSurfaceIDs().first {
+                    // Small delay to let shell initialize before sending command
+                    try? await Task.sleep(for: .milliseconds(500))
+                    await coord.requestDaemon(.sendData(surfaceID: surfaceID.uuidString, data: Data((setup + "\r").utf8)))
+                }
+            }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                 SurfaceShellTracker.shared.bumpScan()
             }

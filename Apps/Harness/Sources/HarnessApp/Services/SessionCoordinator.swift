@@ -150,6 +150,44 @@ final class SessionCoordinator: NSObject {
     // MARK: - Split pane (facade → SplitPaneCoordinator)
 
     func splitActivePane(direction: SplitDirection) { splitPaneCoordinator.splitActivePane(direction: direction) }
+
+    // MARK: - Project scripts (⌘R / ⌘.)
+
+    /// Surface ID of the dedicated RUN pane, tracked per active session.
+    private var runSurfaceID: SurfaceID?
+
+    func runProjectScript() {
+        guard let tab = snapshot.activeWorkspace?.activeTab else { return }
+        let cwd = tab.cwd
+        guard let config = ProjectConfig.load(from: cwd), let script = config.runScript, !script.isEmpty else { return }
+        // If RUN surface already exists and is alive, re-send the script
+        if let existing = runSurfaceID, tab.rootPane.allSurfaceIDs().contains(existing) {
+            // Kill existing process and re-run
+            requestDaemon(.sendData(surfaceID: existing.uuidString, data: Data("\u{03}".utf8))) // Ctrl-C
+            Task {
+                try? await Task.sleep(for: .milliseconds(200))
+                await self.requestDaemon(.sendData(surfaceID: existing.uuidString, data: Data((script + "\r").utf8)))
+            }
+            return
+        }
+        // Create a new split pane for RUN
+        splitPaneCoordinator.splitActivePaneAndRun(direction: .horizontal, command: script)
+        // After sync, capture the new pane's surface as runSurfaceID
+        Task {
+            try? await Task.sleep(for: .milliseconds(300))
+            await syncFromDaemon()
+            if let newTab = self.snapshot.activeWorkspace?.activeTab,
+               let sid = newTab.rootPane.allSurfaceIDs().last {
+                self.runSurfaceID = sid
+            }
+        }
+    }
+
+    func stopProjectScript() {
+        guard let sid = runSurfaceID else { return }
+        // Send SIGTERM via Ctrl-C
+        requestDaemon(.sendData(surfaceID: sid.uuidString, data: Data("\u{03}".utf8)))
+    }
     func splitActivePaneAndRun(direction: SplitDirection, command: String) { splitPaneCoordinator.splitActivePaneAndRun(direction: direction, command: command) }
     func focusPaneDirectional(_ direction: DirectionalAxis) { splitPaneCoordinator.focusPaneDirectional(direction) }
     func splitPaneSurface(tabID: TabID, sourcePaneID: PaneID, surfaceID: SurfaceID, targetPaneID: PaneID, direction: SplitDirection, beforeTarget: Bool) {

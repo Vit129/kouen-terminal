@@ -169,7 +169,15 @@ public enum BannerShortcutRegistry {
 
     public static let gitPanel = Keybinding(
         id: "gitPanel", title: "Show Git Panel",
-        modifiers: .command, keyChar: "g")
+        modifiers: [.command, .shift], keyChar: "g")
+
+    public static let runScript = Keybinding(
+        id: "runScript", title: "Run Script",
+        modifiers: .command, keyChar: "r")
+
+    public static let stopScript = Keybinding(
+        id: "stopScript", title: "Stop Script",
+        modifiers: .command, keyChar: ".")
 
     // MARK: - Banner shortcuts (legacy format for terminal banner rendering)
 
