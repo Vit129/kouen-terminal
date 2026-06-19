@@ -147,34 +147,59 @@ Core mental model: `Repository → Worktree → Terminal State (tabs/splits/noti
 
 ---
 
-### F4: Git Worktree Management — P1
+### F4: Git Worktree-Per-Session Model — P1
 
-**What:** Create/switch/archive/delete worktrees from sidebar.
+**What:** Every session owns its own git worktree. Session group = repo. Branch display = worktree branch (always correct, no shared HEAD problem).
 
-**Absorbed from P21:** Parallel agent concept — but via worktree isolation (git feature) instead of RPC orchestration (over-engineered for this use case).
+**Core invariant: 1 session = 1 worktree = 1 branch = 1 cwd**
 
-**Design:**
-- Git sidebar → "Worktrees" section below branches
-- Create (⌘N in git context): prompt branch name → `git worktree add` → auto-create session
-- Session ↔ worktree binding in session metadata (`worktreePath`, `worktreeBranch`)
-- Switch worktree = switch session (tabs/splits restore via daemon)
-- Archive: detach session + hide from active list (keep on disk)
-- Delete: `git worktree remove` + close session + optionally delete branch
+**Mental model:**
+```
+Project Group: harness-terminal/        (grouped by repo origin)
+├── [CC] workingtree1                   (worktree: ~/.worktrees/workingtree1/)
+├── [KR] DEEP-FEATURE                  (worktree: ~/.worktrees/DEEP-FEATURE/)
+├── [●]  feature1                       (worktree: ~/.worktrees/feature1/)
+├── [●]  main                           (worktree: ~/project/ — default worktree)
+```
+
+**How sessions get worktrees:**
+1. **New session (⌘T):** Creates in repo's default worktree (main). Branch = main.
+2. **Agent creates branch:** Agent runs `git worktree add` → session cwd moves to new worktree dir → sidebar auto-updates branch display.
+3. **User switches branch:** If user runs `git switch feature1` in a session that's on main → Harness detects cwd still same BUT branch changed → auto-creates worktree for isolation, moves session cwd there.
+4. **Manual:** `harness-cli new-session --worktree feature-x --repo ~/Code/project`
+
+**Sidebar grouping logic:**
+- Group key = **git toplevel / bare repo origin** (not cwd)
+- Detect shared repo: `git -C <cwd> rev-parse --show-toplevel` or `git -C <cwd> worktree list` → all worktrees share same `.git` (or gitdir)
+- Sessions with different cwds but same repo origin = same group
+
+**Branch detection (per-session):**
+- Each session's cwd is its own worktree dir → `git -C <session-cwd> branch --show-current` gives the correct per-session branch
+- No more "propagate branch to all tabs with same cwd" — each session has unique cwd
+
+**Display:**
+- Title: branch name (from session's own worktree)
+- Group header: repo name (folder name of main worktree)
+- Agent icon: shown when agent detected
 
 **CLI:**
 ```bash
 harness-cli new-session --worktree feature-x --repo ~/Code/project
 harness-cli list-sessions --worktree  # filter worktree-bound sessions
-```
 
-**Multi-agent parallel via worktrees:**
-```bash
-# Script: spin up 5 agents in parallel (what Supacode advertises as "50 agents")
+# Script: spin up 5 agents in parallel
 for feature in auth payments search analytics logging; do
   harness-cli new-session --worktree "$feature" --repo ~/Code/app
 done
 # Each session auto-starts agent via harness.json setupScript
 ```
+
+**Key implementation tasks:**
+1. Sidebar grouping: detect repo origin across worktree cwds (`git worktree list --porcelain`)
+2. Branch display: probe branch per-session using session's own cwd (already works if cwds differ)
+3. Auto-worktree on branch switch: detect `git switch/checkout` in session → create worktree if not exists → move cwd
+4. Agent worktree creation: detect when agent runs `git worktree add` → session cwd follows
+5. Archive: `git worktree remove` + detach session from sidebar
 
 **Harness advantage:** daemon persistence + remote + CLI scripting. Supacode requires manual GUI interaction.
 
@@ -245,18 +270,18 @@ done
 
 **Exit criteria:** Create session at repo with `harness.json` → agent auto-starts → sidebar shows 🟢 → ⌘R opens RUN tab → ⌘. stops it.
 
-### Phase 2 — Worktree + Sidebar (P1, ~3 weeks)
+### Phase 2 — Worktree-Per-Session + Sidebar (P1, ~3 weeks)
 
 | # | Task | Builds on |
 |---|------|-----------|
-| 7 | Git worktree list in sidebar | Existing git panel |
-| 8 | Create worktree action (⌘N) | `git worktree add` |
-| 9 | Session ↔ worktree binding | Session metadata |
-| 10 | Sidebar 2-line layout + section headers | SessionRowView redesign |
-| 11 | `harness-cli new-session --worktree` | CLI extension |
-| 12 | Archive/delete worktree actions | Git commands + session lifecycle |
+| 7 | Sidebar grouping by repo origin (detect shared repo across worktree cwds via `git worktree list`) | Existing group logic (replace cwd-based with repo-origin-based) |
+| 8 | Per-session branch probe using session's own cwd | Existing SurfaceShellTracker + git probe |
+| 9 | Auto-create worktree when agent creates branch (detect `git worktree add` in PTY output) | Session lifecycle |
+| 10 | Auto-create worktree on `git switch` (detect branch change → isolate into worktree) | PTY output monitoring |
+| 11 | `harness-cli new-session --worktree` (creates worktree + session + cd) | CLI extension |
+| 12 | Archive/delete worktree actions in sidebar | Git commands + session lifecycle |
 
-**Exit criteria:** ⌘N creates worktree + session → agent auto-starts → switch worktree = switch session with state → `harness-cli` can script parallel worktrees.
+**Exit criteria:** Agent creates branch → session moves to worktree → sidebar shows correct per-session branch → multiple sessions in same project show different branches → `harness-cli` can script parallel worktrees.
 
 ### Phase 3 — GitHub (P1, ~2 weeks)
 
