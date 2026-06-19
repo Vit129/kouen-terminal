@@ -171,15 +171,10 @@ final class AgentNotchViewModel: ObservableObject {
     }
 
     private func armPeekDismiss(after duration: Duration) {
+        // Persistent notification: don't auto-dismiss.
+        // User must click the notch (to open) or click elsewhere to dismiss.
         peekDismissTask?.cancel()
-        peekDismissTask = Task { [weak self] in
-            try? await Task.sleep(for: duration)
-            guard !Task.isCancelled else { return }
-            await MainActor.run {
-                guard let self, self.isPeeking else { return }
-                self.close()
-            }
-        }
+        peekDismissTask = nil
     }
 
     // MARK: - Hover
@@ -200,9 +195,8 @@ final class AgentNotchViewModel: ObservableObject {
                 }
             }
         } else {
-            // Leaving a peek lets it finish on a short fuse instead of the full duration.
+            // Persistent peek: don't dismiss on hover exit. User clicks to interact or dismiss.
             if isPeeking {
-                armPeekDismiss(after: .milliseconds(800))
                 return
             }
             hoverTask = Task { [weak self] in
