@@ -80,7 +80,7 @@ public enum URLDetection {
             while let last = token.last, ").,;:!?'\\\"]>".contains(last) {
                 token.removeLast()
             }
-            if !token.isEmpty && token.contains("/") && (token.hasPrefix("/") || token.hasPrefix("~") || token.hasPrefix(".")) {
+            if !token.isEmpty && token.contains("/") {
                 return (token, lo ..< (lo + token.count))
             }
         }
