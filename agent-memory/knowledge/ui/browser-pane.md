@@ -82,3 +82,43 @@ with `userInfo: ["url": url]` instead of `NSWorkspace.shared.open(url)`.
 `MainSplitViewController` observes this notification (mirroring the existing
 `HarnessOpenFilePreview` pattern) and calls
 `SessionCoordinator.shared.splitPaneCoordinator.openBrowserPane(url:direction:)`.
+
+## Multi-Tab Support (P24 Phase 3)
+
+`BrowserPaneView` now supports multiple tabs within a single browser pane:
+
+- **Tab model:** `BrowserTab` struct (id, webView, title) stored in `tabs: [BrowserTab]`
+- **Tab bar:** `NSScrollView` + `NSStackView` of `BrowserTabButton` views above toolbar. Always visible.
+- **New tab:** `+` button in tab bar or via `createTab(url:configuration:)` API
+- **target=_blank:** `WKUIDelegate.createWebView` → `createTab(url:)` instead of loading in same view
+- **Close tab:** `×` on each tab. Last tab close → close entire browser pane
+- **Tab switch:** `selectTab(at:)` swaps `WKWebView` in `mainStack` (NSStackView)
+- **Tab title:** Set from page `document.title` via `webView.title` on `didFinish`, truncated to 20 chars
+- **Cookie/session:** Uses `WKWebsiteDataStore.default()` (persistent) — login state preserved across tabs and app restarts
+
+### Layout (top to bottom in mainStack)
+
+1. `tabBar` (28pt) — always visible
+2. `toolbar` (32pt) — back/forward/reload/URL/close
+3. `errorBanner` (0 or 24pt)
+4. `webView` (fills remaining space)
+
+## GitHub URL Click-to-Browser-Pane (P24)
+
+`openLink` in `HarnessTerminalSurfaceView+SelectionAndLinks.swift` now intercepts
+⌘-click on GitHub URLs (`host.contains("github.com")`) and posts
+`HarnessOpenLocalhostURL` notification → opens in browser pane instead of external Safari.
+
+Combined with PR badge click (`onPRClick` in `SidebarSessionRows.swift`) →
+`splitPaneCoordinator.openBrowserPane(url:)`, users can view PRs inline.
+
+## BUG: Tab close button unresponsive (gesture conflict)
+
+`BrowserTabButton` uses `NSClickGestureRecognizer` for tab selection and an
+`NSButton` for close (`×`). The gesture recognizer intercepts all clicks including
+those on the close button.
+
+**Fix:** `selectTapped(_:)` checks if click location is within `closeBtn.frame`
+and returns early — letting the button's own target-action fire. Alternative
+approach if this still fails: use `gestureRecognizer(_:shouldRequireFailureOf:)`
+or remove the gesture and use `mouseUp` override instead.
