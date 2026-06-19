@@ -229,6 +229,18 @@ final class TerminalTabBarView: NSView {
 
     // MARK: - Layout
 
+    override func viewWillMove(toWindow newWindow: NSWindow?) {
+        if newWindow == nil {
+            // RL-040: Cancel any pending layout/display passes that would fire
+            // after this view is removed. AppKit can queue layout() calls that
+            // arrive after dealloc starts, crashing in the @objc thunk.
+            NSObject.cancelPreviousPerformRequests(withTarget: self)
+            needsLayout = false
+            needsDisplay = false
+        }
+        super.viewWillMove(toWindow: newWindow)
+    }
+
     override func layout() {
         guard window != nil else { return }
         super.layout()

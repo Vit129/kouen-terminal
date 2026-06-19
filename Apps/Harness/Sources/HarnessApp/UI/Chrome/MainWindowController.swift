@@ -21,7 +21,7 @@ final class MainWindowController: NSWindowController {
             cursorHex: SessionCoordinator.shared.settings.customCursorHex
         )
 
-        let window = NSWindow(
+        let window = HarnessWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1280, height: 800),
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,

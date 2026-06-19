@@ -19,6 +19,7 @@ final class WindowBorderOverlayView: NSView {
     }
 
     override func layout() {
+        guard window != nil else { return }
         super.layout()
         needsDisplay = true // the stroke path depends on bounds
     }
@@ -47,4 +48,13 @@ final class WindowBorderOverlayView: NSView {
 
     // Purely decorative — never intercept clicks or hover.
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func viewWillMove(toWindow newWindow: NSWindow?) {
+        if newWindow == nil {
+            NSObject.cancelPreviousPerformRequests(withTarget: self)
+            needsLayout = false
+            needsDisplay = false
+        }
+        super.viewWillMove(toWindow: newWindow)
+    }
 }
