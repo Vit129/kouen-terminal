@@ -225,6 +225,7 @@ final class WorktreeRowView: NSView {
     private let agentIconView = NSImageView()
     private let branchIcon = NSImageView()
     private let titleLabel = NSTextField(labelWithString: "")
+    private let subtitleLabel = NSTextField(labelWithString: "")
     private let prBadge = SidebarBadgeView()
     private let aheadBadge = SidebarBadgeView()
     private let behindBadge = SidebarBadgeView()
@@ -270,6 +271,12 @@ final class WorktreeRowView: NSView {
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
+        subtitleLabel.font = .systemFont(ofSize: 10)
+        subtitleLabel.usesSingleLineMode = true
+        subtitleLabel.lineBreakMode = .byTruncatingTail
+        subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
+        subtitleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
         prBadge.isHidden = true
         let prClick = NSClickGestureRecognizer(target: self, action: #selector(handlePRClick))
         prBadge.addGestureRecognizer(prClick)
@@ -303,6 +310,7 @@ final class WorktreeRowView: NSView {
         fill.addSubview(agentIconView)
         fill.addSubview(branchIcon)
         fill.addSubview(titleLabel)
+        fill.addSubview(subtitleLabel)
         fill.addSubview(badgeStack)
 
         NSLayoutConstraint.activate([
@@ -327,8 +335,12 @@ final class WorktreeRowView: NSView {
             branchIcon.heightAnchor.constraint(equalToConstant: 12),
 
             titleLabel.leadingAnchor.constraint(equalTo: branchIcon.trailingAnchor, constant: 6),
-            titleLabel.centerYAnchor.constraint(equalTo: fill.centerYAnchor),
+            titleLabel.topAnchor.constraint(equalTo: fill.topAnchor, constant: 5),
             titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: badgeStack.leadingAnchor, constant: -6),
+
+            subtitleLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
+            subtitleLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 1),
+            subtitleLabel.trailingAnchor.constraint(lessThanOrEqualTo: badgeStack.leadingAnchor, constant: -6),
 
             badgeStack.trailingAnchor.constraint(equalTo: fill.trailingAnchor, constant: -6),
             badgeStack.centerYAnchor.constraint(equalTo: fill.centerYAnchor),
@@ -371,6 +383,8 @@ final class WorktreeRowView: NSView {
         let branch = tab.gitBranch?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         titleLabel.stringValue = branch.isEmpty ? title : branch
         titleLabel.textColor = isSelected ? c.textPrimary : c.textSecondary
+        subtitleLabel.stringValue = HarnessDesign.shortenPath(tab.cwd)
+        subtitleLabel.textColor = c.textSecondary.withAlphaComponent(0.6)
         
         toolTip = "\(title)\n\(tab.cwd)"
 
