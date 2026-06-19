@@ -40,8 +40,25 @@ extension HarnessCLI {
             return
         }
         guard let workspaceID = try resolveWorkspaceID(args, client: client) else {
-            fputs("Usage: harness-cli new-session --workspace <name|uuid> [--cwd path] [--name name] [--group-with <session>]\n", harnessStderr)
+            fputs("Usage: harness-cli new-session --workspace <name|uuid> [--cwd path] [--name name] [--worktree <branch>] [--repo <path>] [--group-with <session>]\n", harnessStderr)
             exit(1)
+        }
+        // --worktree <branch>: create a git worktree then session with cwd pointing to it
+        if let worktreeBranch = flagValue(args, flag: "--worktree") {
+            let repo = flagValue(args, flag: "--repo") ?? FileManager.default.currentDirectoryPath
+            let worktreeDir = (repo as NSString).deletingLastPathComponent
+                .appending("/\((repo as NSString).lastPathComponent)-worktrees/\(worktreeBranch)")
+            let gitProcess = Process()
+            gitProcess.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+            gitProcess.arguments = ["-C", repo, "worktree", "add", worktreeDir, "-b", worktreeBranch]
+            gitProcess.standardError = Pipe()
+            try? gitProcess.run()
+            gitProcess.waitUntilExit()
+            // If worktree already exists (exit 128), still use the path
+            let finalCwd = FileManager.default.fileExists(atPath: worktreeDir) ? worktreeDir : repo
+            let response = try checkedRequest(client, .newSession(workspaceID: workspaceID, cwd: finalCwd, name: name ?? worktreeBranch))
+            if case let .sessionID(id) = response { print(id.uuidString) }
+            return
         }
         let cwd = flagValue(args, flag: "--cwd")
         let response = try checkedRequest(client, .newSession(workspaceID: workspaceID, cwd: cwd, name: name))
