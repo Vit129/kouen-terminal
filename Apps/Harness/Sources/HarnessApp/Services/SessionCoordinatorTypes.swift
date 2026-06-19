@@ -16,21 +16,34 @@ struct NotificationEntry: Identifiable, Equatable {
 
 enum DesktopNotifier {
     // UNUserNotificationCenter.current() crashes on macOS 26 beta due to a corrupted
-    // NSCalendarDate in the notification database. All banner delivery is disabled until
-    // the system issue is resolved; sound fallback is preserved.
+    // NSCalendarDate in the notification database. Fallback: osascript AppleScript notification.
     static func requestAuthorizationIfNeeded() {}
     static func show(title: String, body: String, withSound: Bool = true) {
-        if withSound { DispatchQueue.main.async { NSSound(named: "Glass")?.play() } }
+        // osascript fallback — reliable on all macOS versions including 26
+        let soundClause = withSound ? " sound name \"Glass\"" : ""
+        let script = "display notification \"\(Self.escape(body))\" with title \"\(Self.escape(title))\"\(soundClause)"
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        process.arguments = ["-e", script]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try? process.run()
     }
     static func authorizationStatus(_ completion: @escaping @MainActor (UNAuthorizationStatus) -> Void) {
-        Task { @MainActor in completion(.notDetermined) }
+        Task { @MainActor in completion(.authorized) }
     }
     static func requestOrOpenSettings() { openSystemNotificationSettings() }
     static func openSystemNotificationSettings() {
         guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.notifications") else { return }
         NSWorkspace.shared.open(url)
     }
-    static func sendTest() {}
+    static func sendTest() {
+        show(title: "Harness", body: "Notifications are working!")
+    }
+    private static func escape(_ s: String) -> String {
+        s.replacingOccurrences(of: "\\", with: "\\\\")
+         .replacingOccurrences(of: "\"", with: "\\\"")
+    }
 }
 
 enum HarnessPathDisplay {
