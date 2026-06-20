@@ -127,6 +127,48 @@ Jump to the waiting agent with `Cmd+Shift+I`.
 
 Per-agent guides live in [docs/agent-hooks/README.md](docs/agent-hooks/README.md).
 
+## 5a. MCP Server — Let AI Agents Use Harness As A Tool
+
+`harness-mcp` exposes Harness sessions, terminal I/O, files, Git, and the agent board as MCP tools
+so AI agents (Claude Code, Claude Desktop, Cursor, Codex) can control the terminal without shell
+hacks.
+
+Register after installing Harness:
+
+```bash
+harness-cli install-mcp                  # Claude Code + Claude Desktop
+harness-cli install-mcp --claude-code    # Claude Code only  (writes ~/.claude.json user scope)
+harness-cli install-mcp --claude-desktop # Claude Desktop only
+```
+
+By default only read-only tools are exposed. To enable control tools (send keys, run commands,
+write files):
+
+```bash
+HARNESS_MCP_ALLOW_CONTROL=1 harness-mcp
+```
+
+Or add specific tool names to `~/Library/Application Support/Harness/mcp-policy.json`.
+
+## 5b. ACP Agent Chat — Inline AI Chat In The Sidebar
+
+Harness can spawn Claude Code or Codex as an ACP agent and chat with them in the **Agent** sidebar
+tab. The agent streams responses and tool calls, which Harness gates through an approval bar.
+
+```bash
+# 1. Install ACP adapter packages (requires npm)
+harness-cli install-acp              # installs both claude-code-acp and codex-acp
+harness-cli install-acp --claude     # claude-code-acp only
+harness-cli install-acp --codex      # codex-acp only
+
+# 2. In Harness: Settings > Agents > toggle "Chat" on for Claude Code or Codex
+# 3. Click the "Agent" tab in the sidebar
+```
+
+Adapters are the official Zed-sponsored packages `@zed-industries/claude-code-acp` and
+`@zed-industries/codex-acp`. Other agents with built-in `--acp` support (Gemini, Kiro) work
+without an adapter — just toggle "Chat" on in Settings > Agents.
+
 ## 6. Remote Or Headless Daemon
 
 On the remote machine, run `harness-cli doctor` to find the daemon socket path. On your local machine, register it:

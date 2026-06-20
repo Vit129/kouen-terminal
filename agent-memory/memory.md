@@ -1,7 +1,8 @@
 # Memory — harness-terminal
 
 ## Decisions
-- ACP shelved — re-enable when adapters ship with agent CLIs natively
+- ACP enabled (June 2026) — `HARNESS_ACP` flag set in Package.swift; Agent sidebar tab at index 3; adapter binaries `claude-code-acp`/`codex-acp` installed via `harness-cli install-acp`
+- MCP install chain complete — `harness-mcp` is built, bundled in .app, auto-refreshed on launch; register with `harness-cli install-mcp [--claude-code|--claude-desktop|--all]`
 - CWD tracking: daemon polls proc_pidinfo 500ms — no shell integration needed
 - File preview: constraint-based sibling panel, never reparent terminal views
 - ⌘1–9: `selectSession(workspaceID:sessionID:)` — not `selectWorkspace`

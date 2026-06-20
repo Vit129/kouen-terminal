@@ -456,7 +456,26 @@ harness-cli install-hooks claude-code
 harness-cli notify --surface "$HARNESS_SURFACE" --body "Approval required"
 ```
 
-Per-agent guides: [docs/agent-hooks/](docs/agent-hooks/). Daemon hooks (`hooks.json`): `after-new-tab`, `after-new-session`, `after-kill-tab`, `after-split-pane`, `after-kill-pane`, `after-resize-pane`, `pane-exited`, `client-attached`, `client-detached`, `agent-state-changed`, `notification-posted` (full list in [docs/COMMANDS.md](docs/COMMANDS.md)).
+Per-agent guides: [docs/agent-hooks/](docs/agent-hooks/).
+
+**MCP server (`harness-mcp`):** JSON-RPC 2.0 over stdin/stdout. AI agents use Harness as a tool provider — list sessions, send keys, capture panes, read files, git queries, agent board (24+ tools). Direction: *agent → Harness*. Bundled in `Harness.app/Contents/MacOS/harness-mcp`, auto-refreshed on launch by `DaemonLauncher`. Register via:
+
+```bash
+harness-cli install-mcp                  # Claude Code + Claude Desktop
+harness-cli install-mcp --claude-code    # claude mcp add harness <path> -s user → ~/.claude.json
+harness-cli install-mcp --claude-desktop # merges mcpServers.harness into claude_desktop_config.json
+```
+
+Set `HARNESS_MCP_ALLOW_CONTROL=1` to enable control tools (send keys, run commands, write files); default is read-only. Tool list and policy in `mcp-policy.json`.
+
+**ACP agent chat:** Harness can spawn an ACP agent and chat in the **Agent** sidebar tab (index 3). Direction: *Harness → agent*. Uses `Content-Length` framing, same wire format as MCP. Compiled behind `#if HARNESS_ACP` (flag set in `Package.swift`). Adapters: `@zed-industries/claude-code-acp` (binary: `claude-code-acp`) and `@zed-industries/codex-acp` (binary: `codex-acp`). Agents with built-in `--acp` (Gemini, Kiro) need no adapter. Setup:
+
+```bash
+harness-cli install-acp   # npm install -g @zed-industries/claude-code-acp @zed-industries/codex-acp
+# then Settings > Agents > toggle "Chat" on → Agent sidebar tab
+```
+
+PATH resolution in the .app bundle checks Homebrew, npm-global, nvm dirs in addition to system PATH (`resolveBinaryPath()` in `SettingsViewController+Agents.swift`). Key classes: `ACPClient` (actor), `ACPSession` (@MainActor), `AgentChatPanelView` (AppKit), `AgentConfig`/`AgentRegistryStore` (UserDefaults). Daemon hooks (`hooks.json`): `after-new-tab`, `after-new-session`, `after-kill-tab`, `after-split-pane`, `after-kill-pane`, `after-resize-pane`, `pane-exited`, `client-attached`, `client-detached`, `agent-state-changed`, `notification-posted` (full list in [docs/COMMANDS.md](docs/COMMANDS.md)).
 
 **UI:** `SessionCardRowView`, `TabPillView`, **`AgentChipView`** in sidebar/session rows when agent kind is detected or inferred (static chip, not activity-gated), `NotificationBellButton` / `NotificationDropdownPanelView`, `Cmd+Shift+I` jump to notification (skips still-`working` agents). OS banners gated per-event by `notificationEvents` then by `systemNotificationsEnabled`, and presented even in-foreground via `DesktopNotifier`'s `ForegroundPresenter` (`UNUserNotificationCenterDelegate`).
 

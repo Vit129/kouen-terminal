@@ -37,7 +37,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
     /// Wraps the search field so it gets the same radius-7 elevated-surface chrome as
     /// the workspace pill and session cards.
     private let searchContainer = NSView()
-    private let sidebarTabs = NSSegmentedControl(labels: ["Sessions", "Files"], trackingMode: .selectOne, target: nil, action: nil)
+    private let sidebarTabs = NSSegmentedControl(labels: ["Sessions", "Files", "Git", "Agent"], trackingMode: .selectOne, target: nil, action: nil)
 #if HARNESS_ACP
     private let agentChatPanel = AgentChatPanelView()
 #endif
@@ -1153,12 +1153,11 @@ final class HarnessSidebarPanelViewController: NSViewController {
             fileTreeView.isHidden = fileViewerVC.view.isHidden == false
         }
         gitPanelView.isHidden = index != 2
-        // Search/Agent tabs are not in `sidebarTabs` today (only Sessions/Files/Git
-        // are shown) but the views/cases are kept for the shelved ACP agent panel and an
-        // unwired search panel.
-        searchPanelView.isHidden = index != 3
+        // Search panel is intentionally not wired to a tab (index 3 was its placeholder
+        // before Agent was promoted to the tab bar at index 3 in place of it).
+        searchPanelView.isHidden = true
 #if HARNESS_ACP
-        agentChatPanel.isHidden = index != 4
+        agentChatPanel.isHidden = index != 3
 #endif
         switch index {
         case 1:
@@ -1177,15 +1176,11 @@ final class HarnessSidebarPanelViewController: NSViewController {
                 gitPanelView.clearRoot()
             }
         case 3:
-            sectionLabel.stringValue = "SEARCH"
-            sectionLabel.font = HarnessDesign.Typography.sectionLabel
-            if let cwd = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd {
-                searchPanelView.updateRoot(path: cwd)
-            }
-        case 4:
             sectionLabel.stringValue = "AGENT"
             sectionLabel.font = HarnessDesign.Typography.sectionLabel
-            // [ACP SHELVED] connectAgentIfNeeded()
+#if HARNESS_ACP
+            connectAgentIfNeeded()
+#endif
         default:
             // Switching back to Sessions tab: rebuild cache so heightOfRow/viewFor
             // read O(1) cachedSidebarRows if sessions changed while tab was hidden.

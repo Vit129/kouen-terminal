@@ -79,7 +79,8 @@ let platformTargets: [Target] = [
             .product(name: "Sparkle", package: "Sparkle"),
         ],
         path: "Apps/Harness/Sources/HarnessApp",
-        exclude: ["Resources"]
+        exclude: ["Resources"],
+        swiftSettings: [.define("HARNESS_ACP")]
     ),
 ]
 let platformTestTargets: [Target] = [
@@ -175,7 +176,7 @@ let package = Package(
         .target(
             name: "HarnessCore",
             path: "Packages/HarnessCore/Sources/HarnessCore",
-            swiftSettings: strictFoundationSettings
+            swiftSettings: strictFoundationSettings + [.define("HARNESS_ACP")]
         ),
         // Native terminal engine — pure Swift, no external dependencies. Foundation only
         // so it links for headless CLI use and unit tests without a GPU.

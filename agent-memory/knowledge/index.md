@@ -7,7 +7,8 @@
 | ui/appkit-metal.md | AppKit/Metal | CADisplayLink, zPosition, overlay, lifecycle, opacity, layer, preview, transparency, tint, legibility, liquid-glass | 4/0 | Metal surface lifecycle, overlay compositing, compensated NSView preview opacity parity, and window background tint for translucent legibility (CASE-027) |
 | architecture/ipc-architecture.md | IPC/Daemon | socket, codec, binary-frame, security | 1/0 | Unix socket IPC design: framing, hot-path binary frames, security model |
 | ui/split-panes.md | AppKit/UI | NSSplitView, ratio, recursion, reorder, two-axis, split-down, adjustRatio | 4/0 | Split pane management: ratio persistence, infinite-recursion guards, subview reorder, two-axis (Split Right/Split Down) parity (P13) |
-| patterns/acp-client.md | ACP/Agent | JSON-RPC, stdio, shelved, adapter | 0/0 | ACP protocol integration — shelved due to adapter ecosystem immaturity |
+| patterns/acp-client.md | ACP/Agent | JSON-RPC, stdio, adapter, HARNESS_ACP, claude-code-acp, codex-acp, PATH-resolution | 0/0 | ACP protocol integration — active; Agent sidebar tab 3; adapters via harness-cli install-acp; PATH resolution augmented for .app bundle |
+| patterns/mcp-install.md | MCP/Install | harness-mcp, install-mcp, BinaryRefresher, DaemonLauncher, claude-code, claude-desktop | 0/0 | harness-mcp install chain: build in release, bundled in .app, auto-refreshed on launch, register with harness-cli install-mcp |
 | ui/git-panel.md | AppKit/Git | DispatchSource, worktrees, real-time | 1/0 | Git panel with real-time refresh, history click→editor, worktree support |
 | meta/project-history.md | Meta | sprints, releases, architecture | 0/0 | Sprint timeline and architecture decisions from v1.3→v3.0.0 |
 | meta/competitive-position.md | Meta | Supacode, Warp, iTerm2, Ghostty, cmux, gaps, USPs | 0/0 | Competitive analysis: Harness wins/gaps vs market, unique selling points, positioning |

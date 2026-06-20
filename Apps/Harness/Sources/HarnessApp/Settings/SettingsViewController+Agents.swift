@@ -93,7 +93,7 @@ extension SettingsViewController {
         promptBox.alignment = .leading
         promptBox.spacing = 12
 
-        let stack = NSStackView(views: [
+        var views: [NSView] = [
             header,
             notifyGroup,
             deliveryGroup,
@@ -101,7 +101,11 @@ extension SettingsViewController {
             settingsGroup("Detection & hooks", [detectionBox]),
             settingsGroup("Set up via your IDE", [promptBox]),
             settingsGroup("Agents", Self.agentColorKinds.map(agentRow) + [leadingRow(reset)]),
-        ])
+        ]
+#if HARNESS_ACP
+        views.append(buildACPAgentsGroup())
+#endif
+        let stack = NSStackView(views: views)
         stack.orientation = .vertical
         stack.alignment = .width
         stack.spacing = 18
@@ -423,10 +427,34 @@ extension SettingsViewController {
         }
     }
 
-    /// Find the first executable on $PATH from the given list.
+    /// Find the first executable on $PATH plus well-known npm/Homebrew directories.
+    /// macOS .app bundles receive a minimal system PATH — checking extra dirs is required
+    /// to find npm-global binaries like claude-code-acp installed by the user.
     private func resolveBinaryPath(_ executables: [String]) -> String? {
-        let pathDirs = (ProcessInfo.processInfo.environment["PATH"] ?? "")
+        var pathDirs = (ProcessInfo.processInfo.environment["PATH"] ?? "")
             .split(separator: ":").map(String.init)
+        // Supplement with locations apps don't get in their PATH but the user likely has.
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let extras = [
+            "/usr/local/bin",
+            "/opt/homebrew/bin",
+            "/opt/homebrew/sbin",
+            "\(home)/.npm-global/bin",
+            "\(home)/.local/bin",
+            "\(home)/Library/pnpm",
+            "/usr/local/share/npm/bin",
+        ]
+        for extra in extras where !pathDirs.contains(extra) {
+            pathDirs.append(extra)
+        }
+        // Also check common nvm installations (version dirs vary, so try current/default symlinks).
+        let nvmBin = "\(home)/.nvm/versions/node"
+        if let nvmNodes = try? FileManager.default.contentsOfDirectory(atPath: nvmBin) {
+            for node in nvmNodes.sorted().reversed() {
+                let dir = "\(nvmBin)/\(node)/bin"
+                if !pathDirs.contains(dir) { pathDirs.append(dir) }
+            }
+        }
         let fm = FileManager.default
         for exe in executables {
             for dir in pathDirs {
@@ -440,8 +468,8 @@ extension SettingsViewController {
     /// Returns (binary name to search on PATH, args) for ACP mode per agent.
     private func acpBinaryInfo(for kind: AgentKind) -> (String, [String]) {
         switch kind {
-        case .claudeCode: return ("claude-agent-acp", [])
-        case .codex: return ("codex", ["--acp"])
+        case .claudeCode: return ("claude-code-acp", [])
+        case .codex: return ("codex-acp", [])
         case .gemini: return ("gemini", ["--acp"])
         case .antigravity: return ("agy", ["--acp"])
         case .kiro: return ("kiro", ["--acp"])

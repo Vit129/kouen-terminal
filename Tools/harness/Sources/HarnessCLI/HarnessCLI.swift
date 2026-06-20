@@ -189,6 +189,8 @@ struct HarnessCLI {
                 handleInstallTools()
             case "install-mcp":
                 try handleInstallMCP(args)
+            case "install-acp":
+                try handleInstallACP(args)
             case "install-shell-integration":
                 handleInstallShellIntegration(args)
             case "attach":

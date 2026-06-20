@@ -57,6 +57,8 @@ See [USAGE.md](USAGE.md) for the full install, run, CLI, and remote/headless gui
 - Daemon-owned sessions, tabs, panes, scrollback, and layouts so work can survive app restarts and be attached from another client.
 - `harness-cli` automation for creating sessions, sending keys, capturing panes, installing hooks, and driving remote/headless daemons.
 - Agent detection and notifications for Claude Code, Codex, Cursor, Grok, Pi, Hermes, OpenClaw, OpenCode, Aider, Gemini, Goose, and generic agents.
+- `harness-mcp` MCP server — AI agents can use Harness as a tool provider (session control, terminal I/O, file navigation, Git, board) via JSON-RPC 2.0 over stdio.
+- ACP agent chat — run Claude Code or Codex as an inline chat agent in the sidebar Agent tab via the `@zed-industries/claude-code-acp` / `codex-acp` adapters.
 - Optional tmux-style controls: prefix key, status line, copy mode, paste buffers, hooks, command prompt, and many tmux-compatible commands.
 - IDE-like navigation — double-click folders to cd, ⌘P fuzzy jump to any directory via zoxide frecency, ⌘-click file paths, and `:cd` from the command prompt.
 - Sidebar tools for sessions, file navigation with folder cd, real-time Git workflows, command palette, and editor/LSP flows. ⌘-clicking a file path in the terminal opens it in the editor and reveals it in the file tree.
@@ -99,6 +101,33 @@ harness-cli install-hooks codex
 
 More examples are in [USAGE.md](USAGE.md), [docs/COMMANDS.md](docs/COMMANDS.md), and [docs/MULTIPLEXER_GUIDE.md](docs/MULTIPLEXER_GUIDE.md).
 
+## MCP Server
+
+`harness-mcp` is a Model Context Protocol server that lets AI agents use Harness as a tool provider — list sessions, send keys, capture panes, read files, run git queries, and more.
+
+Register it with your agent host after installing Harness:
+
+```bash
+harness-cli install-mcp                  # both Claude Code and Claude Desktop
+harness-cli install-mcp --claude-code    # Claude Code only (writes ~/.claude.json)
+harness-cli install-mcp --claude-desktop # Claude Desktop only
+```
+
+By default only read-only tools are exposed. Set `HARNESS_MCP_ALLOW_CONTROL=1` to enable control tools (send keys, run commands, write files).
+
+## ACP Agent Chat
+
+Harness can run Claude Code or Codex as an inline chat agent in the **Agent** sidebar tab, using the ACP (Agent Client Protocol) — JSON-RPC 2.0 over stdio.
+
+```bash
+# Install adapter packages (requires npm)
+harness-cli install-acp
+
+# Then in Harness: Settings > Agents > toggle "Chat" on for Claude Code or Codex
+```
+
+The Agent tab appears in the sidebar next to Git. Harness spawns the adapter binary, streams responses, and gates tool-call permissions through an approval bar.
+
 ## Remote And Headless
 
 The daemon and CLI can run without the GUI, including on Linux. Register a remote daemon over SSH and use `--host` with normal CLI commands:
@@ -119,7 +148,7 @@ harness-cli capture-pane --host devbox --surface <id>
 | Terminal rendering | CoreText + Metal |
 | IPC | Unix sockets, length-prefixed JSON, binary PTY frames |
 | Scripting | JavaScriptCore |
-| Agent tooling | CLI hooks + `harness-mcp` |
+| Agent tooling | CLI hooks + `harness-mcp` MCP server + ACP agent chat |
 | Platforms | macOS 15+ GUI, macOS/Linux daemon and CLI |
 
 ## Documentation
