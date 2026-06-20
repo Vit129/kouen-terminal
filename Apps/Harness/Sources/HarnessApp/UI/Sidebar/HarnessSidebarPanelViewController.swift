@@ -591,6 +591,138 @@ final class HarnessSidebarPanelViewController: NSViewController {
         updateSidebarToggleMenu()
     }
 
+    @objc private func notificationBellClicked() {
+        showNotificationsDropdown()
+    }
+
+    private var notificationsDropdown: NotificationDropdownPanelView?
+    private var notificationsDropdownMonitor: Any?
+    private weak var notificationsDropdownPreviousResponder: NSResponder?
+
+    func showNotificationsDropdown() {
+        if notificationsDropdown != nil {
+            dismissNotificationsDropdown()
+            return
+        }
+        let coordinator = SessionCoordinator.shared
+        let snapshot = coordinator.snapshot
+        // Agent notifications first, then board error/needs-attention sessions
+        var entries = coordinator.notificationsList()
+        let agentTabIDs = Set(entries.map(\.tabID))
+        for ws in snapshot.workspaces {
+            for session in ws.sessions {
+                for tab in session.tabs {
+                    guard !agentTabIDs.contains(tab.id) else { continue }
+                    let kind = BoardModel.columnKind(for: tab)
+                    guard kind == .needsAttention || kind == .error else { continue }
+                    let body = kind == .error ? "Exit error" : "Needs attention"
+                    let entry = NotificationEntry(
+                        workspaceID: ws.id,
+                        workspaceName: ws.name,
+                        sessionID: session.id,
+                        tabID: tab.id,
+                        tabTitle: tab.title.isEmpty ? tab.cwd : tab.title,
+                        surfaceID: tab.id,
+                        agentKind: tab.effectiveAgentKind,
+                        body: body
+                    )
+                    entries.append(entry)
+                }
+            }
+        }
+        let dropdown = NotificationDropdownPanelView(
+            entries: entries,
+            onSelect: { [weak self] entry in
+                self?.dismissNotificationsDropdown()
+                coordinator.openNotification(entry)
+            },
+            onClearAll: { [weak self] in
+                self?.dismissNotificationsDropdown()
+                coordinator.clearAllNotifications()
+            },
+            onDismiss: { [weak self] in
+                self?.dismissNotificationsDropdown()
+            }
+        )
+        dropdown.alphaValue = 0
+        dropdown.translatesAutoresizingMaskIntoConstraints = true
+        dropdown.layer?.zPosition = 100
+
+        // Float the panel over the window's content view rather than inside the narrow
+        // sidebar: anchored to the sidebar it was clipped at the divider (cut off) and its
+        // body text was squeezed into ~190pt. Hosted on the content view it can use a
+        // comfortable fixed width and overhang the terminal, fully visible. Frame-positioned
+        // just below the bell; it dismisses on any outside click so it needn't track resizes.
+        let host = view.window?.contentView ?? view
+        let width: CGFloat = 300
+        let height = dropdown.preferredHeight
+        // Only anchor to the bell when the sidebar is visible — if the sidebar is hidden the
+        // bell has no real position in the window (coordinates are 0,0) and the panel would
+        // appear off-screen below the window bottom. Fall back to top-left of the content view.
+        let isBellOnScreen = notificationBell.window != nil
+            && !notificationBell.isHiddenOrHasHiddenAncestor
+            && notificationBell.visibleRect != .zero
+        let originX: CGFloat
+        let originY: CGFloat
+        if isBellOnScreen {
+            let bell = host.convert(notificationBell.bounds, from: notificationBell)
+            // minX is the bell's left edge; clamp so the panel never leaves the window.
+            originX = max(8, min(bell.minX, host.bounds.maxX - width - 8))
+            // The content view is not flipped (y grows upward), so the panel sits below the bell
+            // when its top edge is the bell's bottom edge.
+            originY = bell.minY - 6 - height
+        } else {
+            // Sidebar is collapsed: anchor to the top-left of the content view, 8pt from the edge,
+            // just below the title bar (assume ~52pt chrome at the top).
+            originX = 8
+            originY = host.bounds.maxY - 52 - height
+        }
+        dropdown.frame = NSRect(x: originX, y: originY, width: width, height: height)
+        host.addSubview(dropdown)
+        notificationsDropdown = dropdown
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.12
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            dropdown.animator().alphaValue = 1
+        }
+        installNotificationsDropdownMonitor()
+        // Take first responder so arrow keys / Enter / Escape reach the dropdown.
+        // Deferred to the next run-loop turn so the view is fully inserted before
+        // makeFirstResponder fires — same pattern used by picker panels elsewhere.
+        notificationsDropdownPreviousResponder = view.window?.firstResponder
+        DispatchQueue.main.async { [weak self, weak dropdown] in
+            guard let self, let dropdown, dropdown.superview != nil else { return }
+            self.view.window?.makeFirstResponder(dropdown)
+        }
+    }
+
+    private func dismissNotificationsDropdown() {
+        notificationsDropdown?.removeFromSuperview()
+        notificationsDropdown = nil
+        if let monitor = notificationsDropdownMonitor {
+            NSEvent.removeMonitor(monitor)
+            notificationsDropdownMonitor = nil
+        }
+        if let previous = notificationsDropdownPreviousResponder {
+            view.window?.makeFirstResponder(previous)
+            notificationsDropdownPreviousResponder = nil
+        }
+    }
+
+    private func installNotificationsDropdownMonitor() {
+        notificationsDropdownMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            guard let self, let dropdown = self.notificationsDropdown else { return event }
+            let point = dropdown.convert(event.locationInWindow, from: nil)
+            if !dropdown.bounds.contains(point) {
+                let bellPoint = self.notificationBell.convert(event.locationInWindow, from: nil)
+                if !self.notificationBell.bounds.contains(bellPoint) {
+                    self.dismissNotificationsDropdown()
+                }
+            }
+            return event
+        }
+    }
+
     @objc private func agentsButtonClicked() {
         showAgentsInbox()
     }

@@ -43,7 +43,12 @@ final class DaemonClientTests: XCTestCase {
         var addr = sockaddr_un()
         addr.sun_family = sa_family_t(AF_UNIX)
         let sunPathCapacity = MemoryLayout.size(ofValue: addr.sun_path)
-        HarnessPaths.socketURL.path.withCString { cstr in
+        let socketPath = HarnessPaths.socketURL.path
+        let bindSize = socklen_t(MemoryLayout.offset(of: \sockaddr_un.sun_path)! + socketPath.utf8.count + 1)
+        #if canImport(Darwin)
+        addr.sun_len = UInt8(bindSize)
+        #endif
+        socketPath.withCString { cstr in
             withUnsafeMutablePointer(to: &addr.sun_path) { ptr in
                 let dest = UnsafeMutableRawPointer(ptr).assumingMemoryBound(to: CChar.self)
                 strncpy(dest, cstr, sunPathCapacity - 1)
@@ -51,7 +56,7 @@ final class DaemonClientTests: XCTestCase {
         }
         let bindResult = withUnsafePointer(to: &addr) {
             $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-                posixBind(serverFD, $0, socklen_t(MemoryLayout<sockaddr_un>.size))
+                posixBind(serverFD, $0, bindSize)
             }
         }
         XCTAssertEqual(bindResult, 0)
