@@ -673,6 +673,14 @@ private final class BrowserTabButton: NSView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        // CASE-038: NSClickGestureRecognizer intercepts NSButton clicks.
+        // Return the close button directly so it receives the full mouse event.
+        let localToClose = closeBtn.convert(point, from: self)
+        if closeBtn.bounds.contains(localToClose) { return closeBtn }
+        return super.hitTest(point)
+    }
+
     @objc private func selectTapped(_ gesture: NSClickGestureRecognizer) {
         let loc = gesture.location(in: self)
         if closeBtn.frame.contains(loc) { return }
