@@ -254,10 +254,14 @@ public final class TerminalMetalRenderer {
     private let glyphPipeline: MTLRenderPipelineState
     private let decoPipeline: MTLRenderPipelineState
     private let imagePipeline: MTLRenderPipelineState
+    private let overlayPipeline: MTLRenderPipelineState?
     private let sampler: MTLSamplerState
     private let atlas: GlyphAtlas
     private let imageCache: ImageTextureCache
     private let ascentPixels: Int
+    /// Active shader overlay effect: "none" | "scanlines" | "grain" | "vignette" | "crt".
+    public var shaderEffect: String = "none"
+    private var overlaySeed: Float = 0
     /// The render-target pixel format both pipelines are built for.
     public static let pixelFormat: MTLPixelFormat = .rgba8Unorm
 
@@ -355,6 +359,10 @@ public final class TerminalMetalRenderer {
             imagePipeline = try Self.makePipeline(
                 device: device, library: library,
                 vertex: "image_vertex", fragment: "image_fragment", blending: true
+            )
+            overlayPipeline = try? Self.makePipeline(
+                device: device, library: library,
+                vertex: "overlay_vertex", fragment: "overlay_fragment", blending: true
             )
         } catch {
             return nil
@@ -732,6 +740,25 @@ public final class TerminalMetalRenderer {
             frame.images, zBand: .aboveText, encoder: renderEncoder,
             viewport: &vp, ox: ox, oy: oy
         )
+
+        // Overlay effect pass (scanlines / grain / vignette / crt) — fullscreen quad.
+        let overlayMode: UInt32
+        switch shaderEffect {
+        case "scanlines": overlayMode = 1
+        case "grain":     overlayMode = 2
+        case "vignette":  overlayMode = 3
+        case "crt":       overlayMode = 4
+        default:          overlayMode = 0
+        }
+        if overlayMode != 0, let overlayPipeline {
+            overlaySeed = overlaySeed + 1.0
+            // OverlayUniforms layout: viewport(float2), mode(uint), intensity(float), seed(float)
+            // Total 5 × 4 = 20 bytes — aligned to float4 via struct in the shader.
+            var uniforms: (Float, Float, UInt32, Float, Float) = (vp.x, vp.y, overlayMode, 1.0, overlaySeed)
+            renderEncoder.setRenderPipelineState(overlayPipeline)
+            renderEncoder.setFragmentBytes(&uniforms, length: MemoryLayout.stride(ofValue: uniforms), index: 0)
+            renderEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+        }
 
         renderEncoder.endEncoding()
         frameStats.atlasPages = atlas.stats.pages
