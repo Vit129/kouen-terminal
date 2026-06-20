@@ -9,7 +9,7 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [3.5.2] - 2026-06-20
 
 ### Added
-- **4-direction split pane** — split left/right/up/down with `⌘⇧→/←/↑/↓` (WezTerm-style `--left/--right/--top/--bottom` flags in `:split-window`)
+- **Split pane shortcuts** — split right/down with `⌘D`/`⌘⇧D` (`:split-window` supports `--right/--bottom` flags)
 
 ### Fixed
 - **Window not showing on launch** — `HarnessAIChatView` constraint activation order caused NSGenericException (no common ancestor), swallowed by AppKit leaving app running with zero windows
@@ -162,7 +162,7 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 - **`agent_chip` format variable** — new `#{agent_chip}` in status/pane-border format strings returns the 2-letter chip (e.g. `KR`, `CC`) for the active agent.
 
 ### Changed
-- **Welcome banner unified shortcuts** — merged "Try this" and "Native shortcuts" into a single "Shortcuts" section with 11 Harness-native shortcuts (`⌘⇧N`, `⌘⇧→/←/↑/↓`, `⌘P`, `⌘F`, `⌘B`, `⌘;` etc.). Removed all `ctrl-a` prefix references.
+- **Welcome banner unified shortcuts** — merged "Try this" and "Native shortcuts" into a single "Shortcuts" section with Harness-native shortcuts (`⌘⇧N`, `⌘D`, `⌘⇧D`, `⌘P`, `⌘F`, `⌘B`, `⌘;` etc.). Removed all `ctrl-a` prefix references.
 - **`pane-border-format` default** — changed from `#{pane_index} #{pane_title}` to `#{pane_index}`, eliminating tool-injected process names (e.g. `kiro-cli`) from the pane border label. Old value auto-migrated.
 - **Command prompt placeholder** — updated from tmux-style `split-window -h ; copy-mode` to Harness-first `find, grep, cd, rename-window`.
 
