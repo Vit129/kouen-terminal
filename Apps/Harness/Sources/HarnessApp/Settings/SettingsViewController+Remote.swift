@@ -8,12 +8,18 @@ extension SettingsViewController: NSTableViewDataSource, NSTableViewDelegate {
         reloadRemoteHosts(selecting: selectedRemoteHostName)
 
         // Observe connection state changes so status self-corrects after SSH handshake.
-        NotificationCenter.default.removeObserver(self, name: RemoteHostsService.activeHostDidChange, object: nil)
-        NotificationCenter.default.addObserver(forName: RemoteHostsService.activeHostDidChange, object: nil, queue: .main) { [weak self] _ in
+        remoteObservers.forEach { NotificationCenter.default.removeObserver($0) }
+        remoteObservers.removeAll()
+        remoteObservers.append(NotificationCenter.default.addObserver(forName: RemoteHostsService.activeHostDidChange, object: nil, queue: .main) { [weak self] _ in
             guard let self else { return }
             self.reloadRemoteHosts(selecting: self.selectedRemoteHostName)
             self.refreshRemoteStatus()
-        }
+        })
+        remoteObservers.append(NotificationCenter.default.addObserver(forName: RemoteHostsService.connectionDidFail, object: nil, queue: .main) { [weak self] note in
+            guard let self else { return }
+            let msg = (note.userInfo?["error"] as? String) ?? "Connection failed"
+            self.refreshRemoteStatus("⚠️ \(msg)")
+        })
 
         remoteHostsTable.delegate = self
         remoteHostsTable.dataSource = self
@@ -66,7 +72,7 @@ extension SettingsViewController: NSTableViewDataSource, NSTableViewDelegate {
         remotePortField.placeholderString = "22"
         remoteIdentityField.placeholderString = "~/.ssh/id_ed25519"
         remoteJumpHostField.placeholderString = "jump-host"
-        remoteSocketPathField.placeholderString = "~/.harness/harness.sock"
+        remoteSocketPathField.placeholderString = "/home/user/.config/harness/harness.sock"
 
         let identityBrowse = NSButton(title: "…", target: self, action: #selector(chooseRemoteIdentityFile))
         identityBrowse.bezelStyle = .rounded

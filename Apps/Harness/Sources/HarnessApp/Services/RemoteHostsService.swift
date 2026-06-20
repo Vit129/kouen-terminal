@@ -8,6 +8,7 @@ import HarnessCore
 final class RemoteHostsService: @unchecked Sendable {
     static let shared = RemoteHostsService()
     static let activeHostDidChange = Notification.Name("HarnessRemoteActiveHostDidChange")
+    static let connectionDidFail = Notification.Name("HarnessRemoteConnectionDidFail")
 
     private let store = RemoteHostStore()
     private let lock = NSLock()
@@ -32,7 +33,13 @@ final class RemoteHostsService: @unchecked Sendable {
             didChange = true
         }
         lock.unlock()
-        if didChange { Self.postActiveHostDidChange() }
+        if didChange {
+            // Switch the GUI back to the local daemon — the tunnel is gone.
+            DispatchQueue.main.async {
+                SessionCoordinator.shared.applyEndpointSwitch(.localControlSocket)
+            }
+            Self.postActiveHostDidChange()
+        }
     }
 
     /// Bring up (or reuse) the tunnel to `name` and return the local endpoint that reaches it.

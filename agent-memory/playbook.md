@@ -1,49 +1,94 @@
 # Playbook — Problem Resolution Cases
 
-<!-- Flat table. Search by domain or trigger keywords at session start. -->
-<!-- Sequential IDs: CASE-001, CASE-002, etc. -->
-<!-- Max 120 chars per field. Archive rule: zero Applied+Prevented after 30 days → move to completed-archive.md -->
-<!-- Promote rule: recurring pattern (Applied 2+) → agent-memory/knowledge/*.md -->
+<!-- Search by domain or trigger keywords. Sequential IDs. -->
+<!-- Archive rule: zero Applied+Prevented after 30 days → completed-archive.md -->
+<!-- Promote rule: Applied 2+ → agent-memory/knowledge/*.md -->
 
-| ID | Trigger | Fix | Domain | Outcome | Applied | Prevented |
-|----|---------|-----|--------|---------|---------|-----------|
-| CASE-001 | NSButton checkbox inside NSStackView inside NSScrollView not receiving clicks in Git sidebar panel | Remove FlippedView scroll-wrapper; use custom FlippedStackView directly as documentView to fix Auto Layout constraints. | AppKit/UI | RESOLVED | 1 | 0 |
-| CASE-002 | NSSplitView subviews collapsing to 0 size (hidden left/bottom splits) and custom ratios lost on rebuild | Set subviews `autoresizingMask = [.width, .height]`; store ratio in HarnessSplitView and setPosition on first layout pass with non-zero frame, setting appliedRatio flag *before* calling setPosition to prevent recursive stack overflow. | AppKit/UI | RESOLVED | 1 | 0 |
-| CASE-003 | Terminal (Metal/CADisplayLink) goes black after pane tree rebuild (removeFromSuperview + re-add in same window) | Override `viewDidMoveToSuperview()` in HarnessTerminalSurfaceView: if window != nil, stop+start display link + scheduleRender. | AppKit/Metal | RESOLVED | 4 | 0 |
-| CASE-004 | Overlay NSView above Metal terminal surface not visible (zPosition, addSubview positioned:above) | Metal CALayer composites above all sibling layers regardless of zPosition. Use HitTestPassthroughView with layer?.zPosition=1000 — works for small overlays but full-frame overlay blocks Metal render. | AppKit/Metal | WORKAROUND | 1 | 0 |
-| CASE-005 | NSButton with .recessed bezelStyle shows white background in dark theme | Use .inline bezelStyle + isBordered=false + manual layer?.backgroundColor for dark pill appearance. | AppKit/UI | RESOLVED | 1 | 0 |
-| CASE-006 | NSSplitView.setPosition in layout() causes infinite recursion when N>2 subviews | Add `isApplyingPositions` bool guard — set true before loop, check at entry. `appliedRatio` alone insufficient because setPosition triggers layout for each divider. | AppKit/UI | RESOLVED | 1 | 0 |
-| CASE-007 | NSSplitView subview reorder via removeFromSuperview+addSubview causes window collapse/black | Remove only the view being moved, reinsert with `addSubview(_:positioned:relativeTo:)`, restore frames after reinsert, call `adjustSubviews()`. Never remove both subviews simultaneously. | AppKit/UI | RESOLVED | 1 | 0 |
-| CASE-008 | NSApp.keyWindow nil when menu action triggered via AppleScript (process not frontmost) | Use `NSApp.keyWindow ?? NSApp.mainWindow` fallback in menu target handlers. | AppKit/UI | RESOLVED | 1 | 0 |
-| CASE-009 | Git panel not updating in real-time (only refreshes on sidebar tab switch) | Add DispatchSource.makeFileSystemObjectSource watching `.git` dir with 500ms debounce → auto-refresh on commit/stage/checkout. | AppKit/Git | RESOLVED | 1 | 0 |
-| CASE-010 | NSFont has no `.italicSystemFont` (unlike UIFont) | Use `NSFontManager.shared.convert(.systemFont(ofSize:), toHaveTrait: .italicFontMask)` instead. | AppKit/UI | RESOLVED | 1 | 0 |
-| CASE-011 | AnyCodable has no subscript operator — can't chain `dict["key"]?["nested"]` | Pattern-match each level: `if case let .object(inner) = dict["key"], case let .string(v) = inner["nested"]`. | Swift/Types | RESOLVED | 1 | 0 |
-| CASE-012 | File preview causes 1-2s black screen on open/close (Metal surface dies) | Don't reparent terminal views into NSSplitView. Use constraint-based sibling panel: add editor as sibling, shift terminalHost.leadingAnchor. | AppKit/Metal | RESOLVED | 1 | 0 |
-| CASE-013 | Swift 6 crash: MainActor.assumeIsolated inside DispatchQueue.main.async | Replace `DispatchQueue.main.async { MainActor.assumeIsolated {} }` with `Task { @MainActor in }`. For DispatchSource, use `.main` queue directly. | Swift/Concurrency | RESOLVED | 3 | 0 |
-| CASE-014 | NSSplitView.setPosition fails when bounds.width==0 (view not yet laid out) | Use DispatchQueue.main.async with retry after 50ms if bounds still zero. Or use constraint multiplier instead of setPosition. | AppKit/UI | RESOLVED | 1 | 0 |
-| CASE-015 | File tree 3s polling causes unnecessary CPU + flicker | Remove polling task; FSEvents watcher with 500ms debounce is sufficient. Reconcile nodes in-place to preserve expand/collapse state. | AppKit/Perf | RESOLVED | 1 | 0 |
-| CASE-016 | File tree doesn't update real-time for nested file add/delete | FileTreeWatcher watched `.git` only — DispatchSource is non-recursive. Replace with FSEventStreamCreate on rootPath. Use WatcherContext + Unmanaged.passRetained for @convention(c) callback inside Swift actor. | AppKit/FSEvents | RESOLVED | 1 | 0 |
-| CASE-017 | Folder expand state resets after every file tree refresh | @State private var isExpanded in NodeRow resets on view recreation. Move isExpanded to @Observable FileTreeNode — survives reconcile because existing objects are reused by ID. | SwiftUI/State | RESOLVED | 1 | 0 |
-| CASE-018 | File preview drag-to-select text broken | SyntaxTextView.mouseDown calls super.mouseDown (NSView) — never reaches NSTextView. Override mouseDown/mouseDragged/mouseUp and forward all three to textView directly. | AppKit/UI | RESOLVED | 1 | 0 |
-| CASE-019 | Terminal selection highlight invisible | FrameBuilder.init(theme:) passes selectionBackground/selectionForeground as nil — renderer falls back to canvasForeground making selection same color as text. Fix: selectionBackground ?? theme.selectionBackground in convenience init. | Terminal/Renderer | RESOLVED | 1 | 0 |
-| CASE-020 | Branch chip shows stale branch after git checkout | refreshGitBranch() reads SessionCoordinator snapshot (stale). FSEvents onChange fires loadRoot() but never refreshGitBranch(). Fix: run git rev-parse --abbrev-ref HEAD at end of loadRoot() and set gitBranch directly. | AppKit/Git | RESOLVED | 1 | 0 |
-| CASE-021 | Git Changes panel doesn't update real-time on file edit/create/delete | GitPanelView.startWatching() used DispatchSource on .git only — doesn't see working tree changes. Replace with FSEventStreamCreate on rootPath (same WatcherContext pattern as FileTreeWatcher). | AppKit/Git | RESOLVED | 1 | 0 |
-| CASE-022 | File Preview (editor tab + sidebar viewer) doesn't update after the previewed file changes on disk | No file watcher existed — load(path:) was one-shot. Added FileChangeWatcher (single-file DispatchSource.makeFileSystemObjectSource, O_EVTONLY, 0.3s debounce) wired into both views' load(); reused QLPreviewView calls refreshPreviewItem(). | AppKit/UI | RESOLVED | 1 | 0 |
-| CASE-023 | Terminal shows interleaved/garbled fragments of two unrelated TUI status messages in the same rows (e.g. agentic CLI status box) | resetForShellPrompt() (fired on OSC 133;D) was clearing modes.synchronizedOutput, which can fire from a sub-command's shell integration while an outer ?2026h redraw batch is still open — renderer presentNow()'d a half-applied frame. Fix: leave synchronizedOutput untouched in resetForShellPrompt(); rely on existing 150ms sync-timeout safety valve. | Terminal/Renderer | RESOLVED | 1 | 0 |
-| CASE-024 | Sidebar permanently disappears after collapse-then-expand when "Always collapse sidebar on launch" is enabled | MainSplitViewController forced visual collapse on launch but left settings.sidebarVisible=true (stale from prior session); first toggleSidebar() computed !true=false → no-op collapse instead of expand. Fix: set settings.sidebarVisible=false when forcing collapse on launch, in sync with the visual state. | AppKit/UI | RESOLVED | 1 | 0 |
-| CASE-025 | Terminal view blinks/flickers when file preview pane is opened or closed | Programmatic layout changes (split open/close) resize terminal view outside live window resize. Fix: temporarily set `presentsWithTransaction = true` inside `layout()` if bounds size changed, forcing rendering to sync with the main CATransaction. | AppKit/Metal | RESOLVED | 1 | 0 |
-| CASE-026 | New terminal session occasionally shows black screen (no shell prompt) | Race condition: view added to superview before window attaches → `viewDidMoveToSuperview` skips `startDisplayLink` (window==nil). `viewDidMoveToWindow` called later but `startDisplayLink` has `guard renderLink == nil` → no-op if partial state. Fix: always `stop+start` display link in `viewDidMoveToWindow`. | AppKit/Metal | RESOLVED | 1 | 0 |
-| CASE-027 | Translucent window shows unreadable text when content behind is bright (pure .clear background) | `window.backgroundColor = .clear` gives no legibility floor. Replace with `window.backgroundColor = themeColor.withAlphaComponent(max(opacity, 0.15))` — 15% tint floor ensures text contrast regardless of backdrop. CGS blur still applies on top. Drop window shadow while translucent (dark band at corners). | AppKit/UI | RESOLVED | 1 | 0 |
-| CASE-028 | async syncFromDaemon does not prune dead TerminalHostViews — Metal surfaces accumulate for app lifetime | Async variant was missing `terminalHosts.prune(keeping: live)` that the sync variant has inside `if structureChanged`. scheduleSnapshotRefresh always uses the async path, so every daemon revision push skipped the prune. Fix: add identical prune block to the async variant. | AppKit/Memory | RESOLVED | 1 | 0 |
-| CASE-029 | Sidebar expand chevron disappears when rotated inside `NSStackView`, or when a single-session group header is hidden until the group grows | Render the chevron as symbol state (`chevron.right` / `chevron.down`) instead of `frameCenterRotation`, and keep the `SessionGroup` header visible from the first row so the expand target and project anchor stay stable. | AppKit/UI | RESOLVED | 1 | 0 |
-| CASE-030 | Multiple sessions on the same branch are hidden/collapsed in the sidebar, and terminal session switches do not sync the selected row of the sidebar session list. | Remove allSameBranch checks in `rebuildSidebarRows()`; call `selectActiveSessionRowIfVisible(scroll: false)` inside `refreshMetadata()`; call `refreshGitBranch()` inside `loadRoot()`. | AppKit/UI | RESOLVED | 1 | 0 |
+## AppKit / UI
 
-| CASE-031 | App crash (EXC_BAD_ACCESS) during rapid session close/create — CADisplayLink fires on deallocated HarnessTerminalSurfaceView | macOS `NSView.displayLink(target:selector:)` does NOT strongly retain the target (unlike iOS CADisplayLink). If `viewDidMoveToWindow(nil)` races or is skipped, the display link fires on a dangling pointer. Fix: add `deinit { renderLink?.invalidate(); blinkTimer?.invalidate() }` as safety net. Mark both properties `nonisolated(unsafe)` for deinit access. | AppKit/Metal | RESOLVED | 1 | 0 |
-| CASE-032 | `FileTreeSwiftUIView` crash (EXC_BAD_ACCESS in swift_getObjectType) when switching sessions or opening new tab | `WorkspaceFileTreeView.updateRoot` previously replaced `hostingView.rootView` with a new struct; mid-layout-pass replacement left AttributeGraph with a stale `@Observable` reference. Switched to `FileTreeContext` (`@Observable` class) + `@Bindable var context` in the SwiftUI view. `@Bindable` ensures SwiftUI holds a strong reference to the context object throughout the render cycle. Using `let context` (without `@Bindable`) is insufficient — SwiftUI does not track `@Observable` objects declared as plain `let`. | SwiftUI/AppKit | RESOLVED | 1 | 0 |
-| CASE-033 | Tool-injected process names (e.g. `kiro-cli-term`) appear as OSC 2 title in sidebar session cards and pane border | Kiro CLI sets terminal title via OSC 2 to `zsh (kiro-cli-term)` which gets stored as `tab.title`. Fix: strip ` (kiro-cli…)` suffix in daemon `updateTabTitle` handler before storing. Also change `pane-border-format` default from `#{pane_index} #{pane_title}` to `#{pane_index}` (add old value to `supersededDefaults` for auto-migration). | Daemon/IPC | RESOLVED | 1 | 0 |
-| CASE-035 | NSAlert Enter key always fires first button (Close Session) even when Cancel has Tab focus ring | NSAlert auto-assigns `keyEquivalent = "\r"` to first `addButton`. Fix: set `buttons[0].keyEquivalent = ""` and `buttons[1].keyEquivalent = ""` on all destructive close dialogs. Space activates focused button. | AppKit/UI | RESOLVED | 1 | 0 |
-| CASE-036 | Command Prompt (⌘;) cannot receive keyboard input or be dismissed with Escape | `CommandPromptController` builds a borderless `NSPanel` directly — borderless panels return `canBecomeKey = false` by default. Fix: use `KeyablePanel` subclass with `override var canBecomeKey: Bool { true }`. | AppKit/UI | RESOLVED | 1 | 0 || CASE-037 | SyntaxTextView mouseUp causes stack overflow (71K frames of `forwardMethod` recursion) | Parent NSView forwarding mouseUp to child NSTextView creates responder-chain loop. Fix: remove mouseUp/mouseDragged forwarding — NSTextView's mouseDown tracking loop handles them internally. | AppKit/UI | RESOLVED | 1 | 0 |
-| CASE-023 | Keybinding displayed in banner/docs doesn't match actual menu binding (⌘⇧N vs ⌘T) | Centralize keybindings in `BannerShortcutRegistry.Keybinding` struct — menu, banner, onboarding derive from it. Never hardcode shortcuts in multiple places. | Architecture | RESOLVED | 1 | 0 |
-| CASE-038 | NSClickGestureRecognizer on parent view intercepts NSButton clicks in BrowserTabButton | Check click location in gesture handler — return early if in close button frame. If still broken: use mouseUp override instead of gesture. | AppKit/UI | OPEN | 0 | 0 |
-| CASE-039 | NSTrackingArea on superview with owner:self crashes on pane tree rebuild (zombie view) | Store weak ref to parent (`paneTrackingOwner`), remove tracking area in `viewDidMoveToSuperview` when superview=nil. Use `.inVisibleRect` + `rect:.zero`. Guard mouseEntered/Exited with `window != nil`. | AppKit/UI | RESOLVED | 1 | 0 |
-| CASE-040 | RL-040 zombie crashes: layout()/resetCursorRects()/mouseMoved()/sendEvent() crash in swift_getObjectType via @objc thunk on macOS 26/Swift 6.3.2 | Multi-pronged: (1) stopDisplayLink() in viewWillMove(toWindow:nil), (2) static retiredBars[] hold on TerminalTabBarView, (3) static retiredWindows[] hold on HarnessWindow.close(), (4) nonisolated(unsafe) capture in PrefixKeymap monitor to bypass _checkExpectedExecutor. `nonisolated` on @MainActor class override does NOT suppress @objc thunk executor check. | AppKit/Metal/Swift6 | RESOLVED | 6 | 0 |
+| ID | Trigger | Fix | Outcome | Applied |
+|----|---------|-----|---------|---------|
+| CASE-001 | NSButton checkbox not receiving clicks inside NSScrollView | Remove FlippedView scroll-wrapper; use FlippedStackView as documentView | RESOLVED | 1 |
+| CASE-002 | NSSplitView subviews collapse to 0 / custom ratios lost | `autoresizingMask = [.width, .height]`; store ratio, setPosition on first non-zero layout | RESOLVED | 1 |
+| CASE-005 | NSButton .recessed bezelStyle shows white in dark theme | Use .inline + isBordered=false + manual layer?.backgroundColor | RESOLVED | 1 |
+| CASE-006 | NSSplitView.setPosition in layout() infinite recursion (N>2) | `isApplyingPositions` bool guard | RESOLVED | 1 |
+| CASE-007 | NSSplitView subview reorder causes window collapse/black | Only remove the moved view; reinsert with addSubview(_:positioned:relativeTo:) | RESOLVED | 1 |
+| CASE-008 | NSApp.keyWindow nil in menu action (AppleScript) | `keyWindow ?? mainWindow ?? windows.first(where:)` fallback chain | RESOLVED | 1 |
+| CASE-010 | NSFont has no `.italicSystemFont` | `NSFontManager.shared.convert(font, toHaveTrait: .italicFontMask)` | RESOLVED | 1 |
+| CASE-014 | NSSplitView.setPosition fails when bounds.width==0 | DispatchQueue.main.async retry, or use constraint multiplier | RESOLVED | 1 |
+| CASE-018 | File preview drag-to-select broken | Forward mouseDown/mouseDragged/mouseUp to textView directly | RESOLVED | 1 |
+| CASE-024 | Sidebar disappears after collapse+expand on launch | Set `settings.sidebarVisible=false` when forcing collapse | RESOLVED | 1 |
+| CASE-027 | Translucent window unreadable on bright background | `themeColor.withAlphaComponent(max(opacity, 0.15))` floor + drop shadow | RESOLVED | 1 |
+| CASE-029 | Sidebar chevron disappears on rotation/hide | Symbol state (`chevron.right`/`.down`) instead of frameCenterRotation | RESOLVED | 1 |
+| CASE-030 | Multiple sessions hidden; sidebar doesn't sync selection | Remove allSameBranch; call selectActiveSessionRow in refreshMetadata | RESOLVED | 1 |
+| CASE-035 | NSAlert Enter fires Close (destructive) even with Cancel focused | Clear `buttons[0].keyEquivalent = ""`; Space activates focused | RESOLVED | 1 |
+| CASE-036 | Command Prompt (⌘;) can't receive keyboard input | Borderless NSPanel `canBecomeKey=false` default — use KeyablePanel subclass | RESOLVED | 1 |
+| CASE-037 | SyntaxTextView mouseUp stack overflow (71K frames) | Remove mouseUp/mouseDragged forwarding — NSTextView handles internally | RESOLVED | 1 |
+| CASE-038 | NSClickGestureRecognizer intercepts NSButton clicks | Check click location in handler; use mouseUp override if needed | OPEN | 0 |
+| CASE-039 | NSTrackingArea on superview crashes on pane rebuild | Remove in viewDidMoveToSuperview(nil); use .inVisibleRect + rect:.zero | RESOLVED | 1 |
+
+## AppKit / Metal / Display Link
+
+| ID | Trigger | Fix | Outcome | Applied |
+|----|---------|-----|---------|---------|
+| CASE-003 | Terminal goes black after pane rebuild (remove+re-add) | stop+start display link in `viewDidMoveToSuperview()` if window!=nil | RESOLVED | 4 |
+| CASE-004 | Overlay NSView above Metal surface not visible | zPosition=1000 on overlay layer (full-frame blocks Metal) | WORKAROUND | 1 |
+| CASE-012 | File preview causes 1-2s black screen (Metal dies on reparent) | Constraint-based sibling panel, never reparent terminal views | RESOLVED | 1 |
+| CASE-025 | Terminal flickers on file preview open/close | `presentsWithTransaction = true` during programmatic resize | RESOLVED | 1 |
+| CASE-026 | New session occasionally shows black (no prompt) | Always stop+start display link in viewDidMoveToWindow | RESOLVED | 1 |
+| CASE-028 | Metal surfaces accumulate (async sync skips prune) | Add `terminalHosts.prune(keeping:)` to async syncFromDaemon variant | RESOLVED | 1 |
+| CASE-031 | Crash: CADisplayLink fires on deallocated surface | `deinit { renderLink?.invalidate() }` — macOS doesn't retain target | RESOLVED | 1 |
+
+## Swift 6 / Concurrency / RL-040
+
+| ID | Trigger | Fix | Outcome | Applied |
+|----|---------|-----|---------|---------|
+| CASE-013 | MainActor.assumeIsolated inside DispatchQueue.main.async | `Task { @MainActor in }` or `.main` queue directly | RESOLVED | 3 |
+| CASE-032 | SwiftUI crash (swift_getObjectType) on session switch | `@Observable` class + `@Bindable var` — never replace rootView struct mid-layout | RESOLVED | 1 |
+| CASE-040 | RL-040 zombie crashes: layout/resetCursorRects/mouseMoved/sendEvent | Multi-pronged: stopDisplayLink in viewWillMove, retiredBars[] hold on TabBar, retiredWindows[] on Window.close(), nonisolated(unsafe) in PrefixKeymap. **`nonisolated` does NOT suppress @objc thunk executor check on Swift 6.3.2.** | RESOLVED | 6 |
+
+## Git / File System
+
+| ID | Trigger | Fix | Outcome | Applied |
+|----|---------|-----|---------|---------|
+| CASE-009 | Git panel not updating in real-time | DispatchSource on `.git` dir + 500ms debounce | RESOLVED | 1 |
+| CASE-015 | File tree 3s polling wastes CPU | FSEvents watcher + reconcile in-place (preserve expand state) | RESOLVED | 1 |
+| CASE-016 | Nested file add/delete not detected | FSEventStreamCreate on rootPath (recursive); Unmanaged for @convention(c) | RESOLVED | 1 |
+| CASE-020 | Branch chip stale after git checkout | Run git rev-parse at end of loadRoot() | RESOLVED | 1 |
+| CASE-021 | Git Changes panel not real-time | FSEventStreamCreate on rootPath (same WatcherContext pattern) | RESOLVED | 1 |
+| CASE-022 | File preview doesn't update on disk change | FileChangeWatcher (single-file DispatchSource, 0.3s debounce) | RESOLVED | 1 |
+
+## Terminal / Renderer / Daemon
+
+| ID | Trigger | Fix | Outcome | Applied |
+|----|---------|-----|---------|---------|
+| CASE-011 | AnyCodable no subscript for nested access | Pattern-match: `if case let .object(inner) = dict["key"]` | RESOLVED | 1 |
+| CASE-017 | Folder expand state resets on refresh | Move isExpanded to @Observable FileTreeNode (survives reconcile) | RESOLVED | 1 |
+| CASE-019 | Terminal selection highlight invisible | Pass selectionBackground from theme in FrameBuilder.init | RESOLVED | 1 |
+| CASE-023 | Garbled TUI (interleaved status fragments) | Don't clear synchronizedOutput in resetForShellPrompt; use 150ms timeout | RESOLVED | 1 |
+| CASE-033 | Tool-injected names appear as OSC 2 title | Strip suffix in daemon updateTabTitle; change pane-border-format default | RESOLVED | 1 |
+
+## Architecture / Keybindings
+
+| ID | Trigger | Fix | Outcome | Applied |
+|----|---------|-----|---------|---------|
+| CASE-034 | Keybinding in banner doesn't match menu binding | Centralize in `BannerShortcutRegistry.Keybinding` struct — single source of truth | RESOLVED | 1 |
+
+## Remote SSH (P23)
+
+| ID | Trigger | Fix | Outcome | Applied |
+|----|---------|-----|---------|---------|
+| CASE-041 | hitTest() on WindowTitleStripView swallows remoteBadge clicks | Check subviews for NSButton hits before returning self | RESOLVED | 1 |
+| CASE-042 | saveRemoteHostClicked rename silently overwrites existing host | Add duplicate-name check; reconnect if renaming active host | RESOLVED | 1 |
+| CASE-043 | connectRemoteHostClicked persists form values over saved config | Only addHost for brand-new (unsaved) hosts; existing hosts use stored config | RESOLVED | 1 |
+| CASE-044 | sshArgValue(after:) fails for glued arg form (-p2222) | Use hasPrefix matching + dropFirst as fallback after exact-token match | RESOLVED | 1 |
+| CASE-045 | Connect button disabled for unsaved new hosts | Enable when form is filled (name+target+socket) even without selection | RESOLVED | 1 |
+| CASE-046 | Settings VC never observes connection state changes | Add activeHostDidChange + connectionDidFail observers (stored tokens) | RESOLVED | 1 |
+| CASE-047 | Observer leak in buildRemotePage (block observer accumulates) | Store token in array; remove all old tokens before adding new ones | RESOLVED | 1 |
+| CASE-048 | Socket path placeholder suggests tilde (SSH doesn't expand ~) | Show absolute path: `/home/user/.config/harness/harness.sock` | RESOLVED | 1 |
+| CASE-049 | Concurrent connectToRemote calls → orphaned SSH processes | `isConnectingRemote` flag guards against concurrent spawns | RESOLVED | 1 |
+| CASE-050 | removeHost of active host leaves GUI on dead socket | Call `applyEndpointSwitch(.localControlSocket)` when active host removed | RESOLVED | 1 |
+| CASE-051 | Connect failure leaves status stuck on "Connecting…" | Post `connectionDidFail` notification with error; Settings shows ⚠️ msg | RESOLVED | 1 |
+| CASE-052 | disconnect() posts notification even when already nil | Guard: `guard let name else { return }` | RESOLVED | 1 |
+| CASE-053 | buildRemotePage width constraints accumulate on every visit | Guard: `if remoteNameField.constraints.isEmpty` before activating | RESOLVED | 1 |
+| CASE-054 | Hardcoded page index 6 for Remote settings | `SettingsWindowController.pageRemote` named constant | RESOLVED | 1 |

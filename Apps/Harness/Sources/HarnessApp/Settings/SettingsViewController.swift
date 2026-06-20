@@ -114,6 +114,7 @@ final class SettingsViewController: NSViewController, NSFontChanging {
     let remoteDisconnectButton = NSButton(title: "Disconnect", target: nil, action: nil)
     var remoteHosts: [RemoteHost] = []
     var selectedRemoteHostName: String?
+    var remoteObservers: [Any] = []
     let pageContainer = NSView()
     var pages: [Int: NSView] = [:]
     var currentPage: Int = 0
