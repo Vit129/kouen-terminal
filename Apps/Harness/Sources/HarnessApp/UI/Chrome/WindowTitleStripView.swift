@@ -10,6 +10,7 @@ final class WindowTitleStripView: NSView {
     private let folderIcon = NSImageView()
     private let label = NSTextField(labelWithString: "")
     private let previewBadge = NSTextField(labelWithString: "")
+    private let remoteBadge = NSButton(title: "Local", target: nil, action: nil)
     private let stack = NSStackView()
     /// Base left padding for the readout; the traffic-light inset is added on top while
     /// the sidebar is collapsed (the lights then sit over the strip's left edge).
@@ -48,6 +49,8 @@ final class WindowTitleStripView: NSView {
         stack.addArrangedSubview(folderIcon)
         stack.addArrangedSubview(label)
         addSubview(stack)
+        configureRemoteBadge()
+        addSubview(remoteBadge)
         addSubview(previewBadge)
 
         let leading = stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: basePadding)
@@ -55,7 +58,9 @@ final class WindowTitleStripView: NSView {
         NSLayoutConstraint.activate([
             leading,
             stack.centerYAnchor.constraint(equalTo: centerYAnchor),
-            stack.trailingAnchor.constraint(lessThanOrEqualTo: previewBadge.leadingAnchor, constant: -12),
+            stack.trailingAnchor.constraint(lessThanOrEqualTo: remoteBadge.leadingAnchor, constant: -12),
+            remoteBadge.centerYAnchor.constraint(equalTo: centerYAnchor),
+            remoteBadge.trailingAnchor.constraint(equalTo: previewBadge.leadingAnchor, constant: -8),
             previewBadge.centerYAnchor.constraint(equalTo: centerYAnchor),
             previewBadge.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -14),
             previewBadge.widthAnchor.constraint(lessThanOrEqualToConstant: 520),
@@ -63,11 +68,22 @@ final class WindowTitleStripView: NSView {
             folderIcon.heightAnchor.constraint(equalToConstant: 16),
         ])
         configurePreviewBadge()
+        refreshRemoteBadge()
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(remoteHostDidChange),
+            name: RemoteHostsService.activeHostDidChange,
+            object: nil
+        )
         applyColors()
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
 
     override func hitTest(_ point: NSPoint) -> NSView? {
         if let _ = super.hitTest(point) {
@@ -125,6 +141,54 @@ final class WindowTitleStripView: NSView {
         folderIcon.contentTintColor = c.textSecondary
         label.textColor = c.textSecondary
         previewBadge.textColor = c.textTertiary
+        remoteBadge.contentTintColor = c.textSecondary
+        remoteBadge.layer?.backgroundColor = c.surfaceElevated.cgColor
+        remoteBadge.layer?.borderColor = c.border.cgColor
+    }
+
+    private func configureRemoteBadge() {
+        remoteBadge.bezelStyle = .shadowlessSquare
+        remoteBadge.isBordered = false
+        remoteBadge.font = .systemFont(ofSize: 11, weight: .medium)
+        remoteBadge.image = NSImage(systemSymbolName: "network", accessibilityDescription: "Remote")
+        remoteBadge.imagePosition = .imageLeading
+        remoteBadge.target = self
+        remoteBadge.action = #selector(remoteBadgeClicked)
+        remoteBadge.toolTip = "Remote daemon"
+        remoteBadge.wantsLayer = true
+        remoteBadge.layer?.cornerRadius = 6
+        remoteBadge.layer?.cornerCurve = .continuous
+        remoteBadge.layer?.borderWidth = 1
+        remoteBadge.contentTintColor = .secondaryLabelColor
+        remoteBadge.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            remoteBadge.heightAnchor.constraint(equalToConstant: 22),
+            remoteBadge.widthAnchor.constraint(greaterThanOrEqualToConstant: 72),
+        ])
+    }
+
+    @objc private func remoteHostDidChange() {
+        refreshRemoteBadge()
+    }
+
+    func refreshRemoteBadge() {
+        if let active = RemoteHostsService.shared.activeHostName {
+            remoteBadge.title = active
+            remoteBadge.toolTip = "Connected to \(active). Click to disconnect."
+            remoteBadge.contentTintColor = HarnessChrome.current.accent
+        } else {
+            remoteBadge.title = "Local"
+            remoteBadge.toolTip = "Using local daemon"
+            remoteBadge.contentTintColor = HarnessChrome.current.textSecondary
+        }
+    }
+
+    @objc private func remoteBadgeClicked() {
+        if RemoteHostsService.shared.activeHostName != nil {
+            SessionCoordinator.shared.disconnectRemote()
+        } else {
+            SettingsWindowController.show(page: 6)
+        }
     }
 
     private func configurePreviewBadge() {

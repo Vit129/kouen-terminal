@@ -102,6 +102,18 @@ final class SettingsViewController: NSViewController, NSFontChanging {
     let notificationTestButton = NSButton(title: "Send Test Notification", target: nil, action: nil)
     let notificationPermissionButton = NSButton(title: "Open System Settings…", target: nil, action: nil)
     let notificationStatusField = NSTextField(labelWithString: "")
+    let remoteHostsTable = NSTableView()
+    let remoteHostsStatusField = NSTextField(labelWithString: "")
+    let remoteNameField = HarnessTextField()
+    let remoteSSHTargetField = HarnessTextField()
+    let remotePortField = HarnessTextField()
+    let remoteIdentityField = HarnessTextField()
+    let remoteJumpHostField = HarnessTextField()
+    let remoteSocketPathField = HarnessTextField()
+    let remoteConnectButton = NSButton(title: "Connect", target: nil, action: nil)
+    let remoteDisconnectButton = NSButton(title: "Disconnect", target: nil, action: nil)
+    var remoteHosts: [RemoteHost] = []
+    var selectedRemoteHostName: String?
     let pageContainer = NSView()
     var pages: [Int: NSView] = [:]
     var currentPage: Int = 0
@@ -572,6 +584,7 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         pages[3] = buildKeysPage()
         pages[4] = buildAgentsPage()
         pages[5] = buildAdvancedPage()
+        pages[6] = buildRemotePage()
     }
 
     fileprivate func showPage(_ index: Int) {
@@ -581,6 +594,7 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         // re-fetches live option values): a daemon that was down when Settings opened may be back,
         // and vice-versa. The other pages are static enough to stay cached.
         if index == 5 { pages[5] = buildAdvancedPage() }
+        if index == 6 { pages[6] = buildRemotePage() }
         guard let page = pages[index] else { return }
         page.translatesAutoresizingMaskIntoConstraints = false
         pageContainer.addSubview(page)
@@ -605,6 +619,7 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         3: ["keys", "prefix", "binding", "keybinding", "shortcut"],
         4: ["agents", "agent", "color", "codex", "claude", "cursor", "pi", "hermes", "openclaw", "hook", "notification", "notify", "banner", "bell", "sound", "detection"],
         5: ["advanced", "options", "status", "mouse", "mode", "clipboard", "base-index", "renumber", "monitor", "rename", "repeat", "history", "pane", "border", "harness-cli", "set-option", "performance", "pipeline", "render", "identity", "term_program", "xtversion", "shift+enter", "kitty", "ghostty"],
+        6: ["remote", "ssh", "host", "daemon", "tunnel", "socket", "jump", "identity", "putty"],
     ]
 
     private func buildSidebar() -> NSView {
@@ -638,6 +653,7 @@ final class SettingsViewController: NSViewController, NSFontChanging {
             ("Keys", "keyboard"),
             ("Agents", "sparkles"),
             ("Advanced", "slider.horizontal.3"),
+            ("Remote", "network"),
         ]
         for (index, entry) in entries.enumerated() {
             let button = SettingsSidebarButton(title: entry.0, symbol: entry.1)
