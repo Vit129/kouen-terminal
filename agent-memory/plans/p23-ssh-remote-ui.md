@@ -1,6 +1,6 @@
 # P23 — SSH Remote Host Manager (PuTTY-style UI)
 
-Status: **Planning**
+Status: **Active**
 Priority: **P2** — remote workflow enabler
 Owner surface: HarnessApp (Settings + toolbar), HarnessCore (already done)
 Created: 2026-06-18
@@ -110,15 +110,15 @@ RemoteHostsService.shared.disconnect()
 ## PBIs
 
 ### Phase 1 — Settings UI (core)
-- [ ] **PBI-SSH-001:** Add "Remote" tab to `SettingsViewController`
-- [ ] **PBI-SSH-002:** Host list (`NSTableView`) — list, select, delete, duplicate
-- [ ] **PBI-SSH-003:** Detail form — Name, SSH Target, Port, Identity File (file picker), Jump Host, Socket Path fields
-- [ ] **PBI-SSH-004:** Save/revert logic — write to `RemoteHostsService` on Save, discard on Cancel
-- [ ] **PBI-SSH-005:** Connect/Disconnect button in detail form — async tunnel setup + error sheet
+- [x] **PBI-SSH-001:** Add "Remote" tab to `SettingsViewController`
+- [x] **PBI-SSH-002:** Host list (`NSTableView`) — list, select, delete, duplicate
+- [x] **PBI-SSH-003:** Detail form — Name, SSH Target, Port, Identity File (file picker), Jump Host, Socket Path fields
+- [x] **PBI-SSH-004:** Save/revert logic — write to `RemoteHostsService` on Save, discard on Cancel
+- [x] **PBI-SSH-005:** Connect/Disconnect button in detail form — async tunnel setup via existing `SessionCoordinator.connectToRemote`; connection errors currently surface through the existing daemon reconnect toast path, not a dedicated sheet
 
 ### Phase 2 — Toolbar indicator
-- [ ] **PBI-SSH-006:** Toolbar badge showing active remote host name (nil = local, dim)
-- [ ] **PBI-SSH-007:** Click badge → popover with host name + Disconnect button
+- [x] **PBI-SSH-006:** Toolbar badge showing active remote host name (nil = local, dim)
+- [x] **PBI-SSH-007:** Click badge disconnects when remote is active; when local, it opens Settings → Remote. Popover deferred as polish.
 
 ### Phase 3 — Socket auto-detect (optional, later)
 - [ ] **PBI-SSH-008:** "Detect" button — runs `ssh <target> harness-cli doctor` and parses socket path
