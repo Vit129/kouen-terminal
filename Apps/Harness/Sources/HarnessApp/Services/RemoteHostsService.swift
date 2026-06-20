@@ -7,6 +7,7 @@ import HarnessCore
 /// @unchecked Sendable: the store/tunnel manager are thread-safe; `_activeHostName` is lock-guarded.
 final class RemoteHostsService: @unchecked Sendable {
     static let shared = RemoteHostsService()
+    static let activeHostDidChange = Notification.Name("HarnessRemoteActiveHostDidChange")
 
     private let store = RemoteHostStore()
     private let lock = NSLock()
@@ -24,9 +25,14 @@ final class RemoteHostsService: @unchecked Sendable {
     func removeHost(named name: String) {
         store.remove(name: name)
         SSHTunnelManager.shared.stop(host: name)
+        var didChange = false
         lock.lock()
-        if _activeHostName == name { _activeHostName = nil }
+        if _activeHostName == name {
+            _activeHostName = nil
+            didChange = true
+        }
         lock.unlock()
+        if didChange { Self.postActiveHostDidChange() }
     }
 
     /// Bring up (or reuse) the tunnel to `name` and return the local endpoint that reaches it.
@@ -37,6 +43,7 @@ final class RemoteHostsService: @unchecked Sendable {
         }
         let endpoint = try SSHTunnelManager.shared.endpoint(for: host)
         lock.lock(); _activeHostName = name; lock.unlock()
+        Self.postActiveHostDidChange()
         return endpoint
     }
 
@@ -44,5 +51,12 @@ final class RemoteHostsService: @unchecked Sendable {
     func disconnect() {
         lock.lock(); let name = _activeHostName; _activeHostName = nil; lock.unlock()
         if let name { SSHTunnelManager.shared.stop(host: name) }
+        Self.postActiveHostDidChange()
+    }
+
+    private static func postActiveHostDidChange() {
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: activeHostDidChange, object: nil)
+        }
     }
 }
