@@ -156,3 +156,9 @@ All plans below are **done** and merged into main.
 - WKWebView pane for localhost preview
 - harness-mcp browser tools (navigate, screenshot, evaluate)
 - Post-release fixes in v2.7.1
+
+## P24 — Supacode-Inspired Competitive Features (Consolidated)
+- Status: Complete (archived from active plan list on 2026-06-20)
+- Competitive analysis consolidated Supacode, P21 actionable agent layer, and P4 follow-ups into Harness-specific parity work.
+- Key completed scope: project config/lifecycle scripts direction, agent status/auto-start UX, worktree-per-session model, GitHub PR/CI integration plan, sidebar density, and CLI scripting model.
+- P21 ACP sideband/provider/brain/execution layers remain shelved separately; P4 follow-ups were absorbed into P24.
