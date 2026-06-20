@@ -185,6 +185,8 @@ struct HarnessCLI {
                 try handleDetectAgent(args, client: client)
             case "install-hooks":
                 try handleInstallHooks(args)
+            case "install-tools":
+                handleInstallTools()
             case "install-shell-integration":
                 handleInstallShellIntegration(args)
             case "attach":
