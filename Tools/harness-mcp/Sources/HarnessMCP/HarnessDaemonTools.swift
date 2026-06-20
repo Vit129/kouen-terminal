@@ -237,6 +237,90 @@ struct HarnessDaemonTools: Sendable {
         return await okResponse(for: .killPane(paneID: paneID), expected: "killPane")
     }
 
+    /// Spawn a new session and immediately launch an AI agent CLI (claude, codex, kiro, gemini, cursor).
+    func harnessSpawnAgent(
+        agent: String,
+        workspaceId: String?,
+        cwd: String?
+    ) async -> (AnyCodable?, JSONRPCError?) {
+        guard isToolAllowed("harnessSpawnAgent") else { return (nil, disabledError("harnessSpawnAgent")) }
+
+        // Resolve workspace
+        let resolvedWorkspaceId: UUID
+        if let wid = workspaceId, let uuid = UUID(uuidString: wid) {
+            resolvedWorkspaceId = uuid
+        } else {
+            guard let snapResp = await send(.getSnapshot),
+                  case let .snapshot(snap) = snapResp,
+                  let first = snap.workspaces.first
+            else { return (nil, Self.daemonUnavailableError) }
+            resolvedWorkspaceId = first.id
+        }
+
+        // Map agent name → CLI launch command
+        let agentLabel: String
+        let agentCommand: String
+        switch agent.lowercased() {
+        case "claude", "claude-code":
+            agentLabel = "Claude"; agentCommand = "claude\n"
+        case "codex":
+            agentLabel = "Codex"; agentCommand = "codex\n"
+        case "kiro":
+            agentLabel = "Kiro"; agentCommand = "kiro\n"
+        case "gemini":
+            agentLabel = "Gemini"; agentCommand = "gemini\n"
+        case "cursor":
+            agentLabel = "Cursor"
+            agentCommand = cwd.map { "cursor \($0)\n" } ?? "cursor .\n"
+        default:
+            return (nil, JSONRPCError(code: -32602,
+                message: "Unknown agent '\(agent)'. Valid values: claude, codex, kiro, gemini, cursor"))
+        }
+
+        // Spawn the session
+        guard let spawnResp = await send(.newSession(
+            workspaceID: resolvedWorkspaceId, cwd: cwd, name: "\(agentLabel)", shell: nil
+        )) else { return (nil, Self.daemonUnavailableError) }
+
+        guard case let .sessionID(sessionID) = spawnResp else {
+            if case let .error(msg) = spawnResp {
+                return (nil, JSONRPCError(code: -32000, message: msg))
+            }
+            return (nil, JSONRPCError(code: -32000, message: "Unexpected response to newSession"))
+        }
+
+        // Poll snapshot until the shell is ready (up to ~2 s)
+        var surfaceIDString: String?
+        for attempt in 0..<6 {
+            if attempt > 0 {
+                try? await Task.sleep(nanoseconds: 350_000_000)
+            }
+            guard let snapResp2 = await send(.getSnapshot),
+                  case let .snapshot(snap2) = snapResp2,
+                  let ws = snap2.workspaces.first(where: { $0.id == resolvedWorkspaceId }),
+                  let session = ws.sessions.first(where: { $0.id == sessionID }),
+                  let leaf = session.tabs.first?.rootPane.allLeaves().first
+            else { continue }
+            surfaceIDString = (leaf.activeSurfaceID ?? leaf.surfaceID).uuidString
+            break
+        }
+
+        guard let sid = surfaceIDString else {
+            return (nil, JSONRPCError(code: -32000, message: "Session spawned but surface not ready in time"))
+        }
+
+        // Send the agent launch command
+        _ = await send(.send(surfaceID: sid, text: agentCommand))
+        await notifyMCPActivity(surfaceId: sid, tool: "harnessSpawnAgent")
+
+        return (toolResult(json: .object([
+            "sessionId": .string(sessionID.uuidString),
+            "surfaceId": .string(sid),
+            "agent": .string(agent),
+            "launched": .string(agentCommand.trimmingCharacters(in: .whitespacesAndNewlines)),
+        ])), nil)
+    }
+
     // MARK: - waitForPaneOutput
 
     func waitForPaneOutput(
