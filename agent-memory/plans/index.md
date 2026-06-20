@@ -12,3 +12,11 @@
 ## Completed
 
 → [completed-archive.md](completed-archive.md)
+
+### Quick ref — ACP/MCP/P4 in archive
+
+| Plan | Status | Direction | Notes |
+|------|--------|-----------|-------|
+| P4 — LSP + Code Viewing | Done | — | `harnessErrors` MCP tool surfaces LSP diagnostics to agents |
+| P5 — ACP Client | Shelved | Harness→agent | Chat sidebar; re-enable when adapters ship as `brew install` |
+| P12 — MCP Server | Done | agent→Harness | 25 tools; `harness-mcp`; Claude Code/Codex/Kiro; see `knowledge/architecture/mcp-server.md` |

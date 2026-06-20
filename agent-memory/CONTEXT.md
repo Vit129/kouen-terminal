@@ -3,7 +3,7 @@
 ## Now
 - **Task:** None active — ready for next session
 - **Branch:** main
-- **Latest release:** v3.2.3 (build 147)
+- **Latest release:** v3.5.0
 - **Status:** idle
 
 ## Open Questions

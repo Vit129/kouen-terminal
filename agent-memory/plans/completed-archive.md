@@ -68,11 +68,14 @@ All plans below are **done** and merged into main.
 - IDE mode, focus mode, session state dots, diff highlighting, git preview/history improvements, and task board sidebar shipped
 - ACP sidebar work remains intentionally shelved; implementation is preserved but not exposed
 
-## P5 — ACP Client
+## P5 — ACP Client (Shelved)
 - ACP core implementation exists in `HarnessCore/ACP`: `ACPClient`, `ACPSession`, `ACPProcess`, `ACPTransport`, `ACPMessage`, and `AgentConfig`
 - `AgentChatPanelView` and settings-side ACP agent configuration remain in the app code
 - Runtime entry point is intentionally disabled in the sidebar (`[ACP SHELVED] connectAgentIfNeeded()`)
-- Shelved rationale is tracked in `agent-memory/knowledge/acp-client.md`
+- Shelved rationale: adapter binaries not widely available, PATH resolution in .app bundles unreliable, no tool sandboxing
+- Full context: `agent-memory/knowledge/patterns/acp-client.md`
+- Direction: ACP = Harness→agent (embedded chat). MCP (P12) = agent→Harness (tool server). Both share `ACPMessage` framing from `HarnessCore`.
+- Re-enable criteria: `brew install` for adapters, agent tool sandboxing at protocol level
 
 ## P7 — Sidebar UI Polish
 - Large-screen sidebar group header button visibility/alignment completed
@@ -83,6 +86,7 @@ All plans below are **done** and merged into main.
 - Track 2 (Vi Navigation): `gf` path-under-cursor, `gd`/`K`/`]d`/`[d` LSP-backed, `:view`/`:edit`/`:split`/`:vsplit`/`:find`, `harness view` CLI
 - Track 3 (LSP Command API): `harness lsp start/status/hover/definition/diagnostics`
 - Follow-ups (`:recent`, `:grep`, `:make`) moved to P24
+- MCP surface: `harnessErrors` tool in `harness-mcp` exposes LSP diagnostics to AI agents (see P12/architecture/mcp-server.md)
 
 ## P21 — Hermes-Inspired Agent Platform (Shelved → P24 partial)
 - Status: Shelved — ACP adapters not publicly available
@@ -108,9 +112,14 @@ All plans below are **done** and merged into main.
 
 ## P12 — Agent Orchestration via MCP
 - PBI-ORCH-001–005 complete
-- `harness-mcp` server exposes session/pane/surface tools
-- MCP badge on tab bar via `lastMCPControlAt`
-- Tool policy gating for agent actions
+- `harness-mcp` binary: JSON-RPC 2.0 over stdin/stdout, protocol v2024-11-05
+- 25 tools across 5 categories: session/pane control, file I/O, git, workbench, browser pane
+- Tool policy gating: `~/.config/harness/mcp-policy.json` or `HARNESS_MCP_ALLOW_CONTROL=1`
+- MCP badge on tab bar via `lastMCPControlAt` timestamp on `Tab` snapshot
+- Browser pane fully controllable: open/navigate/snapshot/interact/close
+- Workbench tools: `harnessFind`, `harnessGrep`, `harnessRecent`, `harnessErrors` (LSP diagnostics)
+- Direction: agent→Harness (opposite of shelved ACP which is Harness→agent)
+- Full architecture: `agent-memory/knowledge/architecture/mcp-server.md`
 
 ## P13 — Split Pane Parity
 - PBI-SPLIT-001–005 implemented

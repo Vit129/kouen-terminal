@@ -272,6 +272,8 @@ struct HarnessCLI {
                 try handleListHooks(args, client: client)
             case "display-message":
                 try handleDisplayMessage(args, client: client)
+            case "settings":
+                handleSettings(args: Array(args.dropFirst()))
             default:
                 printUsage()
                 exit(1)

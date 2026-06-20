@@ -123,6 +123,11 @@ struct ToolRegistry: Sendable {
             toolDef("harnessErrors", "Get diagnostics/compile errors in the active session's workspace or a specific file", [
                 param("path", "string", "Path to file to query diagnostics for (optional)"),
             ]),
+            toolDef("harnessSpawnAgent", "Spawn a new Harness terminal session and immediately launch an AI agent CLI (requires MCP policy allowlist or HARNESS_MCP_ALLOW_CONTROL=1)", [
+                param("agent", "string", "Agent to launch: 'claude', 'codex', 'kiro', 'gemini', or 'cursor'"),
+                param("workspaceId", "string", "Workspace UUID (optional, uses active workspace if omitted)"),
+                param("cwd", "string", "Working directory for the new session (optional)"),
+            ]),
         ])])
     }
 
@@ -163,6 +168,7 @@ struct ToolRegistry: Sendable {
         case "harnessBrowserSnapshot": return await harnessBrowserSnapshot(args)
         case "harnessBrowserInteract": return await harnessBrowserInteract(args)
         case "harnessBrowserClose": return await harnessBrowserClose(args)
+        case "harnessSpawnAgent": return await harnessSpawnAgent(args)
         default:
             return (nil, JSONRPCError(code: -32602, message: "Unknown tool: \(name)"))
         }
@@ -470,6 +476,15 @@ struct ToolRegistry: Sendable {
             return (nil, JSONRPCError(code: -32602, message: "Missing 'paneId' parameter"))
         }
         return await browserTools.harnessBrowserClose(paneIdStr: paneId)
+    }
+
+    private func harnessSpawnAgent(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        guard case let .string(agent)? = args["agent"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'agent' parameter"))
+        }
+        let workspaceId = optionalStringArg(args["workspaceId"])
+        let cwd = optionalStringArg(args["cwd"])
+        return await daemonTools.harnessSpawnAgent(agent: agent, workspaceId: workspaceId, cwd: cwd)
     }
 
     // MARK: - Helpers
