@@ -1024,16 +1024,12 @@ private final class PaneSplitButtonsView: NSView {
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stack)
 
-        let splitLeft = makeButton("rectangle.lefthalf.inset.filled", tooltip: "Split Left (⌘⇧←)", action: #selector(doSplitLeft))
-        let splitRight = makeButton("rectangle.righthalf.inset.filled", tooltip: "Split Right (⌘⇧→)", action: #selector(doSplitRight))
-        let splitUp = makeButton("rectangle.tophalf.inset.filled", tooltip: "Split Up (⌘⇧↑)", action: #selector(doSplitUp))
-        let splitDown = makeButton("rectangle.bottomhalf.inset.filled", tooltip: "Split Down (⌘⇧↓)", action: #selector(doSplitDown))
+        let splitRight = makeButton("rectangle.righthalf.inset.filled", tooltip: "Split Right (⌘D)", action: #selector(doSplitRight))
+        let splitDown = makeButton("rectangle.bottomhalf.inset.filled", tooltip: "Split Down (⌘⇧D)", action: #selector(doSplitDown))
         let openBrowser = makeButton("safari", tooltip: "Open Browser Pane (⌘B)", action: #selector(openBrowserPane))
         let closeBtn = makeButton("xmark", tooltip: "Close Pane (⌥⇧⌘W)", action: #selector(closePane))
 
-        stack.addArrangedSubview(splitLeft)
         stack.addArrangedSubview(splitRight)
-        stack.addArrangedSubview(splitUp)
         stack.addArrangedSubview(splitDown)
         stack.addArrangedSubview(openBrowser)
         stack.addArrangedSubview(closeBtn)
