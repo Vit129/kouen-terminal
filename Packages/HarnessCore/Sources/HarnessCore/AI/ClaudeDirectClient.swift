@@ -96,17 +96,20 @@ public actor ClaudeDirectClient {
         messages: [Message],
         systemPrompt: String? = nil,
         maxTokens: Int = 512
-    ) async -> Result<String, String> {
-        var result = ""
-        var lastError: String? = nil
+    ) async -> (text: String?, error: String?) {
+        final class Box: @unchecked Sendable {
+            var result = ""
+            var lastError: String?
+        }
+        let box = Box()
         await stream(messages: messages, systemPrompt: systemPrompt, maxTokens: maxTokens) { event in
             switch event {
-            case .text(let chunk): result += chunk
-            case .error(let msg): lastError = msg
+            case .text(let chunk): box.result += chunk
+            case .error(let msg): box.lastError = msg
             case .done: break
             }
         }
-        if let err = lastError { return .failure(err) }
-        return .success(result)
+        if let err = box.lastError { return (nil, err) }
+        return (box.result, nil)
     }
 }

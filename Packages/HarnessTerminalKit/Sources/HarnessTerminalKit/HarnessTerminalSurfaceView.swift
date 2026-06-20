@@ -1325,6 +1325,10 @@ public final class HarnessTerminalSurfaceView: NSView {
             // invalidateCursorRects asynchronously — if the view is deallocated between the
             // invalidation and the callback, resetCursorRects fires on a zombie.
             discardCursorRects()
+            // Stop display link — prevents resetCursorRects/displayTick firing on a
+            // zombie during the retire-hold window (RL-040). viewDidMoveToWindow
+            // will restart it if the view is re-attached.
+            stopDisplayLink()
             // Remove tracking area — NSTrackingArea does NOT retain its owner, so
             // mouseMoved dispatches to a zombie if the area outlives the view.
             if let trackingArea {

@@ -50,14 +50,17 @@ final class PrefixKeymap {
 
     private func ensureMonitor() {
         guard monitor == nil else { return }
-        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            // RL-040: If the event targets a view whose window is already gone (zombie),
-            // the Swift runtime crashes in swift_task_isCurrentExecutorWithFlagsImpl when
-            // entering any @MainActor code that touches the event's responder chain.
-            // Drop such events at the monitor level before they reach any view thunk.
-            if let eventWindow = event.window, eventWindow.contentView == nil { return event }
-            guard let self else { return event }
-            return self.handle(event)
+        // RL-040: The event monitor closure is @Sendable; accessing @MainActor `self`
+        // triggers _checkExpectedExecutor → swift_task_isCurrentExecutorWithFlagsImpl
+        // which can crash on macOS 26 / Swift 6.3.2 when the runtime's task metadata
+        // is corrupted during app teardown. Capture `self` as unowned(unsafe) +
+        // nonisolated(unsafe) to suppress the executor check. Safe because:
+        // 1) PrefixKeymap is a singleton (never deallocated)
+        // 2) NSEvent local monitors always fire on the main thread
+        nonisolated(unsafe) let unsafeSelf = self
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            guard let eventWindow = event.window, eventWindow.contentView != nil else { return event }
+            return unsafeSelf.handle(event)
         }
     }
 

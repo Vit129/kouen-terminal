@@ -229,14 +229,23 @@ final class TerminalTabBarView: NSView {
 
     // MARK: - Layout
 
+    /// RL-040: Prevent deallocation while AppKit's display server still holds an unsafe
+    /// reference and can dispatch layout() to this view. The @objc thunk dereferences `self`
+    /// metadata before any Swift guard can run.
+    private static var retiredBars: [TerminalTabBarView] = []
+
     override func viewWillMove(toWindow newWindow: NSWindow?) {
         if newWindow == nil {
-            // RL-040: Cancel any pending layout/display passes that would fire
-            // after this view is removed. AppKit can queue layout() calls that
-            // arrive after dealloc starts, crashing in the @objc thunk.
+            // Cancel any pending layout/display passes.
             NSObject.cancelPreviousPerformRequests(withTarget: self)
             needsLayout = false
             needsDisplay = false
+            // Hold self alive for 500ms so AppKit's async layout drain completes.
+            Self.retiredBars.append(self)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                guard let self else { return }
+                Self.retiredBars.removeAll { $0 === self }
+            }
         }
         super.viewWillMove(toWindow: newWindow)
     }

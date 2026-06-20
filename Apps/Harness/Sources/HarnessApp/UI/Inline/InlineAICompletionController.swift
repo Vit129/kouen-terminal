@@ -96,11 +96,10 @@ final class InlineAICompletionController {
             )
             await MainActor.run {
                 self.inFlight = false
-                switch result {
-                case .success(let cmd):
+                if let cmd = result.text {
                     let trimmed = cmd.trimmingCharacters(in: .whitespacesAndNewlines)
                     self.completionView.suggestion = trimmed.isEmpty ? nil : trimmed
-                case .failure:
+                } else {
                     self.completionView.suggestion = nil
                 }
             }
