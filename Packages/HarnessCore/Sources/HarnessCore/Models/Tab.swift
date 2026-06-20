@@ -162,6 +162,8 @@ extension Tab {
         sortOrder == other.sortOrder &&
         exitStatus == other.exitStatus &&
         persistent == other.persistent &&
+        worktreePath == other.worktreePath &&
+        parentRepoPath == other.parentRepoPath &&
         zoomedPaneID == other.zoomedPaneID &&
         activePaneID == other.activePaneID
     }

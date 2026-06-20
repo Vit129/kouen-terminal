@@ -273,7 +273,19 @@ enum HarnessDesign {
     }
 
     static func projectGroupName(for path: String) -> String {
-        pathDisplayName(projectGroupRootPath(for: path))
+        projectGroupDisplayName(forRootPath: projectGroupRootPath(for: path))
+    }
+
+    static func projectGroupDisplayName(forRootPath rootPath: String) -> String {
+        let trimmed = rootPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "Sessions" }
+        if trimmed == "Other" || trimmed == "Sessions" { return trimmed }
+
+        let url = URL(fileURLWithPath: trimmed)
+        if url.lastPathComponent == ".git" {
+            return url.deletingLastPathComponent().lastPathComponent
+        }
+        return pathDisplayName(trimmed)
     }
 
     static func projectGroupRootPath(for path: String) -> String {

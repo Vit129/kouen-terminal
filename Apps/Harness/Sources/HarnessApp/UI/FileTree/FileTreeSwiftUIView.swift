@@ -777,10 +777,24 @@ private struct NodeRow: View {
 
     private func openFile() {
         let coordinator = SessionCoordinator.shared
-        coordinator.splitActivePane(direction: .horizontal)
-        guard let surfaceID = coordinator.activeSurfaceID else { return }
-        let command = "open \(node.node.path)\r"
-        coordinator.requestDaemon(.sendData(surfaceID: surfaceID.uuidString, data: Data(command.utf8)))
+        let action = coordinator.settings.fileClickAction
+        if action == "editor" || action == "preview" {
+            guard let split = NSApp.keyWindow?.contentViewController as? MainSplitViewController
+                ?? NSApp.mainWindow?.contentViewController as? MainSplitViewController else { return }
+            split.contentVC.openFileTab(path: node.node.path)
+        } else {
+            coordinator.splitActivePane(direction: .horizontal)
+            guard let surfaceID = coordinator.activeSurfaceID else { return }
+            let cmd: String
+            if action == "vi" {
+                cmd = "vi \(node.node.path)\r"
+            } else if action == "cat" {
+                cmd = "cat \(node.node.path)\r"
+            } else {
+                cmd = "open \(node.node.path)\r"
+            }
+            coordinator.requestDaemon(.sendData(surfaceID: surfaceID.uuidString, data: Data(cmd.utf8)))
+        }
     }
 }
 
