@@ -6,6 +6,18 @@ All notable changes to Harness are documented here. The format is based on
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/robzilla1738/harness-terminal/releases).
 
+## [3.5.0] - 2026-06-20
+
+### Added
+- File click action setting — choose preview, editor, vi, cat, or terminal-only
+- Tab pill: branch name as primary title, repo name as context subtitle
+- Sidebar worktree grouping fix — uses parentRepoPath for correct repo grouping
+- `harness-cli install-tools` — one command to install zoxide, fd, fzf, rg, bat, eza, jq, lazygit
+- ⌘I opens Agent Notch panel (select notifying agent directly)
+- Persistent notch peek — notification stays until user clicks
+- macOS native toast notifications for agent done/waiting (osascript fallback)
+- Always auto-isolate worktrees on branch switch (not config-gated)
+
 ## [3.4.0] - 2026-06-19
 
 ### Added
