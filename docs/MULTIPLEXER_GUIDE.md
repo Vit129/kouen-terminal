@@ -334,7 +334,7 @@ automatically and notify via Harness's activity path, so there's nothing to inst
 | `Cmd-1`…`Cmd-9` | Switch to tab N | | `Cmd-,` | Settings |
 | `Cmd-Shift-[` / `]` | Prev / next tab | | `Cmd-\` | Toggle sidebar |
 | `Cmd-Shift-N` | New workspace | | `Cmd-+` / `-` / `0` | Font bigger / smaller / reset |
-| `Cmd-Shift-U` | Jump to next notification | | `prefix ?` | Cheatsheet |
+| `Cmd-Shift-I` | Toggle Agent Notch | | `Cmd-Shift-U` | Notifications inbox |
 
 > Coming from another multiplexer? [MIGRATION.md](MIGRATION.md) has a key-by-key translation table
 > and a tested path for bringing your config and bindings over. You can migrate a `.tmux.conf` by

@@ -29,7 +29,7 @@ files are left alone.
 - The tab pill's dot turns Grok blue when a `grok` / `grok-build` process is
   detected in that pane.
 - When Grok finishes (or errors), you get a macOS banner + sidebar entry;
-  `Cmd+Shift+I` jumps to the pane.
+  `Cmd+Shift+I` opens the Agent Notch for direct selection, and `Cmd+Shift+U` opens the notifications inbox.
 
 > Grok Build is young and its hook event names are still settling. If
 > `on-complete` / `on-error` don't fire in your build, check `grok` docs for the

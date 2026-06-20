@@ -24,7 +24,7 @@
 - Sidebar 2-line layout: Line 1 = branch (bold), Line 2 = short cwd (dimmed) — Supacode-style info density
 - Top bar always shows branch (⎇) even when agent active — only hides cwd path
 - Worktree auto-isolate is ALWAYS ON (not config-gated) — every branch switch → own worktree → correct git probe per tab
-- ⌘I opens Agent Notch panel (select notifying agent), persistent peek (no auto-dismiss)
+- ⌘⇧I toggles the Agent Notch panel for selecting the notifying agent; ⌘⇧U opens the notifications inbox; persistent peek stays until user action
 
 ## Lessons
 - RL-004: Never reparent Metal terminal surfaces — 1-2s black screen (CASE-003)

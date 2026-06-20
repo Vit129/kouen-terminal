@@ -39,7 +39,8 @@ Harness `stop` entry in place and leaves everything else untouched.)
 - The tab pill's dot turns Cursor cyan whenever a `cursor-agent` process is
   detected in that pane.
 - When the agent stops, notifications surface in macOS Notification Center plus
-  the Harness sidebar; `Cmd+Shift+I` jumps to the pane.
+  the Harness sidebar; `Cmd+Shift+I` opens the Agent Notch for direct selection,
+  and `Cmd+Shift+U` opens the notifications inbox.
 
 ## Manual fallback
 

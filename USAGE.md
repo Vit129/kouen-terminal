@@ -123,7 +123,7 @@ Send a manual notification:
 harness-cli notify --surface "$HARNESS_SURFACE" --title "Agent" --body "Needs approval"
 ```
 
-Jump to the waiting agent with `Cmd+Shift+I`.
+Open the Agent Notch with `Cmd+Shift+I` to pick the notifying agent, or open the notifications inbox with `Cmd+Shift+U`.
 
 Per-agent guides live in [docs/agent-hooks/README.md](docs/agent-hooks/README.md).
 
@@ -299,4 +299,3 @@ See [docs/MIGRATION.md](docs/MIGRATION.md) for the full tmux key-by-key translat
 ### Importing Colors And Fonts
 
 Harness auto-imports colors, font face, opacity, and padding from compatible terminal configs on first run. Re-import any time via **Settings → Appearance → Reset to defaults** or the `source-config` command.
-

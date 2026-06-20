@@ -50,6 +50,16 @@ final class NotchPanelController: NSObject {
         model.close()
     }
 
+    func toggleFromMenu() {
+        let coordinator = SessionCoordinator.shared
+        if !coordinator.settings.notchVisibilityMode.isEnabled(for: coordinator.settings.experienceMode) {
+            coordinator.settings.notchVisibilityMode = .on
+            try? coordinator.settings.save()
+        }
+        refreshVisibility()
+        model.toggleOpen()
+    }
+
     private func observeNotifications() {
         NotificationCenter.default.addObserver(
             self,
