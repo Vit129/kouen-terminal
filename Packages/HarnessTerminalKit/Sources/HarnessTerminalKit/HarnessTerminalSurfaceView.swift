@@ -347,6 +347,11 @@ public final class HarnessTerminalSurfaceView: NSView {
     public var onCopy: ((String) -> Void)?
     /// Optional per-frame renderer stats sink for diagnostics/benchmarks.
     public var onRenderStats: ((TerminalRenderStats) -> Void)?
+    /// ⌥Space hotkey — triggered before the key reaches the PTY. Return `true` to suppress PTY delivery.
+    public var onOptionSpace: (() -> Bool)?
+    /// Generic key intercept — fires before Command shortcuts and PTY delivery (but after copy-mode).
+    /// Return `true` to consume the event. Used by overlay UIs (e.g. `InlineAICompletionView`).
+    public var onKeyIntercept: ((NSEvent) -> Bool)?
     /// Whether a program may set the system clipboard via OSC 52 (tmux
     /// `set-clipboard`). The host sets this from the option; default on.
     public var allowProgramClipboardAccess = true
@@ -495,6 +500,8 @@ public final class HarnessTerminalSurfaceView: NSView {
     var ligaturesEnabled = true
     /// Draw the OSC 133 prompt gutter stripe. Off by default (a user opt-in).
     private var promptGutterEnabled = false
+    /// Active Metal shader overlay effect name (e.g. "scanlines", "grain", "crt"). "none" = off.
+    private var shaderEffect: String = "none"
 
     var columns: Int = 80
     var rows: Int = 24
@@ -734,6 +741,14 @@ public final class HarnessTerminalSurfaceView: NSView {
 
     public func receive(_ text: String) { receive(Data(text.utf8)) }
 
+    /// Returns the last `maxLines` lines of visible terminal output as plain text.
+    /// Joins soft-wrapped rows so each logical command/output line is one string.
+    public func captureVisibleLines(maxLines: Int = 20) -> String {
+        let lines = emulatorSync { $0.captureLines(joinWrapped: true) }
+        let tail = lines.suffix(maxLines)
+        return tail.joined(separator: "\n")
+    }
+
     /// Scan raw output bytes for user-configured trigger patterns.
     private func scanOutputTriggers(_ data: Data) {
         let triggers = OutputTriggerStore.load()
@@ -913,6 +928,7 @@ public final class HarnessTerminalSurfaceView: NSView {
         minimumContrast: Double = 1,
         boldIsBright: Bool = true,
         promptGutter: Bool = false,
+        shaderEffect: String = "none",
         offMainParserFramePipeline: Bool = true,
         liveResizeReflow: Bool = true
     ) {
@@ -935,6 +951,7 @@ public final class HarnessTerminalSurfaceView: NSView {
         glyphGamma = resolvedTextRendering.glyphGamma
         ligaturesEnabled = ligatures
         promptGutterEnabled = promptGutter
+        self.shaderEffect = shaderEffect
         let bg = RGBColor(hex: canvasBackgroundHex) ?? RGBColor(red: 0, green: 0, blue: 0)
         let fg = RGBColor(hex: canvasForegroundHex) ?? RGBColor(red: 255, green: 255, blue: 255)
         let cursor = RGBColor(hex: cursorHex) ?? fg
@@ -1021,6 +1038,7 @@ public final class HarnessTerminalSurfaceView: NSView {
         metalLayer.isOpaque = self.canvasOpacity >= 1
         metalLayer.colorspace = CGColorSpace(name: layerColorSpaceName)
         buildRenderer()
+        renderer?.shaderEffect = self.shaderEffect
         updateGridSize()
         scheduleRender()
     }
@@ -1252,6 +1270,7 @@ public final class HarnessTerminalSurfaceView: NSView {
         // advancement match what the renderer draws.
         if let renderer {
             emulatorSync { $0.setCellPixelSize(width: renderer.cellPixelWidth, height: renderer.cellPixelHeight) }
+            renderer.shaderEffect = self.shaderEffect
         }
         invalidateRenderGeneration()
     }

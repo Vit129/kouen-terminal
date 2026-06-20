@@ -415,6 +415,7 @@ public final class TerminalHostView: NSView {
             minimumContrast: HarnessSettings.clampedContrast(settings.minimumContrast),
             boldIsBright: settings.boldIsBright,
             promptGutter: settings.showPromptGutter,
+            shaderEffect: settings.terminalShaderEffect,
             offMainParserFramePipeline: settings.offMainParserFramePipeline,
             liveResizeReflow: settings.liveResizeReflow
         )
@@ -696,6 +697,34 @@ public final class TerminalHostView: NSView {
     /// integration marks).
     public func jumpToPreviousPrompt() { nativeView.jumpToPreviousPrompt() }
     public func jumpToNextPrompt() { nativeView.jumpToNextPrompt() }
+
+    /// Returns the last `maxLines` of visible terminal output as plain text.
+    public func captureVisibleLines(maxLines: Int = 20) -> String {
+        nativeView.captureVisibleLines(maxLines: maxLines)
+    }
+
+    /// ⌥Space handler — set by `InlineAICompletionController` to intercept the hotkey before it
+    /// reaches the PTY. Return `true` to consume the event.
+    public var onOptionSpace: (() -> Bool)? {
+        get { nativeView.onOptionSpace }
+        set { nativeView.onOptionSpace = newValue }
+    }
+
+    /// Generic key intercept — fires before Command shortcuts and PTY delivery (after copy-mode).
+    /// Return `true` to consume the event.
+    public var onKeyIntercept: ((NSEvent) -> Bool)? {
+        get { nativeView.onKeyIntercept }
+        set { nativeView.onKeyIntercept = newValue }
+    }
+
+    /// Send raw bytes to the PTY as if the user typed them. Routes through the same
+    /// `InputGate` path as keyboard input (sync panes, etc.).
+    public func sendInput(_ data: Data) {
+        inputGate.route(data)
+    }
+
+    /// Current working directory reported by the shell via OSC 7, or nil if not yet reported.
+    public var currentCWD: String? { nativeView.currentCwd }
 
     /// `synchronize-panes`: the surface-id strings (excluding this pane) that this
     /// pane's input should also be mirrored to. Empty = normal single-pane input.

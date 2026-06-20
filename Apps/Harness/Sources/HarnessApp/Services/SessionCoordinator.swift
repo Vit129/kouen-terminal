@@ -32,6 +32,8 @@ final class SessionCoordinator: NSObject {
     var surfaceIndex: [SurfaceID: (tab: Tab, tabID: TabID)] = [:]
     var lastClosedTab: (cwd: String, title: String)?
     let terminalHosts = TerminalPaneRegistry()
+    /// One inline AI completion controller per terminal pane — keyed by surface UUID string.
+    private var inlineAIControllers: [String: InlineAICompletionController] = [:]
     private var lastDaemonErrorNotice: Date?
 
     var activeTabCWD: String? {
@@ -337,6 +339,10 @@ final class SessionCoordinator: NSObject {
         themeService.applyTerminalIdentity(to: host)
         themeService.pushBorderColors(to: host)
         terminalHosts.register(host)
+        // Wire the inline AI completion overlay (⌥Space → Claude command suggestion).
+        let aiController = InlineAICompletionController()
+        aiController.install(in: host)
+        inlineAIControllers[surfaceID.uuidString] = aiController
         return host
     }
 

@@ -189,6 +189,8 @@ extension HarnessTerminalSurfaceView {
             handleCopyModeKey(event)
             return
         }
+        // Overlay intercept: e.g. InlineAICompletionController handling Tab/Return/Esc.
+        if let intercept = onKeyIntercept, intercept(event) { return }
         // Let the app handle Command shortcuts (menus, palette, etc.).
         if event.modifierFlags.contains(.command) {
             // ⌘ + an editing key drives readline line-editing (⌘ is otherwise reserved for the
@@ -262,6 +264,11 @@ extension HarnessTerminalSurfaceView {
 
         if let special = Self.specialKey(for: event) {
             emit(inputEncoder.encode(special, modifiers: mods, event: eventType, modes: modes))
+            return
+        }
+
+        // ⌥Space: inline AI completion shortcut. Let the host intercept before the key reaches the PTY.
+        if mods == .option, event.charactersIgnoringModifiers == " ", let handler = onOptionSpace, handler() {
             return
         }
 
