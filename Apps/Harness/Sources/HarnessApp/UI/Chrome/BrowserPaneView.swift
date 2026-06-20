@@ -38,11 +38,18 @@ public final class BrowserPaneView: NSView {
     internal var errorBannerHeightConstraint: NSLayoutConstraint?
 
     private var loadStates: [LoadCompletionState] = []
+    private let progressLine = BrowserProgressLine()
+    private var progressObservation: NSKeyValueObservation?
 
     public convenience init(url: URL, paneID: PaneID = UUID()) {
         let config = WKWebViewConfiguration()
         config.limitsNavigationsToAppBoundDomains = false
         let web = WKWebView(frame: .zero, configuration: config)
+        web.allowsMagnification = true
+        web.allowsBackForwardNavigationGestures = true
+#if DEBUG
+        web.configuration.preferences.setValue(true, forKey: "developerExtrasEnabled")
+#endif
         self.init(url: url, paneID: paneID, webView: web)
     }
 
@@ -65,6 +72,7 @@ public final class BrowserPaneView: NSView {
         webView.uiDelegate = self
 
         BrowserPaneRegistry.shared.register(self)
+        setupProgressObservation()
 
         let resolvedURL: URL
         if let savedURLString = UserDefaults.standard.string(forKey: "browserPane.\(paneID.uuidString).url"),
@@ -308,7 +316,8 @@ public final class BrowserPaneView: NSView {
     }
 
     private func setupConstraints() {
-        let mainStack = NSStackView(views: [tabBar, toolbar, errorBanner, webView])
+        progressLine.translatesAutoresizingMaskIntoConstraints = false
+        let mainStack = NSStackView(views: [tabBar, toolbar, progressLine, errorBanner, webView])
         mainStack.orientation = .vertical
         mainStack.spacing = 0
         mainStack.alignment = .width
@@ -325,10 +334,19 @@ public final class BrowserPaneView: NSView {
             mainStack.trailingAnchor.constraint(equalTo: trailingAnchor),
             mainStack.bottomAnchor.constraint(equalTo: bottomAnchor),
 
-            toolbar.heightAnchor.constraint(equalToConstant: 32),
-            tabBar.heightAnchor.constraint(equalToConstant: 28),
+            toolbar.heightAnchor.constraint(equalToConstant: 36),
+            tabBar.heightAnchor.constraint(equalToConstant: 30),
+            progressLine.heightAnchor.constraint(equalToConstant: 2),
             errorBannerHeightConstraint!
         ])
+    }
+
+    private func setupProgressObservation() {
+        progressObservation = webView.observe(\.estimatedProgress, options: []) { [weak self] wv, _ in
+            DispatchQueue.main.async {
+                self?.progressLine.setProgress(wv.estimatedProgress, isLoading: wv.isLoading)
+            }
+        }
     }
 
     private func configureNavigationButton(_ button: NSButton, symbolName: String, action: Selector) {
@@ -377,12 +395,23 @@ public final class BrowserPaneView: NSView {
         let text = sender.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         let url: URL
-        if text.contains("://") {
-            url = URL(string: text) ?? URL(string: "about:blank")!
+        let knownScheme = text.hasPrefix("http://") || text.hasPrefix("https://")
+            || text.hasPrefix("file://") || text.hasPrefix("ftp://")
+        let looksLikeDomain = !text.contains(" ")
+            && (text.contains(".") || text.hasPrefix("localhost") || text.hasPrefix("127."))
+        if knownScheme {
+            url = URL(string: text) ?? searchURL(for: text)
+        } else if looksLikeDomain {
+            url = URL(string: "https://\(text)") ?? searchURL(for: text)
         } else {
-            url = URL(string: "http://\(text)") ?? URL(string: "about:blank")!
+            url = searchURL(for: text)
         }
         navigate(to: url)
+    }
+
+    private func searchURL(for query: String) -> URL {
+        let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
+        return URL(string: "https://www.google.com/search?q=\(encoded)") ?? URL(string: "about:blank")!
     }
 
     @objc private func dismissErrorBanner() {
@@ -597,43 +626,47 @@ private final class BrowserTabButton: NSView {
         self.onClose = onClose
         super.init(frame: .zero)
         wantsLayer = true
-        layer?.cornerRadius = 4
+        layer?.cornerRadius = 6
+        layer?.cornerCurve = .continuous
         layer?.backgroundColor = isActive
-            ? NSColor.white.withAlphaComponent(0.1).cgColor
+            ? HarnessDesign.chrome.surfaceElevated.cgColor
             : NSColor.clear.cgColor
         translatesAutoresizingMaskIntoConstraints = false
 
-        label.stringValue = title.isEmpty ? "Tab" : title
-        label.font = .systemFont(ofSize: 11)
-        label.textColor = isActive ? .white : .white.withAlphaComponent(0.6)
+        label.stringValue = title.isEmpty ? "New Tab" : title
+        label.font = .systemFont(ofSize: 11.5, weight: .regular)
+        label.textColor = isActive ? HarnessDesign.chrome.textPrimary : HarnessDesign.chrome.textSecondary
         label.lineBreakMode = .byTruncatingTail
         label.translatesAutoresizingMaskIntoConstraints = false
 
         closeBtn.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: "Close Tab")?
-            .withSymbolConfiguration(.init(pointSize: 8, weight: .medium))
+            .withSymbolConfiguration(.init(pointSize: 7, weight: .semibold))
         closeBtn.isBordered = false
         closeBtn.target = self
         closeBtn.action = #selector(closeTapped)
         closeBtn.translatesAutoresizingMaskIntoConstraints = false
-        closeBtn.contentTintColor = .white.withAlphaComponent(0.5)
+        closeBtn.contentTintColor = HarnessDesign.chrome.textSecondary
 
         addSubview(label)
         addSubview(closeBtn)
 
         NSLayoutConstraint.activate([
-            heightAnchor.constraint(equalToConstant: 24),
-            widthAnchor.constraint(greaterThanOrEqualToConstant: 60),
-            widthAnchor.constraint(lessThanOrEqualToConstant: 150),
-            label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
+            heightAnchor.constraint(equalToConstant: 26),
+            widthAnchor.constraint(greaterThanOrEqualToConstant: 80),
+            widthAnchor.constraint(lessThanOrEqualToConstant: 180),
+            label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
             label.centerYAnchor.constraint(equalTo: centerYAnchor),
             label.trailingAnchor.constraint(lessThanOrEqualTo: closeBtn.leadingAnchor, constant: -4),
-            closeBtn.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -4),
+            closeBtn.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -6),
             closeBtn.centerYAnchor.constraint(equalTo: centerYAnchor),
             closeBtn.widthAnchor.constraint(equalToConstant: 14),
             closeBtn.heightAnchor.constraint(equalToConstant: 14),
         ])
 
         let click = NSClickGestureRecognizer(target: self, action: #selector(selectTapped(_:)))
+        // delaysPrimaryMouseButtonEvents defaults to true which swallows the mouse-down before
+        // it reaches the close button's NSButton. Setting false lets button + recognizer coexist.
+        click.delaysPrimaryMouseButtonEvents = false
         addGestureRecognizer(click)
     }
 
@@ -642,9 +675,60 @@ private final class BrowserTabButton: NSView {
 
     @objc private func selectTapped(_ gesture: NSClickGestureRecognizer) {
         let loc = gesture.location(in: self)
-        // Don't intercept clicks on the close button
         if closeBtn.frame.contains(loc) { return }
         onSelect()
     }
     @objc private func closeTapped() { onClose() }
+}
+
+// MARK: - Progress bar
+
+@MainActor
+private final class BrowserProgressLine: NSView {
+    private let fill = NSView()
+    private var fillWidth: NSLayoutConstraint?
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+        fill.wantsLayer = true
+        fill.layer?.backgroundColor = NSColor.controlAccentColor.cgColor
+        fill.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(fill)
+        fillWidth = fill.widthAnchor.constraint(equalToConstant: 0)
+        NSLayoutConstraint.activate([
+            fill.leadingAnchor.constraint(equalTo: leadingAnchor),
+            fill.topAnchor.constraint(equalTo: topAnchor),
+            fill.bottomAnchor.constraint(equalTo: bottomAnchor),
+            fillWidth!,
+        ])
+        alphaValue = 0
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    func setProgress(_ progress: Double, isLoading: Bool) {
+        let w = bounds.width > 0 ? bounds.width : superview?.bounds.width ?? 400
+        let target = w * CGFloat(min(max(progress, 0), 1))
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.2
+            fillWidth?.animator().constant = target
+        }
+        if isLoading {
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = 0.1
+                self.animator().alphaValue = 1
+            }
+        } else {
+            NSAnimationContext.runAnimationGroup({ ctx in
+                ctx.duration = 0.2
+                fillWidth?.animator().constant = w
+            }, completionHandler: {
+                NSAnimationContext.runAnimationGroup { ctx in
+                    ctx.duration = 0.25
+                    self.animator().alphaValue = 0
+                }
+                self.fillWidth?.constant = 0
+            })
+        }
+    }
 }
