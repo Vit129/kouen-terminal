@@ -37,8 +37,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
     /// Wraps the search field so it gets the same radius-7 elevated-surface chrome as
     /// the workspace pill and session cards.
     private let searchContainer = NSView()
-    private let sidebarTabs = NSSegmentedControl(labels: ["Sessions", "Files", "Chat"], trackingMode: .selectOne, target: nil, action: nil)
-    private let aiChatView = HarnessAIChatView()
+    private let sidebarTabs = NSSegmentedControl(labels: ["Sessions", "Files"], trackingMode: .selectOne, target: nil, action: nil)
 #if HARNESS_ACP
     private let agentChatPanel = AgentChatPanelView()
 #endif
@@ -48,7 +47,6 @@ final class HarnessSidebarPanelViewController: NSViewController {
     let fileTreeView = WorkspaceFileTreeView()
     private let fileViewerVC = FileViewerViewController()
     let gitPanelView = GitPanelView()
-    private let searchPanelView = SearchPanelView()
     private let footer = NSView()
     /// Opens the Agent Inbox popover (every running agent, waiting first). Stored so
     /// the popover can anchor to it. Created in `setupFooter`.
@@ -502,8 +500,6 @@ final class HarnessSidebarPanelViewController: NSViewController {
         setupFileTree()
         setupFileViewer()
         setupGitPlaceholder()
-        setupSearchPanel()
-        setupChatPanel()
 #if HARNESS_ACP
         setupAgentPanel()
 #endif
@@ -1044,32 +1040,6 @@ final class HarnessSidebarPanelViewController: NSViewController {
     }
 
 
-    private func setupSearchPanel() {
-        searchPanelView.isHidden = true
-        view.addSubview(searchPanelView)
-        NSLayoutConstraint.activate([
-            searchPanelView.topAnchor.constraint(equalTo: sectionHeader.bottomAnchor),
-            searchPanelView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            searchPanelView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            searchPanelView.bottomAnchor.constraint(equalTo: footer.topAnchor),
-        ])
-        searchPanelView.onOpenFile = { [weak self] path, _ in
-            guard let self, let split = self.view.window?.contentViewController as? MainSplitViewController else { return }
-            split.contentVC.openFileTab(path: path)
-        }
-    }
-
-    private func setupChatPanel() {
-        aiChatView.translatesAutoresizingMaskIntoConstraints = false
-        aiChatView.isHidden = true
-        view.addSubview(aiChatView)
-        NSLayoutConstraint.activate([
-            aiChatView.topAnchor.constraint(equalTo: sectionHeader.bottomAnchor),
-            aiChatView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            aiChatView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            aiChatView.bottomAnchor.constraint(equalTo: footer.topAnchor),
-        ])
-    }
 
 #if HARNESS_ACP
     private func setupAgentPanel() {
@@ -1112,7 +1082,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
     /// Switches the sidebar to the Git tab (used by the "Show Git Panel" ⌘G shortcut).
     func selectGitTab() {
         sidebarTabs.selectedSegment = -1
-        selectSidebarTab(index: 3)
+        selectSidebarTab(index: 2)
     }
 
     /// Switches the sidebar to the Files tab and reveals `path` in the file tree
@@ -1166,11 +1136,9 @@ final class HarnessSidebarPanelViewController: NSViewController {
         } else {
             fileTreeView.isHidden = fileViewerVC.view.isHidden == false
         }
-        aiChatView.isHidden = index != 2
-        gitPanelView.isHidden = index != 3
-        searchPanelView.isHidden = index != 4
+        gitPanelView.isHidden = index != 2
 #if HARNESS_ACP
-        agentChatPanel.isHidden = index != 5
+        agentChatPanel.isHidden = index != 3
 #endif
         switch index {
         case 1:
@@ -1181,10 +1149,6 @@ final class HarnessSidebarPanelViewController: NSViewController {
                 fileTreeView.updateRoot(path: cwd, sessionID: activeSessionID)
             }
         case 2:
-            sectionLabel.stringValue = "CHAT"
-            sectionLabel.font = HarnessDesign.Typography.sectionLabel
-            aiChatView.applyTheme()
-        case 3:
             sectionLabel.stringValue = "GIT"
             sectionLabel.font = HarnessDesign.Typography.sectionLabel
             if let cwd = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd {
@@ -1192,13 +1156,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
             } else {
                 gitPanelView.clearRoot()
             }
-        case 4:
-            sectionLabel.stringValue = "SEARCH"
-            sectionLabel.font = HarnessDesign.Typography.sectionLabel
-            if let cwd = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd {
-                searchPanelView.updateRoot(path: cwd)
-            }
-        case 5:
+        case 3:
             sectionLabel.stringValue = "AGENT"
             sectionLabel.font = HarnessDesign.Typography.sectionLabel
             // [ACP SHELVED] connectAgentIfNeeded()
@@ -1281,9 +1239,6 @@ final class HarnessSidebarPanelViewController: NSViewController {
         workspaces = snap.workspaces
         activeWorkspaceID = snap.activeWorkspaceID
         let newActiveSessionID = snap.activeWorkspace?.activeSessionID
-        if newActiveSessionID != activeSessionID {
-            aiChatView.resetContext()
-        }
         activeSessionID = newActiveSessionID
         sessions = snap.activeWorkspace?.sessions ?? []
         let name = snap.activeWorkspace?.name ?? "Workspace"

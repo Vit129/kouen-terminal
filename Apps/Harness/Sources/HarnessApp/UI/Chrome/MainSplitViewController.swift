@@ -5,8 +5,8 @@ import QuartzCore
 @MainActor
 final class MainSplitViewController: NSViewController {
     private let split = NSSplitView()
-    private let sidebar = HarnessSidebarPanelViewController()
-    private let content = ContentAreaViewController()
+    private var sidebar: HarnessSidebarPanelViewController!
+    private var content: ContentAreaViewController!
     var contentVC: ContentAreaViewController { content }
     private let statusLine = StatusLineView()
     /// 1px hairline along the inner edge of the sidebar — adds quiet definition
@@ -21,6 +21,8 @@ final class MainSplitViewController: NSViewController {
     private let splitDelegate = SplitChromeDelegate()
 
     override func loadView() {
+        sidebar = HarnessSidebarPanelViewController()
+        content = ContentAreaViewController()
         // The root contentView must stay a plain, NON-layer-backed NSView. A plain NSView
         // draws nothing (transparent by default), so the window blur shows through — but it
         // is *not* layer-backed, so the window server rounds the frame + CGS background blur

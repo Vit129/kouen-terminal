@@ -558,6 +558,13 @@ public final class TerminalHostView: NSView {
         nativeView.metalLayer.presentsWithTransaction = enabled
     }
 
+    /// Invalidate the surface's display link so AppKit's internal forwarder cannot
+    /// dispatch into a freed view. Called from TerminalPaneRegistry.retire() before
+    /// removeFromSuperview. (RL-040)
+    public func stopSurfaceDisplayLink() {
+        nativeView.stopDisplayLinkForRetire()
+    }
+
     public func focusTerminal() {
         window?.makeFirstResponder(nativeView)
         hostDelegate?.terminalHostDidChangeFocus(true, surfaceID: surfaceID)
