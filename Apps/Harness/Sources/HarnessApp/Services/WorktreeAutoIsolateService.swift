@@ -1,10 +1,9 @@
 import Foundation
 import HarnessCore
 
-/// Observes branch changes and auto-creates a worktree for isolation when:
-/// 1. The session's `harness.json` has `isolateAgents: true`, AND
-/// 2. The branch changed to something other than the default branch, AND
-/// 3. The session isn't already in a worktree.
+/// Observes branch changes and auto-creates a worktree for isolation.
+/// Every tab that switches to a non-default branch gets its own worktree
+/// so that git probe always returns the correct branch per tab.
 @MainActor
 final class WorktreeAutoIsolateService {
     static let shared = WorktreeAutoIsolateService()
@@ -33,15 +32,25 @@ final class WorktreeAutoIsolateService {
         if tab.worktreePath != nil { return }
 
         let cwd = tab.cwd
-        // Check harness.json config
-        guard let config = ProjectConfig.load(from: cwd), config.isolateAgents == true else { return }
+        // Check if cwd is a git repo root (not already a worktree subdir)
+        guard manager.repoRoot(for: cwd) == cwd else { return }
 
-        // Create worktree
+        // Create worktree for this branch
         let sessionID = branch.replacingOccurrences(of: "/", with: "-")
-        let baseRef = config.baseRef ?? "HEAD"
-        guard let wtPath = manager.create(repoPath: cwd, sessionID: sessionID, branch: branch, baseRef: baseRef) else { return }
+        let config = ProjectConfig.load(from: cwd)
+        let baseRef = config?.baseRef ?? "HEAD"
 
-        // Move session CWD to the new worktree
+        // Try to create — if branch already exists in another worktree, just cd to it
+        let existingWorktree = manager.list(repoPath: cwd).first { $0.branch == branch }
+        let wtPath: String
+        if let existing = existingWorktree {
+            wtPath = existing.path
+        } else {
+            guard let created = manager.create(repoPath: cwd, sessionID: sessionID, branch: branch, baseRef: baseRef) else { return }
+            wtPath = created
+        }
+
+        // Move shell to the worktree path
         if let surfaceID = tab.rootPane.allSurfaceIDs().first {
             coord.requestDaemon(.sendData(
                 surfaceID: surfaceID.uuidString,
