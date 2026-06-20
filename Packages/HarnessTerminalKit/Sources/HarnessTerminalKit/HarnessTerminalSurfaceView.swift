@@ -1469,6 +1469,13 @@ public final class HarnessTerminalSurfaceView: NSView {
         scheduler.stop()
     }
 
+    /// Public entry point for TerminalPaneRegistry.retire() — invalidates the display link
+    /// before removeFromSuperview so AppKit's _NSDisplayLinkForwarder cannot fire into a
+    /// freed view. (RL-040)
+    public func stopDisplayLinkForRetire() {
+        stopDisplayLink()
+    }
+
     /// Window visibility changed (occlusion observer / attach seed). While occluded the scheduler
     /// holds every present — dirty marks and parsing continue, so the pane stays current and
     /// costs no GPU work. On becoming visible, re-arm: any output that arrived while covered

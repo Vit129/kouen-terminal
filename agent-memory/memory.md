@@ -2,6 +2,8 @@
 
 ## Decisions
 - ACP shelved — re-enable when adapters ship with agent CLIs natively
+- No built-in AI chat view — Harness connects AI via CLI agents (Claude Code, Codex) running in terminal + ACP (like MCP). Removed HarnessAIChatView and SearchPanelView sidebar tabs.
+- AI connectivity model: (1) harness-mcp = MCP server that CLI agents call to interact with terminal sessions, (2) ACP = LSP-style framing for agent→daemon notifications (hook events, waiting state). Same pattern as Zed/SupaCode context providers.
 - CWD tracking: daemon polls proc_pidinfo 500ms — no shell integration needed
 - File preview: constraint-based sibling panel, never reparent terminal views
 - ⌘1–9: `selectSession(workspaceID:sessionID:)` — not `selectWorkspace`

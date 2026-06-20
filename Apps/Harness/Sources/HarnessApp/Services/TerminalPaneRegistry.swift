@@ -39,12 +39,16 @@ final class TerminalPaneRegistry {
 
     private func retire(_ host: TerminalHostView) {
         host.resignIfFirstResponder()
+        // Stop the display link BEFORE removing from superview so AppKit's internal
+        // _NSDisplayLinkForwarder cannot dispatch viewDidMoveToWindow on a freed view.
+        host.stopSurfaceDisplayLink()
         host.removeFromSuperview()
         // Keep alive long enough for ALL pending AppKit events to drain.
-        // 100ms wasn't enough — key events can queue across multiple run loop iterations
-        // during rapid rebuilds (initial launch, session switch). 500ms covers worst case.
+        // 500ms wasn't enough — alternate-screen programs (fzf, zi, vim) trigger rapid
+        // rebuild sequences where the display link forwarder schedules a callback in a
+        // later run-loop iteration. 1.5s covers the full cadence cycle. (RL-040/041)
         retired.append(host)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
             self?.retired.removeAll { $0 === host }
         }
     }
