@@ -3,28 +3,28 @@ _Auto-generated from graphify-out/GRAPH_REPORT.md · do not edit manually_
 _Regen: `~/.claude/scripts/generate-graph-summary.sh .` after `graphify update .`_
 
 ## Summary
-- 17515 nodes · 33708 edges · 815 communities (775 shown, 40 thin omitted)
-- Extraction: 92% EXTRACTED · 8% INFERRED · 0% AMBIGUOUS · INFERRED: 2748 edges (avg confidence: 0.8)
+- 15646 nodes · 35718 edges · 767 communities (618 shown, 149 thin omitted)
+- Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 5276 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 
 ## Graph Freshness
-- Built from commit: `cbfb5257`
+- Built from commit: `e258c71d`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 
 ## God Nodes (most connected - your core abstractions)
-1. `HarnessTerminalSurfaceView` - 362 edges
-2. `SettingsViewController` - 278 edges
-3. `SessionEditor` - 163 edges
-4. `SessionCoordinator` - 160 edges
-5. `TerminalEmulator` - 157 edges
-6. `HarnessCLI` - 120 edges
-7. `SurfaceRegistry` - 115 edges
-8. `IPCRequest` - 107 edges
-9. `ViEngine` - 104 edges
-10. `TerminalScreen` - 97 edges
+1. `HarnessTerminalSurfaceView` - 368 edges
+2. `SettingsViewController` - 304 edges
+3. `Foundation` - 263 edges
+4. `HarnessCore` - 252 edges
+5. `XCTest` - 167 edges
+6. `SessionCoordinator` - 166 edges
+7. `SessionEditor` - 164 edges
+8. `TerminalEmulator` - 158 edges
+9. `HarnessSidebarPanelViewController` - 133 edges
+10. `AppKit` - 130 edges
 
 
 ## Surprising Connections (you probably didn't know these)
@@ -34,16 +34,15 @@ _Regen: `~/.claude/scripts/generate-graph-summary.sh .` after `graphify update .
   Apps/Harness/Sources/HarnessApp/UI/Sidebar/HarnessSidebarPanelViewController.swift → Packages/HarnessCore/Sources/HarnessCore/ACP/AgentConfig.swift
 - `register()` --calls--> `KeyTableID`  [INFERRED]
   Apps/Harness/Sources/HarnessApp/Scripting/ScriptAPI.swift → Packages/HarnessCore/Sources/HarnessCore/Keybindings/KeyTable.swift
-- `vfork_and_exec()` --calls--> `Process`  [INFERRED]
-  Tools/harness/Sources/HarnessCLI/HarnessCLI+Workbench.swift → Apps/Harness/Sources/HarnessApp/UI/CommandPalette/CommandPaletteController.swift
-- `firstMatch()` --calls--> `NSRegularExpression`  [INFERRED]
-  Scripts/generate-release-notes.swift → Packages/HarnessCopyMode/Sources/HarnessCopyMode/CopyModeReducer.swift
+- `DaemonSyncService` --calls--> `DaemonSessionService`  [INFERRED]
+  Apps/Harness/Sources/HarnessApp/Services/DaemonSyncService.swift → Packages/HarnessCore/Sources/HarnessCore/IPC/DaemonSessionService.swift
+- `ThemeImportController` --calls--> `ThemeFileService`  [INFERRED]
+  Apps/Harness/Sources/HarnessApp/Services/ThemeImportController.swift → Packages/HarnessTheme/Sources/HarnessTheme/ThemeFileService.swift
 
 
 ## Community Hubs (top 25)
 - [[_COMMUNITY_Terminal Engine Model  TerminalGridModel|Terminal Engine: Model / TerminalGridModel]]
 - [[_COMMUNITY_Harness CLI HarnessCLI|Harness CLI: HarnessCLI]]
-- [[_COMMUNITY_Tests HarnessTerminalRendererTests  MetalRendererTests|Tests: HarnessTerminalRendererTests / MetalRendererTests]]
 - [[_COMMUNITY_Terminal Engine Screen  TerminalScreen|Terminal Engine: Screen / TerminalScreen]]
 - [[_COMMUNITY_HarnessCore Settings  HarnessSettings|HarnessCore: Settings / HarnessSettings]]
 - [[_COMMUNITY_HarnessCore IPC  IPCMessage|HarnessCore: IPC / IPCMessage]]
@@ -66,5 +65,6 @@ _Regen: `~/.claude/scripts/generate-graph-summary.sh .` after `graphify update .
 - [[_COMMUNITY_HarnessCore Agents  AgentHookInstaller|HarnessCore: Agents / AgentHookInstaller]]
 - [[_COMMUNITY_Daemon HarnessDaemon  RealPty|Daemon: HarnessDaemon / RealPty]]
 - [[_COMMUNITY_Tests HarnessDaemonTests  DaemonRoundTripTests|Tests: HarnessDaemonTests / DaemonRoundTripTests]]
+- [[_COMMUNITY_HarnessCore Session  SessionEditor|HarnessCore: Session / SessionEditor]]
 
 _Full map → graphify-out/GRAPH_REPORT.md · query: `graphify query "..."`_
