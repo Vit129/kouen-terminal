@@ -104,3 +104,48 @@ Layout: `titleLabel.topAnchor` (not centerY) + `subtitleLabel` below with 1pt ga
 
 `ContentAreaViewController` passes empty cwd when agent active but always passes
 `tab.gitBranch` — branch is never hidden from the user.
+
+## Git Branch Per-Tab Isolation (Worktree Auto-Isolate)
+
+### Problem
+
+Multiple tabs sharing the same repo root cwd → `git rev-parse --abbrev-ref HEAD`
+returns the **main worktree's HEAD** for all tabs, regardless of which branch
+each shell actually checked out. Results in wrong branch display in tab pill,
+sidebar, top bar, and status bar.
+
+### Solution
+
+`WorktreeAutoIsolateService` observes `HarnessActiveTabGitBranchDidChange` notification.
+When a tab's detected branch ≠ default (main/master/develop) AND the tab isn't already
+in a worktree:
+
+1. Check if branch already has a worktree → cd to it
+2. Otherwise create new worktree in `.harness-worktrees/<branch-slug>/`
+3. Send `cd <worktree-path>` to the shell
+
+Each tab gets its own cwd → git probe returns correct branch per tab.
+
+### Key: Always-On (not config-gated)
+
+Originally behind `harness.json` `isolateAgents: true` flag. Changed to **always on**
+because branch display correctness is fundamental — not optional.
+
+### Files
+
+- `Apps/Harness/Sources/HarnessApp/Services/WorktreeAutoIsolateService.swift`
+- `Packages/HarnessCore/Sources/HarnessCore/Metadata/MetadataProvider.swift` (git probe)
+- `Apps/Harness/Sources/HarnessApp/Services/DaemonSyncService.swift` (5s metadata refresh)
+
+### Branch Detection Flow
+
+```
+DaemonSyncService (5s loop)
+  → GitMetadataProvider.refresh(tab:)
+    → git -C <tab.cwd> rev-parse --abbrev-ref HEAD
+    → if changed → updateTabGitBranch IPC → notification
+      → WorktreeAutoIsolateService.handleBranchChange()
+        → create/reuse worktree → cd shell
+        → SurfaceShellTracker updates tab.cwd (500ms poll)
+        → next metadata refresh → correct branch
+```
