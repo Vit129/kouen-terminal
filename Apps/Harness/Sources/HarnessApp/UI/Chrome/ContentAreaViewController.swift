@@ -826,6 +826,10 @@ final class PaneContainerView: NSView {
         for sub in view.subviews {
             if let host = sub as? TerminalHostView {
                 host.resignIfFirstResponder()
+                // RL-040: Stop the display link BEFORE removing from superview.
+                // Without this, AppKit's internal cursor-rect display link can fire
+                // resetCursorRects on the zombie view during the retired-hold window.
+                host.stopSurfaceDisplayLink()
                 host.removeFromSuperview()
             } else {
                 detachHosts(in: sub)

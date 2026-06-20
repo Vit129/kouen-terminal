@@ -345,7 +345,7 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         statusLineHex: String? = nil,
         windowBorderHex: String? = nil,
         windowBorderOpacity: Float = 0.25,
-        systemNotificationsEnabled: Bool = true,
+        systemNotificationsEnabled: Bool = false,
         notificationSoundEnabled: Bool = true,
         notchVisibilityMode: NotchVisibilityMode = .automatic,
         notchOpenOnHover: Bool = true,

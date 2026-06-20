@@ -265,9 +265,9 @@ public enum CommandIPCTranslator {
             return .requests([.selectTab(workspaceID: first.workspaceID, tabID: first.tabID)])
 
         // MARK: Pane structure
-        case let .splitWindow(direction):
+        case let .splitWindow(direction, before):
             guard let tab = target.tab, let pane = target.paneID else { return .unresolved }
-            return .requests([.newSplit(tabID: tab.id, paneID: pane, direction: layoutDirection(for: direction))])
+            return .requests([.newSplit(tabID: tab.id, paneID: pane, direction: layoutDirection(for: direction), before: before)])
 
         case .killPane:
             guard let pane = target.paneID else { return .unresolved }

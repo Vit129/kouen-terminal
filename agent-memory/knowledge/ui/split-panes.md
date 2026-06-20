@@ -27,7 +27,7 @@ Reordering via `removeFromSuperview` + `addSubview` causes window collapse/black
 ## Two-Axis Split Parity (P13)
 
 `SplitDirection.horizontal` = side-by-side leaves (vertical divider, "Split Right",
-⌘D); `.vertical` = stacked leaves (horizontal divider, "Split Down", ⌘⇧D). AppKit
+⌘⇧→); `.vertical` = stacked leaves (horizontal divider, "Split Down", ⌘⇧↓). AppKit
 naming is inverted from this: `split.isVertical = direction == .horizontal` (a
 side-by-side leaf pair sits in a *vertical* `NSSplitView` divider). Don't conflate
 the two naming systems when reading `PaneContainerView`.

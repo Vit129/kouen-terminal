@@ -22,21 +22,10 @@ final class HarnessSidebarPanelViewController: NSViewController {
     private let chromeHeader = SidebarTitlebarHeaderView()
     private let workspaceBar = NSView()
     let workspacePill = WorkspacePillButton()
-    private let notificationBell = NotificationBellButton()
     /// Collapses the sidebar (⌘\). Lives at the sidebar's top-trailing edge, against
     /// the divider; when the sidebar is collapsed it's gone with it (re-open via ⌘\).
     /// Flat `.plain` style + 30×30 so it matches the neighbouring notification bell.
     private let sidebarToggleButton = SoftIconButton(frame: NSRect(x: 0, y: 0, width: 30, height: 30))
-    /// Plain editable field (not `NSSearchField`): a borderless `NSSearchField` collapses
-    /// its built-in search-button cell when it becomes first responder, which shifts the
-    /// text/insertion-point left over the placeholder and drops the magnifier — the
-    /// "messes up on click" glitch. A bare `NSTextField` + a static magnifier image view
-    /// has no such cell to collapse, so focus is rock-steady.
-    private let searchField = NSTextField()
-    private let searchIcon = NSImageView()
-    /// Wraps the search field so it gets the same radius-7 elevated-surface chrome as
-    /// the workspace pill and session cards.
-    private let searchContainer = NSView()
     private let sidebarTabs = NSSegmentedControl(labels: ["Sessions", "Files"], trackingMode: .selectOne, target: nil, action: nil)
 #if HARNESS_ACP
     private let agentChatPanel = AgentChatPanelView()
@@ -59,8 +48,6 @@ final class HarnessSidebarPanelViewController: NSViewController {
     private var isProgrammaticSelection = false
     var workspaceDropdown: WorkspaceSwitcherPanelView?
     var workspaceDropdownMonitor: Any?
-    /// Live filter text from the search field; empty shows all sessions.
-    var sessionFilter = ""
     private var collapsedGroups = Set<String>()
     var cachedSidebarRows: [SidebarSessionRow] = []
     /// Last session ID sent to fileTreeView so we can detect session changes even
@@ -87,9 +74,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
     /// filter is active (see the data source), so callers that reorder still use the
     /// unfiltered `sessions`.
     private var displayedSessions: [SessionGroup] {
-        let q = sessionFilter.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !q.isEmpty else { return sessions }
-        return sessions.filter { sessionMatches($0, query: q) }
+        return sessions
     }
 
     private func columnKind(for tab: Tab) -> BoardColumnKind {
@@ -492,7 +477,6 @@ final class HarnessSidebarPanelViewController: NSViewController {
         super.viewDidLoad()
         setupChromeHeader()
         setupWorkspaceBar()
-        setupSearchField()
         setupSidebarTabs()
         setupSectionHeader()
         setupFooter()
@@ -545,7 +529,6 @@ final class HarnessSidebarPanelViewController: NSViewController {
         for case let button as SoftIconButton in footer.subviews {
             button.applyChrome()
         }
-        applySearchChrome()
         sessionTable.reloadData()
     }
 
@@ -561,17 +544,12 @@ final class HarnessSidebarPanelViewController: NSViewController {
         ])
     }
 
-    /// The sidebar header row: the search field with the notification bell + sidebar toggle
-    /// to its right. Workspaces are deliberately not surfaced here (single active workspace);
-    /// the switcher machinery stays dormant so it can be re-enabled later. The search field
-    /// itself is added in `setupSearchField` (it slots into the leading space of this row).
+    /// The sidebar header row: the sidebar toggle button on the trailing edge.
+    /// Workspaces are deliberately not surfaced here (single active workspace);
+    /// the switcher machinery stays dormant so it can be re-enabled later.
     private func setupWorkspaceBar() {
         workspaceBar.translatesAutoresizingMaskIntoConstraints = false
         HarnessDesign.makeClear(workspaceBar)
-
-        notificationBell.translatesAutoresizingMaskIntoConstraints = false
-        notificationBell.target = self
-        notificationBell.action = #selector(notificationBellClicked)
 
         sidebarToggleButton.toolTip = "Hide sidebar (⌘\\)"
         sidebarToggleButton.target = self
@@ -579,7 +557,6 @@ final class HarnessSidebarPanelViewController: NSViewController {
         sidebarToggleButton.translatesAutoresizingMaskIntoConstraints = false
         updateSidebarToggleMenu()
 
-        workspaceBar.addSubview(notificationBell)
         workspaceBar.addSubview(sidebarToggleButton)
         view.addSubview(workspaceBar)
 
@@ -588,15 +565,11 @@ final class HarnessSidebarPanelViewController: NSViewController {
             workspaceBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             workspaceBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             workspaceBar.heightAnchor.constraint(equalToConstant: HarnessDesign.workspaceBarHeight),
-            // Toggle pinned to the trailing edge (against the divider); 30×30 like the bell.
+            // Toggle pinned to the trailing edge (against the divider); 30×30.
             sidebarToggleButton.trailingAnchor.constraint(equalTo: workspaceBar.trailingAnchor, constant: -HarnessDesign.horizontalInset),
             sidebarToggleButton.centerYAnchor.constraint(equalTo: workspaceBar.centerYAnchor),
             sidebarToggleButton.widthAnchor.constraint(equalToConstant: 30),
             sidebarToggleButton.heightAnchor.constraint(equalToConstant: 30),
-            notificationBell.trailingAnchor.constraint(equalTo: sidebarToggleButton.leadingAnchor, constant: -6),
-            notificationBell.centerYAnchor.constraint(equalTo: workspaceBar.centerYAnchor),
-            notificationBell.widthAnchor.constraint(equalToConstant: 30),
-            notificationBell.heightAnchor.constraint(equalToConstant: 30),
         ])
     }
 
@@ -616,134 +589,6 @@ final class HarnessSidebarPanelViewController: NSViewController {
     @objc func toggleSidebarPositionFromMenu() {
         (view.window?.contentViewController as? MainSplitViewController)?.toggleSidebarPosition()
         updateSidebarToggleMenu()
-    }
-
-    @objc private func notificationBellClicked() {
-        showNotificationsDropdown()
-    }
-
-    private var notificationsDropdown: NotificationDropdownPanelView?
-    private var notificationsDropdownMonitor: Any?
-    private weak var notificationsDropdownPreviousResponder: NSResponder?
-
-    func showNotificationsDropdown() {
-        if notificationsDropdown != nil {
-            dismissNotificationsDropdown()
-            return
-        }
-        let coordinator = SessionCoordinator.shared
-        let snapshot = coordinator.snapshot
-        // Agent notifications first, then board error/needs-attention sessions
-        var entries = coordinator.notificationsList()
-        let agentTabIDs = Set(entries.map(\.tabID))
-        for ws in snapshot.workspaces {
-            for session in ws.sessions {
-                for tab in session.tabs {
-                    guard !agentTabIDs.contains(tab.id) else { continue }
-                    let kind = BoardModel.columnKind(for: tab)
-                    guard kind == .needsAttention || kind == .error else { continue }
-                    let body = kind == .error ? "Exit error" : "Needs attention"
-                    let entry = NotificationEntry(
-                        workspaceID: ws.id,
-                        workspaceName: ws.name,
-                        sessionID: session.id,
-                        tabID: tab.id,
-                        tabTitle: tab.title.isEmpty ? tab.cwd : tab.title,
-                        surfaceID: tab.id,
-                        agentKind: tab.effectiveAgentKind,
-                        body: body
-                    )
-                    entries.append(entry)
-                }
-            }
-        }
-        let dropdown = NotificationDropdownPanelView(
-            entries: entries,
-            onSelect: { [weak self] entry in
-                self?.dismissNotificationsDropdown()
-                coordinator.openNotification(entry)
-            },
-            onClearAll: { [weak self] in
-                self?.dismissNotificationsDropdown()
-                coordinator.clearAllNotifications()
-            },
-            onDismiss: { [weak self] in
-                self?.dismissNotificationsDropdown()
-            }
-        )
-        dropdown.alphaValue = 0
-        dropdown.translatesAutoresizingMaskIntoConstraints = true
-        dropdown.layer?.zPosition = 100
-
-        // Float the panel over the window's content view rather than inside the narrow
-        // sidebar: anchored to the sidebar it was clipped at the divider (cut off) and its
-        // body text was squeezed into ~190pt. Hosted on the content view it can use a
-        // comfortable fixed width and overhang the terminal, fully visible. Frame-positioned
-        // just below the bell; it dismisses on any outside click so it needn't track resizes.
-        let host = view.window?.contentView ?? view
-        let width: CGFloat = 300
-        let height = dropdown.preferredHeight
-        // Only anchor to the bell when the sidebar is visible — if the sidebar is hidden the
-        // bell has no real position in the window (coordinates are 0,0) and the panel would
-        // appear off-screen below the window bottom. Fall back to top-left of the content view.
-        let isBellOnScreen = notificationBell.window != nil
-            && !notificationBell.isHiddenOrHasHiddenAncestor
-            && notificationBell.visibleRect != .zero
-        let originX: CGFloat
-        let originY: CGFloat
-        if isBellOnScreen {
-            let bell = host.convert(notificationBell.bounds, from: notificationBell)
-            // minX is the bell's left edge; clamp so the panel never leaves the window.
-            originX = max(8, min(bell.minX, host.bounds.maxX - width - 8))
-            // The content view is not flipped (y grows upward), so the panel sits below the bell
-            // when its top edge is the bell's bottom edge.
-            originY = bell.minY - 6 - height
-        } else {
-            // Sidebar is collapsed: anchor to the top-left of the content view, 8pt from the edge,
-            // just below the title bar (assume ~52pt chrome at the top).
-            originX = 8
-            originY = host.bounds.maxY - 52 - height
-        }
-        dropdown.frame = NSRect(x: originX, y: originY, width: width, height: height)
-        host.addSubview(dropdown)
-        notificationsDropdown = dropdown
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.12
-            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            dropdown.animator().alphaValue = 1
-        }
-        installNotificationsDropdownMonitor()
-        // Take first responder so arrow keys / Enter / Escape reach the dropdown
-        // immediately; restore whatever had focus (e.g. the terminal) on dismiss.
-        notificationsDropdownPreviousResponder = view.window?.firstResponder
-        view.window?.makeFirstResponder(dropdown)
-    }
-
-    private func dismissNotificationsDropdown() {
-        notificationsDropdown?.removeFromSuperview()
-        notificationsDropdown = nil
-        if let monitor = notificationsDropdownMonitor {
-            NSEvent.removeMonitor(monitor)
-            notificationsDropdownMonitor = nil
-        }
-        if let previous = notificationsDropdownPreviousResponder {
-            view.window?.makeFirstResponder(previous)
-            notificationsDropdownPreviousResponder = nil
-        }
-    }
-
-    private func installNotificationsDropdownMonitor() {
-        notificationsDropdownMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
-            guard let self, let dropdown = self.notificationsDropdown else { return event }
-            let point = dropdown.convert(event.locationInWindow, from: nil)
-            if !dropdown.bounds.contains(point) {
-                let bellPoint = self.notificationBell.convert(event.locationInWindow, from: nil)
-                if !self.notificationBell.bounds.contains(bellPoint) {
-                    self.dismissNotificationsDropdown()
-                }
-            }
-            return event
-        }
     }
 
     @objc private func agentsButtonClicked() {
@@ -851,87 +696,6 @@ final class HarnessSidebarPanelViewController: NSViewController {
             sidebarTabs.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -HarnessDesign.horizontalInset),
             sidebarTabs.heightAnchor.constraint(equalToConstant: 26),
         ])
-    }
-
-    /// Warp-style "Search sessions…" field; filters the list live by name / cwd.
-    private func setupSearchField() {
-        searchContainer.wantsLayer = true
-        searchContainer.layer?.cornerRadius = HarnessDesign.Radius.card
-        searchContainer.layer?.cornerCurve = .continuous
-        searchContainer.layer?.borderWidth = 1
-        searchContainer.translatesAutoresizingMaskIntoConstraints = false
-
-        // Static magnifier accessory; the container owns the rounded-rect chrome so the
-        // icon + text sit on our standardized surface (matching the pill).
-        searchIcon.translatesAutoresizingMaskIntoConstraints = false
-        searchIcon.image = NSImage(
-            systemSymbolName: "magnifyingglass", accessibilityDescription: nil
-        )
-        searchIcon.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 12, weight: .regular)
-        searchIcon.imageScaling = .scaleProportionallyDown
-        searchIcon.contentTintColor = HarnessChrome.current.textSecondary
-
-        // Borderless/clear single-line editable field; live filtering via the delegate
-        // (`controlTextDidChange`), not a target/action (which only fires on Enter).
-        searchField.translatesAutoresizingMaskIntoConstraints = false
-        searchField.isBezeled = false
-        searchField.isBordered = false
-        searchField.drawsBackground = false
-        searchField.isEditable = true
-        searchField.isSelectable = true
-        searchField.usesSingleLineMode = true
-        searchField.lineBreakMode = .byTruncatingTail
-        searchField.cell?.isScrollable = true
-        searchField.cell?.wraps = false
-        searchField.font = HarnessDesign.Typography.sidebarLabel
-        searchField.focusRingType = .none
-        searchField.delegate = self
-
-        searchContainer.addSubview(searchIcon)
-        searchContainer.addSubview(searchField)
-        // The search field lives in the header row, expanding from the leading edge up to the
-        // notification bell + sidebar toggle on the right.
-        workspaceBar.addSubview(searchContainer)
-        NSLayoutConstraint.activate([
-            searchContainer.leadingAnchor.constraint(equalTo: workspaceBar.leadingAnchor, constant: HarnessDesign.horizontalInset),
-            searchContainer.trailingAnchor.constraint(equalTo: notificationBell.leadingAnchor, constant: -8),
-            searchContainer.centerYAnchor.constraint(equalTo: workspaceBar.centerYAnchor),
-            searchContainer.heightAnchor.constraint(equalToConstant: 30),
-
-            searchIcon.leadingAnchor.constraint(equalTo: searchContainer.leadingAnchor, constant: 8),
-            searchIcon.centerYAnchor.constraint(equalTo: searchContainer.centerYAnchor),
-            searchIcon.widthAnchor.constraint(equalToConstant: 14),
-            searchIcon.heightAnchor.constraint(equalToConstant: 14),
-
-            searchField.leadingAnchor.constraint(equalTo: searchIcon.trailingAnchor, constant: 6),
-            searchField.trailingAnchor.constraint(equalTo: searchContainer.trailingAnchor, constant: -6),
-            searchField.centerYAnchor.constraint(equalTo: searchContainer.centerYAnchor),
-        ])
-    }
-
-    private func applySearchChrome() {
-        let c = HarnessChrome.current
-        searchContainer.layer?.backgroundColor = c.surfaceElevated.cgColor
-        // Defined card rim to match the workspace pill + session cards (one component family).
-        searchContainer.layer?.borderColor = c.borderStrong.cgColor
-        // Typed text + placeholder share the standardized label font, and the
-        // placeholder uses the same resting color as the workspace name so the two
-        // header rows read as identical type.
-        searchField.textColor = c.textPrimary
-        searchIcon.contentTintColor = c.textSecondary
-        searchField.placeholderAttributedString = NSAttributedString(
-            string: "Search sessions…",
-            attributes: [
-                .foregroundColor: c.textSecondary,
-                .font: HarnessDesign.Typography.sidebarLabel,
-            ]
-        )
-    }
-
-    private func searchChanged() {
-        sessionFilter = searchField.stringValue
-        sessionTable.reloadData()
-        selectActiveSessionRowIfVisible(scroll: false)
     }
 
     private func setupSessionList() {
@@ -1474,33 +1238,34 @@ final class HarnessSidebarPanelViewController: NSViewController {
     private func fetchRepoName(for path: String) async -> String {
         let folderName = HarnessDesign.projectGroupName(for: path)
         guard !path.isEmpty, FileManager.default.fileExists(atPath: path) else { return folderName }
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-        process.arguments = ["config", "--get", "remote.origin.url"]
-        process.currentDirectoryURL = URL(fileURLWithPath: path)
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = Pipe()
-        do {
-            try process.run()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            process.waitUntilExit()
-            if process.terminationStatus == 0,
-               let urlString = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-               !urlString.isEmpty {
-                let lastPathComponent = (urlString as NSString).lastPathComponent
-                var repo = lastPathComponent
-                if repo.hasSuffix(".git") {
-                    repo = String(repo.dropLast(4))
+        // Run git off the main actor — readDataToEndOfFile + waitUntilExit block the
+        // calling thread, causing a 1s+ hang report when executed on main.
+        let repoName: String? = await Task.detached(priority: .utility) {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+            process.arguments = ["config", "--get", "remote.origin.url"]
+            process.currentDirectoryURL = URL(fileURLWithPath: path)
+            let pipe = Pipe()
+            process.standardOutput = pipe
+            process.standardError = Pipe()
+            do {
+                try process.run()
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                process.waitUntilExit()
+                if process.terminationStatus == 0,
+                   let urlString = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   !urlString.isEmpty {
+                    let lastPathComponent = (urlString as NSString).lastPathComponent
+                    var repo = lastPathComponent
+                    if repo.hasSuffix(".git") {
+                        repo = String(repo.dropLast(4))
+                    }
+                    if !repo.isEmpty { return repo }
                 }
-                if !repo.isEmpty {
-                    return repo
-                }
-            }
-        } catch {
-            // fallback
-        }
-        return folderName
+            } catch {}
+            return nil
+        }.value
+        return repoName ?? folderName
     }
 
     private func fetchWorktrees(for rootPath: String) async -> [SidebarWorktreeEntry] {
@@ -1575,13 +1340,6 @@ final class HarnessSidebarPanelViewController: NSViewController {
                 }
             }
         }
-    }
-}
-
-extension HarnessSidebarPanelViewController: NSTextFieldDelegate {
-    func controlTextDidChange(_ obj: Notification) {
-        guard (obj.object as? NSTextField) === searchField else { return }
-        searchChanged()
     }
 }
 

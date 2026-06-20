@@ -168,13 +168,11 @@ extension HarnessTerminalSurfaceView {
     }
 
     /// RL-040: `nonisolated` bypasses the Swift 6.3 `@objc` thunk actor-isolation check.
-    nonisolated public override func keyDown(with event: NSEvent) {
+    /// RL-040: Swift 6.3 allows @MainActor override of NSView.keyDown() directly.
+    /// Do NOT use `nonisolated + assumeIsolated` — the thunk dereferences freed self.
+    public override func keyDown(with event: NSEvent) {
         guard self.window != nil else { return }
-        // nonisolated(unsafe) suppresses the Sendable diagnostic — we know this runs on main.
-        nonisolated(unsafe) let ev = event
-        MainActor.assumeIsolated {
-            self._keyDown(with: ev)
-        }
+        self._keyDown(with: event)
     }
 
     private func _keyDown(with event: NSEvent) {
@@ -296,13 +294,10 @@ extension HarnessTerminalSurfaceView {
         interpretKeyEvents([event])
     }
 
-    /// RL-040: `nonisolated` bypasses the Swift 6.3 `@objc` thunk actor-isolation check.
-    nonisolated public override func keyUp(with event: NSEvent) {
+    /// RL-040: Swift 6.3 allows @MainActor override directly.
+    public override func keyUp(with event: NSEvent) {
         guard self.window != nil else { return }
-        nonisolated(unsafe) let ev = event
-        MainActor.assumeIsolated {
-            self._keyUp(with: ev)
-        }
+        self._keyUp(with: event)
     }
 
     private func _keyUp(with event: NSEvent) {

@@ -79,8 +79,10 @@ These are fixed `NSMenuItem` bindings defined in `MainMenuBuilder` — not prefi
 | Switch to session 1–9 | `⌘1` … `⌘9` |
 | Close pane (or tab if single pane) | `⌘W` |
 | Previous / Next session | `⌘[` / `⌘]` |
-| Split Right | `⌘D` |
-| Split Down | `⌘⇧D` |
+| Split Right | `⌘⇧→` |
+| Split Down | `⌘⇧↓` |
+| Split Left | `⌘⇧←` |
+| Split Up | `⌘⇧↑` |
 | Close Pane | `⌘⌥W` |
 | Focus Pane direction | `⌘⌥←/→/↑/↓` |
 | **Find File (fuzzy)** | **`⌘P`** |

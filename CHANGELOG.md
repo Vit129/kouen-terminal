@@ -6,6 +6,23 @@ All notable changes to Harness are documented here. The format is based on
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/robzilla1738/harness-terminal/releases).
 
+## [3.5.2] - 2026-06-20
+
+### Added
+- **4-direction split pane** — split left/right/up/down with `⌘⇧→/←/↑/↓` (WezTerm-style `--left/--right/--top/--bottom` flags in `:split-window`)
+
+### Fixed
+- **Window not showing on launch** — `HarnessAIChatView` constraint activation order caused NSGenericException (no common ancestor), swallowed by AppKit leaving app running with zero windows
+- **RL-040 keyDown/keyUp/mouseMoved/resetCursorRects crashes** — removed all remaining `nonisolated + MainActor.assumeIsolated` patterns from `HarnessTerminalSurfaceView`; Swift 6.3 allows `@MainActor override` directly
+- **TerminalTabBarView.layout() crash** — same RL-040 pattern fix
+
+### Removed
+- Built-in AI chat sidebar tab (Harness connects AI via CLI agents + MCP/ACP instead)
+- Search sessions field from sidebar header (⌘P palette is the primary search)
+- Search panel sidebar tab (`:grep` command and ⌘P palette cover this)
+- Notification bell from sidebar (Notch panel ⌘I is the single notification UI)
+- `MANUAL_TEST_PLAN.md`
+
 ## [3.5.0] - 2026-06-20
 
 ### Added
@@ -145,7 +162,7 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 - **`agent_chip` format variable** — new `#{agent_chip}` in status/pane-border format strings returns the 2-letter chip (e.g. `KR`, `CC`) for the active agent.
 
 ### Changed
-- **Welcome banner unified shortcuts** — merged "Try this" and "Native shortcuts" into a single "Shortcuts" section with 11 Harness-native shortcuts (`⌘⇧N`, `⌘D/⌘⇧D`, `⌘P`, `⌘F`, `⌘B`, `⌘;` etc.). Removed all `ctrl-a` prefix references.
+- **Welcome banner unified shortcuts** — merged "Try this" and "Native shortcuts" into a single "Shortcuts" section with 11 Harness-native shortcuts (`⌘⇧N`, `⌘⇧→/←/↑/↓`, `⌘P`, `⌘F`, `⌘B`, `⌘;` etc.). Removed all `ctrl-a` prefix references.
 - **`pane-border-format` default** — changed from `#{pane_index} #{pane_title}` to `#{pane_index}`, eliminating tool-injected process names (e.g. `kiro-cli`) from the pane border label. Old value auto-migrated.
 - **Command prompt placeholder** — updated from tmux-style `split-window -h ; copy-mode` to Harness-first `find, grep, cd, rename-window`.
 

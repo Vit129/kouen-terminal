@@ -53,12 +53,12 @@ final class MainExecutor: CommandExecutor {
         case let .openBrowser(url, direction):
             let layoutDir = CommandIPCTranslator.layoutDirection(for: direction)
             coordinator.splitPaneCoordinator.openBrowserPane(url: url, direction: layoutDir)
-        case .splitWindow(let direction):
+        case .splitWindow(let direction, let before):
             // `Command.SplitDirection` is divider-orientation (`.vertical` =
             // side-by-side, the CommandParser convention); `splitActivePane`
             // wants the layout direction. Invert through the one shared rule so
             // prefix-`%` splits side-by-side, matching the compositor and tmux.
-            coordinator.splitActivePane(direction: CommandIPCTranslator.layoutDirection(for: direction))
+            coordinator.splitActivePane(direction: CommandIPCTranslator.layoutDirection(for: direction), before: before)
         case .killPane:
             coordinator.killActivePane()
         case .zoomPane:

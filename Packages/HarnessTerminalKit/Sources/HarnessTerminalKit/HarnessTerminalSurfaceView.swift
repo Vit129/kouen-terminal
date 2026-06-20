@@ -1231,19 +1231,17 @@ public final class HarnessTerminalSurfaceView: NSView {
     }
 
     /// RL-040: `nonisolated` bypasses the Swift 6.3 `@objc` thunk actor-isolation check.
-    nonisolated override public func resetCursorRects() {
+    override public func resetCursorRects() {
         guard self.window != nil else { return }
-        MainActor.assumeIsolated {
-            if let programPointerCursor {
-                addCursorRect(bounds, cursor: programPointerCursor)
-            } else {
-                super.resetCursorRects()
-            }
-            // Added last so it wins over the base/program cursor for the link's region: ⌘-hovering
-            // a link shows the pointing hand, signalling it's ⌘-clickable.
-            if let rect = hoveredLinkRect() {
-                addCursorRect(rect, cursor: .pointingHand)
-            }
+        if let programPointerCursor {
+            addCursorRect(bounds, cursor: programPointerCursor)
+        } else {
+            super.resetCursorRects()
+        }
+        // Added last so it wins over the base/program cursor for the link's region: ⌘-hovering
+        // a link shows the pointing hand, signalling it's ⌘-clickable.
+        if let rect = hoveredLinkRect() {
+            addCursorRect(rect, cursor: .pointingHand)
         }
     }
 

@@ -164,7 +164,7 @@ final class SessionCoordinator: NSObject {
 
     // MARK: - Split pane (facade → SplitPaneCoordinator)
 
-    func splitActivePane(direction: SplitDirection) { splitPaneCoordinator.splitActivePane(direction: direction) }
+    func splitActivePane(direction: SplitDirection, before: Bool = false) { splitPaneCoordinator.splitActivePane(direction: direction, before: before) }
 
     // MARK: - Project scripts (⌘R / ⌘.)
 

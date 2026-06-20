@@ -145,8 +145,12 @@ public enum CommandParser {
             // a vertical divider → panes sit side by side; `.horizontal` means
             // a horizontal divider → panes stack top/bottom. `-v` requests the
             // top/bottom split; default and `-h` request side-by-side.
-            if tokens.contains("-v") { return .splitWindow(direction: .horizontal) }
-            return .splitWindow(direction: .vertical)
+            // WezTerm-style positional flags: --left/--right/--top/--bottom.
+            if tokens.contains("--left") { return .splitWindow(direction: .vertical, before: true) }
+            if tokens.contains("--top") { return .splitWindow(direction: .horizontal, before: true) }
+            if tokens.contains("--bottom") { return .splitWindow(direction: .horizontal, before: false) }
+            if tokens.contains("-v") { return .splitWindow(direction: .horizontal, before: false) }
+            return .splitWindow(direction: .vertical, before: false)
         case "kill-pane":
             return .killPane
         case "zoom-pane", "resize-pane":

@@ -50,17 +50,23 @@ final class PrefixKeymap {
 
     private func ensureMonitor() {
         guard monitor == nil else { return }
-        // RL-040: The event monitor closure is @Sendable; accessing @MainActor `self`
-        // triggers _checkExpectedExecutor → swift_task_isCurrentExecutorWithFlagsImpl
-        // which can crash on macOS 26 / Swift 6.3.2 when the runtime's task metadata
-        // is corrupted during app teardown. Capture `self` as unowned(unsafe) +
-        // nonisolated(unsafe) to suppress the executor check. Safe because:
-        // 1) PrefixKeymap is a singleton (never deallocated)
-        // 2) NSEvent local monitors always fire on the main thread
-        nonisolated(unsafe) let unsafeSelf = self
+        // RL-040 FIX: Prevent executor check crash in NSEvent monitor.
+        //
+        // The closure is @Sendable (AppKit requirement) and fires from ObjC code
+        // (_NSSendEventToObservers) without a Swift task context. Directly calling
+        // @MainActor methods inserts swift_task_isCurrentExecutorWithFlagsImpl which
+        // dereferences stale memory → EXC_BAD_ACCESS on macOS 26 / Swift 6.3.
+        //
+        // Fix: capture self as nonisolated(unsafe), call handle() through the same
+        // reference. Since PrefixKeymap is @MainActor AND Sendable (singleton, never
+        // freed), and NSEvent monitors always fire on main thread, this is safe.
+        // The nonisolated(unsafe) reference suppresses the compiler's isolation check
+        // at the callsite — no thunk is emitted.
+        nonisolated(unsafe) let this = self
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            guard let eventWindow = event.window, eventWindow.contentView != nil else { return event }
-            return unsafeSelf.handle(event)
+            guard event.window != nil else { return event }
+            nonisolated(unsafe) let ev = event
+            return this.handle(ev)
         }
     }
 
