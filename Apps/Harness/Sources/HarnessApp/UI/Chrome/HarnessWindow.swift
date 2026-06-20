@@ -21,10 +21,15 @@ final class HarnessWindow: NSWindow {
     nonisolated override func sendEvent(_ event: NSEvent) {
         // Guard: if this window is closing (contentView removed), drop all events.
         guard self.contentView != nil else { return }
-        // Guard keyboard events: if the first responder's view has no window, skip.
+        // Guard keyboard events: if the first responder's view has no window or
+        // has been detached from its superview (retire flow removes from superview
+        // before the window reference clears), skip the event. This prevents the
+        // @objc thunk from crashing when AppKit dispatches a queued key event to a
+        // view that is mid-teardown (RL-040).
         switch event.type {
         case .keyDown, .keyUp:
-            if let responder = self.firstResponder as? NSView, responder.window == nil {
+            if let responder = self.firstResponder as? NSView,
+               responder.window == nil || responder.superview == nil {
                 return
             }
         case .mouseMoved, .mouseEntered, .mouseExited:
