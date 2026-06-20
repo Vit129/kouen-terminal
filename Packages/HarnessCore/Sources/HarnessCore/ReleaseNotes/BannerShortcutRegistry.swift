@@ -117,19 +117,11 @@ public enum BannerShortcutRegistry {
 
     public static let splitRight = Keybinding(
         id: "splitRight", title: "Split Right",
-        modifiers: [.command, .shift], keyChar: "\u{F703}", keyLabel: "→")
+        modifiers: .command, keyChar: "d")
 
     public static let splitDown = Keybinding(
         id: "splitDown", title: "Split Down",
-        modifiers: [.command, .shift], keyChar: "\u{F701}", keyLabel: "↓")
-
-    public static let splitLeft = Keybinding(
-        id: "splitLeft", title: "Split Left",
-        modifiers: [.command, .shift], keyChar: "\u{F702}", keyLabel: "←")
-
-    public static let splitUp = Keybinding(
-        id: "splitUp", title: "Split Up",
-        modifiers: [.command, .shift], keyChar: "\u{F700}", keyLabel: "↑")
+        modifiers: [.command, .shift], keyChar: "d")
 
     public static let previousPane = Keybinding(
         id: "previousPane", title: "Previous Pane",
@@ -189,8 +181,7 @@ public enum BannerShortcutRegistry {
     public static let shortcuts: [BannerShortcut] = [
         .init(key: "", description: "Sessions", showInBanner: true),
         .init(key: "\(newSession.displayKey)", description: "new tab"),
-        .init(key: "\(splitLeft.displayKey) / \(splitRight.displayKey)", description: "split left / right"),
-        .init(key: "\(splitUp.displayKey) / \(splitDown.displayKey)", description: "split up / down"),
+        .init(key: "\(splitRight.displayKey) / \(splitDown.displayKey)", description: "split right / split down"),
         .init(key: "\(closePane.displayKey) / \(closeTab.displayKey)", description: "close pane (or tab) / force close tab"),
         .init(key: "", description: "Navigation", showInBanner: true),
         .init(key: "⌘1–9 / ⌘⇧[ / ⌘⇧]", description: "switch / prev / next session"),

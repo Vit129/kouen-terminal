@@ -96,12 +96,6 @@ enum MainMenuBuilder {
 
         let splitVItem = menuItem("Split Down", action: #selector(MenuTarget.splitV), binding: BannerShortcutRegistry.splitDown)
         view.submenu?.addItem(splitVItem)
-
-        let splitLeftItem = menuItem("Split Left", action: #selector(MenuTarget.splitLeft), binding: BannerShortcutRegistry.splitLeft)
-        view.submenu?.addItem(splitLeftItem)
-
-        let splitUpItem = menuItem("Split Up", action: #selector(MenuTarget.splitUp), binding: BannerShortcutRegistry.splitUp)
-        view.submenu?.addItem(splitUpItem)
         view.submenu?.addItem(.separator())
 
         let prevPane = menuItem("Previous Pane", action: #selector(MenuTarget.previousPane), binding: BannerShortcutRegistry.previousPane)
@@ -404,14 +398,6 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
 
     @objc func splitV() {
         SessionCoordinator.shared.splitActivePane(direction: .vertical)
-    }
-
-    @objc func splitLeft() {
-        SessionCoordinator.shared.splitActivePane(direction: .horizontal, before: true)
-    }
-
-    @objc func splitUp() {
-        SessionCoordinator.shared.splitActivePane(direction: .vertical, before: true)
     }
 
     @objc func runScript() {
