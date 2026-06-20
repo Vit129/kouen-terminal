@@ -19,6 +19,8 @@ final class HarnessWindow: NSWindow {
     /// metadata when the runtime context is partially torn down during dealloc cascades.
     /// `sendEvent` is always called on the main thread by AppKit.
     nonisolated override func sendEvent(_ event: NSEvent) {
+        // Guard: if this window is closing (contentView removed), drop all events.
+        guard self.contentView != nil else { return }
         // Guard keyboard events: if the first responder's view has no window, skip.
         switch event.type {
         case .keyDown, .keyUp:
@@ -33,5 +35,17 @@ final class HarnessWindow: NSWindow {
         }
         nonisolated(unsafe) let ev = event
         super.sendEvent(ev)
+    }
+
+    /// RL-040: Hold a strong reference during close so AppKit's event routing does not
+    /// hit a deallocated window between `close()` and the next runloop drain.
+    private nonisolated(unsafe) static var retiredWindows: [HarnessWindow] = []
+
+    nonisolated override func close() {
+        Self.retiredWindows.append(self)
+        super.close()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            Self.retiredWindows.removeAll { $0 === self }
+        }
     }
 }

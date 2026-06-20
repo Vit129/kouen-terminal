@@ -165,7 +165,8 @@ final class HarnessAIChatView: NSView {
         currentBubble = bubble
 
         let systemPrompt = buildSystemPrompt()
-        var fullReply = ""
+        final class ReplyBox: @unchecked Sendable { var text = "" }
+        let replyBox = ReplyBox()
 
         await client.stream(
             messages: messages,
@@ -176,11 +177,11 @@ final class HarnessAIChatView: NSView {
                 guard let self else { return }
                 switch event {
                 case .text(let chunk):
-                    fullReply += chunk
-                    bubble.string = fullReply
+                    replyBox.text += chunk
+                    bubble.string = replyBox.text
                     self.scrollToBottom()
                 case .done:
-                    self.finishStreaming(reply: fullReply)
+                    self.finishStreaming(reply: replyBox.text)
                 case .error(let msg):
                     bubble.string = "⚠️ \(msg)"
                     self.finishStreaming(reply: msg)
