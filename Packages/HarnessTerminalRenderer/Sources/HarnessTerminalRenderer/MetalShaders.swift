@@ -186,5 +186,62 @@ enum MetalShaders {
         }
         return float4(in.color.rgb, in.color.a * coverage);
     }
+
+    // MARK: - Overlay shaders (scanlines / grain / vignette / crt)
+
+    struct OverlayUniforms {
+        float2 viewport;
+        uint mode;       // 1=scanlines 2=grain 3=vignette 4=crt
+        float intensity; // 0-1
+        float seed;      // grain seed (changes each frame for animated noise)
+    };
+
+    struct OverlayVOut {
+        float4 position [[position]];
+        float2 uv;
+    };
+
+    vertex OverlayVOut overlay_vertex(uint vid [[vertex_id]]) {
+        constexpr float2 positions[4] = {
+            float2(-1.0, -1.0), float2(1.0, -1.0),
+            float2(-1.0,  1.0), float2(1.0,  1.0)
+        };
+        constexpr float2 uvs[4] = {
+            float2(0.0, 1.0), float2(1.0, 1.0),
+            float2(0.0, 0.0), float2(1.0, 0.0)
+        };
+        OverlayVOut out;
+        out.position = float4(positions[vid], 0.0, 1.0);
+        out.uv = uvs[vid];
+        return out;
+    }
+
+    fragment float4 overlay_fragment(OverlayVOut in [[stage_in]],
+                                     constant OverlayUniforms& u [[buffer(0)]]) {
+        float2 px = in.uv * u.viewport;
+        float alpha = 0.0;
+        if (u.mode == 1u) {
+            // Scanlines: darken every 3rd pixel row
+            alpha = (fmod(floor(px.y), 3.0) < 1.0) ? 0.28 : 0.0;
+        } else if (u.mode == 2u) {
+            // Grain: per-pixel pseudo-random noise
+            float2 seed = px + float2(u.seed * 127.1, u.seed * 311.7);
+            float grain = fract(sin(dot(seed, float2(12.9898, 78.233))) * 43758.5453);
+            alpha = grain * 0.18;
+        } else if (u.mode == 3u) {
+            // Vignette: darken corners with smooth radial falloff
+            float2 centered = in.uv * 2.0 - 1.0;
+            float dist = length(centered);
+            alpha = smoothstep(0.45, 1.4, dist) * 0.65;
+        } else if (u.mode == 4u) {
+            // CRT: scanlines + vignette combo
+            float2 centered = in.uv * 2.0 - 1.0;
+            float dist = length(centered);
+            float vignette = smoothstep(0.45, 1.4, dist) * 0.5;
+            float scan = (fmod(floor(px.y), 3.0) < 1.0) ? 0.22 : 0.0;
+            alpha = vignette + scan;
+        }
+        return float4(0.0, 0.0, 0.0, clamp(alpha * u.intensity, 0.0, 0.92));
+    }
     """
 }
