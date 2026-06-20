@@ -16,12 +16,20 @@ struct NotificationEntry: Identifiable, Equatable {
 
 enum DesktopNotifier {
     // UNUserNotificationCenter.current() crashes on macOS 26 beta due to a corrupted
-    // NSCalendarDate in the notification database. Fallback: osascript AppleScript notification.
+    // NSCalendarDate in the notification database. Fallback: osascript AppleScript notification
+    // using `tell application` to attribute the notification to Harness (not Script Editor).
     static func requestAuthorizationIfNeeded() {}
     static func show(title: String, body: String, withSound: Bool = true) {
-        // osascript fallback — reliable on all macOS versions including 26
         let soundClause = withSound ? " sound name \"Glass\"" : ""
-        let script = "display notification \"\(Self.escape(body))\" with title \"\(Self.escape(title))\"\(soundClause)"
+        // Use the bundle identifier to tell the system this notification belongs to Harness.
+        // `tell application id` with our CFBundleIdentifier makes macOS attribute the
+        // notification (and its icon) to Harness.app instead of Script Editor.
+        let bundleID = Bundle.main.bundleIdentifier ?? "com.robert.harness"
+        let script = """
+            tell application id "\(bundleID)"
+                display notification "\(Self.escape(body))" with title "\(Self.escape(title))"\(soundClause)
+            end tell
+            """
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
         process.arguments = ["-e", script]

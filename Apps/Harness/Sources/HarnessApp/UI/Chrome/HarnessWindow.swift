@@ -14,20 +14,24 @@ import AppKit
 /// premature deallocation.
 @MainActor
 final class HarnessWindow: NSWindow {
-    override func sendEvent(_ event: NSEvent) {
+    /// RL-040: `nonisolated` bypasses the Swift 6.3 `@objc` thunk actor-isolation check
+    /// (`swift_task_isCurrentExecutorWithFlagsImpl`) which dereferences corrupted task/view
+    /// metadata when the runtime context is partially torn down during dealloc cascades.
+    /// `sendEvent` is always called on the main thread by AppKit.
+    nonisolated override func sendEvent(_ event: NSEvent) {
         // Guard keyboard events: if the first responder's view has no window, skip.
         switch event.type {
         case .keyDown, .keyUp:
-            if let responder = firstResponder as? NSView, responder.window == nil {
+            if let responder = self.firstResponder as? NSView, responder.window == nil {
                 return
             }
         case .mouseMoved, .mouseEntered, .mouseExited:
             // Mouse tracking events can target views removed mid-flight.
-            // locationInWindow → hitTest on freed view. If our contentView is gone, bail.
-            guard contentView?.window != nil else { return }
+            guard self.contentView?.window != nil else { return }
         default:
             break
         }
-        super.sendEvent(event)
+        nonisolated(unsafe) let ev = event
+        super.sendEvent(ev)
     }
 }

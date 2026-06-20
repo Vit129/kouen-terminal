@@ -18,10 +18,11 @@ final class WindowBorderOverlayView: NSView {
         needsDisplay = true
     }
 
-    override func layout() {
-        guard window != nil else { return }
+    /// RL-040: `nonisolated` bypasses the Swift 6.3 `@objc` thunk actor-isolation check.
+    nonisolated override func layout() {
+        guard self.window != nil else { return }
         super.layout()
-        needsDisplay = true // the stroke path depends on bounds
+        self.needsDisplay = true // the stroke path depends on bounds
     }
 
     /// The system's live rounding for this window, read from the frame view's layer so the
@@ -47,7 +48,9 @@ final class WindowBorderOverlayView: NSView {
     }
 
     // Purely decorative — never intercept clicks or hover.
-    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+    // RL-040: `nonisolated` prevents the Swift 6.3 `@objc` thunk from performing
+    // `swift_task_isCurrentExecutorWithFlagsImpl` which crashes when the view is freed.
+    nonisolated override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
     override func viewWillMove(toWindow newWindow: NSWindow?) {
         if newWindow == nil {

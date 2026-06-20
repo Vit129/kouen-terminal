@@ -392,14 +392,19 @@ final class DaemonSyncService {
                           let workspace = self.snapshot.activeWorkspace else { return [] }
                     return workspace.sessions.flatMap { $0.tabs }.map { (workspace.id, $0) }
                 }
-                var probedCWDs = Set<String>()
+                var probedCWDs = [String: String?]() // cwd → branch result
                 let updates = work.compactMap { workspaceID, tab -> (WorkspaceID, TabID, String?)? in
                     let cwd = tab.cwd
-                    guard !probedCWDs.contains(cwd) else { return nil }
-                    probedCWDs.insert(cwd)
-                    let updated = git.refresh(tab: tab)
-                    guard updated.gitBranch != tab.gitBranch else { return nil }
-                    return (workspaceID, tab.id, updated.gitBranch)
+                    let branch: String?
+                    if let cached = probedCWDs[cwd] {
+                        branch = cached
+                    } else {
+                        let updated = git.refresh(tab: tab)
+                        branch = updated.gitBranch
+                        probedCWDs[cwd] = branch
+                    }
+                    guard branch != tab.gitBranch else { return nil }
+                    return (workspaceID, tab.id, branch)
                 }
                 guard !updates.isEmpty else { continue }
                 await MainActor.run { [weak self] in

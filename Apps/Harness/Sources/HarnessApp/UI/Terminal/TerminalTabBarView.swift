@@ -241,11 +241,16 @@ final class TerminalTabBarView: NSView {
         super.viewWillMove(toWindow: newWindow)
     }
 
-    override func layout() {
-        guard window != nil else { return }
+    /// RL-040: `nonisolated` bypasses the Swift 6.3 `@objc` thunk actor-isolation check
+    /// (`swift_task_isCurrentExecutorWithFlagsImpl`) which dereferences corrupted task metadata
+    /// during app teardown / view dealloc cascades. AppKit always calls layout() on main thread.
+    nonisolated override func layout() {
+        guard self.window != nil else { return }
         super.layout()
-        guard draggingPill == nil else { return }
-        layoutPills()
+        MainActor.assumeIsolated {
+            guard draggingPill == nil else { return }
+            layoutPills()
+        }
     }
 
     private func layoutPills() {

@@ -382,10 +382,14 @@ extension HarnessTerminalSurfaceView {
         trackingArea = area
     }
 
-    public override func mouseMoved(with event: NSEvent) {
-        guard window != nil else { return }
-        super.mouseMoved(with: event)
-        updateLinkHover(at: event.locationInWindow, modifiers: event.modifierFlags)
+    /// RL-040: `nonisolated` bypasses the Swift 6.3 `@objc` thunk actor-isolation check.
+    nonisolated public override func mouseMoved(with event: NSEvent) {
+        guard self.window != nil else { return }
+        nonisolated(unsafe) let ev = event
+        MainActor.assumeIsolated {
+            super.mouseMoved(with: ev)
+            updateLinkHover(at: ev.locationInWindow, modifiers: ev.modifierFlags)
+        }
     }
 
     public override func mouseExited(with event: NSEvent) {
