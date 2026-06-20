@@ -60,7 +60,7 @@ final class IPCCodecTests: XCTestCase {
         let payload = #"{"request":{"newSplit":{"tabID":"\#(tabID.uuidString)","paneID":"\#(paneID.uuidString)","direction":"vertical"}}}"#.data(using: .utf8)!
         let envelope = try JSONDecoder().decode(IPCEnvelope.self, from: payload)
 
-        guard case let .newSplit(decodedTabID, decodedPaneID, direction, shell) = try XCTUnwrap(envelope.request) else {
+        guard case let .newSplit(decodedTabID, decodedPaneID, direction, shell, _) = try XCTUnwrap(envelope.request) else {
             return XCTFail("expected newSplit")
         }
         XCTAssertEqual(decodedTabID, tabID)

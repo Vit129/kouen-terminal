@@ -75,7 +75,7 @@ pane into the current one (Harness's `move-pane`/`join-pane`).
 
 **Type to several panes at once:** `prefix S` toggles `synchronize-panes` for the tab.
 
-> macOS shortcuts work too: `Cmd-D` splits side-by-side (Split Right), `Cmd-Shift-D` splits top/bottom (Split Down).
+> macOS shortcuts work too: `Cmd-Shift-→` splits right, `Cmd-Shift-↓` splits down, `Cmd-Shift-←` splits left, `Cmd-Shift-↑` splits up.
 > In the GUI, directional pane nav is the **arrow keys**; the `attach-window` compositor (§10)
 > uses **`hjkl`** instead.
 

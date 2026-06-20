@@ -70,6 +70,11 @@ Dirty `graphify-out/` files are expected after hooks or incremental updates; dir
 
 Read `graphify-out/GRAPH_REPORT.md` only for broad architecture review or when `query`/`path`/`explain` do not surface enough context. After modifying code or architecture-relevant docs, run `graphify update . --force && ~/.claude/scripts/generate-graph-summary.sh .` to keep both the graph and summary current.
 
+## Infrastructure
+
+- **Headroom Proxy** (always-on): All Claude Code and Codex traffic routes through `localhost:8787` for token compression. See `~/.claude/agent-memory/knowledge/headroom-proxy.md`.
+- **Ponytail** (lazy mode plugin): Installed at `~/.claude/plugins/marketplaces/ponytail/`. Say "ponytail" or `/ponytail` to activate lazy senior dev mode (default: `full`). Stop with "normal mode".
+
 ## High-level architecture
 
 - Package: `Harness` (`Package.swift`, Swift tools 6.0). External dependency exists only on macOS: Sparkle `2.9.x` for the GUI app.

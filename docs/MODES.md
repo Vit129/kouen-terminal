@@ -18,7 +18,7 @@ had (prefix key, status line) disappears.
 
 A fast native terminal. No prefix key, no status bar, no multiplexer terminology — it feels
 like an ordinary terminal. Sessions are **ephemeral**: closing the app cleanly closes its
-shells. Splits and tabs are still available via the menu shortcuts (`⌘D`, `⌘⇧D`, `⌘T`).
+shells. Splits and tabs are still available via the menu shortcuts (`⌘⇧→/←/↑/↓`, `⌘T`).
 
 ## 2. Persistent Terminal
 

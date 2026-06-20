@@ -12,14 +12,14 @@ final class SplitPaneCoordinator {
         self.coord = coordinator
     }
 
-    func splitActivePane(direction: SplitDirection) {
+    func splitActivePane(direction: SplitDirection, before: Bool = false) {
         guard let workspace = coord.snapshot.activeWorkspace,
               let tab = workspace.activeTab,
               let paneID = coord.activeSurfaceID.flatMap({ paneID(for: $0, in: tab.rootPane) })
                 ?? tab.rootPane.allPaneIDs().last
         else { return }
         Task {
-            await coord.requestDaemon(.newSplit(tabID: tab.id, paneID: paneID, direction: direction, shell: coord.settings.defaultShell))
+            await coord.requestDaemon(.newSplit(tabID: tab.id, paneID: paneID, direction: direction, shell: coord.settings.defaultShell, before: before))
             await coord.syncFromDaemon()
         }
     }

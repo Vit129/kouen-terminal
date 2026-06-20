@@ -94,7 +94,8 @@ public struct SessionEditor: Sendable {
         in workspaceID: WorkspaceID,
         tabID: TabID,
         paneID: PaneID,
-        direction: SplitDirection
+        direction: SplitDirection,
+        before: Bool = false
     ) -> PaneID? {
         guard let match = tabIndex(workspaceID: workspaceID, tabID: tabID) else { return nil }
 
@@ -107,15 +108,19 @@ public struct SessionEditor: Sendable {
         if rootDirection == direction || tab.rootPane.allPaneIDs().count == 1 {
             let newLeaf = PaneLeaf()
             let existingCount = Double(tab.rootPane.allPaneIDs().count)
-            let ratio = existingCount / (existingCount + 1.0)
-            tab.rootPane = .branch(direction: direction, ratio: ratio, first: tab.rootPane, second: .leaf(newLeaf))
+            let ratio = before ? 1.0 / (existingCount + 1.0) : existingCount / (existingCount + 1.0)
+            if before {
+                tab.rootPane = .branch(direction: direction, ratio: ratio, first: .leaf(newLeaf), second: tab.rootPane)
+            } else {
+                tab.rootPane = .branch(direction: direction, ratio: ratio, first: tab.rootPane, second: .leaf(newLeaf))
+            }
             tab.lastActivePaneID = tab.activePaneID
             tab.activePaneID = newLeaf.id
             snapshot.workspaces[match.workspaceIndex].sessions[match.sessionIndex].tabs[match.tabIndex] = tab
             bumpRevision()
             return newLeaf.id
         } else {
-            guard let newPaneID = split(node: &tab.rootPane, targetPaneID: paneID, direction: direction) else {
+            guard let newPaneID = split(node: &tab.rootPane, targetPaneID: paneID, direction: direction, before: before) else {
                 return nil
             }
             tab.lastActivePaneID = tab.activePaneID
@@ -222,18 +227,22 @@ public struct SessionEditor: Sendable {
         return (workspace.id, tab.id, pane)
     }
 
-    private func split(node: inout PaneNode, targetPaneID: PaneID, direction: SplitDirection, paneCount: Int = 1) -> PaneID? {
+    private func split(node: inout PaneNode, targetPaneID: PaneID, direction: SplitDirection, paneCount: Int = 1, before: Bool = false) -> PaneID? {
         switch node {
         case let .leaf(leaf) where leaf.id == targetPaneID:
             let newLeaf = PaneLeaf()
-            node = .branch(direction: direction, ratio: 0.5, first: .leaf(leaf), second: .leaf(newLeaf))
+            if before {
+                node = .branch(direction: direction, ratio: 0.5, first: .leaf(newLeaf), second: .leaf(leaf))
+            } else {
+                node = .branch(direction: direction, ratio: 0.5, first: .leaf(leaf), second: .leaf(newLeaf))
+            }
             return newLeaf.id
         case .branch(let existingDirection, let ratio, var first, var second):
-            if let id = split(node: &first, targetPaneID: targetPaneID, direction: direction) {
+            if let id = split(node: &first, targetPaneID: targetPaneID, direction: direction, before: before) {
                 node = .branch(direction: existingDirection, ratio: ratio, first: first, second: second)
                 return id
             }
-            if let id = split(node: &second, targetPaneID: targetPaneID, direction: direction) {
+            if let id = split(node: &second, targetPaneID: targetPaneID, direction: direction, before: before) {
                 node = .branch(direction: existingDirection, ratio: ratio, first: first, second: second)
                 return id
             }

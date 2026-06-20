@@ -14,7 +14,7 @@ public enum IPCRequest: Codable, Sendable {
     case newSessionInGroup(targetSessionID: UUID, name: String?)
     case newTab(workspaceID: UUID, cwd: String?, shell: String? = nil)
     case newTabInWorkspace(named: String, cwd: String?, shell: String? = nil)
-    case newSplit(tabID: UUID, paneID: UUID?, direction: SplitDirection, shell: String? = nil)
+    case newSplit(tabID: UUID, paneID: UUID?, direction: SplitDirection, shell: String? = nil, before: Bool = false)
     case newSurface(tabID: UUID, paneID: UUID, shell: String? = nil)
     case selectPaneSurface(tabID: UUID, paneID: UUID, surfaceID: UUID)
     case splitPaneSurface(tabID: UUID, sourcePaneID: UUID, surfaceID: UUID, targetPaneID: UUID, direction: SplitDirection, beforeTarget: Bool)

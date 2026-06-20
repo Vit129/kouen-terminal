@@ -5,9 +5,6 @@ extension HarnessSidebarPanelViewController {
     // MARK: - Drag to reorder
 
     func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> NSPasteboardWriting? {
-        // Reorder maps to the unfiltered list, so it's only meaningful with no
-        // active filter (displayed rows == sessions then).
-        guard sessionFilter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
         guard let session = sessionRow(at: row) else { return nil }
         let item = NSPasteboardItem()
         item.setString(session.id.uuidString, forType: Self.sessionRowPasteboardType)
@@ -21,7 +18,6 @@ extension HarnessSidebarPanelViewController {
         proposedDropOperation dropOperation: NSTableView.DropOperation
     ) -> NSDragOperation {
         guard dropOperation == .above else { return [] }
-        guard sessionFilter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return [] }
         guard canDropSession(info, aboveRow: row) else { return [] }
         return .move
     }

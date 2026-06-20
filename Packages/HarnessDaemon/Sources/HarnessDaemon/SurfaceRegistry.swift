@@ -337,7 +337,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
             commit()
             fireHookLocked(.afterNewTab)
             return .tabID(tabID)
-        case let .newSplit(tabID, paneID, direction, shell):
+        case let .newSplit(tabID, paneID, direction, shell, before):
             guard let workspace = editor.snapshot.workspaces.first(where: { ws in
                 ws.sessions.contains { session in session.tabs.contains { $0.id == tabID } }
             }) else { return .error("Tab not found") }
@@ -350,7 +350,8 @@ public final class SurfaceRegistry: @unchecked Sendable {
                       in: workspace.id,
                       tabID: tabID,
                       paneID: paneID,
-                      direction: direction
+                      direction: direction,
+                      before: before
                   )
             else { return .error("Could not split pane") }
             if let surfaceID = editor.surfaceID(forPaneID: newPaneID) {

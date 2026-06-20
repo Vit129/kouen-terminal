@@ -11,7 +11,7 @@ import Foundation
 /// without ad-hoc string serialization.
 public indirect enum Command: Codable, Sendable, Equatable {
     // MARK: Pane operations
-    case splitWindow(direction: SplitDirection)
+    case splitWindow(direction: SplitDirection, before: Bool = false)
     case killPane
     case zoomPane
     case selectPane(target: PaneTarget)
@@ -178,7 +178,10 @@ extension Command {
     /// palette, and `display-message`. Not necessarily a round-trippable form.
     public var shortDescription: String {
         switch self {
-        case let .splitWindow(direction): return "split-window -\(direction == .horizontal ? "v" : "h")"
+        case let .splitWindow(direction, before):
+            let flag = direction == .horizontal ? "v" : "h"
+            let posFlag = before ? (direction == .horizontal ? " --top" : " --left") : ""
+            return "split-window -\(flag)\(posFlag)"
         case .killPane: return "kill-pane"
         case .zoomPane: return "zoom-pane"
         case let .selectPane(target): return "select-pane \(target.rawValue)"

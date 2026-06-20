@@ -96,6 +96,12 @@ enum MainMenuBuilder {
 
         let splitVItem = menuItem("Split Down", action: #selector(MenuTarget.splitV), binding: BannerShortcutRegistry.splitDown)
         view.submenu?.addItem(splitVItem)
+
+        let splitLeftItem = menuItem("Split Left", action: #selector(MenuTarget.splitLeft), binding: BannerShortcutRegistry.splitLeft)
+        view.submenu?.addItem(splitLeftItem)
+
+        let splitUpItem = menuItem("Split Up", action: #selector(MenuTarget.splitUp), binding: BannerShortcutRegistry.splitUp)
+        view.submenu?.addItem(splitUpItem)
         view.submenu?.addItem(.separator())
 
         let prevPane = menuItem("Previous Pane", action: #selector(MenuTarget.previousPane), binding: BannerShortcutRegistry.previousPane)
@@ -400,6 +406,14 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
         SessionCoordinator.shared.splitActivePane(direction: .vertical)
     }
 
+    @objc func splitLeft() {
+        SessionCoordinator.shared.splitActivePane(direction: .horizontal, before: true)
+    }
+
+    @objc func splitUp() {
+        SessionCoordinator.shared.splitActivePane(direction: .vertical, before: true)
+    }
+
     @objc func runScript() {
         SessionCoordinator.shared.runProjectScript()
     }
@@ -428,11 +442,7 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
     }
 
     @objc func jumpNotification() {
-        let window = NSApp.keyWindow ?? NSApp.mainWindow
-            ?? NSApp.windows.first(where: { $0.contentViewController is MainSplitViewController })
-        if let split = window?.contentViewController as? MainSplitViewController {
-            split.showNotificationsDropdown()
-        }
+        NotchPanelController.shared.openFromMenu()
     }
 
     @objc func showAgentNotch() {
