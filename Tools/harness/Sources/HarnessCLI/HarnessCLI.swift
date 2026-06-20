@@ -187,6 +187,8 @@ struct HarnessCLI {
                 try handleInstallHooks(args)
             case "install-tools":
                 handleInstallTools()
+            case "install-mcp":
+                try handleInstallMCP(args)
             case "install-shell-integration":
                 handleInstallShellIntegration(args)
             case "attach":
@@ -422,6 +424,18 @@ struct HarnessCLI {
         } catch {
             fputs("warning: shell completion install failed: \(error)\n", harnessStderr)
         }
+        if let mcp = locateMCPBinary() {
+            do {
+                let installedMCP = BinaryRefresher.installedMCPPath
+                try copyExecutable(source: mcp, destination: installedMCP)
+                print("mcp: \(installedMCP.path)")
+                print("Tip: run 'harness-cli install-mcp' to register harness-mcp with Claude Code and Claude Desktop.")
+            } catch {
+                fputs("warning: harness-mcp copy failed: \(error)\n", harnessStderr)
+            }
+        } else {
+            fputs("warning: harness-mcp binary not found; skipping MCP install\n", harnessStderr)
+        }
         print("Tip: run 'harness-cli install-shell-integration' to enable OSC 133 prompt marks, "
             + "the success/failure gutter, and prompt jumping.")
     }
@@ -443,6 +457,21 @@ struct HarnessCLI {
         if FileManager.default.fileExists(atPath: installed.path) { return installed }
         // The installed macOS app bundle (no-op on Linux).
         let appCandidate = URL(fileURLWithPath: "/Applications/Harness.app/Contents/MacOS/HarnessDaemon")
+        if FileManager.default.fileExists(atPath: appCandidate.path) { return appCandidate }
+        return nil
+    }
+
+    static func locateMCPBinary() -> URL? {
+        if let override = ProcessInfo.processInfo.environment["HARNESS_MCP_PATH"],
+           !override.isEmpty, FileManager.default.fileExists(atPath: override) {
+            return URL(fileURLWithPath: override)
+        }
+        let cli = CLIInstallLocator.sourceBinary()
+        let candidate = cli.deletingLastPathComponent().appendingPathComponent("harness-mcp")
+        if FileManager.default.fileExists(atPath: candidate.path) { return candidate }
+        let installed = BinaryRefresher.installedMCPPath
+        if FileManager.default.fileExists(atPath: installed.path) { return installed }
+        let appCandidate = URL(fileURLWithPath: "/Applications/Harness.app/Contents/MacOS/harness-mcp")
         if FileManager.default.fileExists(atPath: appCandidate.path) { return appCandidate }
         return nil
     }

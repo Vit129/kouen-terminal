@@ -235,6 +235,10 @@ final class DaemonLauncher: @unchecked Sendable {
             source: bundledBinaryURL(named: "harness-cli"),
             destination: BinaryRefresher.installedCLIPath
         )
+        _ = try? BinaryRefresher.refreshIfChanged(
+            source: bundledBinaryURL(named: "harness-mcp"),
+            destination: BinaryRefresher.installedMCPPath
+        )
     }
 
     /// A binary shipped next to the app executable (`Contents/MacOS/`), where the release

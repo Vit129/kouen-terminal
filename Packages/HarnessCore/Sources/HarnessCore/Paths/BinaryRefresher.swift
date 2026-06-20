@@ -21,6 +21,10 @@ public enum BinaryRefresher {
         binDirectory.appendingPathComponent("HarnessDaemon")
     }
 
+    public static var installedMCPPath: URL {
+        binDirectory.appendingPathComponent("harness-mcp")
+    }
+
     /// Copy `source` → `destination` (remove-then-copy) and mark it executable. Also used for
     /// the install-in-place case (source == destination), which only needs the chmod.
     public static func copyExecutable(from source: URL, to destination: URL) throws {
