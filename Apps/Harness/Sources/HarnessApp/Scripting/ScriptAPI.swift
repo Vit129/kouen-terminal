@@ -445,6 +445,26 @@ struct ScriptAPI {
         }
         profilesObj.setObject(profilesUseBlock, forKeyedSubscript: "use" as NSString)
         harnessObj.setObject(profilesObj, forKeyedSubscript: "profiles" as NSString)
+
+        // 10. harness.plugin namespace — lifecycle hooks for plugins in ~/.config/harness/plugins/
+        // Plugins register handlers via harness.plugin.on("eventName", handler).
+        // Available events: "pluginsLoaded", "paneCreated", "paneRemoved",
+        //                   "snapshotChanged", "configReloaded", "agentStateChanged".
+        guard let pluginObj = JSValue(newObjectIn: context) else { return }
+
+        let pluginOnBlock: @convention(block) (String, JSValue) -> Void = { [weak runtime] eventName, handler in
+            guard let runtime else { return }
+            runtime.eventHandlers[eventName, default: []].append(handler)
+        }
+        pluginObj.setObject(pluginOnBlock, forKeyedSubscript: "on" as NSString)
+
+        let pluginOffBlock: @convention(block) (String) -> Void = { [weak runtime] eventName in
+            guard let runtime else { return }
+            runtime.eventHandlers.removeValue(forKey: eventName)
+        }
+        pluginObj.setObject(pluginOffBlock, forKeyedSubscript: "off" as NSString)
+
+        harnessObj.setObject(pluginObj, forKeyedSubscript: "plugin" as NSString)
     }
     #endif
 }
