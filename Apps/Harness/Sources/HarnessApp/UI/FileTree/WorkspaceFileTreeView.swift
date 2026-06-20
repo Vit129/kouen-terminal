@@ -54,7 +54,21 @@ final class WorkspaceFileTreeView: NSView {
             let url = URL(fileURLWithPath: path)
             let node = FileNode(id: path, name: url.lastPathComponent, path: path,
                                 isDirectory: url.hasDirectoryPath)
-            self.onFilePreview?(node)
+            
+            let coordinator = SessionCoordinator.shared
+            let action = coordinator.settings.fileClickAction
+            if action == "terminalOnly" {
+                coordinator.splitActivePane(direction: .horizontal)
+                guard let surfaceID = coordinator.activeSurfaceID else { return }
+                let command = "open \(path)\r"
+                coordinator.requestDaemon(.sendData(surfaceID: surfaceID.uuidString, data: Data(command.utf8)))
+            } else if action == "vi" || action == "cat" {
+                guard let surfaceID = coordinator.activeSurfaceID else { return }
+                let cmd = action == "vi" ? "vi \(path)\r" : "cat \(path)\r"
+                coordinator.requestDaemon(.sendData(surfaceID: surfaceID.uuidString, data: Data(cmd.utf8)))
+            } else {
+                self.onFilePreview?(node)
+            }
         }
         keyboard.onPreviewFile = { [weak self] path in
             guard let self else { return }

@@ -28,14 +28,12 @@ final class TerminalBannerTests: XCTestCase {
 
     func testWelcomeIsAGuidedTour() {
         let banner = text(TerminalBanner.welcome(version: "1.2.3", columns: 80))
-        XCTAssertTrue(banner.contains("Harness 1.2.3"))
+        XCTAssertTrue(banner.contains("Welcome to Harness 1.2.3"))
         XCTAssertTrue(banner.contains("Why it's different"))
-        XCTAssertTrue(banner.contains("Try this, in order"))
-        XCTAssertTrue(banner.contains("ctrl-a ?"))
+        XCTAssertTrue(banner.contains("Shortcuts"))
         XCTAssertTrue(banner.contains("harness-cli"))
         XCTAssertTrue(banner.contains("harnesscli.dev"))
-        XCTAssertTrue(banner.contains("Native shortcuts"))
-        XCTAssertTrue(banner.contains("⌘D / ⌘⇧D"))
+        XCTAssertTrue(banner.contains("⌘D / ⇧⌘D"))
     }
 
     /// The tour wraps; it never truncates at any width the box renders at (44+). Below
@@ -136,7 +134,7 @@ final class TerminalBannerTests: XCTestCase {
     func testNarrowColumnsRenderWithoutBox() {
         let banner = text(TerminalBanner.welcome(version: "1.2.3", columns: 30))
         XCTAssertFalse(banner.contains("╭"))
-        XCTAssertTrue(banner.contains("Try this, in order"))
+        XCTAssertTrue(banner.contains("Why it's different"))
     }
 
     func testBoxFrameIsAlignedAtSpawnWidth() {

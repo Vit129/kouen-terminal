@@ -266,6 +266,8 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
     public var lspAutoStart: Bool
     /// Custom language-server executable overrides keyed by language id (`swift`, `python`, etc.).
     public var lspServers: [String: String]
+    /// Mode to open files when selected in the file tree ("preview", "editor", "cat", "vi", "terminalOnly").
+    public var fileClickAction: String
 
     /// Whether the *umbrella* Harness controls are on (prefix or status line). Kept for onboarding
     /// copy and tests; the prefix and status line each resolve independently via the effective
@@ -369,7 +371,8 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         notificationEvents: [String: Bool] = [:],
         boldIsBright: Bool = true,
         lspAutoStart: Bool = false,
-        lspServers: [String: String] = [:]
+        lspServers: [String: String] = [:],
+        fileClickAction: String = "preview"
     ) {
         self.fontSize = HarnessSettings.clampedFontSize(fontSize)
         self.fontFamily = fontFamily
@@ -438,6 +441,7 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         self.boldIsBright = boldIsBright
         self.lspAutoStart = lspAutoStart
         self.lspServers = lspServers
+        self.fileClickAction = fileClickAction
     }
 
     /// Ensure the palette always has exactly 16 slots so index access is safe even if a
@@ -622,6 +626,7 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         boldIsBright = try container.decodeIfPresent(Bool.self, forKey: .boldIsBright) ?? fallback.boldIsBright
         lspAutoStart = try container.decodeIfPresent(Bool.self, forKey: .lspAutoStart) ?? fallback.lspAutoStart
         lspServers = try container.decodeIfPresent([String: String].self, forKey: .lspServers) ?? fallback.lspServers
+        fileClickAction = try container.decodeIfPresent(String.self, forKey: .fileClickAction) ?? fallback.fileClickAction
     }
 
     public static func load() -> HarnessSettings {

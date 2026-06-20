@@ -181,7 +181,12 @@ final class HarnessSidebarPanelViewController: NSViewController {
     }
 
     private func repoRootForSession(_ session: SessionGroup) -> String {
-        let path = (session.activeTab ?? session.tabs.first)?.cwd ?? ""
+        guard let tab = session.activeTab ?? session.tabs.first else { return "Other" }
+        if let parentRepoPath = tab.parentRepoPath?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !parentRepoPath.isEmpty {
+            return parentRepoPath
+        }
+        let path = tab.cwd
         if let gitRoot = gitRepoRoot(for: path) {
             return gitRoot
         }
@@ -189,15 +194,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
     }
 
     private func groupName(forRootPath rootPath: String) -> String {
-        if rootPath == "Other" {
-            return "Other"
-        }
-        // rootPath is git-common-dir (e.g. ~/project/.git) — use parent dir name
-        let url = URL(fileURLWithPath: rootPath)
-        if url.lastPathComponent == ".git" {
-            return url.deletingLastPathComponent().lastPathComponent
-        }
-        return url.lastPathComponent
+        HarnessDesign.projectGroupDisplayName(forRootPath: rootPath)
     }
 
     private static var cachedGhPath: String? = {
