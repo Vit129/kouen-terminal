@@ -583,8 +583,8 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         pages[2] = buildTerminalPage()
         pages[3] = buildKeysPage()
         pages[4] = buildAgentsPage()
-        pages[5] = buildAdvancedPage()
-        pages[6] = buildRemotePage()
+        // Pages 5 (Advanced) and 6 (Remote) are rebuilt on every showPage() visit
+        // to refresh live state — no need to build them eagerly here.
     }
 
     fileprivate func showPage(_ index: Int) {
@@ -618,7 +618,7 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         2: ["terminal", "font", "shell", "directory", "scrollback", "blink", "copy", "session", "harness", "controls", "experience"],
         3: ["keys", "prefix", "binding", "keybinding", "shortcut"],
         4: ["agents", "agent", "color", "codex", "claude", "cursor", "pi", "hermes", "openclaw", "hook", "notification", "notify", "banner", "bell", "sound", "detection"],
-        5: ["advanced", "options", "status", "mouse", "mode", "clipboard", "base-index", "renumber", "monitor", "rename", "repeat", "history", "pane", "border", "harness-cli", "set-option", "performance", "pipeline", "render", "identity", "term_program", "xtversion", "shift+enter", "kitty", "ghostty"],
+        5: ["advanced", "options", "status", "mouse", "mode", "clipboard", "base-index", "renumber", "monitor", "rename", "repeat", "history", "pane", "border", "harness-cli", "set-option", "performance", "pipeline", "render", "term_program", "xtversion", "shift+enter", "kitty", "ghostty"],
         6: ["remote", "ssh", "host", "daemon", "tunnel", "socket", "jump", "identity", "putty"],
     ]
 
@@ -801,6 +801,9 @@ final class SettingsSidebarButton: NSControl {
 /// reflects the current theme/settings; any previously open instance is closed first.
 @MainActor
 enum SettingsWindowController {
+    /// Named page indices — keep in sync with entries array in layoutShell().
+    static let pageRemote = 6
+
     private static var window: NSWindow?
     /// Retained for the window's lifetime so its `windowWillClose` flush actually fires (NSWindow
     /// holds the delegate weakly). Closing the prior window drops the old proxy.

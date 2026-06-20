@@ -86,6 +86,14 @@ final class WindowTitleStripView: NSView {
     }
 
     override func hitTest(_ point: NSPoint) -> NSView? {
+        // Let child buttons (remoteBadge) receive their own clicks.
+        // Only claim the hit for dragging if no interactive subview is under the point.
+        for subview in subviews.reversed() {
+            let local = subview.convert(point, from: self)
+            if let hit = subview.hitTest(local), hit is NSButton {
+                return hit
+            }
+        }
         if let _ = super.hitTest(point) {
             return self
         }
@@ -187,7 +195,7 @@ final class WindowTitleStripView: NSView {
         if RemoteHostsService.shared.activeHostName != nil {
             SessionCoordinator.shared.disconnectRemote()
         } else {
-            SettingsWindowController.show(page: 6)
+            SettingsWindowController.show(page: SettingsWindowController.pageRemote)
         }
     }
 

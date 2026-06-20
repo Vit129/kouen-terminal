@@ -50,7 +50,8 @@ final class RemoteHostsService: @unchecked Sendable {
     /// Tear down the active tunnel and forget it (the caller switches back to the local daemon).
     func disconnect() {
         lock.lock(); let name = _activeHostName; _activeHostName = nil; lock.unlock()
-        if let name { SSHTunnelManager.shared.stop(host: name) }
+        guard let name else { return }
+        SSHTunnelManager.shared.stop(host: name)
         Self.postActiveHostDidChange()
     }
 

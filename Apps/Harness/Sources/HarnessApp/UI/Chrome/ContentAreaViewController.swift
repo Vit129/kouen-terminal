@@ -48,7 +48,6 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         refreshTerminalHostFill()
         refreshEditorPanelFill()
         titleStrip.applyColors()
-        titleStrip.refreshRemoteBadge()
         tabBar.applyChrome()
         paneContainer?.applyChrome()
         updateSidebarToggleConstraints()

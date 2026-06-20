@@ -7,6 +7,14 @@ extension SettingsViewController: NSTableViewDataSource, NSTableViewDelegate {
     func buildRemotePage() -> NSView {
         reloadRemoteHosts(selecting: selectedRemoteHostName)
 
+        // Observe connection state changes so status self-corrects after SSH handshake.
+        NotificationCenter.default.removeObserver(self, name: RemoteHostsService.activeHostDidChange, object: nil)
+        NotificationCenter.default.addObserver(forName: RemoteHostsService.activeHostDidChange, object: nil, queue: .main) { [weak self] _ in
+            guard let self else { return }
+            self.reloadRemoteHosts(selecting: self.selectedRemoteHostName)
+            self.refreshRemoteStatus()
+        }
+
         remoteHostsTable.delegate = self
         remoteHostsTable.dataSource = self
         remoteHostsTable.headerView = nil
@@ -44,12 +52,14 @@ extension SettingsViewController: NSTableViewDataSource, NSTableViewDelegate {
         listStack.alignment = .leading
         listStack.spacing = 10
 
-        remoteNameField.widthAnchor.constraint(equalToConstant: 280).isActive = true
-        remoteSSHTargetField.widthAnchor.constraint(equalToConstant: 280).isActive = true
-        remotePortField.widthAnchor.constraint(equalToConstant: 100).isActive = true
-        remoteIdentityField.widthAnchor.constraint(equalToConstant: 280).isActive = true
-        remoteJumpHostField.widthAnchor.constraint(equalToConstant: 280).isActive = true
-        remoteSocketPathField.widthAnchor.constraint(equalToConstant: 280).isActive = true
+        if remoteNameField.constraints.isEmpty {
+            remoteNameField.widthAnchor.constraint(equalToConstant: 280).isActive = true
+            remoteSSHTargetField.widthAnchor.constraint(equalToConstant: 280).isActive = true
+            remotePortField.widthAnchor.constraint(equalToConstant: 100).isActive = true
+            remoteIdentityField.widthAnchor.constraint(equalToConstant: 280).isActive = true
+            remoteJumpHostField.widthAnchor.constraint(equalToConstant: 280).isActive = true
+            remoteSocketPathField.widthAnchor.constraint(equalToConstant: 280).isActive = true
+        }
 
         remoteNameField.placeholderString = "devbox"
         remoteSSHTargetField.placeholderString = "user@host"
@@ -181,7 +191,11 @@ extension SettingsViewController: NSTableViewDataSource, NSTableViewDelegate {
         let prefix = active.map { "Connected: \($0)" } ?? "Local daemon"
         remoteHostsStatusField.stringValue = override ?? prefix
         let hasSelection = selectedRemoteHostName != nil
-        remoteConnectButton.isEnabled = hasSelection && active != selectedRemoteHostName
+        let formFilled = !remoteNameField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !remoteSSHTargetField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !remoteSocketPathField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let canConnect = (hasSelection || formFilled) && active != selectedRemoteHostName
+        remoteConnectButton.isEnabled = canConnect
         remoteDisconnectButton.isEnabled = active != nil
     }
 
@@ -237,10 +251,22 @@ extension SettingsViewController: NSTableViewDataSource, NSTableViewDelegate {
             refreshRemoteStatus("Name, SSH target, and socket path are required.")
             return
         }
-        if let oldName = selectedRemoteHostName, oldName != host.name {
-            RemoteHostsService.shared.removeHost(named: oldName)
+        let oldName = selectedRemoteHostName
+        let isRename = oldName != nil && oldName != host.name
+        // Guard against overwriting an existing host with the new name.
+        if isRename, remoteHosts.contains(where: { $0.name == host.name }) {
+            refreshRemoteStatus("A host named '\(host.name)' already exists.")
+            return
+        }
+        let wasActive = isRename && RemoteHostsService.shared.activeHostName == oldName
+        if isRename {
+            RemoteHostsService.shared.removeHost(named: oldName!)
         }
         RemoteHostsService.shared.addHost(host)
+        // Reconnect under the new name if the renamed host was the active connection.
+        if wasActive {
+            SessionCoordinator.shared.connectToRemote(named: host.name)
+        }
         reloadRemoteHosts(selecting: host.name)
         syncRemoteFormFromSelection()
         refreshRemoteStatus("Saved \(host.name)")
@@ -252,18 +278,22 @@ extension SettingsViewController: NSTableViewDataSource, NSTableViewDelegate {
     }
 
     @objc private func connectRemoteHostClicked() {
-        if let host = remoteHostFromForm() {
+        // Only persist form values if this is a brand-new (unsaved) host.
+        let name: String
+        if let selected = selectedRemoteHostName {
+            name = selected
+        } else if let host = remoteHostFromForm() {
+            // New host — save it first so it appears in the list.
             RemoteHostsService.shared.addHost(host)
             selectedRemoteHostName = host.name
             reloadRemoteHosts(selecting: host.name)
+            name = host.name
+        } else {
+            refreshRemoteStatus("Name, SSH target, and socket path are required.")
+            return
         }
-        guard let name = selectedRemoteHostName else { return }
         refreshRemoteStatus("Connecting to \(name)…")
         SessionCoordinator.shared.connectToRemote(named: name)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            self?.reloadRemoteHosts(selecting: name)
-            self?.refreshRemoteStatus()
-        }
     }
 
     @objc private func disconnectRemoteHostClicked() {
@@ -286,7 +316,7 @@ extension SettingsViewController: NSTableViewDataSource, NSTableViewDelegate {
     private func uniqueRemoteName(base: String) -> String {
         var candidate = base
         var suffix = 2
-        let existing = Set(remoteHosts.map(\.name))
+        let existing = Set(RemoteHostsService.shared.hosts().map(\.name))
         while existing.contains(candidate) {
             candidate = "\(base)-\(suffix)"
             suffix += 1
@@ -297,8 +327,15 @@ extension SettingsViewController: NSTableViewDataSource, NSTableViewDelegate {
 
 private extension RemoteHost {
     func sshArgValue(after flag: String) -> String? {
-        guard let index = sshArgs.firstIndex(of: flag) else { return nil }
-        let valueIndex = sshArgs.index(after: index)
-        return sshArgs.indices.contains(valueIndex) ? sshArgs[valueIndex] : nil
+        // Exact two-token form: -p 2222
+        if let index = sshArgs.firstIndex(of: flag) {
+            let valueIndex = sshArgs.index(after: index)
+            if sshArgs.indices.contains(valueIndex) { return sshArgs[valueIndex] }
+        }
+        // Glued form: -p2222
+        if let glued = sshArgs.first(where: { $0.hasPrefix(flag) && $0 != flag }) {
+            return String(glued.dropFirst(flag.count))
+        }
+        return nil
     }
 }
