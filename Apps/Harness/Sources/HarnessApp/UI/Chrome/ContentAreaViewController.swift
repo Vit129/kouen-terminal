@@ -18,8 +18,9 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
     /// subviews) complete before ARC deallocates the view tree. Without this, a structural
     /// rebuild can free views that AppKit still dispatches layout()/isFlipped/mouseMoved to.
     private var retiredContainer: PaneContainerView?
-    /// Hosts detached during rebuild — held for 500ms so in-flight AppKit events
-    /// (mouseMoved via tracking area, queued keyDown) drain before ARC frees them (RL-040).
+    /// Hosts detached during rebuild — held for 1.5s so in-flight AppKit events
+    /// (mouseMoved via tracking area, queued keyDown/keyUp, display-link callbacks)
+    /// drain before ARC frees them (RL-040/041).
     private var retiredHosts: [TerminalHostView] = []
     private let fileTabManager = FileTabManager()
     private var fileEditorView: FileEditorView?
@@ -32,8 +33,14 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
     /// enabled, that means the renderer just copied the selection — surface a brief
     /// "Selection copied" toast.
     private var pasteboardCountAtMouseDown: Int = NSPasteboard.general.changeCount
-    private var copySelectionMonitor: Any?
+    private nonisolated(unsafe) var copySelectionMonitor: Any?
     private var sidebarToggleConstraint: NSLayoutConstraint?
+
+    deinit {
+        if let monitor = copySelectionMonitor {
+            NSEvent.removeMonitor(monitor)
+        }
+    }
 
     override func loadView() {
         view = NSView()
@@ -165,6 +172,10 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         // Safe: NSEvent local monitors always fire on the main thread.
         nonisolated(unsafe) let unsafeSelf = self
         copySelectionMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .leftMouseUp]) { event in
+            // RL-040: If the view controller has been torn down (window closed),
+            // bail immediately — accessing unsafeSelf's view properties would
+            // dereference freed memory.
+            guard unsafeSelf.viewIfLoaded?.window != nil else { return event }
             if event.type == .leftMouseDown {
                 unsafeSelf.pasteboardCountAtMouseDown = NSPasteboard.general.changeCount
             } else if event.type == .leftMouseUp,
@@ -446,7 +457,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         // ARC frees any host that isn't reused by the new container.
         let detached = Array(existingHosts.values)
         retiredHosts.append(contentsOf: detached)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
             guard let self else { return }
             self.retiredHosts.removeAll { host in detached.contains { $0 === host } }
         }
@@ -455,7 +466,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         let oldContainer = paneContainer
         paneContainer?.removeFromSuperview()
         retiredContainer = oldContainer
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.retiredContainer = nil }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in self?.retiredContainer = nil }
 
         let container = PaneContainerView(
             node: displayNode,
@@ -1009,12 +1020,16 @@ private final class PaneSplitButtonsView: NSView {
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stack)
 
-        let splitRight = makeButton("square.split.2x1", tooltip: "Split Right (⌘D)", action: #selector(splitH))
-        let splitDown = makeButton("square.split.1x2", tooltip: "Split Down (⌘⇧D)", action: #selector(splitV))
+        let splitLeft = makeButton("rectangle.lefthalf.inset.filled", tooltip: "Split Left (⌘⇧←)", action: #selector(doSplitLeft))
+        let splitRight = makeButton("rectangle.righthalf.inset.filled", tooltip: "Split Right (⌘⇧→)", action: #selector(doSplitRight))
+        let splitUp = makeButton("rectangle.tophalf.inset.filled", tooltip: "Split Up (⌘⇧↑)", action: #selector(doSplitUp))
+        let splitDown = makeButton("rectangle.bottomhalf.inset.filled", tooltip: "Split Down (⌘⇧↓)", action: #selector(doSplitDown))
         let openBrowser = makeButton("safari", tooltip: "Open Browser Pane (⌘B)", action: #selector(openBrowserPane))
         let closeBtn = makeButton("xmark", tooltip: "Close Pane (⌥⇧⌘W)", action: #selector(closePane))
 
+        stack.addArrangedSubview(splitLeft)
         stack.addArrangedSubview(splitRight)
+        stack.addArrangedSubview(splitUp)
         stack.addArrangedSubview(splitDown)
         stack.addArrangedSubview(openBrowser)
         stack.addArrangedSubview(closeBtn)
@@ -1082,12 +1097,20 @@ private final class PaneSplitButtonsView: NSView {
         return btn
     }
 
-    @objc private func splitH() {
+    @objc private func doSplitRight() {
         SessionCoordinator.shared.splitActivePane(direction: .horizontal)
     }
 
-    @objc private func splitV() {
+    @objc private func doSplitLeft() {
+        SessionCoordinator.shared.splitActivePane(direction: .horizontal, before: true)
+    }
+
+    @objc private func doSplitDown() {
         SessionCoordinator.shared.splitActivePane(direction: .vertical)
+    }
+
+    @objc private func doSplitUp() {
+        SessionCoordinator.shared.splitActivePane(direction: .vertical, before: true)
     }
 
     @objc private func openBrowserPane() {
