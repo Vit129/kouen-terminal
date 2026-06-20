@@ -428,7 +428,14 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
     }
 
     @objc func jumpNotification() {
-        NotchPanelController.shared.openFromMenu()
+        // Iterate all windows so the lookup succeeds even when the key window is a
+        // panel or sheet rather than the main content window.
+        for window in NSApp.windows {
+            if let split = window.contentViewController as? MainSplitViewController {
+                split.showNotificationsDropdown()
+                return
+            }
+        }
     }
 
     @objc func showAgentNotch() {

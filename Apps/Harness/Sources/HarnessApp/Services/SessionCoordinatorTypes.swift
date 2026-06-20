@@ -15,26 +15,20 @@ struct NotificationEntry: Identifiable, Equatable {
 }
 
 enum DesktopNotifier {
-    // UNUserNotificationCenter.current() crashes on macOS 26 beta due to a corrupted
-    // NSCalendarDate in the notification database. Fallback: osascript AppleScript notification.
-    // Use `tell application "Harness"` (by name) so macOS attributes the notification to
-    // our app in Notification Center — `tell application id` doesn't work reliably unless
-    // the app has registered via UNUserNotificationCenter (which we can't do on macOS 26).
+    // UNUserNotificationCenter.current() crashes on macOS 26 due to a corrupted NSCalendarDate
+    // in the notification database. Use NSAppleScript in-process instead: Standard Additions
+    // attributes `display notification` to the process that executes it, so running inside
+    // Harness attributes the notification to Harness rather than to the frontmost app.
     static func requestAuthorizationIfNeeded() {}
     static func show(title: String, body: String, withSound: Bool = true) {
         let soundClause = withSound ? " sound name \"Glass\"" : ""
-        let appName = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "Harness"
         let script = """
-            tell application "\(appName)"
-                display notification "\(Self.escape(body))" with title "\(Self.escape(title))"\(soundClause)
-            end tell
+            display notification "\(Self.escape(body))" with title "\(Self.escape(title))"\(soundClause)
             """
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-        process.arguments = ["-e", script]
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
-        try? process.run()
+        DispatchQueue.global(qos: .utility).async {
+            var error: NSDictionary?
+            NSAppleScript(source: script)?.executeAndReturnError(&error)
+        }
     }
     static func authorizationStatus(_ completion: @escaping @MainActor (UNAuthorizationStatus) -> Void) {
         Task { @MainActor in completion(.authorized) }

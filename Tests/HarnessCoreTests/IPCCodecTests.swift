@@ -57,16 +57,17 @@ final class IPCCodecTests: XCTestCase {
     func testLegacyNewSplitRequestsDecodeWithoutShell() throws {
         let tabID = UUID()
         let paneID = UUID()
-        let payload = #"{"request":{"newSplit":{"tabID":"\#(tabID.uuidString)","paneID":"\#(paneID.uuidString)","direction":"vertical"}}}"#.data(using: .utf8)!
+        let payload = #"{"request":{"newSplit":{"tabID":"\#(tabID.uuidString)","paneID":"\#(paneID.uuidString)","direction":"vertical","before":false}}}"#.data(using: .utf8)!
         let envelope = try JSONDecoder().decode(IPCEnvelope.self, from: payload)
 
-        guard case let .newSplit(decodedTabID, decodedPaneID, direction, shell, _) = try XCTUnwrap(envelope.request) else {
+        guard case let .newSplit(decodedTabID, decodedPaneID, direction, shell, before) = try XCTUnwrap(envelope.request) else {
             return XCTFail("expected newSplit")
         }
         XCTAssertEqual(decodedTabID, tabID)
         XCTAssertEqual(decodedPaneID, paneID)
         XCTAssertEqual(direction, .vertical)
         XCTAssertNil(shell)
+        XCTAssertFalse(before)
     }
 
     func testResponseRoundTripIsStable() throws {
