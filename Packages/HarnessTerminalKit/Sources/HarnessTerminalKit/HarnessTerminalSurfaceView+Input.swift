@@ -167,7 +167,17 @@ extension HarnessTerminalSurfaceView {
         scheduleRender()
     }
 
-    public override func keyDown(with event: NSEvent) {
+    /// RL-040: `nonisolated` bypasses the Swift 6.3 `@objc` thunk actor-isolation check.
+    nonisolated public override func keyDown(with event: NSEvent) {
+        guard self.window != nil else { return }
+        // nonisolated(unsafe) suppresses the Sendable diagnostic — we know this runs on main.
+        nonisolated(unsafe) let ev = event
+        MainActor.assumeIsolated {
+            self._keyDown(with: ev)
+        }
+    }
+
+    private func _keyDown(with event: NSEvent) {
         // RL-040: AppKit can deliver a queued keyDown after the view leaves its window
         // (zombie). The @objc thunk crashes in swift_task_isCurrentExecutorWithFlagsImpl
         // when the runtime context is partially torn down. Bail immediately.
@@ -279,7 +289,16 @@ extension HarnessTerminalSurfaceView {
         interpretKeyEvents([event])
     }
 
-    public override func keyUp(with event: NSEvent) {
+    /// RL-040: `nonisolated` bypasses the Swift 6.3 `@objc` thunk actor-isolation check.
+    nonisolated public override func keyUp(with event: NSEvent) {
+        guard self.window != nil else { return }
+        nonisolated(unsafe) let ev = event
+        MainActor.assumeIsolated {
+            self._keyUp(with: ev)
+        }
+    }
+
+    private func _keyUp(with event: NSEvent) {
         // RL-040/RL-041: keyUp arrives in a later event loop iteration than keyDown.
         // Guard against zombie dispatch after the view leaves its window.
         guard window != nil else { return }
@@ -396,7 +415,10 @@ extension HarnessTerminalSurfaceView: @preconcurrency NSTextInputClient {
         scheduleRender()
     }
 
-    public func hasMarkedText() -> Bool { !markedText.isEmpty }
+    /// RL-040: `nonisolated` bypasses the Swift 6.3 `@objc` thunk actor-isolation check.
+    nonisolated public func hasMarkedText() -> Bool {
+        MainActor.assumeIsolated { !markedText.isEmpty }
+    }
 
     public func markedRange() -> NSRange {
         markedText.isEmpty ? NSRange(location: NSNotFound, length: 0)

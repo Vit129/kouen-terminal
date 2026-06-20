@@ -51,7 +51,13 @@ final class PrefixKeymap {
     private func ensureMonitor() {
         guard monitor == nil else { return }
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            self?.handle(event) ?? event
+            // RL-040: If the event targets a view whose window is already gone (zombie),
+            // the Swift runtime crashes in swift_task_isCurrentExecutorWithFlagsImpl when
+            // entering any @MainActor code that touches the event's responder chain.
+            // Drop such events at the monitor level before they reach any view thunk.
+            if let eventWindow = event.window, eventWindow.contentView == nil { return event }
+            guard let self else { return event }
+            return self.handle(event)
         }
     }
 

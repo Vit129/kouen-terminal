@@ -1625,7 +1625,7 @@ extension HarnessSidebarPanelViewController: NSTableViewDataSource, NSTableViewD
         case .worktreeHeader:
             return 24
         case .session, .worktree:
-            return 28
+            return 40
         case .divider:
             return 10
         }

@@ -151,6 +151,9 @@ final class WorkspaceFileTreeView: NSView {
         if newWindow == nil {
             // Detach the hosting view so SwiftUI stops re-evaluating the body
             // after the backing context is freed (zombie @Observable access → crash).
+            // Also cancel pending layout to prevent a queued re-render race.
+            hostingView?.needsLayout = false
+            hostingView?.needsDisplay = false
             hostingView?.removeFromSuperview()
         }
     }
