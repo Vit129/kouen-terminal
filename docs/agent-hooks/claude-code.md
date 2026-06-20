@@ -58,7 +58,7 @@ its `message` field for the notification body.
    - macOS notification banner.
    - The tab pill's working dot lights up (waiting state).
    - "Claude Code: <message>" in the sidebar card meta line.
-4. Press `Cmd+Shift+I` to jump back to the pane.
+4. Press `Cmd+Shift+I` to open the Agent Notch and select the pane, or `Cmd+Shift+U` for the notifications inbox.
 
 ## Customizing
 

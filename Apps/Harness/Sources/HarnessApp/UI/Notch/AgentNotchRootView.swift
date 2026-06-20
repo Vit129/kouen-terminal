@@ -406,7 +406,10 @@ private struct NotchOverviewRow: View {
     }
 
     private var title: String {
-        row.agentKind?.displayName ?? row.title
+        guard let agentName = row.agentKind?.displayName else { return row.title }
+        let source = row.title.isEmpty ? row.sessionName : row.title
+        guard !source.isEmpty, source != agentName else { return agentName }
+        return "\(agentName) · \(source)"
     }
 
     private var subtitle: String {

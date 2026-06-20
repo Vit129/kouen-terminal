@@ -591,10 +591,6 @@ final class HarnessSidebarPanelViewController: NSViewController {
         updateSidebarToggleMenu()
     }
 
-    @objc private func notificationBellClicked() {
-        showNotificationsDropdown()
-    }
-
     private var notificationsDropdown: NotificationDropdownPanelView?
     private var notificationsDropdownMonitor: Any?
     private weak var notificationsDropdownPreviousResponder: NSResponder?
@@ -649,34 +645,14 @@ final class HarnessSidebarPanelViewController: NSViewController {
         dropdown.layer?.zPosition = 100
 
         // Float the panel over the window's content view rather than inside the narrow
-        // sidebar: anchored to the sidebar it was clipped at the divider (cut off) and its
-        // body text was squeezed into ~190pt. Hosted on the content view it can use a
-        // comfortable fixed width and overhang the terminal, fully visible. Frame-positioned
-        // just below the bell; it dismisses on any outside click so it needn't track resizes.
+        // sidebar: anchored to the content view it can use a comfortable fixed width and
+        // overhang the terminal, fully visible. It dismisses on any outside click so it
+        // needn't track resizes.
         let host = view.window?.contentView ?? view
         let width: CGFloat = 300
         let height = dropdown.preferredHeight
-        // Only anchor to the bell when the sidebar is visible — if the sidebar is hidden the
-        // bell has no real position in the window (coordinates are 0,0) and the panel would
-        // appear off-screen below the window bottom. Fall back to top-left of the content view.
-        let isBellOnScreen = notificationBell.window != nil
-            && !notificationBell.isHiddenOrHasHiddenAncestor
-            && notificationBell.visibleRect != .zero
-        let originX: CGFloat
-        let originY: CGFloat
-        if isBellOnScreen {
-            let bell = host.convert(notificationBell.bounds, from: notificationBell)
-            // minX is the bell's left edge; clamp so the panel never leaves the window.
-            originX = max(8, min(bell.minX, host.bounds.maxX - width - 8))
-            // The content view is not flipped (y grows upward), so the panel sits below the bell
-            // when its top edge is the bell's bottom edge.
-            originY = bell.minY - 6 - height
-        } else {
-            // Sidebar is collapsed: anchor to the top-left of the content view, 8pt from the edge,
-            // just below the title bar (assume ~52pt chrome at the top).
-            originX = 8
-            originY = host.bounds.maxY - 52 - height
-        }
+        let originX: CGFloat = 8
+        let originY: CGFloat = host.bounds.maxY - 52 - height
         dropdown.frame = NSRect(x: originX, y: originY, width: width, height: height)
         host.addSubview(dropdown)
         notificationsDropdown = dropdown
@@ -714,10 +690,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
             guard let self, let dropdown = self.notificationsDropdown else { return event }
             let point = dropdown.convert(event.locationInWindow, from: nil)
             if !dropdown.bounds.contains(point) {
-                let bellPoint = self.notificationBell.convert(event.locationInWindow, from: nil)
-                if !self.notificationBell.bounds.contains(bellPoint) {
-                    self.dismissNotificationsDropdown()
-                }
+                self.dismissNotificationsDropdown()
             }
             return event
         }

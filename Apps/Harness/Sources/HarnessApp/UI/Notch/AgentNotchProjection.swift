@@ -128,7 +128,7 @@ public enum AgentNotchProjection {
                 sessionID: context.session.id,
                 sessionName: context.session.name,
                 tabID: agent.tabID,
-                title: agent.kind.displayName,
+                title: displayTitle(for: context.tab),
                 detail: agentDetail(
                     workspace: context.workspace,
                     session: context.session,

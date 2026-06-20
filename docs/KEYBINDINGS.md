@@ -89,7 +89,8 @@ These are fixed `NSMenuItem` bindings defined in `MainMenuBuilder` — not prefi
 | Search command history | `⌃R` |
 | Toggle sidebar | `⌘\` |
 | Show Git panel | `⌘G` |
-| Notifications inbox | `⌘⇧I` |
+| Toggle Agent Notch | `⌘⇧I` |
+| Notifications inbox | `⌘⇧U` |
 | Open Browser Pane | `⌘B` |
 | Settings | `⌘,` |
 | Increase / Decrease / Reset font size | `⌘+` / `⌘-` / `⌘0` |

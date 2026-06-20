@@ -1,4 +1,4 @@
-# Competitive Position (as of v3.5.0, June 2026)
+# Competitive Position (as of v3.5.3, June 2026)
 
 ## Harness Wins
 
