@@ -684,6 +684,20 @@ public final class RealPty: @unchecked Sendable {
         return (pid, cwd)
     }
 
+    /// Returns true when the direct child shell owns the terminal foreground.
+    /// When false, a subprocess (e.g. claude, codex) holds the foreground — its CWD
+    /// may differ from the shell's, so the lightweight shell-only poll should skip
+    /// and let the full tree-walk probe report the correct CWD.
+    public func isShellInForeground() -> Bool {
+        lifecycleLock.lock()
+        let fd = master
+        let child = childPID
+        lifecycleLock.unlock()
+        guard fd >= 0, child > 0 else { return true }
+        let fg = tcgetpgrp(fd)
+        return fg <= 0 || fg == child
+    }
+
     /// Lightweight CWD probe: reads only the direct child shell's cwd via `proc_pidinfo`.
     /// No process-tree walk — O(1) syscall, suitable for high-frequency polling (~500ms).
     public func probeShellCwd() -> (pid: pid_t, cwd: String)? {
