@@ -431,6 +431,11 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
             window.makeFirstResponder(nil)
         }
 
+        // CASE-025: Sync Metal presents with the CATransaction so the terminal doesn't
+        // flash black during the structural rebuild (split/close/switch).
+        let allHosts = SessionCoordinator.shared.terminalHosts.allHosts()
+        allHosts.forEach { $0.setPresentsWithTransaction(true) }
+
         // Incremental update: detach existing terminal hosts from old container
         // (without removing them from window) then rebuild container around them.
         let existingHosts = paneContainer?.collectTerminalHosts() ?? [:]
@@ -471,6 +476,13 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         // Re-assert the focused-pane border after the (re)mount — reused hosts keep
         // their flag, but a freshly shown tab needs its active pane established.
         coordinator.ensureActivePane(for: tab)
+        // Release the synchronized present after the first layout pass completes.
+        CATransaction.begin()
+        CATransaction.setCompletionBlock {
+            allHosts.forEach { $0.setPresentsWithTransaction(false) }
+        }
+        view.layoutSubtreeIfNeeded()
+        CATransaction.commit()
     }
 
     private func paneKey(_ node: PaneNode) -> String {
