@@ -13,14 +13,21 @@ final class ScriptHookCoordinator {
 
     private init() {}
 
-    /// Starts the configuration discovery and loads the script if found.
+    /// Starts the configuration discovery and loads the script if found,
+    /// then loads any plugins from `~/.config/harness/plugins/`.
     func start() {
-        guard let path = ScriptConfigLocator.locate() else {
-            // Scripting is silently disabled if no file exists.
-            return
+        if let path = ScriptConfigLocator.locate() {
+            self.configPath = path
+            loadScript(at: path, isInitial: true)
         }
-        self.configPath = path
-        loadScript(at: path, isInitial: true)
+        // Load plugins after init.js so plugins can depend on globals defined there.
+        // If no runtime exists yet (no init.js), create a bare one for plugins.
+        if runtime == nil {
+            runtime = ScriptRuntime()
+        }
+        if let runtime {
+            PluginLoader.load(into: runtime)
+        }
     }
 
     private func loadScript(at path: String, isInitial: Bool) {

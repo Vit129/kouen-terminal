@@ -293,7 +293,10 @@ public struct KeyTableSet: Codable, Sendable, Equatable {
         // users add global bindings. The `command` table (command-prompt editing) is not seeded
         // until its consumer is wired, to avoid a rebindable-but-unconsulted surface.
         let root = KeyTable(id: .root, bindings: [
-            Binding(spec: KeySpec(key: "p", modifiers: .command), command: .workbench(.find(query: "")))
+            Binding(spec: KeySpec(key: "p", modifiers: .command), command: .workbench(.find(query: "")), note: "Fuzzy-find file"),
+            // Block navigation — Warp-style: jump between OSC 133 shell-prompt marks (needs shell integration)
+            Binding(spec: KeySpec(key: "Up", modifiers: .command), command: .jumpToPreviousPrompt, note: "Previous prompt block"),
+            Binding(spec: KeySpec(key: "Down", modifiers: .command), command: .jumpToNextPrompt, note: "Next prompt block"),
         ])
         return KeyTableSet(tables: [prefix, copyMode, copyModeEmacs, root])
     }

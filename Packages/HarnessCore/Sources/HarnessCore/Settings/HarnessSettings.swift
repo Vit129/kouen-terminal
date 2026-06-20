@@ -268,6 +268,15 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
     public var lspServers: [String: String]
     /// Mode to open files when selected in the file tree ("preview", "editor", "cat", "vi", "terminalOnly").
     public var fileClickAction: String
+    /// Anthropic API key for the built-in Claude chat sidebar and inline AI completions.
+    /// Stored in settings.json (plain text). Users who prefer Keychain can leave this empty
+    /// and set ANTHROPIC_API_KEY in their environment instead.
+    public var claudeAPIKey: String?
+    /// Whether inline AI ghost-text completion is enabled in the terminal input (Tab to accept).
+    public var inlineAICompletion: Bool
+    /// Post-processing shader effect applied over the rendered terminal frame.
+    /// Values: "none" (default), "scanlines", "grain", "bloom".
+    public var terminalShaderEffect: String
 
     /// Whether the *umbrella* Harness controls are on (prefix or status line). Kept for onboarding
     /// copy and tests; the prefix and status line each resolve independently via the effective
@@ -349,7 +358,7 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         ligatures: Bool = true,
         offMainParserFramePipeline: Bool = true,
         liveResizeReflow: Bool = true,
-        showPromptGutter: Bool = false,
+        showPromptGutter: Bool = true,
         showStatusLine: Bool = true,
         // Fresh installs default to the simplest experience — a fast native terminal.
         // Existing installs migrate to `.full` in `init(from:)` so no
@@ -372,7 +381,10 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         boldIsBright: Bool = true,
         lspAutoStart: Bool = false,
         lspServers: [String: String] = [:],
-        fileClickAction: String = "preview"
+        fileClickAction: String = "preview",
+        claudeAPIKey: String? = nil,
+        inlineAICompletion: Bool = false,
+        terminalShaderEffect: String = "none"
     ) {
         self.fontSize = HarnessSettings.clampedFontSize(fontSize)
         self.fontFamily = fontFamily
@@ -442,6 +454,9 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         self.lspAutoStart = lspAutoStart
         self.lspServers = lspServers
         self.fileClickAction = fileClickAction
+        self.claudeAPIKey = claudeAPIKey
+        self.inlineAICompletion = inlineAICompletion
+        self.terminalShaderEffect = terminalShaderEffect
     }
 
     /// Ensure the palette always has exactly 16 slots so index access is safe even if a
@@ -627,6 +642,9 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         lspAutoStart = try container.decodeIfPresent(Bool.self, forKey: .lspAutoStart) ?? fallback.lspAutoStart
         lspServers = try container.decodeIfPresent([String: String].self, forKey: .lspServers) ?? fallback.lspServers
         fileClickAction = try container.decodeIfPresent(String.self, forKey: .fileClickAction) ?? fallback.fileClickAction
+        claudeAPIKey = try container.decodeIfPresent(String.self, forKey: .claudeAPIKey)
+        inlineAICompletion = try container.decodeIfPresent(Bool.self, forKey: .inlineAICompletion) ?? fallback.inlineAICompletion
+        terminalShaderEffect = try container.decodeIfPresent(String.self, forKey: .terminalShaderEffect) ?? fallback.terminalShaderEffect
     }
 
     public static func load() -> HarnessSettings {
