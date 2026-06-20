@@ -2,6 +2,16 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Global rules and skills
+
+Global Claude instructions are authoritative and must be checked before repo-specific work:
+
+- `~/.claude/rules/skill-auto-detect.md` — mandatory keyword/semantic skill routing. Invoke matching `Skill()` before responding.
+- `~/.claude/rules/skill-map.md` — use when skill selection is unclear or the user invokes a skill.
+- `~/.claude/skills/` and `~/.agents/skills/` — global skill roots.
+
+For this repo, common triggers include SwiftUI/AppKit/macOS (`macos-swiftui`), Swift/iOS-style UI references (`ios-swiftui-swift` when relevant), Robot Framework UI automation (`robotframework-testing` plus `robotframework-rules`), Playwright/browser testing (`playwright-testing`), debugging (`debug-mantra`), architecture (`architect`), and code review (`review-personas`). If a matching skill exists, invoke it first; if the `Skill` tool is unavailable, read the matching `SKILL.md` manually and state the fallback.
+
 ## Product docs
 
 - `README.md` — public overview, install summary, feature map, and documentation index.

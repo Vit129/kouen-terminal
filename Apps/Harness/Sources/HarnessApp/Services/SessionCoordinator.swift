@@ -72,7 +72,12 @@ final class SessionCoordinator: NSObject {
 
     // MARK: - Remote daemon
 
+    /// Guard against concurrent SSH spawns — only one connect can be in-flight at a time.
+    private var isConnectingRemote = false
+
     func connectToRemote(named name: String) {
+        guard !isConnectingRemote else { return }
+        isConnectingRemote = true
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             var resolved: Endpoint?; var failureMessage: String?
             do { resolved = try RemoteHostsService.shared.connect(named: name) }
@@ -80,8 +85,16 @@ final class SessionCoordinator: NSObject {
             let endpoint = resolved; let message = failureMessage
             Task { @MainActor in
                 guard let self else { return }
+                self.isConnectingRemote = false
                 if let endpoint { self.applyEndpointSwitch(endpoint) }
-                else { self.noteDaemonError(DaemonSessionError.daemonError(message ?? "connection failed")) }
+                else {
+                    self.noteDaemonError(DaemonSessionError.daemonError(message ?? "connection failed"))
+                    NotificationCenter.default.post(
+                        name: RemoteHostsService.connectionDidFail,
+                        object: nil,
+                        userInfo: ["error": message ?? "connection failed"]
+                    )
+                }
             }
         }
     }
@@ -91,7 +104,7 @@ final class SessionCoordinator: NSObject {
         applyEndpointSwitch(.localControlSocket)
     }
 
-    private func applyEndpointSwitch(_ endpoint: Endpoint) {
+    func applyEndpointSwitch(_ endpoint: Endpoint) {
         activeEndpoint = endpoint
         daemonSyncService.switchEndpoint(endpoint)
         terminalHosts.prune(keeping: [])
