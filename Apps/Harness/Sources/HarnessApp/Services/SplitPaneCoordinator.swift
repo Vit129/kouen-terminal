@@ -181,15 +181,17 @@ final class SplitPaneCoordinator {
                     if t.id == tab.id {
                         var updatedTab = t
                         var root = updatedTab.rootPane
-                        if insertBrowserLeaf(browserLeaf, into: &root, targetPaneID: activePaneID, direction: direction) {
-                            updatedTab.rootPane = root
-                            updatedTab.activePaneID = paneID
-                            updatedTab.lastActivePaneID = tab.activePaneID
-                            updatedSnapshot.workspaces[wIdx].sessions[sIdx].tabs[tIdx] = updatedTab
+                        // Insert browser at the root level (right/bottom of entire tab)
+                        // so it sits beside all terminal panes, not nested inside one split.
+                        let existing = root
+                        root = .branch(direction: direction, ratio: 0.6, first: existing, second: .browser(browserLeaf))
+                        updatedTab.rootPane = root
+                        updatedTab.activePaneID = paneID
+                        updatedTab.lastActivePaneID = tab.activePaneID
+                        updatedSnapshot.workspaces[wIdx].sessions[sIdx].tabs[tIdx] = updatedTab
 
-                            coord.daemonSyncService.applyLocalSnapshot(updatedSnapshot)
-                            return
-                        }
+                        coord.daemonSyncService.applyLocalSnapshot(updatedSnapshot)
+                        return
                     }
                 }
             }
