@@ -277,6 +277,8 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
     /// Post-processing shader effect applied over the rendered terminal frame.
     /// Values: "none" (default), "scanlines", "grain", "bloom".
     public var terminalShaderEffect: String
+    /// Configuration for the Warp-style inline terminal AI chat (⌘I).
+    public var aiAgent: AIAgentConfig
 
     /// Whether the *umbrella* Harness controls are on (prefix or status line). Kept for onboarding
     /// copy and tests; the prefix and status line each resolve independently via the effective
@@ -384,7 +386,8 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         fileClickAction: String = "preview",
         claudeAPIKey: String? = nil,
         inlineAICompletion: Bool = false,
-        terminalShaderEffect: String = "none"
+        terminalShaderEffect: String = "none",
+        aiAgent: AIAgentConfig = AIAgentConfig()
     ) {
         self.fontSize = HarnessSettings.clampedFontSize(fontSize)
         self.fontFamily = fontFamily
@@ -457,6 +460,7 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         self.claudeAPIKey = claudeAPIKey
         self.inlineAICompletion = inlineAICompletion
         self.terminalShaderEffect = terminalShaderEffect
+        self.aiAgent = aiAgent
     }
 
     /// Ensure the palette always has exactly 16 slots so index access is safe even if a
@@ -645,6 +649,7 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         claudeAPIKey = try container.decodeIfPresent(String.self, forKey: .claudeAPIKey)
         inlineAICompletion = try container.decodeIfPresent(Bool.self, forKey: .inlineAICompletion) ?? fallback.inlineAICompletion
         terminalShaderEffect = try container.decodeIfPresent(String.self, forKey: .terminalShaderEffect) ?? fallback.terminalShaderEffect
+        aiAgent = try container.decodeIfPresent(AIAgentConfig.self, forKey: .aiAgent) ?? fallback.aiAgent
     }
 
     public static func load() -> HarnessSettings {

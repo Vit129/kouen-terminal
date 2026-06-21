@@ -24,30 +24,65 @@ ToolPolicy  ──── ~/.config/harness/mcp-policy.json or HARNESS_MCP_ALLOW_
 - Protocol version advertised: `2024-11-05`.
 - Reuses `ACPMessage` from `HarnessCore/ACP` for framing (shared with ACP path).
 
-## Tool Categories (25 tools total)
+## Tool Categories (27 tools across 6 categories)
 
-### Read-only (always allowed)
+### Session/Pane (read + control)
 | Tool | What it does |
 |------|-------------|
 | `harnessList` | All workspaces/sessions/tabs/panes with agent detection |
 | `harnessBoard` | Kanban board of sessions by status |
 | `readPaneOutput` | Scrollback text from any pane (up to 2000 lines) |
 | `waitForPaneOutput` | Block until pane emits a string pattern |
+| `sendPaneText` / `sendPaneKeys` | Input to terminal pane (control — gated) |
+| `spawnSession` / `splitPane` / `closePane` | Session/pane lifecycle (control — gated) |
+
+### File I/O
+| Tool | What it does |
+|------|-------------|
 | `readFile` | Read file contents |
+| `writeFile` | Write file (control — gated) |
 | `listDirectory` | List directory entries |
-| `gitStatus` / `gitDiff` / `gitLog` | Git operations |
-| `harnessFind` / `harnessGrep` / `harnessRecent` / `harnessErrors` | Workbench tools |
+
+### Git
+| Tool | What it does |
+|------|-------------|
+| `gitStatus` / `gitDiff` / `gitLog` | Git read operations |
+
+### Workbench
+| Tool | What it does |
+|------|-------------|
+| `harnessFind` / `harnessGrep` / `harnessRecent` / `harnessErrors` | Find, grep, recent files, LSP diagnostics |
+| `runCommand` | Shell exec with cwd (control — gated) |
+
+### Browser Pane
+| Tool | What it does |
+|------|-------------|
+| `harnessBrowserOpen` / `harnessBrowserNavigate` / `harnessBrowserInteract` / `harnessBrowserClose` | Browser pane control (control — gated) |
 | `harnessBrowserSnapshot` | DOM snapshot + interactive elements |
 | `harnessBrowserWait` | Wait for browser load |
 
-### Control (gated by ToolPolicy)
+### Agents
 | Tool | What it does |
 |------|-------------|
-| `sendPaneText` / `sendPaneKeys` | Input to terminal pane |
-| `spawnSession` / `splitPane` / `closePane` | Session/pane lifecycle |
-| `writeFile` | Write file |
-| `runCommand` | Shell exec with cwd |
-| `harnessBrowserOpen` / `harnessBrowserNavigate` / `harnessBrowserInteract` / `harnessBrowserClose` | Browser pane control |
+| `harnessSpawnAgent` | Spawn an agent process in a Harness pane (control — gated) |
+
+## Agent Config Wiring
+
+`MCPConfigWriter` (HarnessCore) reads and writes `mcpServers.harness` in each agent's config file:
+
+| Agent | Config file | Supported |
+|-------|-------------|-----------|
+| Claude Code | `~/.claude.json` | ✓ |
+| Kiro | `~/.kiro/settings/mcp.json` | ✓ |
+| Agy/Gemini | `~/.gemini/settings.json` | ✓ |
+| Codex | `~/.codex/config.toml` | ✗ (uses plugin marketplace) |
+
+Entry written: `{ "type": "stdio", "command": "/path/to/harness-mcp" }` under `mcpServers.harness`.
+
+CLI: `harness-cli mcp setup|status|remove` (no daemon connection required).
+GUI: Settings ▸ Agents — "Add MCP" / "✓ MCP" button per supported agent row.
+
+Binary ships at `Harness.app/Contents/MacOS/harness-mcp` in production. Dev builds use `.build/debug/harness-mcp` resolved by walking up the directory tree.
 
 ## Policy Gating
 
@@ -70,7 +105,7 @@ MCP is the active path for agent ↔ terminal integration. ACP re-enable criteri
 ## Key Files
 
 - `Tools/harness-mcp/Sources/HarnessMCP/MCPServer.swift` — core actor
-- `Tools/harness-mcp/Sources/HarnessMCP/ToolRegistry.swift` — 25 tool implementations
+- `Tools/harness-mcp/Sources/HarnessMCP/ToolRegistry.swift` — 27 tool implementations
 - `Tools/harness-mcp/Sources/HarnessMCP/ToolPolicy.swift` — policy gating
 - `Tools/harness-mcp/Sources/HarnessMCP/HarnessDaemonTools.swift` — daemon IPC
 - `Tools/harness-mcp/Sources/HarnessMCP/HarnessBrowserTools.swift` — browser IPC

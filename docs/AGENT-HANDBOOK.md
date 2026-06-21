@@ -468,6 +468,17 @@ Per-agent guides: [docs/agent-hooks/](docs/agent-hooks/). Daemon hooks (`hooks.j
 
 **Brand icons:** `AgentChipView`, `TabPillView`, the `MenuBarController` menu, and Settings ▸ Agents render each agent's mark from **`AgentIconArt`** via **`SVGPathParser`** → `CGPath` and **`AgentIconRenderer`** (`templateImage` tintable by `contentTintColor`; `coloredImage` baked for `NSMenuItem`; `monogramTemplate` for the text-only fallback). Sources (attribution in [docs/THIRD-PARTY-NOTICES.md](docs/THIRD-PARTY-NOTICES.md)): **lobe-icons** `@lobehub/icons-static-svg` (MIT) for `codex`, `claude`, `cursor`, `openclaw`, `opencode`, `gemini`, `goose`; a **vendor brand mark** (matching the Skillz app) for `pi` (Inflection). No bundled raster assets — vector, crisp at any size, the same procedural approach as the box-drawing. Agents with no mark (Hermes, Aider) fall back to a tinted two-letter monogram (`AgentIconRenderer.monogramTemplate`); the per-agent color override tints it. **Hermes** uses the monogram deliberately: its official mark is a detailed portrait that is illegible at the 14–18px sizes the icon is shown at.
 
+**MCP (Model Context Protocol):** `harness-mcp` is a JSON-RPC 2.0 MCP server (stdin/stdout transport) that lets AI agents call Harness as a tool provider — direction is **agent → Harness**, opposite of the shelved ACP sidebar. 27 tools across 6 categories: session/pane control, file I/O, git, workbench, browser pane, and agent orchestration. The binary ships at `Harness.app/Contents/MacOS/harness-mcp` in production builds (alongside `harness-cli` and `HarnessDaemon`). Tool policy gating: dangerous tools (control, shell) are blocked by default; enable via `~/Library/Application Support/Harness/mcp-policy.json` → `"allowControl": true` or `HARNESS_MCP_ALLOW_CONTROL=1` env var.
+
+MCP setup (one command):
+```bash
+harness-cli mcp setup    # detects Claude Code / Kiro / Agy, writes mcpServers.harness to each config
+harness-cli mcp status   # show which agents are configured
+harness-cli mcp remove   # remove harness-mcp from all agent configs
+```
+
+Or configure a single agent via **Settings ▸ Agents** — each supported agent row has an "Add MCP" / "✓ MCP" button that reads/writes the same config files. Config targets: Claude Code (`~/.claude.json`), Kiro (`~/.kiro/settings/mcp.json`), Agy/Gemini (`~/.gemini/settings.json`). Codex uses a plugin marketplace instead of `mcpServers` in `config.toml` and is not directly configurable this way. `MCPConfigWriter` (HarnessCore) owns reads/writes; the GUI delegates to it off-main with a `Toast` confirmation. MCP architecture details: `agent-memory/knowledge/architecture/mcp-server.md`.
+
 ---
 
 ## UI and key classes

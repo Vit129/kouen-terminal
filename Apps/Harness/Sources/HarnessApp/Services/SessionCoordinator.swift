@@ -34,6 +34,7 @@ final class SessionCoordinator: NSObject {
     let terminalHosts = TerminalPaneRegistry()
     /// One inline AI completion controller per terminal pane — keyed by surface UUID string.
     private var inlineAIControllers: [String: InlineAICompletionController] = [:]
+    private var aiChatControllers: [String: AITerminalChatController] = [:]
     private var lastDaemonErrorNotice: Date?
 
     var activeTabCWD: String? {
@@ -356,7 +357,17 @@ final class SessionCoordinator: NSObject {
         let aiController = InlineAICompletionController()
         aiController.install(in: host)
         inlineAIControllers[surfaceID.uuidString] = aiController
+        // Wire the terminal chat controller (⌘I → Warp-style inline AI blocks).
+        let chatController = AITerminalChatController(hostView: host, settings: settings)
+        aiChatControllers[surfaceID.uuidString] = chatController
         return host
+    }
+
+    // MARK: - Terminal AI Chat (⌘I)
+
+    func toggleAIChat() {
+        guard let surfaceID = activeSurfaceID else { return }
+        aiChatControllers[surfaceID.uuidString]?.toggle()
     }
 
     // MARK: - Find bar / Copy mode / Detach / Prompts

@@ -22,13 +22,20 @@ These MUST be maintained on any macOS 27 SDK upgrade.
 
 ### Rules (enforced, not optional)
 
-1. **Never use `nonisolated` on AppKit overrides** (`layout()`, `viewDidMoveToWindow()`, etc.)
-   - Swift 6.3+ allows `@MainActor` class to override without `nonisolated`
-   - `nonisolated` causes `@objc` thunk to add runtime executor check → crash on zombie
+1. **Use `nonisolated` on crash-prone AppKit overrides** (`sendEvent`, `close`, `layout`, `hitTest`)
+   - On `@MainActor` classes, a plain override generates an `@objc` thunk that calls
+     `swift_task_isCurrentExecutorWithFlagsImpl` — this dereferences metadata and crashes
+     when the view is a zombie (freed but still receiving events)
+   - `nonisolated` **bypasses** that executor check, making the thunk safe on zombie views
+   - Real examples: `HarnessWindow.sendEvent/close`, `WindowBorderOverlayView.layout/hitTest` (RL-040)
+   - Do NOT add `nonisolated` to every override — only to those reachable after dealloc begins
 
 2. **Never use `MainActor.assumeIsolated`** in Timer/NotificationCenter/completion callbacks
    - Use `Task { @MainActor in }` instead
-   - `assumeIsolated` can dereference NULL task context on macOS 26.5+
+   - `assumeIsolated` can dereference NULL task context on macOS 26.5+ when there is no
+     running Swift Task (GCD callbacks and Notification deliveries have no Task context)
+   - Exception: `MainExecutor.execute()` uses `assumeIsolated` inside `Thread.isMainThread`
+     branch and `DispatchQueue.main.sync {}` — both guarantee main thread, so it is safe
 
 3. **Always `guard window != nil` in `updateTrackingAreas()`**
    - AppKit calls it during dealloc/layout after view left window
@@ -47,8 +54,10 @@ These MUST be maintained on any macOS 27 SDK upgrade.
 
 ### Verification checklist for macOS 27 beta
 
-- [ ] Run `grep -rn "override nonisolated" Apps/ Packages/` — must return 0 results
-- [ ] Run `grep -rn "MainActor.assumeIsolated" Apps/` — only allowed in TerminalHostView hot path (with [weak self]+guard)
+- [ ] Run `grep -rn "nonisolated override" Apps/ Packages/` — allowed only in RL-040 sites
+      (HarnessWindow: sendEvent/close, WindowBorderOverlayView: layout/hitTest); any new site needs a RL-040 comment
+- [ ] Run `grep -rn "MainActor.assumeIsolated" Apps/` — allowed only in MainExecutor.execute()
+      (synchronous bridge with Thread.isMainThread guard) and TerminalHostView hot path ([weak self]+guard)
 - [ ] Run app for 2+ hours without crash
 - [ ] Check `heap <PID> | grep NSTextField` — count should be stable (no growth)
 - [ ] Confirm `updateTrackingAreas` all have `guard window != nil`
