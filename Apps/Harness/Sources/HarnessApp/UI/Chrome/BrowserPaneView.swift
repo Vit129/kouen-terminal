@@ -69,7 +69,8 @@ public final class BrowserPaneView: NSView {
         let firstTab = BrowserTab(id: UUID(), webView: webView, title: "New Tab")
         tabs.append(firstTab)
 
-        let logPath = "/tmp/harness-browser-\(paneID.uuidString).log"
+        let tempDir = NSTemporaryDirectory()
+        let logPath = (tempDir as NSString).appendingPathComponent("harness-browser-\(paneID.uuidString).log")
         try? "".write(toFile: logPath, atomically: true, encoding: .utf8)
 
         setupConsoleLogRedirection(for: webView)
@@ -134,9 +135,21 @@ public final class BrowserPaneView: NSView {
     }
 
     private func setupUI() {
-        // Toolbar styling
-        HarnessDesign.installChromeBackground(.tabBar, on: toolbar)
+        // Toolbar styling — translucent blur (CMUX-style)
         toolbar.translatesAutoresizingMaskIntoConstraints = false
+        toolbar.wantsLayer = true
+        let blurView = NSVisualEffectView()
+        blurView.material = .hudWindow
+        blurView.blendingMode = .behindWindow
+        blurView.state = .active
+        blurView.translatesAutoresizingMaskIntoConstraints = false
+        toolbar.addSubview(blurView, positioned: .below, relativeTo: nil)
+        NSLayoutConstraint.activate([
+            blurView.topAnchor.constraint(equalTo: toolbar.topAnchor),
+            blurView.leadingAnchor.constraint(equalTo: toolbar.leadingAnchor),
+            blurView.trailingAnchor.constraint(equalTo: toolbar.trailingAnchor),
+            blurView.bottomAnchor.constraint(equalTo: toolbar.bottomAnchor),
+        ])
 
         let border = NSView()
         border.wantsLayer = true
@@ -200,14 +213,19 @@ public final class BrowserPaneView: NSView {
         toolbarStack.spacing = 8
         toolbarStack.edgeInsets = NSEdgeInsets(top: 4, left: 8, bottom: 4, right: 12)
         toolbarStack.alignment = .centerY
+        toolbarStack.distribution = .fill
         toolbarStack.translatesAutoresizingMaskIntoConstraints = false
         toolbar.addSubview(toolbarStack)
+
+        // urlContainer must stretch to fill available space
+        urlContainer.setContentHuggingPriority(.init(1), for: .horizontal)
 
         NSLayoutConstraint.activate([
             toolbarStack.topAnchor.constraint(equalTo: toolbar.topAnchor),
             toolbarStack.leadingAnchor.constraint(equalTo: toolbar.leadingAnchor),
             toolbarStack.trailingAnchor.constraint(equalTo: toolbar.trailingAnchor),
-            toolbarStack.bottomAnchor.constraint(equalTo: toolbar.bottomAnchor)
+            toolbarStack.bottomAnchor.constraint(equalTo: toolbar.bottomAnchor),
+            urlContainer.heightAnchor.constraint(equalToConstant: 26),
         ])
 
         // Error Banner configuration
@@ -864,22 +882,25 @@ extension BrowserPaneView: WKScriptMessageHandler {
             consoleLogs.removeFirst(consoleLogs.count - 200)
         }
         
-        // Write/append to file /tmp/harness-browser-\(paneID.uuidString).log
+        // Write/append to file asynchronously on a background queue to not block Main thread
         let df = DateFormatter()
         df.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
         let timestamp = df.string(from: Date())
         
         let fileLine = "[\(timestamp)] [\(level.uppercased())] \(text)\n"
-        let logPath = "/tmp/harness-browser-\(paneID.uuidString).log"
-        let url = URL(fileURLWithPath: logPath)
+        let tempDir = NSTemporaryDirectory()
+        let logPath = (tempDir as NSString).appendingPathComponent("harness-browser-\(paneID.uuidString).log")
         
-        if let data = fileLine.data(using: .utf8) {
-            if let fileHandle = try? FileHandle(forWritingTo: url) {
-                defer { try? fileHandle.close() }
-                _ = try? fileHandle.seekToEnd()
-                _ = try? fileHandle.write(contentsOf: data)
-            } else {
-                _ = try? data.write(to: url, options: .atomic)
+        DispatchQueue.global(qos: .utility).async {
+            let url = URL(fileURLWithPath: logPath)
+            if let data = fileLine.data(using: .utf8) {
+                if let fileHandle = try? FileHandle(forWritingTo: url) {
+                    defer { try? fileHandle.close() }
+                    _ = try? fileHandle.seekToEnd()
+                    _ = try? fileHandle.write(contentsOf: data)
+                } else {
+                    _ = try? data.write(to: url, options: .atomic)
+                }
             }
         }
     }

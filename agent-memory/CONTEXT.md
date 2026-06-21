@@ -1,26 +1,31 @@
 # Context — harness-terminal
 
 ## Now
-- **Task:** None active — ready for next session
+- **Task:** Browser pane redesign — CMUX-style integrated browser
 - **Branch:** main
 - **Latest release:** v3.6.1 (build 162)
-- **Status:** idle
+- **Status:** in-progress (design phase)
 
-## Last Session (2026-06-21)
-- Fixed RL-040 keyDown zombie crash: (1) installed missing NSEvent local monitor in AppDelegate, (2) added 1.5s retire-hold to ContentAreaViewController.detachHosts()
-- Added AI agent selector (click pill in ⌘I to switch Claude/Codex/Gemini/Kiro), persisted to settings.json
-- Released v3.6.1 build 162
+## Design Direction (CMUX-inspired)
 
-## Open Questions
-- [open] `@` auto-include in memory-protocol only works for Claude Code — Codex/Gemini use rules/ fallback
-- [open] Per-session-tab focus not restored on cmd+1/2/3. Partial fix not verified.
+1. **Translucent toolbar** — no solid background, blur from terminal window (like CMUX)
+2. **No browser-level tabs** — tab management moves to terminal sidebar (reduce UI duplication)
+3. **Agent-controlled** — API for agents to load URLs, inspect DOM, read console logs (like Chrome DevTools but terminal-native)
+4. **Full web support** — not just localhost, any website works normally (cookies persist)
+
+## Key Changes from Current Design
+
+| Current | New |
+|---------|-----|
+| Tab bar inside BrowserPaneView (28pt) | Remove — sidebar manages tabs |
+| Solid black toolbar background | Translucent/blur matching terminal |
+| No agent API | Agent can: navigate, get DOM, read console, screenshot |
+| Click-to-open only | Agent can open + inspect programmatically |
 
 ## Key Files
-- `AppDelegate.swift` — NSEvent local monitor (RL-040 fix #8)
-- `ContentAreaViewController.swift` — `detachHosts` retire-hold
-- `AIQueryInputView.swift` — agent pill selector
-- `AITerminalChatController.swift` — agent change + persist
+- `Apps/Harness/Sources/HarnessApp/UI/Chrome/BrowserPaneView.swift` — main browser view
+- `agent-memory/knowledge/ui/browser-pane.md` — architecture doc
 
 ## Session Notes
 - Build: `make preview`
-- Never reparent Metal terminal surfaces — causes black screen (RL-004)
+- Read `agent-memory/knowledge/ui/browser-pane.md` for current architecture

@@ -1308,7 +1308,8 @@ public final class HarnessTerminalSurfaceView: NSView {
         }
     }
 
-    public override func viewWillMove(toWindow newWindow: NSWindow?) {
+    nonisolated public override func viewWillMove(toWindow newWindow: NSWindow?) {
+        MainActor.assumeIsolated {
         super.viewWillMove(toWindow: newWindow)
         if newWindow == nil, let window {
             // Resign first responder before leaving the window. If the view is deallocated
@@ -1337,6 +1338,7 @@ public final class HarnessTerminalSurfaceView: NSView {
                 self.trackingArea = nil
             }
         }
+        } // MainActor.assumeIsolated
     }
 
     // MARK: - RL-040: Universal retire-hold on removal
@@ -1355,7 +1357,8 @@ public final class HarnessTerminalSurfaceView: NSView {
         }
     }
 
-    public override func viewDidMoveToWindow() {
+    nonisolated public override func viewDidMoveToWindow() {
+        MainActor.assumeIsolated {
         fputs("BLINKDBG viewDidMoveToWindow: surface=\(ObjectIdentifier(self)) window=\(window != nil)\n", harnessStderr)
         super.viewDidMoveToWindow()
         windowKeyObservers.forEach(NotificationCenter.default.removeObserver(_:))
@@ -1443,9 +1446,11 @@ public final class HarnessTerminalSurfaceView: NSView {
             // re-hosted view would resize the grid behind that layout's back.
             emulatorState.clearPendingResize()
         }
+        } // MainActor.assumeIsolated
     }
 
-    public override func viewDidMoveToSuperview() {
+    nonisolated public override func viewDidMoveToSuperview() {
+        MainActor.assumeIsolated {
         fputs("BLINKDBG viewDidMoveToSuperview: surface=\(ObjectIdentifier(self)) superview=\(superview != nil) window=\(window != nil)\n", harnessStderr)
         super.viewDidMoveToSuperview()
         if window != nil {
@@ -1453,6 +1458,7 @@ public final class HarnessTerminalSurfaceView: NSView {
             startDisplayLink()
             scheduleRender()
         }
+        } // MainActor.assumeIsolated
     }
 
     /// Drive renders at the display's refresh rate while in a window. The link starts paused;
