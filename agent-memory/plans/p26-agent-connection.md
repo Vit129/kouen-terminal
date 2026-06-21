@@ -161,17 +161,44 @@ and `DisplayPanesOverlay`. No changes to `TerminalEmulator` or `HarnessTerminalR
 
 ### Agent process
 
-Harness spawns the agent CLI as a child process outside PTY:
+All supported CLIs have non-interactive/print mode — no ACP framing needed:
+
+| Agent | Command | Stdin |
+|-------|---------|-------|
+| `claude` | `claude -p "<query>"` | context piped to stdin |
+| `codex` | `codex exec "<query>"` | stdin auto-appended as `<stdin>` block |
+| `agy` (Gemini) | `agy -p "<query>"` | context piped to stdin |
+| `kiro` | TBD — likely `-p` or `exec` | TBD |
 
 ```
 AITerminalChatController
-  ↓ AgentProcessManager  (new, wraps Process/ACPProcess)
-  ↓ stdin: prompt + context (last N pane lines)
-  ↓ stdout: streamed to AIResponseBlockView
+  ↓ AgentProcessManager  (new, plain Process — NO ACP framing)
+     ├── stdin pipe: last 80 pane lines as plain text
+     ├── stdout pipe: raw text streamed to AIResponseBlockView
+     └── stderr: captured for error display
 ```
 
-Reuses `ACPProcess` infra (already handles Content-Length framing, stream, crash).
-PATH resolution: `/bin/zsh -l -c "which <agent>"` on first use, cached in settings.
+```swift
+// AgentProcessManager core — no ACPProcess, just Process
+func query(_ text: String, context: String) -> AsyncStream<String> {
+    let proc = Process()
+    proc.executableURL = URL(fileURLWithPath: resolvedPath)
+    proc.arguments = agentArgs(for: agent, query: text)  // -p / exec
+
+    let stdin  = Pipe(); proc.standardInput  = stdin
+    let stdout = Pipe(); proc.standardOutput = stdout
+
+    stdin.fileHandleForWriting.write((context + "\n").data(using: .utf8)!)
+    stdin.fileHandleForWriting.closeFile()
+
+    try proc.run()
+    return AsyncStream { continuation in
+        // read stdout line-by-line and yield to stream
+    }
+}
+```
+
+PATH resolution: `/bin/zsh -l -c "which <agent>"` on first use, cached in `AIAgentConfig`.
 
 ### Agent config (per workspace, switchable)
 
@@ -224,14 +251,14 @@ Keybinding is rebindable via normal Harness keybinding config.
 
 ### Phase B PBIs
 
-- [ ] **B-1:** `AgentProcessManager` — PATH resolution, spawn, stream stdout, crash handle
-- [ ] **B-2:** `AIQueryInputView` — input bar NSView, bottom-pinned to terminal pane, Esc/Enter
-- [ ] **B-3:** `AIResponseBlockView` — streaming text, code block detection, Run/Copy/Dismiss actions
-- [ ] **B-4:** `AITerminalChatController` — wires B-1/B-2/B-3 into `HarnessTerminalSurfaceView`
-- [ ] **B-5:** Context injection — last 80 pane lines via `TerminalEmulator.plainText()`
-- [ ] **B-6:** `AgentKind` settings + per-workspace config, quick-switch pill in query bar
-- [ ] **B-7:** `⌘I` keybinding wired via `CommandIPCTranslator` + `MainExecutor`
-- [ ] **B-8:** Settings → AI tab: agent picker, binary path, extra args, keybinding
+- [ ] **B-1:** `AgentProcessManager` — PATH resolution via login shell, spawn CLI with `-p`/`exec`, stream stdout, crash handle
+- [ ] **B-2:** `AIQueryInputView` — NSView input bar, bottom-pinned to terminal pane, Esc/Enter
+- [ ] **B-3:** `AIResponseBlockView` — streaming text render, fenced code block detection, [▶ Run] [⎘ Copy] [✕ Dismiss]
+- [ ] **B-4:** `AITerminalChatController` — orchestrates B-1/B-2/B-3 on `HarnessTerminalSurfaceView`
+- [ ] **B-5:** Context injection — last 80 pane lines via `TerminalEmulator.plainText()` → stdin
+- [ ] **B-6:** `AgentKind` + `AIAgentConfig` in `HarnessSettings`, per-workspace storage
+- [ ] **B-7:** `⌘I` keybinding → new `Command.openAIChat` → `CommandIPCTranslator` + `MainExecutor`
+- [ ] **B-8:** Settings → AI tab: agent picker, binary path auto-detect + override, keybinding
 
 ---
 
