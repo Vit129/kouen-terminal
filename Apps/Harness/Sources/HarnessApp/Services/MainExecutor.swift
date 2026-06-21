@@ -470,16 +470,25 @@ final class MainExecutor: CommandExecutor {
                 DisplayMessage.show("copy-path: no current file")
             }
         case let .cd(path):
-            let expanded = (path as NSString).expandingTildeInPath
-            let resolved = expanded.hasPrefix("/") ? expanded : ((context?.cwd ?? FileManager.default.currentDirectoryPath) + "/" + expanded)
-            let url = URL(fileURLWithPath: resolved, isDirectory: true)
-            let canonical = url.standardized.path
-            // Send cd command to the active terminal shell.
             guard let surfaceID = coordinator.activeSurfaceID else {
                 DisplayMessage.show("cd: no active terminal")
                 return
             }
-            coordinator.requestDaemon(.sendKeys(surfaceID: surfaceID.uuidString, keys: ["cd \(canonical)", "Enter"]))
+            let cwd = context?.cwd ?? FileManager.default.currentDirectoryPath
+            let expanded = (path as NSString).expandingTildeInPath
+            let resolved = expanded.hasPrefix("/") ? expanded : (cwd + "/" + expanded)
+            let url = URL(fileURLWithPath: resolved, isDirectory: true)
+            let canonical = url.standardized.path
+            // If the path exists on disk, cd directly. Otherwise ask zoxide.
+            let target: String
+            if FileManager.default.fileExists(atPath: canonical) {
+                target = canonical
+            } else if let zResult = Self.zoxideQuery(path) {
+                target = zResult
+            } else {
+                target = canonical
+            }
+            coordinator.requestDaemon(.sendKeys(surfaceID: surfaceID.uuidString, keys: ["cd \(target)", "Enter"]))
         case let .mark(name, path):
             throw CommandExecutionError.unsupportedInThisContext("mark '\(name)' '\(path)' not supported in GUI context yet")
         case let .view(path):
@@ -516,6 +525,24 @@ final class MainExecutor: CommandExecutor {
             focusedSurfaceID: coordinator.activeSurfaceID,
             currentFilePath: activeContentVC()?.currentFilePath
         )
+    }
+
+    /// Ask zoxide for the best match for `query`. Returns nil if zoxide isn't installed or has no match.
+    private static func zoxideQuery(_ query: String) -> String? {
+        let candidates = ["/opt/homebrew/bin/zoxide", "/usr/local/bin/zoxide", "/usr/bin/zoxide"]
+        let binary = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) ?? "zoxide"
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: binary)
+        proc.arguments = ["query", "--", query]
+        let pipe = Pipe()
+        proc.standardOutput = pipe
+        proc.standardError = Pipe()
+        guard (try? proc.run()) != nil else { return nil }
+        proc.waitUntilExit()
+        guard proc.terminationStatus == 0 else { return nil }
+        let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return output?.isEmpty == false ? output : nil
     }
 
     // MARK: Targeting

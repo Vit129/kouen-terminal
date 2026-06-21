@@ -526,6 +526,13 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         }
     }
 
+    // MARK: - Pane lookup (P27 drag-drop)
+
+    func paneShell(for paneID: PaneID) -> NSView? {
+        let id = NSUserInterfaceItemIdentifier("pane-\(paneID.uuidString)")
+        return paneContainer?.findDescendant(withIdentifier: id)
+    }
+
     // MARK: - File Tabs
 
     func openFileTab(path: String) {
@@ -772,6 +779,17 @@ final class PaneContainerView: NSView {
         build(node: node, cwd: cwd, into: self)
     }
 
+    func findDescendant(withIdentifier id: NSUserInterfaceItemIdentifier) -> NSView? {
+        func search(_ view: NSView) -> NSView? {
+            if view.identifier == id { return view }
+            for child in view.subviews {
+                if let found = search(child) { return found }
+            }
+            return nil
+        }
+        return search(self)
+    }
+
     func applyChrome() {
         HarnessDesign.makeClear(self)
     }
@@ -887,6 +905,7 @@ final class PaneContainerView: NSView {
             let paneShell = NSView()
             HarnessDesign.makeClear(paneShell)
             paneShell.translatesAutoresizingMaskIntoConstraints = false
+            paneShell.identifier = NSUserInterfaceItemIdentifier("pane-\(leaf.id.uuidString)")
             parent.addSubview(paneShell)
             NSLayoutConstraint.activate([
                 paneShell.topAnchor.constraint(equalTo: parent.topAnchor),
@@ -1024,11 +1043,16 @@ private final class PaneSplitButtonsView: NSView {
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stack)
 
+        let dragGrip = PaneDragGripView(paneID: paneID)
+        dragGrip.translatesAutoresizingMaskIntoConstraints = false
+        dragGrip.widthAnchor.constraint(equalToConstant: 24).isActive = true
+        dragGrip.heightAnchor.constraint(equalToConstant: 22).isActive = true
         let splitRight = makeButton("rectangle.righthalf.inset.filled", tooltip: "Split Right (⌘D)", action: #selector(doSplitRight))
         let splitDown = makeButton("rectangle.bottomhalf.inset.filled", tooltip: "Split Down (⌘⇧D)", action: #selector(doSplitDown))
         let openBrowser = makeButton("safari", tooltip: "Open Browser Pane (⌘B)", action: #selector(openBrowserPane))
         let closeBtn = makeButton("xmark", tooltip: "Close Pane (⌥⇧⌘W)", action: #selector(closePane))
 
+        stack.addArrangedSubview(dragGrip)
         stack.addArrangedSubview(splitRight)
         stack.addArrangedSubview(splitDown)
         stack.addArrangedSubview(openBrowser)
@@ -1073,6 +1097,7 @@ private final class PaneSplitButtonsView: NSView {
 
     override func mouseExited(with event: NSEvent) {
         guard window != nil else { return }
+        guard !PaneDragController.shared.isDragging else { return }
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.25
             animator().alphaValue = 0
@@ -1151,6 +1176,75 @@ private final class PaneHoverButton: NSButton {
         guard window != nil else { return }
         contentTintColor = .white.withAlphaComponent(0.7)
         layer?.backgroundColor = nil
+    }
+}
+
+/// Draggable grip icon — mouseDown+drag initiates pane drag session.
+@MainActor
+private final class PaneDragGripView: NSView {
+    private let paneID: PaneID
+    private var dragStarted = false
+
+    init(paneID: PaneID) {
+        self.paneID = paneID
+        super.init(frame: .zero)
+        wantsLayer = true
+        layer?.cornerRadius = 4
+        toolTip = "Drag to reorder pane"
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
+        let color = NSColor.white.withAlphaComponent(0.7)
+        ctx.setFillColor(color.cgColor)
+        // Draw 6 dots (3×2 grid) as grip indicator
+        let dotSize: CGFloat = 2.5
+        let spacingX: CGFloat = 5
+        let spacingY: CGFloat = 4
+        let startX = (bounds.width - spacingX * 2) / 2
+        let startY = (bounds.height - spacingY * 2) / 2
+        for row in 0..<3 {
+            for col in 0..<2 {
+                let x = startX + CGFloat(col) * spacingX
+                let y = startY + CGFloat(row) * spacingY
+                ctx.fillEllipse(in: CGRect(x: x, y: y, width: dotSize, height: dotSize))
+            }
+        }
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        dragStarted = false
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        if !dragStarted {
+            dragStarted = true
+            guard let paneShell = superview?.superview else { return }
+            PaneDragController.shared.beginDrag(paneID: paneID, from: paneShell)
+        }
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        layer?.backgroundColor = NSColor.white.withAlphaComponent(0.15).cgColor
+        NSCursor.openHand.push()
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        layer?.backgroundColor = nil
+        NSCursor.pop()
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        trackingAreas.forEach { removeTrackingArea($0) }
+        addTrackingArea(NSTrackingArea(
+            rect: bounds,
+            options: [.mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect],
+            owner: self
+        ))
     }
 }
 
