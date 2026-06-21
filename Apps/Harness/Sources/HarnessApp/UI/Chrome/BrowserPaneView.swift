@@ -754,7 +754,7 @@ private final class LoadCompletionState: @unchecked Sendable {
 @MainActor
 private final class BrowserTabButton: NSView {
     private let label = NSTextField(labelWithString: "")
-    private let closeBtn = NSButton()
+    private let closeBtn = SoftIconButton(frame: NSRect(x: 0, y: 0, width: 20, height: 20))
     private var onSelect: () -> Void
     private var onClose: () -> Void
 
@@ -776,13 +776,10 @@ private final class BrowserTabButton: NSView {
         label.lineBreakMode = .byTruncatingTail
         label.translatesAutoresizingMaskIntoConstraints = false
 
-        closeBtn.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: "Close Tab")?
-            .withSymbolConfiguration(.init(pointSize: 7, weight: .semibold))
-        closeBtn.isBordered = false
+        closeBtn.setSymbol("xmark", accessibilityDescription: "Close Tab", pointSize: 8, weight: .semibold)
         closeBtn.target = self
         closeBtn.action = #selector(closeTapped)
         closeBtn.translatesAutoresizingMaskIntoConstraints = false
-        closeBtn.contentTintColor = HarnessDesign.chrome.textSecondary
 
         addSubview(label)
         addSubview(closeBtn)
