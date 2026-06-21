@@ -794,8 +794,8 @@ private final class BrowserTabButton: NSView {
             label.trailingAnchor.constraint(lessThanOrEqualTo: closeBtn.leadingAnchor, constant: -4),
             closeBtn.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -6),
             closeBtn.centerYAnchor.constraint(equalTo: centerYAnchor),
-            closeBtn.widthAnchor.constraint(equalToConstant: 14),
-            closeBtn.heightAnchor.constraint(equalToConstant: 14),
+            closeBtn.widthAnchor.constraint(equalToConstant: 20),
+            closeBtn.heightAnchor.constraint(equalToConstant: 20),
         ])
 
         let click = NSClickGestureRecognizer(target: self, action: #selector(selectTapped(_:)))
