@@ -240,9 +240,9 @@ final class TerminalTabBarView: NSView {
             NSObject.cancelPreviousPerformRequests(withTarget: self)
             needsLayout = false
             needsDisplay = false
-            // Hold self alive for 500ms so AppKit's async layout drain completes.
+            // Hold self alive for 1.5s so AppKit's async layout drain completes.
             Self.retiredBars.append(self)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
                 guard let self else { return }
                 Self.retiredBars.removeAll { $0 === self }
             }
