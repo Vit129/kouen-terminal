@@ -133,6 +133,8 @@ final class SettingsViewController: NSViewController, NSFontChanging {
     var keyRecorder: KeyRecorderView!
     /// Live "Installed ✓ / Install hooks" buttons keyed by agent (Agents page).
     var hookButtons: [AgentKind: NSButton] = [:]
+    /// "Add MCP" / "✓ MCP" buttons keyed by agent (Agents page).
+    var mcpButtons: [AgentKind: NSButton] = [:]
 #if HARNESS_ACP
     /// "Enable for Chat" toggles keyed by agent (Agents page).
     var chatToggles: [AgentKind: NSButton] = [:]

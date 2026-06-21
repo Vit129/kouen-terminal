@@ -297,6 +297,8 @@ public struct KeyTableSet: Codable, Sendable, Equatable {
             // Block navigation — Warp-style: jump between OSC 133 shell-prompt marks (needs shell integration)
             Binding(spec: KeySpec(key: "Up", modifiers: .command), command: .jumpToPreviousPrompt, note: "Previous prompt block"),
             Binding(spec: KeySpec(key: "Down", modifiers: .command), command: .jumpToNextPrompt, note: "Next prompt block"),
+            // Inline AI chat (Warp-style terminal chat)
+            Binding(spec: KeySpec(key: "i", modifiers: .command), command: .openAIChat, note: "Toggle inline AI chat"),
         ])
         return KeyTableSet(tables: [prefix, copyMode, copyModeEmacs, root])
     }

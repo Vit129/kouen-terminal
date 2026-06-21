@@ -44,6 +44,9 @@ struct HarnessCLI {
             case "version", "--version", "-v":
                 printVersion(args) // best-effort daemon query; works with the daemon down
                 return
+            case "mcp":
+                handleMCP(args)
+                return
             default:
                 break
             }

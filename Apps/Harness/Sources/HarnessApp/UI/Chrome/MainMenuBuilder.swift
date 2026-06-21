@@ -132,14 +132,18 @@ enum MainMenuBuilder {
         reattachItem.target = MenuTarget.shared
         view.submenu?.addItem(reattachItem)
         view.submenu?.addItem(.separator())
-        let jumpItem = NSMenuItem(title: "Show Notifications", action: #selector(MenuTarget.jumpNotification), keyEquivalent: "u")
-        jumpItem.keyEquivalentModifierMask = [.command, .shift]
+        let jumpItem = NSMenuItem(title: "Show Notifications", action: #selector(MenuTarget.jumpNotification), keyEquivalent: "i")
+        jumpItem.keyEquivalentModifierMask = [.command, .control]
         jumpItem.target = MenuTarget.shared
         view.submenu?.addItem(jumpItem)
         let notchItem = NSMenuItem(title: "Toggle Agent Notch", action: #selector(MenuTarget.toggleAgentNotch), keyEquivalent: "i")
         notchItem.keyEquivalentModifierMask = [.command, .shift]
         notchItem.target = MenuTarget.shared
         view.submenu?.addItem(notchItem)
+        let aiChatItem = NSMenuItem(title: "Ask AI…", action: #selector(MenuTarget.openAIChat), keyEquivalent: "i")
+        aiChatItem.keyEquivalentModifierMask = [.command]
+        aiChatItem.target = MenuTarget.shared
+        view.submenu?.addItem(aiChatItem)
         let paletteItem = menuItem("Command Palette", action: #selector(MenuTarget.commandPalette), binding: BannerShortcutRegistry.commandPalette)
         view.submenu?.addItem(paletteItem)
         let promptItem = menuItem("Command Prompt", action: #selector(MenuTarget.commandPrompt), binding: BannerShortcutRegistry.commandPrompt)
@@ -440,6 +444,10 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
 
     @objc func toggleAgentNotch() {
         NotchPanelController.shared.toggleFromMenu()
+    }
+
+    @objc func openAIChat() {
+        SessionCoordinator.shared.toggleAIChat()
     }
 
     @objc func showOnboarding() {
