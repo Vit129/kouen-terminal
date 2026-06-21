@@ -1339,6 +1339,22 @@ public final class HarnessTerminalSurfaceView: NSView {
         }
     }
 
+    // MARK: - RL-040: Universal retire-hold on removal
+
+    /// Hold removed surface views for 1.5s after removal from ANY path (our code, AppKit internal,
+    /// SwiftUI lifecycle). Prevents use-after-free when queued events (keyDown/keyUp, cursor rects,
+    /// tracking areas) dispatch to a freed first-responder. The Swift 6.3.2 @objc thunk crashes at
+    /// `swift_getObjectType` before any guard code in the method body can run.
+    private static var retiredSurfaces: [HarnessTerminalSurfaceView] = []
+
+    public override func removeFromSuperview() {
+        Self.retiredSurfaces.append(self)
+        super.removeFromSuperview()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            Self.retiredSurfaces.removeAll { $0 === self }
+        }
+    }
+
     public override func viewDidMoveToWindow() {
         fputs("BLINKDBG viewDidMoveToWindow: surface=\(ObjectIdentifier(self)) window=\(window != nil)\n", harnessStderr)
         super.viewDidMoveToWindow()
