@@ -19,8 +19,8 @@ struct HarnessBrowserTools: Sendable {
         self.disabledError = disabledError
     }
 
-    private func send(_ request: IPCRequest) async -> IPCResponse? {
-        try? await client.request(request)
+    private func send(_ request: IPCRequest, timeout: TimeInterval = 35) async -> IPCResponse? {
+        try? await client.request(request, timeout: timeout)
     }
 
     // MARK: - harnessBrowserOpen

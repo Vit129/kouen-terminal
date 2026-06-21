@@ -171,6 +171,50 @@ final class DaemonSyncService {
                 _ = await request(.browserResponse(id: id, response: .error(error.localizedDescription)))
             }
 
+        case let .cookies(paneID):
+            guard let view = BrowserPaneRegistry.shared.get(paneID) else {
+                _ = await request(.browserResponse(id: id, response: .error("Browser pane not found")))
+                return
+            }
+            let jar = await view.cookies()
+            _ = await request(.browserResponse(id: id, response: .cookies(jar)))
+
+        case let .storage(paneID, storageType):
+            guard let view = BrowserPaneRegistry.shared.get(paneID) else {
+                _ = await request(.browserResponse(id: id, response: .error("Browser pane not found")))
+                return
+            }
+            do {
+                let items = try await view.storage(type: storageType)
+                _ = await request(.browserResponse(id: id, response: .storage(items)))
+            } catch {
+                _ = await request(.browserResponse(id: id, response: .error(error.localizedDescription)))
+            }
+
+        case let .network(paneID):
+            guard let view = BrowserPaneRegistry.shared.get(paneID) else {
+                _ = await request(.browserResponse(id: id, response: .error("Browser pane not found")))
+                return
+            }
+            do {
+                let entries = try await view.networkRequests()
+                _ = await request(.browserResponse(id: id, response: .network(entries)))
+            } catch {
+                _ = await request(.browserResponse(id: id, response: .error(error.localizedDescription)))
+            }
+
+        case let .screenshot(paneID):
+            guard let view = BrowserPaneRegistry.shared.get(paneID) else {
+                _ = await request(.browserResponse(id: id, response: .error("Browser pane not found")))
+                return
+            }
+            do {
+                let base64 = try await view.screenshot()
+                _ = await request(.browserResponse(id: id, response: .screenshot(base64)))
+            } catch {
+                _ = await request(.browserResponse(id: id, response: .error(error.localizedDescription)))
+            }
+
         case let .close(paneID):
             coord.splitPaneCoordinator.killPane(paneID: paneID)
             _ = await request(.browserResponse(id: id, response: .ok))

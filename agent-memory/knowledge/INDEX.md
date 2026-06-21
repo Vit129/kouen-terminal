@@ -18,6 +18,7 @@
 | architecture/service-decomposition.md | Architecture | SessionCoordinator, facade, services, @MainActor, unowned, lazy | 2/0 | P17 god-object decomposition: SessionCoordinator 2050→397 LOC via 6 focused services (DaemonSync, SessionLifecycle, SplitPane, Notification, Theme, ActivePane) + HostDelegate extension + Types file |
 | patterns/ui-automation.md | QA/Testing | Robot Framework, osascript, System Events, accessibility, CLI verification | 1/0 | P18 UI automation: Robot Framework + custom Python library using macOS System Events (AppleScript) for UI interaction + harness CLI for state verification. No Appium dependency. |
 | ui/browser-pane.md | AppKit/WebKit | WKWebView, BrowserLeaf, applyLocalSnapshot, hit-testing, URLDetection, localhost | 2/0 | P14 embedded Browser Pane: architecture, applyLocalSnapshot re-injection bug (close button no-op), collapsed errorBanner hit-testing bug, ⌘B shortcut, click-to-open localhost/LAN dev-server links |
+| architecture/browser-devtools-api.md | MCP/Browser | WKWebView, snapshot, screenshot, network, cookies, storage, elements, round-trip, timeout | 0/0 | P28 AI browser control: 3-phase (elements+screenshot, network capture, storage); round-trip fix (timeout 2s→35s); config-driven home page |
 | ui/tab-bar.md | AppKit/UI | TabPillView, statusDot, branchLabel, gitBranch, drag, reorder, pill, shouldShowBranch, effectiveAgentKind, agentIcon | 1/0 | Tab bar pill layout; `Tab.effectiveAgentKind` centralized agent detection (daemon + OSC title inference); agent icon in sidebar cards; drag-reorder cancel-on-structural-reload |
 | architecture/background-polling.md | Performance | SurfaceShellTracker, DaemonSyncService, metadataRefresh, snapshotChanged, fanout, PerfCounters, metadataOnly, double-subscription | 1/0 | P22 background polling architecture: SurfaceShellTracker proc-tree walk, 5-s metadata refresh loop, snapshotChanged fanout consumers and gate logic, PerfCounters instrumentation, known non-P22 syncFromDaemon callers |
 | bugs/zombie-crash-macos26.md | Swift/AppKit | zombie, macOS26, Swift6.3, executor, nonisolated, layout, retire, assumeIsolated, @objc, thunk, CASE-034-040 | 5/0 | macOS 26.5 + Swift 6.3.2 zombie view crashes: @objc thunk executor check dereferences freed self. Fixes: retire() 100ms, remove nonisolated, avoid Optional.map closures, detach NSHostingView |
@@ -64,6 +65,9 @@
 | ai/terminal-chat.md | ui/appkit-metal.md | overlay NSView pattern above Metal surface — same as CompletionPopupView |
 | architecture/mcp-server.md | ui/agent-session-board.md | harnessBoard tool exposes BoardModel read-only via MCP |
 | architecture/mcp-server.md | ui/browser-pane.md | harnessBrowser* tools control BrowserPaneView via MCP |
+| architecture/browser-devtools-api.md | architecture/mcp-server.md | P28 extends MCP browser tools; HarnessBrowserTools.swift is the MCP layer |
+| architecture/browser-devtools-api.md | ui/browser-pane.md | BrowserPaneView implements all snapshot/screenshot/network/storage methods |
+| architecture/browser-devtools-api.md | architecture/ipc-architecture.md | round-trip: daemon forwardBrowserRequest → GUI subscription → browserResponse |
 | ui/tab-bar.md | architecture/mcp-server.md | lastMCPControlAt drives MCP badge on TabPillView |
 | ui/git-panel.md | ui/split-panes.md | DispatchSource, real-time refresh |
 | architecture/session-tab-hierarchy.md | ui/appkit-metal.md | ContentAreaViewController, top bar |

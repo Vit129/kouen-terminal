@@ -512,8 +512,9 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
     }
 
     @objc func openBrowserPane() {
+        let home = SessionCoordinator.shared.settings.browserHomePage
         SessionCoordinator.shared.splitPaneCoordinator.openBrowserPane(
-            url: URL(string: "about:blank")!,
+            url: URL(string: home) ?? URL(string: "https://www.google.com")!,
             direction: .horizontal
         )
     }

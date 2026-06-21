@@ -66,5 +66,8 @@
 - `⌘P` palette zoxide entries cd active terminal (not create new session)
 - Welcome page (CompleteStepView) and terminal banner read shortcuts from `BannerShortcutRegistry`
 
+- [2026-06-22] P28 Browser DevTools API: 3-phase implementation — Phase 1 (snapshot+element+screenshot), Phase 2 (network fetch/XHR capture via JS inject), Phase 3 (cookies+localStorage+sessionStorage). Config-driven default URL via HarnessSettings.browserHomePage.
+- RL-048: harness-mcp round-trip broken because DaemonClientActor default timeout = 2s but WKWebView ops take 2–5s. Fix: HarnessBrowserTools.send() passes timeout:35 (daemon has 30s internal timeout + 5s buffer).
+
 ## Tech Debt
 - PBI-REFACTOR-004: `#if HARNESS_ACP` deferred

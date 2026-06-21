@@ -74,6 +74,7 @@ public final class BrowserPaneView: NSView {
         try? "".write(toFile: logPath, atomically: true, encoding: .utf8)
 
         setupConsoleLogRedirection(for: webView)
+        setupNetworkCapture(for: webView)
 
         setupUI()
         setupTabBar()
@@ -317,7 +318,8 @@ public final class BrowserPaneView: NSView {
     }
 
     @objc private func addNewTab() {
-        createTab(url: URL(string: "about:blank")!)
+        let home = SessionCoordinator.shared.settings.browserHomePage
+        createTab(url: URL(string: home) ?? URL(string: "https://www.google.com")!)
     }
 
     func createTab(url: URL, configuration: WKWebViewConfiguration? = nil) {
@@ -439,6 +441,91 @@ public final class BrowserPaneView: NSView {
         let controller = webView.configuration.userContentController
         controller.addUserScript(userScript)
         controller.add(WeakScriptMessageHandler(self), name: "harnessConsoleLog")
+    }
+
+    private func setupNetworkCapture(for webView: WKWebView) {
+        let js = """
+        (function() {
+            if (window.__harnessNetworkCaptured) return;
+            window.__harnessNetworkCaptured = true;
+            window.__harnessNetwork = [];
+            var _fetch = window.fetch;
+            window.fetch = function(input, init) {
+                var url = typeof input === 'string' ? input : (input.url || String(input));
+                var method = (init && init.method) || (typeof input === 'object' && input.method) || 'GET';
+                var reqBody = (init && init.body) ? String(init.body).slice(0, 2000) : null;
+                var t0 = Date.now();
+                var entry = { id: 'r' + (window.__harnessNetwork.length + 1), url: url, method: method, requestBody: reqBody, timestamp: t0 / 1000 };
+                window.__harnessNetwork.push(entry);
+                return _fetch.apply(this, arguments).then(function(res) {
+                    entry.status = res.status;
+                    entry.duration = (Date.now() - t0) / 1000;
+                    var clone = res.clone();
+                    clone.text().then(function(body) { entry.responseBody = body.slice(0, 4000); }).catch(function(){});
+                    return res;
+                }).catch(function(e) { entry.status = 0; throw e; });
+            };
+            var _open = XMLHttpRequest.prototype.open;
+            var _send = XMLHttpRequest.prototype.send;
+            XMLHttpRequest.prototype.open = function(method, url) {
+                this.__harnessMethod = method;
+                this.__harnessUrl = url;
+                this.__harnessT0 = Date.now();
+                return _open.apply(this, arguments);
+            };
+            XMLHttpRequest.prototype.send = function(body) {
+                var entry = { id: 'r' + (window.__harnessNetwork.length + 1), url: this.__harnessUrl || '', method: this.__harnessMethod || 'GET', requestBody: body ? String(body).slice(0, 2000) : null, timestamp: (this.__harnessT0 || Date.now()) / 1000 };
+                window.__harnessNetwork.push(entry);
+                this.addEventListener('load', function() {
+                    entry.status = this.status;
+                    entry.duration = (Date.now() - (this.__harnessT0 || Date.now())) / 1000;
+                    entry.responseBody = this.responseText ? this.responseText.slice(0, 4000) : null;
+                });
+                return _send.apply(this, arguments);
+            };
+        })();
+        """
+        let userScript = WKUserScript(source: js, injectionTime: .atDocumentStart, forMainFrameOnly: false)
+        webView.configuration.userContentController.addUserScript(userScript)
+    }
+
+    public func cookies() async -> [BrowserCookie] {
+        await withCheckedContinuation { continuation in
+            webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { cookies in
+                let result = cookies.map { c in
+                    BrowserCookie(
+                        name: c.name,
+                        value: c.value,
+                        domain: c.domain,
+                        path: c.path,
+                        expires: c.expiresDate?.timeIntervalSince1970,
+                        isSecure: c.isSecure,
+                        isHTTPOnly: c.isHTTPOnly
+                    )
+                }
+                continuation.resume(returning: result)
+            }
+        }
+    }
+
+    public func storage(type: String) async throws -> [String: String] {
+        let store = type == "session" ? "sessionStorage" : "localStorage"
+        let json = try await evaluateJS("""
+        (function(){
+          var result={};
+          var s=window[\(store == "localStorage" ? "'localStorage'" : "'sessionStorage'")];
+          for(var i=0;i<s.length;i++){var k=s.key(i);result[k]=s.getItem(k);}
+          return JSON.stringify(result);
+        })()
+        """)
+        guard let data = json.data(using: .utf8) else { return [:] }
+        return (try? JSONDecoder().decode([String: String].self, from: data)) ?? [:]
+    }
+
+    public func networkRequests() async throws -> [BrowserNetworkEntry] {
+        let json = try await evaluateJS("JSON.stringify(window.__harnessNetwork || [])")
+        guard let data = json.data(using: .utf8) else { return [] }
+        return (try? JSONDecoder().decode([BrowserNetworkEntry].self, from: data)) ?? []
     }
 
     private func configureNavigationButton(_ button: SoftIconButton, symbolName: String, action: Selector) {
@@ -589,10 +676,20 @@ public final class BrowserPaneView: NSView {
         let script = """
         (function(){
           var els=[],i=0;
-          document.querySelectorAll('a,button,input,select,textarea,[role=button]').forEach(function(el){
-            els.push({id:'e'+(++i),tag:el.tagName.toLowerCase(),
-              text:(el.innerText||'').trim().slice(0,80),
-              value:el.value||'',placeholder:el.placeholder||'',href:el.href||''});
+          document.querySelectorAll('a,button,input,select,textarea,[role=button],[role=link],[role=checkbox],[role=radio],[role=combobox],[role=menuitem]').forEach(function(el){
+            var r=el.getBoundingClientRect();
+            var visible=r.width>0&&r.height>0&&getComputedStyle(el).visibility!=='hidden'&&getComputedStyle(el).display!=='none';
+            els.push({
+              id:'e'+(++i),
+              tag:el.tagName.toLowerCase(),
+              role:el.getAttribute('role')||el.tagName.toLowerCase(),
+              text:(el.innerText||el.getAttribute('aria-label')||'').trim().slice(0,80),
+              value:el.value||'',
+              placeholder:el.placeholder||'',
+              href:el.href||'',
+              bounds:{x:Math.round(r.x),y:Math.round(r.y),width:Math.round(r.width),height:Math.round(r.height)},
+              visible:visible
+            });
           });
           return JSON.stringify({url:location.href,title:document.title,
             text:document.body.innerText.slice(0,3000),elements:els});
@@ -605,6 +702,27 @@ public final class BrowserPaneView: NSView {
         var snapshot = try JSONDecoder().decode(BrowserSnapshot.self, from: data)
         snapshot.logs = self.consoleLogs
         return snapshot
+    }
+
+    public func screenshot() async throws -> String {
+        try await withCheckedThrowingContinuation { continuation in
+            let config = WKSnapshotConfiguration()
+            webView.takeSnapshot(with: config) { image, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                guard let image,
+                      let tiffData = image.tiffRepresentation,
+                      let bitmap = NSBitmapImageRep(data: tiffData),
+                      let pngData = bitmap.representation(using: .png, properties: [:]) else {
+                    continuation.resume(throwing: NSError(domain: "BrowserPaneView", code: 3,
+                        userInfo: [NSLocalizedDescriptionKey: "Failed to encode screenshot"]))
+                    return
+                }
+                continuation.resume(returning: pngData.base64EncodedString())
+            }
+        }
     }
 
     public func waitForLoad(timeout: TimeInterval) async throws {
