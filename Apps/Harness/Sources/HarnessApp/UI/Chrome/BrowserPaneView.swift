@@ -208,16 +208,18 @@ public final class BrowserPaneView: NSView {
             urlTextField.centerYAnchor.constraint(equalTo: urlContainer.centerYAnchor),
         ])
 
-        let toolbarStack = NSStackView(views: [backButton, forwardButton, reloadStopButton, urlContainer, closePaneButton])
+        let toolbarStack = NSStackView(views: [tabBar, backButton, forwardButton, reloadStopButton, urlContainer, closePaneButton])
         toolbarStack.orientation = .horizontal
-        toolbarStack.spacing = 8
-        toolbarStack.edgeInsets = NSEdgeInsets(top: 4, left: 8, bottom: 4, right: 12)
+        toolbarStack.spacing = 6
+        toolbarStack.edgeInsets = NSEdgeInsets(top: 4, left: 6, bottom: 4, right: 8)
         toolbarStack.alignment = .centerY
         toolbarStack.distribution = .fill
         toolbarStack.translatesAutoresizingMaskIntoConstraints = false
         toolbar.addSubview(toolbarStack)
 
-        // urlContainer must stretch to fill available space
+        // Tab bar takes its content width, URL stretches
+        tabBar.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+        tabBar.setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)
         urlContainer.setContentHuggingPriority(.init(1), for: .horizontal)
 
         NSLayoutConstraint.activate([
@@ -225,7 +227,8 @@ public final class BrowserPaneView: NSView {
             toolbarStack.leadingAnchor.constraint(equalTo: toolbar.leadingAnchor),
             toolbarStack.trailingAnchor.constraint(equalTo: toolbar.trailingAnchor),
             toolbarStack.bottomAnchor.constraint(equalTo: toolbar.bottomAnchor),
-            urlContainer.heightAnchor.constraint(equalToConstant: 26),
+            urlContainer.heightAnchor.constraint(equalToConstant: 24),
+            tabBar.widthAnchor.constraint(lessThanOrEqualToConstant: 300),
         ])
 
         // Error Banner configuration
@@ -267,19 +270,6 @@ public final class BrowserPaneView: NSView {
         tabBar.hasHorizontalScroller = false
         tabBar.hasVerticalScroller = false
         tabBar.drawsBackground = false
-        // Translucent blur matching toolbar (CMUX-style)
-        let blurView = NSVisualEffectView()
-        blurView.material = .hudWindow
-        blurView.blendingMode = .behindWindow
-        blurView.state = .active
-        blurView.translatesAutoresizingMaskIntoConstraints = false
-        tabBar.addSubview(blurView, positioned: .below, relativeTo: nil)
-        NSLayoutConstraint.activate([
-            blurView.topAnchor.constraint(equalTo: tabBar.topAnchor),
-            blurView.leadingAnchor.constraint(equalTo: tabBar.leadingAnchor),
-            blurView.trailingAnchor.constraint(equalTo: tabBar.trailingAnchor),
-            blurView.bottomAnchor.constraint(equalTo: tabBar.bottomAnchor),
-        ])
 
         tabBarStack.orientation = .horizontal
         tabBarStack.spacing = 1
@@ -373,7 +363,7 @@ public final class BrowserPaneView: NSView {
 
     private func setupConstraints() {
         progressLine.translatesAutoresizingMaskIntoConstraints = false
-        let mainStack = NSStackView(views: [tabBar, toolbar, progressLine, errorBanner, webView])
+        let mainStack = NSStackView(views: [toolbar, progressLine, errorBanner, webView])
         mainStack.orientation = .vertical
         mainStack.spacing = 0
         mainStack.alignment = .width
@@ -392,7 +382,6 @@ public final class BrowserPaneView: NSView {
             mainStack.bottomAnchor.constraint(equalTo: bottomAnchor),
 
             toolbar.heightAnchor.constraint(equalToConstant: 36),
-            tabBar.heightAnchor.constraint(equalToConstant: 30),
             progressLine.heightAnchor.constraint(equalToConstant: 2),
             errorConstraint
         ])
