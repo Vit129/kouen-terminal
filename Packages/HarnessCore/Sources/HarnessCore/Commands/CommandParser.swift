@@ -96,6 +96,7 @@ public enum CommandParser {
         "setenv": "set-environment", "showenv": "show-environment",
         "setb": "set-buffer", "pasteb": "paste-buffer", "deleteb": "delete-buffer",
         "lsb": "list-buffers", "showb": "show-buffer",
+        "z": "cd",
     ]
 
     private static func resolveAlias(_ name: String) -> String? { aliases[name] }
@@ -106,6 +107,8 @@ public enum CommandParser {
     /// out of sync with the switch below.
     public static let knownVerbs: [String] = [
         "find", "grep", "recent", "errors", "make", "board", "attention", "ack", "copy-path", "cd", "mark",
+        "fzf", "zi", "rg", "fd", "view", "edit", "e", "split", "vsplit", "agent",
+        "bat", "eza", "jq",
         "bind-key", "break-pane", "choose-buffer", "choose-client", "choose-session",
         "choose-tree", "choose-window", "clock-mode", "command-prompt", "confirm-before",
         "copy-mode", "detach", "display-menu", "display-message", "display-panes",
@@ -318,6 +321,25 @@ public enum CommandParser {
         case "cd":
             let path = positionalArguments(in: tokens).first ?? ""
             return .workbench(.cd(path: path))
+        case "view", "edit", "e":
+            let path = positionalArguments(in: tokens).first ?? ""
+            return .workbench(.view(path: path))
+        case "split":
+            let path = positionalArguments(in: tokens).first ?? ""
+            if path.isEmpty { return .splitWindow(direction: .vertical, before: false) }
+            return .workbench(.view(path: path))
+        case "vsplit":
+            let path = positionalArguments(in: tokens).first ?? ""
+            if path.isEmpty { return .splitWindow(direction: .horizontal, before: false) }
+            return .workbench(.view(path: path))
+        case "agent":
+            let waiting = tokens.contains("--waiting") || tokens.contains("waiting")
+            return .workbench(.agent(waiting: waiting))
+        case "fzf", "zi", "rg", "fd", "bat", "eza", "jq":
+            // Shell tool passthrough — send the full command line to the active terminal.
+            let args = tokens.joined(separator: " ")
+            let fullCommand = args.isEmpty ? name : "\(name) \(args)"
+            return .sendKeys(keys: [fullCommand, "Enter"])
         case "mark":
             let positional = positionalArguments(in: tokens)
             guard positional.count >= 2 else {
