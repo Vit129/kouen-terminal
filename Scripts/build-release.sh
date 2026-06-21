@@ -15,6 +15,7 @@ echo "Building release binaries..."
 swift build -c release --product Harness
 swift build -c release --product HarnessDaemon
 swift build -c release --product harness-cli
+swift build -c release --product harness-mcp
 
 echo "Packaging Harness.app..."
 "$ROOT/Scripts/package-app.sh" release
