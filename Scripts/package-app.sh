@@ -12,6 +12,7 @@ mkdir -p "$APP/Contents/Resources"
 cp "$BUILD_DIR/Harness" "$APP/Contents/MacOS/Harness"
 cp "$BUILD_DIR/HarnessDaemon" "$APP/Contents/MacOS/HarnessDaemon"
 cp "$BUILD_DIR/harness-cli" "$APP/Contents/MacOS/harness-cli"
+cp "$BUILD_DIR/harness-mcp" "$APP/Contents/MacOS/harness-mcp"
 cp "$ROOT/Apps/Harness/Sources/HarnessApp/Resources/Info.plist" "$APP/Contents/Info.plist"
 
 # Guard: HarnessVersion.swift is the daemon/CLI's view of the version (the app reads
