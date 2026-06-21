@@ -16,8 +16,9 @@
 - AIDLC Mode Lock fully unlocked (Full/QA/Dev all active)
 
 ## Open Questions
-- [open] CMUX Phase 2: Agent API commands (browserNavigate, browserSnapshot, browserClick via IPC) — not wired yet
-- [open] Browser tab management via sidebar (CMUX-style) — currently tabs inside pane only
+- [priority] Fix harness-mcp round-trip first — agent sends command but response doesn't come back
+- [next] Wire WKWebView API (navigate, snapshot, evaluateJS, consoleLogs) through IPC/MCP — covers 90% agent browser use cases
+- [later] Browser tab management via sidebar (CMUX-style)
 
 ## Key Files
 - `Apps/Harness/Sources/HarnessApp/UI/Chrome/BrowserPaneView.swift` — browser view
