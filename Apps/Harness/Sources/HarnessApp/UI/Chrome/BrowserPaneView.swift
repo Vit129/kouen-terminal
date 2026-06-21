@@ -20,7 +20,7 @@ public final class BrowserPaneView: NSView {
     private var activeTab: BrowserTab? { tabs.indices.contains(activeTabIndex) ? tabs[activeTabIndex] : nil }
     private var consoleLogs: [String] = []
 
-    private let tabBar = NSScrollView()
+    private let tabBar = NSView()
     private let tabBarStack = NSStackView()
     private let newTabButton = NSButton()
 
@@ -263,9 +263,6 @@ public final class BrowserPaneView: NSView {
 
     private func setupTabBar() {
         tabBar.translatesAutoresizingMaskIntoConstraints = false
-        tabBar.hasHorizontalScroller = false
-        tabBar.hasVerticalScroller = false
-        tabBar.drawsBackground = false
         tabBar.wantsLayer = true
         let tabBlur = NSVisualEffectView()
         tabBlur.material = .hudWindow
@@ -273,29 +270,32 @@ public final class BrowserPaneView: NSView {
         tabBlur.state = .active
         tabBlur.translatesAutoresizingMaskIntoConstraints = false
         tabBar.addSubview(tabBlur, positioned: .below, relativeTo: nil)
+
+        tabBarStack.orientation = .horizontal
+        tabBarStack.spacing = 1
+        tabBarStack.translatesAutoresizingMaskIntoConstraints = false
+        tabBar.addSubview(tabBarStack)
+
+        newTabButton.translatesAutoresizingMaskIntoConstraints = false
+        newTabButton.image = NSImage(systemSymbolName: "plus", accessibilityDescription: "New Tab")?
+            .withSymbolConfiguration(.init(pointSize: 10, weight: .medium))
+        newTabButton.isBordered = false
+        newTabButton.target = self
+        newTabButton.action = #selector(addNewTab)
+        tabBarStack.addArrangedSubview(newTabButton)
+
         NSLayoutConstraint.activate([
             tabBlur.topAnchor.constraint(equalTo: tabBar.topAnchor),
             tabBlur.leadingAnchor.constraint(equalTo: tabBar.leadingAnchor),
             tabBlur.trailingAnchor.constraint(equalTo: tabBar.trailingAnchor),
             tabBlur.bottomAnchor.constraint(equalTo: tabBar.bottomAnchor),
+            tabBarStack.leadingAnchor.constraint(equalTo: tabBar.leadingAnchor, constant: 8),
+            tabBarStack.trailingAnchor.constraint(lessThanOrEqualTo: tabBar.trailingAnchor, constant: -8),
+            tabBarStack.centerYAnchor.constraint(equalTo: tabBar.centerYAnchor),
         ])
-
-        tabBarStack.orientation = .horizontal
-        tabBarStack.spacing = 1
-        tabBarStack.translatesAutoresizingMaskIntoConstraints = false
-        tabBar.documentView = tabBarStack
-
-        newTabButton.translatesAutoresizingMaskIntoConstraints = false
-        newTabButton.image = NSImage(systemSymbolName: "plus", accessibilityDescription: "New Tab")
-        newTabButton.isBordered = false
-        newTabButton.target = self
-        newTabButton.action = #selector(addNewTab)
-        newTabButton.widthAnchor.constraint(equalToConstant: 20).isActive = true
-        tabBarStack.addArrangedSubview(newTabButton)
 
         refreshTabBar()
     }
-
     private func refreshTabBar() {
         // Remove existing tab views (keep newTabButton)
         for view in tabBarStack.arrangedSubviews where view !== newTabButton {

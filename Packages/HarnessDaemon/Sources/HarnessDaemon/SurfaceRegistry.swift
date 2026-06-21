@@ -355,15 +355,16 @@ public final class SurfaceRegistry: @unchecked Sendable {
                   )
             else { return .error("Could not split pane") }
             if let surfaceID = editor.surfaceID(forPaneID: newPaneID) {
-                // Prefer the live cwd of the pane being split — `tab.cwd` reflects
-                // whichever pane in the tab was last probed and may belong to a
-                // different pane/branch (e.g. a worktree checkout) than this one.
-                let sourceCwd = editor.surfaceID(forPaneID: paneID)
-                    .flatMap { sessions[$0.uuidString]?.currentWorkingDirectory() }
+                // Prefer the tab's worktree path (the session's intended workspace),
+                // then live cwd of the pane being split. When an agent runs from the
+                // repo root, sourceCwd would resolve there instead of the worktree —
+                // causing the split to land on 'main' instead of the current branch.
                 let tabRef = editor.snapshot.workspaces
                     .flatMap { workspace in workspace.sessions.flatMap { $0.tabs } }
                     .first(where: { $0.id == tabID })
-                let cwd = sourceCwd ?? tabRef?.worktreePath ?? tabRef?.cwd
+                let sourceCwd = editor.surfaceID(forPaneID: paneID)
+                    .flatMap { sessions[$0.uuidString]?.currentWorkingDirectory() }
+                let cwd = tabRef?.worktreePath ?? sourceCwd ?? tabRef?.cwd
                 _ = createOrEnsureSurface(
                     surfaceID: surfaceID.uuidString,
                     cwd: cwd,
