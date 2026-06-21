@@ -46,6 +46,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         notchController?.start()
         PrefixKeymap.shared.install()
         AppIdleThrottle.shared.install()
+
+        // Fix #8 (RL-040): Swallow key/mouse events targeting views that lost their window.
+        // On macOS 26.5 + Swift 6.3, the @objc thunk crashes with EXC_BAD_ACCESS
+        // when dispatching to a freed first-responder. This monitor fires before dispatch.
+        NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .keyUp, .mouseMoved, .mouseEntered, .mouseExited]) { event in
+            guard event.window != nil else { return event }
+            if let responder = event.window?.firstResponder as? NSView, responder.window == nil {
+                return nil
+            }
+            return event
+        }
         SurfaceShellTracker.shared.start()
         PRStatusPoller.shared.start()
         ScriptHookCoordinator.shared.start()

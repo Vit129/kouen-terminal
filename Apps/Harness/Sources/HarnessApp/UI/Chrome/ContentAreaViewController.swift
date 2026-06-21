@@ -840,15 +840,20 @@ final class PaneContainerView: NSView {
         detachBrowsers(in: self)
     }
 
+    /// RL-040: Deferred dealloc — hold detached hosts long enough for all pending
+    /// AppKit events (keyDown/keyUp, cursor rects, layout) to drain.
+    private static var retiredHosts: [TerminalHostView] = []
+
     private func detachHosts(in view: NSView) {
         for sub in view.subviews {
             if let host = sub as? TerminalHostView {
                 host.resignIfFirstResponder()
-                // RL-040: Stop the display link BEFORE removing from superview.
-                // Without this, AppKit's internal cursor-rect display link can fire
-                // resetCursorRects on the zombie view during the retired-hold window.
                 host.stopSurfaceDisplayLink()
                 host.removeFromSuperview()
+                Self.retiredHosts.append(host)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    Self.retiredHosts.removeAll { $0 === host }
+                }
             } else {
                 detachHosts(in: sub)
             }
