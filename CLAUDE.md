@@ -43,6 +43,17 @@ For this repo, common triggers include SwiftUI/AppKit/macOS (`macos-swiftui`), S
 - Character width table regeneration is manual, not part of the build: `swift Scripts/generate-width-table.swift > Packages/HarnessTerminalEngine/Sources/HarnessTerminalEngine/Width/CharacterWidthTable.swift`.
 - **Robot Framework regression tests (run BEFORE every build):** `Tests/robot/run.sh`. These verify critical bug-fix invariants remain intact. If any test fails, fix the regression before running `swift build`.
 
+## Session Start Protocol (MANDATORY)
+
+Before responding to ANY task — including continuations ("ทำต่อ", "continue", "ต่อเลย"):
+
+1. `agent-memory/CONTEXT.md` — active task, branch, open questions
+2. `agent-memory/index.md` — catalog of plans + knowledge
+3. `graphify-out/GRAPH_SUMMARY.md` — god nodes + community hubs (if navigating code)
+4. On-demand: `agent-memory/MEMORY.md`, `agent-memory/knowledge/index.md`, active plan in `agent-memory/plans/`, `agent-memory/PLAYBOOK.md`
+
+Continuation rule: derive active task type from CONTEXT.md → invoke matching skill (e.g., active Swift NSView work → `macos-swiftui`). Never skip skill detection on continuation messages.
+
 ## Project context (auto-loaded every session)
 
 - @agent-memory/CONTEXT.md
