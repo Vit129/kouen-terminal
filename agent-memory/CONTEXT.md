@@ -1,23 +1,26 @@
 # Context — harness-terminal
 
 ## Now
-- **Task:** P26 AI chat — add model/agent selector (Claude default, Codex, Antigravity)
+- **Task:** None active — ready for next session
 - **Branch:** main
-- **Latest release:** v3.6.0 (build 161)
-- **Status:** done — builds clean
+- **Latest release:** v3.6.1 (build 162)
+- **Status:** idle
 
-## What Was Done
-- `AIQueryInputView.agentPill` → NSButton with ▾ indicator
-- Click pill → NSMenu popup with Claude/Codex/Gemini/Kiro (checkmark on active)
-- Selection → `onAgentChanged` callback → `AITerminalChatController.changeAgent()` → persists to settings.json via `settings.save()`
-- Next session respects saved choice (loaded from `settings.aiAgent.activeAgent`)
+## Last Session (2026-06-21)
+- Fixed RL-040 keyDown zombie crash: (1) installed missing NSEvent local monitor in AppDelegate, (2) added 1.5s retire-hold to ContentAreaViewController.detachHosts()
+- Added AI agent selector (click pill in ⌘I to switch Claude/Codex/Gemini/Kiro), persisted to settings.json
+- Released v3.6.1 build 162
+
+## Open Questions
+- [open] `@` auto-include in memory-protocol only works for Claude Code — Codex/Gemini use rules/ fallback
+- [open] Per-session-tab focus not restored on cmd+1/2/3. Partial fix not verified.
 
 ## Key Files
-- `Apps/Harness/Sources/HarnessApp/UI/AIChat/AIQueryInputView.swift` — pill button + menu
-- `Apps/Harness/Sources/HarnessApp/UI/AIChat/AITerminalChatController.swift` — wires callback, persists
-- `Packages/HarnessCore/Sources/HarnessCore/AI/AIAgentConfig.swift` — config model
-- `Packages/HarnessCore/Sources/HarnessCore/Settings/HarnessSettings.swift` — save()
+- `AppDelegate.swift` — NSEvent local monitor (RL-040 fix #8)
+- `ContentAreaViewController.swift` — `detachHosts` retire-hold
+- `AIQueryInputView.swift` — agent pill selector
+- `AITerminalChatController.swift` — agent change + persist
 
 ## Session Notes
 - Build: `make preview`
-- Read `agent-memory/knowledge/ai/terminal-chat.md` for P26 context
+- Never reparent Metal terminal surfaces — causes black screen (RL-004)
