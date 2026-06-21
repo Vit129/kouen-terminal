@@ -50,6 +50,8 @@ final class MainExecutor: CommandExecutor {
     private func dispatch(_ command: Command) throws {
         let coordinator = SessionCoordinator.shared
         switch command {
+        case .openAIChat:
+            coordinator.toggleAIChat()
         case let .openBrowser(url, direction):
             let layoutDir = CommandIPCTranslator.layoutDirection(for: direction)
             coordinator.splitPaneCoordinator.openBrowserPane(url: url, direction: layoutDir)

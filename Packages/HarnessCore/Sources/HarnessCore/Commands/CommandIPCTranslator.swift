@@ -451,7 +451,7 @@ public enum CommandIPCTranslator {
              .sourceConfig, .reloadKeybindings, .showCheatsheet, .sequence,
              .sendPrefix, .sourceFile, .commandPrompt, .confirmBefore, .choose,
              .lockClient, .clockMode, .switchClientTable, .displayPopup, .displayMenu,
-             .openBrowser:
+             .openBrowser, .openAIChat:
             return .clientLocal(command)
         }
     }
