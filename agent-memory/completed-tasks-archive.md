@@ -55,3 +55,8 @@ Archived from agent-memory/memory.md. Active tasks in [memory.md](memory.md).
 | 48 | AI-Agent Notification Rings (TerminalHostView.isWaiting + syncWaitingRings) and ⌘⇧U notifications dropdown wiring | ✅ Done |
 | 49 | Quick Select Mode (⌘⇧Y) removed at user's request — didn't work, all related code deleted (HarnessTerminalSurfaceView+QuickSelect.swift, +Input.swift hook, TerminalHostView.enterQuickSelectMode, MainMenuBuilder menu item) | ✅ Done |
 | 50 | Fix git history card click not opening file preview (GitPanelView: replaced dead NSClickGestureRecognizer with HistoryCardView.onTap closure) | ✅ Done |
+| 51 | P26 — Agent Connection: MCP wiring (harness-mcp existing) + ⌘I inline AI chat (Path B, PR #28). ACP remains shelved. | ✅ Done |
+| 52 | P27 — Pane Drag-and-Drop: grip icon in pane hover buttons, PaneDragController state machine, PaneDropZoneOverlay (L/R/T/B/Center zones), joinPane `before` param, SplitPaneCoordinator wrappers | ✅ Done |
+| 53 | Fix tab bar wrong branch display when agent uses worktree (probe worktreePath instead of cwd) | ✅ Done |
+| 54 | Fix split pane inherits worktree path (not repo root) for new shell CWD | ✅ Done |
+| 55 | Wire missing command prompt verbs: :z, :view, :edit, :e, :split, :vsplit, :agent, :fzf, :zi, :rg, :fd, :bat, :eza, :jq (RL-044, CASE-042) | ✅ Done |
