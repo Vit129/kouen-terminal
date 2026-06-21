@@ -37,6 +37,10 @@ public final class BrowserPaneView: NSView {
     internal let errorDismissButton = NSButton()
     internal var errorBannerHeightConstraint: NSLayoutConstraint?
 
+    private var retryTimer: Timer?
+    private var retryCount = 0
+    private static let maxRetries = 30  // ~60s of retrying
+
     private var loadStates: [LoadCompletionState] = []
     private let progressLine = BrowserProgressLine()
     private var progressObservation: NSKeyValueObservation?
@@ -425,6 +429,46 @@ public final class BrowserPaneView: NSView {
         errorBanner.isHidden = false
     }
 
+    // MARK: - Auto-retry on connection loss
+
+    private func startRetryIfConnectionError(_ error: Error) {
+        let nsError = error as NSError
+        // NSURLErrorDomain connection failures (server down, refused, timeout, network lost)
+        let retryableCodes: Set<Int> = [
+            NSURLErrorCannotConnectToHost,      // -1004
+            NSURLErrorNetworkConnectionLost,    // -1005
+            NSURLErrorNotConnectedToInternet,   // -1009
+            NSURLErrorTimedOut,                 // -1001
+            NSURLErrorCannotFindHost,           // -1003
+        ]
+        guard nsError.domain == NSURLErrorDomain, retryableCodes.contains(nsError.code) else { return }
+        guard retryTimer == nil else { return }
+        retryCount = 0
+        showErrorBanner(message: "Server disconnected — reconnecting…")
+        retryTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.attemptRetry()
+            }
+        }
+    }
+
+    private func attemptRetry() {
+        retryCount += 1
+        if retryCount > Self.maxRetries {
+            cancelRetry()
+            showErrorBanner(message: "Server unreachable after 60s")
+            return
+        }
+        errorLabel.stringValue = "Reconnecting… (attempt \(retryCount))"
+        webView.reload()
+    }
+
+    private func cancelRetry() {
+        retryTimer?.invalidate()
+        retryTimer = nil
+        retryCount = 0
+    }
+
     private func updateReloadStopButton(isLoading: Bool) {
         let symbol = isLoading ? "xmark" : "arrow.clockwise"
         reloadStopButton.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
@@ -524,6 +568,7 @@ extension BrowserPaneView: WKNavigationDelegate {
 
     public func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         updateReloadStopButton(isLoading: false)
+        cancelRetry()
         if let url = webView.url {
             urlTextField.stringValue = url.absoluteString
             UserDefaults.standard.set(url.absoluteString, forKey: "browserPane.\(paneID.uuidString).url")
@@ -540,12 +585,14 @@ extension BrowserPaneView: WKNavigationDelegate {
     public func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
         updateReloadStopButton(isLoading: false)
         showErrorBanner(message: error.localizedDescription)
+        startRetryIfConnectionError(error)
         completeLoading(error: error)
     }
 
     public func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         updateReloadStopButton(isLoading: false)
         showErrorBanner(message: error.localizedDescription)
+        startRetryIfConnectionError(error)
         completeLoading(error: error)
     }
 
