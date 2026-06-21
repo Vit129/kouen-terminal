@@ -48,6 +48,7 @@
 - RL-042: `KeyModifiers` name exists in HarnessTerminalEngine (InputEncoder) — adding same name in HarnessCore causes ambiguity. Used `MenuModifiers` to avoid collision.
 - RL-043: NSClickGestureRecognizer on parent view intercepts child NSButton clicks — check click location in handler or use mouseUp override instead
 - RL-044: Documenting a verb in COMMANDS.md/BannerShortcutRegistry without adding it to `CommandParser.buildCommand` + `knownVerbs` = silent `unknownCommand` error. Always wire both layers.
+- RL-045: Override `removeFromSuperview()` on zombie-prone views to add retire-hold — catches ALL free paths (our code, AppKit, SwiftUI) at a single chokepoint instead of chasing call sites. Definitive fix for macOS 26.5 + Swift 6.3.2 thunk crashes.
 
 ## Conventions
 - Build: `make preview`

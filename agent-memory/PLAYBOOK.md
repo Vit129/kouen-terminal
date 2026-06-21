@@ -92,6 +92,7 @@
 | CASE-052 | disconnect() posts notification even when already nil | Guard: `guard let name else { return }` | RESOLVED | 1 |
 | CASE-053 | buildRemotePage width constraints accumulate on every visit | Guard: `if remoteNameField.constraints.isEmpty` before activating | RESOLVED | 1 |
 | CASE-054 | Hardcoded page index 6 for Remote settings | `SettingsWindowController.pageRemote` named constant | RESOLVED | 1 |
+| CASE-055 | RL-040 zombie crash still recurring despite retire-hold in TerminalPaneRegistry | Override `removeFromSuperview()` on HarnessTerminalSurfaceView itself — catches ALL removal paths (AppKit, SwiftUI, NSSplitView, our code) at single chokepoint. Also install NSEvent local monitor in AppDelegate. | RESOLVED | 1 |
 
 ## Command Prompt / Parser
 

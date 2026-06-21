@@ -241,4 +241,41 @@ All three share the same root: the Swift 6.3.2 runtime on macOS 26.5 crashes whe
 
 ## Open: Remaining Crash Sources
 
-The `ContentAreaViewController.detachHosts(in:)` method calls `host.removeFromSuperview()` directly (bypassing `TerminalPaneRegistry.retire()`). While hosts are retained by `existingHosts` dictionary during rebuild, a timing race can leave them briefly orphaned. Consider routing this through the registry's retire path as well.
+~~The `ContentAreaViewController.detachHosts(in:)` method calls `host.removeFromSuperview()` directly (bypassing `TerminalPaneRegistry.retire()`).~~
+
+**RESOLVED (2026-06-21):** Universal retire-hold via `removeFromSuperview()` override in `HarnessTerminalSurfaceView` eliminates ALL remaining free-path zombies. See Fix #10 below.
+
+### 10. Universal retire-hold via `removeFromSuperview()` override (definitive)
+
+```swift
+// In HarnessTerminalSurfaceView:
+private static var retiredSurfaces: [HarnessTerminalSurfaceView] = []
+
+public override func removeFromSuperview() {
+    Self.retiredSurfaces.append(self)
+    super.removeFromSuperview()
+    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+        Self.retiredSurfaces.removeAll { $0 === self }
+    }
+}
+```
+
+**Why this is the definitive fix for surface views:** Instead of chasing every call site that removes the view (our code, AppKit internal rebuild, NSSplitView collapse, SwiftUI lifecycle, NSWindow close), the override catches ALL of them at the single chokepoint. No matter who calls `removeFromSuperview()`, the view lives for 1.5s after removal — covering the full keyDown→keyUp cycle and any pending layout/cursor-rect/tracking-area callbacks.
+
+**Supersedes:** Fix #1 (`TerminalPaneRegistry.retire()`) and the `ContentAreaViewController.retiredHosts` static array are now redundant for surface views specifically, but left in place as defense-in-depth for non-surface terminal hosts.
+
+### 11. NSEvent local monitor installed in AppDelegate (fix #8 actually deployed)
+
+The knowledge doc documented Fix #8 but it was never actually installed in `AppDelegate.applicationDidFinishLaunching`. Added 2026-06-21:
+
+```swift
+NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .keyUp, .mouseMoved, .mouseEntered, .mouseExited]) { event in
+    guard event.window != nil else { return event }
+    if let responder = event.window?.firstResponder as? NSView, responder.window == nil {
+        return nil
+    }
+    return event
+}
+```
+
+**Note:** This only helps when `self` is alive but detached (window == nil). If `self` is truly freed (use-after-free), `firstResponder` is a dangling pointer and this check may itself crash. Fix #10 (retire-hold) is the primary defense; this monitor is secondary.
