@@ -134,3 +134,48 @@ retries loading the URL at a 3-second interval, up to 10 attempts.
 - **Auto-close:** If all 10 retries are exhausted (30s total), the browser pane closes itself via `splitPaneCoordinator.closeBrowserPane(paneID:)`.
 - **Cancel on success:** `webView(_:didFinish:)` calls `cancelRetry()` which invalidates the timer and resets the attempt counter.
 - **Use case:** Dev servers (Vite, Next.js) that aren't ready when the link is first clicked — the pane waits for the server to come up rather than showing a dead error page.
+
+## CMUX-Style Redesign (2026-06-21)
+
+### Layout (single toolbar row)
+
+```
+Row 1 (28pt): [tab1 ×][tab2 ×][+]          ← tab bar (plain NSView + NSStackView)
+Row 2 (32pt): [◀][▶][🔄] [URL________] [×] ← toolbar (NSVisualEffectView blur)
+──────────────────────────────────────────── ← progress line 2pt
+[web content]                                ← WKWebView
+```
+
+- Tab bar: plain `NSView` (NOT `NSScrollView` — scroll view eats mouse events)
+- Toolbar: `NSVisualEffectView` with `.hudWindow` material + `.behindWindow` blending
+- Total chrome: 60pt (tab 28 + toolbar 32)
+- URL field uses container with rounded corners + stretches via `.fill` distribution
+
+### BUG: Tab close button never fired (CASE-055 extended)
+
+**Symptom:** Click × on tab → nothing happens. Close pane button (toolbar ×) works fine.
+
+**Root cause chain (3 layers):**
+1. `NSScrollView` as tab bar container intercepted mouse events before subviews
+2. `SoftIconButton.isTransparent = true` → NSButton never sends its action (by design)
+3. `NSClickGestureRecognizer` consumed ALL mouse events before `mouseUp` could fire
+
+**Fix:** Remove all three layers:
+1. Tab bar → plain `NSView` (not NSScrollView)
+2. Close icon → `SoftIconButton` for visual only (icon render)
+3. NO gesture recognizer → `mouseUp` override handles both select + close
+
+```swift
+override func mouseUp(with event: NSEvent) {
+    let loc = convert(event.locationInWindow, from: nil)
+    if closeBtn.frame.contains(loc) {
+        onClose()
+    } else {
+        onSelect()
+    }
+}
+```
+
+**Lesson (RL-043 update):** NSClickGestureRecognizer on a view consumes ALL mouse events
+even with `delaysPrimaryMouseButtonEvents = false`. If you need both "select area" and
+"close button" in one view, use `mouseUp` override — never gesture recognizer.

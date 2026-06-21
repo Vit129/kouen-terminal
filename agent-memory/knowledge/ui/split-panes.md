@@ -80,3 +80,25 @@ User drags the ⋮⋮ grip icon (PaneDragGripView) in the pane hover buttons to 
 - `Apps/.../Services/SplitPaneCoordinator.swift` (swapPanes, movePaneToDirection)
 
 **Constraints respected:** RL-004 (no Metal reparent), RL-040/041 (retire-hold), CASE-003 (presentsWithTransaction)
+
+## Split CWD Resolution — Worktree Priority (2026-06-21)
+
+**Bug:** Cmd+D / Cmd+Shift+D creates new split pane that starts in repo root (`main` branch) instead of the current worktree branch when an agent process is running.
+
+**Root cause:** In `SurfaceRegistry.handleMessage(.newSplit)`, the CWD for the new surface was resolved as:
+```swift
+let cwd = sourceCwd ?? tabRef?.worktreePath ?? tabRef?.cwd
+```
+
+`sourceCwd` = live CWD of the deepest descendant process in the source pane. When an agent (Claude Code, Codex, etc.) runs, `deepestReadableDescendant()` returns the agent's own CWD — which is typically the **repo root** (main branch), not the worktree the session was intended to operate in.
+
+**Fix:** Reorder priority — worktree path wins when set:
+```swift
+let cwd = tabRef?.worktreePath ?? sourceCwd ?? tabRef?.cwd
+```
+
+**Why worktreePath must win:** The `worktreePath` is set when a session is created via worktree auto-isolate — it represents the *intended workspace* for that session/tab. The live process CWD is just an artifact of whatever subprocess happens to be running.
+
+**File:** `Packages/HarnessDaemon/Sources/HarnessDaemon/SurfaceRegistry.swift` (line ~360)
+
+**Related:** `DaemonSyncService` git branch probe already uses `tab.worktreePath ?? tab.cwd` — this aligns the split creation with the same priority.

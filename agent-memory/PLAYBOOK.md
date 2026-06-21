@@ -45,7 +45,7 @@
 |----|---------|-----|---------|---------|
 | CASE-013 | MainActor.assumeIsolated inside DispatchQueue.main.async | `Task { @MainActor in }` or `.main` queue directly | RESOLVED | 3 |
 | CASE-032 | SwiftUI crash (swift_getObjectType) on session switch | `@Observable` class + `@Bindable var` — never replace rootView struct mid-layout | RESOLVED | 1 |
-| CASE-040 | RL-040 zombie crashes: layout/resetCursorRects/mouseMoved/sendEvent | Multi-pronged: stopDisplayLink in viewWillMove, retiredBars[] hold on TabBar, retiredWindows[] on Window.close(), nonisolated(unsafe) in PrefixKeymap. **`nonisolated` does NOT suppress @objc thunk executor check on Swift 6.3.2.** | RESOLVED | 6 |
+| CASE-040 | RL-040 zombie crashes: layout/resetCursorRects/mouseMoved/sendEvent/viewDidMoveToWindow/displayTick | Multi-pronged: `nonisolated` + `assumeIsolated` on ALL @objc callbacks (layout, resetCursorRects, viewDidMoveToWindow, viewDidMoveToSuperview, viewWillMove, displayTick), removeFromSuperview retire-hold 1.5s, NSEvent local monitor, guard window != nil. | RESOLVED | 8 |
 
 ## Git / File System
 
@@ -67,6 +67,7 @@
 | CASE-019 | Terminal selection highlight invisible | Pass selectionBackground from theme in FrameBuilder.init | RESOLVED | 1 |
 | CASE-023 | Garbled TUI (interleaved status fragments) | Don't clear synchronizedOutput in resetForShellPrompt; use 150ms timeout | RESOLVED | 1 |
 | CASE-033 | Tool-injected names appear as OSC 2 title | Strip suffix in daemon updateTabTitle; change pane-border-format default | RESOLVED | 1 |
+| CASE-056 | Split pane (Cmd+D) lands on main instead of current worktree branch | Reorder CWD priority in SurfaceRegistry.newSplit: `worktreePath → sourceCwd → tab.cwd` (agent's deepestDescendant CWD returns repo root) | RESOLVED | 1 |
 
 ## Architecture / Keybindings
 
