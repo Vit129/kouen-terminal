@@ -113,7 +113,7 @@ All plans below are **done** and merged into main.
 ## P12 — Agent Orchestration via MCP
 - PBI-ORCH-001–005 complete
 - `harness-mcp` binary: JSON-RPC 2.0 over stdin/stdout, protocol v2024-11-05
-- 25 tools across 5 categories: session/pane control, file I/O, git, workbench, browser pane
+- 27 tools across 6 categories: session/pane control, file I/O, git, workbench, browser pane, agents
 - Tool policy gating: `~/.config/harness/mcp-policy.json` or `HARNESS_MCP_ALLOW_CONTROL=1`
 - MCP badge on tab bar via `lastMCPControlAt` timestamp on `Tab` snapshot
 - Browser pane fully controllable: open/navigate/snapshot/interact/close
