@@ -526,6 +526,13 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         }
     }
 
+    // MARK: - Pane lookup (P27 drag-drop)
+
+    func paneShell(for paneID: PaneID) -> NSView? {
+        let id = NSUserInterfaceItemIdentifier("pane-\(paneID.uuidString)")
+        return paneContainer?.findDescendant(withIdentifier: id)
+    }
+
     // MARK: - File Tabs
 
     func openFileTab(path: String) {
@@ -772,6 +779,17 @@ final class PaneContainerView: NSView {
         build(node: node, cwd: cwd, into: self)
     }
 
+    func findDescendant(withIdentifier id: NSUserInterfaceItemIdentifier) -> NSView? {
+        func search(_ view: NSView) -> NSView? {
+            if view.identifier == id { return view }
+            for child in view.subviews {
+                if let found = search(child) { return found }
+            }
+            return nil
+        }
+        return search(self)
+    }
+
     func applyChrome() {
         HarnessDesign.makeClear(self)
     }
@@ -887,6 +905,7 @@ final class PaneContainerView: NSView {
             let paneShell = NSView()
             HarnessDesign.makeClear(paneShell)
             paneShell.translatesAutoresizingMaskIntoConstraints = false
+            paneShell.identifier = NSUserInterfaceItemIdentifier("pane-\(leaf.id.uuidString)")
             parent.addSubview(paneShell)
             NSLayoutConstraint.activate([
                 paneShell.topAnchor.constraint(equalTo: parent.topAnchor),
@@ -1024,11 +1043,13 @@ private final class PaneSplitButtonsView: NSView {
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stack)
 
+        let dragGrip = makeButton("line.3.horizontal", tooltip: "Drag to reorder", action: #selector(beginPaneDrag))
         let splitRight = makeButton("rectangle.righthalf.inset.filled", tooltip: "Split Right (⌘D)", action: #selector(doSplitRight))
         let splitDown = makeButton("rectangle.bottomhalf.inset.filled", tooltip: "Split Down (⌘⇧D)", action: #selector(doSplitDown))
         let openBrowser = makeButton("safari", tooltip: "Open Browser Pane (⌘B)", action: #selector(openBrowserPane))
         let closeBtn = makeButton("xmark", tooltip: "Close Pane (⌥⇧⌘W)", action: #selector(closePane))
 
+        stack.addArrangedSubview(dragGrip)
         stack.addArrangedSubview(splitRight)
         stack.addArrangedSubview(splitDown)
         stack.addArrangedSubview(openBrowser)
@@ -1099,6 +1120,11 @@ private final class PaneSplitButtonsView: NSView {
 
     @objc private func doSplitRight() {
         SessionCoordinator.shared.splitActivePane(direction: .horizontal)
+    }
+
+    @objc private func beginPaneDrag() {
+        guard let parent = superview else { return }
+        PaneDragController.shared.beginDrag(paneID: paneID, from: parent)
     }
 
     @objc private func doSplitLeft() {
