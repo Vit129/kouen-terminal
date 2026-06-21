@@ -267,7 +267,19 @@ public final class BrowserPaneView: NSView {
         tabBar.hasHorizontalScroller = false
         tabBar.hasVerticalScroller = false
         tabBar.drawsBackground = false
-        HarnessDesign.installChromeBackground(.tabBar, on: tabBar)
+        // Translucent blur matching toolbar (CMUX-style)
+        let blurView = NSVisualEffectView()
+        blurView.material = .hudWindow
+        blurView.blendingMode = .behindWindow
+        blurView.state = .active
+        blurView.translatesAutoresizingMaskIntoConstraints = false
+        tabBar.addSubview(blurView, positioned: .below, relativeTo: nil)
+        NSLayoutConstraint.activate([
+            blurView.topAnchor.constraint(equalTo: tabBar.topAnchor),
+            blurView.leadingAnchor.constraint(equalTo: tabBar.leadingAnchor),
+            blurView.trailingAnchor.constraint(equalTo: tabBar.trailingAnchor),
+            blurView.bottomAnchor.constraint(equalTo: tabBar.bottomAnchor),
+        ])
 
         tabBarStack.orientation = .horizontal
         tabBarStack.spacing = 1
