@@ -162,6 +162,10 @@ public enum BrowserRequestPayload: Codable, Sendable {
     case navigate(paneID: UUID, url: URL)
     case wait(paneID: UUID, timeoutSeconds: Double?)
     case snapshot(paneID: UUID, interactive: Bool?)
+    case screenshot(paneID: UUID)
+    case network(paneID: UUID)
+    case cookies(paneID: UUID)
+    case storage(paneID: UUID, storageType: String)
     case interact(paneID: UUID, action: String, elementID: String, text: String?)
     case close(paneID: UUID)
 }
@@ -170,7 +174,37 @@ public enum BrowserResponsePayload: Codable, Sendable {
     case open(paneID: UUID)
     case ok
     case snapshot(BrowserSnapshot)
+    case screenshot(String)
+    case network([BrowserNetworkEntry])
+    case cookies([BrowserCookie])
+    case storage([String: String])
     case error(String)
+}
+
+public struct BrowserCookie: Codable, Sendable {
+    public var name: String
+    public var value: String
+    public var domain: String
+    public var path: String
+    public var expires: Double?
+    public var isSecure: Bool
+    public var isHTTPOnly: Bool
+
+    public init(name: String, value: String, domain: String, path: String, expires: Double?, isSecure: Bool, isHTTPOnly: Bool) {
+        self.name = name; self.value = value; self.domain = domain; self.path = path
+        self.expires = expires; self.isSecure = isSecure; self.isHTTPOnly = isHTTPOnly
+    }
+}
+
+public struct BrowserNetworkEntry: Codable, Sendable {
+    public var id: String
+    public var url: String
+    public var method: String
+    public var status: Int?
+    public var requestBody: String?
+    public var responseBody: String?
+    public var duration: Double?
+    public var timestamp: Double
 }
 
 public struct BrowserSnapshot: Codable, Sendable {
@@ -189,22 +223,23 @@ public struct BrowserSnapshot: Codable, Sendable {
     }
 }
 
+public struct BrowserElementBounds: Codable, Sendable {
+    public var x: Int
+    public var y: Int
+    public var width: Int
+    public var height: Int
+}
+
 public struct BrowserElement: Codable, Sendable {
     public var id: String
     public var tag: String
+    public var role: String?
     public var text: String
     public var value: String
     public var placeholder: String
     public var href: String?
-
-    public init(id: String, tag: String, text: String, value: String, placeholder: String, href: String? = nil) {
-        self.id = id
-        self.tag = tag
-        self.text = text
-        self.value = value
-        self.placeholder = placeholder
-        self.href = href
-    }
+    public var bounds: BrowserElementBounds?
+    public var visible: Bool?
 }
 
 public enum DirectionalAxis: String, Codable, Sendable {

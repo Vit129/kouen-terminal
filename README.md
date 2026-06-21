@@ -99,6 +99,37 @@ harness-cli install-hooks codex
 
 More examples are in [USAGE.md](USAGE.md), [docs/COMMANDS.md](docs/COMMANDS.md), and [docs/MULTIPLEXER_GUIDE.md](docs/MULTIPLEXER_GUIDE.md).
 
+## AI Browser Control (harness-mcp)
+
+AI agents (Claude Code, Codex, Kiro) can see and interact with the embedded browser pane via `harness-mcp`. No separate browser or Playwright process needed.
+
+**What an agent can do:**
+
+| Capability | Tool | Returns |
+| --- | --- | --- |
+| Open / navigate URL | `harnessBrowserOpen`, `harnessBrowserNavigate` | pane ID |
+| Read DOM + elements | `harnessBrowserSnapshot` | accessibility tree with stable refs (e1, e2…) |
+| Click / fill / scroll | `harnessBrowserInteract` | ok / error |
+| Screenshot | `harnessBrowserScreenshot` | base64 PNG |
+| Read console logs | included in snapshot | array of log strings |
+| Network requests | `harnessBrowserNetwork` | url, method, status, req/res body |
+| Cookies | `harnessBrowserCookies` | name, value, domain, expires, secure |
+| localStorage / sessionStorage | `harnessBrowserStorage` | key/value pairs |
+
+**Snapshot element format** — stable refs let agents interact without writing selectors:
+
+```json
+{ "id": "e7", "tag": "button", "role": "button", "text": "Save", "bounds": {"x":120,"y":340,"width":80,"height":32}, "visible": true }
+```
+
+**Default home page** is configurable in `settings.json`:
+
+```json
+{ "browserHomePage": "https://www.google.com" }
+```
+
+**Token efficiency:** snapshot returns structured data (~200–500 tokens), not screenshots or raw HTML — significantly cheaper than vision-based browser automation.
+
 ## Remote And Headless
 
 The daemon and CLI can run without the GUI, including on Linux. Register a remote daemon over SSH and use `--host` with normal CLI commands:

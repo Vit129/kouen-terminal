@@ -279,6 +279,8 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
     public var terminalShaderEffect: String
     /// Configuration for the Warp-style inline terminal AI chat (⌘I).
     public var aiAgent: AIAgentConfig
+    /// Default URL opened when a new browser pane or tab is created.
+    public var browserHomePage: String
 
     /// Whether the *umbrella* Harness controls are on (prefix or status line). Kept for onboarding
     /// copy and tests; the prefix and status line each resolve independently via the effective
@@ -387,7 +389,8 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         claudeAPIKey: String? = nil,
         inlineAICompletion: Bool = false,
         terminalShaderEffect: String = "none",
-        aiAgent: AIAgentConfig = AIAgentConfig()
+        aiAgent: AIAgentConfig = AIAgentConfig(),
+        browserHomePage: String = "https://www.google.com"
     ) {
         self.fontSize = HarnessSettings.clampedFontSize(fontSize)
         self.fontFamily = fontFamily
@@ -461,6 +464,7 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         self.inlineAICompletion = inlineAICompletion
         self.terminalShaderEffect = terminalShaderEffect
         self.aiAgent = aiAgent
+        self.browserHomePage = browserHomePage
     }
 
     /// Ensure the palette always has exactly 16 slots so index access is safe even if a
@@ -650,6 +654,7 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         inlineAICompletion = try container.decodeIfPresent(Bool.self, forKey: .inlineAICompletion) ?? fallback.inlineAICompletion
         terminalShaderEffect = try container.decodeIfPresent(String.self, forKey: .terminalShaderEffect) ?? fallback.terminalShaderEffect
         aiAgent = try container.decodeIfPresent(AIAgentConfig.self, forKey: .aiAgent) ?? fallback.aiAgent
+        browserHomePage = try container.decodeIfPresent(String.self, forKey: .browserHomePage) ?? fallback.browserHomePage
     }
 
     public static func load() -> HarnessSettings {
