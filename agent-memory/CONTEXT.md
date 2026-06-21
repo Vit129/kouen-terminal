@@ -1,31 +1,29 @@
 # Context — harness-terminal
 
 ## Now
-- **Task:** Browser pane redesign — CMUX-style integrated browser
+- **Task:** None active — ready for next session
 - **Branch:** main
 - **Latest release:** v3.6.1 (build 162)
-- **Status:** in-progress (design phase)
+- **Status:** idle
 
-## Design Direction (CMUX-inspired)
+## Last Session (2026-06-21)
+- CMUX-style browser redesign: translucent toolbar (NSVisualEffectView .hudWindow), 2-row compact layout (28pt tab + 32pt toolbar)
+- Fixed tab close button: removed NSScrollView + NSClickGestureRecognizer that consumed mouse events
+- AI agent selector (⌘I pill click) — persists to settings.json
+- RL-040 universal fix: removeFromSuperview() override with 1.5s retire-hold
+- Shared memory protocol: .ai/memory-protocol.md symlink architecture
+- Rules restructure: 7 files (1000 lines) → 3 files (136 lines)
+- AIDLC Mode Lock fully unlocked (Full/QA/Dev all active)
 
-1. **Translucent toolbar** — no solid background, blur from terminal window (like CMUX)
-2. **No browser-level tabs** — tab management moves to terminal sidebar (reduce UI duplication)
-3. **Agent-controlled** — API for agents to load URLs, inspect DOM, read console logs (like Chrome DevTools but terminal-native)
-4. **Full web support** — not just localhost, any website works normally (cookies persist)
-
-## Key Changes from Current Design
-
-| Current | New |
-|---------|-----|
-| Tab bar inside BrowserPaneView (28pt) | Remove — sidebar manages tabs |
-| Solid black toolbar background | Translucent/blur matching terminal |
-| No agent API | Agent can: navigate, get DOM, read console, screenshot |
-| Click-to-open only | Agent can open + inspect programmatically |
+## Open Questions
+- [open] CMUX Phase 2: Agent API commands (browserNavigate, browserSnapshot, browserClick via IPC) — not wired yet
+- [open] Browser tab management via sidebar (CMUX-style) — currently tabs inside pane only
 
 ## Key Files
-- `Apps/Harness/Sources/HarnessApp/UI/Chrome/BrowserPaneView.swift` — main browser view
-- `agent-memory/knowledge/ui/browser-pane.md` — architecture doc
+- `Apps/Harness/Sources/HarnessApp/UI/Chrome/BrowserPaneView.swift` — browser view
+- `~/.claude/rules/` — core.md, coding.md, routing.md (restructured)
+- `~/.claude/scripts/shared/memory-protocol.md` — shared protocol
 
 ## Session Notes
 - Build: `make preview`
-- Read `agent-memory/knowledge/ui/browser-pane.md` for current architecture
+- NSClickGestureRecognizer ALWAYS consumes mouse events — use mouseUp override instead (RL-043)
