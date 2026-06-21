@@ -106,7 +106,6 @@ public final class TerminalHostView: NSView {
                 window.makeFirstResponder(nil)
             }
             nativeView.discardCursorRects()
-            window.invalidateCursorRects(for: nativeView)
         }
         // Remove tracking area — NSTrackingArea does NOT retain its owner.
         if let ta = nativeView.trackingArea {

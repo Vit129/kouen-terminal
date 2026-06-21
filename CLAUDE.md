@@ -116,3 +116,6 @@ Read `graphify-out/GRAPH_REPORT.md` only for broad architecture review or when `
 - `themes.json` is the editable theme source but is excluded from the SwiftPM build. Runtime loads compiled base64 from `BundledThemesData.swift`; after editing themes, regenerate with `EXPORT_THEMES=1 swift test --filter ThemeCatalogEmbedTests`.
 - `CharacterWidthTable.swift` is generated and committed. If canonical width ranges in `CharacterWidth.swift` change, regenerate with `Scripts/generate-width-table.swift`; `CharacterWidthTests` exhaustively checks all Unicode scalars.
 - Release packaging order matters: `dmg`, `sign`, and `finalize` intentionally operate on an existing `Harness.app`; running `make dmg` after `make sign` without respecting the documented order can rebuild away a signature.
+
+<!-- Agent Memory Lifecycle (shared protocol) -->
+@.ai/memory-protocol.md

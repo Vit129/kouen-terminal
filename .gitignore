@@ -50,3 +50,6 @@ graphify-out/GRAPH_TREE.html
 # Dated graphify snapshot dirs (e.g. graphify-out/2026-06-10/) — duplicates of graph.json
 graphify-out/20*/
 .robot-output/
+
+# Shared agent protocol (symlinked)
+.ai/
