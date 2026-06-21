@@ -58,6 +58,12 @@ enum HarnessDesign {
         static let capsule: CGFloat = 999
     }
 
+    /// Divider between panes, panels, and sidebar — single source of truth.
+    enum Divider {
+        /// Visual thickness of split dividers. 1px is hard to see/grab; 2px is comfortable.
+        static let thickness: CGFloat = 2
+    }
+
     /// Animation durations (seconds) and shared easing curves. Keep motion short.
     enum Motion {
         static let microFast: TimeInterval = 0.10

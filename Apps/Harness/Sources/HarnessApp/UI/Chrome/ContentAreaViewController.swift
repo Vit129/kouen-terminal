@@ -1263,6 +1263,7 @@ final class HarnessSplitView: NSSplitView, NSSplitViewDelegate {
     private var ratioDebounce: DispatchWorkItem?
 
     override var dividerColor: NSColor { HarnessChrome.current.border }
+    override var dividerThickness: CGFloat { HarnessDesign.Divider.thickness }
 
     override func layout() {
         super.layout()
