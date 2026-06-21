@@ -130,7 +130,7 @@ public enum IPCRequest: Codable, Sendable {
     case previousLayout(tabID: UUID)
     case rotatePanes(tabID: UUID, forward: Bool)
     case breakPane(paneID: UUID)
-    case joinPane(sourcePaneID: UUID, destPaneID: UUID, direction: SplitDirection)
+    case joinPane(sourcePaneID: UUID, destPaneID: UUID, direction: SplitDirection, before: Bool = false)
     case respawnPane(surfaceID: String, keepHistory: Bool)
     case clearHistory(surfaceID: String)
     case resizeWindow(tabID: UUID, rows: UInt16, cols: UInt16)

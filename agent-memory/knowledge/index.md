@@ -26,6 +26,7 @@
 | bugs/nstextfield-leak-board.md | AppKit/Perf | NSTextField, leak, BoardViewController, agentStateChanged, snapshotChanged, removeFromSuperview, P20 | 1/0 | 21GB memory leak from unconditional board UI rebuild on every notification — NSTextField internal observers prevent deallocation. Fix: diff columns before rebuild. |
 | patterns/build-self-kill-protection.md | Build/Scripts | TERM_PROGRAM, kill_stale_prod, run.sh, self-kill, Harness-hosted | 1/0 | Build scripts killing Harness while running inside Harness. Fix: detect TERM_PROGRAM=Harness, skip kill of /Applications instance and runtime state clear. |
 | patterns/fsevents-pattern.md | Swift/FSEvents | FSEventStreamCreate, recursive, DispatchSource, WatcherContext, Unmanaged, CASE-016, CASE-021 | 1/0 | Reusable FSEvents recursive watcher pattern for Swift actors — replaces non-recursive DispatchSource for nested directory watching. |
+| architecture/command-prompt.md | Commands/Parser | CommandParser, CommandPrompt, knownVerbs, aliases, sendKeys, zoxide, passthrough | 1/0 | Command prompt 2-layer architecture: CommandParser (text→Command) + MainExecutor (Command→effect). Every documented verb needs both layers or throws unknownCommand. |
 
 ## Source Map
 
@@ -48,6 +49,7 @@
 | bugs/nstextfield-leak-board.md | `HarnessApp/UI/Sidebar/BoardViewController.swift`, `HarnessCore/Notifications/NotificationBus.swift`, `HarnessApp/Services/NotificationCoordinator.swift` |
 | patterns/build-self-kill-protection.md | `Scripts/run.sh`, `Scripts/clear-runtime-state.sh` |
 | patterns/fsevents-pattern.md | `HarnessApp/Services/FileExplorer/FileTreeWatcher.swift`, `HarnessApp/UI/Git/GitPanelView.swift` |
+| architecture/command-prompt.md | `HarnessCore/Commands/CommandParser.swift`, `HarnessApp/Services/MainExecutor.swift`, `HarnessCore/Workbench/WorkbenchCommand.swift`, `HarnessApp/UI/CommandPalette/CommandPromptController.swift` |
 | bugs/zombie-crash-macos26.md | `HarnessApp/Services/TerminalPaneRegistry.swift`, `HarnessApp/UI/Chrome/ContentAreaViewController.swift`, `HarnessApp/UI/FileTree/WorkspaceFileTreeView.swift`, `HarnessApp/Services/ActivePaneService.swift`, `HarnessTerminalKit/HarnessTerminalSurfaceView+Scrollback.swift`, `HarnessTerminalKit/TerminalScrollbarView.swift`, `HarnessTerminalKit/ResizeHUDView.swift` |
 
 ## Edges

@@ -273,4 +273,20 @@ final class SplitPaneCoordinator {
         default: return false
         }
     }
+
+    // MARK: - Drag-and-drop (P27)
+
+    func swapPanes(srcPaneID: PaneID, dstPaneID: PaneID) {
+        Task {
+            await coord.requestDaemon(.swapPanes(srcPaneID: srcPaneID, dstPaneID: dstPaneID))
+            await coord.syncFromDaemon()
+        }
+    }
+
+    func movePaneToDirection(sourcePaneID: PaneID, destPaneID: PaneID, direction: SplitDirection, before: Bool) {
+        Task {
+            await coord.requestDaemon(.joinPane(sourcePaneID: sourcePaneID, destPaneID: destPaneID, direction: direction, before: before))
+            await coord.syncFromDaemon()
+        }
+    }
 }

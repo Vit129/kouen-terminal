@@ -1429,7 +1429,8 @@ public struct SessionEditor: Sendable {
     public mutating func joinPane(
         sourcePaneID: PaneID,
         destPaneID: PaneID,
-        direction: SplitDirection
+        direction: SplitDirection,
+        before: Bool = false
     ) -> PaneID? {
         // Validate BOTH ends before mutating (the swapPanes pattern). The removal below writes
         // into `snapshot` immediately, so failing the destination lookup afterwards would leave
@@ -1478,7 +1479,7 @@ public struct SessionEditor: Sendable {
                     var tab = snapshot.workspaces[workspaceIndex].sessions[sessionIndex].tabs[tabIndex]
                     guard tab.rootPane.allPaneIDs().contains(destPaneID) else { continue }
                     let newLeaf = PaneLeaf(id: UUID(), surfaceID: leaf.surfaceID, daemonSurfaceID: leaf.daemonSurfaceID)
-                    insertSplit(&tab.rootPane, at: destPaneID, with: newLeaf, direction: direction)
+                    insertSplit(&tab.rootPane, at: destPaneID, with: newLeaf, direction: direction, before: before)
                     // Focus follows the joined pane into the destination tab.
                     tab.lastActivePaneID = tab.activePaneID
                     tab.activePaneID = newLeaf.id
@@ -1577,13 +1578,15 @@ public struct SessionEditor: Sendable {
         }
     }
 
-    private func insertSplit(_ node: inout PaneNode, at target: PaneID, with newLeaf: PaneLeaf, direction: SplitDirection) {
+    private func insertSplit(_ node: inout PaneNode, at target: PaneID, with newLeaf: PaneLeaf, direction: SplitDirection, before: Bool = false) {
         switch node {
         case let .leaf(leaf) where leaf.id == target:
-            node = .branch(direction: direction, ratio: 0.5, first: .leaf(leaf), second: .leaf(newLeaf))
+            let first: PaneNode = before ? .leaf(newLeaf) : .leaf(leaf)
+            let second: PaneNode = before ? .leaf(leaf) : .leaf(newLeaf)
+            node = .branch(direction: direction, ratio: 0.5, first: first, second: second)
         case .branch(let dir, let ratio, var first, var second):
-            insertSplit(&first, at: target, with: newLeaf, direction: direction)
-            insertSplit(&second, at: target, with: newLeaf, direction: direction)
+            insertSplit(&first, at: target, with: newLeaf, direction: direction, before: before)
+            insertSplit(&second, at: target, with: newLeaf, direction: direction, before: before)
             node = .branch(direction: dir, ratio: ratio, first: first, second: second)
         default:
             break
