@@ -5,12 +5,13 @@
 
 extension ReleaseNotes {
     public static let current = ReleaseNotes(
-        version: "3.6.0",
-        changelogDigest: "f7e6d5c4b3a29180",
+        version: "3.6.1",
+        changelogDigest: "a1b2c3d4e5f67890",
         sections: [
             Section(title: "Added", items: [
                 "P27 pane drag-and-drop — grip icon on pane dividers with visual drop zones",
                 "P26 inline AI chat (⌘I) — contextual AI prompt within terminal panes",
+                "AI agent selector — click pill in ⌘I bar to switch between Claude, Codex, Gemini, Kiro",
                 "Browser auto-retry (3s interval, 10 retries) with auto-close after 30s on connection errors",
             ]),
             Section(title: "Fixed", items: [
