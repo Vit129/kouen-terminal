@@ -297,6 +297,20 @@ extension SettingsViewController {
             trailing.addArrangedSubview(button)
         }
 
+        if MCPConfigWriter.canConfigure(kind) {
+            let configured = MCPConfigWriter.isConfigured(kind)
+            let button = NSButton(
+                title: configured ? "✓ MCP" : "Add MCP",
+                target: self,
+                action: #selector(mcpButtonClicked(_:))
+            )
+            button.bezelStyle = .rounded
+            button.controlSize = .regular
+            if configured { button.contentTintColor = .systemGreen }
+            mcpButtons[kind] = button
+            trailing.addArrangedSubview(button)
+        }
+
         let row = NSStackView(views: [leading, spacer, trailing])
         row.orientation = .horizontal
         row.alignment = .centerY
@@ -388,6 +402,54 @@ extension SettingsViewController {
                     sender.title = "Install Hooks"
                     sender.toolTip = "Failed: \(error.localizedDescription)"
                     if let host { Toast.show("Couldn't install \(kind.displayName) hooks", in: host) }
+                }
+            }
+        }
+    }
+
+    @objc private func mcpButtonClicked(_ sender: NSButton) {
+        guard let kind = mcpButtons.first(where: { $0.value === sender })?.key else { return }
+        let isConfigured = MCPConfigWriter.isConfigured(kind)
+        // Resolve harness-mcp next to the running executable (Contents/MacOS/ in prod,
+        // .build/debug/ or .build/release/ in dev — whichever is executable).
+        let mcpPath: String = {
+            if let dir = Bundle.main.executableURL?.deletingLastPathComponent() {
+                let bundled = dir.appendingPathComponent("harness-mcp")
+                if FileManager.default.isExecutableFile(atPath: bundled.path) { return bundled.path }
+            }
+            // Dev fallback: check common build output locations.
+            for candidate in ["../../.build/debug/harness-mcp", "../../.build/release/harness-mcp"] {
+                let url = URL(fileURLWithPath: candidate)
+                if FileManager.default.isExecutableFile(atPath: url.path) { return url.path }
+            }
+            return "harness-mcp"
+        }()
+
+        sender.isEnabled = false
+        DispatchQueue.global(qos: .userInitiated).async { [weak self, weak sender] in
+            let outcome: Result<Bool, Error>  // true = added, false = removed
+            if isConfigured {
+                outcome = Result { try MCPConfigWriter.remove(kind); return false }
+            } else {
+                outcome = Result { try MCPConfigWriter.add(kind, mcpBinaryPath: mcpPath); return true }
+            }
+            DispatchQueue.main.async {
+                guard let sender else { return }
+                sender.isEnabled = true
+                switch outcome {
+                case .success(let added):
+                    sender.title = added ? "✓ MCP" : "Add MCP"
+                    sender.contentTintColor = added ? .systemGreen : nil
+                    if let host = self?.view {
+                        let msg = added
+                            ? "Added \(kind.displayName) — restart agent to load harness MCP"
+                            : "Removed \(kind.displayName) from MCP"
+                        Toast.show(msg, in: host)
+                    }
+                case .failure(let error):
+                    if let host = self?.view {
+                        Toast.show("MCP: \(error.localizedDescription)", in: host)
+                    }
                 }
             }
         }
