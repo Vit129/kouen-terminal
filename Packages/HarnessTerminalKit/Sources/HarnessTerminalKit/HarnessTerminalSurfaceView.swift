@@ -1230,18 +1230,21 @@ public final class HarnessTerminalSurfaceView: NSView {
         window?.invalidateCursorRects(for: self)
     }
 
-    /// RL-040: `nonisolated` bypasses the Swift 6.3 `@objc` thunk actor-isolation check.
-    override public func resetCursorRects() {
-        guard self.window != nil else { return }
-        if let programPointerCursor {
-            addCursorRect(bounds, cursor: programPointerCursor)
-        } else {
-            super.resetCursorRects()
-        }
-        // Added last so it wins over the base/program cursor for the link's region: ⌘-hovering
-        // a link shows the pointing hand, signalling it's ⌘-clickable.
-        if let rect = hoveredLinkRect() {
-            addCursorRect(rect, cursor: .pointingHand)
+    /// RL-040: `nonisolated` prevents the @objc thunk from calling swift_getObjectType(self)
+    /// to verify executor isolation. AppKit always calls resetCursorRects() on the main thread.
+    nonisolated override public func resetCursorRects() {
+        MainActor.assumeIsolated {
+            guard self.window != nil else { return }
+            if let programPointerCursor {
+                addCursorRect(bounds, cursor: programPointerCursor)
+            } else {
+                super.resetCursorRects()
+            }
+            // Added last so it wins over the base/program cursor for the link's region: ⌘-hovering
+            // a link shows the pointing hand, signalling it's ⌘-clickable.
+            if let rect = hoveredLinkRect() {
+                addCursorRect(rect, cursor: .pointingHand)
+            }
         }
     }
 
@@ -1559,39 +1562,42 @@ public final class HarnessTerminalSurfaceView: NSView {
         if !repaintLastFrame() { scheduleRender() }
     }
 
-    public override func layout() {
-        super.layout()
-        // Resize the drawable and repaint in the SAME turn, with implicit animations off, so a
-        // resize never shows a stale frame stretched to the new bounds (the flicker).
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        let needsFirstPaint = !hasSizedGrid
-        let oldBounds = bounds
-        updateGridSize()
-        let sizeChanged = bounds.size != oldBounds.size
-        let needsTempSync = sizeChanged && !metalLayer.presentsWithTransaction
-        if sizeChanged || needsFirstPaint {
-            fputs("BLINKDBG layout: surface=\(ObjectIdentifier(self)) needsFirstPaint=\(needsFirstPaint) sizeChanged=\(sizeChanged) old=\(oldBounds.size) new=\(bounds.size) hasSizedGrid=\(hasSizedGrid) window=\(window != nil)\n", harnessStderr)
+    /// RL-040: `nonisolated` prevents the @objc thunk from calling swift_getObjectType(self).
+    nonisolated public override func layout() {
+        MainActor.assumeIsolated {
+            super.layout()
+            // Resize the drawable and repaint in the SAME turn, with implicit animations off, so a
+            // resize never shows a stale frame stretched to the new bounds (the flicker).
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            let needsFirstPaint = !hasSizedGrid
+            let oldBounds = bounds
+            updateGridSize()
+            let sizeChanged = bounds.size != oldBounds.size
+            let needsTempSync = sizeChanged && !metalLayer.presentsWithTransaction
+            if sizeChanged || needsFirstPaint {
+                fputs("BLINKDBG layout: surface=\(ObjectIdentifier(self)) needsFirstPaint=\(needsFirstPaint) sizeChanged=\(sizeChanged) old=\(oldBounds.size) new=\(bounds.size) hasSizedGrid=\(hasSizedGrid) window=\(window != nil)\n", harnessStderr)
+            }
+            if needsTempSync {
+                metalLayer.presentsWithTransaction = true
+            }
+            if needsFirstPaint {
+                // First real layout: `updateGridSize` already committed the grid; build + present the
+                // true frame synchronously so the terminal opens correct with no flash.
+                scheduler.forceRender()
+            } else if !repaintLastFrame() {
+                // Resize/animation storm: re-present the cached frame at the new size — no emulator-queue
+                // access, so a window drag never blocks on the output parser (the jank source). Fresh
+                // output still lands between layout frames via the async display-link path. Fall back to
+                // a full synchronous build only when there's no valid cached frame (e.g. generation just
+                // changed via a font/theme/reflow invalidation).
+                scheduler.forceRender()
+            }
+            if needsTempSync {
+                metalLayer.presentsWithTransaction = false
+            }
+            CATransaction.commit()
         }
-        if needsTempSync {
-            metalLayer.presentsWithTransaction = true
-        }
-        if needsFirstPaint {
-            // First real layout: `updateGridSize` already committed the grid; build + present the
-            // true frame synchronously so the terminal opens correct with no flash.
-            scheduler.forceRender()
-        } else if !repaintLastFrame() {
-            // Resize/animation storm: re-present the cached frame at the new size — no emulator-queue
-            // access, so a window drag never blocks on the output parser (the jank source). Fresh
-            // output still lands between layout frames via the async display-link path. Fall back to
-            // a full synchronous build only when there's no valid cached frame (e.g. generation just
-            // changed via a font/theme/reflow invalidation).
-            scheduler.forceRender()
-        }
-        if needsTempSync {
-            metalLayer.presentsWithTransaction = false
-        }
-        CATransaction.commit()
     }
 
     /// Recompute columns/rows from the view size and resize the emulator + drawable.

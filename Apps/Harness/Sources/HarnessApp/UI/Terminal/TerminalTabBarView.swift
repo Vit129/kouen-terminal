@@ -250,13 +250,16 @@ final class TerminalTabBarView: NSView {
         super.viewWillMove(toWindow: newWindow)
     }
 
-    /// RL-040: Swift 6.3 allows @MainActor override of NSView.layout() directly.
-    /// Do NOT use `nonisolated + assumeIsolated` — the thunk still dereferences freed self.
-    override func layout() {
-        guard window != nil else { return }
-        super.layout()
-        guard draggingPill == nil else { return }
-        layoutPills()
+    /// RL-040: `nonisolated` prevents the @objc thunk from calling swift_getObjectType(self)
+    /// to verify executor isolation. AppKit always calls layout() on the main thread, so the
+    /// check is unnecessary — and fatal when self's isa has been corrupted by a use-after-free.
+    nonisolated override func layout() {
+        MainActor.assumeIsolated {
+            guard window != nil else { return }
+            super.layout()
+            guard draggingPill == nil else { return }
+            layoutPills()
+        }
     }
 
     private func layoutPills() {

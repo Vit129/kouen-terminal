@@ -10,6 +10,7 @@ final class AIQueryInputView: NSView {
 
     var onSubmit: ((String) -> Void)?
     var onDismiss: (() -> Void)?
+    var onAgentChanged: ((AgentKind) -> Void)?
 
     // MARK: - Subviews
 
@@ -24,15 +25,19 @@ final class AIQueryInputView: NSView {
         return v
     }()
 
-    private let agentPill: NSTextField = {
-        let f = NSTextField(labelWithString: "✦ Claude")
-        f.font = .monospacedSystemFont(ofSize: 11, weight: .medium)
-        f.textColor = .systemTeal
-        f.wantsLayer = true
-        f.layer?.backgroundColor = NSColor.systemTeal.withAlphaComponent(0.12).cgColor
-        f.layer?.cornerRadius = 4
-        return f
+    private let agentPill: NSButton = {
+        let b = NSButton(title: "✦ Claude", target: nil, action: nil)
+        b.bezelStyle = .recessed
+        b.isBordered = false
+        b.font = .monospacedSystemFont(ofSize: 11, weight: .medium)
+        b.contentTintColor = .systemTeal
+        b.wantsLayer = true
+        b.layer?.backgroundColor = NSColor.systemTeal.withAlphaComponent(0.12).cgColor
+        b.layer?.cornerRadius = 4
+        return b
     }()
+
+    private var currentAgent: AgentKind = .claudeCode
 
     private let field: NSTextField = {
         let f = NSTextField()
@@ -90,11 +95,41 @@ final class AIQueryInputView: NSView {
         ])
 
         field.delegate = self
+        agentPill.target = self
+        agentPill.action = #selector(agentPillClicked(_:))
+    }
+
+    // MARK: - Agent Picker
+
+    @objc private func agentPillClicked(_ sender: NSButton) {
+        let menu = NSMenu()
+        let agents: [(AgentKind, String)] = [
+            (.claudeCode, "Claude"),
+            (.codex, "Codex"),
+            (.antigravity, "Gemini"),
+            (.kiro, "Kiro"),
+        ]
+        for (kind, label) in agents {
+            let item = NSMenuItem(title: "✦ \(label)", action: #selector(agentSelected(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = kind
+            item.state = (kind == currentAgent) ? .on : .off
+            menu.addItem(item)
+        }
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.height), in: sender)
+    }
+
+    @objc private func agentSelected(_ item: NSMenuItem) {
+        guard let kind = item.representedObject as? AgentKind else { return }
+        currentAgent = kind
+        configure(agent: kind)
+        onAgentChanged?(kind)
     }
 
     // MARK: - Configuration
 
     func configure(agent: AgentKind) {
+        currentAgent = agent
         let name: String
         switch agent {
         case .claudeCode:  name = "Claude"
@@ -103,7 +138,7 @@ final class AIQueryInputView: NSView {
         case .kiro:        name = "Kiro"
         default:           name = agent.rawValue
         }
-        agentPill.stringValue = "✦ \(name)"
+        agentPill.title = "✦ \(name) ▾"
     }
 
     func focus() {
