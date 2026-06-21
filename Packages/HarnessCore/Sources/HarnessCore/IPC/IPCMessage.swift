@@ -178,12 +178,14 @@ public struct BrowserSnapshot: Codable, Sendable {
     public var title: String
     public var text: String
     public var elements: [BrowserElement]
+    public var logs: [String]?
 
-    public init(url: String, title: String, text: String, elements: [BrowserElement]) {
+    public init(url: String, title: String, text: String, elements: [BrowserElement], logs: [String]? = nil) {
         self.url = url
         self.title = title
         self.text = text
         self.elements = elements
+        self.logs = logs
     }
 }
 
