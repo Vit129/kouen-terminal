@@ -6,6 +6,14 @@ All notable changes to Harness are documented here. The format is based on
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/robzilla1738/harness-terminal/releases).
 
+## [3.6.2] - 2026-06-21
+
+### Fixed
+- **RL-040 zombie crashes (6 sites)** — applied `nonisolated + MainActor.assumeIsolated` to all remaining `@objc` callbacks on `HarnessTerminalSurfaceView`: `viewDidMoveToWindow`, `viewDidMoveToSuperview`, `viewWillMove(toWindow:)`, `displayTick`, `keyDown`, `keyUp`. Eliminates the Swift 6.3 thunk's `swift_getObjectType` isa read on freed views.
+- **RL-040 TerminalTabBarView.layout crash** — increased retire-hold from 500ms to 1.5s
+- **RL-040 FlippedView.isFlipped crash** — added `nonisolated` on property + retire-hold
+- **Split pane goes to wrong branch** — Cmd+D/Cmd+Shift+D now starts in the session's worktree (not repo root). When an agent runs, its process CWD resolves to repo root; fixed by preferring `worktreePath` over live process CWD.
+
 ## [3.5.3] - 2026-06-21
 
 ### Added
