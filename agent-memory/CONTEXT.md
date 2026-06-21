@@ -2,23 +2,32 @@
 
 ## Now
 - **Task:** None active — ready for next session
-- **Branch:** main
-- **Latest release:** v3.6.1 (build 162)
+- **Branch:** main (latest release v3.7.0 build 164)
 - **Status:** idle
 
-## Last Session (2026-06-21)
-- CMUX-style browser redesign: translucent toolbar (NSVisualEffectView .hudWindow), 2-row compact layout (28pt tab + 32pt toolbar)
-- Fixed tab close button: removed NSScrollView + NSClickGestureRecognizer that consumed mouse events
-- AI agent selector (⌘I pill click) — persists to settings.json
-- RL-040 universal fix: removeFromSuperview() override with 1.5s retire-hold
-- Shared memory protocol: .ai/memory-protocol.md symlink architecture
-- Rules restructure: 7 files (1000 lines) → 3 files (136 lines)
-- AIDLC Mode Lock fully unlocked (Full/QA/Dev all active)
+## Session 2026-06-22 — P28 Complete + CLI Infrastructure
+
+**P28 Browser DevTools API:**
+- Phase 1: snapshot (role/bounds/visible) + screenshot (WKWebView.takeSnapshot → base64 PNG)
+- Phase 2: network capture (fetch + XHR via JS monkey-patch at atDocumentStart)
+- Phase 3: cookies (WKHTTPCookieStore) + localStorage + sessionStorage (evaluateJS)
+- RL-048 fix: DaemonClientActor timeout 2s → 35s (WKWebView ops take 2–5s)
+- Config-driven browser home page: HarnessSettings.browserHomePage (default google.com)
+- v3.7.0 released on GitHub with full release notes
+
+**Release Infrastructure:**
+- `make start` fixed: full-cycle `git push` now only pushes new tags (avoids rejected existing tags)
+- full-cycle CHANGELOG guard: prompt user if CHANGELOG entry missing before gh release
+- v3.7.0 build 164 available with P28 + RL-048
+
+**CLI Infrastructure (My-Investment-Port pattern):**
+- `.claude/settings.json`: permissions (allow swift/make/git), PreToolUse graphify hint, UserPromptSubmit skill-trigger
+- `.claude/hooks/skill-trigger.py`: auto-invoke matching Skill() when keywords detected
+- `.claude/hooks/skill-keywords.json`: routes debug/zombie/rl- → debug-mantra; swiftui/appkit → macos-swiftui; graphify → graphify
+- `.gitignore`: track .claude/hooks/ and .claude/settings.json (only ignore worktrees)
 
 ## Open Questions
-- [priority] Fix harness-mcp round-trip first — agent sends command but response doesn't come back
-- [next] Wire WKWebView API (navigate, snapshot, evaluateJS, consoleLogs) through IPC/MCP — covers 90% agent browser use cases
-- [later] Browser tab management via sidebar (CMUX-style)
+- [none — P28 scope complete]
 
 ## Key Files
 - `Apps/Harness/Sources/HarnessApp/UI/Chrome/BrowserPaneView.swift` — browser view
