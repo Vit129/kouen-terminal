@@ -54,3 +54,29 @@ splits and `select-pane -U/-D`/`kill-pane` collapse before P13 — only the
 `SessionCoordinator` gate, UI affordances (hover buttons, tab/sidebar/main menus,
 command palette), ratio wiring, and docs were blocking. See
 `agent-memory/plans/p13-split-pane-parity.md` for the full PBI breakdown.
+
+## Pane Drag-and-Drop (P27)
+
+User drags the ⋮⋮ grip icon (PaneDragGripView) in the pane hover buttons to reorder panes.
+
+**Architecture:**
+- `PaneDragGripView` — custom NSView, mouseDown+mouseDragged initiates drag
+- `PaneDragController` — singleton state machine, installs NSEvent local monitor for drag/drop/escape
+- `PaneDropZoneOverlay` — CAShapeLayer-based zone highlight (L/R/T/B/Center), animated transitions
+- Commit: zone → `SplitPaneCoordinator.swapPanes` (center) or `.movePaneToDirection` (edges)
+- Model rebuild triggers automatically via `reloadIfNeeded` (no manual view manipulation)
+
+**Zone mapping:**
+- Left edge → `joinPane(src, dst, .horizontal, before: true)`
+- Right edge → `joinPane(src, dst, .horizontal, before: false)`
+- Top edge → `joinPane(src, dst, .vertical, before: true)`
+- Bottom edge → `joinPane(src, dst, .vertical, before: false)`
+- Center → `swapPanes(src, dst)` (disabled when ≤2 panes)
+
+**Key files:**
+- `Apps/.../UI/Chrome/PaneDragController.swift`
+- `Apps/.../UI/Chrome/PaneDropZoneOverlay.swift`
+- `Apps/.../UI/Chrome/ContentAreaViewController.swift` (PaneDragGripView, paneShell identifier)
+- `Apps/.../Services/SplitPaneCoordinator.swift` (swapPanes, movePaneToDirection)
+
+**Constraints respected:** RL-004 (no Metal reparent), RL-040/041 (retire-hold), CASE-003 (presentsWithTransaction)
