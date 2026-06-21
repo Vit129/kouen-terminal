@@ -123,3 +123,14 @@ and returns early — letting the button's own target-action fire. Alternative
 approach if this still fails: use `gestureRecognizer(_:shouldRequireFailureOf:)`
 or remove the gesture and use `mouseUp` override instead.
 
+
+## Browser Auto-Retry (P24 Phase 4)
+
+When a page load fails with a connection error, `BrowserPaneView` automatically
+retries loading the URL at a 3-second interval, up to 10 attempts.
+
+- **Detection:** `webView(_:didFail:withError:)` and `webView(_:didFailProvisionalNavigation:withError:)` check if the error domain is `NSURLErrorDomain` with codes indicating the server isn't reachable yet (e.g. `NSURLErrorCannotConnectToHost`, `NSURLErrorTimedOut`, `NSURLErrorNetworkConnectionLost`, `NSURLErrorNotConnectedToInternet`).
+- **Retry loop:** A `Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true)` fires `webView.load(request)` up to `maxRetries = 10`. The error banner shows "Retrying… (N/10)".
+- **Auto-close:** If all 10 retries are exhausted (30s total), the browser pane closes itself via `splitPaneCoordinator.closeBrowserPane(paneID:)`.
+- **Cancel on success:** `webView(_:didFinish:)` calls `cancelRetry()` which invalidates the timer and resets the attempt counter.
+- **Use case:** Dev servers (Vite, Next.js) that aren't ready when the link is first clicked — the pane waits for the server to come up rather than showing a dead error page.

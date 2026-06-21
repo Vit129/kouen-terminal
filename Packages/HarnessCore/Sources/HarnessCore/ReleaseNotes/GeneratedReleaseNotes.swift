@@ -5,13 +5,20 @@
 
 extension ReleaseNotes {
     public static let current = ReleaseNotes(
-        version: "3.5.4",
-        changelogDigest: "a0b1c2d3e4f5g6h7",
+        version: "3.6.0",
+        changelogDigest: "f7e6d5c4b3a29180",
         sections: [
+            Section(title: "Added", items: [
+                "P27 pane drag-and-drop — grip icon on pane dividers with visual drop zones",
+                "P26 inline AI chat (⌘I) — contextual AI prompt within terminal panes",
+                "Browser auto-retry (3s interval, 10 retries) with auto-close after 30s on connection errors",
+            ]),
             Section(title: "Fixed", items: [
-                ":z, :view, :edit, :e, :split, :vsplit, :agent — wired missing command prompt verbs",
-                ":fzf, :zi, :rg, :fd, :bat, :eza, :jq — shell tool passthrough from command prompt",
-                ":z uses zoxide query fallback when path doesn't exist on disk",
+                "Command prompt verbs: :z, :view, :edit, :agent, and shell tool passthrough",
+                "Tab bar showing wrong branch name in worktree-isolated sessions",
+                "Split pane now inherits worktree path from parent session",
+                "Pane divider thickness corrected from 1px to 2px for better grab target",
+                "Browser pane opens at root split level instead of nested inside terminal pane",
             ]),
         ]
     )
