@@ -1043,7 +1043,10 @@ private final class PaneSplitButtonsView: NSView {
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stack)
 
-        let dragGrip = makeButton("line.3.horizontal", tooltip: "Drag to reorder", action: #selector(beginPaneDrag))
+        let dragGrip = PaneDragGripView(paneID: paneID)
+        dragGrip.translatesAutoresizingMaskIntoConstraints = false
+        dragGrip.widthAnchor.constraint(equalToConstant: 24).isActive = true
+        dragGrip.heightAnchor.constraint(equalToConstant: 22).isActive = true
         let splitRight = makeButton("rectangle.righthalf.inset.filled", tooltip: "Split Right (⌘D)", action: #selector(doSplitRight))
         let splitDown = makeButton("rectangle.bottomhalf.inset.filled", tooltip: "Split Down (⌘⇧D)", action: #selector(doSplitDown))
         let openBrowser = makeButton("safari", tooltip: "Open Browser Pane (⌘B)", action: #selector(openBrowserPane))
@@ -1094,6 +1097,7 @@ private final class PaneSplitButtonsView: NSView {
 
     override func mouseExited(with event: NSEvent) {
         guard window != nil else { return }
+        guard !PaneDragController.shared.isDragging else { return }
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.25
             animator().alphaValue = 0
@@ -1120,11 +1124,6 @@ private final class PaneSplitButtonsView: NSView {
 
     @objc private func doSplitRight() {
         SessionCoordinator.shared.splitActivePane(direction: .horizontal)
-    }
-
-    @objc private func beginPaneDrag() {
-        guard let parent = superview else { return }
-        PaneDragController.shared.beginDrag(paneID: paneID, from: parent)
     }
 
     @objc private func doSplitLeft() {
@@ -1177,6 +1176,75 @@ private final class PaneHoverButton: NSButton {
         guard window != nil else { return }
         contentTintColor = .white.withAlphaComponent(0.7)
         layer?.backgroundColor = nil
+    }
+}
+
+/// Draggable grip icon — mouseDown+drag initiates pane drag session.
+@MainActor
+private final class PaneDragGripView: NSView {
+    private let paneID: PaneID
+    private var dragStarted = false
+
+    init(paneID: PaneID) {
+        self.paneID = paneID
+        super.init(frame: .zero)
+        wantsLayer = true
+        layer?.cornerRadius = 4
+        toolTip = "Drag to reorder pane"
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
+        let color = NSColor.white.withAlphaComponent(0.7)
+        ctx.setFillColor(color.cgColor)
+        // Draw 6 dots (3×2 grid) as grip indicator
+        let dotSize: CGFloat = 2.5
+        let spacingX: CGFloat = 5
+        let spacingY: CGFloat = 4
+        let startX = (bounds.width - spacingX * 2) / 2
+        let startY = (bounds.height - spacingY * 2) / 2
+        for row in 0..<3 {
+            for col in 0..<2 {
+                let x = startX + CGFloat(col) * spacingX
+                let y = startY + CGFloat(row) * spacingY
+                ctx.fillEllipse(in: CGRect(x: x, y: y, width: dotSize, height: dotSize))
+            }
+        }
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        dragStarted = false
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        if !dragStarted {
+            dragStarted = true
+            guard let paneShell = superview?.superview else { return }
+            PaneDragController.shared.beginDrag(paneID: paneID, from: paneShell)
+        }
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        layer?.backgroundColor = NSColor.white.withAlphaComponent(0.15).cgColor
+        NSCursor.openHand.push()
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        layer?.backgroundColor = nil
+        NSCursor.pop()
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        trackingAreas.forEach { removeTrackingArea($0) }
+        addTrackingArea(NSTrackingArea(
+            rect: bounds,
+            options: [.mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect],
+            owner: self
+        ))
     }
 }
 
