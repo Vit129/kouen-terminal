@@ -39,7 +39,7 @@ public final class BrowserPaneView: NSView {
 
     private var retryTimer: Timer?
     private var retryCount = 0
-    private static let maxRetries = 30  // ~60s of retrying
+    private static let maxRetries = 10  // 10 × 3s = 30s then auto-close
 
     private var loadStates: [LoadCompletionState] = []
     private let progressLine = BrowserProgressLine()
@@ -445,7 +445,7 @@ public final class BrowserPaneView: NSView {
         guard retryTimer == nil else { return }
         retryCount = 0
         showErrorBanner(message: "Server disconnected — reconnecting…")
-        retryTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+        retryTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.attemptRetry()
             }
@@ -456,10 +456,11 @@ public final class BrowserPaneView: NSView {
         retryCount += 1
         if retryCount > Self.maxRetries {
             cancelRetry()
-            showErrorBanner(message: "Server unreachable after 60s")
+            // Auto-close: server didn't come back within 30s
+            onClosePaneRequested?()
             return
         }
-        errorLabel.stringValue = "Reconnecting… (attempt \(retryCount))"
+        errorLabel.stringValue = "Reconnecting… (\(retryCount)/\(Self.maxRetries))"
         webView.reload()
     }
 
