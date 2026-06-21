@@ -114,7 +114,7 @@ public enum CommandParser {
         "last-pane", "last-window", "link-window", "list-keys", "lock-client", "move-pane",
         "reattach-surface",
         "move-window", "new-session", "new-window", "next-layout", "next-pane", "next-window",
-        "next-workspace", "open-browser", "pipe-pane", "previous-layout", "previous-pane", "previous-window",
+        "next-workspace", "open-ai-chat", "open-browser", "pipe-pane", "previous-layout", "previous-pane", "previous-window",
         "previous-workspace", "reload-keybindings", "rename-session", "rename-window",
         "renumber-windows", "respawn-pane", "rotate-window", "select-layout", "select-pane",
         "select-window", "select-workspace", "send-keys", "send-prefix", "show-cheatsheet",
@@ -132,6 +132,8 @@ public enum CommandParser {
     private static func buildCommand(name rawName: String, tokens: [String]) throws -> Command {
         let name = resolveAlias(rawName) ?? rawName
         switch name {
+        case "open-ai-chat":
+            return .openAIChat
         case "open-browser":
             var direction: SplitDirection = .vertical
             if tokens.contains("-v") { direction = .horizontal }
