@@ -22,13 +22,17 @@
 | Large community (1M+ users) | Warp, iTerm2, Ghostty |
 | Block-based terminal (command grouping) | Warp |
 
-## Gaps Closed (v3.6.0–3.6.1)
+## Known Limitations (honest assessment)
 
-| Was a gap | How closed |
-|-----------|-----------|
-| AI chat built-in | ⌘I inline chat — CLI print mode (no ACP needed) |
-| Single AI provider lock-in | Agent selector: Claude/Codex/Gemini/Kiro switchable |
-| Browser chrome too heavy | CMUX-style 2-row compact layout (28+32pt) |
+| Feature | Status | Issue |
+|---------|--------|-------|
+| MCP server | ⚠️ Partial | Tools exist but response doesn't come back to agent properly |
+| Inline AI chat (⌘I) | ⚠️ Partial | Can send query but response not streaming back / not displaying |
+| Agent selector | ✅ Works | Persists to settings, switches CLI binary |
+| Browser pane | ✅ Works | Navigate, tabs, console capture — functional |
+| Browser agent API | ⚠️ Not wired | snapshot/evaluateJS exist in code but not exposed via IPC/MCP |
+
+**Honest status:** AI integration is UI-ready but not functionally complete — agent CLI spawns but output doesn't reliably stream back to the user. MCP tools exist but the round-trip (agent sends command → daemon executes → result returns to agent) has gaps.
 
 ## Unique Selling Points (no competitor has all)
 
