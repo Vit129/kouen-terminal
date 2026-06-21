@@ -8,7 +8,8 @@
 | architecture/ipc-architecture.md | IPC/Daemon | socket, codec, binary-frame, security | 1/0 | Unix socket IPC design: framing, hot-path binary frames, security model |
 | ui/split-panes.md | AppKit/UI | NSSplitView, ratio, recursion, reorder, two-axis, split-down, adjustRatio | 4/0 | Split pane management: ratio persistence, infinite-recursion guards, subview reorder, two-axis (Split Right/Split Down) parity (P13) |
 | patterns/acp-client.md | ACP/Agent | JSON-RPC, stdio, shelved, adapter | 0/0 | ACP protocol integration — shelved due to adapter ecosystem immaturity |
-| architecture/mcp-server.md | MCP/Agent | JSON-RPC, stdio, tools, policy, badge, browser, daemon | 0/0 | harness-mcp: 25-tool MCP server (agent→Harness direction); tool policy gating; tab badge; browser pane control; contrast with shelved ACP (Harness→agent direction) |
+| architecture/mcp-server.md | MCP/Agent | JSON-RPC, stdio, tools, policy, badge, browser, daemon | 0/0 | harness-mcp: 27-tool MCP server (agent→Harness direction); tool policy gating; tab badge; browser pane control; MCPConfigWriter for Claude Code/Kiro/Agy |
+| ai/terminal-chat.md | AI/Chat | ⌘I, inline, overlay, AgentProcessManager, AIQueryInputView, AIResponseBlockView, ACP, MCP, cli, stdin | 0/0 | P26B Warp-style inline AI chat: ⌘I overlay on terminal pane, CLI print-mode (claude -p / codex exec), stdin context injection, streaming response blocks; ACP vs MCP vs Terminal Chat distinction |
 | ui/git-panel.md | AppKit/Git | DispatchSource, worktrees, real-time | 1/0 | Git panel with real-time refresh, history click→editor, worktree support |
 | meta/project-history.md | Meta | sprints, releases, architecture | 0/0 | Sprint timeline and architecture decisions from v1.3→v3.0.0 |
 | meta/competitive-position.md | Meta | Supacode, Warp, iTerm2, Ghostty, cmux, gaps, USPs | 0/0 | Competitive analysis: Harness wins/gaps vs market, unique selling points, positioning |
@@ -34,7 +35,8 @@
 | architecture/ipc-architecture.md | `HarnessCore/IPC/IPCCodec.swift`, `HarnessCore/IPC/DaemonClient.swift`, `HarnessDaemon/DaemonServer.swift` |
 | ui/split-panes.md | `HarnessApp/UI/HarnessSplitView.swift`, `HarnessApp/UI/ContentAreaViewController.swift` (PaneContainerView), `HarnessApp/Services/SessionCoordinator.swift`, `HarnessCore/Session/SessionEditor.swift` |
 | patterns/acp-client.md | `HarnessCore/ACP/ACPClient.swift`, `HarnessCore/ACP/ACPSession.swift`, `HarnessApp/UI/AgentChatPanelView.swift` |
-| architecture/mcp-server.md | `Tools/harness-mcp/Sources/HarnessMCP/MCPServer.swift`, `Tools/harness-mcp/Sources/HarnessMCP/ToolRegistry.swift`, `Tools/harness-mcp/Sources/HarnessMCP/ToolPolicy.swift`, `Tools/harness-mcp/Sources/HarnessMCP/HarnessDaemonTools.swift`, `Tools/harness-mcp/Sources/HarnessMCP/HarnessBrowserTools.swift`, `HarnessCore/ACP/ACPMessage.swift` |
+| architecture/mcp-server.md | `Tools/harness-mcp/Sources/HarnessMCP/MCPServer.swift`, `Tools/harness-mcp/Sources/HarnessMCP/ToolRegistry.swift`, `Tools/harness-mcp/Sources/HarnessMCP/ToolPolicy.swift`, `HarnessCore/Agents/MCPConfigWriter.swift`, `HarnessCore/ACP/ACPMessage.swift` |
+| ai/terminal-chat.md | `HarnessCore/AI/AIAgentConfig.swift`, `HarnessCore/AI/AgentProcessManager.swift`, `HarnessApp/UI/AIChat/AIQueryInputView.swift`, `HarnessApp/UI/AIChat/AIResponseBlockView.swift`, `HarnessApp/UI/AIChat/AITerminalChatController.swift`, `HarnessApp/Services/SessionCoordinator.swift` |
 | ui/git-panel.md | `HarnessApp/UI/GitPanelView.swift` |
 | architecture/session-tab-hierarchy.md | `HarnessApp/UI/ContentAreaViewController.swift`, `HarnessApp/UI/MainMenuBuilder.swift`, `HarnessApp/Services/SessionCoordinator.swift`, `HarnessCore/Session/SessionEditor.swift` |
 | ui/agent-session-board.md | `HarnessCore/Board/BoardModel.swift`, `HarnessCLI/HarnessCLI+Board.swift`, `HarnessApp/UI/BoardViewController.swift`, `HarnessApp/Scripting/ScriptAPI.swift`, `HarnessMCP/HarnessDaemonTools.swift`, `HarnessMCP/ToolRegistry.swift` |
@@ -55,6 +57,9 @@
 | ui/appkit-metal.md | ui/split-panes.md | NSView lifecycle, removeFromSuperview, rebuild |
 | architecture/ipc-architecture.md | patterns/acp-client.md | framing, protocol, stdio |
 | architecture/mcp-server.md | patterns/acp-client.md | ACPMessage, JSON-RPC, stdio, framing — shared model, opposite directions |
+| ai/terminal-chat.md | architecture/mcp-server.md | both agent integration paths; MCP = agent→Harness, Terminal Chat = user→agent |
+| ai/terminal-chat.md | patterns/acp-client.md | ACP was the original Harness→agent path; terminal chat replaced it with CLI print-mode |
+| ai/terminal-chat.md | ui/appkit-metal.md | overlay NSView pattern above Metal surface — same as CompletionPopupView |
 | architecture/mcp-server.md | ui/agent-session-board.md | harnessBoard tool exposes BoardModel read-only via MCP |
 | architecture/mcp-server.md | ui/browser-pane.md | harnessBrowser* tools control BrowserPaneView via MCP |
 | ui/tab-bar.md | architecture/mcp-server.md | lastMCPControlAt drives MCP badge on TabPillView |
