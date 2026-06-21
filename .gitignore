@@ -21,8 +21,9 @@ Harness-notarize.zip
 .icon-staging*/
 .env
 
-# Local-only agent notes
-.claude/
+# Local-only agent notes — track hooks, settings, only ignore worktrees
+.claude/worktrees/
+.claude/settings.local.json
 .cursor/
 .codex-workflows/
 claude.md
