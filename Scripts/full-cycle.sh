@@ -89,7 +89,8 @@ if [[ -z "$NOTES" ]]; then
 fi
 
 git tag -f "$TAG" -m "$TAG"
-git push origin main --tags --force
+git push origin main
+git push origin "refs/tags/$TAG" --force
 gh release create "$TAG" --title "$TAG" --notes "$NOTES" 2>/dev/null \
   || gh release edit "$TAG" --title "$TAG" --notes "$NOTES" 2>/dev/null \
   || echo "⚠️  GitHub release skipped (gh CLI not configured or tag exists)"
