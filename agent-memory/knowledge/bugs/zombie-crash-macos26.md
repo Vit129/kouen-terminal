@@ -279,3 +279,39 @@ NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .keyUp, .mouseMoved, .mous
 ```
 
 **Note:** This only helps when `self` is alive but detached (window == nil). If `self` is truly freed (use-after-free), `firstResponder` is a dangling pointer and this check may itself crash. Fix #10 (retire-hold) is the primary defense; this monitor is secondary.
+
+### 12. `nonisolated` + `MainActor.assumeIsolated` on high-frequency AppKit callbacks (2026-06-21)
+
+**Corrects the misdiagnosis in Fix #2.** The Jun 16 Codex fix was wrong because it applied `nonisolated` to `layout()` on classes that were NOT zombie-prone — causing other issues. But the pattern IS correct for zombie-prone views:
+
+```swift
+// In HarnessTerminalSurfaceView (zombie-prone):
+nonisolated public override func viewDidMoveToWindow() {
+    MainActor.assumeIsolated {
+        // ... full method body ...
+    }
+}
+```
+
+**Why this works:** The `@objc` thunk for a `nonisolated` method does NOT call `swift_getObjectType(self)` — there's no executor isolation check to perform. If `self` is freed, the thunk simply jumps to the method body (which is wrapped in `assumeIsolated` — safe because AppKit always calls these on main thread). The `guard window != nil` inside catches alive-but-detached views.
+
+**Why Fix #2 was wrong about this being universally bad:** Fix #2's rule "never use nonisolated on AppKit overrides" was correct for non-zombie-prone views (where it's unnecessary and breaks semantics). But for `HarnessTerminalSurfaceView` specifically — which has the `removeFromSuperview()` retire-hold and IS the crash site — `nonisolated` eliminates the thunk crash at source.
+
+**Applied to (2026-06-21):**
+| Method | Crash trigger |
+|--------|--------------|
+| `viewDidMoveToWindow()` | Display link fires callback during deferred removal |
+| `viewDidMoveToSuperview()` | Same mechanism |
+| `viewWillMove(toWindow:)` | AppKit calls during view hierarchy changes |
+| `displayTick()` | CADisplayLink fires on freed surface |
+| `layout()` | Already had it (earliest fix) |
+| `resetCursorRects()` | Already had it |
+
+**The complete defense stack for HarnessTerminalSurfaceView is now:**
+1. `removeFromSuperview()` override → 1.5s retire-hold (keeps `self` alive)
+2. `nonisolated` on all `@objc` callbacks → eliminates thunk isa read
+3. `guard window != nil` inside method bodies → catches alive-but-detached
+4. NSEvent local monitor → swallows events targeting windowless views
+5. `viewWillMove(toWindow: nil)` → resign first responder, stop display link, remove tracking areas
+
+**Updated prevention rule:** "Never use `nonisolated` on AppKit overrides" → "Only use `nonisolated` + `MainActor.assumeIsolated` on zombie-prone views (`HarnessTerminalSurfaceView`) where the `@objc` thunk crash is the confirmed failure mode. All other views should use standard `override func` without `nonisolated`."
