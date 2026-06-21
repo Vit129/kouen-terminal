@@ -114,3 +114,6 @@ All three communicate over Unix-domain sockets using `HarnessCore` IPC:
 
 ### Release packaging order
 `make release` → `make sign` → `make dmg` → `make finalize`. Running `make dmg` before `make sign` ships an unsigned DMG.
+
+<!-- Agent Memory Lifecycle (shared protocol) -->
+@.ai/memory-protocol.md
