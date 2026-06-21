@@ -108,6 +108,7 @@ Daemon must be running. `harness-mcp` exits with a clear error if daemon socket 
 
 ### Phase A PBIs
 
+- [x] **A-0:** MCP status UI in Agents settings page — `MCPConfigWriter` + "Add MCP"/"✓ MCP" button per agent row (2026-06-21)
 - [ ] **A-1:** Bundle `harness-mcp` in `Harness.app/Contents/MacOS/` via `build-release.sh`
 - [ ] **A-2:** Add `harness-cli mcp setup` command (detect Claude Code / Codex / Kiro, write configs)
 - [ ] **A-3:** Wire Claude Code manually now (dev path → `.build/debug/harness-mcp`)
