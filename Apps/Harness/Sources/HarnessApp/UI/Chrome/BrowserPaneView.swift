@@ -800,9 +800,7 @@ private final class BrowserTabButton: NSView {
             closeBtn.heightAnchor.constraint(equalToConstant: 20),
         ])
 
-        let click = NSClickGestureRecognizer(target: self, action: #selector(selectTapped(_:)))
-        // delaysPrimaryMouseButtonEvents defaults to true which swallows the mouse-down before
-        // it reaches the close button's NSButton. Setting false lets button + recognizer coexist.
+        let click = NSClickGestureRecognizer(target: self, action: #selector(selectTapped))
         click.delaysPrimaryMouseButtonEvents = false
         addGestureRecognizer(click)
     }
@@ -810,12 +808,11 @@ private final class BrowserTabButton: NSView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 
-    override func hitTest(_ point: NSPoint) -> NSView? {
-        // CASE-038: NSClickGestureRecognizer intercepts NSButton clicks.
-        // Return the close button directly so it receives the full mouse event.
-        let localToClose = closeBtn.convert(point, from: self)
-        if closeBtn.bounds.contains(localToClose) { return closeBtn }
-        return super.hitTest(point)
+    override func mouseUp(with event: NSEvent) {
+        let loc = convert(event.locationInWindow, from: nil)
+        if !closeBtn.frame.contains(loc) {
+            onSelect()
+        }
     }
 
     @objc private func selectTapped(_ gesture: NSClickGestureRecognizer) {
