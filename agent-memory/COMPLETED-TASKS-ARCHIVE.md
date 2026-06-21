@@ -1,6 +1,6 @@
 # Task Ledger Archive (Tasks 1–50)
 
-Archived from agent-memory/memory.md. Active tasks in [memory.md](memory.md).
+Archived from agent-memory/MEMORY.md. Active tasks in [MEMORY.md](MEMORY.md).
 
 | # | Task | Status |
 |---|------|--------|
