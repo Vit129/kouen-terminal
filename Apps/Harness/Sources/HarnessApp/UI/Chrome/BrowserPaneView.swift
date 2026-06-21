@@ -797,9 +797,6 @@ private final class BrowserTabButton: NSView {
             closeBtn.heightAnchor.constraint(equalToConstant: 20),
         ])
 
-        let click = NSClickGestureRecognizer(target: self, action: #selector(selectTapped))
-        click.delaysPrimaryMouseButtonEvents = false
-        addGestureRecognizer(click)
     }
 
     @available(*, unavailable)
@@ -814,11 +811,6 @@ private final class BrowserTabButton: NSView {
         }
     }
 
-    @objc private func selectTapped(_ gesture: NSClickGestureRecognizer) {
-        let loc = gesture.location(in: self)
-        if closeBtn.frame.contains(loc) { return }
-        onSelect()
-    }
     @objc private func closeTapped() {
         NSLog("BROWSER_DEBUG: closeTapped fired")
         onClose()
