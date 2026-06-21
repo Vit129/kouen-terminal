@@ -807,7 +807,9 @@ private final class BrowserTabButton: NSView {
 
     override func mouseUp(with event: NSEvent) {
         let loc = convert(event.locationInWindow, from: nil)
-        if !closeBtn.frame.contains(loc) {
+        if closeBtn.frame.contains(loc) {
+            onClose()
+        } else {
             onSelect()
         }
     }

@@ -1859,12 +1859,14 @@ public final class HarnessTerminalSurfaceView: NSView {
 
     /// Display-cadence tick: present at most one coalesced frame, then pause the link when there's
     /// nothing left to draw so a quiet terminal doesn't wake the CPU every refresh.
-    @objc private func displayTick() {
+    @objc nonisolated private func displayTick() {
+        MainActor.assumeIsolated {
         scheduler.tick()
         if !scheduler.hasPendingWork {
             renderLink?.isPaused = true
             scheduler.linkDidPause() // reopen the immediate-present path for the next arrival
         }
+        } // MainActor.assumeIsolated
     }
 
     private func renderNow(forced: Bool = false) {
