@@ -392,16 +392,16 @@ final class DaemonSyncService {
                           let workspace = self.snapshot.activeWorkspace else { return [] }
                     return workspace.sessions.flatMap { $0.tabs }.map { (workspace.id, $0) }
                 }
-                var probedCWDs = [String: String?]() // cwd → branch result
+                var probedCWDs = [String: String?]() // probePath → branch result
                 let updates = work.compactMap { workspaceID, tab -> (WorkspaceID, TabID, String?)? in
-                    let cwd = tab.cwd
+                    let probePath = tab.worktreePath ?? tab.cwd
                     let branch: String?
-                    if let cached = probedCWDs[cwd] {
+                    if let cached = probedCWDs[probePath] {
                         branch = cached
                     } else {
                         let updated = git.refresh(tab: tab)
                         branch = updated.gitBranch
-                        probedCWDs[cwd] = branch
+                        probedCWDs[probePath] = branch
                     }
                     guard branch != tab.gitBranch else { return nil }
                     return (workspaceID, tab.id, branch)
