@@ -90,7 +90,7 @@ final class MainSplitViewController: NSViewController {
 
             edgeDivider.topAnchor.constraint(equalTo: view.topAnchor),
             edgeDivider.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            edgeDivider.widthAnchor.constraint(equalToConstant: 1),
+            edgeDivider.widthAnchor.constraint(equalToConstant: HarnessDesign.Divider.thickness),
         ])
         updateEdgeDividerConstraints(sidebarContainer: sidebarContainer)
 
