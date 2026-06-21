@@ -359,9 +359,10 @@ public final class BrowserPaneView: NSView {
     }
 
     private func closeTab(at index: Int) {
+        NSLog("BROWSER_DEBUG: closeTab(at: %d), tabs.count=%d", index, tabs.count)
         guard tabs.count > 1 else {
-            // Last tab — close the pane
-            closePaneClicked()
+            // Last tab — close the entire browser pane
+            SessionCoordinator.shared.splitPaneCoordinator.closeBrowserPane(paneID: paneID)
             return
         }
         tabs[index].webView.removeFromSuperview()
@@ -452,6 +453,7 @@ public final class BrowserPaneView: NSView {
     // MARK: - Actions
 
     @objc private func closePaneClicked() {
+        NSLog("BROWSER_DEBUG: closePaneClicked, onClosePaneRequested=%d", onClosePaneRequested != nil ? 1 : 0)
         if let cb = onClosePaneRequested {
             cb()
         } else {
@@ -821,7 +823,10 @@ private final class BrowserTabButton: NSView {
         if closeBtn.frame.contains(loc) { return }
         onSelect()
     }
-    @objc private func closeTapped() { onClose() }
+    @objc private func closeTapped() {
+        NSLog("BROWSER_DEBUG: closeTapped fired")
+        onClose()
+    }
 }
 
 // MARK: - Progress bar
