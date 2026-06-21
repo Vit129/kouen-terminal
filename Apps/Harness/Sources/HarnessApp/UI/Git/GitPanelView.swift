@@ -5,6 +5,7 @@ import CoreServices
 @MainActor
 final class GitPanelView: NSView {
     private var currentPath: String?
+    private var manuallyUnstagedFiles = Set<String>()
     /// Bumped on every `refresh()` call so a slower, stale refresh can detect
     /// that a newer one has superseded it and discard its results.
     private var refreshGeneration = 0
@@ -30,7 +31,7 @@ final class GitPanelView: NSView {
     }
 
     // Top tabs: Changes | History | Worktrees | Repos
-    private let tabSelector = NSSegmentedControl(labels: ["Changes", "History", "Worktrees", "Repos"], trackingMode: .selectOne, target: nil, action: nil)
+    private let tabSelector = NSSegmentedControl(labels: ["Changes", "History"], trackingMode: .selectOne, target: nil, action: nil)
     private let changesContainer = NSView()
     private let historyContainer = NSView()
     private let worktreesContainer = NSView()
@@ -88,6 +89,7 @@ final class GitPanelView: NSView {
 
     func clearRoot() {
         currentPath = nil
+        manuallyUnstagedFiles.removeAll()
         stopWatching()
     }
 
@@ -372,10 +374,9 @@ final class GitPanelView: NSView {
         commitButton.isHidden = selected != 0
         stageAllButton.isHidden = selected != 0
         historyContainer.isHidden = selected != 1
-        worktreesContainer.isHidden = selected != 2
-        addWorktreeButton.isHidden = selected != 2
-        reposContainer.isHidden = selected != 3
-        if selected == 3 { refreshRepos() }
+        worktreesContainer.isHidden = true
+        addWorktreeButton.isHidden = true
+        reposContainer.isHidden = true
     }
 
     // MARK: - Actions
@@ -405,8 +406,17 @@ final class GitPanelView: NSView {
 
     @objc private func stageAllAction() {
         if stageAllButton.title == "Unstage All" {
-            runAndRefresh(["reset"])
+            guard let path = currentPath else { return }
+            Task {
+                let porcelain = await runGit(["status", "--porcelain"], in: path)
+                for line in porcelain.components(separatedBy: "\n") where !line.isEmpty {
+                    let file = String(line.dropFirst(3))
+                    self.manuallyUnstagedFiles.insert(file)
+                }
+                self.runAndRefresh(["reset"])
+            }
         } else {
+            manuallyUnstagedFiles.removeAll()
             runAndRefresh(["add", "-A"])
         }
     }
@@ -699,6 +709,11 @@ final class GitPanelView: NSView {
         guard let path = currentPath, let file = sender.toolTip else { return }
         let wantsStaged = !sender.isStaged
         sender.isStaged = wantsStaged
+        if wantsStaged {
+            manuallyUnstagedFiles.remove(file)
+        } else {
+            manuallyUnstagedFiles.insert(file)
+        }
         NSLog("[GitPanel] toggleStage: file=%@ wantsStaged=%d path=%@", file, wantsStaged ? 1 : 0, path)
         Task {
             let result = await runGit(wantsStaged ? ["add", file] : ["restore", "--staged", file], in: path)
@@ -764,14 +779,39 @@ final class GitPanelView: NSView {
 
         let branch = await runGit(["branch", "--show-current"], in: path)
         let aheadBehind = await runGit(["rev-list", "--left-right", "--count", "@{upstream}...HEAD"], in: path)
-        let numstat = await runGit(["diff", "--numstat", "HEAD"], in: path)
-        let porcelain = await runGit(["status", "--porcelain"], in: path)
+        var numstat = await runGit(["diff", "--numstat", "HEAD"], in: path)
+        var porcelain = await runGit(["status", "--porcelain"], in: path)
         let log = await runGit(["log", "--format=%H|%an|%ar|%s", "-25"], in: path)
 
         // A newer refresh started while these git calls were in flight — its
         // result will supersede ours, so discard this stale snapshot instead
         // of overwriting the UI with out-of-date staged/changed state.
         guard generation == refreshGeneration else { return }
+
+        // Auto-stage unstaged changes that are not manually unstaged
+        var filesToAutoStage: [String] = []
+        for line in porcelain.components(separatedBy: "\n") where !line.isEmpty {
+            let indexStatus = String(line.prefix(1))
+            let workTreeStatus = String(line.dropFirst().prefix(1))
+            let file = String(line.dropFirst(3))
+            
+            let isUnstaged = workTreeStatus != " " || indexStatus == "?"
+            if isUnstaged && !manuallyUnstagedFiles.contains(file) {
+                filesToAutoStage.append(file)
+            }
+        }
+        
+        if !filesToAutoStage.isEmpty {
+            for file in filesToAutoStage {
+                _ = await runGit(["add", file], in: path)
+            }
+            porcelain = await runGit(["status", "--porcelain"], in: path)
+            numstat = await runGit(["diff", "--numstat", "HEAD"], in: path)
+        }
+
+        if porcelain.isEmpty {
+            manuallyUnstagedFiles.removeAll()
+        }
 
         branchLabel.stringValue = "⎇ " + (branch.isEmpty ? "detached" : branch)
 
