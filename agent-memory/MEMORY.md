@@ -28,6 +28,7 @@
 - [2026-06-21] agent-memory/ UPPERCASE convention: top-level = UPPERCASE (MEMORY.md, PLAYBOOK.md, INDEX.md), subdirs (knowledge/, plans/) = lowercase kebab-case
 - [2026-06-21] Shared memory protocol: single canonical `~/.claude/scripts/shared/memory-protocol.md` → symlinked into each project as `.ai/memory-protocol.md` → agent docs include via `@.ai/memory-protocol.md`
 - [2026-06-21] `@` auto-include only works in Claude Code — Codex/Gemini/Kiro need explicit read instruction in their agent docs
+- [2026-06-21] Webview Console redirection & Glassmorphism: WKWebView redirects logs to /tmp/harness-browser-[paneID].log & includes them in BrowserSnapshot for agent debugging. Refactored UI toolbar/tabbar with installChromeBackground(.tabBar) and SoftIconButton.
 
 ## Lessons
 - RL-004: Never reparent Metal terminal surfaces — 1-2s black screen (CASE-003)

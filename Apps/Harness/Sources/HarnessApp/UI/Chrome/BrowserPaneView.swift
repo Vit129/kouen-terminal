@@ -18,17 +18,18 @@ public final class BrowserPaneView: NSView {
     private var tabs: [BrowserTab] = []
     private var activeTabIndex: Int = 0
     private var activeTab: BrowserTab? { tabs.indices.contains(activeTabIndex) ? tabs[activeTabIndex] : nil }
+    private var consoleLogs: [String] = []
 
     private let tabBar = NSScrollView()
     private let tabBarStack = NSStackView()
     private let newTabButton = NSButton()
 
     private let toolbar = NSView()
-    private let backButton = NSButton()
-    private let forwardButton = NSButton()
-    internal let reloadStopButton = NSButton()
+    private let backButton = SoftIconButton(frame: NSRect(x: 0, y: 0, width: 20, height: 20))
+    private let forwardButton = SoftIconButton(frame: NSRect(x: 0, y: 0, width: 20, height: 20))
+    internal let reloadStopButton = SoftIconButton(frame: NSRect(x: 0, y: 0, width: 20, height: 20))
     internal let urlTextField = NSTextField()
-    internal let closePaneButton = NSButton()
+    internal let closePaneButton = SoftIconButton(frame: NSRect(x: 0, y: 0, width: 20, height: 20))
     /// Called when user taps the close (×) button in the toolbar.
     public var onClosePaneRequested: (() -> Void)?
 
@@ -67,6 +68,11 @@ public final class BrowserPaneView: NSView {
         // Create first tab
         let firstTab = BrowserTab(id: UUID(), webView: webView, title: "New Tab")
         tabs.append(firstTab)
+
+        let logPath = "/tmp/harness-browser-\(paneID.uuidString).log"
+        try? "".write(toFile: logPath, atomically: true, encoding: .utf8)
+
+        setupConsoleLogRedirection(for: webView)
 
         setupUI()
         setupTabBar()
@@ -129,8 +135,7 @@ public final class BrowserPaneView: NSView {
 
     private func setupUI() {
         // Toolbar styling
-        toolbar.wantsLayer = true
-        toolbar.layer?.backgroundColor = HarnessDesign.chrome.sidebarBackground.cgColor
+        HarnessDesign.installChromeBackground(.tabBar, on: toolbar)
         toolbar.translatesAutoresizingMaskIntoConstraints = false
 
         let border = NSView()
@@ -158,23 +163,39 @@ public final class BrowserPaneView: NSView {
         closePaneButton.setContentHuggingPriority(.required, for: .horizontal)
         closePaneButton.setContentCompressionResistancePriority(.required, for: .horizontal)
 
-        // URL Text Field configuration
+        // URL Text Field container & configuration
+        let urlContainer = NSView()
+        urlContainer.translatesAutoresizingMaskIntoConstraints = false
+        urlContainer.wantsLayer = true
+        urlContainer.layer?.cornerRadius = 6
+        urlContainer.layer?.cornerCurve = .continuous
+        urlContainer.layer?.backgroundColor = HarnessDesign.chrome.surfaceElevated.cgColor
+        urlContainer.layer?.borderColor = HarnessDesign.chrome.borderStrong.cgColor
+        urlContainer.layer?.borderWidth = 1
+
         urlTextField.translatesAutoresizingMaskIntoConstraints = false
         urlTextField.isEditable = true
-        urlTextField.drawsBackground = true
-        urlTextField.backgroundColor = HarnessDesign.chrome.surfaceElevated
+        urlTextField.drawsBackground = false
         urlTextField.textColor = HarnessDesign.chrome.textPrimary
-        urlTextField.isBezeled = true
-        urlTextField.bezelStyle = .roundedBezel
+        urlTextField.isBezeled = false
+        urlTextField.isBordered = false
         urlTextField.focusRingType = .none
         urlTextField.target = self
         urlTextField.action = #selector(urlEntered(_:))
         urlTextField.font = NSFont.systemFont(ofSize: HarnessDesign.FontSize.chromeBody)
         urlTextField.setAccessibilityIdentifier("browser-url-text-field")
-        urlTextField.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        urlTextField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-        let toolbarStack = NSStackView(views: [backButton, forwardButton, reloadStopButton, urlTextField, closePaneButton])
+        urlContainer.addSubview(urlTextField)
+        urlContainer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        urlContainer.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        NSLayoutConstraint.activate([
+            urlTextField.leadingAnchor.constraint(equalTo: urlContainer.leadingAnchor, constant: 6),
+            urlTextField.trailingAnchor.constraint(equalTo: urlContainer.trailingAnchor, constant: -6),
+            urlTextField.centerYAnchor.constraint(equalTo: urlContainer.centerYAnchor),
+        ])
+
+        let toolbarStack = NSStackView(views: [backButton, forwardButton, reloadStopButton, urlContainer, closePaneButton])
         toolbarStack.orientation = .horizontal
         toolbarStack.spacing = 8
         toolbarStack.edgeInsets = NSEdgeInsets(top: 4, left: 8, bottom: 4, right: 12)
@@ -228,8 +249,7 @@ public final class BrowserPaneView: NSView {
         tabBar.hasHorizontalScroller = false
         tabBar.hasVerticalScroller = false
         tabBar.drawsBackground = false
-        tabBar.wantsLayer = true
-        tabBar.layer?.backgroundColor = HarnessDesign.chrome.sidebarBackground.cgColor
+        HarnessDesign.installChromeBackground(.tabBar, on: tabBar)
 
         tabBarStack.orientation = .horizontal
         tabBarStack.spacing = 1
@@ -278,6 +298,8 @@ public final class BrowserPaneView: NSView {
         newWeb.navigationDelegate = self
         newWeb.uiDelegate = self
         newWeb.translatesAutoresizingMaskIntoConstraints = false
+
+        setupConsoleLogRedirection(for: newWeb)
 
         let tab = BrowserTab(id: UUID(), webView: newWeb, title: "New Tab")
         tabs.append(tab)
@@ -329,7 +351,8 @@ public final class BrowserPaneView: NSView {
         addSubview(mainStack)
         self.mainStack = mainStack
 
-        errorBannerHeightConstraint = errorBanner.heightAnchor.constraint(equalToConstant: 0)
+        let errorConstraint = errorBanner.heightAnchor.constraint(equalToConstant: 0)
+        errorBannerHeightConstraint = errorConstraint
         errorBanner.isHidden = true
 
         NSLayoutConstraint.activate([
@@ -341,7 +364,7 @@ public final class BrowserPaneView: NSView {
             toolbar.heightAnchor.constraint(equalToConstant: 36),
             tabBar.heightAnchor.constraint(equalToConstant: 30),
             progressLine.heightAnchor.constraint(equalToConstant: 2),
-            errorBannerHeightConstraint!
+            errorConstraint
         ])
     }
 
@@ -353,11 +376,44 @@ public final class BrowserPaneView: NSView {
         }
     }
 
-    private func configureNavigationButton(_ button: NSButton, symbolName: String, action: Selector) {
+    private func setupConsoleLogRedirection(for webView: WKWebView) {
+        let js = """
+        (function() {
+            if (window.__harnessConsoleRedirected) return;
+            window.__harnessConsoleRedirected = true;
+            var levels = ['log', 'info', 'warn', 'error', 'debug'];
+            levels.forEach(function(level) {
+                var original = console[level];
+                console[level] = function() {
+                    if (original) {
+                        original.apply(console, arguments);
+                    }
+                    var args = Array.prototype.slice.call(arguments);
+                    var msg = args.map(function(arg) {
+                        if (typeof arg === 'object') {
+                            try { return JSON.stringify(arg); } catch(e) { return String(arg); }
+                        }
+                        return String(arg);
+                    }).join(' ');
+                    try {
+                        window.webkit.messageHandlers.harnessConsoleLog.postMessage({
+                            level: level,
+                            message: msg
+                        });
+                    } catch(e) {}
+                };
+            });
+        })();
+        """
+        let userScript = WKUserScript(source: js, injectionTime: .atDocumentStart, forMainFrameOnly: false)
+        let controller = webView.configuration.userContentController
+        controller.addUserScript(userScript)
+        controller.add(WeakScriptMessageHandler(self), name: "harnessConsoleLog")
+    }
+
+    private func configureNavigationButton(_ button: SoftIconButton, symbolName: String, action: Selector) {
         button.translatesAutoresizingMaskIntoConstraints = false
-        button.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil)
-        button.isBordered = false
-        button.bezelStyle = .regularSquare
+        button.setSymbol(symbolName, accessibilityDescription: nil, pointSize: 11, weight: .medium)
         button.target = self
         button.action = action
         button.widthAnchor.constraint(equalToConstant: 20).isActive = true
@@ -472,7 +528,7 @@ public final class BrowserPaneView: NSView {
 
     private func updateReloadStopButton(isLoading: Bool) {
         let symbol = isLoading ? "xmark" : "arrow.clockwise"
-        reloadStopButton.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
+        reloadStopButton.setSymbol(symbol, accessibilityDescription: nil, pointSize: 11, weight: .medium)
     }
 
     // MARK: - Public API
@@ -515,7 +571,9 @@ public final class BrowserPaneView: NSView {
         guard let data = jsonString.data(using: .utf8) else {
             throw NSError(domain: "BrowserPaneView", code: 2, userInfo: [NSLocalizedDescriptionKey: "Invalid snapshot format"])
         }
-        return try JSONDecoder().decode(BrowserSnapshot.self, from: data)
+        var snapshot = try JSONDecoder().decode(BrowserSnapshot.self, from: data)
+        snapshot.logs = self.consoleLogs
+        return snapshot
     }
 
     public func waitForLoad(timeout: TimeInterval) async throws {
@@ -751,12 +809,13 @@ private final class BrowserProgressLine: NSView {
         fill.layer?.backgroundColor = NSColor.controlAccentColor.cgColor
         fill.translatesAutoresizingMaskIntoConstraints = false
         addSubview(fill)
-        fillWidth = fill.widthAnchor.constraint(equalToConstant: 0)
+        let widthConstraint = fill.widthAnchor.constraint(equalToConstant: 0)
+        fillWidth = widthConstraint
         NSLayoutConstraint.activate([
             fill.leadingAnchor.constraint(equalTo: leadingAnchor),
             fill.topAnchor.constraint(equalTo: topAnchor),
             fill.bottomAnchor.constraint(equalTo: bottomAnchor),
-            fillWidth!,
+            widthConstraint,
         ])
         alphaValue = 0
     }
@@ -786,5 +845,55 @@ private final class BrowserProgressLine: NSView {
                 self.fillWidth?.constant = 0
             })
         }
+    }
+}
+
+extension BrowserPaneView: WKScriptMessageHandler {
+    public func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard let body = message.body as? [String: Any],
+              let level = body["level"] as? String,
+              let text = body["message"] as? String else {
+            return
+        }
+        
+        let logLine = "[\(level.uppercased())] \(text)"
+        
+        // Append to memory array (cap size to 200)
+        consoleLogs.append(logLine)
+        if consoleLogs.count > 200 {
+            consoleLogs.removeFirst(consoleLogs.count - 200)
+        }
+        
+        // Write/append to file /tmp/harness-browser-\(paneID.uuidString).log
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
+        let timestamp = df.string(from: Date())
+        
+        let fileLine = "[\(timestamp)] [\(level.uppercased())] \(text)\n"
+        let logPath = "/tmp/harness-browser-\(paneID.uuidString).log"
+        let url = URL(fileURLWithPath: logPath)
+        
+        if let data = fileLine.data(using: .utf8) {
+            if let fileHandle = try? FileHandle(forWritingTo: url) {
+                defer { try? fileHandle.close() }
+                _ = try? fileHandle.seekToEnd()
+                _ = try? fileHandle.write(contentsOf: data)
+            } else {
+                _ = try? data.write(to: url, options: .atomic)
+            }
+        }
+    }
+}
+
+@MainActor
+private final class WeakScriptMessageHandler: NSObject, WKScriptMessageHandler {
+    private weak var handler: WKScriptMessageHandler?
+
+    init(_ handler: WKScriptMessageHandler) {
+        self.handler = handler
+    }
+
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        handler?.userContentController(userContentController, didReceive: message)
     }
 }

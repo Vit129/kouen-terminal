@@ -33,7 +33,7 @@ final class TerminalBannerTests: XCTestCase {
         XCTAssertTrue(banner.contains("Shortcuts"))
         XCTAssertTrue(banner.contains("harness-cli"))
         XCTAssertTrue(banner.contains("harnesscli.dev"))
-        XCTAssertTrue(banner.contains("⌘D / ⇧⌘D"))
+        XCTAssertTrue(banner.contains("⌘D / ⌘⇧D"))
     }
 
     /// The tour wraps; it never truncates at any width the box renders at (44+). Below
