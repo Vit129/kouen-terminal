@@ -92,3 +92,9 @@
 | CASE-052 | disconnect() posts notification even when already nil | Guard: `guard let name else { return }` | RESOLVED | 1 |
 | CASE-053 | buildRemotePage width constraints accumulate on every visit | Guard: `if remoteNameField.constraints.isEmpty` before activating | RESOLVED | 1 |
 | CASE-054 | Hardcoded page index 6 for Remote settings | `SettingsWindowController.pageRemote` named constant | RESOLVED | 1 |
+
+## Command Prompt / Parser
+
+| ID | Trigger | Fix | Outcome | Applied |
+|----|---------|-----|---------|---------|
+| CASE-042 | :z/:view/:edit/:agent etc throw unknownCommand | Add verb to CommandParser.buildCommand + knownVerbs (see knowledge/architecture/command-prompt.md) | RESOLVED | 1 |
