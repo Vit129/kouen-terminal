@@ -36,6 +36,7 @@ final class PaneDragController {
         guard let workspace = SessionCoordinator.shared.snapshot.activeWorkspace,
               let tab = workspace.activeTab else { return }
         let allPanes = tab.rootPane.allPaneIDs().filter { $0 != srcID }
+        let totalPanes = tab.rootPane.allPaneIDs().count
         guard let contentVC = (NSApp.keyWindow?.contentViewController as? MainSplitViewController
             ?? NSApp.mainWindow?.contentViewController as? MainSplitViewController)?.contentVC
         else { return }
@@ -43,6 +44,7 @@ final class PaneDragController {
         for paneID in allPanes {
             guard let shell = contentVC.paneShell(for: paneID) else { continue }
             let overlay = PaneDropZoneOverlay(targetPaneID: paneID)
+            overlay.disableCenter = totalPanes <= 2
             overlay.frame = shell.bounds
             overlay.autoresizingMask = [.width, .height]
             shell.addSubview(overlay)
