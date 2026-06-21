@@ -43,9 +43,3 @@
 - น้องๆอาจ depend on current structure (skill keywords, routing paths)
 - Hooks reference specific paths — need to update if files move
 - AIDLC SKILL.md is shared — adding routing tables there affects everyone
-
-## Workaround (ตอนนี้)
-
-- `assume-unchanged` บน 4 files ที่แก้ personal
-- ไม่ push → ไม่กระทบ team
-- เวลา pull ถ้า conflict → `git stash` → pull → re-apply
