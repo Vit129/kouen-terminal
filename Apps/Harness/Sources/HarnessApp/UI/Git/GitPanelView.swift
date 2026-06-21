@@ -1369,7 +1369,15 @@ private final class StageToggleButton: NSButton {
 }
 
 private final class FlippedView: NSView {
-    override var isFlipped: Bool { true }
+    nonisolated override var isFlipped: Bool { true }
+    private static var retired: [FlippedView] = []
+    override func removeFromSuperview() {
+        Self.retired.append(self)
+        super.removeFromSuperview()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            Self.retired.removeAll { $0 === self }
+        }
+    }
 }
 
 extension GitPanelView: NSGestureRecognizerDelegate {
