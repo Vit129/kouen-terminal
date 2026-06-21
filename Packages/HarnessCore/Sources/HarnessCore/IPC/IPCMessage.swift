@@ -146,6 +146,7 @@ public enum IPCRequest: Codable, Sendable {
     case displayMessage(format: String)
     /// tmux `show-messages`: the daemon's recent display-message log (most recent last).
     case showMessages
+    case runGit(args: [String], cwd: String)
 
     // Browser tool integration (P14)
     case browserOpen(url: URL, direction: SplitDirection?)
@@ -287,6 +288,7 @@ public enum IPCResponse: Codable, Sendable {
     case hookID(UUID)
     case hooks([HookEntry])
     case error(String)
+    case gitResult(output: String, stderr: String, success: Bool)
 
     // Browser tool integration (P14)
     case browserRequest(id: UUID, paneID: UUID?, req: BrowserRequestPayload)

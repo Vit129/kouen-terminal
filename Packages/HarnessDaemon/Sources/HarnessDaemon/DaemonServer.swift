@@ -334,6 +334,15 @@ public final class DaemonServer: @unchecked Sendable {
                     }
                 }
                 continue
+            case let .runGit(args, cwd):
+                Task { [weak self] in
+                    guard let self else { return }
+                    let res = await self.registry.runGitCommandInDaemon(args: args, cwd: cwd)
+                    self.queue.async {
+                        self.send(.gitResult(output: res.output, stderr: res.stderr, success: res.success), to: fd)
+                    }
+                }
+                continue
             case let .browserResponse(id, response):
                 // Intercept response from GUI client
                 if let pending = self.pendingBrowserRequests.removeValue(forKey: id) {

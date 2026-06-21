@@ -1068,8 +1068,8 @@ public final class SurfaceRegistry: @unchecked Sendable {
             // observe the notification bus and decide how to surface it.
             postDisplayMessage(FormatString.evaluate(format, context: buildFormatContext()))
             return .ok
-        case .browserOpen, .browserNavigate, .browserWait, .browserSnapshot, .browserInteract, .browserClose, .browserResponse:
-            return .error("Browser requests are handled at the daemon server layer")
+        case .runGit, .browserOpen, .browserNavigate, .browserWait, .browserSnapshot, .browserInteract, .browserClose, .browserResponse:
+            return .error("Browser/Git requests are handled at the daemon server layer")
         }
     }
 
@@ -1381,6 +1381,33 @@ public final class SurfaceRegistry: @unchecked Sendable {
             return process.terminationStatus == 0
         } catch {
             return false
+        }
+    }
+
+    public func runGitCommandInDaemon(args: [String], cwd: String) async -> (output: String, stderr: String, success: Bool) {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+                process.arguments = args
+                process.currentDirectoryURL = URL(fileURLWithPath: cwd)
+                process.environment = ProcessInfo.processInfo.environment
+                let outPipe = Pipe()
+                let errPipe = Pipe()
+                process.standardOutput = outPipe
+                process.standardError = errPipe
+                do {
+                    try process.run()
+                    let outData = outPipe.fileHandleForReading.readDataToEndOfFile()
+                    let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
+                    process.waitUntilExit()
+                    let output = String(data: outData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                    let stderr = String(data: errData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                    continuation.resume(returning: (output, stderr, process.terminationStatus == 0))
+                } catch {
+                    continuation.resume(returning: ("", error.localizedDescription, false))
+                }
+            }
         }
     }
 
