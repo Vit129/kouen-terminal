@@ -745,28 +745,18 @@ final class GitPanelView: NSView {
     private struct GitResult { let output: String; let stderr: String; let success: Bool }
 
     private func runGitWithStatus(_ args: [String], in directory: String) async -> GitResult {
-        await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-                process.arguments = args
-                process.currentDirectoryURL = URL(fileURLWithPath: directory)
-                let outPipe = Pipe()
-                let errPipe = Pipe()
-                process.standardOutput = outPipe
-                process.standardError = errPipe
-                do {
-                    try process.run()
-                    let outData = outPipe.fileHandleForReading.readDataToEndOfFile()
-                    let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
-                    process.waitUntilExit()
-                    let output = String(data: outData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                    let stderr = String(data: errData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                    continuation.resume(returning: GitResult(output: output, stderr: stderr, success: process.terminationStatus == 0))
-                } catch {
-                    continuation.resume(returning: GitResult(output: "", stderr: error.localizedDescription, success: false))
-                }
+        do {
+            let client = DaemonClient()
+            let response = try client.request(.runGit(args: args, cwd: directory))
+            if case let .gitResult(output, stderr, success) = response {
+                return GitResult(output: output, stderr: stderr, success: success)
+            } else if case let .error(err) = response {
+                return GitResult(output: "", stderr: err, success: false)
+            } else {
+                return GitResult(output: "", stderr: "Unexpected daemon response", success: false)
             }
+        } catch {
+            return GitResult(output: "", stderr: error.localizedDescription, success: false)
         }
     }
 
