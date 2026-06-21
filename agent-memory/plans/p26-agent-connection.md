@@ -113,7 +113,7 @@ Daemon must be running. `harness-mcp` exits with a clear error if daemon socket 
 - [x] **A-2:** `harness-cli mcp setup|status|remove` — detects Claude Code / Kiro / Agy, writes mcpServers.harness (2026-06-21)
 - [x] **A-3:** Wire agents via `harness-cli mcp setup` (covered by A-0 UI + A-2 CLI) (2026-06-21)
 - [x] **A-4:** Updated `docs/AGENT-HANDBOOK.md` with MCP setup steps + config targets (2026-06-21)
-- [ ] **A-5:** Update tool count in `knowledge/architecture/mcp-server.md` (25 → 27, add agents category)
+- [x] **A-5:** Update `knowledge/architecture/mcp-server.md` — 27 tools, 6 categories, agent config wiring section (2026-06-21)
 
 ---
 
