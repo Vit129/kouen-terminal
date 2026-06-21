@@ -1,32 +1,23 @@
 # Context — harness-terminal
 
 ## Now
-- **Task:** Release 3.6.0 + agent-memory infrastructure normalization
+- **Task:** P26 AI chat — add model/agent selector (Claude default, Codex, Antigravity)
 - **Branch:** main
 - **Latest release:** v3.6.0 (build 161)
-- **Status:** complete
+- **Status:** done — builds clean
 
-## What Was Done This Session (2026-06-21)
-1. ✅ Released 3.6.0 (build 161) — P26 inline AI chat, P27 pane drag-and-drop, browser auto-retry
-2. ✅ Normalized agent-memory filenames to UPPERCASE across all 4 projects
-3. ✅ Updated all docs (CLAUDE.md, AGENTS.md, GEMINI.md) to reference UPPERCASE filenames
-4. ✅ Designed + implemented shared memory-protocol architecture:
-   - Canonical: `~/.claude/scripts/shared/memory-protocol.md`
-   - Delivery: symlink via `.ai/memory-protocol.md` per project
-   - Install: `~/.claude/scripts/install-memory-protocol.sh`
-5. ✅ Updated graphify, built, committed, pushed all repos
-
-## Open Questions
-- [open] `@.ai/memory-protocol.md` auto-include works for Claude Code only. Codex/Gemini/Kiro need explicit "read .ai/memory-protocol.md" instruction instead of `@` directive.
-- [open] 3 remaining crashes on 2026-06-17: zombie-view (same mechanism as RL-040). Not yet root-caused.
-- [open] Per-session-tab focus not restored on cmd+1/2/3. Partial fix not verified.
+## What Was Done
+- `AIQueryInputView.agentPill` → NSButton with ▾ indicator
+- Click pill → NSMenu popup with Claude/Codex/Gemini/Kiro (checkmark on active)
+- Selection → `onAgentChanged` callback → `AITerminalChatController.changeAgent()` → persists to settings.json via `settings.save()`
+- Next session respects saved choice (loaded from `settings.aiAgent.activeAgent`)
 
 ## Key Files
-- `~/.claude/scripts/shared/memory-protocol.md` — shared protocol (single source of truth)
-- `~/.claude/scripts/install-memory-protocol.sh` — installer
-- `agent-memory/knowledge/ui/browser-pane.md` — updated with auto-retry section
+- `Apps/Harness/Sources/HarnessApp/UI/AIChat/AIQueryInputView.swift` — pill button + menu
+- `Apps/Harness/Sources/HarnessApp/UI/AIChat/AITerminalChatController.swift` — wires callback, persists
+- `Packages/HarnessCore/Sources/HarnessCore/AI/AIAgentConfig.swift` — config model
+- `Packages/HarnessCore/Sources/HarnessCore/Settings/HarnessSettings.swift` — save()
 
 ## Session Notes
-- Build: `make preview` (uses `.harness-preview/` dir)
-- `swift build` passes clean on 3.6.0
-- Never reparent Metal terminal surfaces — causes black screen (RL-004)
+- Build: `make preview`
+- Read `agent-memory/knowledge/ai/terminal-chat.md` for P26 context

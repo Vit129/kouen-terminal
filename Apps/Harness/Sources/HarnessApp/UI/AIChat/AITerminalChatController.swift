@@ -67,6 +67,7 @@ final class AITerminalChatController {
         input.configure(agent: settings.aiAgent.activeAgent)
         input.onSubmit = { [weak self] text in self?.submit(text) }
         input.onDismiss = { [weak self] in self?.dismiss(clearBlocks: false) }
+        input.onAgentChanged = { [weak self] kind in self?.changeAgent(kind) }
 
         host.addSubview(input, positioned: .above, relativeTo: nil)
         NSLayoutConstraint.activate(inputConstraints(for: input, in: host))
@@ -83,6 +84,13 @@ final class AITerminalChatController {
             responseBlocks.forEach { $0.removeFromSuperview() }
             responseBlocks.removeAll()
         }
+    }
+
+    // MARK: - Agent switching
+
+    private func changeAgent(_ kind: AgentKind) {
+        settings.aiAgent.activeAgent = kind
+        try? settings.save()
     }
 
     // MARK: - Submit
