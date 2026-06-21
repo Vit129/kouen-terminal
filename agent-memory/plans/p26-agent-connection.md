@@ -1,6 +1,6 @@
 # P26 — Agent Connection: MCP + Terminal Chat (Warp-style)
 
-Status: **Design**
+Status: **DONE** (Path A + B shipped 2026-06-21, PR #28 merged to main)
 Priority: MCP wiring = P1 (config-only) · Terminal Chat = P1 (core feature) · ACP sidebar = P3 (deferred)
 Created: 2026-06-21
 Depends on: P12 (MCP shipped), P5 (ACP code preserved)
@@ -252,14 +252,14 @@ Keybinding is rebindable via normal Harness keybinding config.
 
 ### Phase B PBIs
 
-- [ ] **B-1:** `AgentProcessManager` — PATH resolution via login shell, spawn CLI with `-p`/`exec`, stream stdout, crash handle
-- [ ] **B-2:** `AIQueryInputView` — NSView input bar, bottom-pinned to terminal pane, Esc/Enter
-- [ ] **B-3:** `AIResponseBlockView` — streaming text render, fenced code block detection, [▶ Run] [⎘ Copy] [✕ Dismiss]
-- [ ] **B-4:** `AITerminalChatController` — orchestrates B-1/B-2/B-3 on `HarnessTerminalSurfaceView`
-- [ ] **B-5:** Context injection — last 80 pane lines via `TerminalEmulator.plainText()` → stdin
-- [ ] **B-6:** `AgentKind` + `AIAgentConfig` in `HarnessSettings`, per-workspace storage
-- [ ] **B-7:** `⌘I` keybinding → new `Command.openAIChat` → `CommandIPCTranslator` + `MainExecutor`
-- [ ] **B-8:** Settings → AI tab: agent picker, binary path auto-detect + override, keybinding
+- [x] **B-1:** `AgentProcessManager` — PATH resolution via login shell, spawn CLI with `-p`/`exec`, stream stdout (2026-06-21)
+- [x] **B-2:** `AIQueryInputView` — NSView input bar, bottom-pinned to terminal pane, Esc/Enter (2026-06-21)
+- [x] **B-3:** `AIResponseBlockView` — streaming text render, fenced code block detection, [▶ Run] [⎘ Copy] [✕ Dismiss] (2026-06-21)
+- [x] **B-4:** `AITerminalChatController` — @MainActor orchestrator on `TerminalHostView` (2026-06-21)
+- [x] **B-5:** Context injection — `captureVisibleLines(maxLines:)` → stdin (2026-06-21)
+- [x] **B-6:** `AIAgentConfig` in `HarnessSettings.aiAgent`, per-session config (2026-06-21)
+- [x] **B-7:** `⌘I` → `Command.openAIChat` → `CommandIPCTranslator` + `MainExecutor` + `KeyTable.defaults` (2026-06-21)
+- [ ] **B-8:** Settings → AI tab: agent picker, binary path override, keybinding display (deferred)
 
 ---
 
