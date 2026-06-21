@@ -9,7 +9,8 @@ public struct GitMetadataProvider: MetadataProvider {
 
     public func refresh(tab: Tab) -> Tab {
         var updated = tab
-        updated.gitBranch = Self.currentBranch(at: tab.cwd)
+        let probePath = tab.worktreePath ?? tab.cwd
+        updated.gitBranch = Self.currentBranch(at: probePath)
         return updated
     }
 
