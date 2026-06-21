@@ -26,7 +26,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
     /// the divider; when the sidebar is collapsed it's gone with it (re-open via ⌘\).
     /// Flat `.plain` style + 30×30 so it matches the neighbouring notification bell.
     private let sidebarToggleButton = SoftIconButton(frame: NSRect(x: 0, y: 0, width: 30, height: 30))
-    private let sidebarTabs = NSSegmentedControl(labels: ["Sessions", "Files"], trackingMode: .selectOne, target: nil, action: nil)
+    private let sidebarTabs = NSSegmentedControl(labels: ["Sessions", "Files", "Git"], trackingMode: .selectOne, target: nil, action: nil)
 #if HARNESS_ACP
     private let agentChatPanel = AgentChatPanelView()
 #endif
@@ -950,7 +950,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
 
     /// Switches the sidebar to the Git tab (used by the "Show Git Panel" ⌘G shortcut).
     func selectGitTab() {
-        sidebarTabs.selectedSegment = -1
+        sidebarTabs.selectedSegment = 2
         selectSidebarTab(index: 2)
     }
 
