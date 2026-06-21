@@ -46,7 +46,7 @@ For this repo, common triggers include SwiftUI/AppKit/macOS (`macos-swiftui`), S
 ## Project context (auto-loaded every session)
 
 - @agent-memory/CONTEXT.md
-- @agent-memory/index.md
+- @agent-memory/INDEX.md
 
 ## Project context lookup
 
@@ -56,7 +56,7 @@ For this repo, common triggers include SwiftUI/AppKit/macOS (`macos-swiftui`), S
 - `graphify-out/.graphify_labels.json` — readable community labels for the graph.
 - `agent-memory/CONTEXT.md` — current session state: active task, plan, key files (rewrite every session).
 - `agent-memory/MEMORY.md` — persistent decisions + lessons (append-only).
-- `agent-memory/index.md` — catalog of plans + knowledge.
+- `agent-memory/INDEX.md` — catalog of plans + knowledge.
 - `agent-memory/PLAYBOOK.md` — reusable fix patterns and prevention notes (on-demand).
 - `agent-memory/knowledge/` — durable domain notes for architecture areas such as IPC, AppKit/Metal, ACP, split panes, and git panel behavior.
 
