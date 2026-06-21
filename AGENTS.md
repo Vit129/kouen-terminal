@@ -41,7 +41,7 @@ make clean        # remove build artifacts, Harness.app, dist/
 - `graphify-out/.graphify_labels.json` — readable community labels for the graph.
 - `agent-memory/MEMORY.md` — hot state: active decisions, recent lessons, and current task context.
 - `agent-memory/PLAYBOOK.md` — reusable fix patterns and prevention notes.
-- `agent-memory/user-profile.md` — stable user preferences for style, testing, and workflow.
+- `agent-memory/USER-PROFILE.md` — stable user preferences for style, testing, and workflow.
 - `agent-memory/knowledge/` — durable domain notes for architecture areas such as IPC, AppKit/Metal, ACP, split panes, and git panel behavior.
 
 ## Graphify + agent-memory
