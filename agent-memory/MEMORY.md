@@ -25,6 +25,9 @@
 - Top bar always shows branch (⎇) even when agent active — only hides cwd path
 - Worktree auto-isolate is ALWAYS ON (not config-gated) — every branch switch → own worktree → correct git probe per tab
 - ⌘⇧I toggles the Agent Notch panel for selecting the notifying agent; ⌘⇧U opens the notifications inbox; persistent peek stays until user action
+- [2026-06-21] agent-memory/ UPPERCASE convention: top-level = UPPERCASE (MEMORY.md, PLAYBOOK.md, INDEX.md), subdirs (knowledge/, plans/) = lowercase kebab-case
+- [2026-06-21] Shared memory protocol: single canonical `~/.claude/scripts/shared/memory-protocol.md` → symlinked into each project as `.ai/memory-protocol.md` → agent docs include via `@.ai/memory-protocol.md`
+- [2026-06-21] `@` auto-include only works in Claude Code — Codex/Gemini/Kiro need explicit read instruction in their agent docs
 
 ## Lessons
 - RL-004: Never reparent Metal terminal surfaces — 1-2s black screen (CASE-003)
