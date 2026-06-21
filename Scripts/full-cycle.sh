@@ -85,6 +85,14 @@ TAG="v${NEW_VERSION}"
 # Read changelog for this version (between first two ## headers)
 NOTES="$(sed -n "/^## \[${NEW_VERSION}\]/,/^## \[/{/^## \[${NEW_VERSION}\]/d;/^## \[/d;p}" CHANGELOG.md 2>/dev/null)" || NOTES=""
 if [[ -z "$NOTES" ]]; then
+  echo ""
+  echo "⚠️  No CHANGELOG entry found for ${TAG}."
+  echo "   Release notes will be empty on GitHub."
+  echo "   Tip: add ## [${NEW_VERSION}] section to CHANGELOG.md before running full-cycle."
+  if [[ -t 0 ]]; then
+    read -r -p "   Continue anyway? [y/N] " confirm
+    [[ "${confirm,,}" == "y" ]] || { echo "Aborted."; exit 1; }
+  fi
   NOTES="Release ${TAG}"
 fi
 
