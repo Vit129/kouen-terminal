@@ -1,6 +1,7 @@
 # Memory — harness-terminal
 
 ## Decisions
+- [2026-06-24] presentsWithTransaction order fix: must be set BEFORE drawableSize changes in layout(). viewWillMove(toWindow:nil) resets the flag, so external setPresentsWithTransaction(true) calls don't survive removeFromSuperview(). The fix in layout() covers all callers.
 - ACP shelved — re-enable when adapters ship with agent CLIs natively
 - No built-in AI chat view — Harness connects AI via CLI agents (Claude Code, Codex) running in terminal + ACP (like MCP). Removed HarnessAIChatView and SearchPanelView sidebar tabs.
 - AI connectivity model: (1) harness-mcp = MCP server that CLI agents call to interact with terminal sessions, (2) ACP = LSP-style framing for agent→daemon notifications (hook events, waiting state). Same pattern as Zed/SupaCode context providers.
