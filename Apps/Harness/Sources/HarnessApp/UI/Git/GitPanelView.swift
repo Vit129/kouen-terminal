@@ -503,7 +503,7 @@ final class GitPanelView: NSView {
     }
 
     @objc private func removeWorktreeAction(_ sender: NSButton) {
-        guard let path = currentPath, let worktreePath = sender.toolTip else { return }
+        guard let path = currentPath, let worktreePath = sender.identifier?.rawValue else { return }
         Task {
             await SessionCoordinator.shared.closeTabs(under: worktreePath)
             _ = await runGit(["worktree", "remove", worktreePath], in: path)
@@ -517,7 +517,12 @@ final class GitPanelView: NSView {
     }
 
     @objc private func openWorktree(_ sender: NSClickGestureRecognizer) {
-        guard let path = sender.view?.identifier?.rawValue else { return }
+        guard let card = sender.view, let path = card.identifier?.rawValue else { return }
+        // Don't intercept clicks on the remove button (RL-043)
+        let loc = sender.location(in: card)
+        for sub in card.subviews where sub is NSButton {
+            if sub.frame.contains(loc) { return }
+        }
         let coordinator = SessionCoordinator.shared
         guard let surfaceID = coordinator.activeSurfaceID else { return }
         coordinator.requestDaemon(.sendKeys(surfaceID: surfaceID.uuidString, keys: ["cd \(path)", "Enter"]))
@@ -890,6 +895,7 @@ final class GitPanelView: NSView {
         let branch: String
         let isMain: Bool
         let isLocked: Bool
+        let isMerged: Bool
     }
 
     private func makeStatusBadge(letter: String, color: NSColor) -> NSView {
@@ -1100,16 +1106,18 @@ final class GitPanelView: NSView {
         titleRow.spacing = 5
         titleRow.translatesAutoresizingMaskIntoConstraints = false
 
-        let meta = NSTextField(labelWithString: worktree.branch)
+        let meta = NSTextField(labelWithString: worktree.isMerged ? "✓ merged · \(worktree.branch)" : worktree.branch)
         meta.font = .systemFont(ofSize: 10)
-        meta.textColor = HarnessDesign.chrome.textTertiary
+        meta.textColor = worktree.isMerged ? NSColor.systemGreen : HarnessDesign.chrome.textTertiary
         meta.lineBreakMode = .byTruncatingTail
         meta.translatesAutoresizingMaskIntoConstraints = false
 
         let removeButton = NSButton(title: "✕", target: self, action: #selector(removeWorktreeAction(_:)))
         removeButton.bezelStyle = .recessed; removeButton.controlSize = .small
         removeButton.font = .systemFont(ofSize: 11, weight: .medium)
-        removeButton.toolTip = worktree.path
+        removeButton.toolTip = worktree.isMerged ? "Remove (merged — safe to delete)" : "Remove (has unmerged commits)"
+        removeButton.contentTintColor = worktree.isMerged ? .systemGreen : .systemOrange
+        removeButton.identifier = NSUserInterfaceItemIdentifier(worktree.path)
         removeButton.isHidden = worktree.isMain
         removeButton.translatesAutoresizingMaskIntoConstraints = false
 
@@ -1223,20 +1231,27 @@ final class GitPanelView: NSView {
             let isLocked = lines.contains { line in
                 line == "locked" || line.hasPrefix("locked ")
             }
-            return WorktreeEntry(path: worktreePath, head: head, branch: branch, isMain: index == 0, isLocked: isLocked)
+            return WorktreeEntry(path: worktreePath, head: head, branch: branch, isMain: index == 0, isLocked: isLocked, isMerged: false)
         }
 
-        let header = makeWorktreesSectionHeader(count: entries.count)
+        // Check which branches are merged into main
+        let mergedOutput = await runGit(["branch", "--merged", "main", "--format=%(refname:short)"], in: path)
+        let mergedBranches = Set(mergedOutput.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty })
+        let finalEntries = entries.map { entry in
+            WorktreeEntry(path: entry.path, head: entry.head, branch: entry.branch, isMain: entry.isMain, isLocked: entry.isLocked, isMerged: mergedBranches.contains(entry.branch))
+        }
+
+        let header = makeWorktreesSectionHeader(count: finalEntries.count)
         worktreesStack.addArrangedSubview(header)
         header.leadingAnchor.constraint(equalTo: worktreesStack.leadingAnchor).isActive = true
         header.trailingAnchor.constraint(equalTo: worktreesStack.trailingAnchor).isActive = true
 
         if !worktreesExpanded {
             return
-        } else if entries.isEmpty {
+        } else if finalEntries.isEmpty {
             worktreesStack.addArrangedSubview(makeLabel("No worktrees"))
         } else {
-            for entry in entries {
+            for entry in finalEntries {
                 let row = makeWorktreeRow(entry)
                 worktreesStack.addArrangedSubview(row)
                 row.leadingAnchor.constraint(equalTo: worktreesStack.leadingAnchor).isActive = true
