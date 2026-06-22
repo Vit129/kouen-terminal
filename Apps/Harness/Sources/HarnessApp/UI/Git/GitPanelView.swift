@@ -9,6 +9,7 @@ final class GitPanelView: NSView {
     /// Bumped on every `refresh()` call so a slower, stale refresh can detect
     /// that a newer one has superseded it and discard its results.
     private var refreshGeneration = 0
+    private var lastWorktreeOutput = ""
     private nonisolated(unsafe) var watchStream: FSEventStreamRef?
     private nonisolated(unsafe) var contextPointer: UnsafeMutableRawPointer?
     private nonisolated(unsafe) var watchDebounce: DispatchWorkItem?
@@ -542,6 +543,7 @@ final class GitPanelView: NSView {
                 errAlert.informativeText = result.stderr.isEmpty ? result.output : result.stderr
                 errAlert.runModal()
             }
+            lastWorktreeOutput = "" // force rebuild
             await refresh()
         }
     }
@@ -1234,6 +1236,10 @@ final class GitPanelView: NSView {
         guard let path = currentPath else { return }
         let output = await runGit(["worktree", "list", "--porcelain"], in: path)
         guard generation == refreshGeneration else { return }
+
+        // Skip rebuild if nothing changed (prevents flicker from FSEvent re-triggers)
+        if output == lastWorktreeOutput { return }
+        lastWorktreeOutput = output
 
         worktreesStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
 
