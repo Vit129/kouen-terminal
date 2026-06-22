@@ -1,5 +1,43 @@
 import Foundation
 
+// MARK: - SnapshotChangedPayload
+
+/// Typed payload for the `snapshotChanged` notification, replacing the stringly-typed
+/// userInfo dictionary. Consumers read this via `Notification.snapshotPayload`.
+public struct SnapshotChangedPayload: Sendable {
+    /// IPC revision from the daemon. Used by SessionCoordinator for deduplication.
+    public let revision: Int
+    /// True when the pane tree structure changed (split/close/switch). Consumers that
+    /// rebuild expensive layout should gate on this.
+    public let structureChanged: Bool
+    /// True when only metadata (agent badges, cwd, status) changed — no pane rebuild needed.
+    public let metadataOnly: Bool
+    /// True when the active theme or opacity changed and renderers should repaint.
+    public let chromeChanged: Bool
+
+    public init(revision: Int, structureChanged: Bool, metadataOnly: Bool, chromeChanged: Bool) {
+        self.revision = revision
+        self.structureChanged = structureChanged
+        self.metadataOnly = metadataOnly
+        self.chromeChanged = chromeChanged
+    }
+}
+
+// MARK: - Notification typed accessor
+
+public extension Notification {
+    /// Returns the typed `SnapshotChangedPayload` posted by `NotificationBus`.
+    /// Falls back to safe conservative defaults for revision-only pings from DaemonClient
+    /// (structureChanged=true, metadataOnly=false) so old-path consumers remain correct.
+    var snapshotPayload: SnapshotChangedPayload {
+        if let p = userInfo?["payload"] as? SnapshotChangedPayload { return p }
+        let revision = userInfo?["revision"] as? Int ?? 0
+        return SnapshotChangedPayload(revision: revision, structureChanged: true, metadataOnly: false, chromeChanged: true)
+    }
+}
+
+// MARK: - NotificationBus
+
 /// @unchecked Sendable: the subscriber table is guarded by `lock`; posts hop to the main queue.
 public final class NotificationBus: @unchecked Sendable {
     public static let shared = NotificationBus()
@@ -37,6 +75,20 @@ public final class NotificationBus: @unchecked Sendable {
         }
     }
 
+    /// Post a full typed payload (called by DaemonSyncService and other in-process sources).
+    public func postSnapshotChanged(_ payload: SnapshotChangedPayload) {
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(
+                name: self.snapshotChanged,
+                object: nil,
+                userInfo: ["payload": payload, "revision": payload.revision]
+            )
+        }
+    }
+
+    /// Low-level ping from DaemonClient: daemon reports a new revision but we haven't
+    /// fetched or applied the snapshot yet. Carries only `revision` so SessionCoordinator
+    /// can schedule a sync and deduplicate in-flight requests.
     public func postSnapshotChanged(revision: Int) {
         DispatchQueue.main.async {
             NotificationCenter.default.post(

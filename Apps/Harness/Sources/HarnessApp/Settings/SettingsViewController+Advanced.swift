@@ -191,14 +191,12 @@ extension SettingsViewController {
         advValues[key] = rawValue
         HarnessOptions.reloadFromDisk()
         // Nudge the status line + chrome to re-read the new option value.
-        NotificationCenter.default.post(
-            name: NotificationBus.shared.snapshotChanged,
-            object: nil,
-            userInfo: ["revision": SessionCoordinator.shared.snapshot.revision,
-                       "structureChanged": false,
-                       "chromeChanged": false,
-                       "metadataOnly": true]
-        )
+        NotificationBus.shared.postSnapshotChanged(SnapshotChangedPayload(
+            revision: SessionCoordinator.shared.snapshot.revision,
+            structureChanged: false,
+            metadataOnly: true,
+            chromeChanged: false
+        ))
     }
 
     func settingsCaption(_ text: String) -> NSTextField {

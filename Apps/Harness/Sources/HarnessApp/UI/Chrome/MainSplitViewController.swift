@@ -197,8 +197,9 @@ final class MainSplitViewController: NSViewController {
     }
 
     @objc private func snapshotChanged(_ note: Notification) {
-        let metadataOnly = note.userInfo?["metadataOnly"] as? Bool ?? false
-        if note.userInfo?["chromeChanged"] as? Bool == true {
+        let payload = note.snapshotPayload
+        let metadataOnly = payload.metadataOnly
+        if payload.chromeChanged {
             // Cross-dissolve the chrome (theme switch) instead of a hard color pop.
             // Re-arming the flag per cascade means rapid successive switches just
             // restart the fade rather than queueing.

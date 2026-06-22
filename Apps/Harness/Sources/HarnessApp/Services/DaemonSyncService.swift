@@ -363,16 +363,12 @@ final class DaemonSyncService {
         coord.syncWaitingRings()
         coord.notificationCoordinator.updateDockBadge(from: remote)
         coord.reflectRemoteActivePane()
-        NotificationCenter.default.post(
-            name: NotificationBus.shared.snapshotChanged,
-            object: nil,
-            userInfo: [
-                "revision": remote.revision,
-                "structureChanged": structureChanged,
-                "chromeChanged": !metadataOnly,
-                "metadataOnly": metadataOnly,
-            ]
-        )
+        NotificationBus.shared.postSnapshotChanged(SnapshotChangedPayload(
+            revision: remote.revision,
+            structureChanged: structureChanged,
+            metadataOnly: metadataOnly,
+            chromeChanged: !metadataOnly
+        ))
     }
 
     func applyLocalSnapshot(_ updated: SessionSnapshot) {

@@ -59,7 +59,7 @@ final class SessionCoordinator: NSObject {
     }
 
     @objc private func snapshotChangedNotification(_ note: Notification) {
-        let revision = note.userInfo?["revision"] as? Int ?? -1
+        let revision = note.snapshotPayload.revision
         guard revision != daemonSyncService.lastRevision,
               revision != daemonSyncService.pendingSnapshotRevision else { return }
         daemonSyncService.pendingSnapshotRevision = revision
