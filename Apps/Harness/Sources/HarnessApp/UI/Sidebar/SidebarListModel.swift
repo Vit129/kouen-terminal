@@ -45,6 +45,7 @@ final class SidebarListModel {
     var activeSessionID: SessionID?
     var activeWorkspaceID: WorkspaceID?
     private(set) var sessions: [SessionGroup] = []
+    private var isRebuilding = false
 
     var collapsedGroups = Set<String>()
     var collapsedWorktreeGroups = Set<String>()
@@ -142,6 +143,9 @@ final class SidebarListModel {
     // MARK: - Row rebuild
 
     private func rebuildRows() {
+        guard !isRebuilding else { return }
+        isRebuilding = true
+        defer { isRebuilding = false }
         var groupMap: [String: Int] = [:]
         var groups: [(name: String, rootPath: String, firstIndex: Int, sessions: [SessionGroup])] = []
         for (index, session) in sessions.enumerated() {
@@ -218,6 +222,7 @@ final class SidebarListModel {
                 let root = await self.resolveGitRepoRoot(for: path)
                 self.repoRootCache[path] = (repoRoot: root, fetchedAt: Date())
                 self.repoRootUpdatesInProgress.remove(path)
+                // Safe to rebuild: cache is now populated so gitRepoRoot won't spawn new Tasks
                 self.rebuildRows()
             }
         }
