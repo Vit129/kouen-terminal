@@ -503,26 +503,8 @@ final class GitPanelView: NSView {
     }
 
     @objc private func removeWorktreeAction(_ sender: NSButton) {
-        guard let path = currentPath, let worktreePath = sender.identifier?.rawValue else { return }
-        let alert = NSAlert()
-        alert.messageText = "Remove worktree?"
-        alert.informativeText = worktreePath
-        alert.addButton(withTitle: "Remove")
-        alert.addButton(withTitle: "Cancel")
-        alert.alertStyle = .warning
-        alert.buttons.first?.keyEquivalent = ""  // RL-032: don't bind Enter to destructive
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
-        Task {
-            await SessionCoordinator.shared.closeTabs(under: worktreePath)
-            let result = await runGitWithStatus(["worktree", "remove", "--force", worktreePath], in: path)
-            if !result.success {
-                let errAlert = NSAlert()
-                errAlert.messageText = "Failed to remove worktree"
-                errAlert.informativeText = result.stderr.isEmpty ? result.output : result.stderr
-                errAlert.runModal()
-            }
-            await refresh()
-        }
+        guard let worktreePath = sender.identifier?.rawValue else { return }
+        removeWorktreeAction(path: worktreePath)
     }
 
     @objc private func toggleWorktreesSection() {
@@ -532,14 +514,36 @@ final class GitPanelView: NSView {
 
     @objc private func openWorktree(_ sender: NSClickGestureRecognizer) {
         guard let card = sender.view, let path = card.identifier?.rawValue else { return }
-        // Skip if click landed on the remove button
-        let loc = sender.location(in: card)
-        for sub in card.subviews {
-            if sub.identifier?.rawValue != nil, sub is NSButton, sub.frame.contains(loc) { return }
-        }
+        cdToWorktree(path)
+    }
+
+    private func cdToWorktree(_ path: String) {
         let coordinator = SessionCoordinator.shared
         guard let surfaceID = coordinator.activeSurfaceID else { return }
         coordinator.requestDaemon(.sendKeys(surfaceID: surfaceID.uuidString, keys: ["cd \(path)", "Enter"]))
+    }
+
+    private func removeWorktreeAction(path worktreePath: String) {
+        guard let repoPath = currentPath else { return }
+        let alert = NSAlert()
+        alert.messageText = "Remove worktree?"
+        alert.informativeText = worktreePath
+        alert.addButton(withTitle: "Remove")
+        alert.addButton(withTitle: "Cancel")
+        alert.alertStyle = .warning
+        alert.buttons.first?.keyEquivalent = ""
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        Task {
+            await SessionCoordinator.shared.closeTabs(under: worktreePath)
+            let result = await runGitWithStatus(["worktree", "remove", "--force", worktreePath], in: repoPath)
+            if !result.success {
+                let errAlert = NSAlert()
+                errAlert.messageText = "Failed to remove worktree"
+                errAlert.informativeText = result.stderr.isEmpty ? result.output : result.stderr
+                errAlert.runModal()
+            }
+            await refresh()
+        }
     }
 
     @objc private func showCommitDetail(_ sender: Any) {
@@ -1077,7 +1081,9 @@ final class GitPanelView: NSView {
     }
 
     private func makeWorktreeRow(_ worktree: WorktreeEntry) -> NSView {
-        let card = NSView()
+        let card = WorktreeCardView()
+        card.onSelect = { [weak self] in self?.cdToWorktree(worktree.path) }
+        card.onClose = { [weak self] in self?.removeWorktreeAction(path: worktree.path) }
         card.wantsLayer = true
         card.translatesAutoresizingMaskIntoConstraints = false
         card.identifier = NSUserInterfaceItemIdentifier(worktree.path)
@@ -1089,11 +1095,9 @@ final class GitPanelView: NSView {
             card.layer?.borderWidth = 1
         }
 
-        // No gesture recognizer — remove button uses target/action directly
-        // For cd: click anywhere except the ✕ button
+        // Click handling: use mouseUp on card (same as BrowserTabButton pattern)
+        // SoftIconButton is isTransparent=true so target/action won't fire — handle in mouseUp
         card.identifier = NSUserInterfaceItemIdentifier(worktree.path)
-        let tap = NSClickGestureRecognizer(target: self, action: #selector(openWorktree(_:)))
-        card.addGestureRecognizer(tap)
 
         let name = NSTextField(labelWithString: HarnessDesign.shortenPath(worktree.path))
         name.font = .systemFont(ofSize: 12, weight: .bold)
@@ -1451,5 +1455,25 @@ extension GitPanelView: NSGestureRecognizerDelegate {
             }
         }
         return true
+    }
+}
+
+
+// MARK: - WorktreeCardView (mouseUp pattern — same as BrowserTabButton)
+
+private final class WorktreeCardView: NSView {
+    var onSelect: (() -> Void)?
+    var onClose: (() -> Void)?
+
+    override func mouseUp(with event: NSEvent) {
+        let loc = convert(event.locationInWindow, from: nil)
+        // Check if click landed on the remove button (SoftIconButton)
+        for sub in subviews where sub is SoftIconButton {
+            if sub.frame.contains(loc) {
+                onClose?()
+                return
+            }
+        }
+        onSelect?()
     }
 }
