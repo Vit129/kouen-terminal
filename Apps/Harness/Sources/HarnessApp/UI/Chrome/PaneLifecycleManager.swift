@@ -10,12 +10,6 @@ final class PaneLifecycleManager {
     private unowned let containerView: NSView
 
     private(set) var paneContainer: PaneContainerView?
-    /// Holds the previous container for one runloop cycle after removal so AppKit's pending
-    /// layout/display passes complete before ARC deallocates the view tree (RL-040/041).
-    private var retiredContainer: PaneContainerView?
-    /// Hosts detached during rebuild — held 1.5s so in-flight AppKit events drain (RL-040/041).
-    private var retiredHosts: [TerminalHostView] = []
-
     private var lastStructureKey = ""
     var pendingReload: Bool?
 
@@ -58,16 +52,10 @@ final class PaneLifecycleManager {
         paneContainer?.detachHostsOnly()
 
         let detached = Array(existingHosts.values)
-        retiredHosts.append(contentsOf: detached)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
-            guard let self else { return }
-            self.retiredHosts.removeAll { host in detached.contains { $0 === host } }
-        }
+        for host in detached { ZombieHoldRegistry.shared.hold(host) }
 
-        let oldContainer = paneContainer
+        if let old = paneContainer { ZombieHoldRegistry.shared.hold(old) }
         paneContainer?.removeFromSuperview()
-        retiredContainer = oldContainer
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in self?.retiredContainer = nil }
 
         let container = PaneContainerView(
             node: displayNode,

@@ -412,18 +412,13 @@ final class PaneContainerView: NSView {
         browserController.detachBrowsers(in: self)
     }
 
-    private static var retiredHosts: [TerminalHostView] = []
-
     private func detachHosts(in view: NSView) {
         for sub in view.subviews {
             if let host = sub as? TerminalHostView {
                 host.resignIfFirstResponder()
                 host.stopSurfaceDisplayLink()
                 host.removeFromSuperview()
-                Self.retiredHosts.append(host)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                    Self.retiredHosts.removeAll { $0 === host }
-                }
+                ZombieHoldRegistry.shared.hold(host)
             } else {
                 detachHosts(in: sub)
             }

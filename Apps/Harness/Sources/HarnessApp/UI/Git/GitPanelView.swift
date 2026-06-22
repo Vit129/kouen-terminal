@@ -1400,13 +1400,9 @@ private final class StageToggleButton: NSButton {
 
 private final class FlippedView: NSView {
     nonisolated override var isFlipped: Bool { true }
-    private static var retired: [FlippedView] = []
     override func removeFromSuperview() {
-        Self.retired.append(self)
+        ZombieHoldRegistry.shared.hold(self)
         super.removeFromSuperview()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            Self.retired.removeAll { $0 === self }
-        }
     }
 }
 

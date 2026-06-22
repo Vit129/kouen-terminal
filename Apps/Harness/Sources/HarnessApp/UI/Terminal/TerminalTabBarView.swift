@@ -44,9 +44,6 @@ final class TerminalTabBarView: NSView {
     private var activeTabID: TabID?
     private var pillsByID: [TabID: TabPillView] = [:]
     private var orderedPills: [TabPillView] = []
-    /// Retired pills kept alive for one runloop tick so AppKit's pending tracking-area
-    /// and layout passes complete before ARC frees them (prevents UAF crash).
-    private var retiredPills: [TabPillView] = []
 
     // Layout metrics.
     private let edgeInset: CGFloat = 10
@@ -132,10 +129,8 @@ final class TerminalTabBarView: NSView {
         pillsByID.removeAll(keepingCapacity: true)
         draggingPill = nil
         dragTargetIndex = nil
-        // Defer dealloc: AppKit may still have pending tracking-area or layout
-        // dispatches targeting the removed pills. Keep them alive one tick.
-        retiredPills = oldPills
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.retiredPills.removeAll() }
+        // RL-041: keep pills alive 0.5s (keyUp arrives in a later event-loop iteration).
+        for pill in oldPills { ZombieHoldRegistry.shared.hold(pill, duration: 0.5) }
 
         for (index, tab) in tabs.enumerated() {
             let id = tab.id
@@ -232,20 +227,13 @@ final class TerminalTabBarView: NSView {
     /// RL-040: Prevent deallocation while AppKit's display server still holds an unsafe
     /// reference and can dispatch layout() to this view. The @objc thunk dereferences `self`
     /// metadata before any Swift guard can run.
-    private static var retiredBars: [TerminalTabBarView] = []
-
     override func viewWillMove(toWindow newWindow: NSWindow?) {
         if newWindow == nil {
-            // Cancel any pending layout/display passes.
             NSObject.cancelPreviousPerformRequests(withTarget: self)
             needsLayout = false
             needsDisplay = false
-            // Hold self alive for 1.5s so AppKit's async layout drain completes.
-            Self.retiredBars.append(self)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
-                guard let self else { return }
-                Self.retiredBars.removeAll { $0 === self }
-            }
+            // Hold self alive for 1.5s so AppKit's async layout drain completes (RL-040).
+            ZombieHoldRegistry.shared.hold(self)
         }
         super.viewWillMove(toWindow: newWindow)
     }
