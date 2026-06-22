@@ -76,25 +76,31 @@ else
   ./Scripts/commit-push.sh
 fi
 
-# Step 5: Tag + GitHub release.
+# Step 5: Generate CHANGELOG + tag + GitHub release via git-cliff.
 echo ""
-echo "▶ Step 5: Tagging and creating GitHub release..."
+echo "▶ Step 5: Generating CHANGELOG and creating GitHub release..."
 NEW_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$ROOT/Apps/Harness/Sources/HarnessApp/Resources/Info.plist")"
 TAG="v${NEW_VERSION}"
 
-# Read changelog for this version (between first two ## headers)
-NOTES="$(sed -n "/^## \[${NEW_VERSION}\]/,/^## \[/{/^## \[${NEW_VERSION}\]/d;/^## \[/d;p}" CHANGELOG.md 2>/dev/null)" || NOTES=""
-if [[ -z "$NOTES" ]]; then
-  echo ""
-  echo "⚠️  No CHANGELOG entry found for ${TAG}."
-  echo "   Release notes will be empty on GitHub."
-  echo "   Tip: add ## [${NEW_VERSION}] section to CHANGELOG.md before running full-cycle."
-  if [[ -t 0 ]]; then
-    read -r -p "   Continue anyway? [y/N] " confirm
-    [[ "$(echo "$confirm" | tr '[:upper:]' '[:lower:]')" == "y" ]] || { echo "Aborted."; exit 1; }
-  fi
-  NOTES="Release ${TAG}"
+if ! command -v git-cliff &>/dev/null; then
+  echo "❌ git-cliff not found. Install with: brew install git-cliff"
+  exit 1
 fi
+
+# Generate full CHANGELOG.md from all tags
+git-cliff --tag "$TAG" --output CHANGELOG.md
+
+# Generate release notes for this tag only (since previous tag)
+PREV_TAG="$(git tag --sort=-v:refname | grep -v "^${TAG}$" | head -1)"
+if [[ -n "$PREV_TAG" ]]; then
+  NOTES="$(git-cliff "${PREV_TAG}..${TAG}" --strip header 2>/dev/null)" || NOTES="Release ${TAG}"
+else
+  NOTES="$(git-cliff --tag "$TAG" --strip header 2>/dev/null)" || NOTES="Release ${TAG}"
+fi
+
+# Commit the updated CHANGELOG
+git add CHANGELOG.md
+git commit -m "chore(release): update CHANGELOG for ${TAG}" || true
 
 git tag -f "$TAG" -m "$TAG"
 git push origin main
