@@ -3,6 +3,7 @@
 > **Goal:** Replace NSTableView-based session list with SwiftUI List to permanently eliminate row-index race crashes.
 > **Estimated:** 4-6 hours
 > **Prerequisite:** None (standalone refactor)
+> **Status:** ✅ DONE (2026-06-23)
 
 ---
 

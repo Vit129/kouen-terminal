@@ -16,6 +16,7 @@
 
 | Plan | Status | Notes |
 |------|--------|-------|
+| Sidebar SwiftUI Migration (Option B) | Done | NSTableView → SwiftUI List; RL-051 crash class eliminated; VC 1676→890 lines (~47KB reduction); @Observable model + NSHostingView bridge |
 | P27 — Pane Drag-and-Drop | Done | Drag grip → drop zone overlay (L/R/T/B/Center) → swapPanes / joinPane with `before` param |
 | P26 — Agent Connection | Done | Path A: harness-mcp (existing), Path B: ⌘I inline AI chat (PR #28). ACP remains shelved. |
 | P4 — LSP + Code Viewing | Done | `harnessErrors` MCP tool surfaces LSP diagnostics to agents |
