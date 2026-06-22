@@ -504,9 +504,23 @@ final class GitPanelView: NSView {
 
     @objc private func removeWorktreeAction(_ sender: NSButton) {
         guard let path = currentPath, let worktreePath = sender.identifier?.rawValue else { return }
+        let alert = NSAlert()
+        alert.messageText = "Remove worktree?"
+        alert.informativeText = worktreePath
+        alert.addButton(withTitle: "Remove")
+        alert.addButton(withTitle: "Cancel")
+        alert.alertStyle = .warning
+        alert.buttons.first?.keyEquivalent = ""  // RL-032: don't bind Enter to destructive
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
         Task {
             await SessionCoordinator.shared.closeTabs(under: worktreePath)
-            _ = await runGit(["worktree", "remove", worktreePath], in: path)
+            let result = await runGitWithStatus(["worktree", "remove", "--force", worktreePath], in: path)
+            if !result.success {
+                let errAlert = NSAlert()
+                errAlert.messageText = "Failed to remove worktree"
+                errAlert.informativeText = result.stderr.isEmpty ? result.output : result.stderr
+                errAlert.runModal()
+            }
             await refresh()
         }
     }
