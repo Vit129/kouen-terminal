@@ -1,4 +1,5 @@
 import Foundation
+import HarnessIPC
 
 /// Renders `[AgentSessionSummary]` into the `harness-cli list-agents` text output —
 /// tab-separated lines. Lives in HarnessCore (not the CLI) so the formatting is

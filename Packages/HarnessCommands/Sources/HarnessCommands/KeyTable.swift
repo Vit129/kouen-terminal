@@ -1,4 +1,5 @@
 import Foundation
+import HarnessIPC
 
 /// Named registries of (KeySpec → Command). Tables let us model the
 /// multiplexer's stateful key handling: while the user is in copy mode,
