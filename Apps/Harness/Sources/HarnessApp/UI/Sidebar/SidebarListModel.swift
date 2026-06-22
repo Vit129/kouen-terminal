@@ -231,21 +231,23 @@ final class SidebarListModel {
 
     private func resolveGitRepoRoot(for path: String) async -> String? {
         guard !path.isEmpty, FileManager.default.fileExists(atPath: path) else { return nil }
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-        process.arguments = ["-C", path, "rev-parse", "--path-format=absolute", "--git-common-dir"]
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = Pipe()
-        do {
-            try process.run()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            process.waitUntilExit()
-            if process.terminationStatus == 0,
-               let root = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-               !root.isEmpty { return root }
-        } catch {}
-        return nil
+        return await Task.detached(priority: .utility) {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+            process.arguments = ["-C", path, "rev-parse", "--path-format=absolute", "--git-common-dir"]
+            let pipe = Pipe()
+            process.standardOutput = pipe
+            process.standardError = Pipe()
+            do {
+                try process.run()
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                process.waitUntilExit()
+                if process.terminationStatus == 0,
+                   let root = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   !root.isEmpty { return root }
+            } catch {}
+            return nil
+        }.value
     }
 
     private func columnKind(for tab: Tab) -> BoardColumnKind {
@@ -298,102 +300,108 @@ final class SidebarListModel {
     }()
 
     private func fetchHasRemote(for path: String) async -> Bool {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-        process.arguments = ["remote"]
-        process.currentDirectoryURL = URL(fileURLWithPath: path)
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = Pipe()
-        do {
-            try process.run()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            process.waitUntilExit()
-            if process.terminationStatus == 0 {
-                return !(String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "").isEmpty
-            }
-        } catch {}
-        return false
+        await Task.detached(priority: .utility) {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+            process.arguments = ["remote"]
+            process.currentDirectoryURL = URL(fileURLWithPath: path)
+            let pipe = Pipe()
+            process.standardOutput = pipe
+            process.standardError = Pipe()
+            do {
+                try process.run()
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                process.waitUntilExit()
+                if process.terminationStatus == 0 {
+                    return !(String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "").isEmpty
+                }
+            } catch {}
+            return false
+        }.value
     }
 
     private func fetchGitMetadata(for path: String, branch: String) async -> RepoGitMetadata {
         let empty = RepoGitMetadata(prNumber: nil, prURL: nil, aheadCount: nil, behindCount: nil)
         guard let ghPath = Self.cachedGhPath, await fetchHasRemote(for: path) else { return empty }
 
-        var prNumber: Int? = nil
-        var prURL: String? = nil
-        let prProcess = Process()
-        prProcess.executableURL = URL(fileURLWithPath: ghPath)
-        prProcess.arguments = ["pr", "view", "--json", "number,url"]
-        prProcess.currentDirectoryURL = URL(fileURLWithPath: path)
-        let prPipe = Pipe()
-        prProcess.standardOutput = prPipe
-        prProcess.standardError = Pipe()
-        do {
-            try prProcess.run()
-            let data = prPipe.fileHandleForReading.readDataToEndOfFile()
-            prProcess.waitUntilExit()
-            if prProcess.terminationStatus == 0,
-               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let number = json["number"] as? Int {
-                prNumber = number
-                prURL = json["url"] as? String
-            }
-        } catch {}
+        return await Task.detached(priority: .utility) {
+            var prNumber: Int? = nil
+            var prURL: String? = nil
+            let prProcess = Process()
+            prProcess.executableURL = URL(fileURLWithPath: ghPath)
+            prProcess.arguments = ["pr", "view", "--json", "number,url"]
+            prProcess.currentDirectoryURL = URL(fileURLWithPath: path)
+            let prPipe = Pipe()
+            prProcess.standardOutput = prPipe
+            prProcess.standardError = Pipe()
+            do {
+                try prProcess.run()
+                let data = prPipe.fileHandleForReading.readDataToEndOfFile()
+                prProcess.waitUntilExit()
+                if prProcess.terminationStatus == 0,
+                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let number = json["number"] as? Int {
+                    prNumber = number
+                    prURL = json["url"] as? String
+                }
+            } catch {}
 
-        var aheadCount: Int? = nil
-        var behindCount: Int? = nil
-        let revProcess = Process()
-        revProcess.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-        revProcess.arguments = ["rev-list", "--left-right", "--count", "HEAD...origin/\(branch)"]
-        revProcess.currentDirectoryURL = URL(fileURLWithPath: path)
-        let revPipe = Pipe()
-        revProcess.standardOutput = revPipe
-        revProcess.standardError = Pipe()
-        do {
-            try revProcess.run()
-            let data = revPipe.fileHandleForReading.readDataToEndOfFile()
-            revProcess.waitUntilExit()
-            if revProcess.terminationStatus == 0,
-               let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) {
-                let parts = output.components(separatedBy: "\t")
-                if parts.count == 2 { aheadCount = Int(parts[0]); behindCount = Int(parts[1]) }
-            }
-        } catch {}
+            var aheadCount: Int? = nil
+            var behindCount: Int? = nil
+            let revProcess = Process()
+            revProcess.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+            revProcess.arguments = ["rev-list", "--left-right", "--count", "HEAD...origin/\(branch)"]
+            revProcess.currentDirectoryURL = URL(fileURLWithPath: path)
+            let revPipe = Pipe()
+            revProcess.standardOutput = revPipe
+            revProcess.standardError = Pipe()
+            do {
+                try revProcess.run()
+                let data = revPipe.fileHandleForReading.readDataToEndOfFile()
+                revProcess.waitUntilExit()
+                if revProcess.terminationStatus == 0,
+                   let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) {
+                    let parts = output.components(separatedBy: "\t")
+                    if parts.count == 2 { aheadCount = Int(parts[0]); behindCount = Int(parts[1]) }
+                }
+            } catch {}
 
-        return RepoGitMetadata(prNumber: prNumber, prURL: prURL, aheadCount: aheadCount, behindCount: behindCount)
+            return RepoGitMetadata(prNumber: prNumber, prURL: prURL, aheadCount: aheadCount, behindCount: behindCount)
+        }.value
     }
 
     private func fetchWorktrees(for rootPath: String) async -> [SidebarWorktreeEntry] {
         guard !rootPath.isEmpty, FileManager.default.fileExists(atPath: rootPath) else { return [] }
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-        process.arguments = ["worktree", "list", "--porcelain"]
-        process.currentDirectoryURL = URL(fileURLWithPath: rootPath)
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = Pipe()
-        do {
-            try process.run()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            process.waitUntilExit()
-            guard process.terminationStatus == 0 else { return [] }
-            let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            return output.components(separatedBy: "\n\n").enumerated().compactMap { index, block in
-                let lines = block.components(separatedBy: "\n").filter { !$0.isEmpty }
-                guard let wtLine = lines.first(where: { $0.hasPrefix("worktree ") }),
-                      let headLine = lines.first(where: { $0.hasPrefix("HEAD ") }) else { return nil }
-                let worktreePath = String(wtLine.dropFirst("worktree ".count))
-                let head = String(headLine.dropFirst("HEAD ".count))
-                let branchLine = lines.first(where: { $0.hasPrefix("branch ") })
-                let branch = branchLine.map { line -> String in
-                    let ref = String(line.dropFirst("branch ".count))
-                    return ref.hasPrefix("refs/heads/") ? String(ref.dropFirst("refs/heads/".count)) : ref
-                } ?? "detached"
-                let isLocked = lines.contains { $0 == "locked" || $0.hasPrefix("locked ") }
-                return SidebarWorktreeEntry(path: worktreePath, head: head, branch: branch,
-                                            isMain: index == 0, isLocked: isLocked)
-            }
-        } catch { return [] }
+        return await Task.detached(priority: .utility) {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+            process.arguments = ["worktree", "list", "--porcelain"]
+            process.currentDirectoryURL = URL(fileURLWithPath: rootPath)
+            let pipe = Pipe()
+            process.standardOutput = pipe
+            process.standardError = Pipe()
+            do {
+                try process.run()
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                process.waitUntilExit()
+                guard process.terminationStatus == 0 else { return [] }
+                let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                return output.components(separatedBy: "\n\n").enumerated().compactMap { index, block in
+                    let lines = block.components(separatedBy: "\n").filter { !$0.isEmpty }
+                    guard let wtLine = lines.first(where: { $0.hasPrefix("worktree ") }),
+                          let headLine = lines.first(where: { $0.hasPrefix("HEAD ") }) else { return nil }
+                    let worktreePath = String(wtLine.dropFirst("worktree ".count))
+                    let head = String(headLine.dropFirst("HEAD ".count))
+                    let branchLine = lines.first(where: { $0.hasPrefix("branch ") })
+                    let branch = branchLine.map { line -> String in
+                        let ref = String(line.dropFirst("branch ".count))
+                        return ref.hasPrefix("refs/heads/") ? String(ref.dropFirst("refs/heads/".count)) : ref
+                    } ?? "detached"
+                    let isLocked = lines.contains { $0 == "locked" || $0.hasPrefix("locked ") }
+                    return SidebarWorktreeEntry(path: worktreePath, head: head, branch: branch,
+                                                isMain: index == 0, isLocked: isLocked)
+                }
+            } catch { return [] }
+        }.value
     }
 }
