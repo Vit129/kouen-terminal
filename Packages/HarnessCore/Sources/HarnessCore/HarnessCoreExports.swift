@@ -2,3 +2,4 @@
 // compile without modification across the ~260 consumer files.
 @_exported import HarnessIPC
 @_exported import HarnessSettings
+@_exported import HarnessCommands

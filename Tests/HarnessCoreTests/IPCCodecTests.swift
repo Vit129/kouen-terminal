@@ -1,5 +1,6 @@
 import XCTest
 @testable import HarnessCore
+@testable import HarnessIPC
 
 final class IPCCodecTests: XCTestCase {
     /// Encode → decode → re-encode must be byte-stable (IPCRequest/Response aren't

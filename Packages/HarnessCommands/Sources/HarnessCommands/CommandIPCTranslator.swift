@@ -1,4 +1,5 @@
 import Foundation
+import HarnessIPC
 
 /// A value snapshot of *what a client is focused on*, used to resolve
 /// target-less commands (split the focused pane, kill the focused pane, select

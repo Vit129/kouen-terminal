@@ -1,4 +1,5 @@
 import Foundation
+import HarnessIPC
 
 /// Configuration for the Warp-style inline terminal AI chat (⌘I).
 /// Stored in `HarnessSettings.aiAgent`; persisted to `settings.json`.

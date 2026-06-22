@@ -61,7 +61,7 @@ let platformTargets: [Target] = [
     // dependencies (deliberately isolated, mirrors install paths via its own helpers).
     .target(
         name: "HarnessOnboarding",
-        dependencies: ["HarnessCore"],
+        dependencies: ["HarnessCore", "HarnessIPC", "HarnessSettings", "HarnessCommands"],
         path: "Packages/HarnessOnboarding/Sources/HarnessOnboarding"
     ),
     .executableTarget(
@@ -152,6 +152,9 @@ let package = Package(
     name: "Harness",
     platforms: [.macOS(.v15)],
     products: [
+        .library(name: "HarnessIPC", targets: ["HarnessIPC"]),
+        .library(name: "HarnessSettings", targets: ["HarnessSettings"]),
+        .library(name: "HarnessCommands", targets: ["HarnessCommands"]),
         .library(name: "HarnessCore", targets: ["HarnessCore"]),
         // Self-contained native terminal engine (VT parser + screen/grid model). Pure
         // Swift, no Metal/AppKit.
@@ -172,8 +175,31 @@ let package = Package(
     ] + platformProducts,
     dependencies: platformDependencies,
     targets: [
+        // IPC wire types, session/tab/workspace models, notification bus.
+        // Leaf package: depends only on Foundation/Darwin — nothing else from this repo.
+        .target(
+            name: "HarnessIPC",
+            path: "Packages/HarnessIPC/Sources/HarnessIPC",
+            swiftSettings: strictFoundationSettings
+        ),
+        // App settings, keybindings, shell integration. Depends on HarnessIPC for AgentKind.
+        .target(
+            name: "HarnessSettings",
+            dependencies: ["HarnessIPC"],
+            path: "Packages/HarnessSettings/Sources/HarnessSettings",
+            swiftSettings: strictFoundationSettings
+        ),
+        // Command vocabulary, key tables, format, session editor, options, board model.
+        // Depends on HarnessIPC for Tab/SessionSnapshot/SplitDirection/IPCRequest.
+        .target(
+            name: "HarnessCommands",
+            dependencies: ["HarnessIPC"],
+            path: "Packages/HarnessCommands/Sources/HarnessCommands",
+            swiftSettings: strictFoundationSettings
+        ),
         .target(
             name: "HarnessCore",
+            dependencies: ["HarnessIPC", "HarnessSettings", "HarnessCommands"],
             path: "Packages/HarnessCore/Sources/HarnessCore",
             swiftSettings: strictFoundationSettings
         ),
@@ -204,7 +230,7 @@ let package = Package(
         ),
         .target(
             name: "HarnessLSP",
-            dependencies: ["HarnessCore"],
+            dependencies: ["HarnessCore", "HarnessIPC", "HarnessSettings", "HarnessCommands"],
             path: "Packages/HarnessLSP/Sources/HarnessLSP"
         ),
         .target(
@@ -240,12 +266,12 @@ let package = Package(
         ),
         .executableTarget(
             name: "HarnessMCP",
-            dependencies: ["HarnessCore"],
+            dependencies: ["HarnessCore", "HarnessIPC", "HarnessSettings", "HarnessCommands"],
             path: "Tools/harness-mcp/Sources/HarnessMCP"
         ),
         .testTarget(
             name: "HarnessCoreTests",
-            dependencies: ["HarnessCore"],
+            dependencies: ["HarnessCore", "HarnessIPC", "HarnessSettings", "HarnessCommands"],
             path: "Tests/HarnessCoreTests"
         ),
         .testTarget(

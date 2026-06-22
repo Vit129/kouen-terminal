@@ -1,4 +1,5 @@
 import Foundation
+import HarnessIPC
 
 /// Parses a textual command sequence (e.g. `split-window -h ; copy-mode`) into
 /// a `Command` tree. Used by the `:` command prompt, `harness-cli run`,

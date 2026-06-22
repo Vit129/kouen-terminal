@@ -1,4 +1,5 @@
 import Foundation
+import HarnessIPC
 
 public enum TerminalColorRenderingMode: String, Codable, Sendable {
     case accurate
@@ -657,94 +658,14 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         browserHomePage = try container.decodeIfPresent(String.self, forKey: .browserHomePage) ?? fallback.browserHomePage
     }
 
-    public static func load() -> HarnessSettings {
-        let imported = TerminalConfigImporter.load()
-        let url = HarnessPaths.settingsURL
-        if FileManager.default.fileExists(atPath: url.path), let data = try? Data(contentsOf: url) {
-            guard var settings = try? JSONDecoder().decode(HarnessSettings.self, from: data) else {
-                // Present but unreadable: preserve it as `.corrupt` for recovery rather than
-                // silently overwriting it with defaults (which would discard the user's settings).
-                // Mirrors SessionStore/OptionStore — return defaults WITHOUT rewriting the file.
-                HarnessPaths.backupCorruptFile(at: url, label: "Harness")
-                return HarnessSettings.makeDefaults(imported: imported)
-            }
-            let hasStoredColorChoice = settingsDataContainsColorChoice(data)
-            // Track whether any migration below actually changed something, so a no-op launch never
-            // rewrites settings.json (a needless write — and a corruption window — on every start).
-            var didMutate = false
-            // Schema migration: when the saved file predates a feature (e.g. it was written before
-            // customBackgroundHex existed, or before the user installed a source terminal), backfill
-            // from the live terminal config — but ONLY when the user hasn't set their own visuals.
-            // Once colors/font are populated (a Harness edit, or a prior import), silently
-            // overwriting them on a source-config change is data loss; the user re-pulls explicitly
-            // via Settings / `source-config` / prefix `r` (the consented path). Either way we record
-            // the new signature so we don't re-evaluate this every launch.
-            if let imported, settings.importedConfigSignature != imported.signature {
-                if settings.hasUserVisualCustomizations {
-                    settings.importedConfigSignature = imported.signature
-                } else {
-                    settings.applyImportedDefaults(imported)
-                }
-                didMutate = true
-            }
-            // Recover from accidental "background-opacity = 0.05" footgun states.
-            // The slider could go all the way down; older code didn't guard it.
-            // Anything below 30% makes the window effectively invisible.
-            let clampedOpacity = HarnessSettings.clampedOpacity(settings.backgroundOpacity)
-            if clampedOpacity != settings.backgroundOpacity { settings.backgroundOpacity = clampedOpacity; didMutate = true }
-            let clampedBlur = HarnessSettings.clampedBlur(settings.backgroundBlur)
-            if clampedBlur != settings.backgroundBlur { settings.backgroundBlur = clampedBlur; didMutate = true }
-            // Recover hand-edited or runaway font sizes that would overflow the glyph atlas (huge)
-            // or balloon the grid allocation (tiny). 8–32 matches the Cmd+/- zoom policy.
-            let clampedFontSize = HarnessSettings.clampedFontSize(settings.fontSize)
-            if clampedFontSize != settings.fontSize { settings.fontSize = clampedFontSize; didMutate = true }
-            let clampedPaddingX = HarnessSettings.clampedPadding(settings.windowPaddingX)
-            if clampedPaddingX != settings.windowPaddingX { settings.windowPaddingX = clampedPaddingX; didMutate = true }
-            let clampedPaddingY = HarnessSettings.clampedPadding(settings.windowPaddingY)
-            if clampedPaddingY != settings.windowPaddingY { settings.windowPaddingY = clampedPaddingY; didMutate = true }
-            // One-shot color-fidelity migration: explicit vividColors/colorRendering keys
-            // are the user's gamut choice. Older files that lack both never made one, so
-            // land them on accurate sRGB.
-            let migrationKey = "HarnessColorFidelityMigrationV1"
-            if !UserDefaults.standard.bool(forKey: migrationKey) {
-                UserDefaults.standard.set(true, forKey: migrationKey)
-                if !hasStoredColorChoice, settings.colorRendering != .accurate {
-                    settings.colorRendering = .accurate
-                    didMutate = true
-                }
-            }
-            // Persist only a migration that actually changed something — and surface a write failure
-            // (a read-only disk / full volume) instead of silently dropping the migrated state.
-            if didMutate {
-                do { try settings.save() }
-                catch { fputs("Harness: failed to persist migrated settings.json — \(error)\n", harnessStderr) }
-            }
-            return settings
-        }
-        // First-run / user nuked the file: seed from the imported config and persist
-        // immediately so subsequent launches are stable.
-        let seeded = HarnessSettings.makeDefaults(imported: imported)
-        do { try seeded.save() }
-        catch { fputs("Harness: failed to seed settings.json — \(error)\n", harnessStderr) }
-        return seeded
-    }
-
     /// Whether the user (or a prior import) has populated any editable visual field. Gates the
     /// auto-backfill in `load()`: a changed source-terminal config must never silently overwrite
     /// colors/font the user is relying on (they re-import explicitly to opt in).
-    private var hasUserVisualCustomizations: Bool {
+    public var hasUserVisualCustomizations: Bool {
         customBackgroundHex != nil || customForegroundHex != nil || customCursorHex != nil
             || selectionBackgroundHex != nil || selectionForegroundHex != nil
             || boldColorHex != nil || cursorTextHex != nil
             || paletteHex.contains { $0 != nil }
-    }
-
-    private static func settingsDataContainsColorChoice(_ data: Data) -> Bool {
-        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return false
-        }
-        return object[CodingKeys.vividColors.stringValue] != nil
-            || object[CodingKeys.colorRendering.stringValue] != nil
     }
 
     /// Opacity bounds. The user can pick any value from fully transparent to
@@ -781,12 +702,6 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         max(0, value)
     }
 
-    public func save() throws {
-        try HarnessPaths.ensureDirectories()
-        let data = try JSONEncoder().encode(self)
-        try data.write(to: HarnessPaths.settingsURL, options: .atomic)
-    }
-
     /// Builds a default settings instance, layering imported config values over hardcoded defaults.
     public static func makeDefaults(imported: ImportedTerminalConfig?) -> HarnessSettings {
         var settings = HarnessSettings()
@@ -821,7 +736,7 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         return settings
     }
 
-    private mutating func applyImportedDefaults(_ imported: ImportedTerminalConfig) {
+    public mutating func applyImportedDefaults(_ imported: ImportedTerminalConfig) {
         if let value = imported.fontFamily { fontFamily = value }
         // Font size is Harness-owned (see makeDefaults) — import the face, not the size.
         if let value = imported.defaultShell { defaultShell = value }

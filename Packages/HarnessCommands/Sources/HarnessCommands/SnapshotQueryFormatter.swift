@@ -1,4 +1,5 @@
 import Foundation
+import HarnessIPC
 
 /// Machine-readable rows behind `harness-cli list-sessions/list-windows/list-panes --json`.
 /// The text form is derived from these (`SnapshotQueryFormatter`), so the JSON and the

@@ -1,4 +1,5 @@
 import Foundation
+import HarnessIPC
 
 /// Canonical action vocabulary for Harness. Every keystroke binding, CLI
 /// subcommand, command-palette entry, hook firing, and `:` prompt entry

@@ -1,4 +1,5 @@
 import Foundation
+import HarnessIPC
 
 /// A single Kanban-style card representing one live session/tab in the board.
 ///
