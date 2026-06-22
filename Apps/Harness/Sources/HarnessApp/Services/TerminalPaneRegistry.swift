@@ -6,10 +6,6 @@ import HarnessTerminalKit
 final class TerminalPaneRegistry {
     private var hosts: [SurfaceID: TerminalHostView] = [:]
 
-    /// Hosts pending dealloc — held for one run loop cycle so AppKit's in-flight
-    /// key events drain before the underlying surface view is freed (RL-040).
-    private var retired: [TerminalHostView] = []
-
     func register(_ host: TerminalHostView) {
         hosts[host.surfaceID] = host
     }
@@ -47,9 +43,6 @@ final class TerminalPaneRegistry {
         // 500ms wasn't enough — alternate-screen programs (fzf, zi, vim) trigger rapid
         // rebuild sequences where the display link forwarder schedules a callback in a
         // later run-loop iteration. 1.5s covers the full cadence cycle. (RL-040/041)
-        retired.append(host)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
-            self?.retired.removeAll { $0 === host }
-        }
+        ZombieHoldRegistry.shared.hold(host)
     }
 }
