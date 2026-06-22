@@ -683,6 +683,9 @@ private final class TabPillView: NSView {
     }
 
     override func mouseExited(with event: NSEvent) {
+        let localPoint = convert(event.locationInWindow, from: nil)
+        guard !bounds.contains(localPoint) else { return }
+
         isHovered = false
         HarnessMotion.animate(HarnessDesign.Motion.microFast) { _ in
             closeButton.animator().alphaValue = 0

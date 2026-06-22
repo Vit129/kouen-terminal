@@ -3,13 +3,13 @@ _Auto-generated from graphify-out/GRAPH_REPORT.md · do not edit manually_
 _Regen: `~/.claude/scripts/generate-graph-summary.sh .` after `graphify update .`_
 
 ## Summary
-- 16043 nodes · 36272 edges · 787 communities (624 shown, 163 thin omitted)
-- Extraction: 86% EXTRACTED · 14% INFERRED · 0% AMBIGUOUS · INFERRED: 5093 edges (avg confidence: 0.8)
+- 16058 nodes · 36319 edges · 782 communities (624 shown, 158 thin omitted)
+- Extraction: 86% EXTRACTED · 14% INFERRED · 0% AMBIGUOUS · INFERRED: 5105 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 
 ## Graph Freshness
-- Built from commit: `74ae0121`
+- Built from commit: `23145c43`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -18,9 +18,9 @@ _Regen: `~/.claude/scripts/generate-graph-summary.sh .` after `graphify update .
 1. `HarnessTerminalSurfaceView` - 369 edges
 2. `SettingsViewController` - 305 edges
 3. `Foundation` - 269 edges
-4. `HarnessCore` - 262 edges
+4. `HarnessCore` - 263 edges
 5. `SessionCoordinator` - 167 edges
-6. `XCTest` - 166 edges
+6. `XCTest` - 167 edges
 7. `SessionEditor` - 164 edges
 8. `TerminalEmulator` - 158 edges
 9. `AppKit` - 139 edges
@@ -57,7 +57,6 @@ _Regen: `~/.claude/scripts/generate-graph-summary.sh .` after `graphify update .
 - [[_COMMUNITY_Tests HarnessTerminalEngineTests  KittyKeyboardTests|Tests: HarnessTerminalEngineTests / KittyKeyboardTests]]
 - [[_COMMUNITY_Terminal Engine Parser  VTParser|Terminal Engine: Parser / VTParser]]
 - [[_COMMUNITY_Tests HarnessCoreTests  FormatStringTests|Tests: HarnessCoreTests / FormatStringTests]]
-- [[_COMMUNITY_Terminal Renderer HarnessTerminalRenderer  GlyphRasterizer|Terminal Renderer: HarnessTerminalRenderer / GlyphRasterizer]]
 - [[_COMMUNITY_HarnessCore ACP  ACPClient|HarnessCore: ACP / ACPClient]]
 - [[_COMMUNITY_Tests HarnessDaemonTests  ScrollbackFileTests|Tests: HarnessDaemonTests / ScrollbackFileTests]]
 - [[_COMMUNITY_Terminal Engine HarnessTerminalEngine  InputEncoder|Terminal Engine: HarnessTerminalEngine / InputEncoder]]
@@ -66,5 +65,6 @@ _Regen: `~/.claude/scripts/generate-graph-summary.sh .` after `graphify update .
 - [[_COMMUNITY_HarnessCore Agents  AgentHookInstaller|HarnessCore: Agents / AgentHookInstaller]]
 - [[_COMMUNITY_Daemon HarnessDaemon  RealPty|Daemon: HarnessDaemon / RealPty]]
 - [[_COMMUNITY_Tests HarnessDaemonTests  DaemonRoundTripTests|Tests: HarnessDaemonTests / DaemonRoundTripTests]]
+- [[_COMMUNITY_HarnessCore Session  SessionEditor|HarnessCore: Session / SessionEditor]]
 
 _Full map → graphify-out/GRAPH_REPORT.md · query: `graphify query "..."`_

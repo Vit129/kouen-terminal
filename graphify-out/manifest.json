@@ -130,8 +130,8 @@
     "semantic_hash": ""
   },
   "Tools/harness-mcp/Sources/HarnessMCP/StdioTransport.swift": {
-    "mtime": 1780824385.5021203,
-    "ast_hash": "4963e7cb366916cf9ac20a140446a60b",
+    "mtime": 1782125871.5106752,
+    "ast_hash": "51c74d544dcba6d9843db56b0dc0d11a",
     "semantic_hash": ""
   },
   "Tools/harness-mcp/Sources/HarnessMCP/Main.swift": {
@@ -2140,8 +2140,8 @@
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/UI/Terminal/TerminalTabBarView.swift": {
-    "mtime": 1782097937.0169992,
-    "ast_hash": "09ed1c338679169b86eedc3077d9ad4b",
+    "mtime": 1782127017.7939477,
+    "ast_hash": "157985ce76594f87ac3884f337cb10f0",
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/UI/Agents/AgentChatPanelView.swift": {
@@ -2985,8 +2985,8 @@
     "semantic_hash": ""
   },
   "agent-memory/CONTEXT.md": {
-    "mtime": 1782114002.7569034,
-    "ast_hash": "ab68fc550bc4fd09bb72e074a0fef5a4",
+    "mtime": 1782124829.4167697,
+    "ast_hash": "0897bf7b7bea7cb1ac9fb763bc371b23",
     "semantic_hash": ""
   },
   "agent-memory/USER-PROFILE.md": {
@@ -3607,6 +3607,11 @@
   "agent-memory/plans/swiftui-migration.md": {
     "mtime": 1782118617.3108547,
     "ast_hash": "35d68fafa9b94e0f27b2ae05dc099c31",
+    "semantic_hash": ""
+  },
+  "Tests/HarnessMCPTests/StdioTransportTests.swift": {
+    "mtime": 1782125871.5110798,
+    "ast_hash": "7a28ad1a648f4c382966af2976acaac5",
     "semantic_hash": ""
   }
 }
