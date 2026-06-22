@@ -97,14 +97,11 @@ final class SurfaceProgressTracker {
             onVisibilityChange()
             return
         }
-        NotificationCenter.default.post(
-            name: NotificationBus.shared.snapshotChanged,
-            object: nil,
-            userInfo: [
-                "revision": SessionCoordinator.shared.snapshot.revision,
-                "structureChanged": false,
-                "metadataOnly": true,
-            ]
-        )
+        NotificationBus.shared.postSnapshotChanged(SnapshotChangedPayload(
+            revision: SessionCoordinator.shared.snapshot.revision,
+            structureChanged: false,
+            metadataOnly: true,
+            chromeChanged: false
+        ))
     }
 }

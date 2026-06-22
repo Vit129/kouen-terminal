@@ -1,5 +1,10 @@
 import Foundation
 
+/// Current IPC wire-format version. Bump whenever a breaking change is made to
+/// `IPCRequest` or `IPCResponse`. The daemon rejects `identifyClient` messages
+/// whose `protocolVersion` does not match this value.
+public let ipcProtocolVersion: Int = 1
+
 public enum IPCRequest: Codable, Sendable {
     case ping
     case listWorkspaces
@@ -104,8 +109,9 @@ public enum IPCRequest: Codable, Sendable {
     case detachSurface(surfaceID: String)
     /// Identify this connection to the daemon so it shows up in `list-clients`
     /// and can be addressed by `detach-client`. Idempotent; safe to send once
-    /// per persistent connection.
-    case identifyClient(label: String)
+    /// per persistent connection. `protocolVersion` must equal `ipcProtocolVersion`;
+    /// the daemon returns `.protocolRejected` and closes the connection if it does not.
+    case identifyClient(label: String, protocolVersion: Int)
     case listClients
     case detachClient(clientID: UUID)
     case daemonStats
@@ -155,6 +161,14 @@ public enum IPCRequest: Codable, Sendable {
     case browserSnapshot(paneID: UUID, interactive: Bool?)
     case browserInteract(paneID: UUID, action: String, elementID: String, text: String?)
     case browserClose(paneID: UUID)
+    case browserScreenshot(paneID: UUID)
+    case browserNetwork(paneID: UUID)
+    case browserCookies(paneID: UUID)
+    case browserStorage(paneID: UUID, storageType: String)
+    case browserEvaluate(paneID: UUID, script: String)
+    case browserGoBack(paneID: UUID)
+    case browserGoForward(paneID: UUID)
+    case browserReload(paneID: UUID)
     case browserResponse(id: UUID, response: BrowserResponsePayload)
 }
 
@@ -169,6 +183,10 @@ public enum BrowserRequestPayload: Codable, Sendable {
     case storage(paneID: UUID, storageType: String)
     case interact(paneID: UUID, action: String, elementID: String, text: String?)
     case close(paneID: UUID)
+    case evaluate(paneID: UUID, script: String)
+    case goBack(paneID: UUID)
+    case goForward(paneID: UUID)
+    case reload(paneID: UUID)
 }
 
 public enum BrowserResponsePayload: Codable, Sendable {
@@ -179,6 +197,7 @@ public enum BrowserResponsePayload: Codable, Sendable {
     case network([BrowserNetworkEntry])
     case cookies([BrowserCookie])
     case storage([String: String])
+    case text(String)
     case error(String)
 }
 
@@ -288,6 +307,9 @@ public enum IPCResponse: Codable, Sendable {
     case hookID(UUID)
     case hooks([HookEntry])
     case error(String)
+    /// Sent in response to `identifyClient` when the client's `protocolVersion` does not
+    /// match `ipcProtocolVersion`. The daemon closes the connection immediately after.
+    case protocolRejected(reason: String)
     case gitResult(output: String, stderr: String, success: Bool)
 
     // Browser tool integration (P14)

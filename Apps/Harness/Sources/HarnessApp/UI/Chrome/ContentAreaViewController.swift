@@ -9,32 +9,30 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
     private let tabBar = TerminalTabBarView()
     private let terminalHost = NSView()
     private let sidebarToggle = SoftIconButton(frame: NSRect(x: 0, y: 0, width: 24, height: 24))
-    /// Thin separator under the tab bar so the chrome reads as its own band instead of
-    /// relying on empty space to imply separation from the terminal canvas.
     private let tabBarDivider = HarnessDesign.divider()
-    private var paneContainer: PaneContainerView?
-    /// Keep a strong reference to the previous pane container for one runloop cycle after
-    /// removal so AppKit's pending layout/display passes (which hold unsafe internal refs to
-    /// subviews) complete before ARC deallocates the view tree. Without this, a structural
-    /// rebuild can free views that AppKit still dispatches layout()/isFlipped/mouseMoved to.
-    private var retiredContainer: PaneContainerView?
-    /// Hosts detached during rebuild — held for 1.5s so in-flight AppKit events
-    /// (mouseMoved via tracking area, queued keyDown/keyUp, display-link callbacks)
-    /// drain before ARC frees them (RL-040/041).
-    private var retiredHosts: [TerminalHostView] = []
-    private let fileTabManager = FileTabManager()
-    private var fileEditorView: FileEditorView?
-    var activeDiagnostics: [LSPDiagnostic] { fileEditorView?.activeDiagnostics ?? [] }
-    var currentFilePath: String? { fileEditorView?.filePath }
-    private var lastStructureKey = ""
-    private var pendingReload: Bool?
-    /// Pasteboard change counter captured at left-mouse-down. On mouse-up, if it
-    /// has incremented inside the terminal area AND the user has `copy-on-select`
-    /// enabled, that means the renderer just copied the selection — surface a brief
-    /// "Selection copied" toast.
-    private var pasteboardCountAtMouseDown: Int = NSPasteboard.general.changeCount
-    private nonisolated(unsafe) var copySelectionMonitor: Any?
     private var sidebarToggleConstraint: NSLayoutConstraint?
+
+    private nonisolated(unsafe) var copySelectionMonitor: Any?
+    private var pasteboardCountAtMouseDown: Int = NSPasteboard.general.changeCount
+
+    // Coordinators — initialized in viewDidLoad once views exist.
+    private var filePreview: FilePreviewCoordinator!
+    private var paneLifecycle: PaneLifecycleManager!
+
+    // MARK: - Pass-throughs (callers see these on ContentAreaVC unchanged)
+
+    var isFileEditorVisible: Bool { filePreview.isFileEditorVisible }
+    var activeDiagnostics: [LSPDiagnostic] { filePreview.activeDiagnostics }
+    var currentFilePath: String? { filePreview.currentFilePath }
+
+    func openFileTab(path: String) { filePreview.openFileTab(path: path) }
+    func closeFileTab(id: FileTabID) { filePreview.closeFileTab(id: id) }
+    func selectFileTab(id: FileTabID) { filePreview.selectFileTab(id: id) }
+    func navigateCurrentFile(line: Int, column: Int) { filePreview.navigateCurrentFile(line: line, column: column) }
+    func showFileEditorSplit() { filePreview.showFileEditorSplit() }
+    func hideFileEditorSplit() { filePreview.hideFileEditorSplit() }
+    func activateTerminalTab() { filePreview.activateTerminalTab() }
+    func paneShell(for paneID: PaneID) -> NSView? { paneLifecycle.paneShell(for: paneID) }
 
     deinit {
         if let monitor = copySelectionMonitor {
@@ -44,25 +42,19 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
 
     override func loadView() {
         view = NSView()
-        // The terminal area stays visually independent from app chrome. the renderer
-        // owns its own background color, opacity, blur, and color pipeline here;
-        // sidebar/tab chrome must not add an AppKit backdrop over or behind it.
         HarnessDesign.makeClear(view)
     }
 
     func applyChrome() {
         HarnessDesign.makeClear(view)
         refreshTerminalHostFill()
-        refreshEditorPanelFill()
+        filePreview.refreshEditorPanelFill()
         titleStrip.applyColors()
         tabBar.applyChrome()
-        paneContainer?.applyChrome()
+        paneLifecycle.paneContainer?.applyChrome()
         updateSidebarToggleConstraints()
     }
 
-    /// Reflect the active tab's cwd in the title strip's folder/path readout. Hidden while a
-    /// CLI agent (claude, codex, cursor-agent, …) owns the pane: the agent's own UI is the
-    /// context then, and a shell-cwd readout over it is just noise. Returns when the tool exits.
     private func updateTitleStripPath() {
         let snap = SessionCoordinator.shared.snapshot
         guard let tab = snap.activeWorkspace?.activeTab else {
@@ -70,26 +62,15 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
             return
         }
         let agentActive = tab.effectiveAgentKind != nil
-        // Always show branch; hide cwd path when agent is active (less noise)
         titleStrip.setPath(agentActive ? "" : tab.cwd, gitBranch: tab.gitBranch)
     }
 
-    /// Back the terminal host so the canvas reads the same as the rest of the window.
-    /// When the window is **opaque** (opacity ≥ 1) the host is a solid terminal-colored
-    /// fill — this covers any resize gap before the renderer repaints, so the terminal
-    /// shows true rich color. When **translucent** the host is `.clear`: the renderer
-    /// already draws the canvas at `backgroundOpacity` alpha, so a clear host lets that
-    /// single translucent layer composite over the one window-wide blur — exactly like
-    /// the chrome (`sidebarBackground × opacity`). An opaque fill here would block the
-    /// blur and make the terminal look solid while the chrome was see-through.
     private func refreshTerminalHostFill() {
         terminalHost.wantsLayer = true
         let opacity = HarnessSettings.clampedOpacity(SessionCoordinator.shared.settings.backgroundOpacity)
         if opacity >= 1 {
             terminalHost.layer?.backgroundColor = HarnessChrome.current.terminalBackground.cgColor
         } else {
-            // Minimum tint so text stays readable over bright backgrounds.
-            // Light themes need a higher floor; dark themes are already legible at low alpha.
             let isDark = HarnessChrome.current.isDark
             let minTint: CGFloat = isDark ? 0.3 : 0.5
             let effectiveAlpha = max(CGFloat(opacity), minTint)
@@ -98,15 +79,12 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         }
     }
 
-    private func refreshEditorPanelFill() {
-        guard let panel = fileEditorPanel else { return }
-        let opacity = CGFloat(HarnessSettings.clampedOpacity(SessionCoordinator.shared.settings.backgroundOpacity))
-        panel.layer?.backgroundColor = HarnessChrome.current.terminalBackground
-            .withAlphaComponent(opacity).cgColor
-    }
-
     override func viewDidLoad() {
         super.viewDidLoad()
+
+        filePreview = FilePreviewCoordinator(containerView: view, terminalHost: terminalHost, tabBarDivider: tabBarDivider)
+        paneLifecycle = PaneLifecycleManager(terminalHost: terminalHost, containerView: view)
+
         tabBar.delegate = self
         tabBar.translatesAutoresizingMaskIntoConstraints = false
         tabBarDivider.translatesAutoresizingMaskIntoConstraints = false
@@ -120,8 +98,6 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         setupSidebarToggle()
 
         NSLayoutConstraint.activate([
-            // Draggable title strip above the tabs: window-move grab area + Ghostty-style
-            // folder/path readout. Pushes the tab pills below the traffic-light band.
             titleStrip.topAnchor.constraint(equalTo: view.topAnchor),
             titleStrip.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             titleStrip.trailingAnchor.constraint(equalTo: view.trailingAnchor),
@@ -131,8 +107,6 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
             tabBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             tabBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
 
-            // No divider line under the tab bar: the elevated chrome background now
-            // provides the tab-strip/terminal boundary (see HarnessChromePalette).
             tabBarDivider.topAnchor.constraint(equalTo: tabBar.bottomAnchor),
             tabBarDivider.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             tabBarDivider.trailingAnchor.constraint(equalTo: view.trailingAnchor),
@@ -141,21 +115,15 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
             terminalHost.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             terminalHost.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
-        let leading = terminalHost.leadingAnchor.constraint(equalTo: view.leadingAnchor)
-        leading.isActive = true
-        terminalHostLeading = leading
+        filePreview.setupInitialLeadingConstraint()
 
         NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(snapshotChanged(_:)),
-            name: NotificationBus.shared.snapshotChanged,
-            object: nil
+            self, selector: #selector(snapshotChanged(_:)),
+            name: NotificationBus.shared.snapshotChanged, object: nil
         )
         NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(viQuitCommand(_:)),
-            name: .viQuitCommand,
-            object: nil
+            self, selector: #selector(viQuitCommand(_:)),
+            name: .viQuitCommand, object: nil
         )
         NotificationCenter.default.addObserver(self, selector: #selector(viOpenFileCommand(_:)), name: .viOpenFileCommand, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(viSplitFileCommand(_:)), name: .viSplitFileCommand, object: nil)
@@ -163,27 +131,21 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         NotificationCenter.default.addObserver(self, selector: #selector(viNextBufferCommand(_:)), name: .viNextBufferCommand, object: nil)
         installCopySelectionToast()
         reloadTabBar()
-        restoreEditorState()
+        filePreview.restoreEditorState()
     }
 
     private func installCopySelectionToast() {
-        // RL-040: Same nonisolated(unsafe) pattern as PrefixKeymap — bypass the
-        // @Sendable closure's _checkExpectedExecutor that crashes on zombie event chains.
-        // Safe: NSEvent local monitors always fire on the main thread.
-        nonisolated(unsafe) let unsafeSelf = self
-        copySelectionMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .leftMouseUp]) { event in
-            // RL-040: If the view controller has been torn down (window closed),
-            // bail immediately — accessing unsafeSelf's view properties would
-            // dereference freed memory.
-            guard unsafeSelf.viewIfLoaded?.window != nil else { return event }
+        copySelectionMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .leftMouseUp]) { [weak self] event in
+            guard let self else { return event }
+            guard self.viewIfLoaded?.window != nil else { return event }
             if event.type == .leftMouseDown {
-                unsafeSelf.pasteboardCountAtMouseDown = NSPasteboard.general.changeCount
+                self.pasteboardCountAtMouseDown = NSPasteboard.general.changeCount
             } else if event.type == .leftMouseUp,
                       SessionCoordinator.shared.settings.copyOnSelect,
-                      unsafeSelf.eventIsInsideTerminalArea(event),
-                      NSPasteboard.general.changeCount > unsafeSelf.pasteboardCountAtMouseDown
+                      self.eventIsInsideTerminalArea(event),
+                      NSPasteboard.general.changeCount > self.pasteboardCountAtMouseDown
             {
-                Toast.show("Selection copied", in: unsafeSelf.terminalHost)
+                Toast.show("Selection copied", in: self.terminalHost)
             }
             return event
         }
@@ -197,76 +159,60 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
 
     override func viewDidLayout() {
         super.viewDidLayout()
-        guard paneContainer == nil || pendingReload != nil else { return }
+        guard paneLifecycle.paneContainer == nil || paneLifecycle.pendingReload != nil else { return }
         guard terminalHost.bounds.width > 1, terminalHost.bounds.height > 1 else { return }
-        let force = pendingReload ?? true
-        pendingReload = nil
-        reloadIfNeeded(force: force)
+        let force = paneLifecycle.pendingReload ?? true
+        paneLifecycle.pendingReload = nil
+        paneLifecycle.reloadIfNeeded(force: force)
     }
 
+    // MARK: - Vi Notification Handlers
+
     @objc private func viQuitCommand(_ note: Notification) {
-        if let activeID = fileTabManager.activeTab()?.id {
-            closeFileTab(id: activeID)
-        }
+        filePreview.handleViQuit()
     }
 
     @objc private func viOpenFileCommand(_ note: Notification) {
         guard let path = note.userInfo?["path"] as? String else { return }
-        guard let resolved = resolveViPath(path, command: "edit") else { return }
-        openFileTab(path: resolved)
+        filePreview.handleViOpen(path: path)
     }
 
     @objc private func viSplitFileCommand(_ note: Notification) {
         guard let path = note.userInfo?["path"] as? String, !path.isEmpty else { return }
         let direction = (note.userInfo?["direction"] as? String) == "vertical"
-            ? SplitDirection.vertical
-            : SplitDirection.horizontal
-        guard let expanded = resolveViPath(path, command: "split") else { return }
-        SessionCoordinator.shared.splitActivePaneAndRun(
-            direction: direction,
-            command: "${EDITOR:-vi} \(Self.shellQuote(expanded))"
-        )
+            ? SplitDirection.vertical : SplitDirection.horizontal
+        filePreview.handleViSplit(path: path, direction: direction)
     }
 
     @objc private func viFindFileCommand(_ note: Notification) {
         guard let query = note.userInfo?["query"] as? String, !query.isEmpty else { return }
-        let root = currentWorkbenchCWD()
-        switch FuzzyPathResolver.resolve(query: query, root: root, limit: 5) {
-        case .none:
-            DisplayMessage.show("find: no match")
-        case .unique(let path):
-            openFileTab(path: path)
-        case .ambiguous(let matches):
-            DisplayMessage.show(matches.enumerated().map { "\($0.offset + 1): \($0.element)" }.joined(separator: "\n"))
-        }
+        filePreview.handleViFind(query: query)
     }
 
     @objc private func viNextBufferCommand(_ note: Notification) {
         guard let delta = note.userInfo?["delta"] as? Int else { return }
-        let tabs = fileTabManager.openTabs
-        guard !tabs.isEmpty, let active = fileTabManager.activeTab() else { return }
-        let idx = tabs.firstIndex(where: { $0.id == active.id }) ?? 0
-        let newIdx = (idx + delta + tabs.count) % tabs.count
-        selectFileTab(id: tabs[newIdx].id)
+        filePreview.handleViNextBuffer(delta: delta)
     }
 
+    // MARK: - Snapshot
+
     @objc private func snapshotChanged(_ note: Notification) {
-        let structureChanged = note.userInfo?["structureChanged"] as? Bool ?? true
-        let metadataOnly = note.userInfo?["metadataOnly"] as? Bool ?? false
+        let payload = note.snapshotPayload
+        let structureChanged = payload.structureChanged
+        let metadataOnly = payload.metadataOnly
         if metadataOnly && !structureChanged {
             refreshTabBarMetadata()
             return
         }
         reloadTabBar()
-        reloadIfNeeded(force: structureChanged)
+        paneLifecycle.reloadIfNeeded(force: structureChanged)
     }
+
+    // MARK: - Tab Bar
 
     func reloadTabBar() {
         let snap = SessionCoordinator.shared.snapshot
         guard let workspace = snap.activeWorkspace else { return }
-        // Each session = one tab pill (1 session = 1 project path).
-        // Derive TabStatus from BoardModel so the dot reflects running/done/error/waiting
-        // using the same central logic as the sidebar session cards and Board tab.
         let sessionTabs = workspace.sessions.compactMap { session -> Tab? in
             guard var tab = session.activeTab ?? session.tabs.first else { return nil }
             let kind = BoardModel.columnKind(for: tab)
@@ -284,16 +230,11 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         updateTitleStripPath()
     }
 
-    /// Leading inset so the title strip's path readout clears the macOS traffic lights when
-    /// the sidebar is collapsed. Driven by `MainSplitViewController` during the toggle. The
-    /// tab bar itself sits below the lights (the strip pushes it down) and needs no inset.
     func setTabBarLeadingInset(_ inset: CGFloat) {
         let settings = SessionCoordinator.shared.settings
         titleStrip.setLeadingInset(inset)
-        
         let sidebarVisible = settings.sidebarVisible
         let sidebarOnRight = settings.sidebarOnRight
-        
         if sidebarOnRight {
             tabBar.setLeadingInset(inset)
             tabBar.trailingInset = sidebarVisible ? 0 : 28
@@ -301,7 +242,6 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
             tabBar.setLeadingInset(sidebarVisible ? 0 : inset)
             tabBar.trailingInset = 0
         }
-        
         sidebarToggle.isHidden = sidebarVisible
     }
 
@@ -329,7 +269,6 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
             sidebarToggleConstraint = sidebarToggle.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 6)
         }
         sidebarToggleConstraint?.isActive = true
-
         let symbol = sidebarOnRight ? "sidebar.right" : "sidebar.left"
         sidebarToggle.setSymbol(symbol, accessibilityDescription: "Show sidebar", pointSize: 12, weight: .medium)
     }
@@ -348,6 +287,8 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         tabBar.refreshMetadata(tabs: sessionTabs, activeTabID: activeTabID)
         updateTitleStripPath()
     }
+
+    // MARK: - TerminalTabBarDelegate
 
     func tabBarDidSelect(tabID: TabID) {
         let coordinator = SessionCoordinator.shared
@@ -401,378 +342,26 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
     }
 
     func tabBarDidRequestTogglePersistent(tabID: TabID) {
-        // Flip the tab's persistence pin via the daemon (mirrors the session pin in the sidebar).
-        // Read the current value from the snapshot so the menu item toggles rather than forces a
-        // state; the resulting commit refreshes the pill's checkmark on the next reload.
         let coordinator = SessionCoordinator.shared
         let current = coordinator.snapshot.workspaces
             .flatMap(\.sessions).flatMap(\.tabs)
             .first(where: { $0.id == tabID })?.persistent ?? false
         coordinator.requestDaemon(.setTabPersistent(tabID: tabID, persistent: !current))
     }
-
-    private func reloadAll(force: Bool) {
-        reloadTabBar()
-        reloadIfNeeded(force: force)
-    }
-
-    func reloadIfNeeded(force: Bool) {
-        guard terminalHost.bounds.width > 1, terminalHost.bounds.height > 1 else {
-            pendingReload = (pendingReload ?? false) || force
-            return
-        }
-
-        let coordinator = SessionCoordinator.shared
-        guard let workspace = coordinator.snapshot.activeWorkspace,
-              let tab = workspace.activeTab
-        else { return }
-
-        let displayNode = zoomedNode(for: tab) ?? tab.rootPane
-        let key = "\(coordinator.structureRevision)|\(workspace.id)|\(tab.id)|\(tab.zoomedPaneID?.uuidString ?? "all")|\(paneKey(displayNode))"
-        guard force || key != lastStructureKey else {
-            paneContainer?.refreshChrome(snapshot: coordinator.snapshot)
-            return
-        }
-        fputs("BLINKDBG reloadIfNeeded REBUILD: force=\(force) oldKey=\(lastStructureKey) newKey=\(key)\n", harnessStderr)
-        lastStructureKey = key
-
-        // Resign first responder BEFORE detaching so any in-flight key events
-        // dispatched during the rebuild target nil, not a soon-to-be-freed surface.
-        if let window = view.window, window.firstResponder is HarnessTerminalSurfaceView {
-            window.makeFirstResponder(nil)
-        }
-
-        // CASE-025: Sync Metal presents with the CATransaction so the terminal doesn't
-        // flash black during the structural rebuild (split/close/switch).
-        let allHosts = SessionCoordinator.shared.terminalHosts.allHosts()
-        allHosts.forEach { $0.setPresentsWithTransaction(true) }
-
-        // Incremental update: detach existing terminal hosts from old container
-        // (without removing them from window) then rebuild container around them.
-        let existingHosts = paneContainer?.collectTerminalHosts() ?? [:]
-        let existingBrowserPanes = paneContainer?.collectBrowserPanes() ?? [:]
-        paneContainer?.detachHostsOnly()
-        // RL-040: Hold detached hosts for 500ms so in-flight AppKit events
-        // (mouseMoved via tracking area, queued keyDown/keyUp) drain before
-        // ARC frees any host that isn't reused by the new container.
-        let detached = Array(existingHosts.values)
-        retiredHosts.append(contentsOf: detached)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
-            guard let self else { return }
-            self.retiredHosts.removeAll { host in detached.contains { $0 === host } }
-        }
-        // Keep the old container alive past this runloop tick so AppKit's pending
-        // layout/display passes that reference its subviews complete before dealloc.
-        let oldContainer = paneContainer
-        paneContainer?.removeFromSuperview()
-        retiredContainer = oldContainer
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in self?.retiredContainer = nil }
-
-        let container = PaneContainerView(
-            node: displayNode,
-            cwd: tab.cwd,
-            themeName: coordinator.snapshot.themeName,
-            existingHosts: existingHosts,
-            existingBrowserPanes: existingBrowserPanes
-        )
-        container.translatesAutoresizingMaskIntoConstraints = false
-        terminalHost.addSubview(container)
-        NSLayoutConstraint.activate([
-            container.topAnchor.constraint(equalTo: terminalHost.topAnchor),
-            container.leadingAnchor.constraint(equalTo: terminalHost.leadingAnchor),
-            container.trailingAnchor.constraint(equalTo: terminalHost.trailingAnchor),
-            container.bottomAnchor.constraint(equalTo: terminalHost.bottomAnchor),
-        ])
-        paneContainer = container
-        // Re-assert the focused-pane border after the (re)mount — reused hosts keep
-        // their flag, but a freshly shown tab needs its active pane established.
-        coordinator.ensureActivePane(for: tab)
-        // Release the synchronized present after the first layout pass completes.
-        CATransaction.begin()
-        CATransaction.setCompletionBlock {
-            allHosts.forEach { $0.setPresentsWithTransaction(false) }
-        }
-        view.layoutSubtreeIfNeeded()
-        CATransaction.commit()
-    }
-
-    private func paneKey(_ node: PaneNode) -> String {
-        switch node {
-        case let .leaf(leaf):
-            return "l:\((leaf.activeSurfaceID ?? leaf.surfaceID).uuidString)"
-        case let .browser(leaf):
-            return "br:\(leaf.id.uuidString)"
-        case let .branch(direction, _, first, second):
-            // Ratio is intentionally excluded from the rebuild key: a divider drag
-            // persists the ratio but must not force a pane remount (that was the
-            // resize flicker). Ratio is re-applied via setPosition on (re)mount.
-            return "b:\(direction.rawValue):\(paneKey(first)):\(paneKey(second))"
-        }
-    }
-
-    private func zoomedNode(for tab: Tab) -> PaneNode? {
-        guard let zoomedPaneID = tab.zoomedPaneID else { return nil }
-        return leafNode(paneID: zoomedPaneID, in: tab.rootPane)
-    }
-
-    private func leafNode(paneID: PaneID, in node: PaneNode) -> PaneNode? {
-        switch node {
-        case let .leaf(leaf) where leaf.id == paneID:
-            return .leaf(leaf)
-        case let .branch(_, _, first, second):
-            return leafNode(paneID: paneID, in: first) ?? leafNode(paneID: paneID, in: second)
-        default:
-            return nil
-        }
-    }
-
-    // MARK: - Pane lookup (P27 drag-drop)
-
-    func paneShell(for paneID: PaneID) -> NSView? {
-        let id = NSUserInterfaceItemIdentifier("pane-\(paneID.uuidString)")
-        return paneContainer?.findDescendant(withIdentifier: id)
-    }
-
-    // MARK: - File Tabs
-
-    func openFileTab(path: String) {
-        fileTabManager.open(path: path)
-        showFileEditorSplit()
-        loadActiveFileTab()
-        persistEditorState()
-    }
-
-    func navigateCurrentFile(line: Int, column: Int) {
-        fileEditorView?.navigateTo(line: line, column: column)
-    }
-
-    private func resolveViPath(_ path: String, command: String) -> String? {
-        var expanded = (path as NSString).expandingTildeInPath
-        let cwd = currentWorkbenchCWD()
-        if !expanded.hasPrefix("/") {
-            expanded = (cwd as NSString).appendingPathComponent(expanded)
-        }
-        if !FileManager.default.fileExists(atPath: expanded) {
-            let root = cwd
-            switch FuzzyPathResolver.resolve(query: path, root: root, limit: 5) {
-            case .none:
-                DisplayMessage.show("\(command): no match")
-                return nil
-            case .unique(let match):
-                return match
-            case .ambiguous(let matches):
-                DisplayMessage.show(matches.enumerated().map { "\($0.offset + 1): \($0.element)" }.joined(separator: "\n"))
-                return nil
-            }
-        }
-        return expanded
-    }
-
-    private func currentWorkbenchCWD() -> String {
-        let coordinator = SessionCoordinator.shared
-        return WorkbenchContextResolver.resolve(
-            snapshot: coordinator.snapshot,
-            focusedSurfaceID: coordinator.activeSurfaceID,
-            currentFilePath: currentFilePath
-        )?.cwd ?? FileManager.default.currentDirectoryPath
-    }
-
-    private static func shellQuote(_ value: String) -> String {
-        ShellQuoting.quote(value)
-    }
-
-    func closeFileTab(id: FileTabID) {
-        fileTabManager.close(id: id)
-        if fileTabManager.hasOpenTabs {
-            loadActiveFileTab()
-        } else {
-            hideFileEditorSplit()
-        }
-        persistEditorState()
-    }
-
-    func selectFileTab(id: FileTabID) {
-        fileTabManager.activate(id: id)
-        loadActiveFileTab()
-        persistEditorState()
-    }
-
-    private func loadActiveFileTab() {
-        guard let tab = fileTabManager.activeTab() else { return }
-        fileEditorView?.load(path: tab.path)
-        fileEditorTabBar?.reload(tabs: fileTabManager.openTabs, activeID: fileTabManager.activeFileTabID)
-    }
-
-    private var fileEditorPanel: NSView?
-    var isFileEditorVisible: Bool {
-        fileEditorPanel != nil
-    }
-    private var fileEditorTabBar: FileEditorTabBarView?
-    private var terminalHostLeading: NSLayoutConstraint?
-    private var editorWidthConstraint: NSLayoutConstraint?
-    private var editorDivider: NSView?
-
-    func showFileEditorSplit() {
-        fputs("BLINKDBG showFileEditorSplit: alreadyOpen=\(fileEditorPanel != nil)\n", harnessStderr)
-        if fileEditorPanel != nil {
-            loadActiveFileTab()
-            return
-        }
-        // Add editor panel to the left of terminalHost — no reparenting terminal views.
-        let panel = NSView()
-        panel.wantsLayer = true
-        let c = HarnessDesign.chrome
-        // No opaque background — let window vibrancy show through (same as terminal)
-        panel.layer?.borderColor = c.border.cgColor
-        panel.layer?.borderWidth = 1
-        panel.translatesAutoresizingMaskIntoConstraints = false
-
-        let tabBarView = FileEditorTabBarView()
-        tabBarView.translatesAutoresizingMaskIntoConstraints = false
-        tabBarView.onSelect = { [weak self] id in self?.selectFileTab(id: id) }
-        tabBarView.onClose = { [weak self] id in self?.closeFileTab(id: id) }
-        panel.addSubview(tabBarView)
-        fileEditorTabBar = tabBarView
-
-        let editor = FileEditorView(frame: .zero)
-        editor.translatesAutoresizingMaskIntoConstraints = false
-        panel.addSubview(editor)
-        fileEditorView = editor
-
-        NSLayoutConstraint.activate([
-            tabBarView.topAnchor.constraint(equalTo: panel.topAnchor),
-            tabBarView.leadingAnchor.constraint(equalTo: panel.leadingAnchor),
-            tabBarView.trailingAnchor.constraint(equalTo: panel.trailingAnchor),
-            tabBarView.heightAnchor.constraint(equalToConstant: 34),
-            editor.topAnchor.constraint(equalTo: tabBarView.bottomAnchor),
-            editor.leadingAnchor.constraint(equalTo: panel.leadingAnchor),
-            editor.trailingAnchor.constraint(equalTo: panel.trailingAnchor),
-            editor.bottomAnchor.constraint(equalTo: panel.bottomAnchor),
-        ])
-
-        view.addSubview(panel)
-        // Editor: start at 40% width, draggable
-        let initialWidth = view.bounds.width > 0 ? view.bounds.width * 0.4 : 400
-        let widthC = panel.widthAnchor.constraint(equalToConstant: initialWidth)
-        widthC.priority = .defaultHigh
-        NSLayoutConstraint.activate([
-            panel.topAnchor.constraint(equalTo: tabBarDivider.bottomAnchor, constant: 2),
-            panel.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            panel.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            widthC,
-            panel.widthAnchor.constraint(greaterThanOrEqualToConstant: 200),
-        ])
-        editorWidthConstraint = widthC
-
-        // Drag divider between editor and terminal
-        let divider = EditorDividerView()
-        divider.translatesAutoresizingMaskIntoConstraints = false
-        divider.widthConstraint = widthC
-        divider.containerView = view
-        view.addSubview(divider)
-        NSLayoutConstraint.activate([
-            divider.topAnchor.constraint(equalTo: panel.topAnchor),
-            divider.bottomAnchor.constraint(equalTo: panel.bottomAnchor),
-            divider.leadingAnchor.constraint(equalTo: panel.trailingAnchor, constant: -2),
-            divider.widthAnchor.constraint(equalToConstant: 5),
-        ])
-        editorDivider = divider
-
-        // Shift terminalHost leading to make room
-        if let existing = terminalHostLeading {
-            existing.isActive = false
-        }
-        let leading = terminalHost.leadingAnchor.constraint(equalTo: panel.trailingAnchor)
-        leading.isActive = true
-        terminalHostLeading = leading
-
-        fileEditorPanel = panel
-        refreshEditorPanelFill()
-        layoutFileEditorSplitSynchronously()
-        persistEditorState()
-    }
-
-    func hideFileEditorSplit() {
-        guard let panel = fileEditorPanel else { return }
-        panel.removeFromSuperview()
-        editorDivider?.removeFromSuperview()
-        fileEditorPanel = nil
-        fileEditorView = nil
-        fileEditorTabBar = nil
-        editorWidthConstraint = nil
-        editorDivider = nil
-        // Restore terminalHost leading to view edge
-        if let lc = terminalHostLeading {
-            lc.isActive = false
-            terminalHostLeading = nil
-        }
-        let restored = terminalHost.leadingAnchor.constraint(equalTo: view.leadingAnchor)
-        restored.isActive = true
-        terminalHostLeading = restored
-        layoutFileEditorSplitSynchronously()
-        persistEditorState()
-    }
-
-    private func layoutFileEditorSplitSynchronously() {
-        // Set presentsWithTransaction on all visible terminal surfaces so Metal
-        // doesn't flash black while the constraint change resizes them (CASE-025 / task-51).
-        let hosts = SessionCoordinator.shared.terminalHosts.allHosts()
-        hosts.forEach { $0.setPresentsWithTransaction(true) }
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        view.layoutSubtreeIfNeeded()
-        terminalHost.layoutSubtreeIfNeeded()
-        CATransaction.commit()
-        hosts.forEach { $0.setPresentsWithTransaction(false) }
-    }
-
-    private func persistEditorState() {
-        let visible = isFileEditorVisible
-        let paths = fileTabManager.openTabs.map { $0.path }
-        let activePath = fileTabManager.activeTab()?.path
-        
-        UserDefaults.standard.set(visible, forKey: "harness.fileEditorVisible")
-        UserDefaults.standard.set(paths, forKey: "harness.fileEditorPaths")
-        if let activePath {
-            UserDefaults.standard.set(activePath, forKey: "harness.fileEditorActivePath")
-        } else {
-            UserDefaults.standard.removeObject(forKey: "harness.fileEditorActivePath")
-        }
-    }
-
-    private func restoreEditorState() {
-        let visible = UserDefaults.standard.bool(forKey: "harness.fileEditorVisible")
-        let paths = UserDefaults.standard.stringArray(forKey: "harness.fileEditorPaths") ?? []
-        let activePath = UserDefaults.standard.string(forKey: "harness.fileEditorActivePath")
-        
-        for path in paths {
-            fileTabManager.open(path: path)
-        }
-        if let activePath {
-            fileTabManager.open(path: activePath)
-        }
-        
-        if visible && fileTabManager.hasOpenTabs {
-            showFileEditorSplit()
-            loadActiveFileTab()
-        }
-    }
-
-    func activateTerminalTab() {
-        // no-op — terminal is always visible in split mode
-    }
 }
+
+// MARK: - PaneContainerView
 
 @MainActor
 final class PaneContainerView: NSView {
     private let coordinator = SessionCoordinator.shared
     private let tabID: TabID?
     private var existingHosts: [SurfaceID: TerminalHostView]
-    private var existingBrowserPanes: [PaneID: BrowserPaneView]
+    private let browserController: BrowserIntegrationController
 
     init(node: PaneNode, cwd: String, themeName: String, existingHosts: [SurfaceID: TerminalHostView] = [:], existingBrowserPanes: [PaneID: BrowserPaneView] = [:]) {
         self.existingHosts = existingHosts
-        self.existingBrowserPanes = existingBrowserPanes
+        self.browserController = BrowserIntegrationController(existingPanes: existingBrowserPanes)
         self.tabID = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.id
         super.init(frame: .zero)
         HarnessDesign.makeClear(self)
@@ -799,18 +388,14 @@ final class PaneContainerView: NSView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    /// Collect all terminal hosts keyed by surfaceID before teardown.
     func collectTerminalHosts() -> [SurfaceID: TerminalHostView] {
         var result: [SurfaceID: TerminalHostView] = [:]
         collectHosts(in: self, into: &result)
         return result
     }
 
-    /// Collect all browser panes keyed by paneID before teardown.
     func collectBrowserPanes() -> [PaneID: BrowserPaneView] {
-        var result: [PaneID: BrowserPaneView] = [:]
-        collectBrowsers(in: self, into: &result)
-        return result
+        browserController.collectBrowserPanes(in: self)
     }
 
     private func collectHosts(in view: NSView, into result: inout [SurfaceID: TerminalHostView]) {
@@ -823,26 +408,10 @@ final class PaneContainerView: NSView {
         }
     }
 
-    private func collectBrowsers(in view: NSView, into result: inout [PaneID: BrowserPaneView]) {
-        for sub in view.subviews {
-            if let browser = sub as? BrowserPaneView {
-                result[browser.paneID] = browser
-            } else {
-                collectBrowsers(in: sub, into: &result)
-            }
-        }
-    }
-
-    /// Remove terminal hosts from the view hierarchy without triggering dealloc —
-    /// they'll be re-inserted into the new container.
     func detachHostsOnly() {
         detachHosts(in: self)
-        detachBrowsers(in: self)
+        browserController.detachBrowsers(in: self)
     }
-
-    /// RL-040: Deferred dealloc — hold detached hosts long enough for all pending
-    /// AppKit events (keyDown/keyUp, cursor rects, layout) to drain.
-    private static var retiredHosts: [TerminalHostView] = []
 
     private func detachHosts(in view: NSView) {
         for sub in view.subviews {
@@ -850,22 +419,9 @@ final class PaneContainerView: NSView {
                 host.resignIfFirstResponder()
                 host.stopSurfaceDisplayLink()
                 host.removeFromSuperview()
-                Self.retiredHosts.append(host)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                    Self.retiredHosts.removeAll { $0 === host }
-                }
+                ZombieHoldRegistry.shared.hold(host)
             } else {
                 detachHosts(in: sub)
-            }
-        }
-    }
-
-    private func detachBrowsers(in view: NSView) {
-        for sub in view.subviews {
-            if sub is BrowserPaneView {
-                sub.removeFromSuperview()
-            } else {
-                detachBrowsers(in: sub)
             }
         }
     }
@@ -874,38 +430,11 @@ final class PaneContainerView: NSView {
         applyChrome()
     }
 
-    private func tabFor(surfaceID: SurfaceID, in snapshot: SessionSnapshot) -> Tab? {
-        for workspace in snapshot.workspaces {
-            for session in workspace.sessions {
-                for tab in session.tabs where tab.rootPane.allSurfaceIDs().contains(surfaceID) {
-                    return tab
-                }
-            }
-        }
-        return nil
-    }
-
     private func build(node: PaneNode, cwd: String, into parent: NSView) {
         switch node {
         case let .browser(bl):
-            let bv: BrowserPaneView
-            if let existing = existingBrowserPanes.removeValue(forKey: bl.id) {
-                bv = existing
-            } else {
-                bv = BrowserPaneView(url: bl.url, paneID: bl.id)
-            }
-            let paneIDCopy = bl.id
-            bv.onClosePaneRequested = {
-                SessionCoordinator.shared.splitPaneCoordinator.closeBrowserPane(paneID: paneIDCopy)
-            }
-            bv.translatesAutoresizingMaskIntoConstraints = false
-            parent.addSubview(bv)
-            NSLayoutConstraint.activate([
-                bv.topAnchor.constraint(equalTo: parent.topAnchor),
-                bv.leadingAnchor.constraint(equalTo: parent.leadingAnchor),
-                bv.trailingAnchor.constraint(equalTo: parent.trailingAnchor),
-                bv.bottomAnchor.constraint(equalTo: parent.bottomAnchor),
-            ])
+            browserController.buildNode(bl, into: parent)
+
         case let .leaf(leaf):
             let paneShell = NSView()
             HarnessDesign.makeClear(paneShell)
@@ -918,7 +447,6 @@ final class PaneContainerView: NSView {
                 paneShell.trailingAnchor.constraint(equalTo: parent.trailingAnchor),
                 paneShell.bottomAnchor.constraint(equalTo: parent.bottomAnchor),
             ])
-
             let surfaceID = leaf.activeSurfaceID ?? leaf.surfaceID
             let host: TerminalHostView
             if let existing = existingHosts.removeValue(forKey: surfaceID) {
@@ -934,8 +462,6 @@ final class PaneContainerView: NSView {
                 host.trailingAnchor.constraint(equalTo: paneShell.trailingAnchor),
                 host.bottomAnchor.constraint(equalTo: paneShell.bottomAnchor),
             ])
-
-            // CMUX-style split buttons at top-right, above Metal via zPosition
             if let tabID {
                 let splitButtons = PaneSplitButtonsView(tabID: tabID, paneID: leaf.id)
                 splitButtons.translatesAutoresizingMaskIntoConstraints = false
@@ -948,7 +474,6 @@ final class PaneContainerView: NSView {
                 ])
             }
         case let .branch(direction, ratio, first, second):
-            // Flatten same-direction chain into a single NSSplitView with N children
             let flatChildren = flattenSameDirection(node, direction: direction)
             let split = HarnessSplitView()
             split.dividerStyle = .thin
@@ -960,11 +485,10 @@ final class PaneContainerView: NSView {
                 split.secondPaneID = firstLeafID(second)
                 split.ratio = ratio
             } else {
-                split.ratio = nil  // signal: distribute equally among N children
+                split.ratio = nil
             }
             split.delegate = split
             split.translatesAutoresizingMaskIntoConstraints = false
-
             parent.addSubview(split)
             NSLayoutConstraint.activate([
                 split.topAnchor.constraint(equalTo: parent.topAnchor),
@@ -972,7 +496,6 @@ final class PaneContainerView: NSView {
                 split.trailingAnchor.constraint(equalTo: parent.trailingAnchor),
                 split.bottomAnchor.constraint(equalTo: parent.bottomAnchor),
             ])
-
             for child in flatChildren {
                 let container = NSView()
                 container.autoresizingMask = [.width, .height]
@@ -982,9 +505,6 @@ final class PaneContainerView: NSView {
         }
     }
 
-    /// Flatten a chain of same-direction branches into a flat list of child nodes.
-    /// e.g., branch(H, branch(H, L1, L2), L3) → [L1, L2, L3]
-    /// Different-direction branches are kept as single nodes in the list.
     private func flattenSameDirection(_ node: PaneNode, direction: SplitDirection) -> [PaneNode] {
         switch node {
         case .leaf:
@@ -996,8 +516,6 @@ final class PaneContainerView: NSView {
         }
     }
 
-    /// Representative leaf of a subtree (its first leaf in traversal order). Paired
-    /// across both children, it uniquely identifies a branch for ratio persistence.
     private func firstLeafID(_ node: PaneNode) -> PaneID? {
         switch node {
         case let .leaf(leaf): return leaf.id
@@ -1007,8 +525,8 @@ final class PaneContainerView: NSView {
     }
 }
 
-/// Transparent overlay that passes all hits through to the view behind it,
-/// except for clicks that land on one of its subviews (the split buttons).
+// MARK: - HitTestPassthroughView
+
 @MainActor
 private final class HitTestPassthroughView: NSView {
     override func hitTest(_ point: NSPoint) -> NSView? {
@@ -1017,7 +535,8 @@ private final class HitTestPassthroughView: NSView {
     }
 }
 
-/// CMUX-style split buttons: small icon buttons at the bottom-right corner of each pane.
+// MARK: - PaneSplitButtonsView
+
 @MainActor
 private final class PaneSplitButtonsView: NSView {
     private let tabID: TabID
@@ -1069,13 +588,11 @@ private final class PaneSplitButtonsView: NSView {
             stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 5),
             stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -5),
         ])
-
         alphaValue = 0
     }
 
     override func viewDidMoveToSuperview() {
         super.viewDidMoveToSuperview()
-        // Remove old tracking area from previous parent
         if let old = paneTrackingArea {
             paneTrackingOwner?.removeTrackingArea(old)
             paneTrackingArea = nil
@@ -1127,22 +644,8 @@ private final class PaneSplitButtonsView: NSView {
         return btn
     }
 
-    @objc private func doSplitRight() {
-        SessionCoordinator.shared.splitActivePane(direction: .horizontal)
-    }
-
-    @objc private func doSplitLeft() {
-        SessionCoordinator.shared.splitActivePane(direction: .horizontal, before: true)
-    }
-
-    @objc private func doSplitDown() {
-        SessionCoordinator.shared.splitActivePane(direction: .vertical)
-    }
-
-    @objc private func doSplitUp() {
-        SessionCoordinator.shared.splitActivePane(direction: .vertical, before: true)
-    }
-
+    @objc private func doSplitRight() { SessionCoordinator.shared.splitActivePane(direction: .horizontal) }
+    @objc private func doSplitDown() { SessionCoordinator.shared.splitActivePane(direction: .vertical) }
     @objc private func openBrowserPane() {
         let home = SessionCoordinator.shared.settings.browserHomePage
         SessionCoordinator.shared.splitPaneCoordinator.openBrowserPane(
@@ -1150,10 +653,7 @@ private final class PaneSplitButtonsView: NSView {
             direction: .horizontal
         )
     }
-
-    @objc private func closePane() {
-        SessionCoordinator.shared.killPane(paneID: paneID)
-    }
+    @objc private func closePane() { SessionCoordinator.shared.killPane(paneID: paneID) }
 }
 
 private final class PaneHoverButton: NSButton {
@@ -1185,7 +685,8 @@ private final class PaneHoverButton: NSButton {
     }
 }
 
-/// Draggable grip icon — mouseDown+drag initiates pane drag session.
+// MARK: - PaneDragGripView
+
 @MainActor
 private final class PaneDragGripView: NSView {
     private let paneID: PaneID
@@ -1206,7 +707,6 @@ private final class PaneDragGripView: NSView {
         guard let ctx = NSGraphicsContext.current?.cgContext else { return }
         let color = NSColor.white.withAlphaComponent(0.7)
         ctx.setFillColor(color.cgColor)
-        // Draw 6 dots (3×2 grid) as grip indicator
         let dotSize: CGFloat = 2.5
         let spacingX: CGFloat = 5
         let spacingY: CGFloat = 4
@@ -1221,9 +721,7 @@ private final class PaneDragGripView: NSView {
         }
     }
 
-    override func mouseDown(with event: NSEvent) {
-        dragStarted = false
-    }
+    override func mouseDown(with event: NSEvent) { dragStarted = false }
 
     override func mouseDragged(with event: NSEvent) {
         if !dragStarted {
@@ -1254,9 +752,8 @@ private final class PaneDragGripView: NSView {
     }
 }
 
-/// NSSplitView for terminal panes: tints its divider to the theme, widens the grab
-/// (and cursor) area beyond the 1px thin divider, and persists user divider drags to
-/// the daemon so split ratios survive relaunch. Acts as its own delegate.
+// MARK: - HarnessSplitView
+
 @MainActor
 final class HarnessSplitView: NSSplitView, NSSplitViewDelegate {
     var tabID: TabID?
@@ -1284,13 +781,11 @@ final class HarnessSplitView: NSSplitView, NSSplitViewDelegate {
         appliedRatio = true
 
         if ratio == nil {
-            // N children: distribute equally
             let paneSize = totalSize / CGFloat(count)
             for i in 0..<(count - 1) {
                 setPosition(paneSize * CGFloat(i + 1), ofDividerAt: i)
             }
         } else if let ratio {
-            // 2 children: use stored ratio
             let position = totalSize * ratio
             if position > 0, position < totalSize {
                 setPosition(position, ofDividerAt: 0)
@@ -1313,16 +808,12 @@ final class HarnessSplitView: NSSplitView, NSSplitViewDelegate {
         forDrawnRect drawnRect: NSRect,
         ofDividerAt dividerIndex: Int
     ) -> NSRect {
-        // Widen the interactive/cursor zone past the 1px thin divider. NSSplitView
-        // shows the resize cursor over the effective rect, so this covers the cursor.
         var rect = proposedEffectiveRect
         if isVertical { rect.size.width = 8 } else { rect.size.height = 8 }
         return rect
     }
 
     func splitViewDidResizeSubviews(_ notification: Notification) {
-        // The divider-index key is present only when the user dragged a divider —
-        // skip programmatic setPosition and window/layout resizes.
         guard notification.userInfo?["NSSplitViewDividerIndex"] != nil else { return }
         persistRatio()
     }
@@ -1333,7 +824,6 @@ final class HarnessSplitView: NSSplitView, NSSplitViewDelegate {
         guard total > 1 else { return }
         let firstSize = isVertical ? subviews[0].frame.width : subviews[0].frame.height
         let ratio = Double(firstSize / total)
-        // Coalesce the stream of drag events into one write after the drag settles.
         ratioDebounce?.cancel()
         let work = DispatchWorkItem {
             Task { @MainActor in
@@ -1350,10 +840,10 @@ final class HarnessSplitView: NSSplitView, NSSplitViewDelegate {
     }
 }
 
-// MARK: - Draggable divider between file editor and terminal
+// MARK: - EditorDividerView
 
 @MainActor
-private final class EditorDividerView: NSView {
+final class EditorDividerView: NSView {
     weak var widthConstraint: NSLayoutConstraint?
     weak var containerView: NSView?
     private var dragStartX: CGFloat = 0

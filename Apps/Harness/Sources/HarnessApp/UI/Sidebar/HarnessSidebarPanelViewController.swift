@@ -20,7 +20,6 @@ final class HarnessSidebarPanelViewController: NSViewController {
     }
 
     private let chromeHeader = SidebarTitlebarHeaderView()
-    private let workspaceBar = NSView()
     let workspacePill = WorkspacePillButton()
     /// Collapses the sidebar (⌘\). Lives at the sidebar's top-trailing edge, against
     /// the divider; when the sidebar is collapsed it's gone with it (re-open via ⌘\).
@@ -513,7 +512,6 @@ final class HarnessSidebarPanelViewController: NSViewController {
     func applyChromeColors() {
         HarnessDesign.applySidebarChrome(to: view)
         HarnessDesign.makeClear(chromeHeader)
-        HarnessDesign.makeClear(workspaceBar)
         HarnessDesign.makeClear(gitPanelView)
         HarnessDesign.makeClear(sectionHeader)
         HarnessDesign.makeClear(footer)
@@ -540,34 +538,29 @@ final class HarnessSidebarPanelViewController: NSViewController {
             chromeHeader.topAnchor.constraint(equalTo: view.topAnchor),
             chromeHeader.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             chromeHeader.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            chromeHeader.heightAnchor.constraint(equalToConstant: HarnessDesign.titlebarChromeHeight),
+            chromeHeader.heightAnchor.constraint(equalToConstant: WindowTitleStripView.height + HarnessDesign.tabBarHeight),
         ])
     }
 
-    /// The sidebar header row: the sidebar toggle button on the trailing edge.
+    /// The sidebar toggle lives in `chromeHeader` so it aligns with the window chrome.
     /// Workspaces are deliberately not surfaced here (single active workspace);
     /// the switcher machinery stays dormant so it can be re-enabled later.
     private func setupWorkspaceBar() {
-        workspaceBar.translatesAutoresizingMaskIntoConstraints = false
-        HarnessDesign.makeClear(workspaceBar)
-
         sidebarToggleButton.toolTip = "Hide sidebar (⌘\\)"
         sidebarToggleButton.target = self
         sidebarToggleButton.action = #selector(sidebarToggleClicked)
         sidebarToggleButton.translatesAutoresizingMaskIntoConstraints = false
         updateSidebarToggleMenu()
 
-        workspaceBar.addSubview(sidebarToggleButton)
-        view.addSubview(workspaceBar)
+        chromeHeader.addSubview(sidebarToggleButton)
 
         NSLayoutConstraint.activate([
-            workspaceBar.topAnchor.constraint(equalTo: chromeHeader.bottomAnchor),
-            workspaceBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            workspaceBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            workspaceBar.heightAnchor.constraint(equalToConstant: HarnessDesign.workspaceBarHeight),
-            // Toggle pinned to the trailing edge (against the divider); 30×30.
-            sidebarToggleButton.trailingAnchor.constraint(equalTo: workspaceBar.trailingAnchor, constant: -HarnessDesign.horizontalInset),
-            sidebarToggleButton.centerYAnchor.constraint(equalTo: workspaceBar.centerYAnchor),
+            // Toggle pinned to the top chrome, against the divider; 30×30.
+            sidebarToggleButton.trailingAnchor.constraint(equalTo: chromeHeader.trailingAnchor, constant: -HarnessDesign.horizontalInset),
+            sidebarToggleButton.centerYAnchor.constraint(
+                equalTo: chromeHeader.topAnchor,
+                constant: WindowTitleStripView.height + HarnessDesign.tabBarHeight / 2
+            ),
             sidebarToggleButton.widthAnchor.constraint(equalToConstant: 30),
             sidebarToggleButton.heightAnchor.constraint(equalToConstant: 30),
         ])
@@ -779,7 +772,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
         view.addSubview(sectionHeader)
 
         NSLayoutConstraint.activate([
-            sectionHeader.topAnchor.constraint(equalTo: sidebarTabs.bottomAnchor),
+            sectionHeader.topAnchor.constraint(equalTo: chromeHeader.bottomAnchor),
             sectionHeader.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             sectionHeader.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             sectionHeader.heightAnchor.constraint(equalToConstant: 24),
@@ -794,11 +787,11 @@ final class HarnessSidebarPanelViewController: NSViewController {
         sidebarTabs.target = self
         sidebarTabs.action = #selector(sidebarTabChanged)
         sidebarTabs.segmentStyle = .rounded
-        view.addSubview(sidebarTabs)
+        chromeHeader.addSubview(sidebarTabs)
         NSLayoutConstraint.activate([
-            sidebarTabs.topAnchor.constraint(equalTo: workspaceBar.bottomAnchor, constant: 6),
-            sidebarTabs.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: HarnessDesign.horizontalInset),
-            sidebarTabs.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -HarnessDesign.horizontalInset),
+            sidebarTabs.leadingAnchor.constraint(equalTo: chromeHeader.leadingAnchor, constant: HarnessDesign.horizontalInset),
+            sidebarTabs.trailingAnchor.constraint(equalTo: sidebarToggleButton.leadingAnchor, constant: -8),
+            sidebarTabs.topAnchor.constraint(equalTo: chromeHeader.topAnchor, constant: WindowTitleStripView.height + 4),
             sidebarTabs.heightAnchor.constraint(equalToConstant: 26),
         ])
     }
