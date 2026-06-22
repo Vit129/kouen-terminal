@@ -1,9 +1,9 @@
 # Context — harness-terminal
 
 ## Now
-- **Task:** None active — ready for next session
-- **Branch:** main (latest release v3.7.0 build 164)
-- **Status:** idle
+- **Task:** Fix app crashes (TerminalTabBarView layout thunk and ContentAreaViewController event monitor) & Fix branch tab display (revert to folder/agent-first, branch-second)
+- **Branch:** fix-app-crashes
+- **Status:** Complete (reverted tab pill branch-first swap to restore session/agent name distinction, all tests passing)
 
 ## Session 2026-06-22 — P28 Complete + CLI Infrastructure
 

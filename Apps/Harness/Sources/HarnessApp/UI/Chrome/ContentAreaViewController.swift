@@ -167,23 +167,17 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
     }
 
     private func installCopySelectionToast() {
-        // RL-040: Same nonisolated(unsafe) pattern as PrefixKeymap — bypass the
-        // @Sendable closure's _checkExpectedExecutor that crashes on zombie event chains.
-        // Safe: NSEvent local monitors always fire on the main thread.
-        nonisolated(unsafe) let unsafeSelf = self
-        copySelectionMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .leftMouseUp]) { event in
-            // RL-040: If the view controller has been torn down (window closed),
-            // bail immediately — accessing unsafeSelf's view properties would
-            // dereference freed memory.
-            guard unsafeSelf.viewIfLoaded?.window != nil else { return event }
+        copySelectionMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .leftMouseUp]) { [weak self] event in
+            guard let self else { return event }
+            guard self.viewIfLoaded?.window != nil else { return event }
             if event.type == .leftMouseDown {
-                unsafeSelf.pasteboardCountAtMouseDown = NSPasteboard.general.changeCount
+                self.pasteboardCountAtMouseDown = NSPasteboard.general.changeCount
             } else if event.type == .leftMouseUp,
                       SessionCoordinator.shared.settings.copyOnSelect,
-                      unsafeSelf.eventIsInsideTerminalArea(event),
-                      NSPasteboard.general.changeCount > unsafeSelf.pasteboardCountAtMouseDown
+                      self.eventIsInsideTerminalArea(event),
+                      NSPasteboard.general.changeCount > self.pasteboardCountAtMouseDown
             {
-                Toast.show("Selection copied", in: unsafeSelf.terminalHost)
+                Toast.show("Selection copied", in: self.terminalHost)
             }
             return event
         }
