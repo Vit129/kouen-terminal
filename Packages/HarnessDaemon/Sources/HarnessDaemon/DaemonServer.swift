@@ -334,6 +334,70 @@ public final class DaemonServer: @unchecked Sendable {
                     }
                 }
                 continue
+            case let .browserScreenshot(paneID):
+                Task {
+                    let resp = await self.forwardBrowserRequest(paneID: paneID, req: .screenshot(paneID: paneID))
+                    self.queue.async {
+                        self.send(.browserSuccess(resp), to: fd)
+                    }
+                }
+                continue
+            case let .browserNetwork(paneID):
+                Task {
+                    let resp = await self.forwardBrowserRequest(paneID: paneID, req: .network(paneID: paneID))
+                    self.queue.async {
+                        self.send(.browserSuccess(resp), to: fd)
+                    }
+                }
+                continue
+            case let .browserCookies(paneID):
+                Task {
+                    let resp = await self.forwardBrowserRequest(paneID: paneID, req: .cookies(paneID: paneID))
+                    self.queue.async {
+                        self.send(.browserSuccess(resp), to: fd)
+                    }
+                }
+                continue
+            case let .browserStorage(paneID, storageType):
+                Task {
+                    let resp = await self.forwardBrowserRequest(paneID: paneID, req: .storage(paneID: paneID, storageType: storageType))
+                    self.queue.async {
+                        self.send(.browserSuccess(resp), to: fd)
+                    }
+                }
+                continue
+            case let .browserEvaluate(paneID, script):
+                Task {
+                    let resp = await self.forwardBrowserRequest(paneID: paneID, req: .evaluate(paneID: paneID, script: script))
+                    self.queue.async {
+                        self.send(.browserSuccess(resp), to: fd)
+                    }
+                }
+                continue
+            case let .browserGoBack(paneID):
+                Task {
+                    let resp = await self.forwardBrowserRequest(paneID: paneID, req: .goBack(paneID: paneID))
+                    self.queue.async {
+                        self.send(.browserSuccess(resp), to: fd)
+                    }
+                }
+                continue
+            case let .browserGoForward(paneID):
+                Task {
+                    let resp = await self.forwardBrowserRequest(paneID: paneID, req: .goForward(paneID: paneID))
+                    self.queue.async {
+                        self.send(.browserSuccess(resp), to: fd)
+                    }
+                }
+                continue
+            case let .browserReload(paneID):
+                Task {
+                    let resp = await self.forwardBrowserRequest(paneID: paneID, req: .reload(paneID: paneID))
+                    self.queue.async {
+                        self.send(.browserSuccess(resp), to: fd)
+                    }
+                }
+                continue
             case let .runGit(args, cwd):
                 Task { [weak self] in
                     guard let self else { return }

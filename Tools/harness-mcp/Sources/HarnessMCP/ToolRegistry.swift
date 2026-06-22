@@ -112,6 +112,32 @@ struct ToolRegistry: Sendable {
             toolDef("harnessBrowserClose", "Close an existing browser pane (requires MCP policy allowlist or HARNESS_MCP_ALLOW_CONTROL=1)", [
                 param("paneId", "string", "Browser pane UUID"),
             ]),
+            toolDef("harnessBrowserScreenshot", "Take a screenshot of a browser pane and return base64 PNG", [
+                param("paneId", "string", "Browser pane UUID"),
+            ]),
+            toolDef("harnessBrowserNetwork", "Get captured network requests (fetch/XHR) from a browser pane", [
+                param("paneId", "string", "Browser pane UUID"),
+            ]),
+            toolDef("harnessBrowserCookies", "Get cookies from a browser pane", [
+                param("paneId", "string", "Browser pane UUID"),
+            ]),
+            toolDef("harnessBrowserStorage", "Get localStorage or sessionStorage from a browser pane", [
+                param("paneId", "string", "Browser pane UUID"),
+                param("storageType", "string", "Storage type: 'local' or 'session'"),
+            ]),
+            toolDef("harnessBrowserEvaluate", "Evaluate a JavaScript expression in a browser pane and return the result (requires MCP policy allowlist or HARNESS_MCP_ALLOW_CONTROL=1)", [
+                param("paneId", "string", "Browser pane UUID"),
+                param("script", "string", "JavaScript code to evaluate. Must return a JSON-serializable value or string."),
+            ]),
+            toolDef("harnessBrowserGoBack", "Navigate the browser pane back in history (requires MCP policy allowlist or HARNESS_MCP_ALLOW_CONTROL=1)", [
+                param("paneId", "string", "Browser pane UUID"),
+            ]),
+            toolDef("harnessBrowserGoForward", "Navigate the browser pane forward in history (requires MCP policy allowlist or HARNESS_MCP_ALLOW_CONTROL=1)", [
+                param("paneId", "string", "Browser pane UUID"),
+            ]),
+            toolDef("harnessBrowserReload", "Reload the current page in a browser pane (requires MCP policy allowlist or HARNESS_MCP_ALLOW_CONTROL=1)", [
+                param("paneId", "string", "Browser pane UUID"),
+            ]),
             toolDef("harnessFind", "Fuzzy search for files in the active session's working directory", [
                 param("query", "string", "Query to filter files (optional)"),
             ]),
@@ -168,6 +194,14 @@ struct ToolRegistry: Sendable {
         case "harnessBrowserSnapshot": return await harnessBrowserSnapshot(args)
         case "harnessBrowserInteract": return await harnessBrowserInteract(args)
         case "harnessBrowserClose": return await harnessBrowserClose(args)
+        case "harnessBrowserScreenshot": return await harnessBrowserScreenshot(args)
+        case "harnessBrowserNetwork": return await harnessBrowserNetwork(args)
+        case "harnessBrowserCookies": return await harnessBrowserCookies(args)
+        case "harnessBrowserStorage": return await harnessBrowserStorage(args)
+        case "harnessBrowserEvaluate": return await harnessBrowserEvaluate(args)
+        case "harnessBrowserGoBack": return await harnessBrowserGoBack(args)
+        case "harnessBrowserGoForward": return await harnessBrowserGoForward(args)
+        case "harnessBrowserReload": return await harnessBrowserReload(args)
         case "harnessSpawnAgent": return await harnessSpawnAgent(args)
         default:
             return (nil, JSONRPCError(code: -32602, message: "Unknown tool: \(name)"))
@@ -476,6 +510,64 @@ struct ToolRegistry: Sendable {
             return (nil, JSONRPCError(code: -32602, message: "Missing 'paneId' parameter"))
         }
         return await browserTools.harnessBrowserClose(paneIdStr: paneId)
+    }
+
+    private func harnessBrowserScreenshot(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        guard case let .string(paneId)? = args["paneId"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'paneId' parameter"))
+        }
+        return await browserTools.harnessBrowserScreenshot(paneIdStr: paneId)
+    }
+
+    private func harnessBrowserNetwork(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        guard case let .string(paneId)? = args["paneId"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'paneId' parameter"))
+        }
+        return await browserTools.harnessBrowserNetwork(paneIdStr: paneId)
+    }
+
+    private func harnessBrowserCookies(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        guard case let .string(paneId)? = args["paneId"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'paneId' parameter"))
+        }
+        return await browserTools.harnessBrowserCookies(paneIdStr: paneId)
+    }
+
+    private func harnessBrowserStorage(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        guard case let .string(paneId)? = args["paneId"],
+              case let .string(storageType)? = args["storageType"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'paneId' or 'storageType' parameter"))
+        }
+        return await browserTools.harnessBrowserStorage(paneIdStr: paneId, storageType: storageType)
+    }
+
+    private func harnessBrowserEvaluate(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        guard case let .string(paneId)? = args["paneId"],
+              case let .string(script)? = args["script"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'paneId' or 'script' parameter"))
+        }
+        return await browserTools.harnessBrowserEvaluate(paneIdStr: paneId, script: script)
+    }
+
+    private func harnessBrowserGoBack(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        guard case let .string(paneId)? = args["paneId"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'paneId' parameter"))
+        }
+        return await browserTools.harnessBrowserGoBack(paneIdStr: paneId)
+    }
+
+    private func harnessBrowserGoForward(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        guard case let .string(paneId)? = args["paneId"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'paneId' parameter"))
+        }
+        return await browserTools.harnessBrowserGoForward(paneIdStr: paneId)
+    }
+
+    private func harnessBrowserReload(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        guard case let .string(paneId)? = args["paneId"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'paneId' parameter"))
+        }
+        return await browserTools.harnessBrowserReload(paneIdStr: paneId)
     }
 
     private func harnessSpawnAgent(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {

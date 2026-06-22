@@ -155,6 +155,14 @@ public enum IPCRequest: Codable, Sendable {
     case browserSnapshot(paneID: UUID, interactive: Bool?)
     case browserInteract(paneID: UUID, action: String, elementID: String, text: String?)
     case browserClose(paneID: UUID)
+    case browserScreenshot(paneID: UUID)
+    case browserNetwork(paneID: UUID)
+    case browserCookies(paneID: UUID)
+    case browserStorage(paneID: UUID, storageType: String)
+    case browserEvaluate(paneID: UUID, script: String)
+    case browserGoBack(paneID: UUID)
+    case browserGoForward(paneID: UUID)
+    case browserReload(paneID: UUID)
     case browserResponse(id: UUID, response: BrowserResponsePayload)
 }
 
@@ -169,6 +177,10 @@ public enum BrowserRequestPayload: Codable, Sendable {
     case storage(paneID: UUID, storageType: String)
     case interact(paneID: UUID, action: String, elementID: String, text: String?)
     case close(paneID: UUID)
+    case evaluate(paneID: UUID, script: String)
+    case goBack(paneID: UUID)
+    case goForward(paneID: UUID)
+    case reload(paneID: UUID)
 }
 
 public enum BrowserResponsePayload: Codable, Sendable {
@@ -179,6 +191,7 @@ public enum BrowserResponsePayload: Codable, Sendable {
     case network([BrowserNetworkEntry])
     case cookies([BrowserCookie])
     case storage([String: String])
+    case text(String)
     case error(String)
 }
 

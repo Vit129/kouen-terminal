@@ -1068,7 +1068,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
             // observe the notification bus and decide how to surface it.
             postDisplayMessage(FormatString.evaluate(format, context: buildFormatContext()))
             return .ok
-        case .runGit, .browserOpen, .browserNavigate, .browserWait, .browserSnapshot, .browserInteract, .browserClose, .browserResponse:
+        case .runGit, .browserOpen, .browserNavigate, .browserWait, .browserSnapshot, .browserInteract, .browserClose, .browserScreenshot, .browserNetwork, .browserCookies, .browserStorage, .browserEvaluate, .browserGoBack, .browserGoForward, .browserReload, .browserResponse:
             return .error("Browser/Git requests are handled at the daemon server layer")
         }
     }

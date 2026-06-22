@@ -218,6 +218,42 @@ final class DaemonSyncService {
         case let .close(paneID):
             coord.splitPaneCoordinator.killPane(paneID: paneID)
             _ = await request(.browserResponse(id: id, response: .ok))
+
+        case let .evaluate(paneID, script):
+            guard let view = BrowserPaneRegistry.shared.get(paneID) else {
+                _ = await request(.browserResponse(id: id, response: .error("Browser pane not found")))
+                return
+            }
+            do {
+                let result = try await view.evaluateJS(script)
+                _ = await request(.browserResponse(id: id, response: .text(result)))
+            } catch {
+                _ = await request(.browserResponse(id: id, response: .error(error.localizedDescription)))
+            }
+
+        case let .goBack(paneID):
+            guard let view = BrowserPaneRegistry.shared.get(paneID) else {
+                _ = await request(.browserResponse(id: id, response: .error("Browser pane not found")))
+                return
+            }
+            view.webView.goBack()
+            _ = await request(.browserResponse(id: id, response: .ok))
+
+        case let .goForward(paneID):
+            guard let view = BrowserPaneRegistry.shared.get(paneID) else {
+                _ = await request(.browserResponse(id: id, response: .error("Browser pane not found")))
+                return
+            }
+            view.webView.goForward()
+            _ = await request(.browserResponse(id: id, response: .ok))
+
+        case let .reload(paneID):
+            guard let view = BrowserPaneRegistry.shared.get(paneID) else {
+                _ = await request(.browserResponse(id: id, response: .error("Browser pane not found")))
+                return
+            }
+            view.webView.reload()
+            _ = await request(.browserResponse(id: id, response: .ok))
         }
     }
 
