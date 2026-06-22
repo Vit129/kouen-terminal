@@ -8,8 +8,14 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 
 ## [3.8.0] - 2026-06-22
 
-### Added
-- Release version bump to v3.8.0.
+### Changed
+- **ContentAreaViewController decomposed** into three focused coordinators: `PaneLifecycleManager` (pane rebuild/zombie lifecycle), `FilePreviewCoordinator` (file editor split panel), and `BrowserIntegrationController` (browser pane build/collect/detach). ContentAreaVC is now a thin coordinator (~270 lines, down from 58 KB).
+- **ZombieHoldRegistry** centralises the retire-hold pattern (RL-040/RL-041) previously duplicated across 5+ files. All zombie-hold sites (`TerminalPaneRegistry`, `TerminalTabBarView`, `ContentAreaVC/PaneContainerView`, `GitPanelView`) now call `ZombieHoldRegistry.shared.hold()`.
+- **Typed `snapshotChanged` notifications** — replaced stringly-typed `userInfo` dictionary with `SnapshotChangedPayload` struct (`revision`, `structureChanged`, `metadataOnly`, `chromeChanged`). All posting sites use `NotificationBus.shared.postSnapshotChanged(_:)`; consumers read `notification.snapshotPayload`.
+- **IPC protocol versioning** — `identifyClient` now carries a `protocolVersion: Int` field matching `ipcProtocolVersion = 1`. The daemon returns `.protocolRejected` and closes the connection on version mismatch, preventing silent misbehaviour from version-skewed client/daemon pairs.
+
+### Fixed
+- `full-cycle.sh` CHANGELOG prompt used bash-only `${confirm,,}` lowercase expansion — replaced with `tr` for zsh compatibility.
 
 ## [3.7.0] - 2026-06-21
 
