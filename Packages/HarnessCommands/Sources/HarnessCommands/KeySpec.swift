@@ -1,4 +1,5 @@
 import Foundation
+import HarnessIPC
 
 /// Platform-independent description of a single keystroke: a base key + a set
 /// of modifiers. Round-trippable to/from textual form (`C-a`, `M-1`, `S-Tab`,

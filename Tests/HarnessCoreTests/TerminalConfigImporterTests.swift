@@ -1,5 +1,6 @@
 import XCTest
 @testable import HarnessCore
+@testable import HarnessSettings
 
 final class TerminalConfigImporterTests: XCTestCase {
     func testCandidatePathsPreferModernThenLegacyNamesAcrossLocations() {

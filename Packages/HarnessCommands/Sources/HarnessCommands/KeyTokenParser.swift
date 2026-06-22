@@ -1,4 +1,5 @@
 import Foundation
+import HarnessIPC
 
 /// Parses Harness key tokens into the raw byte sequence a PTY expects when
 /// the user (or an agent script) sends them. Handles control/meta/shift

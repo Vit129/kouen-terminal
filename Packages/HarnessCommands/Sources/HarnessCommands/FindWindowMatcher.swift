@@ -4,6 +4,7 @@ import Darwin
 import Glibc
 #endif
 import Foundation
+import HarnessIPC
 
 /// Matching for `find-window` (tmux `-N` name / `-T` title / `-C` content). Name and
 /// title both match the tab's title in Harness (tabs have no separate pane titles);
