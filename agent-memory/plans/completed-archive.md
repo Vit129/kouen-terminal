@@ -171,3 +171,24 @@ All plans below are **done** and merged into main.
 - Competitive analysis consolidated Supacode, P21 actionable agent layer, and P4 follow-ups into Harness-specific parity work.
 - Key completed scope: project config/lifecycle scripts direction, agent status/auto-start UX, worktree-per-session model, GitHub PR/CI integration plan, sidebar density, and CLI scripting model.
 - P21 ACP sideband/provider/brain/execution layers remain shelved separately; P4 follow-ups were absorbed into P24.
+
+## P28 — Browser DevTools API (v3.7.0 → v3.9.0)
+- harness-mcp 14 browser tools: Open, Navigate, Wait, Snapshot, Interact, Close, Screenshot, Network, Cookies, Storage, Evaluate, GoBack, GoForward, Reload
+- IPC wiring: BrowserRequestPayload → DaemonServer → GUI BrowserPaneView → MCP response
+- ToolPolicy gate for control tools (evaluateJS, interact, close, navigate)
+- MCP config wired globally (Claude, Codex, Kiro, Gemini)
+- Replaces chrome-devtools-mcp (~70-75% token savings)
+
+## Sidebar SwiftUI Migration — Option B (v3.9.0)
+- NSTableView → SwiftUI List via @Observable SidebarListModel + NSHostingView
+- Eliminates RL-051 crash class (row-index out-of-range) permanently
+- HarnessSidebarPanelVC reduced from 72KB → ~30KB
+- Context menus via .contextMenu {} SwiftUI modifier
+- snapshotChanged → model.update() (SwiftUI handles diffing)
+
+## HarnessCore Package Split (v3.9.0)
+- HarnessCore (30+ subdirs) → HarnessCore + HarnessCommands + HarnessIPC + HarnessSettings
+- 20+ files moved to HarnessCommands (parser, keybindings, format, pane layout)
+- IPC types moved to HarnessIPC (IPCMessage, IPCCodec, models)
+- Settings moved to HarnessSettings (AIAgentConfig, HarnessSettings, ProjectConfig)
+- Faster incremental builds, cleaner dependency graph
