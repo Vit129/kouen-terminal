@@ -12,7 +12,7 @@ import HarnessCore
 /// just another front-end onto `Command` → IPC.
 enum ControlModeClient {
     static func run(client: DaemonClient) throws -> Int32 {
-        _ = try? client.request(.identifyClient(label: "harness-cli -CC"), timeout: 1)
+        _ = try? client.request(.identifyClient(label: "harness-cli -CC", protocolVersion: ipcProtocolVersion), timeout: 1)
         let writer = Writer()
         var commandNumber = 0
 

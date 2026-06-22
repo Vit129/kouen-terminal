@@ -1,5 +1,10 @@
 import Foundation
 
+/// Current IPC wire-format version. Bump whenever a breaking change is made to
+/// `IPCRequest` or `IPCResponse`. The daemon rejects `identifyClient` messages
+/// whose `protocolVersion` does not match this value.
+public let ipcProtocolVersion: Int = 1
+
 public enum IPCRequest: Codable, Sendable {
     case ping
     case listWorkspaces
@@ -104,8 +109,9 @@ public enum IPCRequest: Codable, Sendable {
     case detachSurface(surfaceID: String)
     /// Identify this connection to the daemon so it shows up in `list-clients`
     /// and can be addressed by `detach-client`. Idempotent; safe to send once
-    /// per persistent connection.
-    case identifyClient(label: String)
+    /// per persistent connection. `protocolVersion` must equal `ipcProtocolVersion`;
+    /// the daemon returns `.protocolRejected` and closes the connection if it does not.
+    case identifyClient(label: String, protocolVersion: Int)
     case listClients
     case detachClient(clientID: UUID)
     case daemonStats
@@ -301,6 +307,9 @@ public enum IPCResponse: Codable, Sendable {
     case hookID(UUID)
     case hooks([HookEntry])
     case error(String)
+    /// Sent in response to `identifyClient` when the client's `protocolVersion` does not
+    /// match `ipcProtocolVersion`. The daemon closes the connection immediately after.
+    case protocolRejected(reason: String)
     case gitResult(output: String, stderr: String, success: Bool)
 
     // Browser tool integration (P14)

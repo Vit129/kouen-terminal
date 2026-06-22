@@ -451,7 +451,10 @@ public final class DaemonServer: @unchecked Sendable {
     /// than session state). Returning `nil` falls through to `registry.handle`.
     private func handleClientLifecycle(_ request: IPCRequest, fd: Int32) -> IPCResponse? {
         switch request {
-        case let .identifyClient(label):
+        case let .identifyClient(label, protocolVersion):
+            guard protocolVersion == ipcProtocolVersion else {
+                return .protocolRejected(reason: "client protocolVersion \(protocolVersion) != daemon \(ipcProtocolVersion); upgrade both sides to the same version")
+            }
             // Idempotent: identifying twice on the same socket updates the label
             // but keeps the same client ID so callers can identify-then-act.
             if var record = clients[fd] {
