@@ -31,7 +31,7 @@ final class GitPanelView: NSView {
     }
 
     // Top tabs: Changes | History | Worktrees | Repos
-    private let tabSelector = NSSegmentedControl(labels: ["Changes", "History"], trackingMode: .selectOne, target: nil, action: nil)
+    private let tabSelector = NSSegmentedControl(labels: ["Changes", "History", "Worktrees"], trackingMode: .selectOne, target: nil, action: nil)
     private let changesContainer = NSView()
     private let historyContainer = NSView()
     private let worktreesContainer = NSView()
@@ -374,8 +374,8 @@ final class GitPanelView: NSView {
         commitButton.isHidden = selected != 0
         stageAllButton.isHidden = selected != 0
         historyContainer.isHidden = selected != 1
-        worktreesContainer.isHidden = true
-        addWorktreeButton.isHidden = true
+        worktreesContainer.isHidden = selected != 2
+        addWorktreeButton.isHidden = selected != 2
         reposContainer.isHidden = true
     }
 
