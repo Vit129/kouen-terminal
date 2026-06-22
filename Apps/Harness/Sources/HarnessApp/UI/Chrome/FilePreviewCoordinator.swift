@@ -258,8 +258,7 @@ final class FilePreviewCoordinator {
         hosts.forEach { $0.setPresentsWithTransaction(true) }
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        containerView.layoutSubtreeIfNeeded()
-        terminalHost.layoutSubtreeIfNeeded()
+        containerView.layout()
         CATransaction.commit()
         hosts.forEach { $0.setPresentsWithTransaction(false) }
     }
