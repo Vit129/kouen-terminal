@@ -11,6 +11,8 @@ final class PaneLifecycleManager {
 
     private(set) var paneContainer: PaneContainerView?
     private var lastStructureKey = ""
+    private var containerCache: [String: PaneContainerView] = [:] // tabID → cached container
+    private var activeTabID: String?
     var pendingReload: Bool?
 
     init(terminalHost: NSView, containerView: NSView) {
@@ -32,11 +34,27 @@ final class PaneLifecycleManager {
         else { return }
 
         let displayNode = zoomedNode(for: tab) ?? tab.rootPane
-        let key = "\(coordinator.structureRevision)|\(workspace.id)|\(tab.id)|\(tab.zoomedPaneID?.uuidString ?? "all")|\(paneKey(displayNode))"
+        let paneStructureKey = paneKey(displayNode)
+        let key = "\(coordinator.structureRevision)|\(workspace.id)|\(tab.id)|\(tab.zoomedPaneID?.uuidString ?? "all")|\(paneStructureKey)"
         guard force || key != lastStructureKey else {
             paneContainer?.refreshChrome(snapshot: coordinator.snapshot)
             return
         }
+
+        let tabID = tab.id.uuidString
+
+        // Fast path: if we have a cached container for this tab, just swap visibility
+        if !force, let cached = containerCache[tabID], cached.superview == terminalHost {
+            paneContainer?.isHidden = true
+            cached.isHidden = false
+            paneContainer = cached
+            lastStructureKey = key
+            activeTabID = tabID
+            coordinator.ensureActivePane(for: tab)
+            paneContainer?.refreshChrome(snapshot: coordinator.snapshot)
+            return
+        }
+
         fputs("BLINKDBG reloadIfNeeded REBUILD: force=\(force) oldKey=\(lastStructureKey) newKey=\(key)\n", harnessStderr)
         lastStructureKey = key
 
@@ -54,8 +72,16 @@ final class PaneLifecycleManager {
         let detached = Array(existingHosts.values)
         for host in detached { ZombieHoldRegistry.shared.hold(host) }
 
-        if let old = paneContainer { ZombieHoldRegistry.shared.hold(old) }
-        paneContainer?.removeFromSuperview()
+        // Hide old container (keep in cache if it belongs to a tab)
+        if let old = paneContainer {
+            old.isHidden = true
+            if let prevTabID = activeTabID {
+                containerCache[prevTabID] = old
+            } else {
+                ZombieHoldRegistry.shared.hold(old)
+                old.removeFromSuperview()
+            }
+        }
 
         let container = PaneContainerView(
             node: displayNode,
@@ -73,13 +99,15 @@ final class PaneLifecycleManager {
             container.bottomAnchor.constraint(equalTo: terminalHost.bottomAnchor),
         ])
         paneContainer = container
+        activeTabID = tabID
+        containerCache[tabID] = container
         coordinator.ensureActivePane(for: tab)
 
         CATransaction.begin()
         CATransaction.setCompletionBlock {
             allHosts.forEach { $0.setPresentsWithTransaction(false) }
         }
-        containerView.layoutSubtreeIfNeeded()
+        containerView.layout()
         CATransaction.commit()
     }
 
