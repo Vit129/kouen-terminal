@@ -42,15 +42,11 @@ final class HarnessWindow: NSWindow {
         super.sendEvent(ev)
     }
 
-    /// RL-040: Hold a strong reference during close so AppKit's event routing does not
-    /// hit a deallocated window between `close()` and the next runloop drain.
-    private nonisolated(unsafe) static var retiredWindows: [HarnessWindow] = []
-
+    /// RL-040: Keep alive 0.5s so AppKit event routing does not hit a deallocated window
+    /// between close() and the next runloop drain. Closure capture is the hold.
     nonisolated override func close() {
-        Self.retiredWindows.append(self)
+        let hold = self
         super.close()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            Self.retiredWindows.removeAll { $0 === self }
-        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { _ = hold }
     }
 }

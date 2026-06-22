@@ -91,7 +91,7 @@ if [[ -z "$NOTES" ]]; then
   echo "   Tip: add ## [${NEW_VERSION}] section to CHANGELOG.md before running full-cycle."
   if [[ -t 0 ]]; then
     read -r -p "   Continue anyway? [y/N] " confirm
-    [[ "${confirm,,}" == "y" ]] || { echo "Aborted."; exit 1; }
+    [[ "$(echo "$confirm" | tr '[:upper:]' '[:lower:]')" == "y" ]] || { echo "Aborted."; exit 1; }
   fi
   NOTES="Release ${TAG}"
 fi

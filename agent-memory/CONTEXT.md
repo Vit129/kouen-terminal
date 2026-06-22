@@ -1,9 +1,9 @@
 # Context — harness-terminal
 
 ## Now
-- **Task:** None active — ready for next session
-- **Branch:** main (latest release v3.7.0 build 164)
-- **Status:** idle
+- **Task:** Architecture refactor (items 1–5 from review) — items 1, 2, 4, 5 complete; item 3 (HarnessCore split) blocked, plan written
+- **Branch:** fix-app-crashes
+- **Status:** Items 1/2/4/5 committed; item 3 needs 2-step plan before implementation
 
 ## Session 2026-06-22 — P28 Complete + CLI Infrastructure
 

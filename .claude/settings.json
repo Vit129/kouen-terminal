@@ -47,6 +47,13 @@
     "bgIsolation": "none"
   },
   "mcpServers": {
+    "harness": {
+      "command": "/Applications/Harness.app/Contents/MacOS/harness-mcp",
+      "args": [],
+      "env": {
+        "HARNESS_MCP_ALLOW_CONTROL": "1"
+      }
+    },
     "graphify": {
       "command": "/Users/supavit.cho/.local/share/uv/tools/graphifyy/bin/graphify-mcp",
       "args": [

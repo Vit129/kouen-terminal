@@ -24,7 +24,8 @@ final class WorktreeAutoIsolateService {
 
     private func handleBranchChange() {
         let coord = SessionCoordinator.shared
-        guard let tab = coord.snapshot.activeWorkspace?.activeTab else { return }
+        guard let workspace = coord.snapshot.activeWorkspace,
+              let tab = workspace.activeTab else { return }
         guard let branch = tab.gitBranch, !branch.isEmpty else { return }
         guard !Self.defaultBranches.contains(branch) else { return }
 
@@ -32,21 +33,35 @@ final class WorktreeAutoIsolateService {
         if tab.worktreePath != nil { return }
 
         let cwd = tab.cwd
-        // Check if cwd is a git repo root (not already a worktree subdir)
+        // Check if cwd is the PARENT repo root (not already inside a worktree).
+        // git rev-parse --show-toplevel returns the worktree root if inside one,
+        // so we also check --git-common-dir to detect worktree vs main repo.
         guard manager.repoRoot(for: cwd) == cwd else { return }
+        guard !isInsideWorktree(cwd) else { return }
 
-        // Create worktree for this branch
-        let sessionID = branch.replacingOccurrences(of: "/", with: "-")
-        let config = ProjectConfig.load(from: cwd)
-        let baseRef = config?.baseRef ?? "HEAD"
+        // Collect worktree paths already claimed by OTHER tabs in this workspace.
+        let otherTabWorktrees: Set<String> = Set(
+            workspace.sessions.flatMap(\.tabs)
+                .filter { $0.id != tab.id }
+                .compactMap { $0.worktreePath ?? $0.cwd }
+        )
 
-        // Try to create — if branch already exists in another worktree, just cd to it
-        let existingWorktree = manager.list(repoPath: cwd).first { $0.branch == branch }
+        // Find an existing worktree for this branch that no other tab is using.
+        let existingWorktrees = manager.list(repoPath: cwd).filter { $0.branch == branch }
+        let availableWorktree = existingWorktrees.first { !otherTabWorktrees.contains($0.path) }
+
         let wtPath: String
-        if let existing = existingWorktree {
-            wtPath = existing.path
+        if let available = availableWorktree, available.path != cwd {
+            wtPath = available.path
         } else {
-            guard let created = manager.create(repoPath: cwd, sessionID: sessionID, branch: branch, baseRef: baseRef) else { return }
+            // All existing worktrees for this branch are occupied (or only the repo root itself).
+            // Create a new one with a unique suffix.
+            let baseName = branch.replacingOccurrences(of: "/", with: "-")
+            let suffix = existingWorktrees.isEmpty ? "" : "-\(existingWorktrees.count)"
+            let sessionID = baseName + suffix
+            let config = ProjectConfig.load(from: cwd)
+            let baseRef = config?.baseRef ?? branch
+            guard let created = manager.create(repoPath: cwd, sessionID: sessionID, branch: nil, baseRef: baseRef) else { return }
             wtPath = created
         }
 
@@ -57,5 +72,28 @@ final class WorktreeAutoIsolateService {
                 data: Data(("cd \(wtPath)\r").utf8)
             ))
         }
+    }
+
+    /// Returns true if the path is inside a git linked worktree (not the main working tree).
+    /// Uses `git rev-parse --git-common-dir` vs `--git-dir` — if they differ, it's a worktree.
+    private func isInsideWorktree(_ path: String) -> Bool {
+        let process = Process()
+        let pipe = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        process.arguments = ["rev-parse", "--git-dir", "--git-common-dir"]
+        process.currentDirectoryURL = URL(fileURLWithPath: path)
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        do {
+            try process.run()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0 else { return false }
+            let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+            let lines = output.split(separator: "\n")
+            guard lines.count == 2 else { return false }
+            // In a linked worktree, git-dir != git-common-dir
+            // e.g. git-dir = /repo/.git/worktrees/xyz, git-common-dir = /repo/.git
+            return lines[0] != lines[1]
+        } catch { return false }
     }
 }

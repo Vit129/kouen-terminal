@@ -44,9 +44,6 @@ final class TerminalTabBarView: NSView {
     private var activeTabID: TabID?
     private var pillsByID: [TabID: TabPillView] = [:]
     private var orderedPills: [TabPillView] = []
-    /// Retired pills kept alive for one runloop tick so AppKit's pending tracking-area
-    /// and layout passes complete before ARC frees them (prevents UAF crash).
-    private var retiredPills: [TabPillView] = []
 
     // Layout metrics.
     private let edgeInset: CGFloat = 10
@@ -132,16 +129,14 @@ final class TerminalTabBarView: NSView {
         pillsByID.removeAll(keepingCapacity: true)
         draggingPill = nil
         dragTargetIndex = nil
-        // Defer dealloc: AppKit may still have pending tracking-area or layout
-        // dispatches targeting the removed pills. Keep them alive one tick.
-        retiredPills = oldPills
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.retiredPills.removeAll() }
+        // RL-041: keep pills alive 0.5s (keyUp arrives in a later event-loop iteration).
+        for pill in oldPills { ZombieHoldRegistry.shared.hold(pill, duration: 0.5) }
 
         for (index, tab) in tabs.enumerated() {
             let id = tab.id
             // ⌘1–9 switch to the first nine tabs; past that, no hint.
-            let showSessionContext = shouldShowSessionContext(for: tab)
-            let pill = TabPillView(tab: tab, isActive: tab.id == activeTabID, position: index < 9 ? index + 1 : nil, showSessionContext: showSessionContext)
+            let showBranch = shouldShowBranch(for: tab)
+            let pill = TabPillView(tab: tab, isActive: tab.id == activeTabID, position: index < 9 ? index + 1 : nil, showBranch: showBranch)
             pill.translatesAutoresizingMaskIntoConstraints = true
             pill.toolTip = HarnessDesign.shortenPath(tab.cwd)
             pill.onSelect = { [weak self] id in self?.delegate?.tabBarDidSelect(tabID: id) }
@@ -157,9 +152,9 @@ final class TerminalTabBarView: NSView {
         applyChrome()
     }
 
-    private func shouldShowSessionContext(for tab: Tab) -> Bool {
-        guard let repoName = tabRepoDisplayName(tab) else { return false }
-        return repoName != tabPrimaryDisplayTitle(tab)
+    private func shouldShowBranch(for tab: Tab) -> Bool {
+        guard let branch = tab.gitBranch, !branch.isEmpty else { return false }
+        return true
     }
 
     /// Update titles/status of existing pills without rebuilding, for live PWD /
@@ -176,8 +171,8 @@ final class TerminalTabBarView: NSView {
         self.tabs = tabs
         self.activeTabID = activeTabID
         for tab in tabs {
-            let showSessionContext = shouldShowSessionContext(for: tab)
-            pillsByID[tab.id]?.update(tab: tab, isActive: tab.id == activeTabID, showSessionContext: showSessionContext)
+            let showBranch = shouldShowBranch(for: tab)
+            pillsByID[tab.id]?.update(tab: tab, isActive: tab.id == activeTabID, showBranch: showBranch)
             pillsByID[tab.id]?.toolTip = HarnessDesign.shortenPath(tab.cwd)
         }
         needsLayout = true // active tab change can shift the visible window
@@ -232,27 +227,17 @@ final class TerminalTabBarView: NSView {
     /// RL-040: Prevent deallocation while AppKit's display server still holds an unsafe
     /// reference and can dispatch layout() to this view. The @objc thunk dereferences `self`
     /// metadata before any Swift guard can run.
-    private static var retiredBars: [TerminalTabBarView] = []
-
     override func viewWillMove(toWindow newWindow: NSWindow?) {
         if newWindow == nil {
-            // Cancel any pending layout/display passes.
             NSObject.cancelPreviousPerformRequests(withTarget: self)
             needsLayout = false
             needsDisplay = false
-            // Hold self alive for 1.5s so AppKit's async layout drain completes.
-            Self.retiredBars.append(self)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
-                guard let self else { return }
-                Self.retiredBars.removeAll { $0 === self }
-            }
+            // Hold self alive for 1.5s so AppKit's async layout drain completes (RL-040).
+            ZombieHoldRegistry.shared.hold(self)
         }
         super.viewWillMove(toWindow: newWindow)
     }
 
-    /// RL-040: `nonisolated` prevents the @objc thunk from calling swift_getObjectType(self)
-    /// to verify executor isolation. AppKit always calls layout() on the main thread, so the
-    /// check is unnecessary — and fatal when self's isa has been corrupted by a use-after-free.
     nonisolated override func layout() {
         MainActor.assumeIsolated {
             guard window != nil else { return }
@@ -389,7 +374,7 @@ final class TerminalTabBarView: NSView {
     @objc private func showOverflowMenu() {
         let menu = NSMenu()
         for (i, tab) in tabs.enumerated() where !(i >= visibleStart && i < visibleStart + visibleCount) {
-            let item = NSMenuItem(title: tabPrimaryDisplayTitle(tab), action: #selector(overflowItemSelected(_:)), keyEquivalent: "")
+            let item = NSMenuItem(title: tabDisplayTitle(tab), action: #selector(overflowItemSelected(_:)), keyEquivalent: "")
             item.target = self
             item.representedObject = tab.id.uuidString
             // A waiting tab gets the bell glyph (same vocabulary as the tab pill) — a
@@ -414,14 +399,6 @@ final class TerminalTabBarView: NSView {
 
 @MainActor
 private func tabDisplayTitle(_ tab: Tab) -> String {
-    tabPrimaryDisplayTitle(tab)
-}
-
-@MainActor
-private func tabPrimaryDisplayTitle(_ tab: Tab) -> String {
-    if let branch = tab.gitBranch?.trimmingCharacters(in: .whitespacesAndNewlines), !branch.isEmpty {
-        return branch
-    }
     let folder = HarnessDesign.pathDisplayName(tab.cwd)
     if let kind = tabAgentKind(for: tab) {
         return folder.isEmpty ? kind.displayName : folder
@@ -429,22 +406,6 @@ private func tabPrimaryDisplayTitle(_ tab: Tab) -> String {
     let titleIsAgentBranding = !tab.title.isEmpty && AgentTitleInference.kind(from: tab.title) != nil
     let hasCustomTitle = !tab.title.isEmpty && tab.title != "Shell" && !titleIsAgentBranding
     return !folder.isEmpty ? folder : (hasCustomTitle ? tab.title : "Terminal")
-}
-
-@MainActor
-private func tabSessionContext(_ tab: Tab) -> String? {
-    guard let repoName = tabRepoDisplayName(tab) else { return nil }
-    return repoName == tabPrimaryDisplayTitle(tab) ? nil : repoName
-}
-
-@MainActor
-private func tabRepoDisplayName(_ tab: Tab) -> String? {
-    if let repoPath = tab.parentRepoPath?.trimmingCharacters(in: .whitespacesAndNewlines),
-       !repoPath.isEmpty {
-        return HarnessDesign.projectGroupDisplayName(forRootPath: repoPath)
-    }
-    let name = HarnessDesign.projectGroupName(for: tab.cwd)
-    return name.isEmpty ? nil : name
 }
 
 /// Effective agent kind for the tab — daemon-detected first, then a permissive
@@ -499,7 +460,7 @@ private final class TabPillView: NSView {
     // (true), so dragging there still moves the window.
     override var mouseDownCanMoveWindow: Bool { false }
 
-    init(tab: Tab, isActive: Bool, position: Int?, showSessionContext: Bool) {
+    init(tab: Tab, isActive: Bool, position: Int?, showBranch: Bool) {
         tabID = tab.id
         hasShortcut = position != nil
         super.init(frame: .zero)
@@ -516,7 +477,7 @@ private final class TabPillView: NSView {
 
         titleLabel.lineBreakMode = .byTruncatingTail
         titleLabel.alignment = .center
-        titleLabel.stringValue = tabPrimaryDisplayTitle(tab)
+        titleLabel.stringValue = tabDisplayTitle(tab)
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         titleLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
         titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
@@ -529,8 +490,8 @@ private final class TabPillView: NSView {
         branchLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
         branchLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-        if showSessionContext, let context = tabSessionContext(tab) {
-            branchLabel.stringValue = context
+        if showBranch, let branch = tab.gitBranch, !branch.isEmpty {
+            branchLabel.stringValue = "⎇ \(branch)"
             branchLabel.isHidden = false
             titleLabel.font = .systemFont(ofSize: 11.5, weight: .medium)
         } else {
@@ -696,18 +657,20 @@ private final class TabPillView: NSView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        if let trackingArea { removeTrackingArea(trackingArea) }
-        guard window != nil else { trackingArea = nil; return }
-        let area = NSTrackingArea(
-            rect: bounds,
-            options: [.mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect],
-            owner: self,
-            userInfo: nil
-        )
-        addTrackingArea(area)
-        trackingArea = area
+    nonisolated override func updateTrackingAreas() {
+        MainActor.assumeIsolated {
+            super.updateTrackingAreas()
+            if let trackingArea { removeTrackingArea(trackingArea) }
+            guard window != nil else { trackingArea = nil; return }
+            let area = NSTrackingArea(
+                rect: bounds,
+                options: [.mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect],
+                owner: self,
+                userInfo: nil
+            )
+            addTrackingArea(area)
+            trackingArea = area
+        }
     }
 
     override func mouseEntered(with event: NSEvent) {
@@ -810,13 +773,13 @@ private final class TabPillView: NSView {
         onClose?(tabID)
     }
 
-    func update(tab: Tab, isActive: Bool, showSessionContext: Bool) {
+    func update(tab: Tab, isActive: Bool, showBranch: Bool) {
         status = tab.status
         isPersistent = tab.persistent
         applyStatusDot(tab.status)
         
-        if showSessionContext, let context = tabSessionContext(tab) {
-            branchLabel.stringValue = context
+        if showBranch, let branch = tab.gitBranch, !branch.isEmpty {
+            branchLabel.stringValue = "⎇ \(branch)"
             branchLabel.isHidden = false
             titleLabel.font = .systemFont(ofSize: 11.5, weight: .medium)
         } else {
@@ -825,7 +788,7 @@ private final class TabPillView: NSView {
             titleLabel.font = HarnessDesign.Typography.tabTitle
         }
         
-        titleLabel.stringValue = tabPrimaryDisplayTitle(tab)
+        titleLabel.stringValue = tabDisplayTitle(tab)
         setAgentIcon(for: tab)
         setPersistentIndicator(tab.persistent)
         setWorkingDotVisible(Self.isAgentWorking(tab))

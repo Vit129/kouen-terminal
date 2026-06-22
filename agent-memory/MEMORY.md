@@ -53,6 +53,10 @@
 - [2026-06-21] Webview Console redirection & Glassmorphism: WKWebView redirects logs to /tmp/harness-browser-[paneID].log & includes them in BrowserSnapshot for agent debugging. Refactored UI toolbar/tabbar with installChromeBackground(.tabBar) and SoftIconButton.
 - RL-046: The `nonisolated + MainActor.assumeIsolated` pattern must cover ALL `@objc` callbacks on zombie-prone views — not just `layout()`/`resetCursorRects()`. Also needed on: `viewDidMoveToWindow()`, `viewDidMoveToSuperview()`, `viewWillMove(toWindow:)`, `displayTick()`. Any `@objc` entry point AppKit can call asynchronously after removal needs this treatment.
 - RL-047: Split pane CWD must prefer `tab.worktreePath` over live process CWD (`currentWorkingDirectory()`). When agents run, `deepestReadableDescendant()` returns the agent's CWD (repo root/main) not the session's intended worktree. Priority: `worktreePath → sourceCwd → tab.cwd`.
+- RL-049: `nonisolated override func layout()` and `MainActor.assumeIsolated` wrapper is WRONG for non-zombie-prone views (like `TerminalTabBarView` and `WindowBorderOverlayView`). It triggers thunk executor check crashes or dynamic check failures under Swift 6.3/6.4. Use standard `override func layout()` (without `nonisolated`).
+- RL-050: Retain cycles in event monitors prevent views/controllers from deallocating, leaking them and causing zombie crashes if their subviews are freed. Using `[weak self]` in `NSEvent.addLocalMonitorForEvents` breaks the cycle, allowing `deinit` to call `NSEvent.removeMonitor` and safely bailing if called after deallocation.
+- [2026-06-22] Arch refactor items 1/2/4/5 complete on branch fix-app-crashes. Item 3 (HarnessCore package split) blocked by circular dep: AgentSnapshot/AIAgentConfig/WorkbenchCommand embedded in core IPC/models/settings — must be promoted to HarnessCore proper first before extraction is possible.
+- [2026-06-22] IPC protocol versioning: ipcProtocolVersion=1, identifyClient now carries protocolVersion:Int, daemon returns .protocolRejected on mismatch. ControlModeClient is the only explicit identifyClient sender; GUI/attach register via subscribeSurfaceOutput.
 
 ## Conventions
 - Build: `make preview`
@@ -67,7 +71,9 @@
 - Welcome page (CompleteStepView) and terminal banner read shortcuts from `BannerShortcutRegistry`
 
 - [2026-06-22] P28 Browser DevTools API: 3-phase implementation — Phase 1 (snapshot+element+screenshot), Phase 2 (network fetch/XHR capture via JS inject), Phase 3 (cookies+localStorage+sessionStorage). Config-driven default URL via HarnessSettings.browserHomePage.
+- [2026-06-22] Reverted tab pill branch-first swap from c1543e9 to follow the documented design in knowledge/ui/tab-bar.md. Displaying the branch name on Line 1 caused tabs on the same branch to have identical titles, losing session/agent visual distinction. Restored Line 1 to folder/agent name and Line 2 to ⎇ branch.
 - RL-048: harness-mcp round-trip broken because DaemonClientActor default timeout = 2s but WKWebView ops take 2–5s. Fix: HarnessBrowserTools.send() passes timeout:35 (daemon has 30s internal timeout + 5s buffer).
+
 
 ## Tech Debt
 - PBI-REFACTOR-004: `#if HARNESS_ACP` deferred
