@@ -518,11 +518,6 @@ final class GitPanelView: NSView {
 
     @objc private func openWorktree(_ sender: NSClickGestureRecognizer) {
         guard let card = sender.view, let path = card.identifier?.rawValue else { return }
-        // Don't intercept clicks on the remove button (RL-043)
-        let loc = sender.location(in: card)
-        for sub in card.subviews where sub is NSButton {
-            if sub.frame.contains(loc) { return }
-        }
         let coordinator = SessionCoordinator.shared
         guard let surfaceID = coordinator.activeSurfaceID else { return }
         coordinator.requestDaemon(.sendKeys(surfaceID: surfaceID.uuidString, keys: ["cd \(path)", "Enter"]))
@@ -1076,7 +1071,7 @@ final class GitPanelView: NSView {
         }
 
         let click = NSClickGestureRecognizer(target: self, action: #selector(openWorktree(_:)))
-        click.delegate = self
+        click.numberOfClicksRequired = 2  // double-click to cd, single click reserved for buttons
         card.addGestureRecognizer(click)
 
         let name = NSTextField(labelWithString: HarnessDesign.shortenPath(worktree.path))
