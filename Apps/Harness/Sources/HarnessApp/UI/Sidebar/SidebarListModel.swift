@@ -48,7 +48,7 @@ final class SidebarListModel {
     private var isRebuilding = false
 
     var collapsedGroups = Set<String>()
-    var collapsedWorktreeGroups = Set<String>()
+    var collapsedWorktreeGroups = Set<String>() // tracks EXPANDED groups (inverted: default = collapsed)
     private(set) var projectWorktrees: [String: [SidebarWorktreeEntry]] = [:]
     var pinnedRepos: Set<String> = {
         let array = UserDefaults.standard.stringArray(forKey: "harness.sidebar.pinnedRepos") ?? []
@@ -186,7 +186,7 @@ final class SidebarListModel {
                     !entry.isMain && !activeCwds.contains(where: { $0.hasPrefix(entry.path) })
                 }
                 if !idleWorktrees.isEmpty {
-                    let isWorktreeCollapsed = collapsedWorktreeGroups.contains(group.rootPath)
+                    let isWorktreeCollapsed = !collapsedWorktreeGroups.contains(group.rootPath) // default collapsed
                     newRows.append(.worktreeHeader(rootPath: group.rootPath, count: idleWorktrees.count,
                                                    isCollapsed: isWorktreeCollapsed))
                     if !isWorktreeCollapsed {
