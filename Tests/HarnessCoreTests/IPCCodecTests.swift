@@ -17,7 +17,7 @@ final class IPCCodecTests: XCTestCase {
             .notify(surfaceID: "surface-1", title: "Agent", body: "Needs approval"),
             .newSplit(tabID: UUID(), paneID: UUID(), direction: .vertical, shell: "/opt/homebrew/bin/fish"),
             .selectPane(tabID: UUID(), paneID: UUID()),
-            .identifyClient(label: "harness-cli attach"),
+            .identifyClient(label: "harness-cli attach", protocolVersion: ipcProtocolVersion),
             .listClients,
             .detachClient(clientID: UUID()),
             .daemonStats,
