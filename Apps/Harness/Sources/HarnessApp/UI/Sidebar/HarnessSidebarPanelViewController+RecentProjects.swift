@@ -141,11 +141,10 @@ extension HarnessSidebarPanelViewController {
     }
 
     func selectSessionRow() {
-        let row = sessionTable.selectedRow
-        guard let session = sessionRow(at: row), let activeWorkspaceID else { return }
+        guard let sessionID = sidebarListModel.activeSessionID,
+              let session = sessions.first(where: { $0.id == sessionID }),
+              let activeWorkspaceID else { return }
         SessionCoordinator.shared.selectSession(workspaceID: activeWorkspaceID, sessionID: session.id)
-        // Force file tree + git panel refresh even if daemon thinks session was already active.
-        // This covers the case where snapshotChanged arrived asynchronously before the click.
         if let cwd = session.activeTab?.cwd ?? session.tabs.first?.cwd {
             fileTreeView.updateRoot(path: cwd, sessionID: session.id)
             gitPanelView.updateRoot(path: cwd)
