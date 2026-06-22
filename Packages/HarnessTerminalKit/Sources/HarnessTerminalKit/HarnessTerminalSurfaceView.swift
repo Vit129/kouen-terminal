@@ -1359,7 +1359,6 @@ public final class HarnessTerminalSurfaceView: NSView {
 
     nonisolated public override func viewDidMoveToWindow() {
         MainActor.assumeIsolated {
-        fputs("BLINKDBG viewDidMoveToWindow: surface=\(ObjectIdentifier(self)) window=\(window != nil)\n", harnessStderr)
         super.viewDidMoveToWindow()
         windowKeyObservers.forEach(NotificationCenter.default.removeObserver(_:))
         windowKeyObservers.removeAll()
@@ -1451,7 +1450,6 @@ public final class HarnessTerminalSurfaceView: NSView {
 
     nonisolated public override func viewDidMoveToSuperview() {
         MainActor.assumeIsolated {
-        fputs("BLINKDBG viewDidMoveToSuperview: surface=\(ObjectIdentifier(self)) superview=\(superview != nil) window=\(window != nil)\n", harnessStderr)
         super.viewDidMoveToSuperview()
         if window != nil {
             stopDisplayLink()
@@ -1592,17 +1590,17 @@ public final class HarnessTerminalSurfaceView: NSView {
             // resize never shows a stale frame stretched to the new bounds (the flicker).
             CATransaction.begin()
             CATransaction.setDisableActions(true)
+            // Arm presentsWithTransaction BEFORE drawableSize changes in updateGridSize(). When
+            // drawableSize changes, Metal immediately invalidates the layer's cached content; if the
+            // new frame hasn't arrived yet, the compositor sees 1 black frame. Setting this flag first
+            // ensures the drawableSize change and the new frame present land in the SAME CA transaction
+            // so the compositor never observes the layer without valid content at its new size.
+            // This also covers the REBUILD path where viewWillMove(toWindow:nil) resets the flag to
+            // false between PaneLifecycleManager's setPresentsWithTransaction(true) call and layout().
+            let wasAlreadySync = metalLayer.presentsWithTransaction
+            if !wasAlreadySync { metalLayer.presentsWithTransaction = true }
             let needsFirstPaint = !hasSizedGrid
-            let oldBounds = bounds
             updateGridSize()
-            let sizeChanged = bounds.size != oldBounds.size
-            let needsTempSync = sizeChanged && !metalLayer.presentsWithTransaction
-            if sizeChanged || needsFirstPaint {
-                fputs("BLINKDBG layout: surface=\(ObjectIdentifier(self)) needsFirstPaint=\(needsFirstPaint) sizeChanged=\(sizeChanged) old=\(oldBounds.size) new=\(bounds.size) hasSizedGrid=\(hasSizedGrid) window=\(window != nil)\n", harnessStderr)
-            }
-            if needsTempSync {
-                metalLayer.presentsWithTransaction = true
-            }
             if needsFirstPaint {
                 // First real layout: `updateGridSize` already committed the grid; build + present the
                 // true frame synchronously so the terminal opens correct with no flash.
@@ -1615,9 +1613,7 @@ public final class HarnessTerminalSurfaceView: NSView {
                 // changed via a font/theme/reflow invalidation).
                 scheduler.forceRender()
             }
-            if needsTempSync {
-                metalLayer.presentsWithTransaction = false
-            }
+            if !wasAlreadySync { metalLayer.presentsWithTransaction = false }
             CATransaction.commit()
         }
     }

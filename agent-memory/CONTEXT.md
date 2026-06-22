@@ -2,8 +2,8 @@
 
 ## Now
 - **Task:** None active — ready for next session
-- **Branch:** feat/sidebar-swiftui-list
-- **Status:** idle (Completed file/folder hidden toggle visibility indicator badge update)
+- **Branch:** main
+- **Status:** idle (Completed terminal flicker fix — presentsWithTransaction order in layout())
 
 ## Last Session (2026-06-23) — Sidebar SwiftUI Migration Complete
 

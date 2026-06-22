@@ -80,7 +80,6 @@ final class FilePreviewCoordinator {
     // MARK: - Split Show/Hide
 
     func showFileEditorSplit() {
-        fputs("BLINKDBG showFileEditorSplit: alreadyOpen=\(fileEditorPanel != nil)\n", harnessStderr)
         if fileEditorPanel != nil {
             loadActiveFileTab()
             return

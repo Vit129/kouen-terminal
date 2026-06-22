@@ -55,7 +55,6 @@ final class PaneLifecycleManager {
             return
         }
 
-        fputs("BLINKDBG reloadIfNeeded REBUILD: force=\(force) oldKey=\(lastStructureKey) newKey=\(key)\n", harnessStderr)
         lastStructureKey = key
 
         if let window = containerView.window, window.firstResponder is HarnessTerminalSurfaceView {
