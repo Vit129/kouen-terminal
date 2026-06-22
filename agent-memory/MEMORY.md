@@ -29,6 +29,7 @@
 - [2026-06-21] Shared memory protocol: single canonical `~/.claude/scripts/shared/memory-protocol.md` → symlinked into each project as `.ai/memory-protocol.md` → agent docs include via `@.ai/memory-protocol.md`
 - [2026-06-21] `@` auto-include only works in Claude Code — Codex/Gemini/Kiro need explicit read instruction in their agent docs
 - [2026-06-21] Webview Console redirection & Glassmorphism: WKWebView redirects logs to /tmp/harness-browser-[paneID].log & includes them in BrowserSnapshot for agent debugging. Refactored UI toolbar/tabbar with installChromeBackground(.tabBar) and SoftIconButton.
+- [2026-06-22] harness-mcp browser tools complete (14 tools): Open, Navigate, Wait, Snapshot, Interact, Close, Screenshot, Network, Cookies, Storage, Evaluate (JS), GoBack, GoForward, Reload. Replaces chrome-devtools-mcp for all agents (Claude/Codex/Kiro/Gemini configured globally). ~70-75% token savings vs Chrome DevTools MCP per debug session.
 
 ## Lessons
 - RL-004: Never reparent Metal terminal surfaces — 1-2s black screen (CASE-003)
@@ -50,11 +51,11 @@
 - RL-043: NSClickGestureRecognizer on parent view intercepts child NSButton clicks — check click location in handler or use mouseUp override instead
 - RL-044: Documenting a verb in COMMANDS.md/BannerShortcutRegistry without adding it to `CommandParser.buildCommand` + `knownVerbs` = silent `unknownCommand` error. Always wire both layers.
 - RL-045: Override `removeFromSuperview()` on zombie-prone views to add retire-hold — catches ALL free paths (our code, AppKit, SwiftUI) at a single chokepoint instead of chasing call sites. Definitive fix for macOS 26.5 + Swift 6.3.2 thunk crashes.
-- [2026-06-21] Webview Console redirection & Glassmorphism: WKWebView redirects logs to /tmp/harness-browser-[paneID].log & includes them in BrowserSnapshot for agent debugging. Refactored UI toolbar/tabbar with installChromeBackground(.tabBar) and SoftIconButton.
 - RL-046: The `nonisolated + MainActor.assumeIsolated` pattern must cover ALL `@objc` callbacks on zombie-prone views — not just `layout()`/`resetCursorRects()`. Also needed on: `viewDidMoveToWindow()`, `viewDidMoveToSuperview()`, `viewWillMove(toWindow:)`, `displayTick()`. Any `@objc` entry point AppKit can call asynchronously after removal needs this treatment.
 - RL-047: Split pane CWD must prefer `tab.worktreePath` over live process CWD (`currentWorkingDirectory()`). When agents run, `deepestReadableDescendant()` returns the agent's CWD (repo root/main) not the session's intended worktree. Priority: `worktreePath → sourceCwd → tab.cwd`.
 - RL-049: `nonisolated override func layout()` and `MainActor.assumeIsolated` wrapper is WRONG for non-zombie-prone views (like `TerminalTabBarView` and `WindowBorderOverlayView`). It triggers thunk executor check crashes or dynamic check failures under Swift 6.3/6.4. Use standard `override func layout()` (without `nonisolated`).
 - RL-050: Retain cycles in event monitors prevent views/controllers from deallocating, leaking them and causing zombie crashes if their subviews are freed. Using `[weak self]` in `NSEvent.addLocalMonitorForEvents` breaks the cycle, allowing `deinit` to call `NSEvent.removeMonitor` and safely bailing if called after deallocation.
+- RL-051: `NSTableView.view(atColumn:row:makeIfNecessary:)` throws NSRangeException if row ≥ internal row count. When updating `cachedSidebarRows` via `rebuildSidebarRows()`, MUST call `sessionTable.reloadData()` BEFORE iterating rows for in-place cell updates. Belt-and-suspenders: guard loop with `min(rows.count, sessionTable.numberOfRows)`. Triggered by `z`/`cd`/`⌘\` → `snapshotChanged` → `refreshMetadata()` with stale table state.
 - [2026-06-22] Arch refactor items 1/2/4/5 complete on branch fix-app-crashes. Item 3 (HarnessCore package split) blocked by circular dep: AgentSnapshot/AIAgentConfig/WorkbenchCommand embedded in core IPC/models/settings — must be promoted to HarnessCore proper first before extraction is possible.
 - [2026-06-22] IPC protocol versioning: ipcProtocolVersion=1, identifyClient now carries protocolVersion:Int, daemon returns .protocolRejected on mismatch. ControlModeClient is the only explicit identifyClient sender; GUI/attach register via subscribeSurfaceOutput.
 
@@ -77,3 +78,7 @@
 
 ## Tech Debt
 - PBI-REFACTOR-004: `#if HARNESS_ACP` deferred
+
+## Protocol Compliance Notes
+- [2026-06-22] Memory Protocol step was skipped at end of arch refactor session — CONTEXT.md left in "active" state across sessions. Root cause: agent prioritized fast response over protocol. Fixed manually next session.
+- [2026-06-22] `skill-auto-detect.md` no longer exists at `~/.claude/rules/` (only in old worktrees) — CLAUDE.md reference is stale. Skill routing is now in `routing.md`. For SwiftUI/AppKit refactor work → invoke `macos-swiftui` skill.
