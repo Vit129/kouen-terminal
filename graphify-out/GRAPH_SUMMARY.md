@@ -1,15 +1,15 @@
-# Graph Summary — harness-terminal
+# Graph Summary — .
 _Auto-generated from graphify-out/GRAPH_REPORT.md · do not edit manually_
 _Regen: `~/.claude/scripts/generate-graph-summary.sh .` after `graphify update .`_
 
 ## Summary
-- 16099 nodes · 36634 edges · 784 communities (628 shown, 156 thin omitted)
-- Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 5404 edges (avg confidence: 0.8)
+- 16043 nodes · 36272 edges · 787 communities (624 shown, 163 thin omitted)
+- Extraction: 86% EXTRACTED · 14% INFERRED · 0% AMBIGUOUS · INFERRED: 5093 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 
 ## Graph Freshness
-- Built from commit: `72cf7125`
+- Built from commit: `74ae0121`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -17,10 +17,10 @@ _Regen: `~/.claude/scripts/generate-graph-summary.sh .` after `graphify update .
 ## God Nodes (most connected - your core abstractions)
 1. `HarnessTerminalSurfaceView` - 369 edges
 2. `SettingsViewController` - 305 edges
-3. `Foundation` - 268 edges
-4. `HarnessCore` - 263 edges
-5. `SessionCoordinator` - 168 edges
-6. `XCTest` - 167 edges
+3. `Foundation` - 269 edges
+4. `HarnessCore` - 262 edges
+5. `SessionCoordinator` - 167 edges
+6. `XCTest` - 166 edges
 7. `SessionEditor` - 164 edges
 8. `TerminalEmulator` - 158 edges
 9. `AppKit` - 139 edges
@@ -32,12 +32,12 @@ _Regen: `~/.claude/scripts/generate-graph-summary.sh .` after `graphify update .
   .aidlc/harness/acp/outputs/inception/domain-design.md → Packages/HarnessCore/Sources/HarnessCore/ACP/ACPClient.swift
 - `connectAgentIfNeeded()` --calls--> `AgentRegistryStore`  [INFERRED]
   Apps/Harness/Sources/HarnessApp/UI/Sidebar/HarnessSidebarPanelViewController.swift → Packages/HarnessCore/Sources/HarnessCore/ACP/AgentConfig.swift
-- `register()` --calls--> `KeyTableID`  [INFERRED]
-  Apps/Harness/Sources/HarnessApp/Scripting/ScriptAPI.swift → Packages/HarnessCore/Sources/HarnessCore/Keybindings/KeyTable.swift
 - `AppIdleThrottle` --references--> `Notification`  [INFERRED]
-  Apps/Harness/Sources/HarnessApp/Services/AppIdleThrottle.swift → Packages/HarnessCore/Sources/HarnessCore/Notifications/NotificationBus.swift
+  Apps/Harness/Sources/HarnessApp/Services/AppIdleThrottle.swift → Packages/HarnessIPC/Sources/HarnessIPC/NotificationBus.swift
 - `DaemonSyncService` --calls--> `DaemonSessionService`  [INFERRED]
   Apps/Harness/Sources/HarnessApp/Services/DaemonSyncService.swift → Packages/HarnessCore/Sources/HarnessCore/IPC/DaemonSessionService.swift
+- `RemoteHostsService` --references--> `Notification`  [INFERRED]
+  Apps/Harness/Sources/HarnessApp/Services/RemoteHostsService.swift → Packages/HarnessIPC/Sources/HarnessIPC/NotificationBus.swift
 
 
 ## Community Hubs (top 25)
