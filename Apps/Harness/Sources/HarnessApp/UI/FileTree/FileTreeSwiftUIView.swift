@@ -293,11 +293,21 @@ struct FileTreeSwiftUIView: View {
         Button {
             isOn.wrappedValue.toggle()
         } label: {
-            Image(systemName: systemImage)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(isOn.wrappedValue ? Color.accentColor : Color.secondary)
-                .frame(width: 18, height: 18)
-                .contentShape(Rectangle())
+            ZStack(alignment: .bottomTrailing) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(isOn.wrappedValue ? Color.accentColor : Color.secondary)
+                
+                Image(systemName: isOn.wrappedValue ? "eye" : "eye.slash")
+                    .font(.system(size: 6, weight: .bold))
+                    .foregroundStyle(isOn.wrappedValue ? Color.accentColor : Color.secondary)
+                    .padding(1)
+                    .background(Color(HarnessDesign.chrome.sidebarBackground))
+                    .clipShape(Circle())
+                    .offset(x: 3, y: 3)
+            }
+            .frame(width: 18, height: 18)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .help(help)

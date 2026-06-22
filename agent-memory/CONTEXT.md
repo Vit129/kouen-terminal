@@ -3,7 +3,7 @@
 ## Now
 - **Task:** None active — ready for next session
 - **Branch:** feat/sidebar-swiftui-list
-- **Status:** idle
+- **Status:** idle (Completed file/folder hidden toggle visibility indicator badge update)
 
 ## Last Session (2026-06-23) — Sidebar SwiftUI Migration Complete
 
