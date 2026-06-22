@@ -6,7 +6,7 @@ All notable changes to Harness are documented here. The format is based on
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/robzilla1738/harness-terminal/releases).
 
-## [3.10.0] - 2026-06-24
+## [3.9.2] - 2026-06-24
 
 ### Fixed
 - **Terminal flash eliminated** on sidebar toggle (⌘\\), tab switch (⌘1-9), split pane (⌘D), file preview open/close, and tab close. Root cause: `metalLayer.presentsWithTransaction` was set after `updateGridSize()` changed `drawableSize` — Metal immediately invalidates cached content on size change, so the compositor saw one black frame before the new present arrived. Fix arms the flag before any drawable size change so both land in the same CA transaction. Also fixes the REBUILD path where `viewWillMove(toWindow:nil)` silently reset the flag between `PaneLifecycleManager`'s setup and `layout()`.
