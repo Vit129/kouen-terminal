@@ -197,8 +197,9 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
     // MARK: - Snapshot
 
     @objc private func snapshotChanged(_ note: Notification) {
-        let structureChanged = note.userInfo?["structureChanged"] as? Bool ?? true
-        let metadataOnly = note.userInfo?["metadataOnly"] as? Bool ?? false
+        let payload = note.snapshotPayload
+        let structureChanged = payload.structureChanged
+        let metadataOnly = payload.metadataOnly
         if metadataOnly && !structureChanged {
             refreshTabBarMetadata()
             return
