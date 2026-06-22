@@ -180,12 +180,19 @@ final class SidebarListModel {
                 newRows.append(.session(session))
             }
             if let worktrees = projectWorktrees[group.rootPath], !worktrees.isEmpty {
-                let isWorktreeCollapsed = collapsedWorktreeGroups.contains(group.rootPath)
-                newRows.append(.worktreeHeader(rootPath: group.rootPath, count: worktrees.count,
-                                               isCollapsed: isWorktreeCollapsed))
-                if !isWorktreeCollapsed {
-                    for entry in worktrees {
-                        newRows.append(.worktree(entry, rootPath: group.rootPath))
+                // Only show worktrees that DON'T have an active session (idle ones go to Git tab)
+                let activeCwds = Set(group.sessions.compactMap { ($0.activeTab ?? $0.tabs.first)?.cwd })
+                let idleWorktrees = worktrees.filter { entry in
+                    !entry.isMain && !activeCwds.contains(where: { $0.hasPrefix(entry.path) })
+                }
+                if !idleWorktrees.isEmpty {
+                    let isWorktreeCollapsed = collapsedWorktreeGroups.contains(group.rootPath)
+                    newRows.append(.worktreeHeader(rootPath: group.rootPath, count: idleWorktrees.count,
+                                                   isCollapsed: isWorktreeCollapsed))
+                    if !isWorktreeCollapsed {
+                        for entry in idleWorktrees {
+                            newRows.append(.worktree(entry, rootPath: group.rootPath))
+                        }
                     }
                 }
             }
