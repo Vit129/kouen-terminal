@@ -1089,9 +1089,11 @@ final class GitPanelView: NSView {
             card.layer?.borderWidth = 1
         }
 
-        let click = NSClickGestureRecognizer(target: self, action: #selector(openWorktree(_:)))
-        click.numberOfClicksRequired = 1
-        card.addGestureRecognizer(click)
+        // No gesture recognizer — remove button uses target/action directly
+        // For cd: click anywhere except the ✕ button
+        card.identifier = NSUserInterfaceItemIdentifier(worktree.path)
+        let tap = NSClickGestureRecognizer(target: self, action: #selector(openWorktree(_:)))
+        card.addGestureRecognizer(tap)
 
         let name = NSTextField(labelWithString: HarnessDesign.shortenPath(worktree.path))
         name.font = .systemFont(ofSize: 12, weight: .bold)
@@ -1126,12 +1128,12 @@ final class GitPanelView: NSView {
         meta.lineBreakMode = .byTruncatingTail
         meta.translatesAutoresizingMaskIntoConstraints = false
 
-        let removeButton = NSButton(title: "✕", target: self, action: #selector(removeWorktreeAction(_:)))
-        removeButton.bezelStyle = .recessed; removeButton.controlSize = .small
-        removeButton.font = .systemFont(ofSize: 11, weight: .medium)
-        removeButton.toolTip = worktree.isMerged ? "Remove (merged — safe to delete)" : "Remove (has unmerged commits)"
-        removeButton.contentTintColor = worktree.isMerged ? .systemGreen : .systemOrange
+        let removeButton = SoftIconButton(frame: NSRect(x: 0, y: 0, width: 20, height: 20))
+        removeButton.setSymbol("xmark", accessibilityDescription: "Remove worktree", pointSize: 9, weight: .semibold)
+        removeButton.target = self
+        removeButton.action = #selector(removeWorktreeAction(_:))
         removeButton.identifier = NSUserInterfaceItemIdentifier(worktree.path)
+        removeButton.toolTip = worktree.isMerged ? "Remove (merged — safe)" : "Remove (unmerged)"
         removeButton.isHidden = worktree.isMain
         removeButton.translatesAutoresizingMaskIntoConstraints = false
 
