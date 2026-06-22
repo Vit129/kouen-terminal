@@ -1,4 +1,5 @@
 import Foundation
+import HarnessIPC
 
 public struct SessionEditor: Sendable {
     public var snapshot: SessionSnapshot

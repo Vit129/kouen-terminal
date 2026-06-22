@@ -1,4 +1,5 @@
 import Foundation
+import HarnessIPC
 
 /// The interior rectangle a single pane renders into, in terminal cell
 /// coordinates (origin top-left, x = column, y = row). Excludes the 1-cell

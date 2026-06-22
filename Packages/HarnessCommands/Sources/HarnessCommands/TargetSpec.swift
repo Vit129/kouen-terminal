@@ -1,4 +1,5 @@
 import Foundation
+import HarnessIPC
 
 /// A tmux-style `-t session:window.pane` target reference, parsed from a command
 /// flag and resolved against a `SessionSnapshot` at translate time.
