@@ -58,8 +58,8 @@ final class SidebarListModel {
     private var repoRootCache: [String: (repoRoot: String?, fetchedAt: Date)] = [:]
     private var repoRootUpdatesInProgress: Set<String> = []
     // Stored as var so @Observable tracks mutations for badge re-renders
-    private var gitMetadataCache: [String: (metadata: RepoGitMetadata, fetchedAt: Date)] = [:]
-    private var gitMetadataUpdatesInProgress: Set<String> = []
+    @ObservationIgnored private var gitMetadataCache: [String: (metadata: RepoGitMetadata, fetchedAt: Date)] = [:]
+    @ObservationIgnored private var gitMetadataUpdatesInProgress: Set<String> = []
     private var lastWorktreeFetchTime: [String: Date] = [:]
 
     // MARK: - Main update

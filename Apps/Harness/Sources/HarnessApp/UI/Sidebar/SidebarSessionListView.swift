@@ -44,6 +44,12 @@ struct SidebarSessionListView: View {
             SidebarSessionItemRow(
                 session: session,
                 isSelected: session.id == model.activeSessionID,
+                metadata: {
+                    let tab = session.activeTab ?? session.tabs.first
+                    let branch = tab?.gitBranch?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                    let cwd = tab?.cwd ?? ""
+                    return model.gitMetadata(forPath: cwd, branch: branch)
+                }(),
                 model: model,
                 onSelect: { onSelect(session.id) },
                 onClose: { onCloseSession(session.id) },
@@ -62,7 +68,7 @@ struct SidebarSessionListView: View {
         case let .worktree(entry, _):
             SidebarWorktreeItemRow(
                 entry: entry,
-                model: model,
+                metadata: model.gitMetadata(forPath: entry.path, branch: entry.branch),
                 onActivate: { onWorktreeActivate(entry, model.activeWorkspaceID) }
             )
             .frame(height: 40)
@@ -187,6 +193,7 @@ private struct SidebarGroupHeaderRow: View {
 private struct SidebarSessionItemRow: View {
     let session: SessionGroup
     let isSelected: Bool
+    let metadata: RepoGitMetadata?
     var model: SidebarListModel
     var onSelect: () -> Void
     var onClose: () -> Void
@@ -202,7 +209,6 @@ private struct SidebarSessionItemRow: View {
         let sessionTitle = session.name.isEmpty ? HarnessDesign.pathDisplayName(cwd) : session.name
         let displayTitle = branch.isEmpty ? sessionTitle : branch
         let subtitle = HarnessDesign.shortenPath(cwd)
-        let metadata = model.gitMetadata(forPath: cwd, branch: branch)
 
         let selectedFill = Color(nsColor: c.accent).opacity(c.isDark ? 0.13 : 0.10)
         let selectedBorder = Color(nsColor: c.focusRing).opacity(c.isDark ? 0.48 : 0.52)
@@ -431,14 +437,13 @@ private struct SidebarWorktreeHeaderRow: View {
 
 private struct SidebarWorktreeItemRow: View {
     let entry: SidebarWorktreeEntry
-    var model: SidebarListModel
+    let metadata: RepoGitMetadata?
     var onActivate: () -> Void
 
     @State private var isHovered = false
 
     var body: some View {
         let c = HarnessDesign.chrome
-        let metadata = model.gitMetadata(forPath: entry.path, branch: entry.branch)
 
         ZStack {
             RoundedRectangle(cornerRadius: HarnessDesign.Radius.card, style: .continuous)
