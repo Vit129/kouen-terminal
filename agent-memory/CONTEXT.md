@@ -1,9 +1,9 @@
 # Context — harness-terminal
 
 ## Now
-- **Task:** Fix app crashes (TerminalTabBarView layout thunk and ContentAreaViewController event monitor) & Fix branch tab display (revert to folder/agent-first, branch-second)
+- **Task:** Architecture refactor (items 1–5 from review) — items 1, 2, 4, 5 complete; item 3 (HarnessCore split) blocked, plan written
 - **Branch:** fix-app-crashes
-- **Status:** Complete (reverted tab pill branch-first swap to restore session/agent name distinction, all tests passing)
+- **Status:** Items 1/2/4/5 committed; item 3 needs 2-step plan before implementation
 
 ## Session 2026-06-22 — P28 Complete + CLI Infrastructure
 
