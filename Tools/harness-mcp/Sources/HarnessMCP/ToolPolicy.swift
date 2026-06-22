@@ -23,6 +23,10 @@ struct ToolPolicy: Sendable {
         "harnessBrowserWait",
         "harnessBrowserInteract",
         "harnessBrowserClose",
+        "harnessBrowserEvaluate",
+        "harnessBrowserGoBack",
+        "harnessBrowserGoForward",
+        "harnessBrowserReload",
     ]
 
     private let allowControl: Bool

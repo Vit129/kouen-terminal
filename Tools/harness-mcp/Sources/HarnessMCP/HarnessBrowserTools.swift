@@ -221,6 +221,175 @@ struct HarnessBrowserTools: Sendable {
         }
     }
 
+    // MARK: - harnessBrowserScreenshot
+
+    func harnessBrowserScreenshot(paneIdStr: String) async -> (AnyCodable?, JSONRPCError?) {
+        guard let paneID = UUID(uuidString: paneIdStr) else {
+            return (nil, JSONRPCError(code: -32602, message: "Invalid paneId UUID: \(paneIdStr)"))
+        }
+        guard let response = await send(.browserScreenshot(paneID: paneID)) else {
+            return (nil, JSONRPCError(code: -32000, message: "Daemon unavailable"))
+        }
+        switch response {
+        case let .browserSuccess(payload):
+            if case let .screenshot(base64) = payload {
+                return (toolResult(json: .object(["image": .string(base64)])), nil)
+            }
+            if case let .error(msg) = payload { return (nil, JSONRPCError(code: -32000, message: msg)) }
+            return (nil, JSONRPCError(code: -32000, message: "Unexpected payload response"))
+        case let .error(msg): return (nil, JSONRPCError(code: -32000, message: msg))
+        default: return (nil, JSONRPCError(code: -32000, message: "Unexpected response from daemon"))
+        }
+    }
+
+    // MARK: - harnessBrowserNetwork
+
+    func harnessBrowserNetwork(paneIdStr: String) async -> (AnyCodable?, JSONRPCError?) {
+        guard let paneID = UUID(uuidString: paneIdStr) else {
+            return (nil, JSONRPCError(code: -32602, message: "Invalid paneId UUID: \(paneIdStr)"))
+        }
+        guard let response = await send(.browserNetwork(paneID: paneID)) else {
+            return (nil, JSONRPCError(code: -32000, message: "Daemon unavailable"))
+        }
+        switch response {
+        case let .browserSuccess(payload):
+            if case let .network(entries) = payload {
+                let items: [AnyCodable] = entries.map { e in
+                    var obj: [String: AnyCodable] = [
+                        "id": .string(e.id), "url": .string(e.url), "method": .string(e.method),
+                    ]
+                    if let s = e.status { obj["status"] = .int(s) }
+                    if let d = e.duration { obj["duration"] = .double(d) }
+                    if let b = e.requestBody { obj["requestBody"] = .string(b) }
+                    if let b = e.responseBody { obj["responseBody"] = .string(b) }
+                    return .object(obj)
+                }
+                return (toolResult(json: .object(["requests": .array(items)])), nil)
+            }
+            if case let .error(msg) = payload { return (nil, JSONRPCError(code: -32000, message: msg)) }
+            return (nil, JSONRPCError(code: -32000, message: "Unexpected payload response"))
+        case let .error(msg): return (nil, JSONRPCError(code: -32000, message: msg))
+        default: return (nil, JSONRPCError(code: -32000, message: "Unexpected response from daemon"))
+        }
+    }
+
+    // MARK: - harnessBrowserCookies
+
+    func harnessBrowserCookies(paneIdStr: String) async -> (AnyCodable?, JSONRPCError?) {
+        guard let paneID = UUID(uuidString: paneIdStr) else {
+            return (nil, JSONRPCError(code: -32602, message: "Invalid paneId UUID: \(paneIdStr)"))
+        }
+        guard let response = await send(.browserCookies(paneID: paneID)) else {
+            return (nil, JSONRPCError(code: -32000, message: "Daemon unavailable"))
+        }
+        switch response {
+        case let .browserSuccess(payload):
+            if case let .cookies(cookies) = payload {
+                let items: [AnyCodable] = cookies.map { c in
+                    .object([
+                        "name": .string(c.name), "value": .string(c.value),
+                        "domain": .string(c.domain), "path": .string(c.path),
+                        "isSecure": .bool(c.isSecure), "isHTTPOnly": .bool(c.isHTTPOnly),
+                    ])
+                }
+                return (toolResult(json: .object(["cookies": .array(items)])), nil)
+            }
+            if case let .error(msg) = payload { return (nil, JSONRPCError(code: -32000, message: msg)) }
+            return (nil, JSONRPCError(code: -32000, message: "Unexpected payload response"))
+        case let .error(msg): return (nil, JSONRPCError(code: -32000, message: msg))
+        default: return (nil, JSONRPCError(code: -32000, message: "Unexpected response from daemon"))
+        }
+    }
+
+    // MARK: - harnessBrowserStorage
+
+    func harnessBrowserStorage(paneIdStr: String, storageType: String) async -> (AnyCodable?, JSONRPCError?) {
+        guard let paneID = UUID(uuidString: paneIdStr) else {
+            return (nil, JSONRPCError(code: -32602, message: "Invalid paneId UUID: \(paneIdStr)"))
+        }
+        guard let response = await send(.browserStorage(paneID: paneID, storageType: storageType)) else {
+            return (nil, JSONRPCError(code: -32000, message: "Daemon unavailable"))
+        }
+        switch response {
+        case let .browserSuccess(payload):
+            if case let .storage(kv) = payload {
+                let items: [String: AnyCodable] = kv.mapValues { .string($0) }
+                return (toolResult(json: .object(["entries": .object(items)])), nil)
+            }
+            if case let .error(msg) = payload { return (nil, JSONRPCError(code: -32000, message: msg)) }
+            return (nil, JSONRPCError(code: -32000, message: "Unexpected payload response"))
+        case let .error(msg): return (nil, JSONRPCError(code: -32000, message: msg))
+        default: return (nil, JSONRPCError(code: -32000, message: "Unexpected response from daemon"))
+        }
+    }
+
+    // MARK: - harnessBrowserEvaluate
+
+    func harnessBrowserEvaluate(paneIdStr: String, script: String) async -> (AnyCodable?, JSONRPCError?) {
+        let toolName = "harnessBrowserEvaluate"
+        guard isToolAllowed(toolName) else { return (nil, disabledError(toolName)) }
+        guard let paneID = UUID(uuidString: paneIdStr) else {
+            return (nil, JSONRPCError(code: -32602, message: "Invalid paneId UUID: \(paneIdStr)"))
+        }
+        guard let response = await send(.browserEvaluate(paneID: paneID, script: script)) else {
+            return (nil, JSONRPCError(code: -32000, message: "Daemon unavailable"))
+        }
+        switch response {
+        case let .browserSuccess(payload):
+            if case let .text(result) = payload {
+                return (toolResult(json: .object(["result": .string(result)])), nil)
+            }
+            if case let .error(msg) = payload { return (nil, JSONRPCError(code: -32000, message: msg)) }
+            return (nil, JSONRPCError(code: -32000, message: "Unexpected payload response"))
+        case let .error(msg): return (nil, JSONRPCError(code: -32000, message: msg))
+        default: return (nil, JSONRPCError(code: -32000, message: "Unexpected response from daemon"))
+        }
+    }
+
+    // MARK: - harnessBrowserGoBack / GoForward / Reload
+
+    func harnessBrowserGoBack(paneIdStr: String) async -> (AnyCodable?, JSONRPCError?) {
+        let toolName = "harnessBrowserGoBack"
+        guard isToolAllowed(toolName) else { return (nil, disabledError(toolName)) }
+        guard let paneID = UUID(uuidString: paneIdStr) else {
+            return (nil, JSONRPCError(code: -32602, message: "Invalid paneId UUID: \(paneIdStr)"))
+        }
+        guard let response = await send(.browserGoBack(paneID: paneID)) else {
+            return (nil, JSONRPCError(code: -32000, message: "Daemon unavailable"))
+        }
+        if case let .browserSuccess(.ok) = response { return (toolResult(json: .object(["ok": .bool(true)])), nil) }
+        if case let .browserSuccess(.error(msg)) = response { return (nil, JSONRPCError(code: -32000, message: msg)) }
+        return (nil, JSONRPCError(code: -32000, message: "Unexpected response"))
+    }
+
+    func harnessBrowserGoForward(paneIdStr: String) async -> (AnyCodable?, JSONRPCError?) {
+        let toolName = "harnessBrowserGoForward"
+        guard isToolAllowed(toolName) else { return (nil, disabledError(toolName)) }
+        guard let paneID = UUID(uuidString: paneIdStr) else {
+            return (nil, JSONRPCError(code: -32602, message: "Invalid paneId UUID: \(paneIdStr)"))
+        }
+        guard let response = await send(.browserGoForward(paneID: paneID)) else {
+            return (nil, JSONRPCError(code: -32000, message: "Daemon unavailable"))
+        }
+        if case let .browserSuccess(.ok) = response { return (toolResult(json: .object(["ok": .bool(true)])), nil) }
+        if case let .browserSuccess(.error(msg)) = response { return (nil, JSONRPCError(code: -32000, message: msg)) }
+        return (nil, JSONRPCError(code: -32000, message: "Unexpected response"))
+    }
+
+    func harnessBrowserReload(paneIdStr: String) async -> (AnyCodable?, JSONRPCError?) {
+        let toolName = "harnessBrowserReload"
+        guard isToolAllowed(toolName) else { return (nil, disabledError(toolName)) }
+        guard let paneID = UUID(uuidString: paneIdStr) else {
+            return (nil, JSONRPCError(code: -32602, message: "Invalid paneId UUID: \(paneIdStr)"))
+        }
+        guard let response = await send(.browserReload(paneID: paneID)) else {
+            return (nil, JSONRPCError(code: -32000, message: "Daemon unavailable"))
+        }
+        if case let .browserSuccess(.ok) = response { return (toolResult(json: .object(["ok": .bool(true)])), nil) }
+        if case let .browserSuccess(.error(msg)) = response { return (nil, JSONRPCError(code: -32000, message: msg)) }
+        return (nil, JSONRPCError(code: -32000, message: "Unexpected response"))
+    }
+
     private func toolResult(json value: AnyCodable) -> AnyCodable {
         let data = try? JSONEncoder().encode(value)
         let text = data.flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
