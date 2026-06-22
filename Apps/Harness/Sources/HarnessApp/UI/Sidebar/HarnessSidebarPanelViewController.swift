@@ -1179,9 +1179,11 @@ final class HarnessSidebarPanelViewController: NSViewController {
             lastRefreshedSessions = newSessions
             lastRefreshedActiveID = activeID
             rebuildSidebarRows()
+            sessionTable.reloadData()
             selectActiveSessionRowIfVisible(scroll: false)
             let rows = cachedSidebarRows
-            for row in 0 ..< rows.count {
+            let tableRowCount = sessionTable.numberOfRows
+            for row in 0 ..< min(rows.count, tableRowCount) {
                 if let cell = sessionTable.view(atColumn: 0, row: row, makeIfNecessary: false) as? WorktreeRowView {
                     guard case let .session(session) = rows[row] else { continue }
                     let tab = session.activeTab ?? session.tabs.first ?? Tab()
