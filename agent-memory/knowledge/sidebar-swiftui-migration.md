@@ -5,128 +5,57 @@ metadata:
   type: knowledge
 ---
 
-# Sidebar NSTableView → SwiftUI Migration (Option B)
+# Sidebar SwiftUI Migration — Knowledge
 
-## Problem Solved
-**RL-051**: NSTableView row-index crashes when `z`/`cd`/`⌘\` rapidly navigated. Root cause: `view(atColumn:row:)` called with stale row count after sessions changed.
+> Migrated v3.9.0. NSTableView → SwiftUI List via @Observable SidebarListModel + NSHostingView.
 
-**Solution**: SwiftUI's diffing automatically handles row identity and ordering — no manual row manipulation.
+## Architecture
 
-## Core Pattern
+- `SidebarListModel` (@Observable @MainActor) — single source of truth for rows
+- `SidebarSessionListView` (SwiftUI) — ForEach over model.rows
+- `NSHostingView` bridge in `HarnessSidebarPanelViewController`
+- `snapshotChanged` → `model.update(from: snapshot)` → SwiftUI auto-diffs
 
-### 1. Observable Model
-Move all row state into `@Observable @MainActor` class:
+## Critical Lessons (bugs fixed)
+
+### 1. @MainActor + Task + Process.waitUntilExit = FREEZE (RL-052)
+All async git/gh Process calls MUST use `Task.detached(priority: .utility)`.
+`Task { }` inside @MainActor class inherits MainActor → waitUntilExit blocks main thread.
+
+### 2. @Observable + mutation in body = infinite re-render loop (RL-053)
+NEVER call a method that mutates @Observable state from a SwiftUI View body.
+`gitMetadata()` was mutating `gitMetadataCache` → triggered re-render → called again → ∞
+
+Fix: `@ObservationIgnored` on caches that are updated async, OR pass pre-computed values as parameters to child views.
+
+### 3. Re-entrancy guard on rebuildRows
+`rebuildRows()` can be called from multiple Task completions. Guard with `isRebuilding` flag.
+
+### 4. Worktree display rules
+- Sessions tab: only IDLE worktrees (no active session cwd matches), collapsed by default
+- Main worktree: always hidden (redundant — it's the session itself)
+- Active worktrees: already appear as session rows (no duplication)
+- `collapsedWorktreeGroups` set tracks EXPANDED groups (inverted default)
+
+## Patterns
+
 ```swift
-@Observable @MainActor
-final class SidebarListModel {
-    var rows: [SidebarSessionRow] = []
-    private(set) var sessions: [SessionGroup] = []
-    var collapsedGroups = Set<String>()
-    // Caches for git metadata, worktrees, repo roots (tracked by @Observable)
-    private var gitMetadataCache: [...] = [:]
-    
-    func update(from snapshot: SessionSnapshot) {
-        sessions = ...
-        rebuildRows()  // Called whenever sessions or collapse state changes
-    }
+// CORRECT: Process off main thread
+private func fetchSomething() async -> String {
+    await Task.detached(priority: .utility) {
+        let p = Process(); ...; p.waitUntilExit(); return result
+    }.value
 }
+
+// CORRECT: Cache excluded from observation
+@ObservationIgnored private var cache: [String: Value] = [:]
+
+// CORRECT: Pass data, don't read model in child body
+SidebarRow(entry: entry, metadata: model.getMetadata(...))
+// WRONG: let metadata = model.getMetadata(...) inside body
 ```
 
-**Why**: `@Observable` tracking on cache properties automatically triggers SwiftUI re-renders when git metadata arrives async — no manual `rebuildRows()` needed.
-
-### 2. SwiftUI View + NSHostingView Bridge
-```swift
-struct SidebarSessionListView: View {
-    var model: SidebarListModel  // Not @Bindable — model is mutable via callbacks
-    var onSelect: (SessionID) -> Void
-    // ... other callbacks
-    
-    var body: some View {
-        ScrollView { LazyVStack { ForEach(model.rows) { rowContent($0) } } }
-    }
-}
-
-// In VC:
-let hosting = NSHostingView(rootView: SidebarSessionListView(model: sidebarListModel, ...))
-view.addSubview(hosting)
-```
-
-**Why**: SwiftUI List can be slow with 50+ rows; `LazyVStack + ScrollView` gives better control.
-
-### 3. Row Types with Collision-Safe IDs
-```swift
-enum SidebarSessionRow: Identifiable {
-    case groupHeader(name: String, rootPath: String, count: Int, isCollapsed: Bool, status: BoardColumnKind)
-    case session(SessionGroup)
-    case worktreeHeader(rootPath: String, count: Int, isCollapsed: Bool)
-    case worktree(SidebarWorktreeEntry, rootPath: String)
-    case divider
-    
-    var id: String {
-        switch self {
-        case let .groupHeader(_, rootPath, _, _, _): "group-\(rootPath)"  // ← prefix
-        case let .session(s): "sess-\(s.id.uuidString)"
-        case let .worktreeHeader(rootPath, _, _): "wth-\(rootPath)"
-        case let .worktree(entry, _): "wt-\(entry.path)"
-        case .divider: "divider"
-        }
-    }
-}
-```
-
-**Why**: Prefixes prevent collisions when the same rootPath appears in both groups and worktree headers.
-
-### 4. Native SwiftUI Context Menus
-```swift
-private struct SidebarSessionItemRow: View {
-    let session: SessionGroup
-    var model: SidebarListModel
-    
-    var body: some View {
-        ZStack { /* row content */ }
-            .contextMenu {
-                Button("Rename session…") { renameSession(...) }
-                Button("Split session right") { ... }
-                Button("Close session", role: .destructive) { ... }
-            }
-    }
-}
-```
-
-**Why**: Avoids NSViewRepresentable + NSMenu hit-testing issues. Direct `SessionCoordinator.shared` calls work fine.
-
-### 5. Type Collision Handling
-When importing `SwiftUI` in AppKit code:
-```swift
-// ❌ Ambiguous after import SwiftUI
-private func columnKind(for tab: Tab) -> BoardColumnKind
-
-// ✅ Always qualify in method signatures
-private func columnKind(for tab: HarnessCore.Tab) -> BoardColumnKind
-```
-
-**Why**: `SwiftUI.Tab` (macOS 18+ tab view type) collides with `HarnessCore.Tab`. Qualification in the signature avoids shadow warnings.
-
-## Why RL-051 is Eliminated
-
-| NSTableView | SwiftUI |
-|---|---|
-| Manual row indices: `view(atColumn:0, row:42, ...)` | Row identity via `Identifiable.id` |
-| Stale row counts → crash | Diffing tracks identity automatically |
-| `reloadData()` + iterate rows → O(n) manual updates | Re-render entire view tree (fast for <100 rows) |
-| Selection state scattered (NSTableView + VC properties) | Single source: `model.activeSessionID` |
-
-SwiftUI's diffing is O(n) but deterministic: same ID = same row. No stale indices.
-
-## Reusable Checklist
-
-- [ ] Move row state to `@Observable @MainActor` model
-- [ ] Implement `func update(from snapshot) { ... rebuildRows() }`
-- [ ] Define `enum Row: Identifiable` with prefixed IDs
-- [ ] Create SwiftUI view with callbacks (don't use `@Bindable`)
-- [ ] Bridge with `NSHostingView` using same layout constraints as old scroll view
-- [ ] Implement `.contextMenu {}` on row views (no NSViewRepresentable)
-- [ ] Remove NSTableViewDataSource/Delegate conformance and dead helpers
-- [ ] Qualify all `Tab` references as `HarnessCore.Tab` in method signatures
-- [ ] Test rapid navigation (z/cd/⌘\) without crashes
-- [ ] Verify build size reduction (~47KB for Harness sidebar VC)
+## Files
+- `Apps/Harness/Sources/HarnessApp/UI/Sidebar/SidebarListModel.swift`
+- `Apps/Harness/Sources/HarnessApp/UI/Sidebar/SidebarSessionListView.swift`
+- `Apps/Harness/Sources/HarnessApp/UI/Sidebar/HarnessSidebarPanelViewController.swift`
