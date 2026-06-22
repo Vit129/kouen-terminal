@@ -18,11 +18,10 @@ final class WindowBorderOverlayView: NSView {
         needsDisplay = true
     }
 
-    /// RL-040: `nonisolated` bypasses the Swift 6.3 `@objc` thunk actor-isolation check.
-    nonisolated override func layout() {
-        guard self.window != nil else { return }
+    override func layout() {
+        guard window != nil else { return }
         super.layout()
-        self.needsDisplay = true // the stroke path depends on bounds
+        needsDisplay = true // the stroke path depends on bounds
     }
 
     /// The system's live rounding for this window, read from the frame view's layer so the
