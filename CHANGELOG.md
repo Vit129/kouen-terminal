@@ -6,6 +6,11 @@ All notable changes to Harness are documented here. The format is based on
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/robzilla1738/harness-terminal/releases).
 
+## [3.8.0] - 2026-06-22
+
+### Added
+- Release version bump to v3.8.0.
+
 ## [3.7.0] - 2026-06-21
 
 ### Added

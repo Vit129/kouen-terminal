@@ -55,6 +55,8 @@
 - RL-047: Split pane CWD must prefer `tab.worktreePath` over live process CWD (`currentWorkingDirectory()`). When agents run, `deepestReadableDescendant()` returns the agent's CWD (repo root/main) not the session's intended worktree. Priority: `worktreePath → sourceCwd → tab.cwd`.
 - RL-049: `nonisolated override func layout()` and `MainActor.assumeIsolated` wrapper is WRONG for non-zombie-prone views (like `TerminalTabBarView` and `WindowBorderOverlayView`). It triggers thunk executor check crashes or dynamic check failures under Swift 6.3/6.4. Use standard `override func layout()` (without `nonisolated`).
 - RL-050: Retain cycles in event monitors prevent views/controllers from deallocating, leaking them and causing zombie crashes if their subviews are freed. Using `[weak self]` in `NSEvent.addLocalMonitorForEvents` breaks the cycle, allowing `deinit` to call `NSEvent.removeMonitor` and safely bailing if called after deallocation.
+- [2026-06-22] Arch refactor items 1/2/4/5 complete on branch fix-app-crashes. Item 3 (HarnessCore package split) blocked by circular dep: AgentSnapshot/AIAgentConfig/WorkbenchCommand embedded in core IPC/models/settings — must be promoted to HarnessCore proper first before extraction is possible.
+- [2026-06-22] IPC protocol versioning: ipcProtocolVersion=1, identifyClient now carries protocolVersion:Int, daemon returns .protocolRejected on mismatch. ControlModeClient is the only explicit identifyClient sender; GUI/attach register via subscribeSurfaceOutput.
 
 ## Conventions
 - Build: `make preview`
