@@ -19,6 +19,8 @@ public final class BrowserPaneView: NSView {
     private var activeTabIndex: Int = 0
     private var activeTab: BrowserTab? { tabs.indices.contains(activeTabIndex) ? tabs[activeTabIndex] : nil }
     private var consoleLogs: [String] = []
+    private var pendingLogLines: [String] = []
+    private var logWriteScheduled = false
 
     private let tabBar = NSView()
     private let tabBarStack = NSStackView()
@@ -1025,28 +1027,34 @@ extension BrowserPaneView: WKScriptMessageHandler {
         
         let logLine = "[\(level.uppercased())] \(text)"
         
-        // Append to memory array (cap size to 200)
-        consoleLogs.append(logLine)
-        if consoleLogs.count > 200 {
-            consoleLogs.removeFirst(consoleLogs.count - 200)
+        // Cap in-memory array
+        if consoleLogs.count >= 200 {
+            consoleLogs.removeFirst()
         }
+        consoleLogs.append(logLine)
         
-        // Write/append to file asynchronously on a background queue to not block Main thread
-        let tempDir = NSTemporaryDirectory()
-        let logPath = (tempDir as NSString).appendingPathComponent("harness-browser-\(paneID.uuidString).log")
-        
-        DispatchQueue.global(qos: .utility).async {
-            let df = DateFormatter()
-            df.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
-            let timestamp = df.string(from: Date())
-            let fileLine = "[\(timestamp)] [\(level.uppercased())] \(text)\n"
-            
-            let url = URL(fileURLWithPath: logPath)
-            if let data = fileLine.data(using: .utf8) {
-                if let fileHandle = try? FileHandle(forWritingTo: url) {
-                    defer { try? fileHandle.close() }
-                    _ = try? fileHandle.seekToEnd()
-                    _ = try? fileHandle.write(contentsOf: data)
+        // Batch file writes — throttle to avoid spawning a work item per console.log
+        pendingLogLines.append(logLine)
+        guard !logWriteScheduled else { return }
+        logWriteScheduled = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            guard let self else { return }
+            self.logWriteScheduled = false
+            let batch = self.pendingLogLines
+            self.pendingLogLines.removeAll(keepingCapacity: true)
+            let logPath = (NSTemporaryDirectory() as NSString)
+                .appendingPathComponent("harness-browser-\(self.paneID.uuidString).log")
+            DispatchQueue.global(qos: .utility).async {
+                let df = DateFormatter()
+                df.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
+                let ts = df.string(from: Date())
+                let lines = batch.map { "[\(ts)] \($0)\n" }.joined()
+                guard let data = lines.data(using: .utf8) else { return }
+                let url = URL(fileURLWithPath: logPath)
+                if let fh = try? FileHandle(forWritingTo: url) {
+                    defer { try? fh.close() }
+                    _ = try? fh.seekToEnd()
+                    _ = try? fh.write(contentsOf: data)
                 } else {
                     _ = try? data.write(to: url, options: .atomic)
                 }
