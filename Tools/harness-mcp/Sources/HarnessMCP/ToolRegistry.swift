@@ -21,7 +21,7 @@ struct ToolRegistry: Sendable {
 
     func listTools() -> AnyCodable {
         .object(["tools": .array([
-            toolDef("harnessList", "List Harness workspaces, sessions, tabs, and panes", [
+            toolDef("harnessList", "List Harness workspaces, sessions, tabs, and panes (call first to find existing browser panes before opening new ones)", [
                 param("includePanes", "boolean", "Include per-tab pane details (optional, default true)"),
                 param("includeAgents", "boolean", "Include detected agent info per tab (optional, default true)"),
             ]),
@@ -87,11 +87,11 @@ struct ToolRegistry: Sendable {
                 param("path", "string", "Path to the git repository"),
                 param("count", "number", "Number of commits (default 10)"),
             ]),
-            toolDef("harnessBrowserOpen", "Open a new browser pane (requires MCP policy allowlist or HARNESS_MCP_ALLOW_CONTROL=1)", [
+            toolDef("harnessBrowserOpen", "Open a new browser pane. Check harnessList first to reuse existing panes (requires MCP policy allowlist or HARNESS_MCP_ALLOW_CONTROL=1)", [
                 param("url", "string", "URL to load"),
                 param("direction", "string", "Split direction: right, left, up, or down (optional)"),
             ]),
-            toolDef("harnessBrowserNavigate", "Navigate an existing browser pane (requires MCP policy allowlist or HARNESS_MCP_ALLOW_CONTROL=1)", [
+            toolDef("harnessBrowserNavigate", "Navigate an existing browser pane (preferred when panes already exist; get paneId from harnessList) (requires MCP policy allowlist or HARNESS_MCP_ALLOW_CONTROL=1)", [
                 param("paneId", "string", "Browser pane UUID"),
                 param("url", "string", "URL to load"),
             ]),
