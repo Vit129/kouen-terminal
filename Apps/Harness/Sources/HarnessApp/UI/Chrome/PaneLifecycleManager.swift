@@ -43,8 +43,11 @@ final class PaneLifecycleManager {
 
         let tabID = tab.id.uuidString
 
-        // Fast path: if we have a cached container for this tab, just swap visibility
-        if !force, let cached = containerCache[tabID], cached.superview == terminalHost {
+        // Fast path: if we have a cached container for THIS tab from a previous visit,
+        // just swap visibility. Guard `cached !== paneContainer` ensures we only take
+        // this path for tab-switch restores, not for in-place structural changes
+        // (e.g. adding a browser pane) where a full rebuild is required.
+        if !force, let cached = containerCache[tabID], cached !== paneContainer, cached.superview == terminalHost {
             paneContainer?.isHidden = true
             cached.isHidden = false
             paneContainer = cached

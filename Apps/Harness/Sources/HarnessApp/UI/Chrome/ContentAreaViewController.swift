@@ -617,11 +617,19 @@ private final class PaneSplitButtonsView: NSView {
     // invisible overlay when it's faded out.
     override func hitTest(_ point: NSPoint) -> NSView? {
         let currentOpacity = layer?.presentation()?.opacity ?? layer?.opacity ?? 0
+        #if DEBUG
+        if currentOpacity <= 0.01 {
+            print("[DBG-BTN] hitTest BLOCKED opacity=\(currentOpacity)")
+        }
+        #endif
         guard currentOpacity > 0.01 else { return nil }
         return super.hitTest(point)
     }
 
     override func mouseEntered(with event: NSEvent) {
+        #if DEBUG
+        print("[DBG-BTN] mouseEntered — setting opacity=1")
+        #endif
         guard window != nil else { return }
         let anim = CABasicAnimation(keyPath: "opacity")
         anim.fromValue = layer?.presentation()?.opacity ?? layer?.opacity ?? 0

@@ -494,6 +494,17 @@ final class SoftIconButton: NSButton {
         return self
     }
 
+    // macOS 26: NSButton with momentaryChange + no bezel doesn't reliably fire
+    // its action. Dispatch manually on mouseUp within bounds.
+    override func mouseUp(with event: NSEvent) {
+        let loc = convert(event.locationInWindow, from: nil)
+        guard bounds.contains(loc), let target = target, let action = action else {
+            super.mouseUp(with: event)
+            return
+        }
+        NSApp.sendAction(action, to: target, from: self)
+    }
+
     override func rightMouseDown(with event: NSEvent) {
         if let menu { NSMenu.popUpContextMenu(menu, with: event, for: self) }
         else { super.rightMouseDown(with: event) }
