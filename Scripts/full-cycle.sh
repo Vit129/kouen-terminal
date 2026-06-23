@@ -46,22 +46,7 @@ echo ""
 echo "▶ Step 2: Bumping version..."
 ./Scripts/prepare-release.sh "$@"
 
-# Step 3: Build production app. Rollback on failure.
-echo ""
-echo "▶ Step 3: Building production app..."
-if ! ./Scripts/run.sh prod; then
-  echo ""
-  echo "❌ Production build failed — rolling back version bump..."
-  git checkout -- \
-    Apps/Harness/Sources/HarnessApp/Resources/Info.plist \
-    Packages/HarnessCore/Sources/HarnessCore/HarnessVersion.swift \
-    Packages/HarnessCore/Sources/HarnessCore/ReleaseNotes/GeneratedReleaseNotes.swift \
-    CHANGELOG.md
-  echo "↩️  Version files restored. Fix the build and try again."
-  exit 1
-fi
-
-# Step 4: Commit and push.
+# Step 3: Commit and push.
 git_dir="$(git rev-parse --git-dir)"
 if [[ "$git_dir" == *"worktrees"* ]]; then
   echo "Detected: running in a worktree — merging into main first."
@@ -74,6 +59,21 @@ if [[ "$git_dir" == *"worktrees"* ]]; then
   git pull --ff-only origin main
 else
   ./Scripts/commit-push.sh
+fi
+
+# Step 4: Build production app. Rollback on failure.
+echo ""
+echo "▶ Step 4: Building production app..."
+if ! ./Scripts/run.sh prod; then
+  echo ""
+  echo "❌ Production build failed — rolling back version bump..."
+  git checkout -- \
+    Apps/Harness/Sources/HarnessApp/Resources/Info.plist \
+    Packages/HarnessCore/Sources/HarnessCore/HarnessVersion.swift \
+    Packages/HarnessCore/Sources/HarnessCore/ReleaseNotes/GeneratedReleaseNotes.swift \
+    CHANGELOG.md
+  echo "↩️  Version files restored. Fix the build and try again."
+  exit 1
 fi
 
 # Step 5: Generate CHANGELOG + tag + GitHub release via git-cliff.
