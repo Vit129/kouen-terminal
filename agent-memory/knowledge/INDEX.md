@@ -29,6 +29,8 @@
 | patterns/build-self-kill-protection.md | Build/Scripts | TERM_PROGRAM, kill_stale_prod, run.sh, self-kill, Harness-hosted | 1/0 | Build scripts killing Harness while running inside Harness. Fix: detect TERM_PROGRAM=Harness, skip kill of /Applications instance and runtime state clear. |
 | patterns/fsevents-pattern.md | Swift/FSEvents | FSEventStreamCreate, recursive, DispatchSource, WatcherContext, Unmanaged, CASE-016, CASE-021 | 1/0 | Reusable FSEvents recursive watcher pattern for Swift actors — replaces non-recursive DispatchSource for nested directory watching. |
 | architecture/command-prompt.md | Commands/Parser | CommandParser, CommandPrompt, knownVerbs, aliases, sendKeys, zoxide, passthrough | 1/0 | Command prompt 2-layer architecture: CommandParser (text→Command) + MainExecutor (Command→effect). Every documented verb needs both layers or throws unknownCommand. |
+| rl-lessons.md | AppKit/Swift6 | RL, zombie, NSSplitView, NSPanel, NSAlert, WKWebView, Task.detached, Observable, nonisolated, assumeIsolated | 0/0 | All RL-xxx lesson entries — grep target for bug pattern lookup |
+| architecture/decisions.md | Architecture | ACP, harness-mcp, keybindings, sidebar, worktree, browser, tab, config, IPC | 0/0 | Stable architecture decisions moved from MEMORY.md |
 
 ## Source Map
 

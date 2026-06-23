@@ -421,7 +421,7 @@ final class SoftIconButton: NSButton {
         // layer-driven chrome (the bezel intercepts hit-testing in some macOS
         // builds). Disable it so we own the look and clicks dispatch reliably.
         isBordered = false
-        isTransparent = true
+        isTransparent = false
         bezelStyle = .regularSquare
         imagePosition = .noImage
         setButtonType(.momentaryChange)
@@ -484,6 +484,14 @@ final class SoftIconButton: NSButton {
         HarnessDesign.applyIconButtonChrome(to: layer, bounds: bounds, isHovered: isHovered)
         let c = HarnessDesign.chrome
         iconView.contentTintColor = isHovered ? c.textPrimary : c.textSecondary
+    }
+
+    // The iconView NSImageView child can become the hitTest target on macOS 26,
+    // intercepting mouse events before NSButton's tracking starts. Force self as
+    // the hit view so the button's action always dispatches on click.
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        guard !isHidden, alphaValue > 0.01, frame.contains(point) else { return nil }
+        return self
     }
 
     override func rightMouseDown(with event: NSEvent) {

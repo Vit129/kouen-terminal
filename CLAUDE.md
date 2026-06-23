@@ -1,121 +1,65 @@
-# CLAUDE.md
+# harness-terminal — Claude Instructions
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
-## Global rules and skills
-
-Global Claude instructions are authoritative and must be checked before repo-specific work:
-
-- `~/.claude/rules/skill-auto-detect.md` — mandatory keyword/semantic skill routing. Invoke matching `Skill()` before responding.
-- `~/.claude/rules/skill-map.md` — use when skill selection is unclear or the user invokes a skill.
-- `~/.claude/skills/` and `~/.agents/skills/` — global skill roots.
-
-For this repo, common triggers include SwiftUI/AppKit/macOS (`macos-swiftui`), Swift/iOS-style UI references (`ios-swiftui-swift` when relevant), Robot Framework UI automation (`robotframework-testing` plus `robotframework-rules`), Playwright/browser testing (`playwright-testing`), debugging (`debug-mantra`), architecture (`architect`), and code review (`review-personas`). If a matching skill exists, invoke it first; if the `Skill` tool is unavailable, read the matching `SKILL.md` manually and state the fallback.
-
-## Product docs
-
-- `README.md` — public overview, install summary, feature map, and documentation index.
-- `USAGE.md` — practical install/run/CLI/remote/headless guide. Read before answering user-facing setup or usage questions.
-- `docs/MULTIPLEXER_GUIDE.md` and `docs/COMMANDS.md` — canonical multiplexer and command references.
-
-## Build/test/run commands
-
-- `make build` -> `swift build`.
-- `swift build` builds the SwiftPM package. On macOS this includes `Harness`, `HarnessDaemon`, `harness-cli`, renderer, terminal kit, onboarding, and Sparkle-backed app targets; on Linux the macOS-only targets are omitted by `#if os(macOS)` in `Package.swift`.
-- `swift build --product Harness` builds the macOS GUI executable product.
-- `swift build --product HarnessDaemon` builds the daemon executable product.
-- `swift build --product harness-cli` builds the CLI executable product.
-- `make preview` -> `./Scripts/preview.sh`: builds `Harness`, `HarnessDaemon`, and `harness-cli` products for an isolated preview app with its own bundle id, socket, and state directory.
-- `make debug` -> `./Scripts/run.sh debug`: backward-compatible alias for `make preview`.
-- `make prod` -> `./Scripts/run.sh prod`: builds `Harness`/`HarnessDaemon`/`harness-cli` in release config, packages/signs the repo-root `Harness.app`, and opens it without copying to `/Applications`.
-- `make run` -> `./Scripts/run.sh run`: kills any stale running instance and re-opens the existing repo-root `Harness.app` without rebuilding (fails if it doesn't exist yet — run `make prod` first).
-- `make install` -> `./Scripts/install-app.sh`: manual-only release build + package + sign, stops the old daemon, copies into `/Applications/Harness.app`, clears quarantine/LaunchServices cache, then opens it from `/Applications`. It is not part of the interactive/full-cycle release flow. `make install-no-build` skips the build step.
-- `make preview-stop` stops preview `Harness` and `HarnessDaemon` processes under `.harness-preview`; `make preview-clean` removes `.harness-preview`.
-- `swift run HarnessDaemon` runs the daemon foreground executable from the SwiftPM product.
-- `swift run harness-cli -- <command>` runs the CLI product; `swift run harness-cli -- daemon` execs `HarnessDaemon`.
-- `swift test` runs the package test suite declared in `Package.swift`.
-- `swift test --filter <TestTargetOrCase>` runs a filtered test target/case.
-- `make bench` -> `HARNESS_BENCHMARKS=1 swift test -c release --filter HarnessBenchmarks`.
-- `make icon` -> `./Scripts/generate-app-icon.sh`.
-- `make release` depends on `icon` and runs `./Scripts/build-release.sh`.
-- `make dmg`, `make sign`, `make appcast`, `make finalize`, and `make hotfix-release` call the corresponding scripts; release order is `make release` -> `make sign` -> `make dmg` -> `make finalize`.
-- Theme catalog regeneration: `EXPORT_THEMES=1 swift test --filter ThemeCatalogEmbedTests` rewrites `Packages/HarnessTheme/Sources/HarnessTheme/BundledThemesData.swift` from `Packages/HarnessTheme/Sources/HarnessTheme/Resources/themes.json`.
-- Character width table regeneration is manual, not part of the build: `swift Scripts/generate-width-table.swift > Packages/HarnessTerminalEngine/Sources/HarnessTerminalEngine/Width/CharacterWidthTable.swift`.
-- **Robot Framework regression tests (run BEFORE every build):** `Tests/robot/run.sh`. These verify critical bug-fix invariants remain intact. If any test fails, fix the regression before running `swift build`.
-
-## Project context (auto-loaded every session)
-
+## Auto-loaded
 - @agent-memory/CONTEXT.md
 - @agent-memory/INDEX.md
 
-## Project context lookup
+## Session Start
+1. `agent-memory/CONTEXT.md` — active task, branch, key files
+2. `agent-memory/INDEX.md` — plans + knowledge catalog
+3. `graphify-out/GRAPH_SUMMARY.md` — if navigating code
+4. Bug/pattern → grep on-demand (see below)
 
-- `graphify-out/GRAPH_SUMMARY.md` — capped 70-line digest (god nodes, community hubs, freshness). Auto-loaded above.
-- `graphify-out/graph.json` — machine-readable project knowledge graph. Use Graphify queries before broad source browsing.
-- `graphify-out/GRAPH_REPORT.md` — full navigation guide (4000+ lines). Use only when query/path/explain isn't enough.
-- `graphify-out/.graphify_labels.json` — readable community labels for the graph.
-- `agent-memory/CONTEXT.md` — current session state: active task, plan, key files (rewrite every session).
-- `agent-memory/MEMORY.md` — persistent decisions + lessons (append-only).
-- `agent-memory/INDEX.md` — catalog of plans + knowledge.
-- `agent-memory/PLAYBOOK.md` — reusable fix patterns and prevention notes (on-demand).
-- `agent-memory/knowledge/` — durable domain notes for architecture areas such as IPC, AppKit/Metal, ACP, split panes, and git panel behavior.
+Continuation → CONTEXT.md → invoke `macos-swiftui` skill for SwiftUI/AppKit work.
 
-## Graphify + agent-memory
+## Skills
+AppKit/SwiftUI/macOS → `macos-swiftui` | debugging → `debug-mantra` | review → `review-personas`
+Routing: `~/.claude/rules/routing.md`
 
-For codebase questions, use `graphify query "<question>"`, `graphify path "<A>" "<B>"`, or `graphify explain "<concept>"` — GRAPH_SUMMARY.md already gives you god nodes and community hubs to orient from.
+## Build / Test / Run
 
-- For implementation work, read `agent-memory/CONTEXT.md` for current task, `agent-memory/MEMORY.md` for past decisions, then use Graphify to find both implementation files and matching `agent-memory/knowledge/*.md` durable knowledge docs.
+| Command | What it does |
+|---------|-------------|
+| `make preview` | Isolated preview build (own bundle id, socket, state) — use for dev |
+| `make prod` | Release build → signs → opens `Harness.app` at repo root |
+| `make run` | Re-open existing `Harness.app` without rebuilding |
+| `make install` | Release build → copy → `/Applications/Harness.app` |
+| `swift build --product Harness` | GUI app only |
+| `swift test` | Full test suite |
+| `swift test --filter <name>` | Filtered test |
+| `Tests/robot/run.sh` | **Run BEFORE every build** — regression invariants |
+| `EXPORT_THEMES=1 swift test --filter ThemeCatalogEmbedTests` | Regenerate `BundledThemesData.swift` after theme edits |
 
-Dirty `graphify-out/` files are expected after hooks or incremental updates; dirty graph files are not a reason to skip Graphify. Only skip Graphify if the task is specifically about stale or incorrect graph output, or the user explicitly says not to use it.
+Release order: `make release` → `make sign` → `make dmg` → `make finalize`
 
-Read `graphify-out/GRAPH_REPORT.md` only for broad architecture review or when `query`/`path`/`explain` do not surface enough context. After modifying code or architecture-relevant docs, run `graphify update . --force && ~/.claude/scripts/generate-graph-summary.sh .` to keep both the graph and summary current.
+## On-demand Memory
+```bash
+grep -rn "<keyword>" agent-memory/knowledge/cases/ agent-memory/knowledge/rl-lessons.md agent-memory/MEMORY.md
+```
+Never read PLAYBOOK.md / MEMORY.md / knowledge/ in full. `PLAYBOOK.md` = index only → cases in `knowledge/cases/`.
+
+## Graphify
+```bash
+graphify query "..."        # first nav layer
+graphify path "A" "B"       # dependency path
+graphify explain "concept"
+graphify update . && ~/.claude/scripts/generate-graph-summary.sh .  # after code changes
+```
+`GRAPH_REPORT.md` (4000+ lines) — only for broad architecture review.
+
+## Non-obvious Constraints
+
+- **Swift 6 strict concurrency**: `HarnessCore` + `HarnessTerminalEngine` use `-warnings-as-errors` — concurrency/deprecation warnings = build failures.
+- **`@unchecked Sendable`**: `DaemonClient`, `DaemonServer`, `SurfaceRegistry`, `RealPty`, `DaemonLauncher`, `SurfaceIO`, `InputGate`, `SSHTunnelManager` — preserve lock/queue ownership.
+- **Terminal output replay**: `TerminalHostView` uses `DispatchQueue.main.async` + `MainActor.assumeIsolated` to preserve FIFO byte order. `Task { @MainActor in }` can reorder bursty output.
+- **IPC framing**: control = 4-byte big-endian length-prefixed JSON. PTY hot path = binary magic `0xF5` (output) / `0xF6` (input). New binary frame type needs version gate — old readers drop connection on unknown magic.
+- **ACP shelved**: Agent sidebar + Chat toggle commented out. Code intact for re-enablement.
+- **`IPCCodec.maxPayloadLength`**: 16 MiB.
+- **Daemon socket**: owner-only `0600`, rejects peers with different uid.
+- **`CharacterWidthTable.swift`**: generated + committed. Regenerate via `Scripts/generate-width-table.swift` if `CharacterWidth.swift` changes.
+- **`themes.json`**: excluded from SwiftPM build. Regenerate `BundledThemesData.swift` with theme export test.
+- **Release packaging order**: `dmg`/`sign`/`finalize` operate on existing `Harness.app` — wrong order rebuilds away the signature.
 
 ## Infrastructure
-
-- **Headroom Proxy** (always-on): All Claude Code and Codex traffic routes through `localhost:8787` for token compression. See `~/.claude/agent-memory/knowledge/headroom-proxy.md`.
-- **Ponytail** (lazy mode plugin): Installed at `~/.claude/plugins/marketplaces/ponytail/`. Say "ponytail" or `/ponytail` to activate lazy senior dev mode (default: `full`). Stop with "normal mode".
-
-## High-level architecture
-
-- Package: `Harness` (`Package.swift`, Swift tools 6.0). External dependency exists only on macOS: Sparkle `2.9.x` for the GUI app.
-- `HarnessCore` (`Packages/HarnessCore/Sources/HarnessCore`): shared models, session/editor logic, IPC envelope/schema/codec/client, command parsing/translation, settings, keybindings, paths, hooks, diagnostics, remote SSH tunnel configuration, ACP JSON-RPC framing, and persistence helpers. `HarnessCore` and `HarnessTerminalEngine` use `-warnings-as-errors`.
-- `HarnessTerminalEngine` (`Packages/HarnessTerminalEngine/Sources/HarnessTerminalEngine`): pure Swift terminal engine: VT parser, emulator, screen/grid model, input encoding, image protocols, search, damage tracking, and generated character-width lookup.
-- `HarnessCopyMode` (`Packages/HarnessCopyMode/Sources/HarnessCopyMode`): UI-agnostic copy-mode state and reducer over terminal engine grids.
-- `HarnessTheme` (`Packages/HarnessTheme/Sources/HarnessTheme`): theme definitions, `.harnesstheme` document support, diagnostics, and embedded base64 community catalog.
-- `HarnessLSP` (`Packages/HarnessLSP/Sources/HarnessLSP`): LSP client plumbing — transport, client, models, and server registry — used by the GUI file viewer/editor.
-- `HarnessSyntaxResources` (`Packages/HarnessSyntaxResources`): bundled tree-sitter grammar resources (`Resources/TreeSitterGrammars`) for syntax highlighting.
-- `CHarnessSys` (`Packages/CHarnessSys`): C portability shim for low-level PTY/socket helpers such as non-variadic terminal/ioctl wrappers and peer credentials.
-- `HarnessDaemonCore` (`Packages/HarnessDaemon/Sources/HarnessDaemon`): daemon library. `DaemonServer` owns the Unix socket accept/read/write loop, client subscriptions, snapshot subscriptions, and per-fd resize/detach state. `SurfaceRegistry` owns session layout, `RealPty` surfaces, hooks, options, paste buffers, and persistence. `DaemonCommandExecutor` maps hook-fired commands through `CommandIPCTranslator`.
-- `HarnessDaemon` (`Packages/HarnessDaemon/Sources/HarnessDaemonMain`): thin daemon executable that starts `DaemonServer`, installs signal handlers, writes/removes PID files, starts `AgentScanner`, logs to `HarnessPaths.daemonLogURL`, and runs the dispatch loop.
-- `HarnessCLI` (`Tools/harness/Sources/HarnessCLI`): command-line frontend. `HarnessCLI` parses commands, uses `DaemonClient` for RPC, uses `AttachClient`/`ControlModeClient`/`RecordClient`/`ReplayClient` for live terminal workflows, and on macOS conditionally uses `WindowAttachClient`/`HarnessTerminalKit` for `attach-window`.
-- `HarnessMCP` (`Tools/harness-mcp/Sources/HarnessMCP`, product `harness-mcp`): MCP (Model Context Protocol) server speaking JSON-RPC 2.0 over stdin/stdout so AI agents can use Harness as a tool provider; depends only on `HarnessCore`.
-- `HarnessTerminalRenderer` (`Packages/HarnessTerminalRenderer/Sources/HarnessTerminalRenderer`, macOS): CoreText/Metal renderer, glyph atlas/rasterizer, frame building, color resolution, and image texture cache.
-- `HarnessTerminalKit` (`Packages/HarnessTerminalKit/Sources/HarnessTerminalKit`, macOS): AppKit terminal surface layer. `TerminalHostView` hosts `HarnessTerminalSurfaceView`, ensures daemon surfaces, replays scrollback, subscribes to output, and routes input/resize through `SurfaceIO` and `InputGate`.
-- `HarnessOnboarding` (`Packages/HarnessOnboarding/Sources/HarnessOnboarding`, macOS): isolated SwiftUI/AppKit onboarding wizard and install helpers.
-- `HarnessApp` (`Apps/Harness/Sources/HarnessApp`, macOS product `Harness`): GUI app. `AppDelegate`/controllers build windows, menus, settings, panes, and onboarding. `DaemonLauncher` ensures a daemon exists via launchd in release or direct fallback in debug. `SessionCoordinator`, `MainExecutor`, and pane registry types coordinate GUI state with daemon surfaces.
-- Test targets in `Package.swift`: `HarnessCoreTests`, `HarnessTerminalEngineTests`, `HarnessCopyModeTests`, `HarnessThemeTests`, `HarnessCLITests`, `HarnessDaemonTests`; macOS-only `HarnessTerminalRendererTests`, `HarnessTerminalKitTests`, `HarnessOnboardingTests`, `GridCompositorParityTests` (drift canary: live vs onboarding `GridCompositor`), `HarnessAppTests`, and opt-in `HarnessBenchmarks`.
-- GUI/CLI/daemon communication is not ACP. They communicate through `HarnessCore` IPC over Unix-domain sockets. Boundary types/files are `Endpoint` and `EndpointConnector` (`IPC/Endpoint*.swift`), `DaemonClient` and `DaemonSubscription` (`IPC/DaemonClient.swift`), `IPCRequest`/`IPCResponse`/`IPCEnvelope`/`IPCReply` (`IPC/IPCMessage.swift`), `IPCCodec` (`IPC/IPCCodec.swift`), and `DaemonServer` (`HarnessDaemon/DaemonServer.swift`).
-- IPC framing: control messages are 4-byte big-endian length-prefixed JSON. PTY hot paths use binary frames in `IPCCodec`: daemon-to-client output magic `0xF5` with sequence, and client-to-daemon input magic `0xF6` with surface id and raw bytes.
-- Remote daemon access still uses the same IPC protocol. `SSHTunnelManager` starts `ssh -N -L <local-socket>:<remote-socket>` and returns `Endpoint.unix`; native `Endpoint.tcp` is reserved and currently unsupported.
-- ACP is separate agent-process plumbing in `HarnessCore/ACP`: `ACPMessage` models JSON-RPC 2.0, `ACPTransport` frames messages with `Content-Length`, and `ACPProcess` launches an external agent binary over stdin/stdout.
-- **⚠️ ACP Client is shelved/experimental.** The Agent sidebar tab and Chat toggle in Settings are commented out. Reason: most CLI agents require separate ACP adapter binaries that aren't widely installed, PATH resolution inside macOS .app bundles is unreliable, and there's no way to control which tools an agent invokes. The underlying code (`ACPClient`, `ACPSession`, `AgentChatPanelView`, `AgentConfig`) remains intact for future re-enablement.
-- Shared command mapping lives in `CommandIPCTranslator` (`HarnessCore/Commands/CommandIPCTranslator.swift`). It maps parsed `Command` values to `IPCRequest`s for headless frontends and daemon hooks; GUI `MainExecutor` consults it while keeping AppKit-specific prompts/toasts local.
-
-## Non-obvious constraints
-
-- Swift 6 strict concurrency is on because the package tools version is 6.0. `HarnessCore` and `HarnessTerminalEngine` additionally set `-warnings-as-errors`; concurrency/data-race/deprecation warnings in those foundational targets are build failures.
-- Many long-lived classes are deliberately `@unchecked Sendable` with documented confinement: `DaemonClient`, `DaemonSubscription`, `DaemonServer`, `SurfaceRegistry`, `RealPty`, `DaemonLauncher`, `SurfaceIO`, `InputGate`, `SSHTunnelManager`, and stores. Preserve the stated lock/queue ownership when changing them.
-- AppKit/SwiftUI UI types are `@MainActor`. For terminal output replay, `TerminalHostView` uses `DispatchQueue.main.async` plus `MainActor.assumeIsolated` to preserve FIFO byte order; replacing that with unstructured `Task { @MainActor in }` can reorder bursty terminal output.
-- Package-level `#if os(macOS)` drops Sparkle, `HarnessTerminalRenderer`, `HarnessTerminalKit`, `HarnessOnboarding`, `HarnessApp`, and their tests on non-macOS. On Linux/headless, `HarnessDaemon`, `harness-cli`, core, engine, copy mode, theme, and `CHarnessSys` still build.
-- CLI source has platform conditionals: `WindowAttachClient.swift` is excluded on non-macOS, and `attach-window` is guarded by `#if canImport(HarnessTerminalKit)`. Single-pane `attach` remains headless.
-- Low-level POSIX imports are normally `#if canImport(Darwin)` / `#elseif canImport(Glibc)`. Socket helpers also route through `PlatformSys.swift` and `CHarnessSys`; avoid Darwin-only calls in daemon/CLI/core code unless guarded.
-- The daemon control socket is owner-only: `DaemonServer` binds `HarnessPaths.socketURL`, chmods it `0600`, and rejects peers whose kernel peer uid differs from `geteuid()`.
-- `IPCCodec.maxPayloadLength` is 16 MiB. Binary magic bytes rely on JSON frame length high bytes never colliding with `0xF5`/`0xF6`; adding a new binary frame type needs a version/capability gate because old readers treat unknown magics as oversized JSON and drop the connection.
-- Subscription sockets are long-lived and full-duplex. Input and resize should ride `DaemonSubscription` where possible so resize votes live for the fd lifetime; one-shot `DaemonClient.request(.resizeSurface)` votes disappear when the socket closes.
-- `wait-for`, subscriptions, resize, detach, and client lifecycle are intercepted in `DaemonServer` at the fd layer because they depend on connection identity; do not move those blindly into `SurfaceRegistry`.
-- `themes.json` is the editable theme source but is excluded from the SwiftPM build. Runtime loads compiled base64 from `BundledThemesData.swift`; after editing themes, regenerate with `EXPORT_THEMES=1 swift test --filter ThemeCatalogEmbedTests`.
-- `CharacterWidthTable.swift` is generated and committed. If canonical width ranges in `CharacterWidth.swift` change, regenerate with `Scripts/generate-width-table.swift`; `CharacterWidthTests` exhaustively checks all Unicode scalars.
-- Release packaging order matters: `dmg`, `sign`, and `finalize` intentionally operate on an existing `Harness.app`; running `make dmg` after `make sign` without respecting the documented order can rebuild away a signature.
-
-<!-- Agent Memory Lifecycle (shared protocol) -->
-@.ai/memory-protocol.md
+- Headroom Proxy: `localhost:8787` (always-on, token compression)
+- Ponytail: `~/.claude/plugins/marketplaces/ponytail/` — activate: "ponytail" / `/ponytail`

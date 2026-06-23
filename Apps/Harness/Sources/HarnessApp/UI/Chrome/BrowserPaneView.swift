@@ -47,14 +47,19 @@ public final class BrowserPaneView: NSView {
     private var progressObservation: NSKeyValueObservation?
 
     public convenience init(url: URL, paneID: PaneID = UUID()) {
-        let config = WKWebViewConfiguration()
-        config.limitsNavigationsToAppBoundDomains = false
-        let web = WKWebView(frame: .zero, configuration: config)
-        web.allowsMagnification = true
-        web.allowsBackForwardNavigationGestures = true
+        let web: WKWebView
+        if let warmed = BrowserPaneRegistry.shared.dequeueWarmedWebView() {
+            web = warmed
+        } else {
+            let config = WKWebViewConfiguration()
+            config.limitsNavigationsToAppBoundDomains = false
+            web = WKWebView(frame: .zero, configuration: config)
+            web.allowsMagnification = true
+            web.allowsBackForwardNavigationGestures = true
 #if DEBUG
-        web.configuration.preferences.setValue(true, forKey: "developerExtrasEnabled")
+            web.configuration.preferences.setValue(true, forKey: "developerExtrasEnabled")
 #endif
+        }
         self.init(url: url, paneID: paneID, webView: web)
     }
 
@@ -826,9 +831,29 @@ extension BrowserPaneView: WKUIDelegate {
 public final class BrowserPaneRegistry {
     public static let shared = BrowserPaneRegistry()
     private var panes: [PaneID: WeakBrowserPaneView] = [:]
+    private var warmPool: [WKWebView] = []
 
     private struct WeakBrowserPaneView {
         weak var view: BrowserPaneView?
+    }
+
+    /// Pre-create a WKWebView so the first browser open is instant.
+    public func prewarm() {
+        guard warmPool.isEmpty else { return }
+        let config = WKWebViewConfiguration()
+        config.limitsNavigationsToAppBoundDomains = false
+        let web = WKWebView(frame: .zero, configuration: config)
+        web.allowsMagnification = true
+        web.allowsBackForwardNavigationGestures = true
+#if DEBUG
+        web.configuration.preferences.setValue(true, forKey: "developerExtrasEnabled")
+#endif
+        warmPool.append(web)
+    }
+
+    /// Dequeue a pre-warmed WKWebView, or nil if pool is empty.
+    public func dequeueWarmedWebView() -> WKWebView? {
+        warmPool.isEmpty ? nil : warmPool.removeFirst()
     }
 
     public func register(_ view: BrowserPaneView) {
@@ -978,11 +1003,13 @@ private final class BrowserProgressLine: NSView {
                 ctx.duration = 0.2
                 fillWidth?.animator().constant = w
             }, completionHandler: {
-                NSAnimationContext.runAnimationGroup { ctx in
-                    ctx.duration = 0.25
-                    self.animator().alphaValue = 0
+                MainActor.assumeIsolated {
+                    NSAnimationContext.runAnimationGroup { ctx in
+                        ctx.duration = 0.25
+                        self.animator().alphaValue = 0
+                    }
+                    self.fillWidth?.constant = 0
                 }
-                self.fillWidth?.constant = 0
             })
         }
     }
@@ -1005,15 +1032,15 @@ extension BrowserPaneView: WKScriptMessageHandler {
         }
         
         // Write/append to file asynchronously on a background queue to not block Main thread
-        let df = DateFormatter()
-        df.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
-        let timestamp = df.string(from: Date())
-        
-        let fileLine = "[\(timestamp)] [\(level.uppercased())] \(text)\n"
         let tempDir = NSTemporaryDirectory()
         let logPath = (tempDir as NSString).appendingPathComponent("harness-browser-\(paneID.uuidString).log")
         
         DispatchQueue.global(qos: .utility).async {
+            let df = DateFormatter()
+            df.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
+            let timestamp = df.string(from: Date())
+            let fileLine = "[\(timestamp)] [\(level.uppercased())] \(text)\n"
+            
             let url = URL(fileURLWithPath: logPath)
             if let data = fileLine.data(using: .utf8) {
                 if let fileHandle = try? FileHandle(forWritingTo: url) {

@@ -158,10 +158,10 @@ final class SplitPaneCoordinator {
     }
 
     func openBrowserPane(url: URL, direction: SplitDirection, paneID: PaneID = UUID()) {
+        // activePaneID was unused — the browser is always inserted at the root level
+        // beside all terminal panes, so only workspace+tab need to exist.
         guard let workspace = coord.snapshot.activeWorkspace,
-              let tab = workspace.activeTab,
-              let activePaneID = coord.activeSurfaceID.flatMap({ self.paneID(for: $0, in: tab.rootPane) })
-                ?? tab.rootPane.allPaneIDs().last
+              let tab = workspace.activeTab
         else { return }
 
         let resolvedURL: URL
