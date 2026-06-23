@@ -46,6 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         notchController?.start()
         PrefixKeymap.shared.install()
         AppIdleThrottle.shared.install()
+        BrowserPaneRegistry.shared.prewarm()
 
         // Fix #8 (RL-040): Swallow key/mouse events targeting views that lost their window.
         // On macOS 26.5 + Swift 6.3, the @objc thunk crashes with EXC_BAD_ACCESS

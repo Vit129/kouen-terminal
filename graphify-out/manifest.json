@@ -1260,8 +1260,8 @@
     "semantic_hash": ""
   },
   "Packages/HarnessTerminalKit/Sources/HarnessTerminalKit/HarnessTerminalSurfaceView.swift": {
-    "mtime": 1782035519.1274838,
-    "ast_hash": "3210ab679fb0e29f8470753b88db6afe",
+    "mtime": 1782136072.9089456,
+    "ast_hash": "a9390ed96f5a3a8a2f5a759d93e408b8",
     "semantic_hash": ""
   },
   "Packages/HarnessTerminalKit/Sources/HarnessTerminalKit/HarnessTerminalSurfaceView+Find.swift": {
@@ -1330,8 +1330,8 @@
     "semantic_hash": ""
   },
   "Packages/HarnessCore/Sources/HarnessCore/HarnessVersion.swift": {
-    "mtime": 1782123984.9664168,
-    "ast_hash": "7c9903ee18e2254dba68c7bcd5050169",
+    "mtime": 1782138022.918591,
+    "ast_hash": "f9336730df701d98108a77c0ad465fd3",
     "semantic_hash": ""
   },
   "Packages/HarnessCore/Sources/HarnessCore/Options/EnvironmentStore.swift": {
@@ -1515,8 +1515,8 @@
     "semantic_hash": ""
   },
   "Packages/HarnessCore/Sources/HarnessCore/ReleaseNotes/GeneratedReleaseNotes.swift": {
-    "mtime": 1782123985.7242262,
-    "ast_hash": "513bdc313299cf2e69c008ff4a5c848f",
+    "mtime": 1782138032.4919622,
+    "ast_hash": "a9a04fca32dc7608cd88f8eea0d6ab96",
     "semantic_hash": ""
   },
   "Packages/HarnessCore/Sources/HarnessCore/ReleaseNotes/TerminalBanner.swift": {
@@ -2230,13 +2230,13 @@
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/UI/Chrome/BrowserPaneView.swift": {
-    "mtime": 1782052637.848506,
-    "ast_hash": "c9fd99854b38d8650ba4aee94af0479c",
+    "mtime": 1782140073.743091,
+    "ast_hash": "6ed597b9e6a019de7d0c2fb02ab2f82d",
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/UI/Chrome/MainSplitViewController.swift": {
-    "mtime": 1782097937.0128124,
-    "ast_hash": "088dac0ac4d81bb3f82a15f4c861cb9d",
+    "mtime": 1782139968.6272542,
+    "ast_hash": "d6ec5cc9dd6467469109528f04277e3a",
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/UI/Chrome/WindowBorderOverlayView.swift": {
@@ -2515,8 +2515,8 @@
     "semantic_hash": ""
   },
   "CHANGELOG.md": {
-    "mtime": 1782123985.0093799,
-    "ast_hash": "a23f0b43fd6c2ed3f021458ad07d3954",
+    "mtime": 1782137499.6196039,
+    "ast_hash": "fc8cd0afa784ec3a77deb8b7471c4045",
     "semantic_hash": ""
   },
   "project.yml": {
@@ -2985,8 +2985,8 @@
     "semantic_hash": ""
   },
   "agent-memory/CONTEXT.md": {
-    "mtime": 1782124829.4167697,
-    "ast_hash": "0897bf7b7bea7cb1ac9fb763bc371b23",
+    "mtime": 1782140194.3525586,
+    "ast_hash": "8d24a7b151d75134e4a192657655f096",
     "semantic_hash": ""
   },
   "agent-memory/USER-PROFILE.md": {
@@ -2995,8 +2995,8 @@
     "semantic_hash": ""
   },
   "agent-memory/MEMORY.md": {
-    "mtime": 1782121501.2557337,
-    "ast_hash": "425b19d70c4f042456098ee051194335",
+    "mtime": 1782140191.5011337,
+    "ast_hash": "7d7aa2a4f72a24b10b6f25891947fa51",
     "semantic_hash": ""
   },
   "agent-memory/index.md": {
@@ -3345,13 +3345,13 @@
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/UI/Chrome/FilePreviewCoordinator.swift": {
-    "mtime": 1782097937.0120711,
-    "ast_hash": "c34a7e5f5e72e094280a9f92459fc1b0",
+    "mtime": 1782136072.907529,
+    "ast_hash": "8172c459faa91c677a07544b12aec85f",
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/UI/Chrome/PaneLifecycleManager.swift": {
-    "mtime": 1782097937.0132017,
-    "ast_hash": "cb07bf595b87c62d84137896e87039d3",
+    "mtime": 1782136072.9079115,
+    "ast_hash": "ec6c073feec1c04225324cdafe8210d8",
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/UI/Sidebar/SidebarListModel.swift": {
@@ -3612,6 +3612,11 @@
   "Tests/HarnessMCPTests/StdioTransportTests.swift": {
     "mtime": 1782125871.5110798,
     "ast_hash": "7a28ad1a648f4c382966af2976acaac5",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/bugs/terminal-flicker-fixes.md": {
+    "mtime": 1782136112.4210129,
+    "ast_hash": "61af4eb1b9d32d5971219b3e3563edf6",
     "semantic_hash": ""
   }
 }

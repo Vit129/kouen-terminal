@@ -3,7 +3,7 @@
 ## Now
 - **Task:** None active — ready for next session
 - **Branch:** main
-- **Status:** idle (Completed terminal flicker fix — presentsWithTransaction order in layout())
+- **Status:** idle (Completed sidebar toggle layout and browser main thread freeze fixes)
 
 ## Last Session (2026-06-23) — Sidebar SwiftUI Migration Complete
 

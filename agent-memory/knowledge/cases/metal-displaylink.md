@@ -1,0 +1,13 @@
+# CASE — AppKit / Metal / Display Link
+
+Grep target: `grep -n "CASE-\|<keyword>" knowledge/cases/metal-displaylink.md`
+
+| ID | Trigger | Fix |
+|----|---------|-----|
+| CASE-003 | Terminal goes black after pane rebuild (remove+re-add) | stop+start display link in `viewDidMoveToSuperview()` if window!=nil |
+| CASE-004 | Overlay NSView above Metal surface not visible | zPosition=1000 on overlay layer (full-frame blocks Metal) |
+| CASE-012 | File preview causes 1-2s black screen (Metal dies on reparent) | Constraint-based sibling panel, never reparent terminal views |
+| CASE-025 | Terminal flickers on file preview open/close | `presentsWithTransaction = true` during programmatic resize |
+| CASE-026 | New session occasionally shows black (no prompt) | Always stop+start display link in viewDidMoveToWindow |
+| CASE-028 | Metal surfaces accumulate (async sync skips prune) | Add `terminalHosts.prune(keeping:)` to async syncFromDaemon variant |
+| CASE-031 | Crash: CADisplayLink fires on deallocated surface | `deinit { renderLink?.invalidate() }` — macOS doesn't retain target |

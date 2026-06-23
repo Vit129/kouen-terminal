@@ -588,7 +588,9 @@ private final class PaneSplitButtonsView: NSView {
             stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 5),
             stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -5),
         ])
-        alphaValue = 0
+        // Keep alphaValue = 1 so macOS 26 hitTest (which skips alpha < 0.01 views) never
+        // excludes this overlay. Visual fade is driven by layer.opacity via Core Animation.
+        layer?.opacity = 0
     }
 
     override func viewDidMoveToSuperview() {
@@ -609,21 +611,35 @@ private final class PaneSplitButtonsView: NSView {
         paneTrackingOwner = parent
     }
 
+    // alphaValue stays 1 so paneShell's hitTest (macOS 26 skips alpha<0.01 subviews) always
+    // calls us. We then decide visibility from the presentation layer's opacity — this
+    // correctly reflects in-progress CA animations and keeps clicks from falling into the
+    // invisible overlay when it's faded out.
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        let currentOpacity = layer?.presentation()?.opacity ?? layer?.opacity ?? 0
+        guard currentOpacity > 0.01 else { return nil }
+        return super.hitTest(point)
+    }
+
     override func mouseEntered(with event: NSEvent) {
         guard window != nil else { return }
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.15
-            animator().alphaValue = 1
-        }
+        let anim = CABasicAnimation(keyPath: "opacity")
+        anim.fromValue = layer?.presentation()?.opacity ?? layer?.opacity ?? 0
+        anim.toValue = Float(1)
+        anim.duration = 0.15
+        layer?.add(anim, forKey: "fade")
+        layer?.opacity = 1
     }
 
     override func mouseExited(with event: NSEvent) {
         guard window != nil else { return }
         guard !PaneDragController.shared.isDragging else { return }
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.25
-            animator().alphaValue = 0
-        }
+        let anim = CABasicAnimation(keyPath: "opacity")
+        anim.fromValue = layer?.presentation()?.opacity ?? layer?.opacity ?? 1
+        anim.toValue = Float(0)
+        anim.duration = 0.25
+        layer?.add(anim, forKey: "fade")
+        layer?.opacity = 0
     }
 
     private func makeButton(_ symbol: String, tooltip: String, action: Selector) -> NSButton {
@@ -631,6 +647,7 @@ private final class PaneSplitButtonsView: NSView {
         btn.wantsLayer = true
         btn.bezelStyle = .inline
         btn.isBordered = false
+        btn.isTransparent = false
         btn.image = NSImage(systemSymbolName: symbol, accessibilityDescription: tooltip)?
             .withSymbolConfiguration(.init(pointSize: 12, weight: .medium))
         btn.imagePosition = .imageOnly
@@ -682,6 +699,15 @@ private final class PaneHoverButton: NSButton {
         guard window != nil else { return }
         contentTintColor = .white.withAlphaComponent(0.7)
         layer?.backgroundColor = nil
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        let loc = convert(event.locationInWindow, from: nil)
+        guard bounds.contains(loc), let target = target, let action = action else {
+            super.mouseUp(with: event)
+            return
+        }
+        NSApp.sendAction(action, to: target, from: self)
     }
 }
 
