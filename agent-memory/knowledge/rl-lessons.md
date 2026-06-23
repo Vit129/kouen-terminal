@@ -38,6 +38,9 @@ Grep target: `grep -n "RL-<number>\|<keyword>" knowledge/rl-lessons.md`
 
 - RL-048: harness-mcp DaemonClientActor default timeout=2s but WKWebView ops take 2–5s. Fix: `HarnessBrowserTools.send()` passes `timeout:35`.
 - RL-055: `DateFormatter` init inside high-frequency main thread WKWebView callbacks blocks UI run loop. Offload to `DispatchQueue.global(qos: .utility)`.
+- RL-056: High-frequency WKScriptMessageHandler (console.log) must batch writes — spawning one `DispatchQueue.global` work item per message saturates main thread. Throttle: collect into array, flush every 100ms with single async dispatch.
+- RL-057: `PaneLifecycleManager` fast path (`!force && cached tabID → skip rebuild`) fires even when pane structure changes in-place (e.g. adding browser pane to existing tab). Guard: `cached !== paneContainer` — ensures fast path only applies to tab-switch restores, not structural mutations.
+- RL-058: `NSSplitView.adjustSubviews()` after sidebar `isHidden` toggle redistributes ALL subview frames from scratch — triggers Metal surface layout cascade → 1-frame black flash. Use `setSidebarWidth() + split.layout()` instead. `adjustSubviews()` is only safe when no Metal terminal surfaces are in the subtree.
 
 ## Architecture / Daemon
 

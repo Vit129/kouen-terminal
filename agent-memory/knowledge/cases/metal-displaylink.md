@@ -11,3 +11,4 @@ Grep target: `grep -n "CASE-\|<keyword>" knowledge/cases/metal-displaylink.md`
 | CASE-026 | New session occasionally shows black (no prompt) | Always stop+start display link in viewDidMoveToWindow |
 | CASE-028 | Metal surfaces accumulate (async sync skips prune) | Add `terminalHosts.prune(keeping:)` to async syncFromDaemon variant |
 | CASE-031 | Crash: CADisplayLink fires on deallocated surface | `deinit { renderLink?.invalidate() }` — macOS doesn't retain target |
+| CASE-039 | Terminal blink on sidebar toggle/file preview/split after adding `adjustSubviews()` | Remove `adjustSubviews()` from sidebar toggle path — use `setSidebarWidth() + split.layout()`. See RL-058. |

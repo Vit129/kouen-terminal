@@ -2,6 +2,8 @@
 
 ## Active Decisions
 - [2026-06-24] `presentsWithTransaction` must be set BEFORE `drawableSize` changes in `layout()`. `viewWillMove(toWindow:nil)` resets the flag — external `setPresentsWithTransaction(true)` calls don't survive `removeFromSuperview()`.
+- [2026-06-23] `NSSplitView.adjustSubviews()` in sidebar toggle path causes terminal blink — NEVER use it in paths containing Metal surfaces. Use `setSidebarWidth() + split.layout()` only. (RL-058)
+- [2026-06-23] `PaneLifecycleManager` fast path: must guard with `cached !== paneContainer` to prevent skipping rebuild on in-place structural changes (e.g. adding browser pane). (RL-057)
 - ACP shelved — ongoing. Re-enable when adapters ship natively with agent CLIs.
 - HarnessCore package split blocked — `AgentSnapshot/AIAgentConfig/WorkbenchCommand` must be promoted to core before extraction.
 

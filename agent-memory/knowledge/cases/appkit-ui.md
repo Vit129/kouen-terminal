@@ -22,3 +22,5 @@ Grep target: `grep -n "CASE-\|<keyword>" knowledge/cases/appkit-ui.md`
 | CASE-037 | SyntaxTextView mouseUp stack overflow (71K frames) | Remove mouseUp/mouseDragged forwarding — NSTextView handles internally |
 | CASE-038 | NSClickGestureRecognizer intercepts NSButton clicks | Check click location in handler; use mouseUp override if needed (**OPEN**) |
 | CASE-039 | NSTrackingArea on superview crashes on pane rebuild | Remove in viewDidMoveToSuperview(nil); use .inVisibleRect + rect:.zero |
+| CASE-040 | SoftIconButton (momentaryChange + no bezel) action never fires on macOS 26 | Add `mouseUp` override: manually dispatch via `NSApp.sendAction` if bounds contains loc. See RL-043 pattern. |
+| CASE-041 | `openBrowserPane` / ⌘B does nothing (browser pane never appears) | `PaneLifecycleManager` fast path skips rebuild for same-tab structural changes. Fix: `cached !== paneContainer` guard. See RL-057. |
