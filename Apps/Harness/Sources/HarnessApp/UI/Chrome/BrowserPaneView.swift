@@ -758,10 +758,16 @@ public final class BrowserPaneView: NSView {
     // MARK: - Key Equivalents
 
     override public func performKeyEquivalent(with event: NSEvent) -> Bool {
-        guard let characters = event.charactersIgnoringModifiers, characters == "l" else {
+        guard let characters = event.charactersIgnoringModifiers else {
             return super.performKeyEquivalent(with: event)
         }
-        if event.modifierFlags.contains(.command) {
+        let cmd = event.modifierFlags.contains(.command)
+        if cmd && characters == "w" {
+            // Intercept before WKWebView consumes it — close this browser pane
+            closePaneClicked()
+            return true
+        }
+        if cmd && characters == "l" {
             self.window?.makeFirstResponder(urlTextField)
             return true
         }
