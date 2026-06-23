@@ -87,6 +87,59 @@ if ! command -v git-cliff &>/dev/null; then
   exit 1
 fi
 
+# Archive old minor/major versions before regenerating CHANGELOG.
+# Keep: current minor (X.Y.*) + previous minor (X.Y-1.*)
+# Archive: anything older than that into docs/CHANGELOG-archive.md
+ARCHIVE_FILE="$ROOT/docs/CHANGELOG-archive.md"
+mkdir -p "$ROOT/docs"
+CURRENT_MAJOR="${NEW_VERSION%%.*}"
+CURRENT_MINOR="${NEW_VERSION%.*}"; CURRENT_MINOR="${CURRENT_MINOR##*.}"
+PREV_MINOR=$((CURRENT_MINOR - 1))
+
+python3 - <<PYEOF "$ROOT/CHANGELOG.md" "$ARCHIVE_FILE" "$CURRENT_MAJOR" "$CURRENT_MINOR" "$PREV_MINOR"
+import sys, re
+
+changelog_path, archive_path, major, minor_s, prev_s = sys.argv[1:]
+major, minor, prev = int(major), int(minor_s), int(prev_s)
+
+with open(changelog_path, 'r') as f:
+    content = f.read()
+
+# Split into header + version blocks
+header_match = re.match(r'(.*?)(?=^## \[)', content, re.DOTALL | re.MULTILINE)
+header = header_match.group(1) if header_match else ''
+blocks = re.findall(r'^## \[.*?(?=^## \[|\Z)', content, re.DOTALL | re.MULTILINE)
+
+keep, archive = [], []
+for block in blocks:
+    m = re.match(r'^## \[(\d+)\.(\d+)\.\d+\]', block)
+    if m:
+        v_major, v_minor = int(m.group(1)), int(m.group(2))
+        if v_major == major and v_minor >= prev:
+            keep.append(block)
+        else:
+            archive.append(block)
+    else:
+        keep.append(block)
+
+if archive:
+    archive_header = "# Changelog Archive\n\nOlder releases. See [CHANGELOG.md](../CHANGELOG.md) for recent versions.\n\n"
+    existing_archive = ''
+    try:
+        with open(archive_path, 'r') as f:
+            existing = f.read()
+            # strip header
+            existing_archive = re.sub(r'^.*?(?=^## \[)', '', existing, flags=re.DOTALL|re.MULTILINE)
+    except FileNotFoundError:
+        pass
+    with open(archive_path, 'w') as f:
+        f.write(archive_header + ''.join(archive) + existing_archive)
+    print(f"Archived {len(archive)} version block(s) to docs/CHANGELOG-archive.md")
+
+with open(changelog_path, 'w') as f:
+    f.write(header + ''.join(keep))
+PYEOF
+
 # Generate full CHANGELOG.md from all tags
 git-cliff --tag "$TAG" --output CHANGELOG.md
 
@@ -99,7 +152,7 @@ else
 fi
 
 # Commit the updated CHANGELOG
-git add CHANGELOG.md
+git add CHANGELOG.md docs/CHANGELOG-archive.md 2>/dev/null || git add CHANGELOG.md
 git commit -m "chore(release): update CHANGELOG for ${TAG}" || true
 
 git tag -f "$TAG" -m "$TAG"

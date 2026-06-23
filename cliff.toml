@@ -19,7 +19,6 @@ body = """
 {% for commit in commits %}\
 - {{ commit.message | upper_first }} ([`{{ commit.id | truncate(length=7, end="") }}`](https://github.com/Vit129/harness-terminal/commit/{{ commit.id }}))\
 {% if commit.breaking %} ⚠️ BREAKING{% endif %}
-
 {% endfor %}\
 {% endfor %}\n
 """
