@@ -260,7 +260,6 @@ final class MainSplitViewController: NSViewController {
             panel?.isHidden = false              // unhide so setPosition can size it to 0
             setSidebarWidth(target)
             panel?.isHidden = !visible
-            split.adjustSubviews()
             if visible { panel?.layoutSubtreeIfNeeded() }
             splitDelegate.allowFullCollapse = false
             edgeDivider.isHidden = !visible
@@ -305,10 +304,7 @@ final class MainSplitViewController: NSViewController {
         split.layout()
         CATransaction.commit()
         if raw >= 1 {
-            if !visible {
-                panel.isHidden = true
-                split.adjustSubviews()
-            }
+            if !visible { panel.isHidden = true }
             splitDelegate.allowFullCollapse = false   // restore the 200pt drag floor
             updateContentLeadingInset()
             return

@@ -145,6 +145,9 @@ final class ViEngine {
         let chars = event.characters ?? ""
         let key = event.charactersIgnoringModifiers ?? ""
 
+        // ⌘ key combinations (⌘C, ⌘A, ⌘V, etc.) are system shortcuts — pass through.
+        if cmd { return false }
+
         // Record keystrokes when macro recording is active (before dispatch)
         if recordingMacro != nil, case .normal = mode, !cmd, !ctrl {
             if event.keyCode != 53 { // not Esc
