@@ -16,7 +16,7 @@
     "keywords": ["codex", "delegate to codex", "let codex"]
   },
   {
-    "skill": "graphify",
+    "skill": "graph-report",
     "keywords": ["graphify", "architecture", "codebase map", "graph", "structure", "dependencies", "where is", "which file"]
   }
 ]
