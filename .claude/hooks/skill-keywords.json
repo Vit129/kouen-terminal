@@ -1,10 +1,10 @@
 [
   {
-    "skill": "debugging/debug-mantra",
+    "skill": "debug-mantra",
     "keywords": ["crash", "zombie", "rl-", "bug", "fix", "debug", "error", "fail", "broken", "nonisolated", "mainactor", "thunk", "use-after-free"]
   },
   {
-    "skill": "dev/frontend-dev/macos-swiftui",
+    "skill": "macos-swiftui",
     "keywords": ["swiftui", "appkit", "nsview", "nspanel", "nswindow", "wkwebview", "metal", "coregraphics", "layout", "viewcontroller"]
   },
   {
