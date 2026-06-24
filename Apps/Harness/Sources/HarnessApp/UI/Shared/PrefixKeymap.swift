@@ -63,7 +63,7 @@ final class PrefixKeymap {
         // The nonisolated(unsafe) reference suppresses the compiler's isolation check
         // at the callsite — no thunk is emitted.
         nonisolated(unsafe) let this = self
-        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+        monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .leftMouseDown, .rightMouseDown, .otherMouseDown]) { event in
             guard event.window != nil else { return event }
             nonisolated(unsafe) let ev = event
             return this.handle(ev)
@@ -73,6 +73,11 @@ final class PrefixKeymap {
     /// Returns nil to swallow the event or the original event to forward it.
     private func handle(_ event: NSEvent) -> NSEvent? {
         if suspendedForShortcutRecording { return event }
+        // Any click disarms the prefix so it doesn't silently eat the next keypress.
+        if event.type == .leftMouseDown || event.type == .rightMouseDown || event.type == .otherMouseDown {
+            if armed { disarm() }
+            return event
+        }
         if armed {
             consume(event: event)
             return nil
