@@ -39,6 +39,28 @@ public enum URLDetection {
         #endif
     }
 
+    /// All URL matches in `line`, ordered by start column.
+    /// Unlike `match(in:at:)` which returns only the match touching a specific column, this
+    /// returns every URL in the line — used by hint mode to label all visible links at once.
+    public static func allMatches(in line: String) -> [(url: String, columns: Range<Int>)] {
+        guard !line.isEmpty else { return [] }
+        #if canImport(Darwin)
+        guard let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
+        else { return [] }
+        let full = NSRange(line.startIndex ..< line.endIndex, in: line)
+        var results: [(url: String, columns: Range<Int>)] = []
+        detector.enumerateMatches(in: line, options: [], range: full) { match, _, _ in
+            guard let match, let r = Range(match.range, in: line) else { return }
+            let lower = line.distance(from: line.startIndex, to: r.lowerBound)
+            let upper = line.distance(from: line.startIndex, to: r.upperBound)
+            results.append((match.url?.absoluteString ?? String(line[r]), lower ..< upper))
+        }
+        return results
+        #else
+        return []
+        #endif
+    }
+
     /// Detects if the text at `column` in `line` is a file path (absolute or relative).
     /// Handles single-quoted or double-quoted paths with spaces, and unquoted paths containing `/`.
     public static func detectFilePath(in line: String, at column: Int) -> (url: String, columns: Range<Int>)? {
