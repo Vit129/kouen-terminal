@@ -156,6 +156,8 @@ enum MainMenuBuilder {
         view.submenu?.addItem(findItem)
         let sidebarItem = menuItem("Toggle Sidebar", action: #selector(MenuTarget.toggleSidebar), binding: BannerShortcutRegistry.toggleSidebar)
         view.submenu?.addItem(sidebarItem)
+        let hintItem = menuItem("Hint Mode (Open Link by Key)", action: #selector(MenuTarget.hintMode), binding: BannerShortcutRegistry.hintMode)
+        view.submenu?.addItem(hintItem)
         view.submenu?.addItem(.separator())
         let runItem = menuItem("Run Script", action: #selector(MenuTarget.runScript), binding: BannerShortcutRegistry.runScript)
         view.submenu?.addItem(runItem)
@@ -475,6 +477,8 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
     @objc func openSettings() {
         SettingsWindowController.show()
     }
+
+    @objc func hintMode() { SessionCoordinator.shared.showHintMode() }
 
     @objc func toggleSidebar() {
         let win = NSApp.keyWindow ?? NSApp.mainWindow

@@ -289,6 +289,12 @@ final class SessionCoordinator: NSObject {
         syncFromDaemon(metadataOnly: true)
     }
 
+    func showHintMode() {
+        guard let surfaceID = activeSurfaceID,
+              let host = terminalHosts.host(for: surfaceID) else { return }
+        HintModeOverlay.shared.show(on: host.surfaceView)
+    }
+
     func showDisplayPanes() {
         guard let tab = snapshot.activeWorkspace?.activeTab else { return }
         let panes = tab.rootPane.allSurfaceIDs().enumerated().compactMap { index, sid -> (number: Int, host: TerminalHostView)? in

@@ -35,6 +35,7 @@ public final class TerminalHostView: NSView {
     public weak var hostDelegate: TerminalHostDelegate?
 
     private let nativeView: HarnessTerminalSurfaceView
+    public var surfaceView: HarnessTerminalSurfaceView { nativeView }
     /// Which daemon this pane talks to — the local one by default, or a remote daemon (via an SSH
     /// tunnel) when the pane belongs to a connected remote host.
     private let daemonClient: DaemonClient

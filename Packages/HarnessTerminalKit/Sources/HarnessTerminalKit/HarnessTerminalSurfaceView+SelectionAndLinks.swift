@@ -477,4 +477,46 @@ extension HarnessTerminalSurfaceView {
         }
         CATransaction.commit()
     }
+
+    // MARK: - Hint mode support
+
+    /// All clickable links visible in the current viewport as (url, view-space frame) pairs.
+    /// ponytail: O(rows × cols) scan via emulatorSync; fine for a single keypress trigger.
+    public func visibleLinks() -> [(url: String, frame: CGRect)] {
+        struct RawLink { let url: String; let row: Int; let columns: Range<Int> }
+        let rawLinks: [RawLink] = emulatorSync { emulator in
+            let grid = scrollOffset > 0 ? emulator.readGrid(scrollbackOffset: scrollOffset) : emulator.readGrid()
+            var found: [RawLink] = []
+            var seen = Set<Int>() // row*10000+colStart deduplicates OSC 8 vs auto-detect
+            for row in 0 ..< grid.rows {
+                // OSC 8 hyperlinks — group consecutive cells sharing the same hyperlinkID
+                var col = 0
+                while col < grid.cols {
+                    guard let cell = grid.cell(row: row, col: col), cell.hyperlinkID != 0,
+                          let url = emulator.hyperlinkURL(id: cell.hyperlinkID) else { col += 1; continue }
+                    var lo = col, hi = col
+                    while lo > 0, grid.cell(row: row, col: lo - 1)?.hyperlinkID == cell.hyperlinkID { lo -= 1 }
+                    while hi + 1 < grid.cols, grid.cell(row: row, col: hi + 1)?.hyperlinkID == cell.hyperlinkID { hi += 1 }
+                    let key = row * 10000 + lo
+                    if seen.insert(key).inserted { found.append(RawLink(url: url, row: row, columns: lo ..< (hi + 1))) }
+                    col = hi + 1
+                }
+                // Auto-detected URLs via NSDataDetector over the whole row text
+                var line = ""; line.reserveCapacity(grid.cols)
+                for c in 0 ..< grid.cols {
+                    guard let cell = grid.cell(row: row, col: c), cell.width != .spacerTail else { line.append(" "); continue }
+                    line.unicodeScalars.append(cell.codepoint == 0 ? " " : (Unicode.Scalar(cell.codepoint) ?? " "))
+                }
+                for match in URLDetection.allMatches(in: line) {
+                    let key = row * 10000 + match.columns.lowerBound
+                    if seen.insert(key).inserted { found.append(RawLink(url: match.url, row: row, columns: match.columns)) }
+                }
+            }
+            return found
+        }
+        return rawLinks.compactMap { link in cellRect(row: link.row, columns: link.columns).map { (link.url, $0) } }
+    }
+
+    /// Opens a link using the same logic as ⌘-click (browser pane, file preview, or system browser).
+    public func activateHintLink(_ url: String) { openLink(url) }
 }

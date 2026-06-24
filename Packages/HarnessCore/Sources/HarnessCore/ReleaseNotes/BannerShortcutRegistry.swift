@@ -175,6 +175,10 @@ public enum BannerShortcutRegistry {
         id: "stopScript", title: "Stop Script",
         modifiers: .command, keyChar: ".")
 
+    public static let hintMode = Keybinding(
+        id: "hintMode", title: "Hint Mode (Open Link)",
+        modifiers: [.command, .shift], keyChar: "u")
+
     // MARK: - Banner shortcuts (legacy format for terminal banner rendering)
 
     /// All registered shortcuts for banner display, derived from keybindings above.
