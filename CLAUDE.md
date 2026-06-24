@@ -1,20 +1,14 @@
 # harness-terminal — Claude Instructions
 
-## Auto-loaded
-- @agent-memory/CONTEXT.md
-- @agent-memory/INDEX.md
-
 ## Session Start
-1. `agent-memory/CONTEXT.md` — active task, branch, key files
-2. `agent-memory/INDEX.md` — plans + knowledge catalog
-3. `graphify-out/GRAPH_SUMMARY.md` — if navigating code
-4. Bug/pattern → grep on-demand (see below)
 
-Continuation → CONTEXT.md → invoke `macos-swiftui` skill for SwiftUI/AppKit work.
+- Continuation → read `agent-memory/CONTEXT.md` → invoke `macos-swiftui` skill
+- Code navigation → `graphify-out/GRAPH_SUMMARY.md`
+- Bug/pattern → `grep -rn "<keyword>" agent-memory/knowledge/cases/ agent-memory/MEMORY.md`
 
 ## Skills
+
 AppKit/SwiftUI/macOS → `macos-swiftui` | debugging → `debug-mantra` | review → `review-personas`
-Routing: `~/.claude/rules/routing.md`
 
 ## Build / Test / Run
 
@@ -32,21 +26,6 @@ Routing: `~/.claude/rules/routing.md`
 
 Release order: `make release` → `make sign` → `make dmg` → `make finalize`
 
-## On-demand Memory
-```bash
-grep -rn "<keyword>" agent-memory/knowledge/cases/ agent-memory/knowledge/rl-lessons.md agent-memory/MEMORY.md
-```
-Never read PLAYBOOK.md / MEMORY.md / knowledge/ in full. `PLAYBOOK.md` = index only → cases in `knowledge/cases/`.
-
-## Graphify
-```bash
-graphify query "..."        # first nav layer
-graphify path "A" "B"       # dependency path
-graphify explain "concept"
-graphify update . && ~/.claude/scripts/generate-graph-summary.sh .  # after code changes
-```
-`GRAPH_REPORT.md` (4000+ lines) — only for broad architecture review.
-
 ## Non-obvious Constraints
 
 - **Swift 6 strict concurrency**: `HarnessCore` + `HarnessTerminalEngine` use `-warnings-as-errors` — concurrency/deprecation warnings = build failures.
@@ -60,6 +39,11 @@ graphify update . && ~/.claude/scripts/generate-graph-summary.sh .  # after code
 - **`themes.json`**: excluded from SwiftPM build. Regenerate `BundledThemesData.swift` with theme export test.
 - **Release packaging order**: `dmg`/`sign`/`finalize` operate on existing `Harness.app` — wrong order rebuilds away the signature.
 
-## Infrastructure
-- Headroom Proxy: `localhost:8787` (always-on, token compression)
-- Ponytail: `~/.claude/plugins/marketplaces/ponytail/` — activate: "ponytail" / `/ponytail`
+## Graphify
+
+```bash
+graphify query "..."        # first nav layer
+graphify path "A" "B"       # dependency path
+graphify explain "concept"
+graphify update . && ~/.claude/scripts/generate-graph-summary.sh .
+```
