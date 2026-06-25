@@ -1391,20 +1391,30 @@ public final class SurfaceRegistry: @unchecked Sendable {
                 process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
                 process.arguments = args
                 process.currentDirectoryURL = URL(fileURLWithPath: cwd)
-                process.environment = ProcessInfo.processInfo.environment
+                // GIT_TERMINAL_PROMPT=0: fail fast instead of hanging for credentials.
+                // stdin=null: prevent git from blocking on a read that never comes.
+                var env = ProcessInfo.processInfo.environment
+                env["GIT_TERMINAL_PROMPT"] = "0"
+                process.environment = env
+                process.standardInput = FileHandle.nullDevice
                 let outPipe = Pipe()
                 let errPipe = Pipe()
                 process.standardOutput = outPipe
                 process.standardError = errPipe
+                // Kill if git hangs (e.g. SSH passphrase, network stall).
+                let timeout = DispatchWorkItem { if process.isRunning { process.terminate() } }
+                DispatchQueue.global().asyncAfter(deadline: .now() + 60, execute: timeout)
                 do {
                     try process.run()
                     let outData = outPipe.fileHandleForReading.readDataToEndOfFile()
                     let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
                     process.waitUntilExit()
+                    timeout.cancel()
                     let output = String(data: outData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                     let stderr = String(data: errData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                     continuation.resume(returning: (output, stderr, process.terminationStatus == 0))
                 } catch {
+                    timeout.cancel()
                     continuation.resume(returning: ("", error.localizedDescription, false))
                 }
             }
