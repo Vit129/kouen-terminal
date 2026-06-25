@@ -63,6 +63,8 @@ public struct TerminalGridCell: Equatable, Sendable {
     /// OSC 8 hyperlink id (0 = none). Resolved to a URL via `TerminalEmulator.hyperlinkURL(id:)`.
     /// Survives SGR reset (it's not a pen attribute) — only OSC 8 changes it.
     public var hyperlinkID: UInt32
+    /// SGR 73/74 — cell is rendered normally but skipped during copy (e.g. `harness cat` line numbers).
+    public var excludedFromCopy: Bool
 
     public init(
         codepoint: UInt32 = 0,
@@ -81,7 +83,8 @@ public struct TerminalGridCell: Equatable, Sendable {
         strikethrough: Bool = false,
         overline: Bool = false,
         width: TerminalCellWidth = .normal,
-        hyperlinkID: UInt32 = 0
+        hyperlinkID: UInt32 = 0,
+        excludedFromCopy: Bool = false
     ) {
         self.codepoint = codepoint
         self.combining0 = combining0
@@ -100,6 +103,7 @@ public struct TerminalGridCell: Equatable, Sendable {
         self.overline = overline
         self.width = width
         self.hyperlinkID = hyperlinkID
+        self.excludedFromCopy = excludedFromCopy
     }
 
     /// An empty default-styled cell (a space-equivalent with no attributes).

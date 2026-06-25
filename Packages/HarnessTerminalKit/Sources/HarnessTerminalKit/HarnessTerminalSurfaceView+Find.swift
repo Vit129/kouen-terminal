@@ -358,6 +358,7 @@ extension HarnessTerminalSurfaceView {
         while col <= endCol, col < cells.count {
             let cell = cells[col]
             if cell.width == .spacerTail { col += 1; continue }
+            if cell.excludedFromCopy { col += 1; continue }
             if cell.codepoint != 0 {
                 line += cell.cluster // base + combining marks
             } else {
