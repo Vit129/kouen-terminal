@@ -32,6 +32,16 @@ extension HarnessCLI {
             fputs("Usage: harness-cli view <file>\n", harnessStderr)
             return 64
         }
+
+        // When running inside Harness, emit OSC 7735 so the app opens the file in the sidebar
+        // file viewer — line numbers are in a separate gutter NSView and are never copied.
+        if ProcessInfo.processInfo.environment["HARNESS_SURFACE_ID"] != nil {
+            let expanded = (path.trimmingCharacters(in: .whitespacesAndNewlines) as NSString).expandingTildeInPath
+            let abs = URL(fileURLWithPath: expanded).path
+            print("\u{1B}]7735;\(abs)\u{07}", terminator: "")
+            return 0
+        }
+
         do {
             print(try HarnessFilePreviewLoader.load(path: path), terminator: "")
             return 0

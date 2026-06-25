@@ -336,6 +336,7 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// Desktop notification requested by a program (OSC 9 → nil title; OSC 777 → title+body)
     /// — the host forwards this to its delegate.
     public var onDesktopNotification: ((_ title: String?, _ body: String) -> Void)?
+    public var onOpenFile: ((String) -> Void)?
     /// Fired when terminal output matches a user-configured trigger pattern.
     public var onOutputTrigger: ((_ trigger: String, _ title: String?) -> Void)?
     /// This surface became effectively focused (first responder × key window). The host
@@ -1176,6 +1177,13 @@ public final class HarnessTerminalSurfaceView: NSView {
                 self?.onDesktopNotification?(title, body)
             } else {
                 DispatchQueue.main.async { [weak self] in self?.onDesktopNotification?(title, body) }
+            }
+        }
+        emulator.onOpenFile = { [weak self] path in
+            if Thread.isMainThread {
+                self?.onOpenFile?(path)
+            } else {
+                DispatchQueue.main.async { [weak self] in self?.onOpenFile?(path) }
             }
         }
         emulator.onPointerShapeChange = { [weak self] shape in

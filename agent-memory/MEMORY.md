@@ -1,6 +1,7 @@
 # Memory — harness-terminal
 
 ## Active Decisions
+- [2026-06-25] OSC 7735 = Harness custom sequence for CLI→app file open. Pattern reusable for any future CLI-triggered app action: emit OSC when HARNESS_SURFACE_ID set → TerminalEmulator callback → SurfaceView → TerminalHostDelegate → SessionCoordinator → MainExecutor.shared.
 - [2026-06-24] Hint mode armed monitor MUST have mouse-dismiss + auto-timeout — same bug class as PrefixKeymap. Pattern: `matching: [.keyDown, .leftMouseDown, .rightMouseDown]` + `asyncAfter(3s)`.
 - [2026-06-24] Vi mode at emulator layer = wrong layer. Shell (`set -o vi`) handles input editing; CopyMode handles buffer nav. Don't build terminal-level vi input mode.
 - [2026-06-24] Otty autocomplete (Fig spec DB + history ghost text) too large to replicate. InlineAICompletionController (Option+Space) covers AI suggestions. Shell plugins cover history.
@@ -27,3 +28,6 @@
 - Zombie crash detail → `knowledge/bugs/zombie-crash-macos26.md`
 - Browser pane → `knowledge/ui/browser-pane.md`
 - Split panes → `knowledge/ui/split-panes.md`
+
+## 2026-06-25 — OSC 7735:  opens sidebar file viewer
+- New CLI→app channel via custom OSC sequence (7735). Pattern: emit OSC from CLI when HARNESS_SURFACE_ID set → TerminalEmulator callback → SurfaceView → TerminalHostDelegate → SessionCoordinator → MainExecutor.shared. Reuse this pattern for any future CLI-triggered app-layer actions.
