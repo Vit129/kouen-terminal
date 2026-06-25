@@ -764,6 +764,9 @@ final class GitPanelView: NSView {
                 Toast.show("✗ \(label) failed: \(msg)", in: self, hold: 3.0)
             }
             await refresh()
+            // Git ops modify .git/ and fire FSEvents — cancel the debounced refresh
+            // that would trigger a second full rebuild 0.5 s later.
+            watchDebounce?.cancel()
         }
     }
 
@@ -887,7 +890,6 @@ final class GitPanelView: NSView {
         } else {
             for (rowIndex, line) in porcelain.components(separatedBy: "\n").prefix(40).enumerated() where !line.isEmpty {
                 let file = String(line.dropFirst(3))
-                fputs("CLICKDBG buildRow[\(rowIndex)] line=\(line) file=\(file)\n", harnessStderr)
                 let row = makeChangeRow(line, stats: stats[file])
                 changesStack.addArrangedSubview(row)
                 row.leadingAnchor.constraint(equalTo: changesStack.leadingAnchor).isActive = true
