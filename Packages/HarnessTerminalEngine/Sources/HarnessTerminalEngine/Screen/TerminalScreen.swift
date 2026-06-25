@@ -1298,7 +1298,8 @@ final class TerminalScreen {
             strikethrough: pen.strikethrough,
             overline: pen.overline,
             width: width,
-            hyperlinkID: currentHyperlink
+            hyperlinkID: currentHyperlink,
+            excludedFromCopy: pen.excludedFromCopy
         )
     }
 
@@ -1830,6 +1831,8 @@ final class TerminalScreen {
         case 49: pen.background = .none
         case 53: pen.overline = true
         case 55: pen.overline = false
+        case 73: pen.excludedFromCopy = true
+        case 74: pen.excludedFromCopy = false
         case 59: pen.underlineColor = .none
         case 90 ... 97: pen.foreground = .palette(UInt8(code - 90 + 8))
         case 100 ... 107: pen.background = .palette(UInt8(code - 100 + 8))
@@ -1968,4 +1971,5 @@ private struct Pen {
     var invisible = false
     var strikethrough = false
     var overline = false
+    var excludedFromCopy = false
 }

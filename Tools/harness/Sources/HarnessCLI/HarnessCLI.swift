@@ -25,6 +25,8 @@ struct HarnessCLI {
                 return
             case "view":
                 exit(Int32(handleView(args)))
+            case "cat":
+                exit(Int32(handleCat(args)))
             case "lsp":
                 exit(Int32(handleLSP(args)))
             case "find":
