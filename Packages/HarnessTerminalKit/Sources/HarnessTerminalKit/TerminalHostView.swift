@@ -17,6 +17,8 @@ public protocol TerminalHostDelegate: AnyObject {
     /// working indicator (Claude Code 2.0+ keep-alives one across each turn).
     func terminalHostDidUpdateProgress(_ report: TerminalProgressReport, surfaceID: SurfaceID)
     func terminalHostDidClose(surfaceID: SurfaceID)
+    /// OSC 7735 — open the given path in the sidebar file viewer (line numbers in gutter, not copyable).
+    func terminalHostDidRequestOpenFile(_ path: String, surfaceID: SurfaceID)
 }
 
 extension TerminalHostDelegate {
@@ -24,6 +26,8 @@ extension TerminalHostDelegate {
     public func terminalHostDidFinishCommand(duration: TimeInterval, exitCode: Int?, surfaceID: SurfaceID) {}
     /// Default no-op — only the GUI tab strip renders progress.
     public func terminalHostDidUpdateProgress(_ report: TerminalProgressReport, surfaceID: SurfaceID) {}
+    /// Default no-op — only the GUI layer can open file tabs.
+    public func terminalHostDidRequestOpenFile(_ path: String, surfaceID: SurfaceID) {}
 }
 
 /// Hosts one terminal pane: Harness's native `HarnessTerminalSurfaceView` (GPU renderer +
@@ -264,6 +268,10 @@ public final class TerminalHostView: NSView {
             // OSC 9 carries no title; fall back to the app name so the banner reads sensibly.
             self.hostDelegate?.terminalHostDidRequestDesktopNotification(
                 title: title ?? "Harness", body: body, surfaceID: self.surfaceID)
+        }
+        native.onOpenFile = { [weak self] path in
+            guard let self else { return }
+            self.hostDelegate?.terminalHostDidRequestOpenFile(path, surfaceID: self.surfaceID)
         }
         native.onOutputTrigger = { [weak self] pattern, title in
             guard let self else { return }

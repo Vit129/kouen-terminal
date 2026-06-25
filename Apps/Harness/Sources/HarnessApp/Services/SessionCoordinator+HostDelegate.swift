@@ -60,6 +60,10 @@ extension SessionCoordinator: TerminalHostDelegate {
         terminalHosts.removeHost(for: surfaceID)
         SurfaceProgressTracker.shared.forget(surfaceID)
     }
+
+    func terminalHostDidRequestOpenFile(_ path: String, surfaceID: SurfaceID) {
+        MainExecutor.shared.executeSurfacingErrors(.workbench(.view(path: path)))
+    }
 }
 
 // MARK: - Helpers used by HostDelegate

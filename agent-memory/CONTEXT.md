@@ -5,7 +5,14 @@
 - **Branch:** main
 - **Status:** idle
 
-## Last Session (2026-06-24) — Otty Feature Import
+## Last Session (2026-06-25) — `harness view` opens sidebar viewer
+
+**Completed:**
+- `harness-cli view <file>` now opens the file in the sidebar file editor when inside Harness, instead of printing to stdout. Line numbers appear in the gutter (separate NSView) and are excluded from copy — matching the file preview behavior.
+- OSC 7735 mechanism: CLI emits `\e]7735;<abs-path>\a` when `HARNESS_SURFACE_ID` is set → `TerminalEmulator.onOpenFile` → `HarnessTerminalSurfaceView.onOpenFile` → `TerminalHostView` delegate → `SessionCoordinator.terminalHostDidRequestOpenFile` → `MainExecutor.shared.executeSurfacingErrors(.workbench(.view(path:)))`
+- CLI falls back to stdout when outside Harness
+
+## Previous Session (2026-06-24) — Otty Feature Import
 
 **Completed:**
 - Hint mode (Cmd+Shift+U) — Vimium-style link picker overlay

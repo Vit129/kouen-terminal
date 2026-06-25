@@ -70,6 +70,8 @@ public final class TerminalEmulator: VTParserHandler {
     public var onProgress: ((TerminalProgressReport) -> Void)?
     /// Mouse pointer shape requested via OSC 22 (e.g. `text`, `pointer`, `default`); nil clears.
     public var onPointerShapeChange: ((String?) -> Void)?
+    /// OSC 7735 — Harness-specific: open the given absolute path in the sidebar file viewer.
+    public var onOpenFile: ((String) -> Void)?
     /// Last OSC-22 pointer shape (nil = terminal default). Surfaced for hosts that prefer polling.
     public private(set) var pointerShape: String?
     /// When the current command started running (OSC 133 `C`/`B`), for command-duration timing.
@@ -424,6 +426,7 @@ public final class TerminalEmulator: VTParserHandler {
         case "22": setPointerShape(payload)                // OSC 22 ; <shape> — mouse cursor shape
         case "133": handleSemanticPrompt(payload)          // OSC 133 ; A/B/C/D — shell integration
         case "1337": handleITerm2Image(payload)            // iTerm2 inline image (File=…)
+        case "7735": onOpenFile?(payload)                  // Harness: open file in sidebar viewer
         default: break
         }
     }
