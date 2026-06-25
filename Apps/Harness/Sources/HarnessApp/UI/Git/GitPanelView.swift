@@ -392,12 +392,52 @@ final class GitPanelView: NSView {
         push.target = self
         let forcePush = NSMenuItem(title: "Force Push", action: #selector(doForcePush), keyEquivalent: "")
         forcePush.target = self
+        let commitAndPush = NSMenuItem(title: "Commit & Push", action: #selector(doCommitAndPush), keyEquivalent: "")
+        commitAndPush.target = self
         menu.addItem(fetch)
         menu.addItem(pull)
         menu.addItem(NSMenuItem.separator())
         menu.addItem(push)
         menu.addItem(forcePush)
+        menu.addItem(NSMenuItem.separator())
+        menu.addItem(commitAndPush)
         menu.popUp(positioning: nil, at: NSPoint(x: 0, y: syncButton.bounds.height), in: syncButton)
+    }
+
+    @objc private func doCommitAndPush() {
+        let msg = commitField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !msg.isEmpty else {
+            Toast.show("Enter a commit message first", in: self, hold: 2.0)
+            return
+        }
+        guard let path = currentPath else { return }
+        syncButton.isEnabled = false
+        syncButton.title = "Committing…"
+        Task {
+            let commit = await runGitWithStatus(["commit", "-m", msg], in: path)
+            if !commit.success {
+                syncButton.isEnabled = true
+                syncButton.title = "Sync ▾"
+                let msg = commit.stderr.prefix(120)
+                Toast.show("✗ Commit failed: \(msg)", in: self, hold: 3.0)
+                await refresh()
+                watchDebounce?.cancel()
+                return
+            }
+            commitField.stringValue = ""
+            syncButton.title = "Pushing…"
+            let push = await runGitWithStatus(["push"], in: path)
+            syncButton.isEnabled = true
+            syncButton.title = "Sync ▾"
+            if push.success {
+                Toast.show("✓ Committed & pushed", in: self)
+            } else {
+                let errMsg = push.stderr.prefix(120)
+                Toast.show("✗ Push failed: \(errMsg)", in: self, hold: 3.0)
+            }
+            await refresh()
+            watchDebounce?.cancel()
+        }
     }
 
     @objc private func doFetch() { runAndRefresh(["fetch"]) }
