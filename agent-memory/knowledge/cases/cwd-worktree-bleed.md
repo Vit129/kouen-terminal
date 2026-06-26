@@ -39,7 +39,18 @@ Files: `Packages/HarnessDaemon/.../RealPty.swift`, `SurfaceRegistry.swift`.
 Regression test: `RealPtyLifecycleTests.testProbeReportsShellCwdNotForegroundChild`
 (gated by `HARNESS_LIVE_DAEMON_TESTS=1`).
 
+## Companion bug: blank panel on first open (CASE-042)
+Separate from the cwd storm, `NSHostingView` (SwiftUI) inside `HarnessSidebarPanelViewController`
+starts with zero frame when the panel is closed at launch. `animateSidebar` calls `split.layout()`
+per-frame (moves the NSSplitView divider) but does NOT recursively flush layout inside the panel —
+so SwiftUI hosting views never get a valid size proposal. Fix: `panel.layoutSubtreeIfNeeded()` at
+animation end (`raw >= 1, visible = true`) in `MainSplitViewController.animateSidebar`. One line.
+
 ## Lesson
 When a value represents "where the user is" (worktree/session identity), probe the **shell**,
 not the deepest descendant. Following descendants is right for "what command is running"
 (`currentCommand`) but wrong for directory identity.
+
+When animating an NSSplitView divider manually (per-frame `split.layout()` loop), call
+`panel.layoutSubtreeIfNeeded()` once at animation end for any panel that contains NSHostingViews —
+`NSSplitView.layout()` sizes the panel but does NOT recursively flush SwiftUI's layout engine.
