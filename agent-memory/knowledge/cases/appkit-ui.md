@@ -24,3 +24,5 @@ Grep target: `grep -n "CASE-\|<keyword>" knowledge/cases/appkit-ui.md`
 | CASE-039 | NSTrackingArea on superview crashes on pane rebuild | Remove in viewDidMoveToSuperview(nil); use .inVisibleRect + rect:.zero |
 | CASE-040 | SoftIconButton (momentaryChange + no bezel) action never fires on macOS 26 | Add `mouseUp` override: manually dispatch via `NSApp.sendAction` if bounds contains loc. See RL-043 pattern. |
 | CASE-041 | `openBrowserPane` / ⌘B does nothing (browser pane never appears) | `PaneLifecycleManager` fast path skips rebuild for same-tab structural changes. Fix: `cached !== paneContainer` guard. See RL-057. |
+| CASE-042 | NSHostingView (SwiftUI) blank after NSSplitView animation opens panel | `NSSplitView.layout()` per-frame moves the divider but doesn't flush layout inside the panel. Call `panel.layoutSubtreeIfNeeded()` at animation end (raw >= 1, visible = true). See cwd-worktree-bleed.md. |
+| CASE-043 | Session cwd jumps to wrong directory during `make build` / subprocess | `RealPty.probeWorkingDirectory` reported deepest foreground descendant's cwd. Fix: probe shell's own pid only. See cwd-worktree-bleed.md. |
