@@ -2,17 +2,8 @@
 
 ## Now
 - **Task:** idle
-- **Branch:** fix/memory-leak-audit (ready to push — SSH not available in bg session)
-- **Status:** v3.9.4 commits done locally; push + merge + release workflow trigger needed manually
-
-## Pending (user action required)
-
-```bash
-git push origin fix/memory-leak-audit
-gh pr create --base main --head fix/memory-leak-audit --fill
-gh pr merge --merge --delete-branch
-gh workflow run release.yml --field tag=v3.9.4 --field deploy_appcast=false
-```
+- **Branch:** main (fix/memory-leak-audit merged)
+- **Status:** v3.9.4 released — GitHub Actions release workflow triggered
 
 ## Last Session (2026-06-26) — Memory-leak audit + v3.9.4 release prep
 
