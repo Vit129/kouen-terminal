@@ -44,6 +44,13 @@ final class SessionCoordinator: NSObject {
 
     private override init() {
         super.init()
+        // Drop the per-surface AI controllers when their host is retired — these dicts only
+        // ever inserted (one pair per pane), so without this every closed pane leaked its
+        // InlineAICompletionController + AITerminalChatController (and their subviews) forever.
+        terminalHosts.onRetire = { [weak self] surfaceID in
+            self?.inlineAIControllers.removeValue(forKey: surfaceID.uuidString)
+            self?.aiChatControllers.removeValue(forKey: surfaceID.uuidString)
+        }
         observeNotifications()
         _ = daemonSyncService; _ = notificationCoordinator
         _ = splitPaneCoordinator; _ = sessionLifecycleService
