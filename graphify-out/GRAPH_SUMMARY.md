@@ -3,13 +3,13 @@ _Auto-generated from graphify-out/GRAPH_REPORT.md · do not edit manually_
 _Regen: `~/.claude/scripts/generate-graph-summary.sh .` after `graphify update .`_
 
 ## Summary
-- 16069 nodes · 36329 edges · 792 communities (632 shown, 160 thin omitted)
-- Extraction: 86% EXTRACTED · 14% INFERRED · 0% AMBIGUOUS · INFERRED: 5105 edges (avg confidence: 0.8)
+- 16146 nodes · 36693 edges · 813 communities (649 shown, 164 thin omitted)
+- Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 5412 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 
 ## Graph Freshness
-- Built from commit: `b9b38714`
+- Built from commit: `89507498`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -17,14 +17,14 @@ _Regen: `~/.claude/scripts/generate-graph-summary.sh .` after `graphify update .
 ## God Nodes (most connected - your core abstractions)
 1. `HarnessTerminalSurfaceView` - 369 edges
 2. `SettingsViewController` - 305 edges
-3. `Foundation` - 269 edges
-4. `HarnessCore` - 263 edges
-5. `SessionCoordinator` - 167 edges
-6. `XCTest` - 167 edges
-7. `SessionEditor` - 164 edges
-8. `TerminalEmulator` - 158 edges
-9. `AppKit` - 139 edges
-10. `SurfaceRegistry` - 125 edges
+3. `String` - 297 edges
+4. `Foundation` - 270 edges
+5. `HarnessCore` - 264 edges
+6. `SessionCoordinator` - 168 edges
+7. `XCTest` - 167 edges
+8. `SessionEditor` - 164 edges
+9. `TerminalEmulator` - 158 edges
+10. `AppKit` - 140 edges
 
 
 ## Surprising Connections (you probably didn't know these)
