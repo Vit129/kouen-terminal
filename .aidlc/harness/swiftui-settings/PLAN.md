@@ -10,7 +10,7 @@
 |---|---|---|---|
 | **S0** | `SettingsModel` — @Observable wrapper | `SettingsModel.swift` (NEW) | ✅ |
 | **S1** | Terminal page | `SettingsTerminalView.swift` (NEW) | ✅ |
-| **S2** | Appearance page | `SettingsAppearanceView.swift` (NEW) | ⬜ |
+| **S2** | Appearance page | `SettingsAppearanceView.swift` (NEW) | ✅ |
 | **S3** | Colors page + `SwatchWellView` bridge | `SettingsColorsView.swift`, `SwatchWellView.swift` (NEW) | ⬜ |
 | **S4** | Keys page + `KeyRecorderRepresentable` bridge | `SettingsKeysView.swift` (NEW) | ⬜ |
 | **S5** | Agents page | `SettingsAgentsView.swift` (NEW) | ⬜ |

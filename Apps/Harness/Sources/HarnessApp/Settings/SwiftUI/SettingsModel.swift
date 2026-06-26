@@ -1,6 +1,7 @@
 import SwiftUI
 import HarnessCore
 import HarnessSettings
+import HarnessTerminalKit
 
 /// Observable bridge between HarnessSettings (value type) and SwiftUI views.
 /// Reads from SessionCoordinator on every snapshot notification; writes through
@@ -9,6 +10,8 @@ import HarnessSettings
 final class SettingsModel {
     var settings: HarnessSettings = SessionCoordinator.shared.settings
     var keepSessions: Bool = SessionCoordinator.shared.snapshot.keepSessionsOnQuit
+    var currentThemeName: String = SessionCoordinator.shared.snapshot.themeName
+    let themeNames: [String] = ThemeManager.allThemeNames()
 
     @ObservationIgnored
     nonisolated(unsafe) private var snapshotObserver: Any?
@@ -23,6 +26,7 @@ final class SettingsModel {
                 guard let self else { return }
                 self.settings = SessionCoordinator.shared.settings
                 self.keepSessions = SessionCoordinator.shared.snapshot.keepSessionsOnQuit
+                self.currentThemeName = SessionCoordinator.shared.snapshot.themeName
             }
         }
     }
@@ -43,5 +47,19 @@ final class SettingsModel {
     func setKeepSessions(_ keep: Bool) {
         SessionCoordinator.shared.requestDaemon(.setKeepSessionsOnQuit(keep))
         keepSessions = keep
+    }
+
+    func setTheme(_ name: String) {
+        SessionCoordinator.shared.setTheme(name)
+    }
+
+    func useThemeColors() {
+        SessionCoordinator.shared.setTheme(currentThemeName)
+    }
+
+    func resetToDefaults() {
+        SessionCoordinator.shared.settings.resetToImportedConfig(imported: TerminalConfigImporter.load())
+        try? SessionCoordinator.shared.settings.save()
+        settings = SessionCoordinator.shared.settings
     }
 }
