@@ -1,11 +1,24 @@
 # Context — harness-terminal
 
 ## Now
-- **Task:** None active — ready for next session
-- **Branch:** main
-- **Status:** idle
+- **Task:** Memory-leak audit — committed on `fix/memory-leak-audit` (e642997), not yet merged
+- **Branch:** fix/memory-leak-audit
+- **Status:** fixes done + guarded; needs prod rebuild to confirm 34 GB gone
 
-## Last Session (2026-06-25) — `harness view` opens sidebar viewer
+## Last Session (2026-06-26) — Memory-leak audit (34 GB session)
+
+**Diagnosis (live pid via vmmap/footprint):** 34 GB was MALLOC_SMALL (Swift heap), NOT GPU/Metal. Dominant cause = `existingHosts` strongly pinning per-pane TerminalScreen graphs — **already fixed in `0430ed8`**; the leaking process ran a binary built Jun 24, before that Jun-25 fix. → user must rebuild+reinstall (`make install`) and re-measure over a long session.
+
+**Fixed this session (real, smaller leaks remaining on main):**
+- `SessionCoordinator.inlineAIControllers/aiChatControllers` leaked one pair per closed pane (insert-only dicts). Fix: `TerminalPaneRegistry.onRetire` hook from `retire()` (covers removeHost + prune) drops both entries.
+- `BrowserPaneView` injected network capture array uncapped → cap 500 + monotonic id.
+- Guard: `Tests/robot/memory_leak_guards.robot` (2 tests, green).
+
+**Reverted:** an autoreleasepool wrap on the Metal present loop — GPU was ruled out by vmmap, so it was wrong-target.
+
+**Flagged, separate:** robot `Bug 1 - Browser Pane Reuse On Rebuild` fails on clean main (pre-existing) — `existingBrowserPanes`/`collectBrowserPanes()` gone from ContentAreaViewController; browser panes may no longer be reused across rebuilds. Needs its own look.
+
+## Earlier Session (2026-06-25) — `harness view` opens sidebar viewer
 
 **Completed:**
 - `harness-cli view <file>` now opens the file in the sidebar file editor when inside Harness, instead of printing to stdout. Line numbers appear in the gutter (separate NSView) and are excluded from copy — matching the file preview behavior.

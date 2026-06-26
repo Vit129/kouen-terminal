@@ -1,6 +1,8 @@
 # Memory — harness-terminal
 
 ## Active Decisions
+- [2026-06-26] Huge-RSS triage: run `vmmap -summary <pid>` / `footprint <pid>` on the LIVE process FIRST — MALLOC_SMALL/LARGE vs IOSurface/IOAccelerator instantly separates a Swift-heap leak from a GPU/drawable leak. A 34 GB session was MALLOC_SMALL (heap), NOT GPU — an autoreleasepool "fix" would have been wrong-target. Measure the region, don't theorize from source. Also check installed-app mtime vs the fix commit before chasing a "still leaks" report (the leaking binary predated 0430ed8). (CASE: memory-leak-audit)
+- [2026-06-26] Per-surface state kept OUTSIDE `TerminalPaneRegistry` (e.g. `SessionCoordinator.inlineAIControllers/aiChatControllers`) leaks one entry per closed pane. Fix pattern: `TerminalPaneRegistry.onRetire` hook fired from `retire()` — the single chokepoint both `removeHost` and `prune` funnel through. Any future per-surface dict must hook onRetire, not patch each close site.
 - [2026-06-25] OSC 7735 = Harness custom sequence for CLI→app file open. Pattern reusable for any future CLI-triggered app action: emit OSC when HARNESS_SURFACE_ID set → TerminalEmulator callback → SurfaceView → TerminalHostDelegate → SessionCoordinator → MainExecutor.shared.
 - [2026-06-24] Hint mode armed monitor MUST have mouse-dismiss + auto-timeout — same bug class as PrefixKeymap. Pattern: `matching: [.keyDown, .leftMouseDown, .rightMouseDown]` + `asyncAfter(3s)`.
 - [2026-06-24] Vi mode at emulator layer = wrong layer. Shell (`set -o vi`) handles input editing; CopyMode handles buffer nav. Don't build terminal-level vi input mode.
