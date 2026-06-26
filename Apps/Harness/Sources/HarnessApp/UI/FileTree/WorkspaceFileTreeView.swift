@@ -136,6 +136,13 @@ final class WorkspaceFileTreeView: NSView {
     }
 
     private func setup() {
+        attachHostingView()
+    }
+
+    /// Adds the hosting view and pins it to the edges. Idempotent: safe to call
+    /// again after `viewWillMove(toWindow: nil)` detached it (see `didMoveToWindow`).
+    private func attachHostingView() {
+        guard hostingView.superview == nil else { return }
         hostingView.translatesAutoresizingMaskIntoConstraints = false
         addSubview(hostingView)
         NSLayoutConstraint.activate([
@@ -156,5 +163,14 @@ final class WorkspaceFileTreeView: NSView {
             hostingView?.needsDisplay = false
             hostingView?.removeFromSuperview()
         }
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        // Re-attach after returning to a window: `viewWillMove(toWindow: nil)`
+        // removes the hosting view on detach, but the view can come back alive
+        // (e.g. sidebar position swap removes/re-adds the container). Without this
+        // the file tree stays permanently blank.
+        if window != nil { attachHostingView() }
     }
 }

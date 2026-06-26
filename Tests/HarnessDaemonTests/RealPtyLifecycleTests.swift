@@ -217,6 +217,48 @@ final class RealPtyLifecycleTests: XCTestCase {
                           + "`currentChildPID == entry.pid` guard then skips committing a stale cwd")
     }
 
+    /// A foreground subprocess that cd's into another directory must NOT hijack the session's
+    /// reported cwd. A session maps 1:1 to a worktree, so `probeWorkingDirectory()` reports the
+    /// shell's own cwd — never a descendant's. Regression: a build copying to /Applications or a
+    /// sub-build in /tmp used to make the tab pill, git panel, and file tree jump to the wrong tree.
+    func testProbeReportsShellCwdNotForegroundChild() throws {
+        let fm = FileManager.default
+        let base = URL(fileURLWithPath: NSTemporaryDirectory())
+        let dirA = base.appendingPathComponent("harness-shell-\(UUID().uuidString)")
+        let dirB = base.appendingPathComponent("harness-child-\(UUID().uuidString)")
+        try fm.createDirectory(at: dirA, withIntermediateDirectories: true)
+        try fm.createDirectory(at: dirB, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: dirA); try? fm.removeItem(at: dirB) }
+        // proc cwd is canonical (/var → /private/var); resolvingSymlinksInPath is unreliable
+        // for /var on macOS, so canonicalize with realpath(3) to match the probe's output.
+        func canonical(_ path: String) -> String {
+            var buf = [CChar](repeating: 0, count: Int(PATH_MAX))
+            return realpath(path, &buf) != nil ? String(cString: buf) : path
+        }
+        let realA = canonical(dirA.path)
+        let realB = canonical(dirB.path)
+
+        let pty = try RealPty(
+            id: UUID().uuidString, cwd: dirA.path, shell: "/bin/sh",
+            rows: 24, cols: 80, scrollbackBytes: 64 * 1024
+        )
+        pty.start()
+        defer { pty.close() }
+        Thread.sleep(forTimeInterval: 0.3) // let the shell come up in dirA
+
+        let initial = try XCTUnwrap(pty.probeWorkingDirectory(), "live shell must report a cwd")
+        XCTAssertEqual(initial.cwd, realA, "shell should start in dirA")
+
+        // A foreground subshell cd's into dirB and blocks; the interactive shell stays in dirA.
+        pty.write("(cd \(dirB.path) && sleep 3)\n")
+        Thread.sleep(forTimeInterval: 1.0) // subshell is now the foreground descendant, sitting in dirB
+
+        let during = try XCTUnwrap(pty.probeWorkingDirectory(), "shell must still report a cwd")
+        XCTAssertEqual(during.cwd, realA,
+                       "a foreground subprocess in another dir must not change the session's cwd")
+        XCTAssertNotEqual(during.cwd, realB, "cwd must not bleed from the descendant")
+    }
+
     /// Hammer write/resize concurrently with a respawn; the generation-guarded
     /// lifecycle must neither crash nor double-free.
     func testRespawnUnderConcurrentIODoesNotCrash() throws {

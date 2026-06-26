@@ -674,13 +674,18 @@ public final class RealPty: @unchecked Sendable {
     /// Like `currentWorkingDirectory()`, but also returns the PID the cwd was computed for so the
     /// caller can detect a respawn between the (off-lock) probe and its commit. The PID is the
     /// child generation snapshotted at probe time; `currentChildPID` may differ later.
+    ///
+    /// Reports the *shell's own* cwd, never a descendant's. A session maps 1:1 to a worktree, so a
+    /// transient foreground subprocess that cd's elsewhere (a build copying to /Applications, a
+    /// sub-build in /tmp, an agent in a sibling repo) must not hijack the session's displayed
+    /// directory — that would make the tab pill, git panel, and file tree jump to the wrong tree.
     public func probeWorkingDirectory() -> (pid: pid_t, cwd: String)? {
         // `childPID` is `lifecycleLock`-guarded (class doc); snapshot it under the lock,
-        // then run the proc scan OUTSIDE the lock (it walks every system PID).
+        // then read the cwd OUTSIDE the lock.
         lifecycleLock.lock()
         let pid = childPID
         lifecycleLock.unlock()
-        guard pid > 0, let cwd = Self.cwd(for: deepestReadableDescendant(of: pid) ?? pid) else { return nil }
+        guard pid > 0, let cwd = Self.cwd(for: pid) else { return nil }
         return (pid, cwd)
     }
 
@@ -1228,30 +1233,6 @@ public final class RealPty: @unchecked Sendable {
             sysClose(fd)
         }
         onExit?(exitStatus)
-    }
-
-    private func deepestReadableDescendant(of pid: pid_t) -> pid_t? {
-        let all = ProcessScan.livePIDs()
-        guard !all.isEmpty else { return nil }
-        var parents: [pid_t: pid_t] = [:]
-        for candidate in all { parents[candidate] = ProcessScan.parentPID(candidate) }
-
-        var best: (pid: pid_t, depth: Int)?
-        for candidate in all where candidate != pid {
-            var cursor = candidate
-            var depth = 0
-            while let parent = parents[cursor], parent != 0, depth < 32 {
-                depth += 1
-                if parent == pid {
-                    if Self.cwd(for: candidate) != nil, best == nil || depth > best!.depth {
-                        best = (candidate, depth)
-                    }
-                    break
-                }
-                cursor = parent
-            }
-        }
-        return best?.pid
     }
 
     private static func cwd(for pid: pid_t) -> String? {
