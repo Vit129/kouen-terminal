@@ -2,15 +2,20 @@
 
 ## Now
 - **Task:** idle
-- **Branch:** fix/cwd-worktree-bleed (on remote, 2 commits ahead: layoutSubtreeIfNeeded + CHANGELOG)
-- **Status:** All fixes committed. Robot 8/9 (pre-existing fail). Ready to push remaining 2 commits + PR.
+- **Branch:** main
+- **Status:** SwiftUI Settings migration complete (S0–S9). All 10 AppKit SettingsViewController files deleted.
 
-### Fixes landed this session (fix/cwd-worktree-bleed)
-1. `8ad328d` — pin session cwd to shell, not deepest descendant (`RealPty.swift`)
-2. `WorkspaceFileTreeView` — re-attach hosting view on `viewDidMoveToWindow`
-3. `bef888a` — `panel.layoutSubtreeIfNeeded()` at animation end (blank-on-first-open guard)
-4. Regression test: `testProbeReportsShellCwdNotForegroundChild` (HARNESS_LIVE_DAEMON_TESTS=1)
-5. v3.9.5 version bump + CHANGELOG (by Vit)
+### This session (2026-06-27) — SwiftUI Settings S6–S9 + Cmd+\ fixes
+**Cmd+\ black flash fix** (commits `d5833b0`, `28d0233`):
+- `MainActor.assumeIsolated` replaces `Task { @MainActor in }` in animation loop — stops jitter on macOS 26
+- `presentsWithTransaction` bracketing around sidebar animations — Metal/CA sync, kills black gap
+- `ContentAreaViewController.collectTerminalHosts()` forwarding accessor added
+
+**SwiftUI Settings migration complete** (commit `94c9491`):
+- S6: `SettingsAdvancedView` — daemon set-option surface + local perf toggles; `SwiftUI.Binding<>` prefix required due to `HarnessCommands.Binding` shadow via HarnessCore re-export
+- S7: `SettingsRemoteView` — SwiftUI List + master-detail form, SSH host CRUD
+- S8: `SettingsRootView` (NavigationSplitView) + `SettingsHostingController`; `SettingsWindowController` moved here, int-page API preserved
+- S9: 10 AppKit files deleted (−2800 lines); `ansiNames` promoted into `PaletteCell`
 
 ### This session (2026-06-26) — cwd bleed during builds
 **Symptom:** during `make build`/`install` the session's tab pill, git panel, and file tree all jump to the wrong directory (another repo / `/`) — "1 session = 1 worktree" broke.
