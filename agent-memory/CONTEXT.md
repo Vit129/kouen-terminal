@@ -1,9 +1,16 @@
 # Context — harness-terminal
 
 ## Now
-- **Task:** Fix worktree/cwd inconsistency (tab pill / git panel / file tree showing wrong tree)
-- **Branch:** main (changes staged, NOT committed — awaiting permission)
-- **Status:** Root cause fixed + verified (deterministic repro). Robot 8/9 (the 1 fail "Browser Pane Reuse On Rebuild" is pre-existing). Regression test added (live-daemon gated).
+- **Task:** idle
+- **Branch:** fix/cwd-worktree-bleed (on remote, 2 commits ahead: layoutSubtreeIfNeeded + CHANGELOG)
+- **Status:** All fixes committed. Robot 8/9 (pre-existing fail). Ready to push remaining 2 commits + PR.
+
+### Fixes landed this session (fix/cwd-worktree-bleed)
+1. `8ad328d` — pin session cwd to shell, not deepest descendant (`RealPty.swift`)
+2. `WorkspaceFileTreeView` — re-attach hosting view on `viewDidMoveToWindow`
+3. `bef888a` — `panel.layoutSubtreeIfNeeded()` at animation end (blank-on-first-open guard)
+4. Regression test: `testProbeReportsShellCwdNotForegroundChild` (HARNESS_LIVE_DAEMON_TESTS=1)
+5. v3.9.5 version bump + CHANGELOG (by Vit)
 
 ### This session (2026-06-26) — cwd bleed during builds
 **Symptom:** during `make build`/`install` the session's tab pill, git panel, and file tree all jump to the wrong directory (another repo / `/`) — "1 session = 1 worktree" broke.
