@@ -1,9 +1,16 @@
 # Context — harness-terminal
 
 ## Now
-- **Task:** idle
-- **Branch:** main (fix/memory-leak-audit merged)
-- **Status:** v3.9.4 released — GitHub Actions release workflow triggered
+- **Task:** Fix worktree/cwd inconsistency (tab pill / git panel / file tree showing wrong tree)
+- **Branch:** main (changes staged, NOT committed — awaiting permission)
+- **Status:** Root cause fixed + verified (deterministic repro). Robot 8/9 (the 1 fail "Browser Pane Reuse On Rebuild" is pre-existing). Regression test added (live-daemon gated).
+
+### This session (2026-06-26) — cwd bleed during builds
+**Symptom:** during `make build`/`install` the session's tab pill, git panel, and file tree all jump to the wrong directory (another repo / `/`) — "1 session = 1 worktree" broke.
+**Root cause:** `RealPty.probeWorkingDirectory()` reported the **deepest foreground descendant's** cwd (`deepestReadableDescendant`). A build subprocess that cd's elsewhere (cp → /Applications, sub-build in /tmp, agent in sibling repo) hijacked the session's cwd → spurious revision bumps → reload storm → blank/wrong panel.
+**Fix:** report the shell's own cwd (`Self.cwd(for: childPID)`); removed `deepestReadableDescendant`. Genuine shell `cd` still tracked. See [knowledge/cases/cwd-worktree-bleed.md].
+**Also:** `WorkspaceFileTreeView` re-attaches its hosting view in `viewDidMoveToWindow` (was blank after sidebar position swap).
+**Repro tool:** headless `HarnessDaemon` + `harness-cli new-session --cwd` + `send` a foreground subshell that cd's to another repo, poll `list-surfaces` cwd.
 
 ## Last Session (2026-06-26) — Memory-leak audit + v3.9.4 release prep
 
