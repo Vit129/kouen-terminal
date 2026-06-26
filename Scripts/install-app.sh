@@ -79,4 +79,4 @@ echo "==> Flushing LaunchServices..."
 
 # --- Run ---
 echo "==> Opening $DEST..."
-open "$DEST"
+open "$DEST" || echo "==> (open skipped — no window server in this session; launch from Finder)"
