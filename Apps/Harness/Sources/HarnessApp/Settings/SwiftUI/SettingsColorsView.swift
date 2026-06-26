@@ -153,6 +153,12 @@ private struct ColorHexRow: View {
 // MARK: - PaletteCell
 
 private struct PaletteCell: View {
+    static let ansiNames = [
+        "0 Black", "1 Red", "2 Green", "3 Yellow", "4 Blue", "5 Magenta", "6 Cyan", "7 White",
+        "8 Bright Black", "9 Bright Red", "10 Bright Green", "11 Bright Yellow",
+        "12 Bright Blue", "13 Bright Magenta", "14 Bright Cyan", "15 Bright White",
+    ]
+
     let index: Int
     var model: SettingsModel
 
@@ -176,7 +182,7 @@ private struct PaletteCell: View {
         VStack(spacing: 4) {
             ColorPicker("", selection: colorBinding, supportsOpacity: false)
                 .labelsHidden()
-            Text(SettingsViewController.ansiNames[index])
+            Text(Self.ansiNames[index])
                 .font(.system(size: 9))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
