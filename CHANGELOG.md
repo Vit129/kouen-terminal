@@ -6,6 +6,19 @@ All notable changes to Harness are documented here. The format is based on
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/robzilla1738/harness-terminal/releases).
 
+## [3.9.4] - 2026-06-26
+
+### Added
+- **Commit & Push** shortcut in the Sync menu commits and pushes in one step.
+- `harness cat` displays line numbers in the gutter; line numbers are excluded from copy selection.
+
+### Fixed
+- **Long-session memory leak**: per-pane `InlineAICompletionController` and `AITerminalChatController` were insert-only and never removed when a pane closed, leaking the controller tree for every closed tab. Fixed via `TerminalPaneRegistry.onRetire` hook.
+- **Long-session memory leak**: browser pane network-capture array grew without bound on long-lived polling/streaming pages. Capped at 500 entries.
+- Unclaimed `TerminalHostView` held in memory after `PaneContainerView` rebuild, retaining the entire per-pane terminal graph.
+- Git push could hang indefinitely in the daemon under certain conditions.
+- Git panel double-refreshed (brief blink) immediately after a commit or push.
+
 ## [3.9.3] - 2026-06-23
 
 ### Added

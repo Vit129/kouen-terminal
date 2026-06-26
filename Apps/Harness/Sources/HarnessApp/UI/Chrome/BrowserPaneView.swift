@@ -456,14 +456,18 @@ public final class BrowserPaneView: NSView {
             if (window.__harnessNetworkCaptured) return;
             window.__harnessNetworkCaptured = true;
             window.__harnessNetwork = [];
+            window.__harnessNetworkSeq = 0;
+            // Cap the ring so a long-lived polling/streaming page can't grow this array without
+            // bound (each entry holds up to 2 KB request + 4 KB response). Mirrors the console cap.
+            var __cap = function() { while (window.__harnessNetwork.length > 500) window.__harnessNetwork.shift(); };
             var _fetch = window.fetch;
             window.fetch = function(input, init) {
                 var url = typeof input === 'string' ? input : (input.url || String(input));
                 var method = (init && init.method) || (typeof input === 'object' && input.method) || 'GET';
                 var reqBody = (init && init.body) ? String(init.body).slice(0, 2000) : null;
                 var t0 = Date.now();
-                var entry = { id: 'r' + (window.__harnessNetwork.length + 1), url: url, method: method, requestBody: reqBody, timestamp: t0 / 1000 };
-                window.__harnessNetwork.push(entry);
+                var entry = { id: 'r' + (++window.__harnessNetworkSeq), url: url, method: method, requestBody: reqBody, timestamp: t0 / 1000 };
+                window.__harnessNetwork.push(entry); __cap();
                 return _fetch.apply(this, arguments).then(function(res) {
                     entry.status = res.status;
                     entry.duration = (Date.now() - t0) / 1000;
@@ -481,8 +485,8 @@ public final class BrowserPaneView: NSView {
                 return _open.apply(this, arguments);
             };
             XMLHttpRequest.prototype.send = function(body) {
-                var entry = { id: 'r' + (window.__harnessNetwork.length + 1), url: this.__harnessUrl || '', method: this.__harnessMethod || 'GET', requestBody: body ? String(body).slice(0, 2000) : null, timestamp: (this.__harnessT0 || Date.now()) / 1000 };
-                window.__harnessNetwork.push(entry);
+                var entry = { id: 'r' + (++window.__harnessNetworkSeq), url: this.__harnessUrl || '', method: this.__harnessMethod || 'GET', requestBody: body ? String(body).slice(0, 2000) : null, timestamp: (this.__harnessT0 || Date.now()) / 1000 };
+                window.__harnessNetwork.push(entry); __cap();
                 this.addEventListener('load', function() {
                     entry.status = this.status;
                     entry.duration = (Date.now() - (this.__harnessT0 || Date.now())) / 1000;

@@ -1,46 +1,44 @@
 # Context — harness-terminal
 
 ## Now
-- **Task:** None active — ready for next session
-- **Branch:** main
-- **Status:** idle
+- **Task:** idle
+- **Branch:** main (fix/memory-leak-audit merged)
+- **Status:** v3.9.4 released — GitHub Actions release workflow triggered
 
-## Last Session (2026-06-25) — `harness view` opens sidebar viewer
+## Last Session (2026-06-26) — Memory-leak audit + v3.9.4 release prep
 
-**Completed:**
-- `harness-cli view <file>` now opens the file in the sidebar file editor when inside Harness, instead of printing to stdout. Line numbers appear in the gutter (separate NSView) and are excluded from copy — matching the file preview behavior.
-- OSC 7735 mechanism: CLI emits `\e]7735;<abs-path>\a` when `HARNESS_SURFACE_ID` is set → `TerminalEmulator.onOpenFile` → `HarnessTerminalSurfaceView.onOpenFile` → `TerminalHostView` delegate → `SessionCoordinator.terminalHostDidRequestOpenFile` → `MainExecutor.shared.executeSurfacingErrors(.workbench(.view(path:)))`
-- CLI falls back to stdout when outside Harness
+**Diagnosis (live pid via vmmap/footprint):** 34 GB was MALLOC_SMALL (Swift heap), NOT GPU/Metal. Dominant cause = `existingHosts` strongly pinning per-pane TerminalScreen graphs — **already fixed in `0430ed8`**; the leaking process ran a binary built Jun 24, before that Jun-25 fix. → user must rebuild+reinstall (`make install`) and re-measure over a long session.
 
-## Previous Session (2026-06-24) — Otty Feature Import
+**Fixed this session (real, smaller leaks remaining on main):**
+- `SessionCoordinator.inlineAIControllers/aiChatControllers` leaked one pair per closed pane (insert-only dicts). Fix: `TerminalPaneRegistry.onRetire` hook from `retire()` (covers removeHost + prune) drops both entries.
+- `BrowserPaneView` injected network capture array uncapped → cap 500 + monotonic id.
+- Guard: `Tests/robot/memory_leak_guards.robot` (3 tests, green) + `Tests/robot/helpers/check_retire_coverage.py` structural guard for future dicts.
 
-**Completed:**
+**v3.9.4 prep done:**
+- Info.plist → 3.9.4 / build 170
+- HarnessVersion.swift updated
+- CHANGELOG.md entry written with real content (2 Added, 5 Fixed)
+- GeneratedReleaseNotes.swift regenerated
+- graphify updated (16146 nodes, 36693 edges)
+- knowledge/cases/memory-leak-audit.md created
+
+**Reverted:** an autoreleasepool wrap on the Metal present loop — GPU was ruled out by vmmap.
+
+**Flagged, separate:** robot `Bug 1 - Browser Pane Reuse On Rebuild` fails on clean main (pre-existing) — `existingBrowserPanes`/`collectBrowserPanes()` gone from ContentAreaViewController; browser panes may no longer be reused across rebuilds. Needs its own look.
+
+## Previous Sessions
+
+### 2026-06-25 — `harness view` opens sidebar viewer
+- `harness-cli view <file>` now opens the file in the sidebar file editor when inside Harness, instead of printing to stdout. OSC 7735 mechanism.
+
+### 2026-06-24 — Otty Feature Import
 - Hint mode (Cmd+Shift+U) — Vimium-style link picker overlay
-  - `HintModeOverlay.swift` (NEW) — chip overlay + key monitor + typeahead + 3s auto-dismiss + mouse-dismiss
-  - `HarnessTerminalSurfaceView+SelectionAndLinks.swift` — `visibleLinks()` + `activateHintLink()`
-  - `TerminalHostView.swift` — `public var surfaceView`
-  - `URLDetection.swift` — `allMatches(in:)`
-  - `SessionCoordinator.swift` — `showHintMode()`
-  - `BannerShortcutRegistry.swift` — `hintMode` keybinding
-  - `MainMenuBuilder.swift` — View menu item + MenuTarget action
-  - **Bug fix:** armed monitor without mouse-dismiss — same pattern as PrefixKeymap fix
+- Vi mode / autocomplete intentionally skipped (shell handles it better)
+- Send selection → AI chat (~30 lines) — still pending, low priority
 
-**Skipped (intentional):**
-- Vi mode — shell handles it better (`set -o vi`); CopyMode covers buffer nav
-- Autocomplete — too large (Fig spec DB); AI inline (Option+Space) already exists
-
-**Pending (low priority):**
-- Send selection → AI chat (~30 lines) — context menu in `rightMouseUp` → `AITerminalChatController.prepopulate(text:)`
-
-## Previous Session (2026-06-23) — Sidebar SwiftUI Migration Complete
-
-**Completed (all 6 phases):**
-- Phase 1: `SidebarListModel.swift` — `@Observable` model with rows, git metadata, worktrees
-- Phase 2: `SidebarSessionListView.swift` — SwiftUI `LazyVStack` with all 5 row types
-- Phase 3: `NSHostingView` bridge in VC — replaces NSTableView scroll
-- Phase 4: `reload()` / `refreshMetadata()` wired to model — no more manual `reloadData()`
-- Phase 5: Native SwiftUI `.contextMenu {}` on session and group header rows
-- Phase 6: All dead NSTableView code removed — VC 1676 → 890 lines (~47KB reduction)
+### 2026-06-23 — Sidebar SwiftUI Migration Complete
+- All 6 phases done; NSTableView removed; VC 1676 → 890 lines
 
 ## Unresolved
-- Cmd+\ intermittent failure — PrefixKeymap disarm-on-click fix committed but root cause unknown; next hypothesis: SwiftUI `NSHostingView` `performKeyEquivalent` interception after sidebar migration
+- Cmd+\ intermittent failure — PrefixKeymap disarm-on-click fix committed but root cause unknown
+- Pre-existing robot failure: "Bug 1 - Browser Pane Reuse On Rebuild"

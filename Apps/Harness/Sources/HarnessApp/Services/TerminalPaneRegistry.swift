@@ -6,6 +6,11 @@ import HarnessTerminalKit
 final class TerminalPaneRegistry {
     private var hosts: [SurfaceID: TerminalHostView] = [:]
 
+    /// Invoked with the surface ID whenever a host is retired (close or prune), so the
+    /// coordinator can drop parallel per-surface state it keeps outside this registry
+    /// (e.g. AI controllers) instead of leaking one set per closed pane.
+    var onRetire: ((SurfaceID) -> Void)?
+
     func register(_ host: TerminalHostView) {
         hosts[host.surfaceID] = host
     }
@@ -34,6 +39,7 @@ final class TerminalPaneRegistry {
     }
 
     private func retire(_ host: TerminalHostView) {
+        onRetire?(host.surfaceID)
         host.resignIfFirstResponder()
         // Stop the display link BEFORE removing from superview so AppKit's internal
         // _NSDisplayLinkForwarder cannot dispatch viewDidMoveToWindow on a freed view.
