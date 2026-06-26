@@ -1,6 +1,6 @@
 # Harness
 
-> Forked from [robzilla1738/harness-terminal](https://github.com/robzilla1738/harness-terminal).
+> Forked from [robzilla1738/harness-terminal](https://github.com/robzilla1738/harness-terminal). Current release: **v3.9.4**.
 
 Harness is a native macOS terminal with a first-party Swift terminal engine, a background session daemon, a scriptable CLI, and agent-aware notifications. It can feel like a plain terminal, a persistent terminal, a tmux-style workspace, or an agent workspace depending on the mode you choose.
 
@@ -59,7 +59,7 @@ See [USAGE.md](USAGE.md) for the full install, run, CLI, and remote/headless gui
 - Agent detection and notifications for Claude Code, Codex, Cursor, Grok, Pi, Hermes, OpenClaw, OpenCode, Aider, Gemini, Goose, and generic agents.
 - Optional tmux-style controls: prefix key, status line, copy mode, paste buffers, hooks, command prompt, and many tmux-compatible commands.
 - IDE-like navigation — double-click folders to cd, ⌘P fuzzy jump to any directory via zoxide frecency, ⌘-click file paths, and `:cd` from the command prompt.
-- Sidebar tools for sessions, file navigation with folder cd, real-time Git workflows, command palette, and editor/LSP flows. ⌘-clicking a file path in the terminal opens it in the editor and reveals it in the file tree.
+- Sidebar tools for sessions, file navigation with folder cd, real-time Git workflows (including one-step Commit & Push), command palette, and editor/LSP flows. ⌘-clicking a file path in the terminal opens it in the editor and reveals it in the file tree.
 
 ## How It Feels
 
