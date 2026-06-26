@@ -1231,9 +1231,10 @@ public final class SurfaceRegistry: @unchecked Sendable {
         lock.unlock()
 
         let probed: [(key: String, session: RealPty, uuid: UUID, pid: pid_t, cwd: String)] = snap.compactMap { key, session in
-            // Skip surfaces where a subprocess (agent) holds the foreground — its CWD
-            // may differ from the shell's. The full tree-walk (refreshSurfaceMetadata)
-            // handles those; overwriting here would clobber the correct deep CWD.
+            // Skip surfaces where a subprocess holds the foreground; the 1.5s metadata
+            // scan (refreshSurfaceMetadata) covers those. Both paths report the shell's
+            // own cwd — never a descendant's — so a session stays pinned to its worktree
+            // even while a build/agent subprocess runs in another directory.
             guard session.isShellInForeground(),
                   let uuid = UUID(uuidString: key), let result = session.probeShellCwd() else { return nil }
             return (key, session, uuid, result.pid, result.cwd)

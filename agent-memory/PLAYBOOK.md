@@ -17,6 +17,7 @@ grep -rn "<keyword>" agent-memory/knowledge/cases/ agent-memory/knowledge/rl-les
 | `knowledge/cases/swift6-concurrency.md` | Swift 6, zombie, @Observable, nonisolated, assumeIsolated |
 | `knowledge/cases/remote-ssh.md` | SSH tunnel, remote host, P23 |
 | `knowledge/cases/misc.md` | Git/FS, terminal/renderer, keybindings, command prompt |
+| `knowledge/cases/cwd-worktree-bleed.md` | cwd/worktree, deepest-descendant, tab pill/file tree/git panel wrong dir during builds |
 | `knowledge/rl-lessons.md` | All RL-xxx prevention lessons |
 
 ## Open Cases

@@ -304,7 +304,15 @@ final class MainSplitViewController: NSViewController {
         split.layout()
         CATransaction.commit()
         if raw >= 1 {
-            if !visible { panel.isHidden = true }
+            if !visible {
+                panel.isHidden = true
+            } else {
+                // split.layout() per-frame moves the divider but doesn't flush
+                // pending layouts inside the panel. NSHostingViews (SwiftUI) that
+                // started at zero width may not have had a valid layout pass — force
+                // one now so content is never blank after the panel opens.
+                panel.layoutSubtreeIfNeeded()
+            }
             splitDelegate.allowFullCollapse = false   // restore the 200pt drag floor
             updateContentLeadingInset()
             return
