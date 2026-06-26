@@ -33,6 +33,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
     func hideFileEditorSplit() { filePreview.hideFileEditorSplit() }
     func activateTerminalTab() { filePreview.activateTerminalTab() }
     func paneShell(for paneID: PaneID) -> NSView? { paneLifecycle.paneShell(for: paneID) }
+    func collectTerminalHosts() -> [SurfaceID: TerminalHostView] { paneLifecycle.paneContainer?.collectTerminalHosts() ?? [:] }
 
     deinit {
         if let monitor = copySelectionMonitor {

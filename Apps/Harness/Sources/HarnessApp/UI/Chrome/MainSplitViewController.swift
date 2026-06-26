@@ -258,7 +258,10 @@ final class MainSplitViewController: NSViewController {
         guard animated, let panel = sidebarContainerView else {
             let panel = sidebarContainerView
             panel?.isHidden = false              // unhide so setPosition can size it to 0
+            let hosts = content.collectTerminalHosts()
+            hosts.values.forEach { $0.setPresentsWithTransaction(true) }
             setSidebarWidth(target)
+            hosts.values.forEach { $0.setPresentsWithTransaction(false) }
             panel?.isHidden = !visible
             if visible { panel?.layoutSubtreeIfNeeded() }
             splitDelegate.allowFullCollapse = false
@@ -279,6 +282,7 @@ final class MainSplitViewController: NSViewController {
             updateContentLeadingInset()
             return
         }
+        content.collectTerminalHosts().values.forEach { $0.setPresentsWithTransaction(true) }
         animateSidebar(from: start, to: target, t0: CACurrentMediaTime(), visible: visible, token: sidebarAnimToken)
     }
 
@@ -313,6 +317,7 @@ final class MainSplitViewController: NSViewController {
                 // one now so content is never blank after the panel opens.
                 panel.layoutSubtreeIfNeeded()
             }
+            content.collectTerminalHosts().values.forEach { $0.setPresentsWithTransaction(false) }
             splitDelegate.allowFullCollapse = false   // restore the 200pt drag floor
             updateContentLeadingInset()
             return
