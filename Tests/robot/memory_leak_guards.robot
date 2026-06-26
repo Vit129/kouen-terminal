@@ -5,6 +5,9 @@ Documentation    Regression guards for memory-leak fixes.
 ...                      every closed pane leaked its Inline/Chat controllers + subviews.
 ...              Leak B: Browser pane network-capture JS array grew without bound on
 ...                      long-lived polling/streaming pages.
+...              Leak C: Structural guard — any NEW [String: T] dict added to
+...                      SessionCoordinator must have a .removeValue in the onRetire closure.
+...                      Prevents future contributors from repeating the insert-only pattern.
 Library          OperatingSystem
 Library          Process
 
@@ -13,6 +16,7 @@ ${ROOT}              ${CURDIR}/../..
 ${PANE_REGISTRY}     ${ROOT}/Apps/Harness/Sources/HarnessApp/Services/TerminalPaneRegistry.swift
 ${COORDINATOR}       ${ROOT}/Apps/Harness/Sources/HarnessApp/Services/SessionCoordinator.swift
 ${BROWSER_PANE}      ${ROOT}/Apps/Harness/Sources/HarnessApp/UI/Chrome/BrowserPaneView.swift
+${RETIRE_CHECKER}    ${CURDIR}/helpers/check_retire_coverage.py
 
 *** Test Cases ***
 Leak A - Retiring A Host Drops Its AI Controllers
@@ -35,3 +39,14 @@ Leak B - Browser Network Capture Is Bounded
     ...    msg=Network capture pushes must call __cap() to trim the ring
     Should Not Contain    ${content}    window.__harnessNetwork.length + 1
     ...    msg=Use a monotonic seq for ids, not array length (collides after trim)
+
+Leak C - Every Per-Surface Dict In Coordinator Has Retire Cleanup
+    [Documentation]    Every private var [String: T] in SessionCoordinator must have a
+    ...                .removeValue call inside the onRetire closure. This guard catches
+    ...                the "insert-only dict" pattern before it ships — add the dict,
+    ...                forget the cleanup, this fails at PR time.
+    ${result}=    Run Process    python3    ${RETIRE_CHECKER}    ${COORDINATOR}
+    ...           stdout=PIPE    stderr=PIPE
+    Log    ${result.stdout}
+    Should Be Equal As Integers    ${result.rc}    0
+    ...    msg=Missing onRetire cleanup — ${result.stdout}
