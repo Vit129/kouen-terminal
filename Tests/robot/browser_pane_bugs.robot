@@ -7,10 +7,11 @@ Library          OperatingSystem
 Library          Process
 
 *** Variables ***
-${ROOT}              ${CURDIR}/../..
-${CONTENT_AREA}      ${ROOT}/Apps/Harness/Sources/HarnessApp/UI/Chrome/ContentAreaViewController.swift
-${BROWSER_PANE}      ${ROOT}/Apps/Harness/Sources/HarnessApp/UI/Chrome/BrowserPaneView.swift
-${MAIN_MENU}         ${ROOT}/Apps/Harness/Sources/HarnessApp/UI/Chrome/MainMenuBuilder.swift
+${ROOT}                  ${CURDIR}/../..
+${CONTENT_AREA}          ${ROOT}/Apps/Harness/Sources/HarnessApp/UI/Chrome/ContentAreaViewController.swift
+${BROWSER_PANE}          ${ROOT}/Apps/Harness/Sources/HarnessApp/UI/Chrome/BrowserPaneView.swift
+${BROWSER_INTEGRATION}   ${ROOT}/Apps/Harness/Sources/HarnessApp/UI/Chrome/BrowserIntegrationController.swift
+${MAIN_MENU}             ${ROOT}/Apps/Harness/Sources/HarnessApp/UI/Chrome/MainMenuBuilder.swift
 
 *** Test Cases ***
 Bug 1 - Browser Pane Reuse On Rebuild
@@ -21,8 +22,9 @@ Bug 1 - Browser Pane Reuse On Rebuild
     ...    msg=PaneContainerView must track existing browser panes for reuse
     Should Contain    ${content}    collectBrowserPanes()
     ...    msg=Must collect browser panes before teardown
-    Should Contain    ${content}    existingBrowserPanes.removeValue(forKey: bl.id)
-    ...    msg=Build must reuse cached BrowserPaneView by pane ID
+    ${bic}=    Get File    ${BROWSER_INTEGRATION}
+    Should Contain    ${bic}    panes.removeValue(forKey: leaf.id)
+    ...    msg=BrowserIntegrationController must reuse cached BrowserPaneView by pane ID
 
 Bug 1 - Browser Pane Deferred Unregister
     [Documentation]    BrowserPaneView must defer unregistration during rebuild
