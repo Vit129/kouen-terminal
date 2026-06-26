@@ -11,9 +11,9 @@
 | **S0** | `SettingsModel` — @Observable wrapper | `SettingsModel.swift` (NEW) | ✅ |
 | **S1** | Terminal page | `SettingsTerminalView.swift` (NEW) | ✅ |
 | **S2** | Appearance page | `SettingsAppearanceView.swift` (NEW) | ✅ |
-| **S3** | Colors page + `SwatchWellView` bridge | `SettingsColorsView.swift`, `SwatchWellView.swift` (NEW) | ⬜ |
-| **S4** | Keys page + `KeyRecorderRepresentable` bridge | `SettingsKeysView.swift` (NEW) | ⬜ |
-| **S5** | Agents page | `SettingsAgentsView.swift` (NEW) | ⬜ |
+| **S3** | Colors page + `SwatchWellView` bridge | `SettingsColorsView.swift`, `SwatchWellView.swift` (NEW) | ✅ |
+| **S4** | Keys page + `KeyRecorderRepresentable` bridge | `SettingsKeysView.swift` (NEW) | ✅ |
+| **S5** | Agents page | `SettingsAgentsView.swift` (NEW) | ✅ |
 | **S6** | Advanced page | `SettingsAdvancedView.swift` (NEW) | ⬜ |
 | **S7** | Remote page (NSTableView → SwiftUI List) | `SettingsRemoteView.swift` (NEW) | ⬜ |
 | **S8** | Root container + NSHostingController wiring | `SettingsRootView.swift`, `SettingsHostingController.swift` (NEW) | ⬜ |
