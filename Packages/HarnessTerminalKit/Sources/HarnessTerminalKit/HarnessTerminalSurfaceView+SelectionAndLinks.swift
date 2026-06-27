@@ -163,6 +163,7 @@ extension HarnessTerminalSurfaceView {
                 selectionAnchor = (line: blockStart, column: 0)
                 selectionHead = (line: blockEnd, column: Int.max)
                 scheduleRender()
+                onBlockSelected?(blockStart, blockEnd)
             }
             return
         }

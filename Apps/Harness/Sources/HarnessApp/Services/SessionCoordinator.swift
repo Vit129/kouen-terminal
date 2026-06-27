@@ -407,6 +407,16 @@ final class SessionCoordinator: NSObject {
         let chatController = AITerminalChatController(hostView: host, settings: settings)
         aiChatControllers[surfaceID.uuidString] = chatController
         host.surfaceView.onAskAI = { [weak chatController] text in chatController?.askAI(prefill: text) }
+        // Block output tint + AI explain action bar (Phase 12b).
+        let tintOverlay = BlockTintOverlay(surfaceView: host.surfaceView)
+        tintOverlay.translatesAutoresizingMaskIntoConstraints = false
+        host.addSubview(tintOverlay)
+        NSLayoutConstraint.activate([
+            tintOverlay.topAnchor.constraint(equalTo: host.topAnchor),
+            tintOverlay.leadingAnchor.constraint(equalTo: host.leadingAnchor),
+            tintOverlay.trailingAnchor.constraint(equalTo: host.trailingAnchor),
+            tintOverlay.bottomAnchor.constraint(equalTo: host.bottomAnchor),
+        ])
         // Auto-enable macOS Secure Input on password prompt patterns (Phase 6).
         SecureInputMonitor.shared.observeSurface(host)
         // Dequeue the next queued command each time a shell prompt appears (OSC 133).
