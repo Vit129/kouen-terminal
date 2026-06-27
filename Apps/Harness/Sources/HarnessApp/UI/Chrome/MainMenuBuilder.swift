@@ -160,6 +160,8 @@ enum MainMenuBuilder {
         view.submenu?.addItem(sidebarItem)
         let hintItem = menuItem("Hint Mode (Open Link by Key)", action: #selector(MenuTarget.hintMode), binding: BannerShortcutRegistry.hintMode)
         view.submenu?.addItem(hintItem)
+        let composerItem = menuItem("Composer", action: #selector(MenuTarget.openComposer), binding: BannerShortcutRegistry.composer)
+        view.submenu?.addItem(composerItem)
         view.submenu?.addItem(.separator())
         let runItem = menuItem("Run Script", action: #selector(MenuTarget.runScript), binding: BannerShortcutRegistry.runScript)
         view.submenu?.addItem(runItem)
@@ -452,6 +454,10 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
 
     @objc func openAIChat() {
         SessionCoordinator.shared.toggleAIChat()
+    }
+
+    @objc func openComposer() {
+        SessionCoordinator.shared.openComposer()
     }
 
     @objc func showOnboarding() {
