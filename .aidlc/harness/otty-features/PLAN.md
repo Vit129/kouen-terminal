@@ -43,18 +43,18 @@
 | ~~**1**~~ | ~~Hint mode~~ ✅ | `HintModeOverlay` — ⌘⇧U; home-row labels; 3 s auto-dismiss | Otty |
 | ~~**8**~~ | ~~Composer~~ ✅ | `ComposerPanel` NSPanel — ⌘⇧E; ⌘↩ sends to PTY | Otty (⌘⇧E) |
 | ~~**9**~~ | ~~Prompt Queue~~ ✅ | `PromptQueue` + `PromptQueueBar` — ⌘⇧↩; dequeues on `onCommandFinished` | Otty |
-| ~~**10**~~ | ~~Quick Terminal~~ ✅ | `QuickTerminalController` NSPanel ⌥Space — dedicated workspace, lazy session | Ghostty, iTerm2 Visor |
+| ~~**10**~~ | ~~Quick Terminal~~ ~~✅~~ → **removed** | Removed — blank terminal, can't type; redundant with ⌘T + app switch | Ghostty, iTerm2 Visor |
 | ~~**11**~~ | ~~Recipes~~ ✅ | `RecipesStore` + `RecipePickerController` ⌘⇧R — JSON store, fuzzy picker | Otty, Warp Drive |
 
 #### Large
 | # | Feature | Ponytail Rung | Source |
 |---|---|---|---|
-| **2** | **Vi mode** — vi keybindings in terminal input | State machine in Input handler | Otty, WezTerm |
-| **12** | **Block-based output** — command+output as discrete blocks | Shell integration hook → block boundary markers | Warp |
+| ~~**2**~~ | ~~Vi mode~~ ✅ | `HarnessTerminalSurfaceView+ViMode.swift` — normal/insert/visual state machine | Otty, WezTerm |
+| ~~**12**~~ | ~~Block-based output~~ ✅ | `BlockTintOverlay` + `BlockActionBar` — alternating tint, Cmd+Click selects block, Copy + AI explain | Warp |
 | **13** | **Kitty Graphics Protocol** — inline images | Decode sixel/PNG from PTY stream → render in Metal layer | Ghostty, WezTerm, Kitty |
-| **14** | **Floating panes** — overlay pane without disrupting layout | Z-layer pane outside split tree — use ⌘⌥F (⌘⇧F taken by findInFiles) | Zellij |
-| **15** | **Tab thumbnails overview** — visual all-tabs view | Thumbnail render → grid overlay | Ghostty |
-| **16** | **Embedded browser pane** — WebKit split pane with scriptable API | `WKWebView` hosted in split panel, `NSXPCConnection` or harness-mcp bridge | CMUX |
+| ~~**14**~~ | ~~Floating panes~~ ✅ | `FloatingPaneController.swift` — ⌘⌥F, draggable overlay NSPanel | Zellij |
+| ~~**15**~~ | ~~Tab thumbnails overview~~ ✅ | `TabOverviewController.swift` + `+Thumbnail.swift` — ⌘⇧\ grid overlay | Ghostty |
+| ~~**16**~~ | ~~Embedded browser pane~~ ✅ | `BrowserPaneView.swift` + `BrowserIntegrationController.swift` — ⌘B | CMUX |
 | ~~**17**~~ | ~~Live tab metadata~~ ✅ | git branch + CWD-triggered refresh; `kickBranchRefresh` reads `.git/HEAD` directly | CMUX |
 
 #### Medium (new)
@@ -153,18 +153,18 @@ Phase 11: Recipes                     Medium,  ~200 lines
 
 ── Large ───────────────────────────────────────────────────────
 ~~Phase 2:  Vi mode                     Large,   ~200 lines~~ ✅ 5a7eb10
-~~Phase 12: Block-based output          Large,   ~250 lines~~ ✅ 5a7eb10
+~~Phase 12: Block-based output          Large,   ~250 lines~~ ✅ 5a7eb10 + 0e608ce
 ~~Phase 14: Floating panes              Large,   ~200 lines~~ ✅ 68c4906
 ~~Phase 15: Tab thumbnails              Large,   ~180 lines~~ ✅ 68c4906
 
 ── Large (new from research) ────────────────────────────────────
-Phase 16: Embedded browser pane       Large,   ~300 lines
-Phase 17: Live tab metadata           Medium,  ~120 lines
+~~Phase 16: Embedded browser pane       Large,   ~300 lines~~ ✅
+~~Phase 17: Live tab metadata           Medium,  ~120 lines~~ ✅
 
 ── Medium (new from research) ──────────────────────────────────
-Phase 18: Layout file export/import   Small,   ~80 lines
-Phase 19: Frecency directory jumping  Medium,  ~150 lines
-Phase 20: Session Resurrection audit  Small,   ~50 lines (patch)
+~~Phase 18: Layout file export/import   Small,   ~80 lines~~ ✅
+~~Phase 19: Frecency directory jumping  Medium,  ~150 lines~~ ✅ + zoxide + ⌘↩ new tab
+~~Phase 20: Session Resurrection audit  Small,   ~50 lines (patch)~~ ✅
 
 ── Defer until demand ──────────────────────────────────────────
 Phase 13: Kitty Graphics Protocol     XL,      ~400 lines
