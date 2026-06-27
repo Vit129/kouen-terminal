@@ -1,14 +1,48 @@
 # Context — harness-terminal
 
 ## Now
-- **Task:** otty-features — large phases in progress
+- **Task:** otty-features — ALL phases complete ✅
 - **Branch:** main
-- **Status:** ALL otty-features phases done ✅ (1–12, 14–20). Phase 13 + 21 skipped. Phase 16 was pre-existing.
+- **Status:** P1–P12b, P14–P20 shipped. P13 (Kitty Graphics) + P21 (WASM) deferred. P16 was pre-existing.
 
-### This session (2026-06-27) — otty-features implementation
+### This session (2026-06-27) — Phase 2 + 12 + 12b + 14 + 15
 
-**Completed phases (on main):**
-- Memory fix: `DispatchSource.makeMemoryPressureSource` → trims inactive scrollback (54f6a0b)
+**Commits:**
+- `5a7eb10` — Phase 2 (Vi modal editing) + Phase 12 (Cmd+Click block selection)
+- `0e608ce` — Phase 12b (block output tint + AI explain action bar)
+- Phase 14 (Floating panes ⌘⌥F) + Phase 15 (Tab thumbnails ⌘⇧\\) — in earlier commits this session
+
+**What shipped:**
+
+| Phase | Feature | Key files |
+|-------|---------|-----------|
+| P2 | Vi modal editing (Esc = normal, hjkl/wb/0$/x/i/a/A) | `+ViMode.swift`, `HarnessTerminalSurfaceView.swift` |
+| P12 | Cmd+Click block selection (OSC 133 boundaries) | `+SelectionAndLinks.swift` |
+| P12b | Block tint overlay + AI ✦ action bar | `BlockTintOverlay.swift`, `+Thumbnail.swift` |
+| P14 | Floating terminal pane (⌘⌥F, NSPanel) | `FloatingPaneController.swift` |
+| P15 | Tab overview grid (⌘⇧\\, 4-col, 200×150 thumbnails) | `TabOverviewController.swift`, `+Thumbnail.swift` |
+
+**Architecture decisions this session:**
+- `BlockTintOverlay` is a flipped `NSView` composited above Metal surface via CA compositor. Reads `promptRows` from emulator via new public accessor. Alternating 2.8% / 5.8% alpha white tints → theme-agnostic.
+- `onBlockSelected` callback on surfaceView fires after Cmd+Click → overlay shows `BlockActionBar` (Copy + AI ✦). AI ✦ prefills chat via existing `onAskAI` hook.
+- Tab thumbnails: `CGWindowListCreateImage` removed in macOS 15 → replaced with `bitmapImageRepForCachingDisplay(in:)` + `cacheDisplay(in:to:)`.
+- `TabCell: NSView` subclass instead of NSButton + associated objects to avoid Swift 6 mutable global error.
+- `QuickTerminalController` deleted — blank terminal on open, can't type; redundant with ⌘T + app switch.
+- Vi mode wired at terminal-input level (NOT shell `set -o vi`): sends cursor-move escape sequences to PTY when in normal mode. Toggle ⌘⌃V from menu.
+
+**New public API on `HarnessTerminalSurfaceView`:**
+- `var promptRows: [Int]` — OSC 133 prompt buffer line indices
+- `var selectionString: String?` — wraps internal `selectionTextIfAny()`
+- `func copyBlock()` — wraps internal `copySelection()`
+- `var onBlockSelected: ((_ startLine: Int, _ endLine: Int) -> Void)?`
+- `var viModeState: ViInputMode` + `var onViModeChanged: ((ViInputMode) -> Void)?`
+- `public var promptGutterEnabled: Bool` (was private)
+
+---
+
+### Previous session (2026-06-27) — otty-features waves 1–3
+
+**Completed phases:**
 - Phase 3: right-click → Ask AI prefill (b104eed)
 - Phase 4: scrollback search ⌘F; findInFiles → ⌘⇧F (5fac8a7)
 - Phase 5: click-to-move cursor (ee002b8)
@@ -18,92 +52,39 @@
 - Phase 1: `HintModeOverlay` ⌘⇧U (cba7cdc — pre-existed)
 - Phase 8: `ComposerPanel` ⌘⇧E (f753a14)
 - Phase 9: `PromptQueue` + `PromptQueueBar` ⌘⇧↩ (d9e74b9)
-- Phase 20: session resurrection audit — no gaps found (window frame + scrollback already persisted)
+- Phase 18: layout export/import `.harness-layout` JSON (LayoutFileStore)
+- Phase 19: frecency directory jumping ⌘⇧J (FrecencyDirectoryStore + DirectoryPickerController)
+- Phase 20: session resurrection audit — no gaps (window frame + scrollback already persisted)
+- Phase 11: Recipes ⌘⇧R (RecipesStore + RecipePickerController)
 
-**Performance fixes (on main):**
-- GitPanelView: redundant UI rebuilds + memory leaks fixed
-- Event monitor leaks: KeyRecorderView, SyntaxTextView, ViExCommands, HarnessSidebarPanelVC — monitors removed on deinit
+### Previous: 2026-06-27 — XCTest coverage + skill infrastructure
 
-**AI streaming fix:** double-read on pipe (`while true { let chunk = availableData }`) — 160d064
+- `448f68a` — 9 XCTest cases for PaletteModel + stale test file cleanup
+- `~/.claude/skills/xctest-macos/SKILL.md` — new skill; routing.md updated
 
-**Key decisions:**
-- ⌘F = scrollback search (terminal convention), ⌘⇧F = findInFiles (IDE convention)
-- Phase 14 floating panes → use ⌘⌥F (⌘⇧F taken)
-- `onRawOutput` hook added to `HarnessTerminalSurfaceView` — `onOutputTrigger` is dead in prod (offMainParserFramePipelineEnabled)
+### Previous: 2026-06-27 — SwiftUI waves 1–2, Settings S6–S9
 
-### This session (2026-06-27) — XCTest coverage + skill infrastructure
-
-**Commits:**
-- `448f68a` — test: PaletteModel 9 XCTest cases + delete stale S9 orphans (HarnessSliderTests, SettingsWindowCloseProxyTests)
-
-**Infrastructure:**
-- `~/.claude/skills/xctest-macos/SKILL.md` — new skill for XCTest on macOS Swift targets
-- `~/.claude/skills/xctest-macos/references/swift6-xctest.md` — @MainActor patterns, async tests, @Observable model testing
-- `~/.claude/rules/routing.md` — XCTest/unit test keywords now bypass AIDLC → xctest-macos skill
-- `~/.claude/skills/macos-swiftui/SKILL.md` — testing row added pointing to xctest-macos
-
-**Testability fixes in PaletteModel:**
-- `PaletteModel`: `private` → `internal`
-- `PaletteFileEntry`, `PaletteGrepMatch`: `fileprivate` → `internal`
-
-**Previous session (same day):** AppKit → SwiftUI migration CLOSED. Remaining AppKit files commented as intentional — GitPanelView, WorkspaceFileTreeView, FileViewerViewController.
-
-### This session (2026-06-27) — SwiftUI wave 2: 4 UI components migrated
-
-**Commits (this session):**
-- `760705a` — AppKit → SwiftUI wave 2: CommandPaletteController, TerminalTabBarView, FileEditorTabBarView, AgentInboxPanelView (net −424 lines)
-
-### Previous: 2026-06-27 — Sidebar chrome SwiftUI + Open With Harness + file tree git root
-
-**Commits (previous session):**
-- `bb68fd3` — `HarnessControls.swift` deleted (−998 lines, 9 dead AppKit classes)
-- `a072edf` — sidebar section label + footer → SwiftUI
-- `a6d59a9` — sidebar tab bar → SwiftUI `Picker(.segmented)`, `selectedTab` onto `SidebarSectionModel`, `@objc sidebarTabChanged` removed
-- `36fde38` — Open With Harness for source files: `ExternalOpenKind.filePreview`, Info.plist `public.source-code`/`public.plain-text`, routing chain AppDelegate → MainSplitVC → sidebar
-- `cabcb86` — Open With file → terminal opens at git root, tree reveals file
-- `d3a700f` — file tree roots at git root; expand+scroll to CWD instead of re-root; `lastFileTreeCWD` guard in all 3 sites
-
-**Sidebar chrome is now 100% SwiftUI:** WorkspacePillView ✓, SidebarSessionListView ✓, SidebarSectionLabelView ✓, SidebarTabBarView ✓, SidebarFooterView ✓
-
-**Open With Harness behaviour:**
-- Right-click any source file in Finder → Open With → Harness
-- File tree expands to the file and scrolls to it (no viewer, no back button)
-- Terminal opens at git root of that file (new session if none exists)
-
-**Key design decision: panel-only (no back button)**
-- Re-rooting on every `cd` disrupts context — instead tree stays at git root
-- Expanding + scrolling is stateless: no back stack, no terminal state, no force-cd interruption
-
-**Still AppKit (won't migrate):** SoftIconButton, SidebarTitlebarHeaderView (mouseDownCanMoveWindow), child panels (GitPanelView, WorkspaceFileTreeView, FileViewerVC)
-
----
-
-### Previous: 2026-06-27 — SwiftUI wave 1 + Settings S6–S9 complete
-
-**Wave 1 (same day):**
-- HarnessSidebarPanelViewController+DragReorder.swift — deleted (dead stub)
-- NotificationBellButton.swift — deleted (zero call sites)
-- Toast + AboutPanelController → SwiftUI
-- WorkspacePillButton → WorkspacePillModel + WorkspacePillView (chromeEpoch pattern)
-
-**Settings S6–S9:**
-- S6: SettingsAdvancedView, S7: SettingsRemoteView, S8: SettingsRootView + NavigationSplitView
-- S9: 10 AppKit files deleted (−2800 lines)
+- Wave 1: Toast, AboutPanel, WorkspacePillView → SwiftUI
+- Wave 2: CommandPalette, TerminalTabBar, FileEditorTabBar, AgentInbox → SwiftUI (net −424 lines)
+- S6–S9: Settings panels + NSHostingView migration; −2800 lines AppKit deleted
 - Info.plist → 3.9.5 / build 171
 
-**Cmd+\ black flash fix:** `MainActor.assumeIsolated` + `presentsWithTransaction` bracketing
+### Previous: 2026-06-27 — Sidebar chrome + Open With Harness
 
----
+- Sidebar 100% SwiftUI: WorkspacePill, SessionList, SectionLabel, TabBar, Footer
+- Open With Harness: right-click source file → sidebar file tree expand+scroll; terminal at git root
+- File tree roots at git root; `cd` expands instead of re-rooting
 
 ### Previous sessions (abbreviated)
 
 | Date | Task | Key outcome |
 |------|------|-------------|
-| 2026-06-26 | cwd bleed during builds | `deepestReadableDescendant` removed; shell pid reported directly |
-| 2026-06-26 | Memory-leak audit | `existingHosts` pin fixed; BrowserPaneView capped; v3.9.4 prepped |
+| 2026-06-26 | cwd bleed during builds | `deepestReadableDescendant` removed; shell pid direct |
+| 2026-06-26 | Memory-leak audit | `existingHosts` pin fixed; BrowserPaneView capped; v3.9.4 |
 | 2026-06-25 | `harness view` | OSC 7735 → sidebar file viewer |
-| 2026-06-24 | Otty features | Hint mode (Cmd+Shift+U) |
+| 2026-06-24 | Otty features | Hint mode (⌘⇧U) |
 | 2026-06-23 | Sidebar SwiftUI migration | NSTableView removed; VC 1676 → 890 lines |
 
 ## Unresolved
 - Pre-existing robot failure: "Bug 1 - Browser Pane Reuse On Rebuild" (BrowserIntegrationController refactor changed call sites)
+- Statusline not showing after restart — deprioritized

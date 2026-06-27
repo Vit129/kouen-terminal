@@ -1,18 +1,20 @@
 import AppKit
 import HarnessTerminalKit
 
-/// Warp-style block output overlay: alternating background tint per command block + action bar on Cmd+Click.
-/// Added as a subview of TerminalHostView, filling it entirely — rendered above the Metal surface via CA compositor.
+/// Warp-style block output overlay: per-command tint, rounded border, collapse/expand, Copy/AI/Re-run action bar.
+/// Added as a subview of TerminalHostView filling it entirely — rendered above the Metal surface via CA compositor.
 @MainActor
 final class BlockTintOverlay: NSView {
     private weak var surfaceView: HarnessTerminalSurfaceView?
     private var topLine = 0
     private var visibleRows = 24
     private var actionBar: BlockActionBar?
+    private var collapsedBlocks = Set<Int>()  // buffer-line indices of collapsed prompt rows
 
-    // Even/odd block tint colors (very subtle — readable on any terminal theme)
-    private static let evenTint = NSColor.white.withAlphaComponent(0.028)
-    private static let oddTint  = NSColor.white.withAlphaComponent(0.058)
+    private static let evenTint   = NSColor.white.withAlphaComponent(0.028)
+    private static let oddTint    = NSColor.white.withAlphaComponent(0.055)
+    private static let borderColor = NSColor.white.withAlphaComponent(0.10)
+    private static let collapseW: CGFloat = 18  // gutter width for collapse triangles
 
     init(surfaceView: HarnessTerminalSurfaceView) {
         self.surfaceView = surfaceView
@@ -35,8 +37,9 @@ final class BlockTintOverlay: NSView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 
-    // Flipped so row 0 = y=0 (top of view), matching terminal top-down layout
     override var isFlipped: Bool { true }
+
+    // MARK: - Drawing
 
     override func draw(_ dirtyRect: NSRect) {
         guard let sv = surfaceView, visibleRows > 0 else { return }
@@ -46,14 +49,107 @@ final class BlockTintOverlay: NSView {
 
         for (i, startLine) in prompts.enumerated() {
             let nextPrompt = i + 1 < prompts.count ? prompts[i + 1] : Int.max
-            // Block: from this prompt to (next prompt - 1), clamped to viewport
+            let collapsed = collapsedBlocks.contains(startLine)
+
+            // Viewport rows
             let vStart = max(startLine - topLine, 0)
-            let vEnd   = min(nextPrompt - 1 - topLine, visibleRows - 1)
-            guard vStart < visibleRows, vEnd >= 0, vEnd >= vStart else { continue }
-            let rect = NSRect(x: 0, y: CGFloat(vStart) * rowH,
-                              width: bounds.width, height: CGFloat(vEnd - vStart + 1) * rowH)
+            let rawEnd = collapsed ? startLine : (nextPrompt - 1)  // collapsed = only prompt row visible
+            let vEnd   = min(rawEnd - topLine, visibleRows - 1)
+            guard vStart < visibleRows, vEnd >= 0, vEnd >= vStart else {
+                // Block entirely off-screen — still draw triangle if prompt is visible
+                drawTriangle(row: startLine - topLine, rowH: rowH, collapsed: collapsed)
+                continue
+            }
+
+            let blockRect = NSRect(x: 0, y: CGFloat(vStart) * rowH,
+                                   width: bounds.width, height: CGFloat(vEnd - vStart + 1) * rowH)
+
+            // Tint
             (i.isMultiple(of: 2) ? Self.evenTint : Self.oddTint).setFill()
-            rect.fill()
+            blockRect.fill()
+
+            // Rounded border
+            let borderPath = NSBezierPath(roundedRect: blockRect.insetBy(dx: 0.5, dy: 0.5), xRadius: 4, yRadius: 4)
+            borderPath.lineWidth = 0.5
+            Self.borderColor.setStroke()
+            borderPath.stroke()
+
+            // Collapsed cover
+            if collapsed {
+                let outputStart = startLine + 1
+                let coveredLines = nextPrompt - outputStart
+                if coveredLines > 0 {
+                    let coverY = CGFloat(vEnd + 1) * rowH
+                    let coverRect = NSRect(x: 0, y: coverY, width: bounds.width, height: rowH * 0.75)
+                    NSColor.black.withAlphaComponent(0.75).setFill()
+                    NSBezierPath(roundedRect: coverRect, xRadius: 4, yRadius: 4).fill()
+                    let label = "▶  \(coveredLines) line\(coveredLines == 1 ? "" : "s") hidden"
+                    let attrs: [NSAttributedString.Key: Any] = [
+                        .font: NSFont.monospacedSystemFont(ofSize: 10.5, weight: .regular),
+                        .foregroundColor: NSColor.white.withAlphaComponent(0.42),
+                    ]
+                    label.draw(at: NSPoint(x: Self.collapseW + 4, y: coverY + 6), withAttributes: attrs)
+                }
+            }
+
+            // Collapse triangle on prompt row
+            drawTriangle(row: vStart, rowH: rowH, collapsed: collapsed)
+        }
+    }
+
+    private func drawTriangle(row: Int, rowH: CGFloat, collapsed: Bool) {
+        guard row >= 0, row < visibleRows else { return }
+        let cy = CGFloat(row) * rowH + rowH / 2
+        let cx: CGFloat = 8
+        let path = NSBezierPath()
+        if collapsed {
+            // ▶ right-pointing
+            path.move(to: NSPoint(x: cx - 3, y: cy - 4))
+            path.line(to: NSPoint(x: cx + 4, y: cy))
+            path.line(to: NSPoint(x: cx - 3, y: cy + 4))
+        } else {
+            // ▼ down-pointing
+            path.move(to: NSPoint(x: cx - 4, y: cy - 2))
+            path.line(to: NSPoint(x: cx + 4, y: cy - 2))
+            path.line(to: NSPoint(x: cx, y: cy + 3))
+        }
+        path.close()
+        NSColor.white.withAlphaComponent(0.35).setFill()
+        path.fill()
+    }
+
+    // MARK: - Hit testing (pass-through except triangle gutter + action bar)
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        for sub in subviews.reversed() {
+            let local = sub.convert(point, from: self)
+            if let hit = sub.hitTest(local) { return hit }
+        }
+        guard let sv = surfaceView, visibleRows > 0 else { return nil }
+        let rowH = bounds.height / CGFloat(visibleRows)
+        for startLine in sv.promptRows {
+            let vRow = startLine - topLine
+            guard vRow >= 0, vRow < visibleRows else { continue }
+            if NSRect(x: 0, y: CGFloat(vRow) * rowH, width: Self.collapseW, height: rowH).contains(point) {
+                return self
+            }
+        }
+        return nil
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        let pt = convert(event.locationInWindow, from: nil)
+        guard let sv = surfaceView, visibleRows > 0 else { return }
+        let rowH = bounds.height / CGFloat(visibleRows)
+        for startLine in sv.promptRows {
+            let vRow = startLine - topLine
+            guard vRow >= 0, vRow < visibleRows else { continue }
+            if NSRect(x: 0, y: CGFloat(vRow) * rowH, width: Self.collapseW, height: rowH).contains(pt) {
+                if collapsedBlocks.contains(startLine) { collapsedBlocks.remove(startLine) }
+                else { collapsedBlocks.insert(startLine) }
+                needsDisplay = true
+                return
+            }
         }
     }
 
@@ -65,10 +161,9 @@ final class BlockTintOverlay: NSView {
         let rowH = bounds.height / CGFloat(visibleRows)
         let blockEndRow = min(endLine - topLine, visibleRows - 1)
         guard blockEndRow >= 0 else { return }
-        // Position bar at the bottom-right corner of the block
-        let barW: CGFloat = 144, barH: CGFloat = 28
+        let barW: CGFloat = 192, barH: CGFloat = 28
         let barX = bounds.width - barW - 8
-        let barY = CGFloat(blockEndRow + 1) * rowH - barH - 4  // 4pt above block bottom edge
+        let barY = CGFloat(blockEndRow + 1) * rowH - barH - 4
         let bar = BlockActionBar(frame: NSRect(x: barX, y: barY, width: barW, height: barH),
                                  surfaceView: surfaceView)
         addSubview(bar)
@@ -81,7 +176,7 @@ final class BlockTintOverlay: NSView {
     }
 }
 
-// MARK: - Action bar view
+// MARK: - Action bar
 
 @MainActor
 private final class BlockActionBar: NSView {
@@ -91,17 +186,18 @@ private final class BlockActionBar: NSView {
         self.surfaceView = surfaceView
         super.init(frame: frame)
         wantsLayer = true
-        layer?.backgroundColor = NSColor(white: 0.10, alpha: 0.90).cgColor
+        layer?.backgroundColor = NSColor(white: 0.10, alpha: 0.92).cgColor
         layer?.cornerRadius = 7
         layer?.cornerCurve = .continuous
         layer?.borderWidth = 0.5
-        layer?.borderColor = NSColor.white.withAlphaComponent(0.15).cgColor
+        layer?.borderColor = NSColor.white.withAlphaComponent(0.14).cgColor
 
-        let copyBtn  = makeButton(symbol: "doc.on.doc",  label: "Copy",    action: #selector(copyBlock))
-        let aiBtn    = makeButton(symbol: "sparkles",    label: "AI ✦",    action: #selector(aiExplain))
-        let stack    = NSStackView(views: [copyBtn, aiBtn])
-        stack.orientation = .horizontal
-        stack.spacing     = 1
+        let copyBtn  = makeButton(symbol: "doc.on.doc",  label: "Copy",   action: #selector(copyBlock))
+        let aiBtn    = makeButton(symbol: "sparkles",    label: "AI ✦",   action: #selector(aiExplain))
+        let rerunBtn = makeButton(symbol: "arrow.counterclockwise", label: "Re-run", action: #selector(rerunBlock))
+        let stack = NSStackView(views: [copyBtn, aiBtn, rerunBtn])
+        stack.orientation  = .horizontal
+        stack.spacing      = 1
         stack.distribution = .fillEqually
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stack)
@@ -118,12 +214,12 @@ private final class BlockActionBar: NSView {
 
     private func makeButton(symbol: String, label: String, action: Selector) -> NSButton {
         let btn = NSButton(title: label, target: self, action: action)
-        btn.bezelStyle = .regularSquare
-        btn.isBordered = false
-        btn.font = .systemFont(ofSize: 10.5, weight: .medium)
+        btn.bezelStyle  = .regularSquare
+        btn.isBordered  = false
+        btn.font        = .systemFont(ofSize: 10.5, weight: .medium)
         if let img = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)?
             .withSymbolConfiguration(.init(pointSize: 10, weight: .medium)) {
-            btn.image = img
+            btn.image         = img
             btn.imagePosition = .imageLeading
         }
         btn.contentTintColor = NSColor.white.withAlphaComponent(0.85)
@@ -140,6 +236,21 @@ private final class BlockActionBar: NSView {
         let text = sv.selectionString ?? ""
         guard !text.isEmpty else { removeFromSuperview(); return }
         sv.onAskAI?("Explain this terminal output:\n\n```\n\(text)\n```")
+        removeFromSuperview()
+    }
+
+    @objc private func rerunBlock() {
+        guard let sv = surfaceView,
+              let selection = sv.selectionString,
+              let firstLine = selection.components(separatedBy: "\n").first(where: { !$0.isEmpty })
+        else { removeFromSuperview(); return }
+        // ponytail: naive prompt-prefix strip — covers ❯/$/%/#/>/▶ + space. Ceiling: use OSC 133 B/C
+        // markers to extract the exact command string without guessing the prompt format.
+        let stripped = firstLine.replacingOccurrences(
+            of: #"^.*?[❯$%#>▶]\s+"#, with: "", options: [.regularExpression]
+        )
+        let cmd = stripped.isEmpty ? firstLine : stripped
+        sv.sendText(cmd + "\r")
         removeFromSuperview()
     }
 }
