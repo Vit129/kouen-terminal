@@ -20,7 +20,7 @@ final class KeyRecorderView: NSView {
     private var recording = false {
         didSet { updateAppearance() }
     }
-    private var monitor: Any?
+    private nonisolated(unsafe) var monitor: Any?
 
     init(initial: String) {
         self.value = initial

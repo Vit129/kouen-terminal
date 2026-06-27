@@ -39,7 +39,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
     var activeWorkspaceID: WorkspaceID?
     private var activeSessionID: SessionID?
     var workspaceDropdown: WorkspaceSwitcherPanelView?
-    var workspaceDropdownMonitor: Any?
+    nonisolated(unsafe) var workspaceDropdownMonitor: Any?
     /// Last session ID sent to fileTreeView so we can detect session changes even
     /// when the CWD is the same (e.g. two sessions sharing the same repo root).
     var lastFileTreeSessionID: SessionID?
@@ -161,7 +161,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
     }
 
     private var notificationsDropdown: NotificationDropdownPanelView?
-    private var notificationsDropdownMonitor: Any?
+    private nonisolated(unsafe) var notificationsDropdownMonitor: Any?
     private weak var notificationsDropdownPreviousResponder: NSResponder?
 
     func showNotificationsDropdown() {
@@ -270,7 +270,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
     }
 
     private var agentsInbox: AgentInboxPanelView?
-    private var agentsInboxMonitor: Any?
+    private nonisolated(unsafe) var agentsInboxMonitor: Any?
 
     /// Float the Agent Inbox over the window's content view, anchored just above the
     /// footer's agents button. Mirrors `showNotificationsDropdown`'s presentation so the
