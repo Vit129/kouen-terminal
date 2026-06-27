@@ -46,6 +46,11 @@ private final class PalettePanel: NSPanel {
 enum CommandPaletteController {
     private static var panel: NSPanel?
     private static var windowDelegate: PaletteWindowDelegate?
+
+    fileprivate static func clearReferences() {
+        panel = nil
+        windowDelegate = nil
+    }
     /// MRU stack of action IDs the user has just run. Persisted across launches so
     /// the palette feels like it learns from the user.
     private static let recentDefaultsKey = "com.robert.harness.palette.recent"
@@ -914,6 +919,9 @@ private struct OverlayBackground: NSViewRepresentable {
 private final class PaletteWindowDelegate: NSObject, NSWindowDelegate {
     weak var panel: NSPanel?
     func windowDidResignKey(_ notification: Notification) { panel?.close() }
+    func windowWillClose(_ notification: Notification) {
+        CommandPaletteController.clearReferences()
+    }
 }
 
 // MARK: - Palette data helpers

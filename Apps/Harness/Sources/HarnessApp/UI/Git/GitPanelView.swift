@@ -11,6 +11,18 @@ final class GitPanelView: NSView {
     /// that a newer one has superseded it and discard its results.
     private var refreshGeneration = 0
     private var lastWorktreeOutput = ""
+    private var lastBranch = ""
+    private var lastAheadBehind = ""
+    private var lastNumstat = ""
+    private var lastPorcelain = ""
+    private var lastLog = ""
+
+    private struct RepoEntry: Equatable {
+        let path: String
+        let branch: String
+        let sessionName: String
+    }
+    private var lastRepoEntries: [RepoEntry] = []
     private nonisolated(unsafe) var watchStream: FSEventStreamRef?
     private nonisolated(unsafe) var contextPointer: UnsafeMutableRawPointer?
     private nonisolated(unsafe) var watchDebounce: DispatchWorkItem?
@@ -85,6 +97,13 @@ final class GitPanelView: NSView {
     func updateRoot(path: String) {
         guard path != currentPath else { return }
         currentPath = path
+        lastBranch = ""
+        lastAheadBehind = ""
+        lastNumstat = ""
+        lastPorcelain = ""
+        lastLog = ""
+        lastWorktreeOutput = ""
+        lastRepoEntries = []
         startWatching()
         Task { [weak self] in await self?.refresh() }
     }
@@ -92,6 +111,13 @@ final class GitPanelView: NSView {
     func clearRoot() {
         currentPath = nil
         manuallyUnstagedFiles.removeAll()
+        lastBranch = ""
+        lastAheadBehind = ""
+        lastNumstat = ""
+        lastPorcelain = ""
+        lastLog = ""
+        lastWorktreeOutput = ""
+        lastRepoEntries = []
         stopWatching()
     }
 
@@ -872,6 +898,24 @@ final class GitPanelView: NSView {
             manuallyUnstagedFiles.removeAll()
         }
 
+        let stateChanged = branch != lastBranch ||
+                           aheadBehind != lastAheadBehind ||
+                           numstat != lastNumstat ||
+                           porcelain != lastPorcelain ||
+                           log != lastLog
+
+        if !stateChanged {
+            refreshRepos()
+            await refreshWorktrees(generation: generation)
+            return
+        }
+
+        lastBranch = branch
+        lastAheadBehind = aheadBehind
+        lastNumstat = numstat
+        lastPorcelain = porcelain
+        lastLog = log
+
         branchLabel.stringValue = "⎇ " + (branch.isEmpty ? "detached" : branch)
 
         // Update sync button to reflect ahead/behind state
@@ -929,7 +973,7 @@ final class GitPanelView: NSView {
         if porcelain.isEmpty {
             changesStack.addArrangedSubview(makeLabel("Working tree clean"))
         } else {
-            for (rowIndex, line) in porcelain.components(separatedBy: "\n").prefix(40).enumerated() where !line.isEmpty {
+            for line in porcelain.components(separatedBy: "\n").prefix(40) where !line.isEmpty {
                 let file = String(line.dropFirst(3))
                 let row = makeChangeRow(line, stats: stats[file])
                 changesStack.addArrangedSubview(row)
@@ -1332,15 +1376,9 @@ final class GitPanelView: NSView {
     // MARK: - Repos
 
     private func refreshRepos() {
-        reposStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         let snapshot = SessionCoordinator.shared.snapshot
         // Collect unique repos from all sessions/tabs
         var seen = Set<String>()
-        struct RepoEntry {
-            let path: String
-            let branch: String
-            let sessionName: String
-        }
         var entries: [RepoEntry] = []
         for ws in snapshot.workspaces {
             for session in ws.sessions {
@@ -1356,6 +1394,10 @@ final class GitPanelView: NSView {
                 }
             }
         }
+        if entries == lastRepoEntries { return }
+        lastRepoEntries = entries
+
+        reposStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         if entries.isEmpty {
             let empty = NSTextField(labelWithString: "No repos detected.")
             empty.font = .systemFont(ofSize: 12)

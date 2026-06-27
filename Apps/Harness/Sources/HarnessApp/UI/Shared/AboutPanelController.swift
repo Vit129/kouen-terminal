@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 @MainActor
-enum AboutPanelController {
+final class AboutPanelController: NSObject {
     private static var window: NSWindow?
 
     static func show() {
@@ -16,10 +16,21 @@ enum AboutPanelController {
             win.isRestorable = false
             win.setContentSize(NSSize(width: 440, height: 360))
             window = win
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(windowWillClose(_:)),
+                name: NSWindow.willCloseNotification,
+                object: win
+            )
         }
         window?.center()
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
+    }
+
+    @objc private static func windowWillClose(_ notification: Notification) {
+        NotificationCenter.default.removeObserver(self, name: NSWindow.willCloseNotification, object: notification.object)
+        window = nil
     }
 }
 

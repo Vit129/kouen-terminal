@@ -2,8 +2,8 @@
 
 ## Now
 - **Task:** otty-features — medium phases in progress
-- **Branch:** main (ahead of origin by 10 commits, pushed to d9e74b9)
-- **Status:** Phases 1, 3–9, 17, 20 done and pushed. Medium phases 10, 11, 18, 19 remain. Large phases 2, 12, 14, 15, 16 not started.
+- **Branch:** main
+- **Status:** Phases 1, 3–9, 17, 20 done and pushed. Event monitor leak fixes merged. Medium phases 10, 11, 18, 19 remain. Large phases 2, 12, 14, 15, 16 not started.
 
 ### This session (2026-06-27) — otty-features implementation
 
@@ -19,6 +19,10 @@
 - Phase 8: `ComposerPanel` ⌘⇧E (f753a14)
 - Phase 9: `PromptQueue` + `PromptQueueBar` ⌘⇧↩ (d9e74b9)
 - Phase 20: session resurrection audit — no gaps found (window frame + scrollback already persisted)
+
+**Performance fixes (on main):**
+- GitPanelView: redundant UI rebuilds + memory leaks fixed
+- Event monitor leaks: KeyRecorderView, SyntaxTextView, ViExCommands, HarnessSidebarPanelVC — monitors removed on deinit
 
 **AI streaming fix:** double-read on pipe (`while true { let chunk = availableData }`) — 160d064
 
