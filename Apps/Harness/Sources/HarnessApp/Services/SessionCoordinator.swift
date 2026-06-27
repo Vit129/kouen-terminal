@@ -51,6 +51,7 @@ final class SessionCoordinator: NSObject {
         terminalHosts.onRetire = { [weak self] surfaceID in
             self?.inlineAIControllers.removeValue(forKey: surfaceID.uuidString)
             self?.aiChatControllers.removeValue(forKey: surfaceID.uuidString)
+            SecureInputMonitor.shared.release(surfaceID)
         }
         observeNotifications()
         _ = daemonSyncService; _ = notificationCoordinator
@@ -398,7 +399,12 @@ final class SessionCoordinator: NSObject {
         // Wire the terminal chat controller (⌘I → Warp-style inline AI blocks).
         let chatController = AITerminalChatController(hostView: host, settings: settings)
         aiChatControllers[surfaceID.uuidString] = chatController
+<<<<<<< HEAD
         host.surfaceView.onAskAI = { [weak chatController] text in chatController?.askAI(prefill: text) }
+=======
+        // Auto-enable macOS Secure Input on password prompt patterns (Phase 6).
+        SecureInputMonitor.shared.observeSurface(host)
+>>>>>>> 88049e6 (feat: auto secure input on password prompts (Phase 6))
         return host
     }
 

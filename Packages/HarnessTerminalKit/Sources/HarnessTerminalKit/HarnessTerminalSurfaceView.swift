@@ -339,6 +339,9 @@ public final class HarnessTerminalSurfaceView: NSView {
     public var onOpenFile: ((String) -> Void)?
     /// Fired when terminal output matches a user-configured trigger pattern.
     public var onOutputTrigger: ((_ trigger: String, _ title: String?) -> Void)?
+    /// Raw PTY output bytes — fired before emulator parsing so listeners can scan for
+    /// byte-level patterns (e.g. password prompts for Secure Input toggling).
+    public var onRawOutput: ((Data) -> Void)?
     /// This surface became effectively focused (first responder × key window). The host
     /// bridges it to the focus delegate so focusing a pane by click or app re-activation —
     /// not only a programmatic tab switch — clears its pending notification.
@@ -656,6 +659,7 @@ public final class HarnessTerminalSurfaceView: NSView {
 
     /// Feed PTY output bytes into the emulator and schedule a redraw.
     public func receive(_ data: Data) {
+        onRawOutput?(data)
         if offMainParserFramePipelineEnabled {
             receiveOffMain(data)
             return
