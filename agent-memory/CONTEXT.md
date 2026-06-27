@@ -3,7 +3,7 @@
 ## Now
 - **Task:** otty-features — large phases in progress
 - **Branch:** main
-- **Status:** Medium phases ✅ all done. Large: Phase 2 ✅, Phase 12 ✅ (5a7eb10). Phases 14, 15 → agy. Phase 16 not started.
+- **Status:** ALL otty-features phases done ✅ (1–12, 14–20). Phase 13 + 21 skipped. Phase 16 was pre-existing.
 
 ### This session (2026-06-27) — otty-features implementation
 
