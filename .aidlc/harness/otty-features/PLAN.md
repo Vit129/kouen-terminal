@@ -31,18 +31,18 @@
 #### Quick Wins (Small)
 | # | Feature | Ponytail Rung | Source |
 |---|---|---|---|
-| **3** | **Send selection → AI chat** | Wire `rightMouseUp` → `AITerminalChatController` | Otty, Warp |
-| **4** | **Scrollback Search** | `NSSearchField` overlay + `TerminalSearchEngine` | Ghostty 1.3, iTerm2, WezTerm |
-| **5** | **Click-to-move cursor** | `mouseDown` → compute cell offset → send cursor escape seq | Ghostty 1.3, WezTerm |
-| **6** | **Auto Secure Input** | Monitor PTY for password prompt pattern → toggle macOS Secure Input API | Otty |
-| **7** | **Context-aware keybindings** | Key handler checks selection state before dispatching (Ctrl+C = copy vs interrupt) | Ghostty "Performable" |
+| ~~**3**~~ | ~~Send selection → AI chat~~ ✅ | `rightMouseUp` → `AITerminalChatController.askAI(prefill:)` | Otty, Warp |
+| ~~**4**~~ | ~~Scrollback Search~~ ✅ | ⌘F → `TerminalFindBar`; ⌘⇧F → findInFiles | Ghostty 1.3, iTerm2, WezTerm |
+| ~~**5**~~ | ~~Click-to-move cursor~~ ✅ | `mouseUp` → cursor-move escape seq | Ghostty 1.3, WezTerm |
+| ~~**6**~~ | ~~Auto Secure Input~~ ✅ | `SecureInputMonitor` — PTY pattern → `EnableSecureEventInput()` | Otty |
+| ~~**7**~~ | ~~Context-aware keybindings~~ ✅ | Ctrl+C copies selection; falls through to interrupt if no selection | Ghostty "Performable" |
 
 #### Medium
 | # | Feature | Ponytail Rung | Source |
 |---|---|---|---|
-| **1** | **Hint mode** — keyboard URL picker overlay | Reuse `DisplayPanesOverlay` + `linkRange()` | Otty |
-| **8** | **Composer** — multi-line command editor | Slide-up panel, submit → send to PTY | Otty (⌘⇧E) |
-| **9** | **Prompt Queue** — sequential command runner | Queue DSL + fire-when-idle observer | Otty |
+| ~~**1**~~ | ~~Hint mode~~ ✅ | `HintModeOverlay` — ⌘⇧U; home-row labels; 3 s auto-dismiss | Otty |
+| ~~**8**~~ | ~~Composer~~ ✅ | `ComposerPanel` NSPanel — ⌘⇧E; ⌘↩ sends to PTY | Otty (⌘⇧E) |
+| ~~**9**~~ | ~~Prompt Queue~~ ✅ | `PromptQueue` + `PromptQueueBar` — ⌘⇧↩; dequeues on `onCommandFinished` | Otty |
 | **10** | **Quick Terminal** — hotkey dropdown window | `NSPanel` + global `NSEvent` monitor | Ghostty, iTerm2 Visor |
 | **11** | **Recipes** — saved commands/layouts/snippets | JSON store + picker UI | Otty, Warp Drive |
 
@@ -52,17 +52,17 @@
 | **2** | **Vi mode** — vi keybindings in terminal input | State machine in Input handler | Otty, WezTerm |
 | **12** | **Block-based output** — command+output as discrete blocks | Shell integration hook → block boundary markers | Warp |
 | **13** | **Kitty Graphics Protocol** — inline images | Decode sixel/PNG from PTY stream → render in Metal layer | Ghostty, WezTerm, Kitty |
-| **14** | **Floating panes** — overlay pane without disrupting layout | Z-layer pane outside split tree | Zellij |
+| **14** | **Floating panes** — overlay pane without disrupting layout | Z-layer pane outside split tree — use ⌘⌥F (⌘⇧F taken by findInFiles) | Zellij |
 | **15** | **Tab thumbnails overview** — visual all-tabs view | Thumbnail render → grid overlay | Ghostty |
 | **16** | **Embedded browser pane** — WebKit split pane with scriptable API | `WKWebView` hosted in split panel, `NSXPCConnection` or harness-mcp bridge | CMUX |
-| **17** | **Live tab metadata** — git branch + ports per pane in tab bar | `SurfaceShellTracker` CWD → git branch; `lsof`/`ss` poll → ports | CMUX |
+| ~~**17**~~ | ~~Live tab metadata~~ ✅ | git branch + CWD-triggered refresh; `kickBranchRefresh` reads `.git/HEAD` directly | CMUX |
 
 #### Medium (new)
 | # | Feature | Ponytail Rung | Source |
 |---|---|---|---|
 | **18** | **Layout file export/import** — save/load window layout as JSON | Reuse `LayoutDescriptor` serialization → file picker | Zellij (KDL) |
 | **19** | **Frecency directory jumping** — smart `cd` picker | `SurfaceShellTracker` CWD events → frecency score → fuzzy picker | iTerm2 |
-| **20** | **Session Resurrection across reboot** — verify + patch gaps | Audit `SessionLifecycleService` for daemon-restart + machine-reboot cases | Zellij |
+| ~~**20**~~ | ~~Session Resurrection across reboot~~ ✅ | Audit complete — window frame (`saveFrame`/`setFrameUsingName`) + scrollback (`ScrollbackFile`) already handled | Zellij |
 
 #### Defer
 | # | Feature | Ponytail Rung | Source |
