@@ -3,7 +3,22 @@
 ## Now
 - **Task:** idle
 - **Branch:** main
-- **Status:** SwiftUI Settings migration complete (S0–S9). All 10 AppKit SettingsViewController files deleted.
+- **Status:** AppKit low→medium migration wave done.
+
+### This session (2026-06-27) — AppKit → SwiftUI migration wave
+
+**Wave summary (5 tasks, all committed on main):**
+- `HarnessSidebarPanelViewController+DragReorder.swift` — deleted (dead stub)
+- `NotificationBellButton.swift` — deleted (zero call sites)
+- `Toast.swift` — rewritten with `NSHostingView<ToastBody>`; -19 lines
+- `AboutPanelController.swift` — rewritten with `NSHostingController<AboutView>`; -50 lines
+- `WorkspacePillButton` (128 lines) — replaced by `WorkspacePillModel (@Observable)` + `WorkspacePillView (SwiftUI)`; theme re-render via `chromeEpoch` pattern
+
+**Deferred:** `WorkspaceSwitcherPanelView` (dropdown) — positioning/dismiss stays in AppKit VC; bridge cost ≥ AppKit code; bundle with VC migration when workspace switcher is re-enabled.
+
+**Robot test fix (commit `ad792c9`):** Bug 1 was checking `ContentAreaViewController` for `existingBrowserPanes.removeValue` — refactored into `BrowserIntegrationController`; test updated.
+
+**deep-research skill** disabled in `~/.claude/settings.json` (`skillOverrides`).
 
 ### This session (2026-06-27) — SwiftUI Settings S6–S9 + Cmd+\ fixes
 **Cmd+\ black flash fix** (commits `d5833b0`, `28d0233`):
