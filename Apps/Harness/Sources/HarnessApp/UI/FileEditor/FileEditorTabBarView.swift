@@ -1,122 +1,108 @@
 import AppKit
+import SwiftUI
 import HarnessCore
 
-/// Simple tab strip for the file editor panel. Shows open file tabs with close buttons.
-@MainActor
-final class FileEditorTabBarView: NSView {
+@MainActor @Observable
+private final class FileEditorTabBarModel {
+    var tabs: [FileTabManager.FileTab] = []
+    var activeID: FileTabID?
     var onSelect: ((FileTabID) -> Void)?
     var onClose: ((FileTabID) -> Void)?
+}
 
-    private let scrollView = NSScrollView()
-    private let stack = NSStackView()
+@MainActor
+final class FileEditorTabBarView: NSView {
+    private let model = FileEditorTabBarModel()
 
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
-        wantsLayer = true
-        layer?.backgroundColor = NSColor.clear.cgColor
-        layer?.borderColor = HarnessDesign.chrome.border.cgColor
-        layer?.borderWidth = 0
-        // Bottom border only
-        let border = CALayer()
-        border.backgroundColor = HarnessDesign.chrome.border.cgColor
-        border.frame = CGRect(x: 0, y: 0, width: 10000, height: 1)
-        layer?.addSublayer(border)
+    var onSelect: ((FileTabID) -> Void)? { didSet { model.onSelect = onSelect } }
+    var onClose: ((FileTabID) -> Void)? { didSet { model.onClose = onClose } }
 
-        scrollView.translatesAutoresizingMaskIntoConstraints = false
-        scrollView.hasHorizontalScroller = false
-        scrollView.hasVerticalScroller = false
-        scrollView.drawsBackground = false
-        addSubview(scrollView)
-
-        stack.orientation = .horizontal
-        stack.spacing = 1
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        scrollView.documentView = stack
-
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        let host = NSHostingView(rootView: FileEditorTabBarBody(model: model))
+        host.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(host)
         NSLayoutConstraint.activate([
-            scrollView.topAnchor.constraint(equalTo: topAnchor),
-            scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
-            stack.topAnchor.constraint(equalTo: scrollView.contentView.topAnchor),
-            stack.leadingAnchor.constraint(equalTo: scrollView.contentView.leadingAnchor),
-            stack.heightAnchor.constraint(equalTo: scrollView.heightAnchor),
+            host.topAnchor.constraint(equalTo: topAnchor),
+            host.leadingAnchor.constraint(equalTo: leadingAnchor),
+            host.trailingAnchor.constraint(equalTo: trailingAnchor),
+            host.bottomAnchor.constraint(equalTo: bottomAnchor),
         ])
     }
 
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError() }
+    @available(*, unavailable) required init?(coder: NSCoder) { fatalError() }
 
     func reload(tabs: [FileTabManager.FileTab], activeID: FileTabID?) {
-        stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        for tab in tabs {
-            let pill = FileTabPill(id: tab.id, title: tab.title, isActive: tab.id == activeID)
-            pill.onSelect = { [weak self] id in self?.onSelect?(id) }
-            pill.onClose = { [weak self] id in self?.onClose?(id) }
-            stack.addArrangedSubview(pill)
+        model.tabs = tabs
+        model.activeID = activeID
+    }
+}
+
+private struct FileEditorTabBarBody: View {
+    var model: FileEditorTabBarModel
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 1) {
+                    ForEach(model.tabs, id: \.id) { tab in
+                        FileTabPillView(
+                            tab: tab,
+                            isActive: tab.id == model.activeID,
+                            onSelect: { model.onSelect?($0) },
+                            onClose: { model.onClose?($0) }
+                        )
+                    }
+                }
+            }
+            Rectangle()
+                .fill(Color(HarnessDesign.chrome.border))
+                .frame(height: 1)
         }
     }
 }
 
-@MainActor
-private final class FileTabPill: NSView {
-    let id: FileTabID
-    var onSelect: ((FileTabID) -> Void)?
-    var onClose: ((FileTabID) -> Void)?
-    private weak var closeButton: NSButton?
+private struct FileTabPillView: View {
+    let tab: FileTabManager.FileTab
+    let isActive: Bool
+    let onSelect: (FileTabID) -> Void
+    let onClose: (FileTabID) -> Void
+    @State private var isHovered = false
 
-    init(id: FileTabID, title: String, isActive: Bool) {
-        self.id = id
-        super.init(frame: .zero)
-        wantsLayer = true
+    var body: some View {
         let c = HarnessDesign.chrome
-        layer?.cornerRadius = 5
-        layer?.backgroundColor = isActive ? c.rowSelectedFill.cgColor : NSColor.white.withAlphaComponent(0.05).cgColor
-        if isActive { layer?.borderColor = c.accent.withAlphaComponent(0.5).cgColor; layer?.borderWidth = 1 }
-
-        let label = NSTextField(labelWithString: title)
-        label.font = .systemFont(ofSize: 12, weight: isActive ? .semibold : .medium)
-        label.textColor = isActive ? c.textPrimary : c.textSecondary
-        label.lineBreakMode = .byTruncatingMiddle
-        label.translatesAutoresizingMaskIntoConstraints = false
-
-        let close = NSButton(title: "", target: self, action: #selector(closeTapped))
-        close.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: "Close")?
-            .withSymbolConfiguration(.init(pointSize: 8, weight: .bold))
-        close.imagePosition = .imageOnly
-        close.isBordered = false
-        close.contentTintColor = c.textSecondary
-        close.translatesAutoresizingMaskIntoConstraints = false
-
-        addSubview(label)
-        addSubview(close)
-        self.closeButton = close
-        translatesAutoresizingMaskIntoConstraints = false
-
-        NSLayoutConstraint.activate([
-            label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
-            label.centerYAnchor.constraint(equalTo: centerYAnchor),
-            label.trailingAnchor.constraint(lessThanOrEqualTo: close.leadingAnchor, constant: -4),
-            close.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -4),
-            close.centerYAnchor.constraint(equalTo: centerYAnchor),
-            close.widthAnchor.constraint(equalToConstant: 14),
-            close.heightAnchor.constraint(equalToConstant: 14),
-            widthAnchor.constraint(greaterThanOrEqualToConstant: 80),
-            widthAnchor.constraint(lessThanOrEqualToConstant: 160),
-            heightAnchor.constraint(equalToConstant: 26),
-        ])
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError() }
-
-    override func mouseDown(with event: NSEvent) {
-        let loc = convert(event.locationInWindow, from: nil)
-        if let btn = closeButton, btn.frame.contains(loc) {
-            return // let the button handle it
+        HStack(spacing: 4) {
+            Text(tab.title)
+                .font(.system(size: 12, weight: isActive ? .semibold : .medium))
+                .foregroundStyle(isActive ? Color(c.textPrimary) : Color(c.textSecondary))
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Button { onClose(tab.id) } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(Color(c.textSecondary))
+                    .frame(width: 14, height: 14)
+            }
+            .buttonStyle(.plain)
         }
-        onSelect?(id)
+        .padding(.leading, 8)
+        .padding(.trailing, 4)
+        .frame(minWidth: 80, maxWidth: 160, minHeight: 26, maxHeight: 26)
+        .background(
+            RoundedRectangle(cornerRadius: 5)
+                .fill(
+                    isActive ? Color(c.rowSelectedFill)
+                    : isHovered ? Color(c.textPrimary).opacity(0.06)
+                    : Color.clear
+                )
+        )
+        .overlay {
+            if isActive {
+                RoundedRectangle(cornerRadius: 5)
+                    .strokeBorder(Color(c.accent).opacity(0.5), lineWidth: 1)
+            }
+        }
+        .onHover { isHovered = $0 }
+        .onTapGesture { onSelect(tab.id) }
     }
-
-    @objc private func closeTapped() { onClose?(id) }
 }

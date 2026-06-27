@@ -1,6 +1,7 @@
 # Memory — harness-terminal
 
 ## Active Decisions
+- [2026-06-27] **`.ai/` removed.** Protocol lived in CLAUDE.md already; `.ai/memory-protocol.md` was not auto-loaded by any agent and was copied not symlinked — overhead without benefit. Canonical lookup: grep `agent-memory/` for decisions/knowledge, `graphify query` for code nav, headroom for token compression, ponytail for lazy-dev mode. All projects cleaned.
 - [2026-06-27] **File tree roots at git root, not CWD.** `cd` into a subdirectory expands the tree instead of re-rooting it. Guard: `lastFileTreeCWD` — `revealFileInTree` fires only when CWD changes, not every snapshot. Cleared on session change. Decision: no back button — re-rooting collapses context and a back button needs state that force-`cd` would corrupt. CASE: sidebar-swiftui-migration.
 - [2026-06-27] **Panel-only UX for Open With Harness.** File opens in sidebar file tree (expand+scroll), terminal opens at git root. No file viewer, no back button, no terminal state change beyond creating/selecting a session at git root. Why: simpler, no back-stack edge cases, terminal input not interrupted.
 - [2026-06-27] **chromeEpoch pattern.** Static `HarnessDesign` vars can't be observed by SwiftUI. Add `var chromeEpoch: Int = 0` to each `@Observable` sidebar model. `applyChromeColors()` increments all epochs; SwiftUI bodies consume `let _ = model.chromeEpoch` to subscribe.

@@ -1,5 +1,9 @@
 import AppKit
+import SwiftUI
 import HarnessCore
+
+// SwiftUI 5.1+ also exports `Tab` (TabView content). Disambiguate.
+typealias Tab = HarnessIPC.Tab
 
 @MainActor
 protocol TerminalTabBarDelegate: AnyObject {
@@ -31,880 +35,621 @@ enum TabContextCommand {
     case togglePersistent
 }
 
-/// Frame-laid tab strip. Pills compress toward a minimum width and, once they no
-/// longer fit, spill into a trailing overflow menu (the visible window always keeps
-/// the active tab). Supports drag-to-reorder and a right-click context menu.
+@MainActor
+@Observable
+private final class TerminalTabBarModel {
+    var tabs: [Tab] = []
+    var activeTabID: TabID?
+    var leadingInset: CGFloat = 0
+    var trailingInset: CGFloat = 0
+    var chromeEpoch: Int = 0
+    var draggingTabID: TabID?
+    var dragOffsetX: CGFloat = 0
+    var dragOriginalIndex: Int?
+    var dragTargetIndex: Int?
+
+    @ObservationIgnored weak var delegate: TerminalTabBarDelegate?
+}
+
 @MainActor
 final class TerminalTabBarView: NSView {
-    weak var delegate: TerminalTabBarDelegate?
+    private let model: TerminalTabBarModel
+    private let hostingView: NSHostingView<TerminalTabBarBody>
 
-    private let newTabButton = SoftIconButton(frame: NSRect(x: 0, y: 0, width: 24, height: 24))
-    private let overflowButton = SoftIconButton(frame: NSRect(x: 0, y: 0, width: 24, height: 24))
-    private var tabs: [Tab] = []
-    private var activeTabID: TabID?
-    private var pillsByID: [TabID: TabPillView] = [:]
-    private var orderedPills: [TabPillView] = []
-
-    // Layout metrics.
-    private let edgeInset: CGFloat = 10
-    private let pillSpacing = HarnessDesign.Spacing.xs
-    private let buttonSize: CGFloat = 24
-    private let minPillWidth: CGFloat = 72
-    private let maxPillWidth: CGFloat = 200
-
-    /// Extra leading inset so the tab strip clears the macOS traffic lights when the
-    /// sidebar is collapsed (content shifts to x=0 under `.fullSizeContentView`). 0
-    /// when the sidebar is visible. Driven (and animated) by the split controller.
-    var leadingInset: CGFloat = 0 {
-        didSet { guard leadingInset != oldValue else { return }; needsLayout = true }
+    weak var delegate: TerminalTabBarDelegate? {
+        get { model.delegate }
+        set { model.delegate = newValue }
     }
 
-    var trailingInset: CGFloat = 0 {
-        didSet { guard trailingInset != oldValue else { return }; needsLayout = true }
+    var leadingInset: CGFloat {
+        get { model.leadingInset }
+        set { model.leadingInset = newValue }
     }
 
-    /// Leading x for all tab pills / buttons (rides the traffic-light inset). The
-    /// sidebar toggle now lives in the sidebar header, so nothing precedes the pills.
-    private var contentLeft: CGFloat { edgeInset + leadingInset }
-
-    // Drag-reorder state.
-    private weak var draggingPill: TabPillView?
-    private var dragGrabOffsetX: CGFloat = 0
-    private var dragTargetIndex: Int?
-    private var visibleStart = 0
-    private var visibleCount = 0
-    private var currentPillWidth: CGFloat = 0
-    private let bottomBorder = CALayer()
+    var trailingInset: CGFloat {
+        get { model.trailingInset }
+        set { model.trailingInset = newValue }
+    }
 
     override init(frame frameRect: NSRect) {
+        let model = TerminalTabBarModel()
+        self.model = model
+        self.hostingView = NSHostingView(rootView: TerminalTabBarBody(model: model))
         super.init(frame: frameRect)
         setup()
     }
 
     @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError() }
-
-    private func setup() {
-        wantsLayer = true
-        layer?.backgroundColor = HarnessDesign.chrome.terminalBackground.cgColor
-        bottomBorder.backgroundColor = HarnessDesign.chrome.border.cgColor
-        bottomBorder.frame = CGRect(x: 0, y: 0, width: 10000, height: 1)
-        layer?.addSublayer(bottomBorder)
-
-        newTabButton.setSymbol("plus", accessibilityDescription: "New tab", pointSize: 11, weight: .medium)
-        newTabButton.toolTip = "New tab (⌘T)"
-        newTabButton.target = self
-        newTabButton.action = #selector(addNewTab)
-        newTabButton.translatesAutoresizingMaskIntoConstraints = true
-        addSubview(newTabButton)
-
-        overflowButton.setSymbol("chevron.down", accessibilityDescription: "More tabs", pointSize: 11, weight: .medium)
-        overflowButton.toolTip = "More tabs"
-        overflowButton.target = self
-        overflowButton.action = #selector(showOverflowMenu)
-        overflowButton.translatesAutoresizingMaskIntoConstraints = true
-        overflowButton.isHidden = true
-        addSubview(overflowButton)
-
-        let height = heightAnchor.constraint(equalToConstant: HarnessDesign.tabBarHeight)
-        height.priority = .defaultHigh
-        height.isActive = true
+    required init?(coder: NSCoder) {
+        fatalError()
     }
 
     override var mouseDownCanMoveWindow: Bool { true }
 
     func reload(tabs: [Tab], activeTabID: TabID?) {
-        // A structural reload (tab added/removed) cancels any in-flight drag so an
-        // external tab-order change doesn't commit the drag to a now-stale target index.
-        if let dragging = draggingPill {
-            dragging.layer?.zPosition = 0
-            draggingPill = nil
-            dragTargetIndex = nil
-        }
-        self.tabs = tabs
-        self.activeTabID = activeTabID
-        let oldPills = orderedPills
-        for pill in oldPills { pill.removeFromSuperview() }
-        orderedPills.removeAll(keepingCapacity: true)
-        pillsByID.removeAll(keepingCapacity: true)
-        draggingPill = nil
-        dragTargetIndex = nil
-        // RL-041: keep pills alive 0.5s (keyUp arrives in a later event-loop iteration).
-        for pill in oldPills { ZombieHoldRegistry.shared.hold(pill, duration: 0.5) }
-
-        for (index, tab) in tabs.enumerated() {
-            let id = tab.id
-            // ⌘1–9 switch to the first nine tabs; past that, no hint.
-            let showBranch = shouldShowBranch(for: tab)
-            let pill = TabPillView(tab: tab, isActive: tab.id == activeTabID, position: index < 9 ? index + 1 : nil, showBranch: showBranch)
-            pill.translatesAutoresizingMaskIntoConstraints = true
-            pill.toolTip = HarnessDesign.shortenPath(tab.cwd)
-            pill.onSelect = { [weak self] id in self?.delegate?.tabBarDidSelect(tabID: id) }
-            pill.onClose = { [weak self] id in self?.delegate?.tabBarDidRequestClose(tabID: id) }
-            pill.onDragChanged = { [weak self] p, loc in self?.handleDragChanged(p, windowLocation: loc) }
-            pill.onDragEnded = { [weak self] p in self?.handleDragEnded(p) }
-            pill.onContextCommand = { [weak self] cmd in self?.handleContext(cmd, tabID: id) }
-            addSubview(pill)
-            orderedPills.append(pill)
-            pillsByID[tab.id] = pill
-        }
-        needsLayout = true
-        applyChrome()
+        model.tabs = tabs
+        model.activeTabID = activeTabID
+        resetDrag()
     }
 
-    private func shouldShowBranch(for tab: Tab) -> Bool {
-        guard let branch = tab.gitBranch, !branch.isEmpty else { return false }
-        return true
-    }
-
-    /// Update titles/status of existing pills without rebuilding, for live PWD /
-    /// title / agent updates. Falls back to a full reload if the set of tabs changed.
     func refreshMetadata(tabs: [Tab], activeTabID: TabID?) {
-        let currentOrder = self.tabs.map(\.id)
-        let newOrder = tabs.map(\.id)
-        if currentOrder != newOrder {
+        let currentIDs = model.tabs.map(\.id)
+        let newIDs = tabs.map(\.id)
+        if currentIDs != newIDs {
             reload(tabs: tabs, activeTabID: activeTabID)
             return
         }
-        // Skip pill updates when tabs data is identical (common on idle metadata ticks).
-        guard !tabs.isStableEqual(to: self.tabs) || activeTabID != self.activeTabID else { return }
-        self.tabs = tabs
-        self.activeTabID = activeTabID
-        for tab in tabs {
-            let showBranch = shouldShowBranch(for: tab)
-            pillsByID[tab.id]?.update(tab: tab, isActive: tab.id == activeTabID, showBranch: showBranch)
-            pillsByID[tab.id]?.toolTip = HarnessDesign.shortenPath(tab.cwd)
+
+        guard !tabs.isStableEqual(to: model.tabs) || activeTabID != model.activeTabID else {
+            return
         }
-        needsLayout = true // active tab change can shift the visible window
+
+        model.tabs = tabs
+        model.activeTabID = activeTabID
     }
 
     func applyChrome() {
-        layer?.backgroundColor = HarnessDesign.chrome.terminalBackground.cgColor
-        bottomBorder.backgroundColor = HarnessDesign.chrome.border.cgColor
-        for pill in orderedPills {
-            pill.applyChrome(isActive: pill.tabID == activeTabID)
-        }
-        newTabButton.applyChrome()
-        overflowButton.applyChrome()
+        model.chromeEpoch += 1
     }
 
-    @objc private func addNewTab() {
-        delegate?.tabBarDidRequestNewTab()
-    }
-
-    /// Animate the traffic-light clearance inset (driven by the split controller as the
-    /// sidebar collapses/expands). 0 = sidebar visible, ~72 = collapsed.
     func setLeadingInset(_ inset: CGFloat) {
         leadingInset = inset
-        layoutSubtreeIfNeeded()
-     }
+    }
 
-    // MARK: - Mouse Events
+    private func setup() {
+        wantsLayer = true
+        hostingView.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(hostingView)
 
-    override func mouseUp(with event: NSEvent) {
-        if event.clickCount >= 2,
-           let controller = window?.windowController as? MainWindowController
-        {
-            let local = convert(event.locationInWindow, from: nil)
-            for pill in orderedPills {
-                if pill.frame.contains(local) {
-                    super.mouseUp(with: event)
-                    return
+        let height = heightAnchor.constraint(equalToConstant: HarnessDesign.tabBarHeight)
+        height.priority = .defaultHigh
+
+        NSLayoutConstraint.activate([
+            hostingView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            hostingView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            hostingView.topAnchor.constraint(equalTo: topAnchor),
+            hostingView.bottomAnchor.constraint(equalTo: bottomAnchor),
+            height,
+        ])
+    }
+
+    private func resetDrag() {
+        model.draggingTabID = nil
+        model.dragOffsetX = 0
+        model.dragOriginalIndex = nil
+        model.dragTargetIndex = nil
+    }
+}
+
+@MainActor
+private struct TerminalTabBarBody: View {
+    var model: TerminalTabBarModel
+
+    private let edgeInset: CGFloat = 10
+    private let buttonSize: CGFloat = 24
+    private let minPillWidth: CGFloat = 72
+    private let maxPillWidth: CGFloat = 200
+    private let pillSpacing = HarnessDesign.Spacing.xs
+
+    var body: some View {
+        GeometryReader { proxy in
+            let _ = model.chromeEpoch
+            let metrics = layoutMetrics(availableWidth: proxy.size.width)
+            let visibleRange = metrics.visibleStart..<min(model.tabs.count, metrics.visibleStart + metrics.visibleCount)
+            let overflowTabs = overflowTabs(visibleRange: visibleRange)
+
+            HStack(spacing: pillSpacing) {
+                Color.clear
+                    .frame(width: max(0, model.leadingInset + edgeInset - pillSpacing))
+
+                ForEach(Array(visibleRange), id: \.self) { index in
+                    let tab = model.tabs[index]
+                    TabPillView(
+                        model: model,
+                        tab: tab,
+                        isActive: tab.id == model.activeTabID,
+                        position: shortcutPosition(for: index),
+                        index: index,
+                        visibleStart: metrics.visibleStart,
+                        visibleCount: metrics.visibleCount,
+                        pillWidth: metrics.pillWidth,
+                        pitch: metrics.pitch
+                    )
+                    .frame(width: metrics.pillWidth, height: HarnessDesign.tabPillHeight)
+                    .offset(x: pillOffset(for: index, metrics: metrics))
+                    .animation(.interactiveSpring(response: 0.18, dampingFraction: 0.82), value: model.dragTargetIndex)
+                    .zIndex(model.draggingTabID == tab.id ? 10 : 0)
+                }
+
+                Button {
+                    model.delegate?.tabBarDidRequestNewTab()
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 11, weight: .medium))
+                        .frame(width: buttonSize, height: buttonSize)
+                }
+                .buttonStyle(TabBarIconButtonStyle())
+                .help("New tab")
+
+                if !overflowTabs.isEmpty {
+                    Menu {
+                        ForEach(overflowTabs, id: \.id) { tab in
+                            Button {
+                                model.delegate?.tabBarDidSelect(tabID: tab.id)
+                            } label: {
+                                Label {
+                                    Text(tabDisplayTitle(tab))
+                                } icon: {
+                                    if tab.status == .waiting {
+                                        Image(systemName: "bell.fill")
+                                    } else if tab.persistent {
+                                        Image(systemName: "pin.fill")
+                                    } else {
+                                        Image(systemName: "terminal")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 11, weight: .medium))
+                            .frame(width: buttonSize, height: buttonSize)
+                    }
+                    .menuStyle(.borderlessButton)
+                    .buttonStyle(TabBarIconButtonStyle())
+                    .help("More tabs")
+                }
+
+                Spacer(minLength: max(0, edgeInset + model.trailingInset))
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height, alignment: .leading)
+            .background(Color(HarnessDesign.chrome.terminalBackground))
+            .overlay(alignment: .bottom) {
+                Rectangle()
+                    .fill(Color(HarnessDesign.chrome.border))
+                    .frame(height: 1)
+            }
+        }
+        .frame(height: HarnessDesign.tabBarHeight)
+    }
+
+    private func layoutMetrics(availableWidth: CGFloat) -> TabBarLayoutMetrics {
+        let count = model.tabs.count
+        guard count > 0 else {
+            return TabBarLayoutMetrics(pillWidth: minPillWidth, visibleStart: 0, visibleCount: 0)
+        }
+
+        let contentLeft = edgeInset + model.leadingInset
+        let contentRight = edgeInset + model.trailingInset
+        let allTabsWidth = availableWidth - contentLeft - contentRight - buttonSize - pillSpacing
+        let allPillWidth = (allTabsWidth - pillSpacing * CGFloat(max(0, count - 1))) / CGFloat(count)
+
+        if allPillWidth >= minPillWidth {
+            return TabBarLayoutMetrics(
+                pillWidth: min(maxPillWidth, allPillWidth),
+                visibleStart: 0,
+                visibleCount: count
+            )
+        }
+
+        let overflowWidth = availableWidth - contentLeft - contentRight - buttonSize * 2 - pillSpacing * 2
+        let visibleCount = min(count, max(1, Int((overflowWidth + pillSpacing) / (minPillWidth + pillSpacing))))
+        let pillWidth = min(
+            maxPillWidth,
+            max(minPillWidth, (overflowWidth - pillSpacing * CGFloat(max(0, visibleCount - 1))) / CGFloat(visibleCount))
+        )
+        let activeIndex = model.activeTabID.flatMap { id in model.tabs.firstIndex(where: { $0.id == id }) } ?? 0
+        let visibleStart = visibleWindowStart(activeIndex: activeIndex, visibleCount: visibleCount, tabCount: count)
+
+        return TabBarLayoutMetrics(
+            pillWidth: pillWidth,
+            visibleStart: visibleStart,
+            visibleCount: visibleCount
+        )
+    }
+
+    private func visibleWindowStart(activeIndex: Int, visibleCount: Int, tabCount: Int) -> Int {
+        guard tabCount > visibleCount else { return 0 }
+        let halfWindow = visibleCount / 2
+        let preferred = activeIndex - halfWindow
+        return min(max(0, preferred), tabCount - visibleCount)
+    }
+
+    private func overflowTabs(visibleRange: Range<Int>) -> [Tab] {
+        model.tabs.enumerated().compactMap { index, tab in
+            visibleRange.contains(index) ? nil : tab
+        }
+    }
+
+    private func shortcutPosition(for index: Int) -> Int? {
+        let position = index + 1
+        return position >= 1 && position <= 9 ? position : nil
+    }
+
+    private func pillOffset(for index: Int, metrics: TabBarLayoutMetrics) -> CGFloat {
+        guard let draggingID = model.draggingTabID,
+              let original = model.dragOriginalIndex,
+              let target = model.dragTargetIndex
+        else { return 0 }
+
+        if model.tabs[index].id == draggingID {
+            return model.dragOffsetX
+        }
+
+        guard index >= metrics.visibleStart, index < metrics.visibleStart + metrics.visibleCount else {
+            return 0
+        }
+
+        if target > original, index > original, index <= target {
+            return -metrics.pitch
+        }
+        if target < original, index >= target, index < original {
+            return metrics.pitch
+        }
+        return 0
+    }
+}
+
+@MainActor
+private struct TabPillView: View {
+    var model: TerminalTabBarModel
+    let tab: Tab
+    let isActive: Bool
+    let position: Int?
+    let index: Int
+    let visibleStart: Int
+    let visibleCount: Int
+    let pillWidth: CGFloat
+    let pitch: CGFloat
+
+    @State private var isHovered = false
+    @State private var animateWorkingDot = false
+    @State private var showsMCPBadge = false
+
+    var body: some View {
+        let _ = model.chromeEpoch
+        let c = HarnessDesign.chrome
+        let foreground = isActive || isHovered ? c.textPrimary : c.textSecondary
+        let branch = tab.gitBranch?.isEmpty == false ? tab.gitBranch : nil
+
+        HStack(spacing: HarnessDesign.Spacing.xs) {
+            workingDot
+
+            if let kind = tab.effectiveAgentKind {
+                Image(nsImage: AgentIconRenderer.templateOrMonogramImage(for: kind, size: 12))
+                    .resizable()
+                    .renderingMode(.template)
+                    .foregroundStyle(agentColor(for: kind))
+                    .frame(width: 12, height: 12)
+                    .help(kind.displayName)
+            }
+
+            VStack(alignment: .leading, spacing: -1) {
+                Text(tabDisplayTitle(tab))
+                    .font(.system(size: 12, weight: branch == nil ? .medium : .semibold))
+                    .foregroundStyle(Color(foreground))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+
+                if let branch {
+                    Text("⎇ \(branch)")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(Color(c.textTertiary))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
                 }
             }
-            if newTabButton.frame.contains(local) || overflowButton.frame.contains(local) {
-                super.mouseUp(with: event)
-                return
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .layoutPriority(1)
+
+            if showsMCPBadge {
+                Text("MCP")
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundStyle(Color(c.accent))
+                    .padding(.horizontal, 3)
+                    .padding(.vertical, 1)
+                    .background(
+                        RoundedRectangle(cornerRadius: HarnessDesign.Radius.badge, style: .continuous)
+                            .fill(Color(c.accent).opacity(c.isDark ? 0.16 : 0.12))
+                    )
             }
-            controller.toggleVisibleFrameZoom(self)
+
+            Circle()
+                .fill(Color(statusColor(for: tab.status)))
+                .frame(width: 6, height: 6)
+                .help(statusHelp(for: tab.status))
+
+            if tab.persistent {
+                Image(systemName: "pin.fill")
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundStyle(Color(c.accent))
+                    .help("Kept running after quit")
+            }
+
+            if isHovered {
+                Button {
+                    model.delegate?.tabBarDidRequestClose(tabID: tab.id)
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 8, weight: .bold))
+                        .frame(width: 16, height: 16)
+                }
+                .buttonStyle(TabBarInlineIconButtonStyle())
+                .help("Close tab")
+            } else if let position {
+                Text("⌘\(position)")
+                    .font(.system(size: 10.5, weight: .regular, design: .monospaced))
+                    .foregroundStyle(Color(isActive ? c.textSecondary : c.textTertiary))
+                    .frame(width: 22, alignment: .trailing)
+            }
+        }
+        .padding(.horizontal, HarnessDesign.Spacing.sm)
+        .frame(height: HarnessDesign.tabPillHeight)
+        .background(pillBackground)
+        .overlay(pillBorder)
+        .shadow(
+            color: isActive ? Color.black.opacity(c.isDark ? 0.20 : 0.10) : .clear,
+            radius: isActive ? 3 : 0,
+            x: 0,
+            y: isActive ? 1 : 0
+        )
+        .contentShape(RoundedRectangle(cornerRadius: HarnessDesign.Radius.card, style: .continuous))
+        .onHover { hovered in
+            isHovered = hovered
+        }
+        .onTapGesture(count: 2) {
+            model.delegate?.tabBarDidRequestRename(tabID: tab.id)
+        }
+        .onTapGesture(count: 1) {
+            model.delegate?.tabBarDidSelect(tabID: tab.id)
+        }
+        .contextMenu {
+            Button("Close Tab") {
+                model.delegate?.tabBarDidRequestClose(tabID: tab.id)
+            }
+            Button("Close Other Tabs") {
+                model.delegate?.tabBarDidRequestCloseOthers(tabID: tab.id)
+            }
+            Divider()
+            Button("Rename…") {
+                model.delegate?.tabBarDidRequestRename(tabID: tab.id)
+            }
+            Divider()
+            Button {
+                model.delegate?.tabBarDidRequestTogglePersistent(tabID: tab.id)
+            } label: {
+                Label("Keep Tab Running After Quit", systemImage: tab.persistent ? "checkmark" : "")
+            }
+            Divider()
+            Button("Split Right") {
+                model.delegate?.tabBarDidRequestSplit(tabID: tab.id, direction: .vertical)
+            }
+            Button("Split Down") {
+                model.delegate?.tabBarDidRequestSplit(tabID: tab.id, direction: .horizontal)
+            }
+        }
+        .gesture(dragGesture)
+        .task(id: tab.lastMCPControlAt) {
+            await updateMCPBadge(lastAt: tab.lastMCPControlAt)
+        }
+        .onAppear {
+            updateWorkingDotAnimation()
+        }
+        .onChange(of: tab.agent != nil && tab.status == .running) {
+            updateWorkingDotAnimation()
+        }
+    }
+
+    private var workingDot: some View {
+        let isWorking = tab.agent != nil && tab.status == .running
+        return Rectangle()
+            .fill(Color(HarnessDesign.chrome.textSecondary))
+            .frame(width: 2, height: 2)
+            .opacity(isWorking ? 1 : 0)
+            .offset(x: isWorking && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? (animateWorkingDot ? 2.5 : -2.5) : 0)
+            .animation(
+                isWorking && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+                    ? .easeInOut(duration: 1.2).repeatForever(autoreverses: true)
+                    : .default,
+                value: animateWorkingDot
+            )
+    }
+
+    private var pillBackground: some View {
+        let c = HarnessDesign.chrome
+        return RoundedRectangle(cornerRadius: HarnessDesign.Radius.card, style: .continuous)
+            .fill(backgroundColor(chrome: c))
+    }
+
+    private var pillBorder: some View {
+        RoundedRectangle(cornerRadius: HarnessDesign.Radius.card, style: .continuous)
+            .stroke(isActive ? Color(HarnessDesign.chrome.focusRing).opacity(0.48) : .clear, lineWidth: 1)
+    }
+
+    private var dragGesture: some Gesture {
+        DragGesture(minimumDistance: 4)
+            .onChanged { value in
+                if model.draggingTabID == nil {
+                    model.draggingTabID = tab.id
+                    model.dragOriginalIndex = index
+                    model.dragTargetIndex = index
+                }
+
+                guard model.draggingTabID == tab.id else { return }
+
+                model.dragOffsetX = value.translation.width
+                let leadingX = CGFloat(index - visibleStart) * pitch
+                let dragX = leadingX + value.translation.width
+                let localTarget = clamp(
+                    Int((dragX / max(1, pitch)).rounded()),
+                    lower: 0,
+                    upper: max(0, visibleCount - 1)
+                )
+                model.dragTargetIndex = visibleStart + localTarget
+            }
+            .onEnded { _ in
+                defer {
+                    model.draggingTabID = nil
+                    model.dragOffsetX = 0
+                    model.dragOriginalIndex = nil
+                    model.dragTargetIndex = nil
+                }
+
+                guard model.draggingTabID == tab.id,
+                      let original = model.dragOriginalIndex,
+                      let target = model.dragTargetIndex,
+                      original != target
+                else { return }
+
+                model.delegate?.tabBarDidReorder(tabID: tab.id, toIndex: target)
+            }
+    }
+
+    private func backgroundColor(chrome c: HarnessChromePalette) -> Color {
+        if isActive {
+            return Color(c.accent).opacity(c.isDark ? 0.13 : 0.10)
+        }
+        if isHovered {
+            return Color(c.rowHoverFill)
+        }
+        return .clear
+    }
+
+    private func updateWorkingDotAnimation() {
+        let isWorking = tab.agent != nil && tab.status == .running
+        guard isWorking, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+            animateWorkingDot = false
             return
         }
-        super.mouseUp(with: event)
+        animateWorkingDot = true
     }
 
-    // MARK: - Layout
-
-    /// RL-040: Prevent deallocation while AppKit's display server still holds an unsafe
-    /// reference and can dispatch layout() to this view. The @objc thunk dereferences `self`
-    /// metadata before any Swift guard can run.
-    override func viewWillMove(toWindow newWindow: NSWindow?) {
-        if newWindow == nil {
-            NSObject.cancelPreviousPerformRequests(withTarget: self)
-            needsLayout = false
-            needsDisplay = false
-            // Hold self alive for 1.5s so AppKit's async layout drain completes (RL-040).
-            ZombieHoldRegistry.shared.hold(self)
-        }
-        super.viewWillMove(toWindow: newWindow)
-    }
-
-    nonisolated override func layout() {
-        MainActor.assumeIsolated {
-            guard window != nil else { return }
-            super.layout()
-            guard draggingPill == nil else { return }
-            layoutPills()
-        }
-    }
-
-    private func layoutPills() {
-        let count = orderedPills.count
-        let buttonY = (bounds.height - buttonSize) / 2
-        guard count > 0 else {
-            newTabButton.frame = NSRect(x: contentLeft, y: buttonY, width: buttonSize, height: buttonSize)
-            overflowButton.isHidden = true
+    private func updateMCPBadge(lastAt: Date?) async {
+        guard let lastAt else {
+            showsMCPBadge = false
             return
         }
 
-        // Try to fit every pill inline alongside the "+" button.
-        let inlineAvail = bounds.width - contentLeft - edgeInset - trailingInset - buttonSize - pillSpacing
-        var pillWidth = min(maxPillWidth, (inlineAvail - pillSpacing * CGFloat(count - 1)) / CGFloat(count))
-
-        var needsOverflow = false
-        var vCount = count
-        if pillWidth < minPillWidth {
-            // Can't fit all even at minimum width — reserve the overflow button too.
-            needsOverflow = true
-            let avail = bounds.width - contentLeft - edgeInset - trailingInset - buttonSize * 2 - pillSpacing * 2
-            vCount = min(count, max(1, Int((avail + pillSpacing) / (minPillWidth + pillSpacing))))
-            pillWidth = max(minPillWidth, (avail - pillSpacing * CGFloat(vCount - 1)) / CGFloat(vCount))
+        let elapsed = Date().timeIntervalSince(lastAt)
+        guard elapsed < 5 else {
+            showsMCPBadge = false
+            return
         }
 
-        // Slide the visible window so it always contains the active tab.
-        var start = 0
-        if needsOverflow,
-           let activeID = activeTabID,
-           let activeIdx = orderedPills.firstIndex(where: { $0.tabID == activeID }),
-           activeIdx >= vCount {
-            start = activeIdx - vCount + 1
+        showsMCPBadge = true
+        let remaining = max(0, 5 - elapsed)
+        do {
+            try await Task.sleep(nanoseconds: UInt64(remaining * 1_000_000_000))
+        } catch {
+            return
         }
-        visibleStart = start
-        visibleCount = vCount
-        currentPillWidth = pillWidth
-
-        let y = (bounds.height - HarnessDesign.tabPillHeight) / 2
-        var x = contentLeft
-        for (i, pill) in orderedPills.enumerated() {
-            let visible = i >= start && i < start + vCount
-            pill.isHidden = !visible
-            guard visible else { continue }
-            pill.frame = NSRect(x: x, y: y, width: pillWidth, height: HarnessDesign.tabPillHeight)
-            x += pillWidth + pillSpacing
-        }
-        newTabButton.frame = NSRect(x: x, y: buttonY, width: buttonSize, height: buttonSize)
-
-        overflowButton.isHidden = !needsOverflow
-        if needsOverflow {
-            overflowButton.frame = NSRect(x: bounds.width - edgeInset - trailingInset - buttonSize, y: buttonY, width: buttonSize, height: buttonSize)
-        }
+        showsMCPBadge = false
     }
 
-    private func slotX(_ slot: Int) -> CGFloat {
-        contentLeft + CGFloat(slot) * (currentPillWidth + pillSpacing)
+    private func agentColor(for kind: AgentKind) -> Color {
+        Color(nsColor: NSColor.fromHex(SessionCoordinator.shared.settings.agentColorHex(for: kind)) ?? HarnessDesign.chrome.textSecondary)
     }
+}
 
-    // MARK: - Drag reorder
+@MainActor
+private struct TabBarLayoutMetrics {
+    let pillWidth: CGFloat
+    let visibleStart: Int
+    let visibleCount: Int
 
-    private func handleDragChanged(_ pill: TabPillView, windowLocation: NSPoint) {
-        let loc = convert(windowLocation, from: nil)
-        if draggingPill !== pill {
-            draggingPill = pill
-            dragGrabOffsetX = loc.x - pill.frame.minX
-            pill.layer?.zPosition = 100
-        }
-        var f = pill.frame
-        f.origin.x = max(contentLeft, min(loc.x - dragGrabOffsetX, bounds.width - edgeInset - trailingInset - f.width))
-        pill.frame = f
-        repositionForDrag(pill)
+    var pitch: CGFloat {
+        pillWidth + HarnessDesign.Spacing.xs
     }
+}
 
-    private func repositionForDrag(_ dragged: TabPillView) {
-        // Reorder is scoped to the visible window; overflow pills stay put (v1).
-        let visible = orderedPills.enumerated()
-            .filter { $0.offset >= visibleStart && $0.offset < visibleStart + visibleCount }
-            .map(\.element)
-        let others = visible.filter { $0 !== dragged }
-        // Target slot from the dragged pill's own position (stable — independent of
-        // the others, which are mid-animation).
-        let pitch = currentPillWidth + pillSpacing
-        let raw = pitch > 0 ? (dragged.frame.minX - contentLeft) / pitch : 0
-        let target = max(0, min(Int(raw.rounded()), visible.count - 1))
-        dragTargetIndex = visibleStart + target
-
-        let y = (bounds.height - HarnessDesign.tabPillHeight) / 2
-        var oi = 0
-        HarnessMotion.animate(HarnessDesign.Motion.fast) { _ in
-            for slot in 0..<visible.count where slot != target {
-                guard oi < others.count else { break }
-                let pill = others[oi]; oi += 1
-                pill.animator().frame = NSRect(x: self.slotX(slot), y: y, width: self.currentPillWidth, height: HarnessDesign.tabPillHeight)
-            }
-        }
+@MainActor
+private struct TabBarIconButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(Color(HarnessDesign.chrome.textSecondary))
+            .background(
+                Circle()
+                    .fill(configuration.isPressed ? Color(HarnessDesign.chrome.iconHoverFill).opacity(0.85) : Color.clear)
+            )
+            .contentShape(Circle())
     }
+}
 
-    private func handleDragEnded(_ pill: TabPillView) {
-        pill.layer?.zPosition = 0
-        let target = dragTargetIndex
-        let from = orderedPills.firstIndex { $0 === pill }
-        draggingPill = nil
-        dragTargetIndex = nil
-
-        if let target, let from, target != from {
-            // Commit; the resulting snapshot reload rebuilds pills in the new order.
-            delegate?.tabBarDidReorder(tabID: pill.tabID, toIndex: target)
-        } else {
-            // No move — snap back into place.
-            needsLayout = true
-        }
-    }
-
-    // MARK: - Context + overflow menus
-
-    private func handleContext(_ cmd: TabContextCommand, tabID: TabID) {
-        switch cmd {
-        case .close: delegate?.tabBarDidRequestClose(tabID: tabID)
-        case .closeOthers: delegate?.tabBarDidRequestCloseOthers(tabID: tabID)
-        case .rename: delegate?.tabBarDidRequestRename(tabID: tabID)
-        case .splitHorizontal: delegate?.tabBarDidRequestSplit(tabID: tabID, direction: .horizontal)
-        case .splitVertical: delegate?.tabBarDidRequestSplit(tabID: tabID, direction: .vertical)
-        case .togglePersistent: delegate?.tabBarDidRequestTogglePersistent(tabID: tabID)
-        }
-    }
-
-    @objc private func showOverflowMenu() {
-        let menu = NSMenu()
-        for (i, tab) in tabs.enumerated() where !(i >= visibleStart && i < visibleStart + visibleCount) {
-            let item = NSMenuItem(title: tabDisplayTitle(tab), action: #selector(overflowItemSelected(_:)), keyEquivalent: "")
-            item.target = self
-            item.representedObject = tab.id.uuidString
-            // A waiting tab gets the bell glyph (same vocabulary as the tab pill) — a
-            // checkmark would read as "this item is selected", not "needs attention".
-            // Otherwise a kept-alive tab shows the persistence pin so the flag is visible
-            // even when the tab has spilled into the overflow menu.
-            if tab.status == .waiting {
-                item.image = NSImage(systemSymbolName: "bell.fill", accessibilityDescription: "Waiting")
-            } else if tab.persistent {
-                item.image = NSImage(systemSymbolName: "pin.fill", accessibilityDescription: "Kept running after quit")
-            }
-            menu.addItem(item)
-        }
-        menu.popUp(positioning: nil, at: NSPoint(x: overflowButton.frame.minX, y: overflowButton.frame.minY), in: self)
-    }
-
-    @objc private func overflowItemSelected(_ sender: NSMenuItem) {
-        guard let raw = sender.representedObject as? String, let id = UUID(uuidString: raw) else { return }
-        delegate?.tabBarDidSelect(tabID: id)
+@MainActor
+private struct TabBarInlineIconButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(Color(HarnessDesign.chrome.textSecondary))
+            .background(
+                RoundedRectangle(cornerRadius: HarnessDesign.Radius.badge, style: .continuous)
+                    .fill(configuration.isPressed ? Color(HarnessDesign.chrome.iconHoverFill) : Color.clear)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: HarnessDesign.Radius.badge, style: .continuous))
     }
 }
 
 @MainActor
 private func tabDisplayTitle(_ tab: Tab) -> String {
-    let folder = HarnessDesign.pathDisplayName(tab.cwd)
-    if let kind = tabAgentKind(for: tab) {
-        return folder.isEmpty ? kind.displayName : folder
+    let title = tab.title.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !title.isEmpty {
+        return title
     }
-    let titleIsAgentBranding = !tab.title.isEmpty && AgentTitleInference.kind(from: tab.title) != nil
-    let hasCustomTitle = !tab.title.isEmpty && tab.title != "Shell" && !titleIsAgentBranding
-    return !folder.isEmpty ? folder : (hasCustomTitle ? tab.title : "Terminal")
-}
 
-/// Effective agent kind for the tab — daemon-detected first, then a permissive
-/// inference from the shell title. Lets us paint brand colors on the dot even
-/// when proc-tree detection misses the agent (e.g. Claude Code via Node).
-@MainActor
-private func tabAgentKind(for tab: Tab) -> AgentKind? {
-    tab.effectiveAgentKind
+    let leaf = (tab.cwd as NSString).lastPathComponent
+    return leaf.isEmpty ? tab.cwd : leaf
 }
 
 @MainActor
-private final class TabPillView: NSView {
-    let tabID: TabID
-    var onSelect: ((TabID) -> Void)?
-    var onClose: ((TabID) -> Void)?
-    var onDragChanged: ((TabPillView, NSPoint) -> Void)?
-    var onDragEnded: ((TabPillView) -> Void)?
-    var onContextCommand: ((TabContextCommand) -> Void)?
-
-    private let titleLabel = NSTextField(labelWithString: "")
-    private let branchLabel = NSTextField(labelWithString: "")
-    private let closeButton = NSButton()
-    private let agentIcon = NSImageView()
-    private let persistentIcon = NSImageView()
-    private let statusDot = NSView()
-    /// Transient "MCP" badge shown for 5s after a mutating MCP tool controls this tab's pane.
-    private let mcpBadge = NSTextField(labelWithString: "MCP")
-    /// Ghostty-style "AI is working" indicator: a tiny dot before the title that discretely
-    /// shuttles between two spots while the tab's agent is producing output. Hidden otherwise.
-    private let workingDot = NSView()
-    /// ⌘N hint, shown at the trailing edge for the first 9 tabs and
-    /// swapped for the close button on hover. Empty for tabs past position 9.
-    private let shortcutLabel = NSTextField(labelWithString: "")
-    private let hasShortcut: Bool
-    private var agentIconWidth: NSLayoutConstraint!
-    private var persistentIconWidth: NSLayoutConstraint!
-    private var trackingArea: NSTrackingArea?
-    private var isActive = false
-    private var isHovered = false
-    private var status: TabStatus = .idle
-    /// Whether this tab is pinned to survive a clean quit — drives the context-menu checkmark.
-    private var isPersistent = false
-
-    // Drag detection.
-    private var mouseDownLocation: NSPoint?
-    private var isDragging = false
-
-    // The tab strip lives in the window's titlebar drag region (`.fullSizeContentView`).
-    // Without this, AppKit interprets a drag that starts on a pill as a window move and
-    // pre-empts our reorder. Returning false lets the pill's own `mouseDragged` →
-    // `onDragChanged` reorder run smoothly; the empty tab-bar background keeps the default
-    // (true), so dragging there still moves the window.
-    override var mouseDownCanMoveWindow: Bool { false }
-
-    init(tab: Tab, isActive: Bool, position: Int?, showBranch: Bool) {
-        tabID = tab.id
-        hasShortcut = position != nil
-        super.init(frame: .zero)
-        self.isActive = isActive
-        self.status = tab.status
-        self.isPersistent = tab.persistent
-
-        wantsLayer = true
-        // Card radius (not control) so the active pill reads identically to the
-        // selected session card in the sidebar.
-        layer?.cornerRadius = HarnessDesign.Radius.card
-        layer?.cornerCurve = .continuous
-        layer?.masksToBounds = false
-
-        titleLabel.lineBreakMode = .byTruncatingTail
-        titleLabel.alignment = .center
-        titleLabel.stringValue = tabDisplayTitle(tab)
-        titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        titleLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-
-        branchLabel.font = .systemFont(ofSize: 9, weight: .regular)
-        branchLabel.textColor = HarnessDesign.chrome.textSecondary
-        branchLabel.lineBreakMode = .byTruncatingTail
-        branchLabel.alignment = .center
-        branchLabel.translatesAutoresizingMaskIntoConstraints = false
-        branchLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        branchLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-
-        if showBranch, let branch = tab.gitBranch, !branch.isEmpty {
-            branchLabel.stringValue = "⎇ \(branch)"
-            branchLabel.isHidden = false
-            titleLabel.font = .systemFont(ofSize: 11.5, weight: .medium)
-        } else {
-            branchLabel.stringValue = ""
-            branchLabel.isHidden = true
-            titleLabel.font = HarnessDesign.Typography.tabTitle
-        }
-
-        let titleAndBranchStack = NSStackView(views: [titleLabel, branchLabel])
-        titleAndBranchStack.orientation = .vertical
-        titleAndBranchStack.spacing = -1
-        titleAndBranchStack.alignment = .centerX
-        titleAndBranchStack.translatesAutoresizingMaskIntoConstraints = false
-
-        let xConfig = NSImage.SymbolConfiguration(pointSize: 8, weight: .bold)
-        closeButton.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: "Close tab")?
-            .withSymbolConfiguration(xConfig)
-        closeButton.imagePosition = .imageOnly
-        closeButton.isBordered = false
-        closeButton.bezelStyle = .smallSquare
-        closeButton.setButtonType(.momentaryChange)
-        closeButton.target = self
-        closeButton.action = #selector(closeClicked)
-        closeButton.translatesAutoresizingMaskIntoConstraints = false
-        // Tabs with a ⌘N shortcut badge show that badge instead of the close button until
-        // hovered (mouseEntered/mouseExited swap the two); tabs past position 9 have no
-        // badge and show the close button at rest.
-        closeButton.alphaValue = position != nil ? 0 : 1
-        closeButton.wantsLayer = true
-        closeButton.layer?.cornerRadius = HarnessDesign.Radius.badge
-        closeButton.layer?.cornerCurve = .continuous
-
-        agentIcon.translatesAutoresizingMaskIntoConstraints = false
-        agentIcon.imageScaling = .scaleProportionallyUpOrDown
-        agentIcon.isHidden = true
-
-        persistentIcon.translatesAutoresizingMaskIntoConstraints = false
-        persistentIcon.imageScaling = .scaleProportionallyUpOrDown
-        persistentIcon.isHidden = true
-        persistentIcon.toolTip = "Kept running after quit"
-        persistentIcon.image = NSImage(systemSymbolName: "pin.fill", accessibilityDescription: "Kept running after quit")?
-            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 8, weight: .semibold))
-
-        shortcutLabel.font = .monospacedDigitSystemFont(ofSize: 10.5, weight: .regular)
-        shortcutLabel.alignment = .right
-        shortcutLabel.translatesAutoresizingMaskIntoConstraints = false
-        shortcutLabel.stringValue = position.map { "⌘\($0)" } ?? ""
-        shortcutLabel.isHidden = !hasShortcut
-        shortcutLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
-        shortcutLabel.setContentHuggingPriority(.required, for: .horizontal)
-
-        workingDot.wantsLayer = true
-        workingDot.layer?.cornerRadius = 1
-        workingDot.translatesAutoresizingMaskIntoConstraints = false
-        workingDot.isHidden = true
-
-        statusDot.wantsLayer = true
-        statusDot.layer?.cornerRadius = 3
-        statusDot.layer?.cornerCurve = .continuous
-        statusDot.translatesAutoresizingMaskIntoConstraints = false
-        applyStatusDot(tab.status)
-
-        addSubview(persistentIcon)
-        addSubview(agentIcon)
-        addSubview(titleAndBranchStack)
-        addSubview(shortcutLabel)
-        addSubview(closeButton)
-        addSubview(workingDot)
-        addSubview(statusDot)
-
-        mcpBadge.font = .monospacedSystemFont(ofSize: 8, weight: .bold)
-        mcpBadge.textColor = .systemBlue
-        mcpBadge.translatesAutoresizingMaskIntoConstraints = false
-        mcpBadge.isHidden = true
-        addSubview(mcpBadge)
-
-        // Title centers inside the pill with the close button floating on the
-        // right edge and the agent brand icon (when present) on the left. Leading
-        // edge inset matches the close button's trailing inset so the title stays
-        // optically centered even when both are visible.
-        agentIconWidth = agentIcon.widthAnchor.constraint(equalToConstant: 0)
-        persistentIconWidth = persistentIcon.widthAnchor.constraint(equalToConstant: 0)
-        let titleLeading = titleAndBranchStack.leadingAnchor.constraint(greaterThanOrEqualTo: agentIcon.trailingAnchor, constant: 4)
-        let closeTrailing = closeButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -HarnessDesign.Spacing.xs)
-        let closeWidth = closeButton.widthAnchor.constraint(equalToConstant: 14)
-        let closeHeight = closeButton.heightAnchor.constraint(equalToConstant: 14)
-        [titleLeading, closeTrailing, closeWidth, closeHeight].forEach { $0.priority = .defaultHigh }
-        NSLayoutConstraint.activate([
-            // Leading run: [persistence pin?][agent icon?] — each collapses to zero width when
-            // absent, so a plain tab keeps the agent icon flush at the same inset as before.
-            persistentIcon.leadingAnchor.constraint(equalTo: leadingAnchor, constant: HarnessDesign.Spacing.sm),
-            persistentIcon.centerYAnchor.constraint(equalTo: centerYAnchor),
-            persistentIcon.heightAnchor.constraint(equalToConstant: 12),
-            persistentIconWidth,
-            agentIcon.leadingAnchor.constraint(equalTo: persistentIcon.trailingAnchor),
-            agentIcon.centerYAnchor.constraint(equalTo: centerYAnchor),
-            agentIcon.heightAnchor.constraint(equalToConstant: 14),
-            agentIconWidth,
-            titleLeading,
-            titleAndBranchStack.centerXAnchor.constraint(equalTo: centerXAnchor),
-            titleAndBranchStack.centerYAnchor.constraint(equalTo: centerYAnchor),
-            titleAndBranchStack.trailingAnchor.constraint(lessThanOrEqualTo: shortcutLabel.leadingAnchor, constant: -HarnessDesign.Spacing.xs),
-            titleAndBranchStack.trailingAnchor.constraint(lessThanOrEqualTo: closeButton.leadingAnchor, constant: -HarnessDesign.Spacing.xs),
-            shortcutLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -HarnessDesign.Spacing.sm),
-            shortcutLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
-            closeTrailing,
-            closeButton.centerYAnchor.constraint(equalTo: centerYAnchor),
-            closeWidth,
-            closeHeight,
-            // Working dot sits just before the title, Ghostty-style ("· title"). Overlay only —
-            // it never affects the centered title layout; the shuttle animation gives it room.
-            workingDot.trailingAnchor.constraint(equalTo: titleLabel.leadingAnchor, constant: -7),
-            workingDot.centerYAnchor.constraint(equalTo: centerYAnchor),
-            workingDot.widthAnchor.constraint(equalToConstant: 2),
-            workingDot.heightAnchor.constraint(equalToConstant: 2),
-            // MCP badge: trailing edge of title, center Y
-            mcpBadge.leadingAnchor.constraint(equalTo: titleLabel.trailingAnchor, constant: 3),
-            mcpBadge.centerYAnchor.constraint(equalTo: centerYAnchor),
-            // Status dot: trailing edge of title text — "name •" matching the sidebar style
-            statusDot.leadingAnchor.constraint(equalTo: titleLabel.trailingAnchor, constant: 4),
-            statusDot.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor),
-            statusDot.widthAnchor.constraint(equalToConstant: 6),
-            statusDot.heightAnchor.constraint(equalToConstant: 6),
-        ])
-
-        setAgentIcon(for: tab)
-        setPersistentIndicator(tab.persistent)
-        setWorkingDotVisible(Self.isAgentWorking(tab))
-        setMCPBadge(tab.lastMCPControlAt)
-        applyChrome(isActive: isActive)
-
-        // Re-evaluate the shuttle animation when the user toggles Reduce Motion mid-session,
-        // matching the StatusDotView pattern so the dot follows the live setting immediately.
-        NSWorkspace.shared.notificationCenter.addObserver(
-            self,
-            selector: #selector(reduceMotionDidChange),
-            name: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
-            object: nil
-        )
+private func statusColor(for status: TabStatus) -> NSColor {
+    switch status {
+    case .idle:
+        return BoardColumnKind.idle.color
+    case .waiting:
+        return BoardColumnKind.needsAttention.color
+    case .running:
+        return BoardColumnKind.running.color
+    case .done:
+        return BoardColumnKind.done.color
+    case .error:
+        return BoardColumnKind.error.color
     }
+}
 
-    deinit {
-        NSWorkspace.shared.notificationCenter.removeObserver(self)
+private func statusHelp(for status: TabStatus) -> String {
+    switch status {
+    case .idle:
+        return "Idle"
+    case .waiting:
+        return "Waiting"
+    case .running:
+        return "Running"
+    case .done:
+        return "Done"
+    case .error:
+        return "Error"
     }
+}
 
-    @objc private func reduceMotionDidChange() {
-        // Re-apply the current dot visibility to pick up the new Reduce Motion setting.
-        setWorkingDotVisible(!workingDot.isHidden)
-    }
-
-    /// Primary signal: a live OSC 9;4 progress report — terminal-native, exactly what Ghostty
-    /// renders (Claude Code 2.0+ keep-alives one across each full turn, including thinking).
-    /// Fallback: the process detector's output recency, for agents that don't emit 9;4 (codex).
-    /// `waiting` only vetoes the fallback — an explicit progress report outranks a stale
-    /// waiting status.
-    private static func isAgentWorking(_ tab: Tab) -> Bool {
-        if tab.rootPane.allSurfaceIDs().contains(where: { SurfaceProgressTracker.shared.isActive($0) }) {
-            return true
-        }
-        return tab.agent?.activity == .working && tab.status != .waiting
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError() }
-
-    nonisolated override func updateTrackingAreas() {
-        MainActor.assumeIsolated {
-            super.updateTrackingAreas()
-            if let trackingArea { removeTrackingArea(trackingArea) }
-            guard window != nil else { trackingArea = nil; return }
-            let area = NSTrackingArea(
-                rect: bounds,
-                options: [.mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect],
-                owner: self,
-                userInfo: nil
-            )
-            addTrackingArea(area)
-            trackingArea = area
-        }
-    }
-
-    override func mouseEntered(with event: NSEvent) {
-        isHovered = true
-        HarnessMotion.animate(HarnessDesign.Motion.microFast) { _ in
-            closeButton.animator().alphaValue = 1
-            shortcutLabel.animator().alphaValue = 0
-            applyChrome(isActive: isActive)
-        }
-    }
-
-    override func mouseExited(with event: NSEvent) {
-        let localPoint = convert(event.locationInWindow, from: nil)
-        guard !bounds.contains(localPoint) else { return }
-
-        isHovered = false
-        HarnessMotion.animate(HarnessDesign.Motion.microFast) { _ in
-            closeButton.animator().alphaValue = 0
-            shortcutLabel.animator().alphaValue = hasShortcut ? 1 : 0
-            applyChrome(isActive: isActive)
-        }
-    }
-
-    override func mouseDown(with event: NSEvent) {
-        mouseDownLocation = event.locationInWindow
-        isDragging = false
-        // Selection/drag are resolved on mouseUp/mouseDragged.
-    }
-
-    override func mouseDragged(with event: NSEvent) {
-        guard let start = mouseDownLocation else { return }
-        if !isDragging, abs(event.locationInWindow.x - start.x) > 4 {
-            isDragging = true
-        }
-        if isDragging {
-            onDragChanged?(self, event.locationInWindow)
-        }
-    }
-
-    override func mouseUp(with event: NSEvent) {
-        let local = convert(event.locationInWindow, from: nil)
-        if isDragging {
-            onDragEnded?(self)
-        } else if !closeButton.frame.contains(local), bounds.contains(local) {
-            // Double-click anywhere on the pill (except the close button) renames it,
-            // matching the browser/Terminal.app convention; a single click selects.
-            if event.clickCount >= 2 {
-                onContextCommand?(.rename)
-            } else {
-                onSelect?(tabID)
-            }
-        }
-        mouseDownLocation = nil
-        isDragging = false
-        super.mouseUp(with: event)
-    }
-
-    // Middle-click closes the tab (standard tab-bar affordance). Swallow the press
-    // so it doesn't fall through, and act on release while still over the pill.
-    override func otherMouseDown(with event: NSEvent) {
-        guard event.buttonNumber == 2 else { super.otherMouseDown(with: event); return }
-    }
-
-    override func otherMouseUp(with event: NSEvent) {
-        guard event.buttonNumber == 2 else { super.otherMouseUp(with: event); return }
-        let local = convert(event.locationInWindow, from: nil)
-        if bounds.contains(local) { onContextCommand?(.close) }
-    }
-
-    override func menu(for event: NSEvent) -> NSMenu? {
-        onSelect?(tabID) // make this the active tab so menu actions target it
-        let menu = NSMenu()
-        menu.addItem(menuItem("Close Tab", #selector(ctxClose)))
-        menu.addItem(menuItem("Close Other Tabs", #selector(ctxCloseOthers)))
-        menu.addItem(.separator())
-        menu.addItem(menuItem("Rename…", #selector(ctxRename)))
-        menu.addItem(.separator())
-        // Per-tab persistence pin: survives a clean quit even when its session and the global
-        // keep-on-quit are off. The checkmark reflects the current pinned state.
-        let pin = menuItem("Keep Tab Running After Quit", #selector(ctxTogglePersistent))
-        pin.state = isPersistent ? .on : .off
-        menu.addItem(pin)
-        menu.addItem(.separator())
-        menu.addItem(menuItem("Split Right", #selector(ctxSplitHorizontal)))
-        menu.addItem(menuItem("Split Down", #selector(ctxSplitVertical)))
-        return menu
-    }
-
-    private func menuItem(_ title: String, _ selector: Selector) -> NSMenuItem {
-        let item = NSMenuItem(title: title, action: selector, keyEquivalent: "")
-        item.target = self
-        return item
-    }
-
-    @objc private func ctxClose() { onContextCommand?(.close) }
-    @objc private func ctxCloseOthers() { onContextCommand?(.closeOthers) }
-    @objc private func ctxRename() { onContextCommand?(.rename) }
-    @objc private func ctxSplitHorizontal() { onContextCommand?(.splitHorizontal) }
-    @objc private func ctxSplitVertical() { onContextCommand?(.splitVertical) }
-    @objc private func ctxTogglePersistent() { onContextCommand?(.togglePersistent) }
-
-    @objc private func closeClicked() {
-        onClose?(tabID)
-    }
-
-    func update(tab: Tab, isActive: Bool, showBranch: Bool) {
-        status = tab.status
-        isPersistent = tab.persistent
-        applyStatusDot(tab.status)
-        
-        if showBranch, let branch = tab.gitBranch, !branch.isEmpty {
-            branchLabel.stringValue = "⎇ \(branch)"
-            branchLabel.isHidden = false
-            titleLabel.font = .systemFont(ofSize: 11.5, weight: .medium)
-        } else {
-            branchLabel.stringValue = ""
-            branchLabel.isHidden = true
-            titleLabel.font = HarnessDesign.Typography.tabTitle
-        }
-        
-        titleLabel.stringValue = tabDisplayTitle(tab)
-        setAgentIcon(for: tab)
-        setPersistentIndicator(tab.persistent)
-        setWorkingDotVisible(Self.isAgentWorking(tab))
-        setMCPBadge(tab.lastMCPControlAt)
-        if !isHovered {
-            closeButton.layer?.removeAllAnimations()
-            closeButton.alphaValue = hasShortcut ? 0 : 1
-            shortcutLabel.alphaValue = hasShortcut ? 1 : 0
-        }
-        applyChrome(isActive: isActive)
-    }
-
-    /// Show/hide the leading "kept alive" pin (the visible form of `tab.persistent`).
-    private func setPersistentIndicator(_ visible: Bool) {
-        persistentIcon.isHidden = !visible
-        persistentIconWidth.constant = visible ? 12 : 0
-    }
-
-    private func setMCPBadge(_ lastAt: Date?) {
-        let active = lastAt.map { Date().timeIntervalSince($0) < 5 } ?? false
-        mcpBadge.isHidden = !active
-    }
-
-    /// Show/hide the working dot and run its shuttle: a gentle glide between two spots —
-    /// Ghostty's indeterminate-progress motion (easeInOut, 1.2s, autoreversing forever).
-    /// Honors Reduce Motion: when enabled, the dot is shown statically without animation.
-    private func setWorkingDotVisible(_ visible: Bool) {
-        workingDot.isHidden = !visible
-        if visible {
-            let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
-            if reduceMotion {
-                // Static dot — remove any shuttle that may already be running.
-                workingDot.layer?.removeAnimation(forKey: "shuttle")
-            } else {
-                guard workingDot.layer?.animation(forKey: "shuttle") == nil else { return }
-                let anim = CABasicAnimation(keyPath: "transform.translation.x")
-                anim.fromValue = -2.5
-                anim.toValue = 2.5
-                anim.duration = 1.2
-                anim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-                anim.autoreverses = true
-                anim.repeatCount = .infinity
-                workingDot.layer?.add(anim, forKey: "shuttle")
-            }
-        } else {
-            workingDot.layer?.removeAnimation(forKey: "shuttle")
-        }
-    }
-
-    /// Show the agent's brand glyph as a leading icon (tinted to its brand color)
-    /// when one exists; collapse the slot otherwise.
-    private func applyStatusDot(_ s: TabStatus) {
-        let color: NSColor
-        switch s {
-        case .idle:    color = BoardColumnKind.idle.color
-        case .waiting: color = BoardColumnKind.needsAttention.color
-        case .running: color = BoardColumnKind.running.color
-        case .done:    color = BoardColumnKind.done.color
-        case .error:   color = BoardColumnKind.error.color
-        }
-        statusDot.layer?.backgroundColor = color.cgColor
-    }
-
-    private func setAgentIcon(for tab: Tab) {
-        if let kind = tabAgentKind(for: tab) {
-            agentIcon.image = AgentIconRenderer.templateOrMonogramImage(for: kind, size: 14)
-            agentIcon.contentTintColor = NSColor.fromHex(SessionCoordinator.shared.settings.agentColorHex(for: kind))
-                ?? HarnessDesign.chrome.textSecondary
-            agentIcon.isHidden = false
-            agentIconWidth.constant = 14
-        } else {
-            agentIcon.image = nil
-            agentIcon.isHidden = true
-            agentIconWidth.constant = 0
-        }
-    }
-
-    func applyChrome(isActive: Bool) {
-        self.isActive = isActive
-        let c = HarnessDesign.chrome
-        layer?.cornerRadius = HarnessDesign.Radius.card
-
-        // The active tab is painted to match the *selected session card* in the sidebar
-        // exactly (SessionCardRowView.refresh): an accent-tinted fill + accent rim +
-        // resting elevation, so the tab strip and the side tab read as one system.
-        if isActive {
-            layer?.backgroundColor = c.accent.withAlphaComponent(c.isDark ? 0.13 : 0.10).cgColor
-            layer?.borderWidth = 1
-            layer?.borderColor = c.focusRing.withAlphaComponent(c.isDark ? 0.48 : 0.52).cgColor
-            HarnessDesign.applyShadow(.elevation1, to: layer)
-            titleLabel.textColor = c.textPrimary
-        } else if isHovered {
-            layer?.backgroundColor = c.rowHoverFill.cgColor
-            layer?.borderWidth = 0
-            layer?.borderColor = NSColor.clear.cgColor
-            HarnessDesign.applyShadow(.none, to: layer)
-            titleLabel.textColor = c.textPrimary
-        } else {
-            layer?.backgroundColor = NSColor.clear.cgColor
-            layer?.borderWidth = 0
-            layer?.borderColor = NSColor.clear.cgColor
-            HarnessDesign.applyShadow(.none, to: layer)
-            titleLabel.textColor = c.textSecondary
-        }
-
-        closeButton.contentTintColor = c.textTertiary
-        closeButton.layer?.backgroundColor = NSColor.clear.cgColor
-        // Persistence pin reads as an intentional "kept alive" marker, so it carries the
-        // brand accent rather than the neutral title color — visible on active and idle tabs alike.
-        persistentIcon.contentTintColor = c.accent
-        // Working dot follows the title color so it reads as part of the label, not a badge.
-        workingDot.layer?.backgroundColor = titleLabel.textColor?.cgColor
-        // ⌘N hint: a touch brighter on the active tab, quiet otherwise.
-        shortcutLabel.textColor = isActive ? c.textSecondary : c.textTertiary
-    }
+private func clamp<T: Comparable>(_ value: T, lower: T, upper: T) -> T {
+    min(max(value, lower), upper)
 }

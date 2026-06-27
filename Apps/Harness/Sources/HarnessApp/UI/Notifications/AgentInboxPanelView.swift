@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import HarnessCore
 
 /// Popover-style panel listing **every running agent** (not just the ones that
@@ -21,12 +22,12 @@ final class AgentInboxPanelView: NSView {
     ) {
         self.agents = agents
         self.onSelect = onSelect
-        // Header (28) + rows (52 each, max 6 shown then scrolls) + a slim footer (12).
         let visibleRowCount = min(agents.count, 6)
         let bodyHeight = agents.isEmpty ? 64 : CGFloat(visibleRowCount * 52 + 10)
         self.preferredHeight = 28 + bodyHeight + 12
         super.init(frame: .zero)
 
+        // Panel chrome — stay on NSView layer so it matches the AppKit overlay pattern
         wantsLayer = true
         layer?.cornerRadius = HarnessDesign.Radius.overlay
         layer?.cornerCurve = .continuous
@@ -37,182 +38,120 @@ final class AgentInboxPanelView: NSView {
         layer?.borderColor = c.textPrimary.withAlphaComponent(c.isDark ? 0.11 : 0.14).cgColor
         HarnessDesign.applyShadow(.overlay, to: layer)
 
-        setupContent()
+        let host = NSHostingView(rootView: AgentInboxBody(agents: agents, onSelect: onSelect))
+        host.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(host)
+        NSLayoutConstraint.activate([
+            host.topAnchor.constraint(equalTo: topAnchor),
+            host.leadingAnchor.constraint(equalTo: leadingAnchor),
+            host.trailingAnchor.constraint(equalTo: trailingAnchor),
+            host.bottomAnchor.constraint(equalTo: bottomAnchor),
+        ])
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
+}
 
-    private func setupContent() {
-        let header = NSTextField(labelWithString: "Agents")
-        header.font = .systemFont(ofSize: 11, weight: .semibold)
-        header.textColor = HarnessDesign.chrome.textTertiary
-        header.translatesAutoresizingMaskIntoConstraints = false
+// MARK: - SwiftUI Content
 
-        let bodyContainer = NSView()
-        bodyContainer.translatesAutoresizingMaskIntoConstraints = false
+private struct AgentInboxBody: View {
+    let agents: [AgentSessionSummary]
+    let onSelect: (AgentSessionSummary) -> Void
 
-        if agents.isEmpty {
-            let empty = NSTextField(labelWithString: "No agents running.")
-            empty.font = .systemFont(ofSize: 12)
-            empty.textColor = HarnessDesign.chrome.textSecondary
-            empty.translatesAutoresizingMaskIntoConstraints = false
-            bodyContainer.addSubview(empty)
-            NSLayoutConstraint.activate([
-                empty.centerXAnchor.constraint(equalTo: bodyContainer.centerXAnchor),
-                empty.centerYAnchor.constraint(equalTo: bodyContainer.centerYAnchor),
-            ])
-        } else {
-            let stack = NSStackView()
-            stack.orientation = .vertical
-            stack.alignment = .width
-            stack.spacing = 2
-            stack.edgeInsets = NSEdgeInsets(top: 4, left: 6, bottom: 4, right: 6)
-            stack.translatesAutoresizingMaskIntoConstraints = false
-            for agent in agents {
-                let row = AgentInboxRowView(agent: agent)
-                row.onClick = { [onSelect] in
-                    onSelect(agent)
-                }
-                stack.addArrangedSubview(row)
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Text("Agents")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color(HarnessDesign.chrome.textTertiary))
+                Spacer()
             }
-            let scroll = NSScrollView()
-            scroll.drawsBackground = false
-            scroll.hasVerticalScroller = true
-            scroll.autohidesScrollers = true
-            scroll.scrollerStyle = .overlay
-            scroll.documentView = stack
-            scroll.translatesAutoresizingMaskIntoConstraints = false
-            bodyContainer.addSubview(scroll)
-            NSLayoutConstraint.activate([
-                scroll.topAnchor.constraint(equalTo: bodyContainer.topAnchor),
-                scroll.leadingAnchor.constraint(equalTo: bodyContainer.leadingAnchor),
-                scroll.trailingAnchor.constraint(equalTo: bodyContainer.trailingAnchor),
-                scroll.bottomAnchor.constraint(equalTo: bodyContainer.bottomAnchor),
-                stack.widthAnchor.constraint(equalTo: scroll.widthAnchor),
-            ])
+            .padding(.horizontal, 14)
+            .frame(height: 28)
+
+            // Body
+            if agents.isEmpty {
+                Text("No agents running.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color(HarnessDesign.chrome.textSecondary))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 64)
+            } else {
+                ScrollView {
+                    VStack(spacing: 2) {
+                        ForEach(agents) { agent in
+                            AgentInboxRowView(agent: agent) {
+                                onSelect(agent)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 4)
+                }
+            }
+
+            Spacer(minLength: 8)
         }
-
-        addSubview(header)
-        addSubview(bodyContainer)
-
-        NSLayoutConstraint.activate([
-            header.topAnchor.constraint(equalTo: topAnchor, constant: 8),
-            header.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 14),
-            header.heightAnchor.constraint(equalToConstant: 20),
-
-            bodyContainer.topAnchor.constraint(equalTo: header.bottomAnchor),
-            bodyContainer.leadingAnchor.constraint(equalTo: leadingAnchor),
-            bodyContainer.trailingAnchor.constraint(equalTo: trailingAnchor),
-            bodyContainer.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -8),
-        ])
+        // Clip to panel corner so SwiftUI background doesn't bleed past the layer corner
+        .clipShape(RoundedRectangle(cornerRadius: HarnessDesign.Radius.overlay, style: .continuous))
     }
 }
 
-@MainActor
-private final class AgentInboxRowView: NSView {
-    var onClick: (() -> Void)?
+private struct AgentInboxRowView: View {
+    let agent: AgentSessionSummary
+    let onClick: () -> Void
+    @State private var isHovered = false
 
-    private let agent: AgentSessionSummary
-    private var trackingArea: NSTrackingArea?
-    private var isHovered = false { didSet { applyChrome() } }
+    var body: some View {
+        HStack(spacing: 10) {
+            AgentStatusDot(agent: agent)
+                .frame(width: 14, height: 14)
 
-    init(agent: AgentSessionSummary) {
-        self.agent = agent
-        super.init(frame: .zero)
-        wantsLayer = true
-        layer?.cornerRadius = 8
-        layer?.cornerCurve = .continuous
-        translatesAutoresizingMaskIntoConstraints = false
-        heightAnchor.constraint(equalToConstant: 50).isActive = true
+            VStack(alignment: .leading, spacing: 1) {
+                Text(agent.agentName)
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundStyle(Color(HarnessDesign.chrome.textPrimary))
+                    .lineLimit(1)
+                Text(agentDetail(agent))
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color(HarnessDesign.chrome.textTertiary))
+                    .lineLimit(1)
+            }
 
-        let coordinator = SessionCoordinator.shared
+            Spacer()
 
-        let dot = StatusDotView()
+            Text(AgentListFormatter.age(from: agent.lastActivityAt))
+                .font(.system(size: 9.5, weight: .medium).monospacedDigit())
+                .foregroundStyle(Color(HarnessDesign.chrome.textTertiary))
+        }
+        .padding(.horizontal, 10)
+        .frame(height: 50)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(isHovered ? Color(HarnessDesign.chrome.textPrimary).opacity(0.06) : Color.clear)
+        )
+        .onHover { isHovered = $0 }
+        .onTapGesture { onClick() }
+    }
+}
+
+// Wraps AppKit StatusDotView to preserve the brand-tinted breathing-halo animation.
+private struct AgentStatusDot: NSViewRepresentable {
+    let agent: AgentSessionSummary
+
+    func makeNSView(context: Context) -> StatusDotView {
+        StatusDotView(diameter: 14)
+    }
+
+    func updateNSView(_ dot: StatusDotView, context: Context) {
         if agent.waiting {
             dot.style = .waiting
         } else {
-            dot.style = .agent(hex: coordinator.settings.agentColorHex(for: agent.kind))
+            let hex = SessionCoordinator.shared.settings.agentColorHex(for: agent.kind)
+            dot.style = .agent(hex: hex)
         }
-        dot.applyStyle()
-        dot.translatesAutoresizingMaskIntoConstraints = false
-
-        // Title: agent name ("Claude Code", "Kiro", …)
-        let title = NSTextField(labelWithString: agent.agentName)
-        title.font = .systemFont(ofSize: 12.5, weight: .semibold)
-        title.textColor = HarnessDesign.chrome.textPrimary
-        title.lineBreakMode = .byTruncatingTail
-        title.translatesAutoresizingMaskIntoConstraints = false
-
-        // Body: "project (branch) · tab-title · workspace"
-        let bodyLabel = NSTextField(labelWithString: agentDetail(agent))
-        bodyLabel.font = .systemFont(ofSize: 11)
-        bodyLabel.textColor = HarnessDesign.chrome.textTertiary
-        bodyLabel.lineBreakMode = .byTruncatingTail
-        bodyLabel.translatesAutoresizingMaskIntoConstraints = false
-
-        // Trailing time ("now", "2m", …)
-        let timeLabel = NSTextField(labelWithString: AgentListFormatter.age(from: agent.lastActivityAt))
-        timeLabel.font = .monospacedDigitSystemFont(ofSize: 9.5, weight: .medium)
-        timeLabel.textColor = HarnessDesign.chrome.textTertiary
-        timeLabel.setContentHuggingPriority(.required, for: .horizontal)
-        timeLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
-        timeLabel.translatesAutoresizingMaskIntoConstraints = false
-
-        let textStack = NSStackView(views: [title, bodyLabel])
-        textStack.orientation = .vertical
-        textStack.alignment = .leading
-        textStack.spacing = 1
-        textStack.translatesAutoresizingMaskIntoConstraints = false
-
-        addSubview(dot)
-        addSubview(textStack)
-        addSubview(timeLabel)
-        NSLayoutConstraint.activate([
-            dot.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
-            dot.centerYAnchor.constraint(equalTo: centerYAnchor),
-
-            timeLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
-            timeLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
-
-            textStack.leadingAnchor.constraint(equalTo: dot.trailingAnchor, constant: 10),
-            textStack.trailingAnchor.constraint(lessThanOrEqualTo: timeLabel.leadingAnchor, constant: -8),
-            textStack.centerYAnchor.constraint(equalTo: centerYAnchor),
-        ])
-        applyChrome()
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError() }
-
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        if let trackingArea { removeTrackingArea(trackingArea) }
-        guard window != nil else { trackingArea = nil; return }
-        let area = NSTrackingArea(
-            rect: bounds,
-            options: [.mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect],
-            owner: self,
-            userInfo: nil
-        )
-        addTrackingArea(area)
-        trackingArea = area
-    }
-
-    override func mouseEntered(with event: NSEvent) { isHovered = true }
-    override func mouseExited(with event: NSEvent) { isHovered = false }
-    override func mouseDown(with event: NSEvent) {}
-
-    override func mouseUp(with event: NSEvent) {
-        let point = convert(event.locationInWindow, from: nil)
-        if bounds.contains(point) { onClick?() }
-    }
-
-    private func applyChrome() {
-        let c = HarnessDesign.chrome
-        layer?.backgroundColor = isHovered
-            ? c.textPrimary.withAlphaComponent(0.06).cgColor
-            : NSColor.clear.cgColor
     }
 }
 

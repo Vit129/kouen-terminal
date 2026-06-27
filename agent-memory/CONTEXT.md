@@ -1,9 +1,9 @@
 # Context — harness-terminal
 
 ## Now
-- **Task:** idle
+- **Task:** idle — memory/tooling cleanup
 - **Branch:** main
-- **Status:** AppKit → SwiftUI wave 2 complete — sidebar chrome 100% SwiftUI + Open With Harness
+- **Status:** AppKit → SwiftUI wave 2 complete. `.ai/` removed across all projects; grep+graphify+headroom+ponytail are canonical lookup tools
 
 ### This session (2026-06-27) — Sidebar chrome SwiftUI + Open With Harness + file tree git root
 
