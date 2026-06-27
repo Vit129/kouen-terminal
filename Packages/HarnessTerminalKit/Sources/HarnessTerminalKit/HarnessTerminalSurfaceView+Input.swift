@@ -192,6 +192,8 @@ extension HarnessTerminalSurfaceView {
         }
         // Overlay intercept: e.g. InlineAICompletionController handling Tab/Return/Esc.
         if let intercept = onKeyIntercept, intercept(event) { return }
+        // Vi modal editing: Esc enters normal mode; normal mode maps h/j/k/l etc. to PTY escapes.
+        if handleViMode(event) { return }
         // Let the app handle Command shortcuts (menus, palette, etc.).
         if event.modifierFlags.contains(.command) {
             // ⌘ + an editing key drives readline line-editing (⌘ is otherwise reserved for the

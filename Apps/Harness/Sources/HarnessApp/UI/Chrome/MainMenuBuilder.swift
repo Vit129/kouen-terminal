@@ -180,6 +180,8 @@ enum MainMenuBuilder {
         let importLayoutItem = NSMenuItem(title: "Import Layout…", action: #selector(MenuTarget.importLayout), keyEquivalent: "")
         importLayoutItem.target = MenuTarget.shared
         view.submenu?.addItem(importLayoutItem)
+        let viModeItem = menuItem("Toggle Vi Mode", action: #selector(MenuTarget.toggleViMode), binding: BannerShortcutRegistry.toggleViMode)
+        view.submenu?.addItem(viModeItem)
         view.submenu?.addItem(.separator())
         let runItem = menuItem("Run Script", action: #selector(MenuTarget.runScript), binding: BannerShortcutRegistry.runScript)
         view.submenu?.addItem(runItem)
@@ -526,6 +528,7 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
     @objc func toggleQuickTerminal() { QuickTerminalController.shared.toggle() }
     @objc func exportLayout() { LayoutFileStore.exportCurrentLayout() }
     @objc func importLayout() { LayoutFileStore.importLayout() }
+    @objc func toggleViMode() { SessionCoordinator.shared.toggleViMode() }
 
     @objc func toggleSidebar() {
         let win = NSApp.keyWindow ?? NSApp.mainWindow

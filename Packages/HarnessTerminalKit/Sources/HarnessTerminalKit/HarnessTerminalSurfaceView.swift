@@ -358,6 +358,10 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// Generic key intercept — fires before Command shortcuts and PTY delivery (but after copy-mode).
     /// Return `true` to consume the event. Used by overlay UIs (e.g. `InlineAICompletionView`).
     public var onKeyIntercept: ((NSEvent) -> Bool)?
+    /// Vi modal editing state. `.insert` (default) = passthrough; `.normal` = motion keys intercepted.
+    public var viModeState: ViInputMode = .insert
+    /// Fired on every vi mode transition so the host can update a badge/indicator.
+    public var onViModeChanged: ((ViInputMode) -> Void)?
     /// Whether a program may set the system clipboard via OSC 52 (tmux
     /// `set-clipboard`). The host sets this from the option; default on.
     public var allowProgramClipboardAccess = true
@@ -504,8 +508,8 @@ public final class HarnessTerminalSurfaceView: NSView {
     var glyphGamma: Float = 1
     /// Programming-font ligatures via CoreText run shaping.
     var ligaturesEnabled = true
-    /// Draw the OSC 133 prompt gutter stripe. Off by default (a user opt-in).
-    private var promptGutterEnabled = false
+    /// Draw the OSC 133 prompt gutter stripe. Enabled by default; host may override.
+    public var promptGutterEnabled = true
     /// Active Metal shader overlay effect name (e.g. "scanlines", "grain", "crt"). "none" = off.
     private var shaderEffect: String = "none"
 
