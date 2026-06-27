@@ -1,3 +1,4 @@
+// ponytail: intentionally AppKit — NSAttributedString diffstat rendering + per-file row menus need NSTableView; SwiftUI Table lacks row actions and custom cell editing as of macOS 26.
 import AppKit
 import HarnessCore
 import CoreServices

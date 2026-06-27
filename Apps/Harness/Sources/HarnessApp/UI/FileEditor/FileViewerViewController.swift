@@ -1,3 +1,4 @@
+// ponytail: intentionally AppKit — syntax highlight uses custom NSTextStorage + layout manager; SwiftUI TextEditor has no equivalent hook.
 import AppKit
 import HarnessCore
 import QuickLookUI

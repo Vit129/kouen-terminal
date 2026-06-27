@@ -1,9 +1,9 @@
 # Context — harness-terminal
 
 ## Now
-- **Task:** idle — memory/tooling cleanup
+- **Task:** idle
 - **Branch:** main
-- **Status:** AppKit → SwiftUI wave 2 complete. `.ai/` removed across all projects; grep+graphify+headroom+ponytail are canonical lookup tools
+- **Status:** AppKit → SwiftUI migration CLOSED. Remaining AppKit files commented as intentional — GitPanelView, WorkspaceFileTreeView, FileViewerViewController.
 
 ### This session (2026-06-27) — SwiftUI wave 2: 4 UI components migrated
 

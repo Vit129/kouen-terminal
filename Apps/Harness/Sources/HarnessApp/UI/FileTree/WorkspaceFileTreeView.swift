@@ -1,3 +1,4 @@
+// ponytail: intentionally AppKit — SwiftUI List(children:) cannot reorder hierarchical nodes (macOS 26 limitation); NSDraggingItem preview customisation also requires AppKit.
 import AppKit
 import Observation
 import SwiftUI
