@@ -149,9 +149,21 @@ extension HarnessTerminalSurfaceView {
         if copyMode != nil { return } // copy mode is keyboard-driven; ignore clicks
         // ⌘-click opens an OSC 8 hyperlink or an auto-detected URL.
         // ⌘ overrides mouse reporting, the same way Shift overrides it for selection.
-        if event.modifierFlags.contains(.command), let pos = cell(at: event.locationInWindow),
-           let url = linkURL(atRow: pos.row, column: pos.column) {
-            openLink(url)
+        if event.modifierFlags.contains(.command), let pos = cell(at: event.locationInWindow) {
+            if let url = linkURL(atRow: pos.row, column: pos.column) {
+                openLink(url); return
+            }
+            // No link — select the OSC 133 block containing the clicked row.
+            let clickedLine = selectionTopLine + pos.row
+            let prompts = emulatorSync { $0.promptRows }
+            if !prompts.isEmpty, let blockStart = prompts.last(where: { $0 <= clickedLine }) {
+                let blockEnd = prompts.first(where: { $0 > clickedLine }).map { $0 - 1 } ?? (clickedLine + 512)
+                selectionGranularity = .character
+                selectionRectangular = false
+                selectionAnchor = (line: blockStart, column: 0)
+                selectionHead = (line: blockEnd, column: Int.max)
+                scheduleRender()
+            }
             return
         }
         if isMouseReporting(event) {

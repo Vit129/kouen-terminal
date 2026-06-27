@@ -198,6 +198,11 @@ public enum BannerShortcutRegistry {
         modifiers: [.command, .shift], keyChar: "j",
         showInBanner: false)
 
+    public static let toggleViMode = Keybinding(
+        id: "toggleViMode", title: "Toggle Vi Mode",
+        modifiers: [.command, .control], keyChar: "v",
+        showInBanner: false)
+
     // MARK: - Banner shortcuts (legacy format for terminal banner rendering)
 
     /// All registered shortcuts for banner display, derived from keybindings above.
