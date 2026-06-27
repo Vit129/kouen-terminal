@@ -15,5 +15,5 @@ public enum HarnessVersion {
     public static let short = "3.9.5"
     /// Build number, matches `CFBundleVersion`. Used as the secondary-DA firmware field
     /// and as the daemon↔app/CLI staleness handshake in `daemonStats`.
-    public static let build = 171
+    public static let build = 173
 }
