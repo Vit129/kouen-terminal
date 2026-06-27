@@ -182,6 +182,8 @@ let exportLayoutItem = NSMenuItem(title: "Export Layout…", action: #selector(M
         view.submenu?.addItem(floatingPaneItem)
         let tabOverviewItem = menuItem("Tab Overview", action: #selector(MenuTarget.tabOverview), binding: BannerShortcutRegistry.tabOverview)
         view.submenu?.addItem(tabOverviewItem)
+        let forkTabItem = menuItem("Fork Tab", action: #selector(MenuTarget.forkTab), binding: BannerShortcutRegistry.forkTab)
+        view.submenu?.addItem(forkTabItem)
         view.submenu?.addItem(.separator())
         let runItem = menuItem("Run Script", action: #selector(MenuTarget.runScript), binding: BannerShortcutRegistry.runScript)
         view.submenu?.addItem(runItem)
@@ -530,6 +532,7 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
     @objc func toggleViMode() { SessionCoordinator.shared.toggleViMode() }
     @objc func openFloatingPane() { FloatingPaneController.shared.toggle() }
     @objc func tabOverview() { TabOverviewController.shared.toggle() }
+    @objc func forkTab() { SessionCoordinator.shared.forkTab() }
 
     @objc func toggleSidebar() {
         let win = NSApp.keyWindow ?? NSApp.mainWindow

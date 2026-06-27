@@ -10,6 +10,7 @@ final class BlockTintOverlay: NSView {
     private var visibleRows = 24
     private var actionBar: BlockActionBar?
     private var collapsedBlocks = Set<Int>()  // buffer-line indices of collapsed prompt rows
+    private var cachedPromptRows: [Int] = []  // refreshed on command-finish, not on every draw/hitTest
 
     private static let evenTint   = NSColor.white.withAlphaComponent(0.028)
     private static let oddTint    = NSColor.white.withAlphaComponent(0.055)
@@ -22,12 +23,29 @@ final class BlockTintOverlay: NSView {
         wantsLayer = true
         layer?.isOpaque = false
 
-        surfaceView.onScrollChanged = { [weak self] topLine, _, visibleRows in
+        // Seed prompt cache once — no lock held during mouse moves or draws after this.
+        cachedPromptRows = surfaceView.promptRows
+
+        // Chain onScrollChanged — the previous closure wires the transient scrollbar; don't
+        // replace it or the scrollbar goes dark the moment this overlay is installed.
+        let prevScroll = surfaceView.onScrollChanged
+        surfaceView.onScrollChanged = { [weak self] topLine, totalLines, visibleRows in
+            prevScroll?(topLine, totalLines, visibleRows)
             self?.topLine = topLine
             self?.visibleRows = visibleRows
             self?.needsDisplay = true
             self?.dismissActionBar()
         }
+
+        // Refresh prompt cache when a new shell prompt appears (OSC 133 command-finish).
+        // emulatorSync is called once per command, not on every mouse move or draw tick.
+        let prevFinished = surfaceView.onCommandFinished
+        surfaceView.onCommandFinished = { [weak self, weak surfaceView] duration, exitCode in
+            prevFinished?(duration, exitCode)
+            self?.cachedPromptRows = surfaceView?.promptRows ?? []
+            self?.needsDisplay = true
+        }
+
         surfaceView.onBlockSelected = { [weak self] start, end in
             self?.needsDisplay = true
             self?.showActionBar(startLine: start, endLine: end)
@@ -42,8 +60,8 @@ final class BlockTintOverlay: NSView {
     // MARK: - Drawing
 
     override func draw(_ dirtyRect: NSRect) {
-        guard let sv = surfaceView, visibleRows > 0 else { return }
-        let prompts = sv.promptRows
+        guard visibleRows > 0 else { return }
+        let prompts = cachedPromptRows
         guard !prompts.isEmpty else { return }
         let rowH = bounds.height / CGFloat(visibleRows)
 
@@ -125,9 +143,9 @@ final class BlockTintOverlay: NSView {
             let local = sub.convert(point, from: self)
             if let hit = sub.hitTest(local) { return hit }
         }
-        guard let sv = surfaceView, visibleRows > 0 else { return nil }
+        guard visibleRows > 0 else { return nil }
         let rowH = bounds.height / CGFloat(visibleRows)
-        for startLine in sv.promptRows {
+        for startLine in cachedPromptRows {
             let vRow = startLine - topLine
             guard vRow >= 0, vRow < visibleRows else { continue }
             if NSRect(x: 0, y: CGFloat(vRow) * rowH, width: Self.collapseW, height: rowH).contains(point) {
@@ -139,9 +157,9 @@ final class BlockTintOverlay: NSView {
 
     override func mouseDown(with event: NSEvent) {
         let pt = convert(event.locationInWindow, from: nil)
-        guard let sv = surfaceView, visibleRows > 0 else { return }
+        guard visibleRows > 0 else { return }
         let rowH = bounds.height / CGFloat(visibleRows)
-        for startLine in sv.promptRows {
+        for startLine in cachedPromptRows {
             let vRow = startLine - topLine
             guard vRow >= 0, vRow < visibleRows else { continue }
             if NSRect(x: 0, y: CGFloat(vRow) * rowH, width: Self.collapseW, height: rowH).contains(pt) {

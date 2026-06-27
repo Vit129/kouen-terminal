@@ -10,9 +10,10 @@ public struct FrecencyEntry: Codable, Sendable {
 @MainActor
 public final class FrecencyDirectoryStore: @unchecked Sendable {
     public static let shared = FrecencyDirectoryStore()
-    
+
     public private(set) var entries: [String: FrecencyEntry] = [:]
     private let fileURL: URL
+    private var saveTask: Task<Void, Never>?
     
     private init() {
         self.fileURL = HarnessPaths.applicationSupport.appendingPathComponent("frecency-dirs.json")
@@ -30,18 +31,21 @@ public final class FrecencyDirectoryStore: @unchecked Sendable {
     }
     
     public func save() {
-        do {
-            try FileManager.default.createDirectory(
-                at: fileURL.deletingLastPathComponent(),
-                withIntermediateDirectories: true
-            )
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = .prettyPrinted
-            let list = Array(entries.values)
-            let data = try encoder.encode(list)
-            try data.write(to: fileURL, options: .atomic)
-        } catch {
-            // Ignore or log
+        // Debounce: cancel any pending write and coalesce rapid cd bursts into one disk op.
+        // The actual I/O runs off-main so it never stalls the render loop.
+        saveTask?.cancel()
+        let list = Array(entries.values)
+        let url  = fileURL
+        saveTask = Task.detached(priority: .utility) {
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 s debounce
+            guard !Task.isCancelled else { return }
+            do {
+                try FileManager.default.createDirectory(
+                    at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+                var encoder = JSONEncoder()
+                encoder.outputFormatting = .prettyPrinted
+                try encoder.encode(list).write(to: url, options: .atomic)
+            } catch {}
         }
     }
     

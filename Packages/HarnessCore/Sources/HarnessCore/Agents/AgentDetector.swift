@@ -68,6 +68,32 @@ public enum AgentDetector {
         return hint
     }
 
+    /// Directly override the agent activity for a surface from an OSC 26 report.
+    /// If `kind` is provided and no scan snapshot exists yet, seeds a hint snapshot.
+    public static func setActivity(_ activity: AgentActivity, kind: AgentKind? = nil, forSurfaceKey key: String) {
+        let now = Date()
+        if activity == .working {
+            outputLock.lock()
+            lastOutputAt[key] = now
+            outputLock.unlock()
+        }
+        snapshotsLock.lock()
+        let hasSnapshot = lastSurfaceSnapshots[key] != nil
+        if hasSnapshot {
+            lastSurfaceSnapshots[key]!.activity = activity
+            lastSurfaceSnapshots[key]!.lastActivityAt = now
+            if let kind { lastSurfaceSnapshots[key]!.kind = kind }
+        }
+        snapshotsLock.unlock()
+
+        if !hasSnapshot, let kind {
+            hintsLock.lock()
+            hints[key] = AgentSnapshot(kind: kind, executable: kind.rawValue, pid: 0,
+                                       activity: activity, lastActivityAt: now)
+            hintsLock.unlock()
+        }
+    }
+
     public static func recordActivity(forSurfaceKey key: String) {
         let now = Date()
         outputLock.lock()
