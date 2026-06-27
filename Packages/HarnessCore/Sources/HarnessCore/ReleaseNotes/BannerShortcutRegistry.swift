@@ -151,9 +151,13 @@ public enum BannerShortcutRegistry {
         id: "commandPalette", title: "Command Palette",
         modifiers: .command, keyChar: "p")
 
+    public static let scrollbackSearch = Keybinding(
+        id: "scrollbackSearch", title: "Find in Scrollback",
+        modifiers: .command, keyChar: "f")
+
     public static let findInFiles = Keybinding(
         id: "findInFiles", title: "Find in Files…",
-        modifiers: .command, keyChar: "f")
+        modifiers: [.command, .shift], keyChar: "f")
 
     public static let browserPane = Keybinding(
         id: "browserPane", title: "Open Browser Pane",

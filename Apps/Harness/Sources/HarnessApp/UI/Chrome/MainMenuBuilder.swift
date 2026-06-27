@@ -152,6 +152,8 @@ enum MainMenuBuilder {
         searchHistoryItem.keyEquivalentModifierMask = [.control]
         searchHistoryItem.target = MenuTarget.shared
         view.submenu?.addItem(searchHistoryItem)
+        let scrollbackSearchItem = menuItem("Find in Scrollback", action: #selector(MenuTarget.find), binding: BannerShortcutRegistry.scrollbackSearch)
+        view.submenu?.addItem(scrollbackSearchItem)
         let findItem = menuItem("Find in Files…", action: #selector(MenuTarget.findInFiles), binding: BannerShortcutRegistry.findInFiles)
         view.submenu?.addItem(findItem)
         let sidebarItem = menuItem("Toggle Sidebar", action: #selector(MenuTarget.toggleSidebar), binding: BannerShortcutRegistry.toggleSidebar)
