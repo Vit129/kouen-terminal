@@ -76,10 +76,12 @@ else
   ./Scripts/commit-push.sh
 fi
 
-# Step 4: Build production app (no open — install-no-build handles deployment).
+
+# Step 4: Build production app + install to /Applications.
+# Build BEFORE tagging/releasing so a broken build never creates a public tag.
 echo ""
-echo "▶ Step 4: Building production app..."
-if ! swift build -c release || ! Scripts/package-app.sh release; then
+echo "▶ Step 4: Building production app and installing..."
+if ! make install; then
   echo ""
   echo "❌ Production build failed — rolling back version bump..."
   git checkout -- \
@@ -90,7 +92,6 @@ if ! swift build -c release || ! Scripts/package-app.sh release; then
   echo "↩️  Version files restored. Fix the build and try again."
   exit 1
 fi
-codesign --force --sign - --deep Harness.app >/dev/null
 
 # Step 5: Generate CHANGELOG + tag + GitHub release via git-cliff.
 echo ""
@@ -177,11 +178,6 @@ git push origin "refs/tags/$TAG" --force
 gh release create "$TAG" --title "$TAG" --notes "$NOTES" 2>/dev/null \
   || gh release edit "$TAG" --title "$TAG" --notes "$NOTES" 2>/dev/null \
   || echo "⚠️  GitHub release skipped (gh CLI not configured or tag exists)"
-
-# Step 6: Install to /Applications (app already built in step 4 — skip rebuild).
-echo ""
-echo "▶ Step 6: Installing to /Applications..."
-make install-no-build
 
 echo ""
 echo "✅ Full cycle complete. Version: $TAG"
