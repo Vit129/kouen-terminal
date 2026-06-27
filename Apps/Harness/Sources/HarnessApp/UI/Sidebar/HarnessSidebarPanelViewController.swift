@@ -25,15 +25,13 @@ final class HarnessSidebarPanelViewController: NSViewController {
 #if HARNESS_ACP
     private let agentChatPanel = AgentChatPanelView()
 #endif
-    private let sectionHeader = NSView()
-    private let sectionLabel = NSTextField(labelWithString: "Sessions")
+    let sidebarSectionModel = SidebarSectionModel()
+    private var sectionLabelHostingView: NSView!
     let fileTreeView = WorkspaceFileTreeView()
     private let fileViewerVC = FileViewerViewController()
     let gitPanelView = GitPanelView()
-    private let footer = NSView()
-    /// Opens the Agent Inbox popover (every running agent, waiting first). Stored so
-    /// the popover can anchor to it. Created in `setupFooter`.
-    private let agentsButton = HarnessDesign.softIconButton(symbol: "sparkles", tooltip: "Agents")
+    let sidebarFooterModel = SidebarFooterModel()
+    private var footerHostingView: NSView!
     let sidebarListModel = SidebarListModel()
     private var sessionHostingView: NSView?
     var workspaces: [Workspace] = []
@@ -58,8 +56,8 @@ final class HarnessSidebarPanelViewController: NSViewController {
         setupChromeHeader()
         setupWorkspaceBar()
         setupSidebarTabs()
-        setupSectionHeader()
-        setupFooter()
+        setupSectionLabel()
+        setupFooterView()
         setupSessionList()
         setupFileTree()
         setupFileViewer()
@@ -89,20 +87,16 @@ final class HarnessSidebarPanelViewController: NSViewController {
         HarnessDesign.applySidebarChrome(to: view)
         HarnessDesign.makeClear(chromeHeader)
         HarnessDesign.makeClear(gitPanelView)
-        HarnessDesign.makeClear(sectionHeader)
-        HarnessDesign.makeClear(footer)
-        sectionLabel.textColor = HarnessDesign.chrome.textTertiary
         workspacePillModel.chromeEpoch += 1
-        
+        sidebarSectionModel.chromeEpoch += 1
+        sidebarFooterModel.chromeEpoch += 1
+
         let sidebarOnRight = SessionCoordinator.shared.settings.sidebarOnRight
         let symbol = sidebarOnRight ? "sidebar.right" : "sidebar.left"
         sidebarToggleButton.setSymbol(symbol, accessibilityDescription: "Toggle sidebar", pointSize: 13, weight: .medium)
         sidebarToggleButton.applyChrome()
-        
+
         dismissWorkspaceDropdown()
-        for case let button as SoftIconButton in footer.subviews {
-            button.applyChrome()
-        }
     }
 
     private func setupChromeHeader() {
@@ -294,13 +288,10 @@ final class HarnessSidebarPanelViewController: NSViewController {
         let host = view.window?.contentView ?? view
         let width: CGFloat = 300
         let height = inbox.preferredHeight
-        let button = host.convert(agentsButton.bounds, from: agentsButton)
-        var originX = button.minX
-        originX = min(originX, host.bounds.maxX - width - 8)
-        originX = max(8, originX)
-        // Footer sits at the bottom; the content view is not flipped (y grows upward), so
-        // the panel sits *above* the button when its bottom edge is just above the button.
-        let originY = button.maxY + 6
+        // Anchor above the footer — mirrors showNotificationsDropdown positioning.
+        let footerInHost = host.convert(footerHostingView.bounds, from: footerHostingView)
+        let originX: CGFloat = 8
+        let originY = footerInHost.maxY + 6
         inbox.frame = NSRect(x: originX, y: originY, width: width, height: height)
         host.addSubview(inbox)
         agentsInbox = inbox
@@ -324,35 +315,26 @@ final class HarnessSidebarPanelViewController: NSViewController {
     private func installAgentsInboxMonitor() {
         agentsInboxMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
             guard let self, let inbox = self.agentsInbox else { return event }
-            let point = inbox.convert(event.locationInWindow, from: nil)
-            if !inbox.bounds.contains(point) {
-                let buttonPoint = self.agentsButton.convert(event.locationInWindow, from: nil)
-                if !self.agentsButton.bounds.contains(buttonPoint) {
-                    self.dismissAgentsInbox()
-                }
-            }
+            let inboxPoint = inbox.convert(event.locationInWindow, from: nil)
+            if inbox.bounds.contains(inboxPoint) { return event }
+            // Clicks in the footer let the SwiftUI button action handle toggle.
+            let footerPoint = self.footerHostingView.convert(event.locationInWindow, from: nil)
+            if self.footerHostingView.bounds.contains(footerPoint) { return event }
+            self.dismissAgentsInbox()
             return event
         }
     }
 
-    private func setupSectionHeader() {
-        sectionHeader.translatesAutoresizingMaskIntoConstraints = false
-        HarnessDesign.makeClear(sectionHeader)
-
-        sectionLabel.font = HarnessDesign.Typography.sectionLabel
-        sectionLabel.stringValue = "SESSIONS"
-        sectionLabel.translatesAutoresizingMaskIntoConstraints = false
-
-        sectionHeader.addSubview(sectionLabel)
-        view.addSubview(sectionHeader)
-
+    private func setupSectionLabel() {
+        let hosting = NSHostingView(rootView: SidebarSectionLabelView(model: sidebarSectionModel))
+        hosting.translatesAutoresizingMaskIntoConstraints = false
+        sectionLabelHostingView = hosting
+        view.addSubview(hosting)
         NSLayoutConstraint.activate([
-            sectionHeader.topAnchor.constraint(equalTo: chromeHeader.bottomAnchor),
-            sectionHeader.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            sectionHeader.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            sectionHeader.heightAnchor.constraint(equalToConstant: 24),
-            sectionLabel.leadingAnchor.constraint(equalTo: sectionHeader.leadingAnchor, constant: HarnessDesign.horizontalInset),
-            sectionLabel.bottomAnchor.constraint(equalTo: sectionHeader.bottomAnchor, constant: -4),
+            hosting.topAnchor.constraint(equalTo: chromeHeader.bottomAnchor),
+            hosting.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            hosting.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            hosting.heightAnchor.constraint(equalToConstant: 24),
         ])
     }
 
@@ -405,10 +387,10 @@ final class HarnessSidebarPanelViewController: NSViewController {
         sessionHostingView = hosting
         view.addSubview(hosting)
         NSLayoutConstraint.activate([
-            hosting.topAnchor.constraint(equalTo: sectionHeader.bottomAnchor),
+            hosting.topAnchor.constraint(equalTo: sectionLabelHostingView.bottomAnchor),
             hosting.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             hosting.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            hosting.bottomAnchor.constraint(equalTo: footer.topAnchor),
+            hosting.bottomAnchor.constraint(equalTo: footerHostingView.topAnchor),
         ])
     }
 
@@ -416,10 +398,10 @@ final class HarnessSidebarPanelViewController: NSViewController {
         fileTreeView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(fileTreeView)
         NSLayoutConstraint.activate([
-            fileTreeView.topAnchor.constraint(equalTo: sectionHeader.bottomAnchor),
+            fileTreeView.topAnchor.constraint(equalTo: sectionLabelHostingView.bottomAnchor),
             fileTreeView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             fileTreeView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            fileTreeView.bottomAnchor.constraint(equalTo: footer.topAnchor),
+            fileTreeView.bottomAnchor.constraint(equalTo: footerHostingView.topAnchor),
         ])
         fileTreeView.onFilePreview = { [weak self] node in
             guard let self, let split = self.view.window?.contentViewController as? MainSplitViewController else { return }
@@ -456,10 +438,10 @@ final class HarnessSidebarPanelViewController: NSViewController {
         viewerView.isHidden = true
         view.addSubview(viewerView)
         NSLayoutConstraint.activate([
-            viewerView.topAnchor.constraint(equalTo: sectionHeader.bottomAnchor),
+            viewerView.topAnchor.constraint(equalTo: sectionLabelHostingView.bottomAnchor),
             viewerView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             viewerView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            viewerView.bottomAnchor.constraint(equalTo: footer.topAnchor),
+            viewerView.bottomAnchor.constraint(equalTo: footerHostingView.topAnchor),
         ])
         fileViewerVC.onBack = { [weak self] in
             guard let self else { return }
@@ -471,10 +453,10 @@ final class HarnessSidebarPanelViewController: NSViewController {
     private func setupGitPlaceholder() {
         view.addSubview(gitPanelView)
         NSLayoutConstraint.activate([
-            gitPanelView.topAnchor.constraint(equalTo: sectionHeader.bottomAnchor),
+            gitPanelView.topAnchor.constraint(equalTo: sectionLabelHostingView.bottomAnchor),
             gitPanelView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             gitPanelView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            gitPanelView.bottomAnchor.constraint(equalTo: footer.topAnchor),
+            gitPanelView.bottomAnchor.constraint(equalTo: footerHostingView.topAnchor),
         ])
     }
 
@@ -486,10 +468,10 @@ final class HarnessSidebarPanelViewController: NSViewController {
         agentChatPanel.isHidden = true
         view.addSubview(agentChatPanel)
         NSLayoutConstraint.activate([
-            agentChatPanel.topAnchor.constraint(equalTo: sectionHeader.bottomAnchor),
+            agentChatPanel.topAnchor.constraint(equalTo: sectionLabelHostingView.bottomAnchor),
             agentChatPanel.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             agentChatPanel.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            agentChatPanel.bottomAnchor.constraint(equalTo: footer.topAnchor),
+            agentChatPanel.bottomAnchor.constraint(equalTo: footerHostingView.topAnchor),
         ])
     }
 
@@ -581,85 +563,59 @@ final class HarnessSidebarPanelViewController: NSViewController {
 #endif
         switch index {
         case 1:
-            sectionLabel.stringValue = "FILES"
-            sectionLabel.font = HarnessDesign.Typography.sectionLabel
+            sidebarSectionModel.text = "FILES"
+            sidebarSectionModel.isRepoHeader = false
             if let cwd = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd {
                 let activeSessionID = SessionCoordinator.shared.snapshot.activeWorkspace?.activeSessionID
                 fileTreeView.updateRoot(path: cwd, sessionID: activeSessionID)
             }
         case 2:
-            sectionLabel.stringValue = "GIT"
-            sectionLabel.font = HarnessDesign.Typography.sectionLabel
+            sidebarSectionModel.text = "GIT"
+            sidebarSectionModel.isRepoHeader = false
             if let cwd = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd {
                 gitPanelView.updateRoot(path: cwd)
             } else {
                 gitPanelView.clearRoot()
             }
         case 3:
-            sectionLabel.stringValue = "AGENT"
-            sectionLabel.font = HarnessDesign.Typography.sectionLabel
+            sidebarSectionModel.text = "AGENT"
+            sidebarSectionModel.isRepoHeader = false
             // [ACP SHELVED] connectAgentIfNeeded()
         default:
-            sectionLabel.font = .systemFont(ofSize: 11.5, weight: .bold)
+            sidebarSectionModel.isRepoHeader = true
             updateRepoSectionHeader()
         }
     }
 
-    /// One footer row: "⚙ Settings" (text + icon) on the left, a trimmed set of quick
-    /// icons on the right — all on the same baseline. The redundant settings slider and
-    /// the help icon were removed (Settings is now the labeled button).
-    private func setupFooter() {
-        footer.translatesAutoresizingMaskIntoConstraints = false
-        HarnessDesign.makeClear(footer)
-
-        // Settings is now just a gear icon button, identical in style to the +/⌘ buttons.
-        let settings = HarnessDesign.softIconButton(symbol: "gearshape", tooltip: "Settings (⌘,)")
-        settings.target = self
-        settings.action = #selector(openSettings)
-
-        let newSession = HarnessDesign.softIconButton(symbol: "plus", tooltip: "New session")
-        newSession.target = self
-        newSession.action = #selector(addSession)
-
-        let recentProjects = HarnessDesign.softIconButton(symbol: "clock.arrow.circlepath", tooltip: "Recent projects")
-        recentProjects.target = self
-        recentProjects.action = #selector(showRecentProjects(_:))
-
-        // No "new workspace" control: the app runs a single workspace for now, and without a
-        // switcher a second workspace would strand the user with no way back.
-        let palette = HarnessDesign.softIconButton(symbol: "command", tooltip: "Command palette (⌘K)")
-        palette.target = self
-        palette.action = #selector(openPalette)
-
-        agentsButton.target = self
-        agentsButton.action = #selector(agentsButtonClicked)
-
-        footer.addSubview(settings)
-        footer.addSubview(agentsButton)
-        footer.addSubview(recentProjects)
-        footer.addSubview(newSession)
-        footer.addSubview(palette)
-        view.addSubview(footer)
-
+    private func setupFooterView() {
+        let hosting = NSHostingView(rootView: SidebarFooterView(
+            model: sidebarFooterModel,
+            onSettings: { [weak self] in self?.openSettings() },
+            onAgents: { [weak self] in self?.showAgentsInbox() },
+            onOpenRecent: { [weak self] path in self?.openRecentPath(path) },
+            onNewSession: { [weak self] in self?.addSession() },
+            onPalette: { [weak self] in self?.openPalette() },
+            recentProjectsProvider: { HarnessSidebarPanelViewController.recentProjectsList() }
+        ))
+        hosting.translatesAutoresizingMaskIntoConstraints = false
+        footerHostingView = hosting
+        view.addSubview(hosting)
         NSLayoutConstraint.activate([
-            footer.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            footer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            footer.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            footer.heightAnchor.constraint(equalToConstant: HarnessDesign.footerHeight + 6),
-
-            // Settings on the leading edge; the agents/new-session/palette actions on the trailing.
-            settings.leadingAnchor.constraint(equalTo: footer.leadingAnchor, constant: HarnessDesign.horizontalInset),
-            settings.centerYAnchor.constraint(equalTo: footer.centerYAnchor),
-
-            palette.trailingAnchor.constraint(equalTo: footer.trailingAnchor, constant: -(HarnessDesign.horizontalInset - 4)),
-            palette.centerYAnchor.constraint(equalTo: footer.centerYAnchor),
-            newSession.trailingAnchor.constraint(equalTo: palette.leadingAnchor, constant: -2),
-            newSession.centerYAnchor.constraint(equalTo: footer.centerYAnchor),
-            recentProjects.trailingAnchor.constraint(equalTo: newSession.leadingAnchor, constant: -2),
-            recentProjects.centerYAnchor.constraint(equalTo: footer.centerYAnchor),
-            agentsButton.trailingAnchor.constraint(equalTo: recentProjects.leadingAnchor, constant: -2),
-            agentsButton.centerYAnchor.constraint(equalTo: footer.centerYAnchor),
+            hosting.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            hosting.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            hosting.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            hosting.heightAnchor.constraint(equalToConstant: HarnessDesign.footerHeight + 6),
         ])
+    }
+
+    private func openRecentPath(_ path: String) {
+        guard let id = activeWorkspaceID else { return }
+        if let existing = sessions.first(where: { $0.tabs.contains(where: { $0.cwd == path }) }) {
+            SessionCoordinator.shared.selectSession(workspaceID: id, sessionID: existing.id)
+            return
+        }
+        Self.recordRecentProject(path)
+        SessionCoordinator.shared.addSession(to: id, cwd: path, name: (path as NSString).lastPathComponent)
     }
 
     @objc func reload() {
@@ -883,14 +839,14 @@ final class HarnessSidebarPanelViewController: NSViewController {
         guard sidebarTabs.selectedSegment == 0 else { return }
         let path = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd ?? ""
         if path.isEmpty {
-            self.sectionLabel.stringValue = "SESSIONS"
+            self.sidebarSectionModel.text = "SESSIONS"
             return
         }
         Task {
             let repoName = await fetchRepoName(for: path)
             await MainActor.run {
                 if self.sidebarTabs.selectedSegment == 0 {
-                    self.sectionLabel.stringValue = repoName.hasSuffix("/") ? repoName : "\(repoName)/"
+                    self.sidebarSectionModel.text = repoName.hasSuffix("/") ? repoName : "\(repoName)/"
                 }
             }
         }

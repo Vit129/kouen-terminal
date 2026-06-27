@@ -229,6 +229,135 @@ private final class WorkspaceSwitcherRow: NSView {
     }
 }
 
+// MARK: - Section label
+
+@Observable @MainActor
+final class SidebarSectionModel {
+    var text: String = "SESSIONS"
+    /// true = Sessions tab shows repo name in 11.5pt bold; false = other tabs 10.5pt semibold
+    var isRepoHeader: Bool = true
+    var chromeEpoch: Int = 0
+}
+
+struct SidebarSectionLabelView: View {
+    let model: SidebarSectionModel
+
+    var body: some View {
+        let _ = model.chromeEpoch
+        let c = HarnessDesign.chrome
+        Text(model.text)
+            .font(model.isRepoHeader
+                ? .system(size: 11.5, weight: .bold)
+                : Font(HarnessDesign.Typography.sectionLabel))
+            .foregroundColor(Color(nsColor: c.textTertiary))
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+            .padding(.leading, HarnessDesign.horizontalInset)
+            .padding(.bottom, 4)
+    }
+}
+
+// MARK: - Footer
+
+@Observable @MainActor
+final class SidebarFooterModel {
+    var chromeEpoch: Int = 0
+}
+
+struct SidebarFooterView: View {
+    let model: SidebarFooterModel
+    let onSettings: () -> Void
+    let onAgents: () -> Void
+    let onOpenRecent: (String) -> Void
+    let onNewSession: () -> Void
+    let onPalette: () -> Void
+    let recentProjectsProvider: () -> [String]
+
+    var body: some View {
+        let _ = model.chromeEpoch
+        let c = HarnessDesign.chrome
+        let epoch = model.chromeEpoch
+        HStack(spacing: 2) {
+            FooterIconButton(symbol: "gearshape", tooltip: "Settings (⌘,)", chromeEpoch: epoch, action: onSettings)
+            Spacer()
+            FooterIconButton(symbol: "sparkles", tooltip: "Agents", chromeEpoch: epoch, action: onAgents)
+            RecentProjectsMenuButton(chromeEpoch: epoch, provider: recentProjectsProvider, onSelect: onOpenRecent)
+            FooterIconButton(symbol: "plus", tooltip: "New session", chromeEpoch: epoch, action: onNewSession)
+            FooterIconButton(symbol: "command", tooltip: "Command palette (⌘K)", chromeEpoch: epoch, action: onPalette)
+        }
+        // Suppress unused warning — c is read via chromeEpoch-triggered body re-run in subviews
+        .background(Color(nsColor: c.sidebarBackground).opacity(0))
+        .padding(.horizontal, HarnessDesign.horizontalInset - 4)
+        .frame(height: HarnessDesign.footerHeight + 6)
+    }
+}
+
+private struct FooterIconButton: View {
+    let symbol: String
+    let tooltip: String
+    let chromeEpoch: Int
+    let action: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        let _ = chromeEpoch
+        let c = HarnessDesign.chrome
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(Color(nsColor: isHovered ? c.textPrimary : c.textSecondary))
+                .frame(width: 24, height: 24)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(Color(nsColor: isHovered
+                            ? c.textPrimary.withAlphaComponent(c.isDark ? 0.10 : 0.09)
+                            : NSColor.clear))
+                )
+        }
+        .buttonStyle(.plain)
+        .help(tooltip)
+        .onHover { isHovered = $0 }
+    }
+}
+
+private struct RecentProjectsMenuButton: View {
+    let chromeEpoch: Int
+    let provider: () -> [String]
+    let onSelect: (String) -> Void
+    @State private var isHovered = false
+
+    private var recents: [String] { provider() }
+
+    var body: some View {
+        let _ = chromeEpoch
+        let c = HarnessDesign.chrome
+        Menu {
+            if recents.isEmpty {
+                Text("No recent projects").disabled(true)
+            } else {
+                ForEach(recents, id: \.self) { path in
+                    Button((path as NSString).lastPathComponent) { onSelect(path) }
+                        .help(path)
+                }
+            }
+        } label: {
+            Image(systemName: "clock.arrow.circlepath")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(Color(nsColor: isHovered ? c.textPrimary : c.textSecondary))
+                .frame(width: 24, height: 24)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(Color(nsColor: isHovered
+                            ? c.textPrimary.withAlphaComponent(c.isDark ? 0.10 : 0.09)
+                            : NSColor.clear))
+                )
+                .onHover { isHovered = $0 }
+        }
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Recent projects")
+    }
+}
+
 // MARK: - Workspace pill
 
 @Observable @MainActor
