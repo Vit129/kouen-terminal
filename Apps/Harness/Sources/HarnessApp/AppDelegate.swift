@@ -197,15 +197,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Route each opened URL by kind: `.harnesstheme` files go through the theme importer, all
     /// others through the terminal opener. Terminal opens batch (one `DefaultTerminalOpener.open`
-    /// preserves the existing folder/asWindow semantics); theme opens are handled individually.
+    /// preserves the existing folder/asWindow semantics); theme and file-preview opens are handled individually.
     private func performExternalOpen(_ opens: [QueuedExternalOpen]) {
         let terminalOpens = opens.filter { $0.kind == .terminal }
         for open in opens where open.kind == .theme {
             ThemeImportController.handle(open.url)
         }
+        for open in opens where open.kind == .filePreview {
+            openFilePreview(url: open.url)
+        }
         for open in terminalOpens {
             DefaultTerminalOpener.open([open.url], asWindow: open.asWindow)
         }
+    }
+
+    private func openFilePreview(url: URL) {
+        let split = (NSApp.keyWindow?.contentViewController as? MainSplitViewController)
+                 ?? (NSApp.mainWindow?.contentViewController as? MainSplitViewController)
+        split?.previewExternalFile(path: url.path)
     }
 
     private func drainQueuedExternalOpenURLs() {
@@ -232,3 +241,4 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 }
+
