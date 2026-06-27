@@ -11,6 +11,9 @@ extension HarnessSidebarPanelViewController {
         UserDefaults.standard.stringArray(forKey: recentProjectsKey) ?? []
     }
 
+    /// Public alias used by `SidebarFooterView` closure to load recents without a VC reference.
+    static func recentProjectsList() -> [String] { recentProjects() }
+
     static func recordRecentProject(_ path: String) {
         var recents = recentProjects()
         recents.removeAll { $0 == path }
