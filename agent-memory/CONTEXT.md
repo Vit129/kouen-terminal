@@ -5,9 +5,14 @@
 - **Branch:** main
 - **Status:** AppKit → SwiftUI wave 2 complete. `.ai/` removed across all projects; grep+graphify+headroom+ponytail are canonical lookup tools
 
-### This session (2026-06-27) — Sidebar chrome SwiftUI + Open With Harness + file tree git root
+### This session (2026-06-27) — SwiftUI wave 2: 4 UI components migrated
 
 **Commits (this session):**
+- `760705a` — AppKit → SwiftUI wave 2: CommandPaletteController, TerminalTabBarView, FileEditorTabBarView, AgentInboxPanelView (net −424 lines)
+
+### Previous: 2026-06-27 — Sidebar chrome SwiftUI + Open With Harness + file tree git root
+
+**Commits (previous session):**
 - `bb68fd3` — `HarnessControls.swift` deleted (−998 lines, 9 dead AppKit classes)
 - `a072edf` — sidebar section label + footer → SwiftUI
 - `a6d59a9` — sidebar tab bar → SwiftUI `Picker(.segmented)`, `selectedTab` onto `SidebarSectionModel`, `@objc sidebarTabChanged` removed
