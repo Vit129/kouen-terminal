@@ -313,6 +313,13 @@ final class TerminalScreen {
         }
     }
 
+    /// Immediately trim history to `maxHistoryLines`. Called on memory pressure so inactive
+    /// sessions release their scrollback without waiting for the next scroll event.
+    func enforceHistoryCap() {
+        let excess = history.count - maxHistoryLines
+        if excess > 0 { dropHistoryHead(excess) }
+    }
+
     /// Trim `n` oldest history lines and keep image anchors consistent: every absolute row shifts
     /// down by `n`, and placements that fall entirely above the retained buffer are evicted (their
     /// pixels with them). The single funnel for dropping scrollback so images evict alongside it.
