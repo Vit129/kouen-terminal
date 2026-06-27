@@ -500,12 +500,8 @@ private struct TabPillView: View {
                 model.dragOffsetX = value.translation.width
                 let leadingX = CGFloat(index - visibleStart) * pitch
                 let dragX = leadingX + value.translation.width
-                let localTarget = clamp(
-                    Int((dragX / max(1, pitch)).rounded()),
-                    lower: 0,
-                    upper: max(0, visibleCount - 1)
-                )
-                model.dragTargetIndex = visibleStart + localTarget
+                let globalTarget = Int((dragX / max(1, pitch)).rounded()) + visibleStart
+                model.dragTargetIndex = clamp(globalTarget, lower: 0, upper: max(0, model.tabs.count - 1))
             }
             .onEnded { _ in
                 defer {
