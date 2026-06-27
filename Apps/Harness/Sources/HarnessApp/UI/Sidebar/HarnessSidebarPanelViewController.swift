@@ -44,6 +44,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
     /// when the CWD is the same (e.g. two sessions sharing the same repo root).
     var lastFileTreeSessionID: SessionID?
     var lastFileTreeGitBranch: String?
+    var lastFileTreeCWD: String?
 
     override func loadView() {
         let root = NSView()
@@ -530,7 +531,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
     func openExternalFile(path: String) {
         let expanded = (path as NSString).expandingTildeInPath
         let cwd = Self.gitRoot(for: expanded) ?? (expanded as NSString).deletingLastPathComponent
-        previewFile(path: expanded)
+        selectFilesTab(revealPath: expanded)
         guard let wsID = activeWorkspaceID else { return }
         if let existing = sessions.first(where: { $0.tabs.contains(where: { $0.cwd == cwd }) }) {
             SessionCoordinator.shared.selectSession(workspaceID: wsID, sessionID: existing.id)
@@ -593,7 +594,9 @@ final class HarnessSidebarPanelViewController: NSViewController {
             sidebarSectionModel.isRepoHeader = false
             if let cwd = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd {
                 let activeSessionID = SessionCoordinator.shared.snapshot.activeWorkspace?.activeSessionID
-                fileTreeView.updateRoot(path: cwd, sessionID: activeSessionID)
+                let root = Self.gitRoot(for: cwd) ?? cwd
+                fileTreeView.updateRoot(path: root, sessionID: activeSessionID)
+                fileTreeView.revealFileInTree(path: cwd)
             }
         case 2:
             sidebarSectionModel.text = "GIT"
@@ -662,11 +665,14 @@ final class HarnessSidebarPanelViewController: NSViewController {
             let sessionChanged = activeSessionID != lastFileTreeSessionID
             if sessionChanged {
                 lastFileTreeGitBranch = nil
+                lastFileTreeCWD = nil
             }
             let branchChanged = gitBranch != lastFileTreeGitBranch
-            fileTreeView.updateRoot(path: cwd, sessionID: activeSessionID)
-            if branchChanged {
-                fileTreeView.updateRoot(path: cwd, sessionID: activeSessionID)
+            let root = Self.gitRoot(for: cwd) ?? cwd
+            fileTreeView.updateRoot(path: root, sessionID: activeSessionID)
+            if cwd != lastFileTreeCWD {
+                fileTreeView.revealFileInTree(path: cwd)
+                lastFileTreeCWD = cwd
             }
             gitPanelView.updateRoot(path: cwd)
             lastFileTreeSessionID = activeSessionID
@@ -704,10 +710,16 @@ final class HarnessSidebarPanelViewController: NSViewController {
             let sessionChanged = activeSessionID != lastFileTreeSessionID
             if sessionChanged {
                 lastFileTreeGitBranch = nil
+                lastFileTreeCWD = nil
             }
             let branchChanged = gitBranch != lastFileTreeGitBranch
             if sessionChanged || branchChanged {
-                fileTreeView.updateRoot(path: cwd, sessionID: activeSessionID)
+                let root = Self.gitRoot(for: cwd) ?? cwd
+                fileTreeView.updateRoot(path: root, sessionID: activeSessionID)
+            }
+            if cwd != lastFileTreeCWD {
+                fileTreeView.revealFileInTree(path: cwd)
+                lastFileTreeCWD = cwd
             }
             gitPanelView.updateRoot(path: cwd)
             lastFileTreeSessionID = activeSessionID
@@ -879,5 +891,6 @@ final class HarnessSidebarPanelViewController: NSViewController {
     }
 
 }
+
 
 
