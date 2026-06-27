@@ -76,10 +76,10 @@ else
   ./Scripts/commit-push.sh
 fi
 
-# Step 4: Build production app. Rollback on failure.
+# Step 4: Build production app (no open — install-no-build handles deployment).
 echo ""
 echo "▶ Step 4: Building production app..."
-if ! ./Scripts/run.sh prod; then
+if ! swift build -c release || ! Scripts/package-app.sh release; then
   echo ""
   echo "❌ Production build failed — rolling back version bump..."
   git checkout -- \
@@ -90,6 +90,7 @@ if ! ./Scripts/run.sh prod; then
   echo "↩️  Version files restored. Fix the build and try again."
   exit 1
 fi
+codesign --force --sign - --deep Harness.app >/dev/null
 
 # Step 5: Generate CHANGELOG + tag + GitHub release via git-cliff.
 echo ""

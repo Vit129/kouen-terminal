@@ -2,6 +2,33 @@
 
 Older releases. See [CHANGELOG.md](../CHANGELOG.md) for recent versions.
 
+## [3.8.0] - 2026-06-22
+
+### Added
+- CLI infrastructure — permissions, skill-trigger hook, graphify hint ([`502e5ec`](https://github.com/Vit129/harness-terminal/commit/502e5ecb08f46dce9b28766a5b87624a8bfbb9c3))
+- CLI infrastructure ([`4e2d43a`](https://github.com/Vit129/harness-terminal/commit/4e2d43a5dcfa4393b7a6186b56b1806dc0145b99))
+- Finalize Git tab with auto-staging by default ([`377da37`](https://github.com/Vit129/harness-terminal/commit/377da370e3c8f8d51a8471cdb3905a8e66a33211))
+- Route Git commands via IPC to HarnessDaemon ([`88a89f7`](https://github.com/Vit129/harness-terminal/commit/88a89f742120dd2c3420c4b82de1fd48048f24ed))
+- Fix crashes + worktree isolation + harness-mcp browser tools complete ([`b8c26ea`](https://github.com/Vit129/harness-terminal/commit/b8c26ea3666a200290f602f7fd626798a4a697da))
+- Add IPC protocol versioning to identifyClient handshake ([`a0bc5a0`](https://github.com/Vit129/harness-terminal/commit/a0bc5a03f40ebec41781f6733e210e6cc788dbd6))
+
+### Changed
+- Decompose ContentAreaViewController into three focused coordinators ([`feaab9b`](https://github.com/Vit129/harness-terminal/commit/feaab9b528a4892b13c711bbe3c5ee33c939129a))
+- Centralize zombie-hold pattern into ZombieHoldRegistry ([`3d09e11`](https://github.com/Vit129/harness-terminal/commit/3d09e114ff8a14393d565d8efc8b112a8eeec5da))
+- Replace stringly-typed snapshotChanged userInfo with SnapshotChangedPayload ([`3302026`](https://github.com/Vit129/harness-terminal/commit/3302026d8ace2891124da9a78db3fb8b733b7de2))
+- Harness-terminal ([`0faeab2`](https://github.com/Vit129/harness-terminal/commit/0faeab285585b57f0558f767858990202093223f))
+
+### Documentation
+- CONTEXT.md — P28 complete (all 3 phases + RL-048) + CLI infrastructure ([`80c8f1f`](https://github.com/Vit129/harness-terminal/commit/80c8f1f89fee121b9a3263d75cb39914e3450141))
+- CONTEXT.md P28 completion ([`0381090`](https://github.com/Vit129/harness-terminal/commit/03810900e98ec1d48a137b83864307372f6760f9))
+
+### Fixed
+- Full-cycle push only new tag, not all tags — prevents rejection of existing tags ([`4f9b77f`](https://github.com/Vit129/harness-terminal/commit/4f9b77f0d21ce9cf8cac2fa1f28ec996065b71c9))
+- Full-cycle tag push fix ([`2b44272`](https://github.com/Vit129/harness-terminal/commit/2b44272c71c90412a5321a0fa6f36e7d3d76aeb1))
+- Warn + prompt when CHANGELOG entry missing before gh release ([`17dad96`](https://github.com/Vit129/harness-terminal/commit/17dad961380206577d348074aa709acabd22ca6c))
+- Full-cycle CHANGELOG guard ([`cdbc56b`](https://github.com/Vit129/harness-terminal/commit/cdbc56b17f4a80e317fdddbd39e53c95341e5d31))
+- Replace bash-only ${confirm,,} with tr for zsh compatibility ([`9fbe9bd`](https://github.com/Vit129/harness-terminal/commit/9fbe9bde7945f2b02af56df436ae8f3b6d73db46))
+
 ## [3.7.0] - 2026-06-21
 
 ### Added
