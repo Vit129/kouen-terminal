@@ -398,6 +398,7 @@ final class SessionCoordinator: NSObject {
         // Wire the terminal chat controller (⌘I → Warp-style inline AI blocks).
         let chatController = AITerminalChatController(hostView: host, settings: settings)
         aiChatControllers[surfaceID.uuidString] = chatController
+        host.surfaceView.onAskAI = { [weak chatController] text in chatController?.askAI(prefill: text) }
         return host
     }
 
