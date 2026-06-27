@@ -1512,16 +1512,16 @@ public final class HarnessTerminalSurfaceView: NSView {
         scheduler.start()
     }
 
-    /// On a variable-refresh (ProMotion) display, ask for the panel's full rate while the link is
-    /// awake — the WWDC-recommended range form (min 60 lets the system adapt down for power). A
-    /// no-op on fixed 60Hz panels and when the system already drives the link at native rate; the
-    /// link only runs while there's pending paint, so this never holds the panel at 120Hz at idle.
+    /// On a variable-refresh (ProMotion) display, cap burst renders at 60 Hz. Keyboard echo still
+    /// lands immediately via `presentNow()`, which bypasses the display link entirely. 120 Hz
+    /// render jobs compete with parse jobs on the same serial emulator queue — halving the
+    /// coalesced tick rate cuts that contention without affecting interactive latency.
     /// Re-applied on backing-property changes (the cross-monitor drag path).
     private func applyPreferredFrameRateRange() {
         guard let link = renderLink,
               let maxFPS = window?.screen?.maximumFramesPerSecond, maxFPS > 60 else { return }
         link.preferredFrameRateRange = CAFrameRateRange(
-            minimum: 60, maximum: Float(maxFPS), preferred: Float(maxFPS))
+            minimum: 60, maximum: Float(maxFPS), preferred: 60)
     }
 
     private func stopDisplayLink() {

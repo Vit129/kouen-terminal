@@ -429,10 +429,18 @@ final class SessionCoordinator: NSObject {
             let kind = identity.flatMap { AgentKind(rawValue: $0) }
             AgentDetector.setActivity(resolved, kind: kind, forSurfaceKey: surfaceID.uuidString)
             guard let host else { return }
-            if activity == "waiting_input", let prompt, !prompt.isEmpty {
-                AgentApprovalBar.show(on: host, prompt: prompt, kind: kind)
-            } else {
+            switch activity {
+            case "waiting_input":
+                if let prompt, !prompt.isEmpty {
+                    AgentApprovalBar.show(on: host, prompt: prompt, kind: kind)
+                }
+            case "idle", "errored":
+                // Only dismiss on terminal states — "working" must NOT hide a pending bar,
+                // or a concurrent Notification hook from another agent in the same PTY
+                // will silently cancel a PermissionRequest the user never saw.
                 AgentApprovalBar.hide(from: host)
+            default:
+                break
             }
         }
         // Dequeue the next queued command each time a shell prompt appears (OSC 133).
