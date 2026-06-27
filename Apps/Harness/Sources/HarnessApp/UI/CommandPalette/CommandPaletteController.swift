@@ -371,13 +371,13 @@ enum CommandPaletteController {
 
 // MARK: - SwiftUI palette
 
-fileprivate struct PaletteFileEntry: Sendable {
+struct PaletteFileEntry: Sendable {
     let path: String
     let relativePath: String
     let fileName: String
 }
 
-fileprivate struct PaletteGrepMatch: Sendable {
+struct PaletteGrepMatch: Sendable {
     let absolutePath: String
     let relativePath: String
     let filename: String
@@ -394,7 +394,7 @@ enum PaletteRow {
 
 @MainActor
 @Observable
-private final class PaletteModel {
+final class PaletteModel {
     var query: String = ""
     var rows: [PaletteRow] = []
     var selectedIndex: Int = 0
