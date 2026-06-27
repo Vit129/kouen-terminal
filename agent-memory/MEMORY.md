@@ -41,3 +41,12 @@
 
 ## 2026-06-25 — OSC 7735:  opens sidebar file viewer
 - New CLI→app channel via custom OSC sequence (7735). Pattern: emit OSC from CLI when HARNESS_SURFACE_ID set → TerminalEmulator callback → SurfaceView → TerminalHostDelegate → SessionCoordinator → MainExecutor.shared. Reuse this pattern for any future CLI-triggered app-layer actions.
+
+## 2026-06-27 — Block output tint + AI explain (Phase 12b)
+- `BlockTintOverlay: NSView` flipped, CA-backed, added as subview of TerminalHostView — renders above Metal surface via CA compositor. Draws alternating 2.8%/5.8% white-alpha tints per OSC 133 command block. Theme-agnostic (white alpha works on any dark terminal).
+- `BlockActionBar` shown on `onBlockSelected` callback (Cmd+Click). Two buttons: Copy (wraps `copyBlock()`) + AI ✦ (prefills `onAskAI` with block text). Auto-dismisses on scroll.
+- Public API added to `HarnessTerminalSurfaceView`: `promptRows`, `selectionString`, `copyBlock()`, `onBlockSelected`.
+- `CGWindowListCreateImage` removed in macOS 15 → tab thumbnails use `bitmapImageRepForCachingDisplay(in:)` + `cacheDisplay(in:to:)` instead.
+- `QuickTerminalController` deleted — blank terminal on open (can't type); redundant with ⌘T + app switch.
+- Vi mode at terminal-input level: sends escape sequences to PTY (not `set -o vi`). Esc → normal mode; i/a/A/s → insert. State stored on `HarnessTerminalSurfaceView.viModeState`.
+- `TabCell: NSView` subclass preferred over NSButton + associated objects for click handling — avoids Swift 6 `nonisolated(unsafe)` on non-Sendable `AnyObject` (mutable global state error).

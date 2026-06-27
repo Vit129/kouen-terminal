@@ -7,6 +7,8 @@ extension HarnessTerminalSurfaceView {
     public var selectionString: String? { selectionTextIfAny() }
     /// Copy the current selection to the system clipboard (no-op if nothing selected).
     public func copyBlock() { copySelection() }
+    /// Send raw text bytes to the PTY (equivalent to the user typing the string).
+    public func sendText(_ text: String) { emit(Array(text.utf8)) }
 
     /// Capture the current rendered frame as a scaled thumbnail.
     /// Returns nil when the view has no window (off-screen / inactive tab).
