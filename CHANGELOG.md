@@ -5,6 +5,24 @@ All notable changes to Harness are documented here. The format is based on
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/harness-terminal/releases).
+## [3.11.0] - 2026-06-27
+
+### Added
+- Floating Terminal ⌘⌥F — NSPanel workspace persists frame across toggles ([`68c4906`](https://github.com/Vit129/harness-terminal/commit/68c4906))
+- Tab Overview ⌘⇧\ — thumbnail grid of all open tabs, click to switch ([`68c4906`](https://github.com/Vit129/harness-terminal/commit/68c4906))
+- Block output overlay — per-command tint, rounded border, ⌘-click block select, collapse/expand triangle, Copy / AI ✦ / Re-run action bar ([`196c362`](https://github.com/Vit129/harness-terminal/commit/196c362), [`0e608ce`](https://github.com/Vit129/harness-terminal/commit/0e608ce), [`49d25b2`](https://github.com/Vit129/harness-terminal/commit/49d25b2))
+- Vi modal editing ⌘⌃V — Esc/hjkl/wb/x/i/a/A with visual mode toggle ([`5a7eb10`](https://github.com/Vit129/harness-terminal/commit/5a7eb10))
+- OSC 26 agent protocol — emulator parses identity/status/prompt; drives status dot + agent hooks ([`b6154c2`](https://github.com/Vit129/harness-terminal/commit/b6154c2))
+- Fork Tab ⌘⇧K — new tab at active pane CWD ([`b6154c2`](https://github.com/Vit129/harness-terminal/commit/b6154c2))
+- Agent approval bar — slide-up Allow (↵) / Deny (^C) on OSC 26 waiting_input ([`b6154c2`](https://github.com/Vit129/harness-terminal/commit/b6154c2))
+- Zoxide integration in directory picker + ⌘↩ opens selection in new tab ([`e64bbc8`](https://github.com/Vit129/harness-terminal/commit/e64bbc8))
+
+### Fixed
+- CPU peg (99.4%) — `BlockTintOverlay` called `emulatorSync { promptRows }` on every mouse move (60–120 Hz); now cached and refreshed once per command ([`b6154c2`](https://github.com/Vit129/harness-terminal/commit/b6154c2))
+- `FrecencyDirectoryStore` wrote JSON synchronously on main thread on every `cd` — debounced 0.5 s + background write ([`b6154c2`](https://github.com/Vit129/harness-terminal/commit/b6154c2))
+- Tab Overview blocked main thread on open — thumbnails now render deferred async after panel appears ([`372886a`](https://github.com/Vit129/harness-terminal/commit/372886a))
+- Scrollbar went dark after block overlay installed — `onScrollChanged` was replaced instead of chained ([`b6154c2`](https://github.com/Vit129/harness-terminal/commit/b6154c2))
+
 ## [3.10.1] - 2026-06-27
 
 ### Added
