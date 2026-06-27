@@ -25,6 +25,7 @@ final class SessionCoordinator: NSObject {
     var settings = HarnessSettings.load()
     private(set) var activeEndpoint: Endpoint = .localControlSocket
     var activeSurfaceID: SurfaceID?
+    private var memoryPressureSource: DispatchSourceMemoryPressure?
     var lastActiveSurfaceID: SurfaceID?
     var suppressActivePaneSync = false
     var structureRevision = 0
@@ -56,6 +57,30 @@ final class SessionCoordinator: NSObject {
         _ = splitPaneCoordinator; _ = sessionLifecycleService
         _ = themeService; _ = activePaneService
         daemonSyncService.startMetadataRefresh()
+        startMemoryPressureMonitor()
+    }
+
+    private func startMemoryPressureMonitor() {
+        let source = DispatchSource.makeMemoryPressureSource(eventMask: [.warning, .critical], queue: .main)
+        source.setEventHandler { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                let isCritical = source.data.contains(.critical)
+                // Inactive sessions: trim to 1 000 lines (warning) or 0 (critical).
+                // Focused session: spared on warning, trimmed to 1 000 on critical.
+                let inactiveLimit = isCritical ? 0 : 1_000
+                let focusedLimit  = isCritical ? 1_000 : Int.max
+                let focused = self.activeSurfaceID
+                for host in self.terminalHosts.allHosts() {
+                    let limit = host.surfaceID == focused ? focusedLimit : inactiveLimit
+                    if limit < self.settings.scrollbackLines {
+                        host.surfaceView.trimScrollback(to: limit)
+                    }
+                }
+            }
+        }
+        source.resume()
+        memoryPressureSource = source
     }
 
     private func observeNotifications() {

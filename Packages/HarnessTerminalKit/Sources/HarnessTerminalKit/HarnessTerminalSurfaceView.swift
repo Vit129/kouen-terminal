@@ -1044,6 +1044,15 @@ public final class HarnessTerminalSurfaceView: NSView {
         scheduleRender()
     }
 
+    /// Lower the scrollback cap to `limit` and immediately free the excess lines.
+    /// Safe to call on memory pressure; no-op if already within limit.
+    public func trimScrollback(to limit: Int) {
+        emulatorSync { e in
+            e.maxScrollbackLines = limit
+            e.trimScrollbackNow()
+        }
+    }
+
     // MARK: - Setup
 
     func emulatorSync<T>(_ body: (TerminalEmulator) -> T) -> T {

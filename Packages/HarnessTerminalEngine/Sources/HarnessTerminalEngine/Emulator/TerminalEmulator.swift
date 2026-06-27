@@ -120,6 +120,11 @@ public final class TerminalEmulator: VTParserHandler {
         set { primary.maxHistoryLines = max(0, newValue) }
     }
 
+    /// Immediately drop any scrollback lines that exceed `maxScrollbackLines`.
+    /// Normally the cap is enforced lazily on the next scroll; call this on memory pressure
+    /// to release memory from inactive sessions without waiting for new output.
+    public func trimScrollbackNow() { primary.enforceHistoryCap() }
+
     /// Read the viewport scrolled `offset` lines up into scrollback (0 = live bottom).
     public func readGrid(scrollbackOffset offset: Int) -> TerminalGridSnapshot {
         current.snapshot(scrollbackOffset: offset)
