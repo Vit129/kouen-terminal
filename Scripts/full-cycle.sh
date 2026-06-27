@@ -20,9 +20,7 @@ Runs:
   3. Build production app.
   4. If prod build fails → rollback version bump.
   5. Commit, push, CHANGELOG, tag, GitHub release.
-  6. Sign (code sign + notarize).
-  7. Create DMG.
-  8. Finalize (notarize DMG + upload to GitHub release + appcast).
+  6. Install to /Applications (no rebuild — reuses step 4 binary).
 USAGE
 }
 
@@ -164,18 +162,10 @@ gh release create "$TAG" --title "$TAG" --notes "$NOTES" 2>/dev/null \
   || gh release edit "$TAG" --title "$TAG" --notes "$NOTES" 2>/dev/null \
   || echo "⚠️  GitHub release skipped (gh CLI not configured or tag exists)"
 
-# Step 6: Sign, DMG, finalize (notarize + upload to GitHub release + appcast).
+# Step 6: Install to /Applications (app already built in step 4 — skip rebuild).
 echo ""
-echo "▶ Step 6: Signing..."
-make sign
-
-echo ""
-echo "▶ Step 7: Creating DMG..."
-make dmg
-
-echo ""
-echo "▶ Step 8: Finalizing (notarize + upload + appcast)..."
-make finalize
+echo "▶ Step 6: Installing to /Applications..."
+make install-no-build
 
 echo ""
 echo "✅ Full cycle complete. Version: $TAG"
