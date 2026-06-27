@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import HarnessCore
 import HarnessLSP
 import HarnessTerminalKit
@@ -44,6 +45,7 @@ private final class PalettePanel: NSPanel {
 @MainActor
 enum CommandPaletteController {
     private static var panel: NSPanel?
+    private static var windowDelegate: PaletteWindowDelegate?
     /// MRU stack of action IDs the user has just run. Persisted across launches so
     /// the palette feels like it learns from the user.
     private static let recentDefaultsKey = "com.robert.harness.palette.recent"
@@ -83,7 +85,8 @@ enum CommandPaletteController {
         } else {
             actions = buildActions()
         }
-        let controller = PaletteViewController(actions: actions, recentIDs: loadRecents(), parentWindow: parent, mode: mode)
+        let model = PaletteModel(actions: actions, recentIDs: loadRecents(), parentWindow: parent, mode: mode)
+        let controller = NSHostingController(rootView: PaletteView(model: model))
         let panel = PalettePanel(
             contentRect: NSRect(x: 0, y: 0, width: 620, height: 440),
             styleMask: [.nonactivatingPanel, .borderless],
@@ -97,7 +100,10 @@ enum CommandPaletteController {
         panel.isOpaque = false
         panel.hasShadow = true
         panel.contentViewController = controller
-        panel.delegate = controller
+        let delegate = PaletteWindowDelegate()
+        delegate.panel = panel
+        panel.delegate = delegate
+        windowDelegate = delegate
 
         // Centered on the parent window — exactly, both axes (no vertical bias).
         // Falling back to screen center when there is no parent window keeps the
@@ -117,13 +123,14 @@ enum CommandPaletteController {
             panel.center()
         }
         self.panel = panel
+        model.panel = panel
         NSApp.activate(ignoringOtherApps: true)
         panel.alphaValue = 0
         panel.makeKeyAndOrderFront(nil)
         HarnessMotion.animate(HarnessDesign.Motion.fast, timing: HarnessDesign.Motion.spring) { _ in
             panel.animator().alphaValue = 1
         }
-        controller.focusSearch()
+        model.startFileScan()
     }
 
     @MainActor
@@ -361,393 +368,163 @@ enum CommandPaletteController {
 
 }
 
-// MARK: - View controller
+
+// MARK: - SwiftUI palette
+
+fileprivate struct PaletteFileEntry: Sendable {
+    let path: String
+    let relativePath: String
+    let fileName: String
+}
+
+fileprivate struct PaletteGrepMatch: Sendable {
+    let absolutePath: String
+    let relativePath: String
+    let filename: String
+    let line: Int
+    let column: Int
+    let text: String
+    let ordinal: Int
+}
+
+enum PaletteRow {
+    case header(PaletteAction.Section)
+    case item(PaletteAction)
+}
 
 @MainActor
-final class PaletteViewController: NSViewController, NSTableViewDataSource, NSTableViewDelegate,
-    NSTextFieldDelegate, NSWindowDelegate
-{
-    private let searchField = NSTextField()
-    private let tableView = NSTableView()
-    private let scrollView = NSScrollView()
-    private let emptyLabel = NSTextField(labelWithString: "No matching commands")
-    private let footer = NSView()
-    private let allActions: [PaletteAction]
-    private let recentIDs: [String]
-    private weak var parentWindow: NSWindow?
-    /// Cached file matches from background scan; keyed by rootPath.
-    private var cachedFileEntries: (rootPath: String, entries: [(path: String, relativePath: String, fileName: String)]) = ("", [])
-    private var fileScanTask: Task<Void, Never>?
-    private let symbolIndex = WorkspaceSymbolIndex()
-    /// Flat list of rows shown — alternating section headers and items.
-    private var rows: [Row] = []
-    /// Logical positions of actionable rows so arrow-keys skip headers.
-    private var selectableRowIndexes: [Int] = []
-    private let mode: CommandPaletteController.PaletteMode
-    private var grepActions: [PaletteAction] = []
-    private var grepSearchTask: Task<Void, Never>?
+@Observable
+private final class PaletteModel {
+    var query: String = ""
+    var rows: [PaletteRow] = []
+    var selectedIndex: Int = 0
+    var selectableIndexes: [Int] = []
+    var cachedFileEntries: (rootPath: String, entries: [PaletteFileEntry]) = ("", [])
+    var grepActions: [PaletteAction] = []
 
-    private enum Row {
-        case header(PaletteAction.Section)
-        case item(PaletteAction)
+    let mode: CommandPaletteController.PaletteMode
+    let allActions: [PaletteAction]
+    let recentIDs: [String]
+    weak var parentWindow: NSWindow?
+    weak var panel: NSPanel?
+
+    @ObservationIgnored private var fileScanTask: Task<Void, Never>?
+    @ObservationIgnored private var grepSearchTask: Task<Void, Never>?
+    @ObservationIgnored private let symbolIndex = WorkspaceSymbolIndex()
+
+    var placeholder: String {
+        switch mode {
+        case .normal:
+            return "Search commands, workspaces, themes..."
+        case .errors:
+            return "Search compiler errors..."
+        case .grep:
+            return "Search text in files (grep)..."
+        }
     }
 
-    init(actions: [PaletteAction], recentIDs: [String], parentWindow: NSWindow?, mode: CommandPaletteController.PaletteMode = .normal) {
-        allActions = actions
+    init(
+        actions: [PaletteAction],
+        recentIDs: [String],
+        parentWindow: NSWindow?,
+        mode: CommandPaletteController.PaletteMode = .normal
+    ) {
+        self.allActions = actions
         self.recentIDs = recentIDs
         self.parentWindow = parentWindow
         self.mode = mode
-        super.init(nibName: nil, bundle: nil)
-        rebuildRows(query: "")
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError() }
-
-    override func loadView() {
-        let overlay = HarnessOverlayBackground()
-        overlay.frame = NSRect(x: 0, y: 0, width: 620, height: 440)
-        view = overlay
-    }
-
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        let c = HarnessChrome.current
-        guard let content = (view as? HarnessOverlayBackground)?.contentView else { return }
-
-        let placeholder: String
-        switch mode {
-        case .normal:
-            placeholder = "Search commands, workspaces, themes…"
-        case .errors:
-            placeholder = "Search compiler errors…"
-        case .grep:
-            placeholder = "Search text in files (grep)…"
+        if case let .grep(initialQuery) = mode {
+            query = initialQuery
         }
-
-        searchField.placeholderAttributedString = NSAttributedString(
-            string: placeholder,
-            attributes: [
-                .foregroundColor: c.textTertiary,
-                .font: NSFont.systemFont(ofSize: 15),
-            ]
-        )
-        searchField.font = .systemFont(ofSize: 15)
-        searchField.textColor = c.textPrimary
-        searchField.isBordered = false
-        searchField.drawsBackground = false
-        searchField.focusRingType = .none
-        searchField.delegate = self
-        searchField.translatesAutoresizingMaskIntoConstraints = false
-
-        let separator = NSView()
-        separator.wantsLayer = true
-        separator.layer?.backgroundColor = c.border.cgColor
-        separator.translatesAutoresizingMaskIntoConstraints = false
-
-        let column = NSTableColumn(identifier: .init("action"))
-        tableView.addTableColumn(column)
-        tableView.headerView = nil
-        tableView.backgroundColor = .clear
-        tableView.dataSource = self
-        tableView.delegate = self
-        tableView.intercellSpacing = .zero
-        tableView.selectionHighlightStyle = .none // PaletteRowView draws themed selection
-        // Both single-click and double-click activate. Spotlight/Raycast feel —
-        // there's no value in "select but don't run" inside a transient palette.
-        tableView.action = #selector(activate)
-        tableView.doubleAction = #selector(activate)
-        tableView.target = self
-        tableView.translatesAutoresizingMaskIntoConstraints = false
-
-        scrollView.documentView = tableView
-        scrollView.drawsBackground = false
-        scrollView.hasVerticalScroller = true
-        scrollView.autohidesScrollers = true
-        scrollView.translatesAutoresizingMaskIntoConstraints = false
-        scrollView.contentInsets = NSEdgeInsets(top: 4, left: 0, bottom: 4, right: 0)
-
-        emptyLabel.font = .systemFont(ofSize: 13)
-        emptyLabel.textColor = c.textTertiary
-        emptyLabel.alignment = .center
-        emptyLabel.translatesAutoresizingMaskIntoConstraints = false
-        emptyLabel.isHidden = true
-
-        footer.wantsLayer = true
-        footer.layer?.backgroundColor = c.textPrimary.withAlphaComponent(c.isDark ? 0.04 : 0.05).cgColor
-        footer.translatesAutoresizingMaskIntoConstraints = false
-        let footerHint = makeFooterHint()
-        footer.addSubview(footerHint)
-        NSLayoutConstraint.activate([
-            footerHint.leadingAnchor.constraint(equalTo: footer.leadingAnchor, constant: HarnessDesign.Spacing.xl),
-            footerHint.trailingAnchor.constraint(equalTo: footer.trailingAnchor, constant: -HarnessDesign.Spacing.xl),
-            footerHint.centerYAnchor.constraint(equalTo: footer.centerYAnchor),
-        ])
-
-        content.addSubview(searchField)
-        content.addSubview(separator)
-        content.addSubview(scrollView)
-        content.addSubview(emptyLabel)
-        content.addSubview(footer)
-
-        NSLayoutConstraint.activate([
-            searchField.topAnchor.constraint(equalTo: content.topAnchor, constant: HarnessDesign.Spacing.lg + 2),
-            searchField.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: HarnessDesign.Spacing.xl),
-            searchField.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -HarnessDesign.Spacing.xl),
-            searchField.heightAnchor.constraint(equalToConstant: 28),
-
-            separator.topAnchor.constraint(equalTo: searchField.bottomAnchor, constant: HarnessDesign.Spacing.lg),
-            separator.leadingAnchor.constraint(equalTo: content.leadingAnchor),
-            separator.trailingAnchor.constraint(equalTo: content.trailingAnchor),
-            separator.heightAnchor.constraint(equalToConstant: 1),
-
-            scrollView.topAnchor.constraint(equalTo: separator.bottomAnchor),
-            scrollView.leadingAnchor.constraint(equalTo: content.leadingAnchor),
-            scrollView.trailingAnchor.constraint(equalTo: content.trailingAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: footer.topAnchor),
-
-            emptyLabel.centerXAnchor.constraint(equalTo: scrollView.centerXAnchor),
-            emptyLabel.centerYAnchor.constraint(equalTo: scrollView.centerYAnchor),
-
-            footer.leadingAnchor.constraint(equalTo: content.leadingAnchor),
-            footer.trailingAnchor.constraint(equalTo: content.trailingAnchor),
-            footer.bottomAnchor.constraint(equalTo: content.bottomAnchor),
-            footer.heightAnchor.constraint(equalToConstant: 28),
-        ])
-
-        tableView.reloadData()
-        selectFirstSelectable()
-
-        if case let .grep(query) = mode, !query.isEmpty {
-            searchField.stringValue = query
+        rebuildRows(query: query)
+        if case .grep = mode, !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             startGrepSearch(query: query)
         }
     }
 
-    private func makeFooterHint() -> NSView {
-        let c = HarnessChrome.current
-        let stack = NSStackView()
-        stack.orientation = .horizontal
-        stack.spacing = HarnessDesign.Spacing.lg
-        stack.alignment = .centerY
-        stack.translatesAutoresizingMaskIntoConstraints = false
-
-        func chip(_ keys: String, label: String) -> NSView {
-            let row = NSStackView()
-            row.orientation = .horizontal
-            row.spacing = 4
-            row.alignment = .centerY
-
-            let kbd = NSTextField(labelWithString: keys)
-            kbd.font = .monospacedSystemFont(ofSize: 10, weight: .semibold)
-            kbd.textColor = c.textSecondary
-            kbd.drawsBackground = true
-            kbd.backgroundColor = c.textPrimary.withAlphaComponent(c.isDark ? 0.08 : 0.10)
-            kbd.isBezeled = false
-            kbd.wantsLayer = true
-            kbd.layer?.cornerRadius = 3
-            kbd.layer?.cornerCurve = .continuous
-            kbd.alignment = .center
-            // The bezelless field renders without padding by default; give it a
-            // little horizontal breathing room via a wrapping view.
-            let wrap = NSView()
-            wrap.wantsLayer = true
-            wrap.layer?.cornerRadius = 3
-            wrap.layer?.cornerCurve = .continuous
-            wrap.layer?.backgroundColor = c.textPrimary.withAlphaComponent(c.isDark ? 0.08 : 0.10).cgColor
-            kbd.drawsBackground = false
-            kbd.translatesAutoresizingMaskIntoConstraints = false
-            wrap.addSubview(kbd)
-            NSLayoutConstraint.activate([
-                kbd.leadingAnchor.constraint(equalTo: wrap.leadingAnchor, constant: 5),
-                kbd.trailingAnchor.constraint(equalTo: wrap.trailingAnchor, constant: -5),
-                kbd.topAnchor.constraint(equalTo: wrap.topAnchor, constant: 1),
-                kbd.bottomAnchor.constraint(equalTo: wrap.bottomAnchor, constant: -1),
-            ])
-            row.addArrangedSubview(wrap)
-
-            let text = NSTextField(labelWithString: label)
-            text.font = .systemFont(ofSize: 11, weight: .regular)
-            text.textColor = c.textTertiary
-            row.addArrangedSubview(text)
-            return row
-        }
-        stack.addArrangedSubview(chip("↑↓", label: "Navigate"))
-        stack.addArrangedSubview(chip("↩", label: "Run"))
-        stack.addArrangedSubview(chip("esc", label: "Close"))
-        return stack
+    deinit {
+        fileScanTask?.cancel()
+        grepSearchTask?.cancel()
     }
 
-    func focusSearch() {
-        view.window?.makeFirstResponder(searchField)
-        startFileScanIfNeeded()
-    }
-
-    private func startFileScanIfNeeded() {
-        let rootPath = Self.activeWorkbenchRoot()
+    func startFileScan() {
+        let rootPath = CommandPaletteController.activeWorkbenchRoot()
         guard rootPath != cachedFileEntries.rootPath else { return }
         symbolIndex.scan(root: rootPath)
         fileScanTask?.cancel()
-        fileScanTask = Task.detached(priority: .userInitiated) { [weak self] in
-            let rootURL = URL(fileURLWithPath: rootPath)
-            let rootPrefix = rootPath.hasSuffix("/") ? rootPath : rootPath + "/"
-            let enumerator = FileManager.default.enumerator(
-                at: rootURL,
-                includingPropertiesForKeys: [.isDirectoryKey],
-                options: [.skipsHiddenFiles, .skipsPackageDescendants]
-            )
-            var entries: [(path: String, relativePath: String, fileName: String)] = []
-            while let url = enumerator?.nextObject() as? URL {
-                if Task.isCancelled { break }
-                if (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
-                    let name = url.lastPathComponent
-                    if name == "node_modules" || name == ".git" || name == ".build" || name == "DerivedData" {
-                        enumerator?.skipDescendants()
-                    }
-                    continue
-                }
-                let path = url.path
-                let rel = path.hasPrefix(rootPrefix) ? String(path.dropFirst(rootPrefix.count)) : url.lastPathComponent
-                entries.append((path: path, relativePath: rel, fileName: url.lastPathComponent))
-                if entries.count >= 5000 { break }
-            }
-            await MainActor.run { [weak self] in
-                self?.cachedFileEntries = (rootPath, entries)
+        fileScanTask = Task { [weak self] in
+            let entries = await Task.detached(priority: .userInitiated) {
+                CommandPaletteController.scanFileEntries(rootPath: rootPath)
+            }.value
+            guard !Task.isCancelled else { return }
+            self?.cachedFileEntries = (rootPath, entries)
+            if let query = self?.query, !(self?.isGrepMode ?? false) {
+                self?.rebuildRows(query: query)
             }
         }
     }
 
-    // MARK: - Filtering / ranking
-
-    func controlTextDidChange(_ obj: Notification) {
-        let query = searchField.stringValue
-        if case .grep = mode {
-            startGrepSearch(query: query)
+    func updateQuery(_ newValue: String) {
+        if isGrepMode {
+            startGrepSearch(query: newValue)
         } else {
-            rebuildRows(query: query)
-            tableView.reloadData()
-            emptyLabel.isHidden = !selectableRowIndexes.isEmpty
-            selectFirstSelectable()
+            rebuildRows(query: newValue)
         }
     }
 
-    private func startGrepSearch(query: String) {
+    func moveSelection(by offset: Int) {
+        guard !selectableIndexes.isEmpty else { return }
+        let currentPosition = selectableIndexes.firstIndex(of: selectedIndex) ?? 0
+        let targetPosition = (currentPosition + offset + selectableIndexes.count) % selectableIndexes.count
+        selectedIndex = selectableIndexes[targetPosition]
+    }
+
+    func selectFirstSelectable() {
+        selectedIndex = selectableIndexes.first ?? 0
+    }
+
+    func activateSelected() {
+        activate(rowIndex: selectedIndex)
+    }
+
+    func activate(rowIndex: Int) {
+        guard rows.indices.contains(rowIndex), case let .item(action) = rows[rowIndex] else { return }
+        CommandPaletteController.recordUsage(action.id)
+        panel?.close()
+        action.handler()
+    }
+
+    func close() {
+        panel?.close()
+    }
+
+    private var isGrepMode: Bool {
+        if case .grep = mode { return true }
+        return false
+    }
+
+    private func startGrepSearch(query rawQuery: String) {
         grepSearchTask?.cancel()
+        let query = rawQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else {
-            self.grepActions = []
-            self.rebuildRows(query: "")
-            self.tableView.reloadData()
-            self.emptyLabel.isHidden = !self.selectableRowIndexes.isEmpty
+            grepActions = []
+            rebuildRows(query: "")
             return
         }
-        let root = Self.activeWorkbenchRoot()
-        
-        grepSearchTask = Task {
-            let actions = await Self.runSearch(query: query, root: root)
+        let root = CommandPaletteController.activeWorkbenchRoot()
+        grepSearchTask = Task { [weak self] in
+            let matches = await Task.detached(priority: .userInitiated) {
+                CommandPaletteController.grepMatches(query: query, root: root)
+            }.value
             guard !Task.isCancelled else { return }
-            self.grepActions = actions
-            self.rebuildRows(query: query)
-            self.tableView.reloadData()
-            self.emptyLabel.isHidden = !self.selectableRowIndexes.isEmpty
-            self.selectFirstSelectable()
-        }
-    }
-
-    private static func runSearch(query: String, root: String) async -> [PaletteAction] {
-        let rgPath = ["/opt/homebrew/bin/rg", "/usr/local/bin/rg", "/usr/bin/rg"].first(where: { FileManager.default.fileExists(atPath: $0) })
-        let proc = Process()
-        let pipe = Pipe()
-        proc.standardOutput = pipe
-        proc.standardError = FileHandle.nullDevice
-        proc.currentDirectoryURL = URL(fileURLWithPath: root)
-        if let rgPath {
-            proc.executableURL = URL(fileURLWithPath: rgPath)
-            proc.arguments = ["--line-number", "--column", "--no-heading", "--color=never", query, "."]
-        } else {
-            proc.executableURL = URL(fileURLWithPath: "/usr/bin/grep")
-            proc.arguments = ["-rn", query, "."]
-        }
-        
-        do {
-            try proc.run()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            proc.waitUntilExit()
-            guard let output = String(data: data, encoding: .utf8) else { return [] }
-            
-            var actions: [PaletteAction] = []
-            var count = 0
-            for line in output.components(separatedBy: "\n") {
-                guard !line.isEmpty else { continue }
-                // Parse line of format: path:line:col:text or path:line:text
-                let parts = line.components(separatedBy: ":")
-                guard parts.count >= 3 else { continue }
-                let relPath = parts[0]
-                guard let lineNum = Int(parts[1]) else { continue }
-                
-                let colNum: Int
-                let text: String
-                if parts.count >= 4, let col = Int(parts[2]) {
-                    colNum = col
-                    text = parts.dropFirst(3).joined(separator: ":").trimmingCharacters(in: .whitespacesAndNewlines)
-                } else {
-                    colNum = 1
-                    text = parts.dropFirst(2).joined(separator: ":").trimmingCharacters(in: .whitespacesAndNewlines)
-                }
-                
-                let absPath = (root as NSString).appendingPathComponent(relPath)
-                let filename = (relPath as NSString).lastPathComponent
-                
-                count += 1
-                actions.append(PaletteAction(
-                    id: "grep.\(absPath).\(lineNum).\(colNum).\(count)",
-                    title: text.isEmpty ? "Match" : text,
-                    subtitle: "\(filename):\(lineNum):\(colNum) — \(relPath)",
-                    symbol: "magnifyingglass",
-                    shortcut: "",
-                    section: .grep
-                ) {
-                    guard let split = NSApp.keyWindow?.contentViewController as? MainSplitViewController
-                        ?? NSApp.mainWindow?.contentViewController as? MainSplitViewController
-                    else { return }
-                    split.contentVC.openFileTab(path: absPath)
-                    split.contentVC.navigateCurrentFile(line: lineNum, column: colNum)
-                })
-                if actions.count >= 100 { break }
-            }
-            return actions
-        } catch {
-            return []
-        }
-    }
-
-    @MainActor
-    private static func activeWorkbenchRoot() -> String {
-        let coordinator = SessionCoordinator.shared
-        return WorkbenchContextResolver.resolve(
-            snapshot: coordinator.snapshot,
-            focusedSurfaceID: coordinator.activeSurfaceID,
-            currentFilePath: nil
-        )?.cwd ?? FileManager.default.currentDirectoryPath
-    }
-
-    func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
-        switch selector {
-        case #selector(NSResponder.moveDown(_:)):
-            moveSelection(by: 1); return true
-        case #selector(NSResponder.moveUp(_:)):
-            moveSelection(by: -1); return true
-        case #selector(NSResponder.insertNewline(_:)):
-            activate(); return true
-        case #selector(NSResponder.cancelOperation(_:)):
-            view.window?.close(); return true
-        default:
-            return false
+            self?.grepActions = CommandPaletteController.grepActions(from: matches)
+            self?.rebuildRows(query: query)
         }
     }
 
     private func rebuildRows(query rawQuery: String) {
         let query = rawQuery.trimmingCharacters(in: .whitespaces)
-        var newRows: [Row] = []
+        var newRows: [PaletteRow] = []
         var selectable: [Int] = []
 
         switch mode {
@@ -758,35 +535,18 @@ final class PaletteViewController: NSViewController, NSTableViewDataSource, NSTa
                     matches.append((action, 0))
                 } else {
                     let score = FileFuzzyMatcher.score(query: query, in: action.title) ?? -1
-                    if score >= 0 {
-                        matches.append((action, score))
-                    }
+                    if score >= 0 { matches.append((action, score)) }
                 }
             }
-            if !query.isEmpty {
-                matches.sort { $0.score > $1.score }
-            }
-            if !matches.isEmpty {
-                newRows.append(.header(.errors))
-                for entry in matches {
-                    selectable.append(newRows.count)
-                    newRows.append(.item(entry.action))
-                }
-            }
+            if !query.isEmpty { matches.sort { $0.score > $1.score } }
+            appendSection(.errors, entries: matches.map(\.action), rows: &newRows, selectable: &selectable)
+
         case .grep:
-            if !grepActions.isEmpty {
-                newRows.append(.header(.grep))
-                for action in grepActions {
-                    selectable.append(newRows.count)
-                    newRows.append(.item(action))
-                }
-            }
+            appendSection(.grep, entries: grepActions, rows: &newRows, selectable: &selectable)
+
         case .normal:
             var matches: [(action: PaletteAction, score: Int)] = []
-
             if query.isEmpty {
-                // Empty query: prepend recents (filtered against currently-available
-                // actions so stale IDs don't appear), then everything in section order.
                 let recents = recentIDs.compactMap { id in allActions.first(where: { $0.id == id }) }
                 for action in recents {
                     matches.append((action: PaletteAction(
@@ -799,11 +559,10 @@ final class PaletteViewController: NSViewController, NSTableViewDataSource, NSTa
                         handler: action.handler
                     ), score: 0))
                 }
+
                 let recentFiles = WorkbenchMRU.shared.entries
                 let scopePath = SessionCoordinator.shared.activeTabCWD
-                let scopedFiles = scopePath != nil
-                    ? recentFiles.filter { $0.hasPrefix(scopePath!) }
-                    : recentFiles
+                let scopedFiles = scopePath.map { scope in recentFiles.filter { $0.hasPrefix(scope) } } ?? recentFiles
                 for file in scopedFiles {
                     let filename = (file as NSString).lastPathComponent
                     let relativePath = HarnessDesign.shortenPath(file)
@@ -814,15 +573,15 @@ final class PaletteViewController: NSViewController, NSTableViewDataSource, NSTa
                         symbol: "doc.text",
                         shortcut: "",
                         section: .recent
-                    ) {
-                        guard let split = NSApp.keyWindow?.contentViewController as? MainSplitViewController
+                    ) { [weak parentWindow] in
+                        guard let split = parentWindow?.contentViewController as? MainSplitViewController
                             ?? NSApp.mainWindow?.contentViewController as? MainSplitViewController
                         else { return }
                         split.contentVC.openFileTab(path: file)
                     }, score: 0))
                 }
-                let recentIDSet = Set(recents.map(\.id))
-                for action in allActions where !recentIDSet.contains(action.id) {
+
+                for action in allActions {
                     matches.append((action, 0))
                 }
             } else {
@@ -831,8 +590,6 @@ final class PaletteViewController: NSViewController, NSTableViewDataSource, NSTa
                     let subtitleScore = FileFuzzyMatcher.score(query: query, in: action.subtitle) ?? -1
                     let best = max(titleScore, subtitleScore >= 0 ? subtitleScore - 5 : -1)
                     if best >= 0 {
-                        // Boost recents so a query that matches multiple things prefers a
-                        // command the user actually uses.
                         let recencyBoost = recentIDs.firstIndex(of: action.id).map { 15 - $0 } ?? 0
                         matches.append((action, best + recencyBoost))
                     }
@@ -842,22 +599,13 @@ final class PaletteViewController: NSViewController, NSTableViewDataSource, NSTa
                 matches.sort { $0.score > $1.score }
             }
 
-            // Group into ordered sections with header rows.
             if query.isEmpty {
-                // Empty: keep section order natural — recent first, then everything else.
                 let sectionsInOrder: [PaletteAction.Section] = [.recent, .actions, .navigation, .tabs, .projects, .themes]
                 for section in sectionsInOrder {
-                    let entries = matches.filter { $0.action.section == section }
-                    if entries.isEmpty { continue }
-                    newRows.append(.header(section))
-                    for entry in entries {
-                        selectable.append(newRows.count)
-                        newRows.append(.item(entry.action))
-                    }
+                    let entries = matches.filter { $0.action.section == section }.map(\.action)
+                    appendSection(section, entries: entries, rows: &newRows, selectable: &selectable)
                 }
             } else {
-                // Search mode: top results first regardless of section, but still group
-                // by section to give the user a sense of *what kind* of thing matched.
                 var bySection: [PaletteAction.Section: [(PaletteAction, Int)]] = [:]
                 for entry in matches {
                     bySection[entry.action.section, default: []].append((entry.action, entry.score))
@@ -869,17 +617,30 @@ final class PaletteViewController: NSViewController, NSTableViewDataSource, NSTa
                 }
                 for section in sectionsInOrder {
                     guard let entries = bySection[section], !entries.isEmpty else { continue }
-                    newRows.append(.header(section))
-                    for entry in entries {
-                        selectable.append(newRows.count)
-                        newRows.append(.item(entry.0))
-                    }
+                    appendSection(section, entries: entries.map(\.0), rows: &newRows, selectable: &selectable)
                 }
             }
         }
 
         rows = newRows
-        selectableRowIndexes = selectable
+        selectableIndexes = selectable
+        if !selectable.contains(selectedIndex) {
+            selectFirstSelectable()
+        }
+    }
+
+    private func appendSection(
+        _ section: PaletteAction.Section,
+        entries: [PaletteAction],
+        rows: inout [PaletteRow],
+        selectable: inout [Int]
+    ) {
+        guard !entries.isEmpty else { return }
+        rows.append(.header(section))
+        for action in entries {
+            selectable.append(rows.count)
+            rows.append(.item(action))
+        }
     }
 
     private func fileMatches(query: String) -> [(action: PaletteAction, score: Int)] {
@@ -899,8 +660,8 @@ final class PaletteViewController: NSViewController, NSTableViewDataSource, NSTa
                     symbol: "doc.text",
                     shortcut: "",
                     section: .files
-                ) { [weak window = parentWindow] in
-                    guard let split = window?.contentViewController as? MainSplitViewController
+                ) { [weak parentWindow] in
+                    guard let split = parentWindow?.contentViewController as? MainSplitViewController
                         ?? NSApp.mainWindow?.contentViewController as? MainSplitViewController
                     else { return }
                     split.contentVC.openFileTab(path: path)
@@ -932,199 +693,343 @@ final class PaletteViewController: NSViewController, NSTableViewDataSource, NSTa
             }, score: FileFuzzyMatcher.score(query: query, in: symbol) ?? 0)
         }
     }
-
-    private func selectFirstSelectable() {
-        guard let first = selectableRowIndexes.first else { return }
-        tableView.selectRowIndexes([first], byExtendingSelection: false)
-        tableView.scrollRowToVisible(first)
-    }
-
-    private func moveSelection(by offset: Int) {
-        guard !selectableRowIndexes.isEmpty else { return }
-        let current = tableView.selectedRow
-        let pos = selectableRowIndexes.firstIndex(of: current) ?? 0
-        let target = (pos + offset + selectableRowIndexes.count) % selectableRowIndexes.count
-        let row = selectableRowIndexes[target]
-        tableView.selectRowIndexes([row], byExtendingSelection: false)
-        tableView.scrollRowToVisible(row)
-    }
-
-    // MARK: - Table
-
-    func numberOfRows(in tableView: NSTableView) -> Int { rows.count }
-
-    func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
-        switch rows[row] {
-        case .header: return 26
-        case .item: return 48
-        }
-    }
-
-    func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool {
-        if case .header = rows[row] { return false }
-        return true
-    }
-
-    func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? {
-        PaletteRowView()
-    }
-
-    func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-        switch rows[row] {
-        case let .header(section):
-            return PaletteSectionHeaderView(title: section.title.uppercased())
-        case let .item(action):
-            return PaletteItemView(action: action, query: searchField.stringValue)
-        }
-    }
-
-    @objc private func activate() {
-        let row = tableView.selectedRow
-        guard row >= 0, row < rows.count else { return }
-        guard case let .item(action) = rows[row] else { return }
-        CommandPaletteController.recordUsage(action.id)
-        view.window?.close()
-        action.handler()
-    }
-
-    // MARK: - Dismiss on focus loss
-
-    func windowDidResignKey(_ notification: Notification) {
-        view.window?.close()
-    }
 }
 
-// MARK: - Row views
-
-/// Table row that draws the themed selection fill instead of the system blue.
 @MainActor
-final class PaletteRowView: NSTableRowView {
-    override func drawSelection(in dirtyRect: NSRect) {
-        guard isSelected else { return }
-        let rect = bounds.insetBy(dx: HarnessDesign.Spacing.md, dy: 3)
-        let path = NSBezierPath(roundedRect: rect, xRadius: HarnessDesign.Radius.control, yRadius: HarnessDesign.Radius.control)
+private struct PaletteView: View {
+    @Bindable var model: PaletteModel
+    @FocusState private var searchFocused: Bool
+
+    var body: some View {
         let c = HarnessChrome.current
-        c.accent.withAlphaComponent(c.isDark ? 0.16 : 0.13).setFill()
-        path.fill()
-    }
-}
+        VStack(spacing: 0) {
+            TextField(text: $model.query, prompt: Text(model.placeholder).foregroundStyle(Color(nsColor: c.textTertiary))) {
+                EmptyView()
+            }
+            .textFieldStyle(.plain)
+            .font(.system(size: 15))
+            .foregroundStyle(Color(nsColor: c.textPrimary))
+            .focused($searchFocused)
+            .padding(.horizontal, 18)
+            .frame(height: 52)
+            .onSubmit { model.activateSelected() }
+            .onChange(of: model.query) { _, newValue in
+                model.updateQuery(newValue)
+            }
 
-@MainActor
-private final class PaletteSectionHeaderView: NSView {
-    init(title: String) {
-        super.init(frame: .zero)
-        let label = NSTextField(labelWithString: title)
-        label.font = HarnessDesign.Typography.paletteHeader
-        label.textColor = HarnessChrome.current.textTertiary
-        label.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(label)
-        NSLayoutConstraint.activate([
-            label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: HarnessDesign.Spacing.xl),
-            label.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -6),
-        ])
-    }
+            Divider()
+                .overlay(Color(nsColor: c.border))
 
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError() }
-}
+            ScrollViewReader { proxy in
+                ScrollView(.vertical, showsIndicators: true) {
+                    LazyVStack(spacing: 0) {
+                        ForEach(Array(model.rows.enumerated()), id: \.offset) { index, row in
+                            switch row {
+                            case let .header(section):
+                                PaletteSectionHeader(title: section.title.uppercased())
+                                    .frame(height: 26)
+                                    .id(index)
+                            case let .item(action):
+                                PaletteItemRow(
+                                    action: action,
+                                    query: model.query,
+                                    isSelected: index == model.selectedIndex
+                                )
+                                .frame(height: 48)
+                                .id(index)
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    model.selectedIndex = index
+                                    model.activate(rowIndex: index)
+                                }
+                            }
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+                .overlay {
+                    if model.selectableIndexes.isEmpty {
+                        Text("No matching commands")
+                            .font(.system(size: 13))
+                            .foregroundStyle(Color(nsColor: c.textTertiary))
+                    }
+                }
+                .onChange(of: model.selectedIndex) { _, newValue in
+                    withAnimation(.easeOut(duration: HarnessDesign.Motion.fast)) {
+                        proxy.scrollTo(newValue, anchor: .center)
+                    }
+                }
+            }
 
-@MainActor
-private final class PaletteItemView: NSView {
-    init(action: PaletteAction, query: String) {
-        super.init(frame: .zero)
-        let c = HarnessChrome.current
-
-        let iconBackground = NSView()
-        iconBackground.wantsLayer = true
-        iconBackground.layer?.cornerRadius = HarnessDesign.Radius.control
-        iconBackground.layer?.cornerCurve = .continuous
-        iconBackground.layer?.backgroundColor = c.textPrimary.withAlphaComponent(c.isDark ? 0.06 : 0.07).cgColor
-        iconBackground.translatesAutoresizingMaskIntoConstraints = false
-
-        let icon = NSImageView()
-        icon.image = NSImage(systemSymbolName: action.symbol, accessibilityDescription: nil)?
-            .withSymbolConfiguration(.init(pointSize: 13, weight: .medium))
-        icon.contentTintColor = c.textSecondary
-        icon.translatesAutoresizingMaskIntoConstraints = false
-        iconBackground.addSubview(icon)
-
-        let title = NSTextField(labelWithString: action.title)
-        title.font = HarnessDesign.Typography.paletteTitle
-        title.textColor = c.textPrimary
-        title.lineBreakMode = .byTruncatingTail
-        title.translatesAutoresizingMaskIntoConstraints = false
-        if !query.isEmpty {
-            title.attributedStringValue = highlight(title.stringValue, query: query, primary: c.textPrimary, accent: c.accent)
+            PaletteFooter()
+                .frame(height: 40)
         }
-
-        let subtitle = NSTextField(labelWithString: action.subtitle)
-        subtitle.font = .systemFont(ofSize: 11.5, weight: .regular)
-        subtitle.textColor = c.textTertiary
-        subtitle.lineBreakMode = .byTruncatingTail
-        subtitle.translatesAutoresizingMaskIntoConstraints = false
-
-        let shortcut = NSTextField(labelWithString: action.shortcut)
-        shortcut.font = HarnessDesign.Typography.kbd
-        shortcut.textColor = c.textTertiary
-        shortcut.alignment = .right
-        shortcut.translatesAutoresizingMaskIntoConstraints = false
-        shortcut.setContentHuggingPriority(.required, for: .horizontal)
-        shortcut.setContentCompressionResistancePriority(.required, for: .horizontal)
-        shortcut.isHidden = action.shortcut.isEmpty
-
-        addSubview(iconBackground)
-        addSubview(title)
-        addSubview(subtitle)
-        addSubview(shortcut)
-
-        NSLayoutConstraint.activate([
-            iconBackground.leadingAnchor.constraint(equalTo: leadingAnchor, constant: HarnessDesign.Spacing.xl),
-            iconBackground.centerYAnchor.constraint(equalTo: centerYAnchor),
-            iconBackground.widthAnchor.constraint(equalToConstant: 30),
-            iconBackground.heightAnchor.constraint(equalToConstant: 30),
-
-            icon.centerXAnchor.constraint(equalTo: iconBackground.centerXAnchor),
-            icon.centerYAnchor.constraint(equalTo: iconBackground.centerYAnchor),
-
-            title.leadingAnchor.constraint(equalTo: iconBackground.trailingAnchor, constant: HarnessDesign.Spacing.lg),
-            title.topAnchor.constraint(equalTo: iconBackground.topAnchor, constant: -1),
-            title.trailingAnchor.constraint(lessThanOrEqualTo: shortcut.leadingAnchor, constant: -HarnessDesign.Spacing.md),
-
-            subtitle.leadingAnchor.constraint(equalTo: title.leadingAnchor),
-            subtitle.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 2),
-            subtitle.trailingAnchor.constraint(lessThanOrEqualTo: shortcut.leadingAnchor, constant: -HarnessDesign.Spacing.md),
-
-            shortcut.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -HarnessDesign.Spacing.xl),
-            shortcut.centerYAnchor.constraint(equalTo: centerYAnchor),
-        ])
+        .background(OverlayBackground())
+        .clipShape(RoundedRectangle(cornerRadius: HarnessDesign.Radius.overlay, style: .continuous))
+        .onAppear {
+            searchFocused = true
+            model.startFileScan()
+        }
+        .onKeyPress(.upArrow) {
+            model.moveSelection(by: -1)
+            return .handled
+        }
+        .onKeyPress(.downArrow) {
+            model.moveSelection(by: 1)
+            return .handled
+        }
+        .onKeyPress(.escape) {
+            model.close()
+            return .handled
+        }
     }
+}
 
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError() }
+@MainActor
+private struct PaletteSectionHeader: View {
+    let title: String
 
-    /// Bold the characters in `title` that matched the user's query — gives the
-    /// fuzzy match a visual anchor without resorting to a full word-by-word render.
-    private func highlight(_ title: String, query: String, primary: NSColor, accent: NSColor) -> NSAttributedString {
-        let attrs: [NSAttributedString.Key: Any] = [
-            .font: HarnessDesign.Typography.paletteTitle,
-            .foregroundColor: primary,
-        ]
-        let result = NSMutableAttributedString(string: title, attributes: attrs)
-        let lowerTitle = title.lowercased()
-        let lowerQuery = query.lowercased()
-        var titleIdx = lowerTitle.startIndex
-        for q in lowerQuery {
-            guard titleIdx < lowerTitle.endIndex else { break }
-            if let found = lowerTitle[titleIdx...].firstIndex(of: q) {
-                let nsRange = NSRange(found ... found, in: title)
-                result.addAttributes([
-                    .foregroundColor: accent,
-                    .font: NSFont.systemFont(ofSize: 13.5, weight: .heavy),
-                ], range: nsRange)
-                titleIdx = lowerTitle.index(after: found)
+    var body: some View {
+        HStack {
+            Text(title)
+                .font(.system(size: 10, weight: .heavy))
+                .foregroundStyle(Color(nsColor: HarnessChrome.current.textTertiary))
+                .lineLimit(1)
+            Spacer()
+        }
+        .padding(.horizontal, HarnessDesign.Spacing.xl)
+        .padding(.top, 6)
+    }
+}
+
+@MainActor
+private struct PaletteItemRow: View {
+    let action: PaletteAction
+    let query: String
+    let isSelected: Bool
+
+    var body: some View {
+        let c = HarnessChrome.current
+        HStack(spacing: HarnessDesign.Spacing.lg) {
+            ZStack {
+                RoundedRectangle(cornerRadius: HarnessDesign.Radius.control, style: .continuous)
+                    .fill(Color(nsColor: c.textPrimary.withAlphaComponent(c.isDark ? 0.06 : 0.07)))
+                Image(systemName: action.symbol)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Color(nsColor: c.textSecondary))
+            }
+            .frame(width: 30, height: 30)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(highlightedTitle(primary: c.textPrimary, accent: c.accent))
+                    .font(.system(size: 13.5, weight: .medium))
+                    .foregroundStyle(Color(nsColor: c.textPrimary))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Text(action.subtitle)
+                    .font(.system(size: 11.5, weight: .regular))
+                    .foregroundStyle(Color(nsColor: c.textTertiary))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+
+            Spacer(minLength: HarnessDesign.Spacing.md)
+
+            if !action.shortcut.isEmpty {
+                Text(action.shortcut)
+                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(Color(nsColor: c.textTertiary))
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
             }
         }
+        .padding(.horizontal, HarnessDesign.Spacing.xl)
+        .background {
+            if isSelected {
+                RoundedRectangle(cornerRadius: HarnessDesign.Radius.control, style: .continuous)
+                    .fill(Color(nsColor: c.accent.withAlphaComponent(c.isDark ? 0.16 : 0.13)))
+                    .padding(.horizontal, HarnessDesign.Spacing.md)
+                    .padding(.vertical, 3)
+            }
+        }
+    }
+
+    private func highlightedTitle(primary: NSColor, accent: NSColor) -> AttributedString {
+        var result = AttributedString(action.title)
+        guard !query.isEmpty else { return result }
+        let lowerTitle = action.title.lowercased()
+        let lowerQuery = query.lowercased()
+        var searchStart = lowerTitle.startIndex
+        for char in lowerQuery {
+            guard searchStart < lowerTitle.endIndex else { break }
+            guard let found = lowerTitle[searchStart...].firstIndex(of: char) else { break }
+            let offset = lowerTitle.distance(from: lowerTitle.startIndex, to: found)
+            let attributedIndex = result.index(result.startIndex, offsetByCharacters: offset)
+            result[attributedIndex..<result.index(afterCharacter: attributedIndex)].foregroundColor = Color(nsColor: accent)
+            result[attributedIndex..<result.index(afterCharacter: attributedIndex)].font = .system(size: 13.5, weight: .heavy)
+            searchStart = lowerTitle.index(after: found)
+        }
         return result
+    }
+}
+
+@MainActor
+private struct PaletteFooter: View {
+    var body: some View {
+        let c = HarnessChrome.current
+        HStack(spacing: HarnessDesign.Spacing.lg) {
+            hint(keys: "↑↓", label: "Navigate")
+            hint(keys: "↩", label: "Run")
+            hint(keys: "esc", label: "Close")
+        }
+        .frame(maxWidth: .infinity)
+        .background(Color(nsColor: c.textPrimary.withAlphaComponent(c.isDark ? 0.04 : 0.05)))
+    }
+
+    private func hint(keys: String, label: String) -> some View {
+        let c = HarnessChrome.current
+        return HStack(spacing: 4) {
+            Text(keys)
+                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .foregroundStyle(Color(nsColor: c.textSecondary))
+                .padding(.horizontal, 5)
+                .padding(.vertical, 1)
+                .background(
+                    RoundedRectangle(cornerRadius: 3, style: .continuous)
+                        .fill(Color(nsColor: c.textPrimary.withAlphaComponent(c.isDark ? 0.08 : 0.10)))
+                )
+            Text(label)
+                .font(.system(size: 11, weight: .regular))
+                .foregroundStyle(Color(nsColor: c.textTertiary))
+        }
+    }
+}
+
+private struct OverlayBackground: NSViewRepresentable {
+    func makeNSView(context: Context) -> HarnessOverlayBackground { HarnessOverlayBackground() }
+    func updateNSView(_ v: HarnessOverlayBackground, context: Context) {}
+}
+
+@MainActor
+private final class PaletteWindowDelegate: NSObject, NSWindowDelegate {
+    weak var panel: NSPanel?
+    func windowDidResignKey(_ notification: Notification) { panel?.close() }
+}
+
+// MARK: - Palette data helpers
+
+extension CommandPaletteController {
+    @MainActor
+    fileprivate static func activeWorkbenchRoot() -> String {
+        let coordinator = SessionCoordinator.shared
+        return WorkbenchContextResolver.resolve(
+            snapshot: coordinator.snapshot,
+            focusedSurfaceID: coordinator.activeSurfaceID,
+            currentFilePath: nil
+        )?.cwd ?? FileManager.default.currentDirectoryPath
+    }
+
+    nonisolated fileprivate static func scanFileEntries(rootPath: String) -> [PaletteFileEntry] {
+        let rootURL = URL(fileURLWithPath: rootPath)
+        let rootPrefix = rootPath.hasSuffix("/") ? rootPath : rootPath + "/"
+        let enumerator = FileManager.default.enumerator(
+            at: rootURL,
+            includingPropertiesForKeys: [.isDirectoryKey, .isRegularFileKey],
+            options: [.skipsHiddenFiles, .skipsPackageDescendants]
+        )
+        var entries: [PaletteFileEntry] = []
+        while let url = enumerator?.nextObject() as? URL {
+            if Task.isCancelled { break }
+            let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .isRegularFileKey])
+            if values?.isDirectory == true {
+                let name = url.lastPathComponent
+                if name == "node_modules" || name == ".git" || name == ".build" || name == "DerivedData" {
+                    enumerator?.skipDescendants()
+                }
+                continue
+            }
+            guard values?.isRegularFile == true else { continue }
+            let path = url.path
+            let relativePath = path.hasPrefix(rootPrefix) ? String(path.dropFirst(rootPrefix.count)) : url.lastPathComponent
+            entries.append(PaletteFileEntry(path: path, relativePath: relativePath, fileName: url.lastPathComponent))
+            if entries.count >= 5000 { break }
+        }
+        return entries
+    }
+
+    nonisolated fileprivate static func grepMatches(query: String, root: String) -> [PaletteGrepMatch] {
+        let rgPath = ["/opt/homebrew/bin/rg", "/usr/local/bin/rg", "/usr/bin/rg"].first { FileManager.default.fileExists(atPath: $0) }
+        let proc = Process()
+        let pipe = Pipe()
+        proc.standardOutput = pipe
+        proc.standardError = FileHandle.nullDevice
+        proc.currentDirectoryURL = URL(fileURLWithPath: root)
+        if let rgPath {
+            proc.executableURL = URL(fileURLWithPath: rgPath)
+            proc.arguments = ["--line-number", "--column", "--no-heading", "--color=never", query, "."]
+        } else {
+            proc.executableURL = URL(fileURLWithPath: "/usr/bin/grep")
+            proc.arguments = ["-rn", query, "."]
+        }
+        do {
+            try proc.run()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            proc.waitUntilExit()
+            guard let output = String(data: data, encoding: .utf8) else { return [] }
+            var matches: [PaletteGrepMatch] = []
+            var count = 0
+            for line in output.components(separatedBy: "\n") {
+                guard !line.isEmpty else { continue }
+                let parts = line.components(separatedBy: ":")
+                guard parts.count >= 3, let lineNum = Int(parts[1]) else { continue }
+                let relPath = parts[0]
+                let colNum: Int
+                let text: String
+                if parts.count >= 4, let col = Int(parts[2]) {
+                    colNum = col
+                    text = parts.dropFirst(3).joined(separator: ":").trimmingCharacters(in: .whitespacesAndNewlines)
+                } else {
+                    colNum = 1
+                    text = parts.dropFirst(2).joined(separator: ":").trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+                let absPath = (root as NSString).appendingPathComponent(relPath)
+                let filename = (relPath as NSString).lastPathComponent
+                count += 1
+                matches.append(PaletteGrepMatch(
+                    absolutePath: absPath,
+                    relativePath: relPath,
+                    filename: filename,
+                    line: lineNum,
+                    column: colNum,
+                    text: text,
+                    ordinal: count
+                ))
+                if matches.count >= 100 { break }
+            }
+            return matches
+        } catch {
+            return []
+        }
+    }
+
+    @MainActor
+    fileprivate static func grepActions(from matches: [PaletteGrepMatch]) -> [PaletteAction] {
+        matches.map { match in
+            PaletteAction(
+                id: "grep.\(match.absolutePath).\(match.line).\(match.column).\(match.ordinal)",
+                title: match.text.isEmpty ? "Match" : match.text,
+                subtitle: "\(match.filename):\(match.line):\(match.column) — \(match.relativePath)",
+                symbol: "magnifyingglass",
+                shortcut: "",
+                section: .grep
+            ) {
+                guard let split = NSApp.keyWindow?.contentViewController as? MainSplitViewController
+                    ?? NSApp.mainWindow?.contentViewController as? MainSplitViewController
+                else { return }
+                split.contentVC.openFileTab(path: match.absolutePath)
+                split.contentVC.navigateCurrentFile(line: match.line, column: match.column)
+            }
+        }
     }
 }
 
