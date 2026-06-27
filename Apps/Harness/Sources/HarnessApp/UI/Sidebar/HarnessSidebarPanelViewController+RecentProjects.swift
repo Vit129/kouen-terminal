@@ -50,7 +50,7 @@ extension HarnessSidebarPanelViewController {
         selectSessionRow()
     }
 
-    @objc private func showWorkspaceMenu() {
+    @objc func showWorkspaceMenu() {
         if workspaceDropdown != nil {
             dismissWorkspaceDropdown()
             return
