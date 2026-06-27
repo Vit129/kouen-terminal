@@ -232,7 +232,7 @@ public enum BannerShortcutRegistry {
         .init(key: "\(commandPrompt.displayKey)", description: "command prompt · try: find, grep, cd"),
         .init(key: "", description: "Shell", showInBanner: true),
         .init(key: "z <dir>", description: "smart cd — same list as ⌘⇧J"),
-        .init(key: "fd <pattern>", description: "find files by name (respects .gitignore)"),
+        .init(key: "fd <pattern>", description: "find files by name"),
         .init(key: "rg <pattern>", description: "search file contents (ripgrep)"),
         .init(key: "bat <file>", description: "cat with syntax highlighting + line numbers"),
         .init(key: "eza --git", description: "modern ls — colors, icons, git status"),

@@ -4,7 +4,7 @@ import Foundation
 func handleInstallTools() {
     let tools: [(formula: String, description: String)] = [
         ("zoxide", "smart cd — learns your frequent dirs"),
-        ("fd", "find files by name (respects .gitignore)"),
+        ("fd", "find files by name"),
         ("fzf", "fuzzy finder for files, history, anything"),
         ("ripgrep", "search file contents (rg)"),
         ("bat", "cat with syntax highlighting"),

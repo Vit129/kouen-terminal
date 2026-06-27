@@ -1,28 +1,17 @@
 # Harness Usage
 
-This is the practical setup guide for installing, running, and driving Harness. For the full command reference, see [docs/COMMANDS.md](docs/COMMANDS.md).
+Getting started guide. For deep dives, follow the links at the bottom.
 
 ## 1. Install Harness
 
 ### Option A: Download the app
 
-The latest release in this fork does not currently attach a `.dmg` asset. Check <https://github.com/Vit129/harness-terminal/releases/latest>; if a future release includes `Harness.dmg`, open it, drag `Harness.app` to `/Applications`, launch the app, and run first-run setup when prompted.
+Check [releases](https://github.com/Vit129/harness-terminal/releases/latest) for a `Harness.dmg`. Requires Apple silicon + macOS 15+.
 
-The app requires Apple silicon and macOS 15 or later.
-
-### Option B: Run an isolated preview build
-
-Use this when developing or testing. It keeps runtime state separate from your production Harness install.
+### Option B: Preview build (dev/test)
 
 ```bash
-make preview
-```
-
-The preview app lives under `.harness-preview/` and uses a preview-specific daemon socket and state directory.
-
-Stop and clean it with:
-
-```bash
+make preview        # isolated build, separate state
 make preview-stop
 make preview-clean
 ```
@@ -33,43 +22,31 @@ make preview-clean
 make start
 ```
 
-Opens an interactive menu to commit+push, run a preview build, bump version and build, or run a full release cycle. Use this as the primary workflow.
+Opens a menu to preview, bump version, or run a full release cycle.
 
-### Option D: Install the local build into `/Applications`
+### Option D: Install into `/Applications`
 
 ```bash
 make install
 ```
 
-`make install` builds, packages, ad-hoc signs, stops the old production daemon, copies `Harness.app` to `/Applications`, refreshes app-support daemon/CLI binaries, clears runtime state, and opens the installed app.
-
-If `Harness.app` already exists at the repo root and you only want to copy it:
-
-```bash
-make install-no-build
-```
+Builds, signs, stops the old daemon, copies to `/Applications`, and opens the app.
 
 ## 2. Install The CLI On PATH
 
-From an installed app:
-
 ```bash
 /Applications/Harness.app/Contents/MacOS/harness-cli install
-```
-
-From a local release build:
-
-```bash
+# or from a local build:
 .build/release/harness-cli install
 ```
 
-Then add the app-support bin directory to your shell profile if the installer asks:
+Add to shell profile if prompted:
 
 ```bash
 export PATH="$HOME/Library/Application Support/Harness/bin:$PATH"
 ```
 
-Check the install:
+Verify:
 
 ```bash
 harness-cli doctor
@@ -78,168 +55,30 @@ harness-cli ping
 
 ## 3. Pick An Experience Mode
 
-Open **Settings -> Terminal -> Experience**:
+Open **Settings → Terminal → Experience**:
 
 | Mode | Use when |
-| --- | --- |
-| Plain Terminal | You want a normal terminal with minimal chrome |
-| Persistent Terminal | You want sessions to survive clean app quits |
-| Full Terminal | You want tmux-style prefix, status line, panes, and copy mode |
-| Agent Workspace | You want project sessions and agent notifications foregrounded |
+|---|---|
+| Plain Terminal | Normal terminal, minimal chrome |
+| Persistent Terminal | Sessions survive clean app quits |
+| Full Terminal | tmux-style prefix, status line, panes, copy mode |
+| Agent Workspace | Project sessions + agent notifications foregrounded |
 
-See [docs/MODES.md](docs/MODES.md) for the behavior differences.
+→ [docs/MODES.md](docs/MODES.md)
 
-## 4. Core CLI Commands
-
-```bash
-harness-cli list-workspaces
-harness-cli list-sessions
-harness-cli list-surfaces
-harness-cli new-session --workspace Default --name work --cwd ~/Code/project
-harness-cli new-tab --workspace Default --cwd ~/Code/project
-harness-cli attach --surface <uuid>
-harness-cli attach-window --session work
-harness-cli send-keys --surface <uuid> --keys "make test Enter"
-harness-cli capture-pane --surface <uuid> --scrollback
-```
-
-Run `harness-cli` with no arguments to print the available command list.
-
-## 5. Agent Notifications
-
-Harness sets `HARNESS_SURFACE` inside panes so hooks can notify the exact tab or pane.
-
-Install a supported agent hook:
+## 4. Agent Notifications
 
 ```bash
-harness-cli install-hooks codex
 harness-cli install-hooks claude-code
+harness-cli install-hooks codex
 harness-cli install-hooks cursor
 ```
 
-Send a manual notification:
+`⌘⇧I` opens the Agent Notch. `⌘⇧U` opens the notifications inbox.
 
-```bash
-harness-cli notify --surface "$HARNESS_SURFACE" --title "Agent" --body "Needs approval"
-```
+→ [docs/agent-hooks/README.md](docs/agent-hooks/README.md)
 
-Open the Agent Notch with `Cmd+Shift+I` to pick the notifying agent, or open the notifications inbox with `Cmd+Shift+U`.
-
-Per-agent guides live in [docs/agent-hooks/README.md](docs/agent-hooks/README.md).
-
-## 6. Remote Or Headless Daemon
-
-On the remote machine, run `harness-cli doctor` to find the daemon socket path. On your local machine, register it:
-
-```bash
-harness-cli remote add --name devbox --ssh me@devbox --socket "/home/me/.config/harness/harness.sock"
-harness-cli remote list
-harness-cli ping --host devbox
-harness-cli new-session --host devbox --cwd ~/Code
-harness-cli send-keys --host devbox --surface <id> --keys "ls -la Enter"
-harness-cli capture-pane --host devbox --surface <id>
-```
-
-Pass SSH options with repeated `--ssh-arg` flags:
-
-```bash
-harness-cli remote add --name devbox --ssh me@devbox --socket "/home/me/.config/harness/harness.sock" --ssh-arg -p --ssh-arg 2222
-```
-
-## 7. Build And Test
-
-```bash
-swift build
-swift test
-swift build --product Harness
-swift build --product HarnessDaemon
-swift build --product harness-cli
-HARNESS_BENCHMARKS=1 swift test -c release --filter HarnessBenchmarks
-```
-
-Always run `swift build` after code edits. For daemon, IPC, or PTY changes, also run the relevant filtered tests or the full `swift test` suite when practical.
-
-## Troubleshooting
-
-| Problem | Try |
-| --- | --- |
-| CLI cannot find the daemon | `harness-cli doctor`, then relaunch Harness |
-| CLI version differs from daemon | Re-run `harness-cli install`, then restart the daemon/app |
-| Preview app is stale | `make preview-stop && make preview-clean && make preview` |
-| Production app still uses old daemon | `make install` refreshes `/Applications` and app-support binaries |
-| Agent hook does not notify | Check `harness-cli doctor`, `HARNESS_SURFACE`, and the matching guide in `docs/agent-hooks/` |
-
-## 8. IDE-Like Workflow (Terminal Workbench)
-
-Harness includes IDE-like features accessible without leaving the terminal. No path memorization required.
-
-### File Navigation (replaces File Tree)
-
-| Shortcut / Command | What it does |
-|--------------------|-------------|
-| `⌘P` | Fuzzy file search — like Spotlight or VS Code Cmd+P |
-| `:find <partial>` | Fuzzy-open file by name fragment (vi ex command) |
-| `:recent` | Show recently opened files, pick by number |
-| `:copy-path` | Copy relative path of the current file |
-| `:copy-path absolute` | Copy absolute path |
-| `gf` | Open path under cursor (works on compiler/test output) |
-
-### Search in Project (replaces Search Panel)
-
-| Command | What it does |
-|---------|-------------|
-| `:grep <query>` | Search across the project, results shown as `path:line:col` |
-| `gf` on result | Jump to file at that line |
-
-### Errors and Diagnostics (replaces Problems Panel)
-
-| Command | What it does |
-|---------|-------------|
-| `:errors` | Show LSP diagnostics for the current file |
-| `]d` / `[d` | Jump to next / previous error |
-| `gd` | Go to definition at cursor |
-| `K` | Hover info at cursor (requires LSP) |
-
-### Build and Test (replaces Run Panel)
-
-| Command | What it does |
-|---------|-------------|
-| `:make` | Auto-detect and run the project's default build command |
-| `:make build` | Run the build command (SwiftPM / Makefile / npm auto-detected) |
-| `:make test` | Run the test command |
-| `:make last` | Repeat the last `:make` command |
-
-Tasks run in a split pane — the current terminal stays usable.
-
-### Session State (replaces Status Panel)
-
-| Command | What it does |
-|---------|-------------|
-| `:board` | Open Board tab — Running / Idle / Done / Error / Needs Attention |
-| `:attention` | Jump to the next session that needs attention |
-| `:ack` | Dismiss the current tab's Needs Attention state |
-| `harness-cli board` | Same board view from the shell |
-| `harness-cli board --watch` | Live-updating board (htop-style) |
-
-### Vi Ex Commands (open file editor first, then press `:`)
-
-File editor opens when you click a file in the sidebar, or via `:view <path>` / `:edit <path>`.
-
-```
-:find SessionCoord     → fuzzy-open file matching "SessionCoord"
-:recent                → list recently opened files
-:copy-path             → copy relative path to clipboard
-:grep BoardModel       → search project for "BoardModel"
-:errors                → show LSP errors in current file
-:make test             → run tests in a split pane
-:make last             → repeat last build/test command
-:board                 → show session board
-:split path/to/file    → open file in a new split pane
-```
-
-### Recommended Shell Tools
-
-Harness works best with these CLI tools installed. They power `⌘P` directory jump and fast navigation:
+## 5. Recommended Shell Tools
 
 ```bash
 brew install zoxide fzf ripgrep bat
@@ -250,53 +89,32 @@ Add to `~/.zshrc`:
 ```bash
 eval "$(zoxide init zsh)"
 source <(fzf --zsh)
-alias cat="bat --paging=never"
 ```
 
-| Tool | What it does | Harness integration |
-|------|-------------|---------------------|
-| `zoxide` | Smart cd — learns your frequent directories | `⌘P` fuzzy jump · `⌘⇧J` visual picker (↩ cd · ⌘↩ new tab) |
-| `fzf` | Fuzzy finder for files, history, directories | `ctrl+r` history, `alt+c` cd, `ctrl+t` file |
-| `ripgrep` (`rg`) | Fast grep (10x faster than grep) | `:grep` uses rg when available |
-| `bat` | cat with syntax highlighting | Better `cat` output in terminal |
+| Tool | Harness integration |
+|------|---------------------|
+| `zoxide` | `⌘P` fuzzy jump · `⌘⇧J` visual picker (↩ cd · ⌘↩ new tab) |
+| `fzf` | `ctrl+r` history · `ctrl+t` file pick |
+| `ripgrep` | `:grep` uses rg when available |
+| `bat` | Better `cat` output in terminal |
 
-After install, `z <keyword>` jumps to any directory you've visited — and `⌘⇧J` opens a visual picker over the same zoxide list:
+`⌘⇧R` — saved command Recipes (run immediately or send to Composer).
 
-```bash
-z myproject     # cd to ~/Git/Personal/My-Project (shell)
-⌘⇧J            # same list, GUI picker — ↩ to cd, ⌘↩ to open new tab
-```
+## 6. Troubleshooting
 
-Save frequently-used commands as **Recipes** (`⌘⇧R`) — select to run immediately or send to Composer for editing.
+| Problem | Try |
+|---|---|
+| CLI cannot find daemon | `harness-cli doctor`, relaunch Harness |
+| CLI version differs from daemon | `harness-cli install`, restart daemon |
+| Preview app is stale | `make preview-stop && make preview-clean && make preview` |
+| Agent hook silent | Check `harness-cli doctor` + `HARNESS_SURFACE` + agent guide |
 
 ## More Docs
 
-- [docs/MULTIPLEXER_GUIDE.md](docs/MULTIPLEXER_GUIDE.md) - panes, sessions, copy mode, attach, remote workflows
-- [docs/COMMANDS.md](docs/COMMANDS.md) - full command reference
-- [docs/KEYBINDINGS.md](docs/KEYBINDINGS.md) - shortcuts and custom bindings
-- [docs/shell-integration/README.md](docs/shell-integration/README.md) - prompt marks and shell snippets
-
-## 9. Experience Modes
-
-Switch in **Settings → Terminal → Experience**.
-
-| Mode | Prefix key | Status line | Sessions survive quit | Agent workflows |
-|------|:----------:|:-----------:|:--------------------:|:---------------:|
-| **Plain Terminal** | — | — | No | available |
-| **Persistent Terminal** | — | — | Yes | available |
-| **Full Terminal** | ✓ | ✓ | Yes | available |
-| **Agent Workspace** | optional | optional | Yes | foregrounded |
-
-See [docs/MODES.md](docs/MODES.md) for full details on persistence and prefix/status line overrides.
-
-## 10. Migrating From Another Terminal
-
-### From tmux
-
-Switch to **Full Terminal** mode. Your muscle memory works immediately — prefix `Ctrl-A`, splits, copy mode, paste buffers, command prompt, and `harness-cli attach-window` for full layout attach.
-
-See [docs/MIGRATION.md](docs/MIGRATION.md) for the full tmux key-by-key translation and `.tmux.conf` import guide.
-
-### Importing Colors And Fonts
-
-Harness auto-imports colors, font face, opacity, and padding from compatible terminal configs on first run. Re-import any time via **Settings → Appearance → Reset to defaults** or the `source-config` command.
+- [docs/COMMANDS.md](docs/COMMANDS.md) — full CLI command reference
+- [docs/KEYBINDINGS.md](docs/KEYBINDINGS.md) — shortcuts, IDE workflow, vi ex commands
+- [docs/MODES.md](docs/MODES.md) — experience modes in detail
+- [docs/MULTIPLEXER_GUIDE.md](docs/MULTIPLEXER_GUIDE.md) — panes, copy mode, remote/headless
+- [docs/MIGRATION.md](docs/MIGRATION.md) — migrating from tmux
+- [docs/shell-integration/README.md](docs/shell-integration/README.md) — prompt marks, shell snippets
+- [docs/agent-hooks/README.md](docs/agent-hooks/README.md) — per-agent notification setup
