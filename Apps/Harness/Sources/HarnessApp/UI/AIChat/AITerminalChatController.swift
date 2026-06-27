@@ -57,6 +57,11 @@ final class AITerminalChatController {
         }
     }
 
+    func askAI(prefill text: String) {
+        if !isVisible { showInput() }
+        queryInput?.prefill(text)
+    }
+
     // MARK: - Show / Hide
 
     private func showInput() {

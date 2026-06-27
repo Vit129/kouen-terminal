@@ -346,6 +346,8 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// Copied selection text — the host mirrors it into the daemon paste buffer (the
     /// system pasteboard is written here directly).
     public var onCopy: ((String) -> Void)?
+    /// Right-click with selection → called with the selected text so the host can route it to AI chat.
+    public var onAskAI: ((String) -> Void)?
     /// Optional per-frame renderer stats sink for diagnostics/benchmarks.
     public var onRenderStats: ((TerminalRenderStats) -> Void)?
     /// ⌥Space hotkey — triggered before the key reaches the PTY. Return `true` to suppress PTY delivery.

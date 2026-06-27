@@ -146,6 +146,11 @@ final class AIQueryInputView: NSView {
         window?.makeFirstResponder(field)
     }
 
+    func prefill(_ text: String) {
+        field.stringValue = text
+        field.currentEditor()?.selectAll(nil)
+    }
+
     // MARK: - Key handling
 
     override func keyDown(with event: NSEvent) {
