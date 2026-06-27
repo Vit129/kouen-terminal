@@ -1,6 +1,6 @@
 # Terminal Feature Gap Plan — Harness Terminal
 **Mode:** Dev Only | **Approach:** SDLC | **Date:** 2026-06-26
-**Sources:** Otty, Ghostty, WezTerm, Warp, Zellij, iTerm2
+**Sources:** Otty, Ghostty, WezTerm, Warp, Zellij, iTerm2, CMUX
 
 ---
 
@@ -54,6 +54,20 @@
 | **13** | **Kitty Graphics Protocol** — inline images | Decode sixel/PNG from PTY stream → render in Metal layer | Ghostty, WezTerm, Kitty |
 | **14** | **Floating panes** — overlay pane without disrupting layout | Z-layer pane outside split tree | Zellij |
 | **15** | **Tab thumbnails overview** — visual all-tabs view | Thumbnail render → grid overlay | Ghostty |
+| **16** | **Embedded browser pane** — WebKit split pane with scriptable API | `WKWebView` hosted in split panel, `NSXPCConnection` or harness-mcp bridge | CMUX |
+| **17** | **Live tab metadata** — git branch + ports per pane in tab bar | `SurfaceShellTracker` CWD → git branch; `lsof`/`ss` poll → ports | CMUX |
+
+#### Medium (new)
+| # | Feature | Ponytail Rung | Source |
+|---|---|---|---|
+| **18** | **Layout file export/import** — save/load window layout as JSON | Reuse `LayoutDescriptor` serialization → file picker | Zellij (KDL) |
+| **19** | **Frecency directory jumping** — smart `cd` picker | `SurfaceShellTracker` CWD events → frecency score → fuzzy picker | iTerm2 |
+| **20** | **Session Resurrection across reboot** — verify + patch gaps | Audit `SessionLifecycleService` for daemon-restart + machine-reboot cases | Zellij |
+
+#### Defer
+| # | Feature | Ponytail Rung | Source |
+|---|---|---|---|
+| **21** | **Plugin runtime** (WASM) — first-party extensibility | Defer — large effort, no immediate user demand | Zellij |
 
 ---
 
@@ -143,8 +157,18 @@ Phase 12: Block-based output          Large,   ~250 lines
 Phase 14: Floating panes              Large,   ~200 lines
 Phase 15: Tab thumbnails              Large,   ~180 lines
 
+── Large (new from research) ────────────────────────────────────
+Phase 16: Embedded browser pane       Large,   ~300 lines
+Phase 17: Live tab metadata           Medium,  ~120 lines
+
+── Medium (new from research) ──────────────────────────────────
+Phase 18: Layout file export/import   Small,   ~80 lines
+Phase 19: Frecency directory jumping  Medium,  ~150 lines
+Phase 20: Session Resurrection audit  Small,   ~50 lines (patch)
+
 ── Defer until demand ──────────────────────────────────────────
 Phase 13: Kitty Graphics Protocol     XL,      ~400 lines
+Phase 21: Plugin runtime (WASM)       XL,      ~800 lines
 ```
 
 ---
@@ -482,6 +506,122 @@ if let region = currentSelectionRegion,
 
 ---
 
+## Phase 16: Embedded browser pane
+
+**Source:** CMUX
+
+**What already exists:**
+- `harnessBrowser*` MCP tools — navigate, interact, screenshot via WKWebView (in `harness-mcp`)
+- `SplitTree` / split pane infrastructure
+- `NSPanel` / child window pattern (used in Floating pane plan)
+
+**What's missing:** a first-class browser pane embedded in the session split layout (not just MCP-driven); scriptable from agents via harness-mcp bridge
+
+**Files to touch:**
+| File | Change |
+|---|---|
+| `Apps/Harness/Sources/HarnessApp/UI/BrowserPane/BrowserPaneViewController.swift` | NEW — `WKWebView` in `NSViewController`, address bar, back/forward, reload |
+| `Apps/Harness/Sources/HarnessApp/UI/BrowserPane/BrowserPaneController.swift` | NEW — manages lifecycle, exposes `navigate(url:)` + `evaluate(js:)` for harness-mcp |
+| `HarnessMCP` / `HarnessDaemonTools.swift` | Extend `harnessBrowser*` tools to route to `BrowserPaneController` when a browser pane is open (fall through to headless WKWebView if not) |
+| `UI/Chrome/MainMenuBuilder.swift` | "New Browser Pane" `Cmd+Shift+B` |
+| `WindowController.swift` | Serialize browser pane in session restore |
+
+**Success criteria:** `Cmd+Shift+B` → browser pane opens in split → agent navigates via harness-mcp → URL/content visible in pane → survives session restore.
+
+---
+
+## Phase 17: Live tab metadata (git branch + ports)
+
+**Source:** CMUX
+
+**What already exists:**
+- `SurfaceShellTracker` — tracks CWD per pane via OSC 7 / shell integration
+- `AgentBridge` — process tree watching per pane
+- Tab bar — `TabBarController` renders per-tab labels
+
+**What's missing:** derive git branch from CWD, scan listening ports per pane's process group, display in tab bar
+
+**Files to touch:**
+| File | Change |
+|---|---|
+| `Services/PaneMetadataService.swift` | NEW — polls (500ms) CWD → `git rev-parse --abbrev-ref HEAD` (async), pane PID → `lsof -iTCP -sTCP:LISTEN -p <pid>` → port list |
+| `UI/Chrome/TabBarController.swift` | Subscribe to `PaneMetadataService` → update tab label: `name · branch · :port` |
+
+**Ponytail note:** git branch poll is cheap (reads `.git/HEAD` file, no subprocess if done right). Port scan via `lsof` is heavier — cap at 1s interval and only for focused pane.
+
+**Success criteria:** open repo dir → tab shows `main` branch; start server → tab shows `:3000`; change branch → tab updates within 1s.
+
+---
+
+## Phase 18: Layout file export/import
+
+**Source:** Zellij (KDL layouts)
+
+**What already exists:**
+- `LayoutDescriptor` — serializes window layout (splits, panes, CWDs) for session restore
+- `HarnessPaths.applicationSupport` — canonical location
+
+**What's missing:** export current layout to JSON file user can save/share, import from file to restore
+
+**Files to touch:**
+| File | Change |
+|---|---|
+| `HarnessCore/.../LayoutFileStore.swift` | NEW — `export(layout:to:)` → write `LayoutDescriptor` JSON; `import(from:) -> LayoutDescriptor` |
+| `UI/Chrome/MainMenuBuilder.swift` | "Export Layout…" / "Import Layout…" under File menu → `NSSavePanel` / `NSOpenPanel` |
+
+**Minimum code:** ~80 lines. `LayoutDescriptor` is already `Codable`.
+
+**Success criteria:** arrange complex split layout → File → Export Layout → save `.harness-layout` → quit → File → Import Layout → layout restored exactly.
+
+---
+
+## Phase 19: Frecency directory jumping
+
+**Source:** iTerm2 recent directories
+
+**What already exists:**
+- `SurfaceShellTracker` — emits CWD change events per pane (OSC 7)
+- `CommandPaletteController` — fuzzy picker UI
+
+**What's missing:** frecency store (frequency × recency score), fuzzy picker to jump to recent dir
+
+**Files to touch:**
+| File | Change |
+|---|---|
+| `Services/FrecencyDirectoryStore.swift` | NEW — `[String: FrecencyEntry]` keyed by path; on CWD event: increment count + update timestamp; `ranked() -> [String]` returns sorted by `count / age_seconds` |
+| `UI/Shared/DirectoryPickerController.swift` | NEW — reuse `CommandPaletteController` shape; shows ranked dirs; on select → `cd <path>\n` to active pane |
+| `UI/Chrome/MainMenuBuilder.swift` | "Jump to Directory…" `Cmd+Shift+J` |
+
+**Frecency formula:** `score = count / log(1 + seconds_since_last_visit)` — cheap, no ML needed.
+
+**Success criteria:** visit 5 dirs → `Cmd+Shift+J` → fuzzy picker shows most-used first → select → `cd` runs in active pane.
+
+---
+
+## Phase 20: Session Resurrection audit
+
+**Source:** Zellij
+
+**What already exists:**
+- `SessionLifecycleService` — saves/restores sessions
+- Daemon restart restore — panes reconnect after daemon crash
+
+**Audit scope:** verify these cases work end-to-end:
+1. App quit → relaunch — scrollback + pane structure restored ✓ (known working)
+2. Daemon crash → restart — pane reconnects without losing scrollback
+3. **Machine reboot** → relaunch — sessions come back (currently unknown)
+4. **Multiple windows** → relaunch — all windows restored in correct screen positions
+
+**Files to touch (if gaps found):**
+| File | Change |
+|---|---|
+| `Services/SessionLifecycleService.swift` | Patch: persist window frame + screen identifier per window for cross-reboot restore |
+| `Services/DaemonLauncher.swift` | Ensure scrollback cache survives reboot (write-through to disk, not only in-memory) |
+
+**Success criteria:** reboot Mac → relaunch Harness → all sessions, scrollback, and window positions restored.
+
+---
+
 ## Files Created / Modified Summary
 
 ### Original 3 features
@@ -518,7 +658,16 @@ if let region = currentSelectionRegion,
 | `UI/Shared/TabOverviewController.swift` | NEW | #15 Tab thumbnails |
 | `HarnessTerminalKit/.../HarnessTerminalSurfaceView+Thumbnail.swift` | NEW | #15 Tab thumbnails |
 
-**Total estimate:** ~1,500 lines new code across 25+ files. No new external dependencies (Kitty Graphics uses Metal + existing PTY parser).
+| `Apps/Harness/Sources/HarnessApp/UI/BrowserPane/BrowserPaneViewController.swift` | NEW | #16 Embedded browser |
+| `Apps/Harness/Sources/HarnessApp/UI/BrowserPane/BrowserPaneController.swift` | NEW | #16 Embedded browser |
+| `Services/PaneMetadataService.swift` | NEW | #17 Live tab metadata |
+| `UI/Chrome/TabBarController.swift` | MODIFY | #17 Live tab metadata |
+| `HarnessCore/.../LayoutFileStore.swift` | NEW | #18 Layout export |
+| `Services/FrecencyDirectoryStore.swift` | NEW | #19 Frecency dirs |
+| `UI/Shared/DirectoryPickerController.swift` | NEW | #19 Frecency dirs |
+| `Services/SessionLifecycleService.swift` | MODIFY (if needed) | #20 Session Resurrection |
+
+**Total estimate:** ~1,500 lines (original 15 features) + ~1,000 lines (new 6 features) = ~2,500 lines across 33+ files. No new external dependencies.
 
 ---
 
@@ -538,3 +687,9 @@ if let region = currentSelectionRegion,
 | 10 | Block output — shell integration required or opt-in? | Require shell integration (OSC 133) |
 | 11 | Recipes — sync via iCloud? | Local only first, iCloud later |
 | 12 | Kitty Graphics — defer until user demand? | Yes, `ponytail: skip until requested` |
+| 13 | Browser pane — use WKWebView in-process or separate process (XPC)? | In-process first; XPC if stability issues |
+| 14 | Live tab metadata — poll interval for git branch? | 1s for focused pane, 5s for background panes |
+| 15 | Live tab metadata — show ports always or only when server running? | Only when ≥1 listening port detected |
+| 16 | Layout export format — JSON or custom DSL (like Zellij KDL)? | JSON (reuse existing Codable LayoutDescriptor) |
+| 17 | Frecency picker — global across all sessions or per-project? | Global first |
+| 18 | Session Resurrection — re-run last command or just restore CWD? | Restore CWD only; don't re-run commands |
