@@ -19,8 +19,10 @@ Runs:
   2. Bump release metadata.
   3. Build production app.
   4. If prod build fails → rollback version bump.
-  5. Commit and push.
-  6. Open the app.
+  5. Commit, push, CHANGELOG, tag, GitHub release.
+  6. Sign (code sign + notarize).
+  7. Create DMG.
+  8. Finalize (notarize DMG + upload to GitHub release + appcast).
 USAGE
 }
 
@@ -161,6 +163,19 @@ git push origin "refs/tags/$TAG" --force
 gh release create "$TAG" --title "$TAG" --notes "$NOTES" 2>/dev/null \
   || gh release edit "$TAG" --title "$TAG" --notes "$NOTES" 2>/dev/null \
   || echo "⚠️  GitHub release skipped (gh CLI not configured or tag exists)"
+
+# Step 6: Sign, DMG, finalize (notarize + upload to GitHub release + appcast).
+echo ""
+echo "▶ Step 6: Signing..."
+make sign
+
+echo ""
+echo "▶ Step 7: Creating DMG..."
+make dmg
+
+echo ""
+echo "▶ Step 8: Finalizing (notarize + upload + appcast)..."
+make finalize
 
 echo ""
 echo "✅ Full cycle complete. Version: $TAG"
