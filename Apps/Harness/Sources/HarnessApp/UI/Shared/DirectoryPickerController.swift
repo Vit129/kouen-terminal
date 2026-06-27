@@ -39,6 +39,7 @@ public enum DirectoryPickerController {
         panel.isOpaque = false
         panel.hasShadow = true
         panel.contentViewController = controller
+        panel.setContentSize(NSSize(width: 620, height: 440))
 
         let delegate = DirectoryWindowDelegate()
         delegate.panel = panel

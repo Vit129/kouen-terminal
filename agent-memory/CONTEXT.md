@@ -1,9 +1,9 @@
 # Context — harness-terminal
 
 ## Now
-- **Task:** otty-features — medium phases in progress
+- **Task:** otty-features — large phases in progress
 - **Branch:** main
-- **Status:** ALL medium phases done ✅ (1, 3–11, 17–20). Large phases 2, 12, 14, 15, 16 not started.
+- **Status:** Medium phases ✅ all done. Large: Phase 2 ✅, Phase 12 ✅ (5a7eb10). Phases 14, 15 → agy. Phase 16 not started.
 
 ### This session (2026-06-27) — otty-features implementation
 
