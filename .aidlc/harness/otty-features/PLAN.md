@@ -152,8 +152,8 @@ Phase 10: Quick Terminal              Medium,  ~150 lines
 Phase 11: Recipes                     Medium,  ~200 lines
 
 ── Large ───────────────────────────────────────────────────────
-Phase 2:  Vi mode                     Large,   ~200 lines
-Phase 12: Block-based output          Large,   ~250 lines
+~~Phase 2:  Vi mode                     Large,   ~200 lines~~ ✅ 5a7eb10
+~~Phase 12: Block-based output          Large,   ~250 lines~~ ✅ 5a7eb10
 Phase 14: Floating panes              Large,   ~200 lines
 Phase 15: Tab thumbnails              Large,   ~180 lines
 
