@@ -237,6 +237,29 @@ final class SidebarSectionModel {
     /// true = Sessions tab shows repo name in 11.5pt bold; false = other tabs 10.5pt semibold
     var isRepoHeader: Bool = true
     var chromeEpoch: Int = 0
+    var selectedTab: Int = 0
+}
+
+struct SidebarTabBarView: View {
+    let model: SidebarSectionModel
+    let onTabChange: (Int) -> Void
+
+    var body: some View {
+        Picker("", selection: Binding(
+            get: { model.selectedTab },
+            set: { newValue in
+                model.selectedTab = newValue
+                onTabChange(newValue)
+            }
+        )) {
+            Text("Sessions").tag(0)
+            Text("Files").tag(1)
+            Text("Git").tag(2)
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .frame(maxWidth: .infinity)
+    }
 }
 
 struct SidebarSectionLabelView: View {

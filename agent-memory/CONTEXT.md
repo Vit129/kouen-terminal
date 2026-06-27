@@ -3,9 +3,20 @@
 ## Now
 - **Task:** idle
 - **Branch:** main
-- **Status:** AppKit low→medium migration wave done.
+- **Status:** AppKit → SwiftUI wave 2 in progress — sidebar chrome now SwiftUI-first.
 
-### This session (2026-06-27) — AppKit → SwiftUI migration wave
+### This session (2026-06-27) — AppKit → SwiftUI wave 2 (like cmux)
+
+**Commits:**
+- `bb68fd3` — `HarnessControls.swift` deleted (−998 lines, 9 AppKit control classes, zero callers after Settings SwiftUI migration)
+- `a072edf` — sidebar section label + footer → SwiftUI (−119 AppKit lines from VC; chromeEpoch pattern for both; SwiftUI Menu for recent projects; agentsInbox anchors above footerHostingView)
+
+**Sidebar VC now SwiftUI for:** WorkspacePillView ✓, SidebarSessionListView ✓, SidebarSectionLabelView ✓, SidebarFooterView ✓
+**Still AppKit in sidebar VC:** NSSegmentedControl (sidebarTabs), SoftIconButton (sidebarToggleButton), SidebarTitlebarHeaderView (mouseDownCanMoveWindow — stays), child panels (GitPanelView, WorkspaceFileTreeView, FileViewerVC)
+
+**"Like cmux" status:** Settings ✅, SwiftUI sidebar chrome ✅, modular packages — deferred
+
+### This session (2026-06-27) — AppKit → SwiftUI wave 1
 
 **Wave summary (5 tasks, all committed on main):**
 - `HarnessSidebarPanelViewController+DragReorder.swift` — deleted (dead stub)
