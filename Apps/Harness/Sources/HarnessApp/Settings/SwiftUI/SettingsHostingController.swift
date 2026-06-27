@@ -14,7 +14,7 @@ final class SettingsHostingController: NSHostingController<SettingsRootView> {
 }
 
 @MainActor
-enum SettingsWindowController {
+final class SettingsWindowController: NSObject {
     /// Page index for the Remote page — kept as Int for call-site compatibility.
     static let pageRemote = SettingsRootView.Page.remote.rawValue
 
@@ -35,9 +35,20 @@ enum SettingsWindowController {
         win.minSize = NSSize(width: 840, height: 600)
         win.setContentSize(NSSize(width: 940, height: 680))
         window = win
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(windowWillClose(_:)),
+            name: NSWindow.willCloseNotification,
+            object: win
+        )
         win.appearance = NSAppearance(named: HarnessChrome.current.isDark ? .darkAqua : .aqua)
         win.center()
         win.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    @objc private static func windowWillClose(_ notification: Notification) {
+        NotificationCenter.default.removeObserver(self, name: NSWindow.willCloseNotification, object: notification.object)
+        window = nil
     }
 }

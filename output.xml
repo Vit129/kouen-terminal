@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<robot generator="Robot 7.3.1 (Python 3.13.5 on darwin)" generated="2026-06-27T20:09:17.975289" rpa="false" schemaversion="5">
+<suite id="s1" name="Memory Leak Guards" source="/Users/supavit.cho/Git/Personal/harness-terminal/Tests/robot/memory_leak_guards.robot">
+<test id="s1-t1" name="Leak A - Retiring A Host Drops Its AI Controllers" line="22">
+<kw name="Get File" owner="OperatingSystem">
+<msg time="2026-06-27T20:09:17.991451" level="INFO" html="true">Getting file '&lt;a href="file:///Users/supavit.cho/Git/Personal/harness-terminal/Apps/Harness/Sources/HarnessApp/Services/TerminalPaneRegistry.swift"&gt;/Users/supavit.cho/Git/Personal/harness-terminal/Apps/Harness/Sources/HarnessApp/Services/TerminalPaneRegistry.swift&lt;/a&gt;'.</msg>
+<msg time="2026-06-27T20:09:17.991769" level="INFO">${registry} = import Foundation
+import HarnessCore
+import HarnessTerminalKit
+
+@MainActor
+final class TerminalPaneRegistry {
+    private var hosts: [SurfaceID: TerminalHostView] = [:]
+
+    /// Invoked with the surfa...</msg>
+<var>${registry}</var>
+<arg>${PANE_REGISTRY}</arg>
+<doc>Returns the contents of a specified file.</doc>
+<status status="PASS" start="2026-06-27T20:09:17.991347" elapsed="0.000440"/>
+</kw>
+<kw name="Should Contain" owner="BuiltIn">
+<arg>${registry}</arg>
+<arg>onRetire</arg>
+<arg>msg=TerminalPaneRegistry must expose an onRetire hook fired from retire()</arg>
+<doc>Fails if ``container`` does not contain ``item`` one or more times.</doc>
+<status status="PASS" start="2026-06-27T20:09:17.991864" elapsed="0.000107"/>
+</kw>
+<kw name="Get File" owner="OperatingSystem">
+<msg time="2026-06-27T20:09:17.992069" level="INFO" html="true">Getting file '&lt;a href="file:///Users/supavit.cho/Git/Personal/harness-terminal/Apps/Harness/Sources/HarnessApp/Services/SessionCoordinator.swift"&gt;/Users/supavit.cho/Git/Personal/harness-terminal/Apps/Harness/Sources/HarnessApp/Services/SessionCoordinator.swift&lt;/a&gt;'.</msg>
+<msg time="2026-06-27T20:09:17.992416" level="INFO">${coord} = import AppKit
+import Foundation
+import HarnessCore
+import HarnessTerminalEngine
+import HarnessTerminalKit
+import HarnessTheme
+import UserNotifications
+
+@MainActor
+final class SessionCoordinator: NSObj...</msg>
+<var>${coord}</var>
+<arg>${COORDINATOR}</arg>
+<doc>Returns the contents of a specified file.</doc>
+<status status="PASS" start="2026-06-27T20:09:17.992019" elapsed="0.000416"/>
+</kw>
+<kw name="Should Contain" owner="BuiltIn">
+<arg>${coord}</arg>
+<arg>inlineAIControllers.removeValue</arg>
+<arg>msg=Coordinator must drop the inline AI controller when its host retires</arg>
+<doc>Fails if ``container`` does not contain ``item`` one or more times.</doc>
+<status status="PASS" start="2026-06-27T20:09:17.992490" elapsed="0.000095"/>
+</kw>
+<kw name="Should Contain" owner="BuiltIn">
+<arg>${coord}</arg>
+<arg>aiChatControllers.removeValue</arg>
+<arg>msg=Coordinator must drop the AI chat controller when its host retires</arg>
+<doc>Fails if ``container`` does not contain ``item`` one or more times.</doc>
+<status status="PASS" start="2026-06-27T20:09:17.992630" elapsed="0.000069"/>
+</kw>
+<doc>Host retire (close + prune both funnel through retire()) must notify
+the coordinator so the parallel AI-controller dicts can't grow forever.</doc>
+<status status="PASS" start="2026-06-27T20:09:17.990838" elapsed="0.001912"/>
+</test>
+<test id="s1-t2" name="Leak B - Browser Network Capture Is Bounded" line="34">
+<kw name="Get File" owner="OperatingSystem">
+<msg time="2026-06-27T20:09:17.993091" level="INFO" html="true">Getting file '&lt;a href="file:///Users/supavit.cho/Git/Personal/harness-terminal/Apps/Harness/Sources/HarnessApp/UI/Chrome/BrowserPaneView.swift"&gt;/Users/supavit.cho/Git/Personal/harness-terminal/Apps/Harness/Sources/HarnessApp/UI/Chrome/BrowserPaneView.swift&lt;/a&gt;'.</msg>
+<msg time="2026-06-27T20:09:17.993513" level="INFO">${content} = import AppKit
+import WebKit
+import HarnessCore
+
+@MainActor
+public final class BrowserPaneView: NSView {
+    public let paneID: PaneID
+    public private(set) var webView: WKWebView
+
+    // MARK: - Tab...</msg>
+<var>${content}</var>
+<arg>${BROWSER_PANE}</arg>
+<doc>Returns the contents of a specified file.</doc>
+<status status="PASS" start="2026-06-27T20:09:17.993031" elapsed="0.000495"/>
+</kw>
+<kw name="Should Contain" owner="BuiltIn">
+<arg>${content}</arg>
+<arg>__cap()</arg>
+<arg>msg=Network capture pushes must call __cap() to trim the ring</arg>
+<doc>Fails if ``container`` does not contain ``item`` one or more times.</doc>
+<status status="PASS" start="2026-06-27T20:09:17.993569" elapsed="0.000086"/>
+</kw>
+<kw name="Should Not Contain" owner="BuiltIn">
+<arg>${content}</arg>
+<arg>window.__harnessNetwork.length + 1</arg>
+<arg>msg=Use a monotonic seq for ids, not array length (collides after trim)</arg>
+<doc>Fails if ``container`` contains ``item`` one or more times.</doc>
+<status status="PASS" start="2026-06-27T20:09:17.993693" elapsed="0.000077"/>
+</kw>
+<doc>The injected fetch/XHR capture array must be capped so a
+long-lived page cannot grow it without bound.</doc>
+<status status="PASS" start="2026-06-27T20:09:17.992841" elapsed="0.000973"/>
+</test>
+<test id="s1-t3" name="Leak C - Every Per-Surface Dict In Coordinator Has Retire Cleanup" line="43">
+<kw name="Run Process" owner="Process">
+<msg time="2026-06-27T20:09:17.994404" level="INFO">Starting process:
+python3 /Users/supavit.cho/Git/Personal/harness-terminal/Tests/robot/helpers/check_retire_coverage.py /Users/supavit.cho/Git/Personal/harness-terminal/Tests/robot/../../Apps/Harness/Sources/HarnessApp/Services/SessionCoordinator.swift</msg>
+<msg time="2026-06-27T20:09:17.998118" level="INFO">Waiting for process to complete.</msg>
+<msg time="2026-06-27T20:09:18.070217" level="INFO">Process completed.</msg>
+<msg time="2026-06-27T20:09:18.070420" level="INFO">${result} = &lt;result object with rc 0&gt;</msg>
+<var>${result}</var>
+<arg>python3</arg>
+<arg>${RETIRE_CHECKER}</arg>
+<arg>${COORDINATOR}</arg>
+<arg>stdout=PIPE</arg>
+<arg>stderr=PIPE</arg>
+<doc>Runs a process and waits for it to complete.</doc>
+<status status="PASS" start="2026-06-27T20:09:17.994161" elapsed="0.076282"/>
+</kw>
+<kw name="Log" owner="BuiltIn">
+<msg time="2026-06-27T20:09:18.071052" level="INFO">OK: 2 dict(s) all have retire cleanup: inlineAIControllers, aiChatControllers</msg>
+<arg>${result.stdout}</arg>
+<doc>Logs the given message with the given level.</doc>
+<status status="PASS" start="2026-06-27T20:09:18.070621" elapsed="0.000453"/>
+</kw>
+<kw name="Should Be Equal As Integers" owner="BuiltIn">
+<msg time="2026-06-27T20:09:18.071556" level="INFO">Argument types are:
+&lt;class 'int'&gt;
+&lt;class 'str'&gt;</msg>
+<arg>${result.rc}</arg>
+<arg>0</arg>
+<arg>msg=Missing onRetire cleanup — ${result.stdout}</arg>
+<doc>Fails if objects are unequal after converting them to integers.</doc>
+<status status="PASS" start="2026-06-27T20:09:18.071123" elapsed="0.000467"/>
+</kw>
+<doc>Every private var [String: T] in SessionCoordinator must have a
+.removeValue call inside the onRetire closure. This guard catches
+the "insert-only dict" pattern before it ships — add the dict,
+forget the cleanup, this fails at PR time.</doc>
+<status status="PASS" start="2026-06-27T20:09:17.993882" elapsed="0.077776"/>
+</test>
+<doc>Regression guards for memory-leak fixes.
+Leak A: SessionCoordinator's per-surface AI controller dicts only ever
+        inserted (one pair per pane) and were never removed on close —
+        every closed pane leaked its Inline/Chat controllers + subviews.
+Leak B: Browser pane network-capture JS array grew without bound on
+        long-lived polling/streaming pages.
+Leak C: Structural guard — any NEW [String: T] dict added to
+        SessionCoordinator must have a .removeValue in the onRetire closure.
+        Prevents future contributors from repeating the insert-only pattern.</doc>
+<status status="PASS" start="2026-06-27T20:09:17.975882" elapsed="0.096065"/>
+</suite>
+<statistics>
+<total>
+<stat pass="3" fail="0" skip="0">All Tests</stat>
+</total>
+<tag>
+</tag>
+<suite>
+<stat name="Memory Leak Guards" id="s1" pass="3" fail="0" skip="0">Memory Leak Guards</stat>
+</suite>
+</statistics>
+<errors>
+</errors>
+</robot>

@@ -673,7 +673,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
                 lastFileTreeGitBranch = nil
                 lastFileTreeCWD = nil
             }
-            let branchChanged = gitBranch != lastFileTreeGitBranch
+
             let root = Self.gitRoot(for: cwd) ?? cwd
             fileTreeView.updateRoot(path: root, sessionID: activeSessionID)
             if cwd != lastFileTreeCWD {
