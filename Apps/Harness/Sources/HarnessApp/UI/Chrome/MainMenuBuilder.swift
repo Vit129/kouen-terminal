@@ -148,6 +148,10 @@ enum MainMenuBuilder {
         view.submenu?.addItem(paletteItem)
         let promptItem = menuItem("Command Prompt", action: #selector(MenuTarget.commandPrompt), binding: BannerShortcutRegistry.commandPrompt)
         view.submenu?.addItem(promptItem)
+        let queueItem = NSMenuItem(title: "Add Clipboard to Queue", action: #selector(MenuTarget.addToQueue), keyEquivalent: "\r")
+        queueItem.keyEquivalentModifierMask = [.command, .shift]
+        queueItem.target = MenuTarget.shared
+        view.submenu?.addItem(queueItem)
         let searchHistoryItem = NSMenuItem(title: "Search Command History...", action: #selector(MenuTarget.searchCommandHistory), keyEquivalent: "r")
         searchHistoryItem.keyEquivalentModifierMask = [.control]
         searchHistoryItem.target = MenuTarget.shared
@@ -480,6 +484,11 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
 
     @objc func searchCommandHistory() {
         CommandHistorySearchController.shared.present()
+    }
+
+    @objc func addToQueue() {
+        guard let text = NSPasteboard.general.string(forType: .string), !text.isEmpty else { return }
+        SessionCoordinator.shared.enqueueCommand(text)
     }
 
     @objc func openSettings() {
