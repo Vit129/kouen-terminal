@@ -177,7 +177,7 @@ final class MainSplitViewController: NSViewController {
     }
 
     func previewExternalFile(path: String) {
-        sidebar.previewFile(path: path)
+        sidebar.openExternalFile(path: path)
     }
 
     func applyChrome() {

@@ -524,6 +524,33 @@ final class HarnessSidebarPanelViewController: NSViewController {
         fileViewerVC.load(path: path)
     }
 
+    /// Full "Open With" entry point: shows file in viewer AND routes the terminal to the
+    /// project root (git root if found, else file's parent). The snapshot update that follows
+    /// addSession/selectSession wires the file tree root automatically.
+    func openExternalFile(path: String) {
+        let expanded = (path as NSString).expandingTildeInPath
+        let cwd = Self.gitRoot(for: expanded) ?? (expanded as NSString).deletingLastPathComponent
+        previewFile(path: expanded)
+        guard let wsID = activeWorkspaceID else { return }
+        if let existing = sessions.first(where: { $0.tabs.contains(where: { $0.cwd == cwd }) }) {
+            SessionCoordinator.shared.selectSession(workspaceID: wsID, sessionID: existing.id)
+        } else {
+            Self.recordRecentProject(cwd)
+            SessionCoordinator.shared.addSession(to: wsID, cwd: cwd, name: (cwd as NSString).lastPathComponent)
+        }
+    }
+
+    private static func gitRoot(for path: String) -> String? {
+        var dir = (path as NSString).deletingLastPathComponent
+        while dir != "/" {
+            if FileManager.default.fileExists(atPath: dir + "/.git") { return dir }
+            let parent = (dir as NSString).deletingLastPathComponent
+            if parent == dir { break }
+            dir = parent
+        }
+        return nil
+    }
+
     @objc private func viViewFileCommand(_ note: Notification) {
         guard let path = note.userInfo?["path"] as? String else { return }
         var expanded = (path as NSString).expandingTildeInPath
@@ -852,4 +879,5 @@ final class HarnessSidebarPanelViewController: NSViewController {
     }
 
 }
+
 
