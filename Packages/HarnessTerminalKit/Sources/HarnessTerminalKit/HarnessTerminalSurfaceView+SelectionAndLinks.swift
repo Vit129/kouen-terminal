@@ -216,6 +216,15 @@ extension HarnessTerminalSurfaceView {
             guard !isDirectory else { return }
             // Don't open executables (.app, .command, etc.) — security
             guard !path.hasSuffix(".app"), !path.hasSuffix(".command"), !path.hasSuffix(".tool") else { return }
+            // HTML files open in the browser pane, not file preview
+            if path.hasSuffix(".html") || path.hasSuffix(".htm") {
+                NotificationCenter.default.post(
+                    name: Notification.Name("HarnessOpenLocalhostURL"),
+                    object: nil,
+                    userInfo: ["url": URL(fileURLWithPath: path)]
+                )
+                return
+            }
             NotificationCenter.default.post(
                 name: Notification.Name("HarnessOpenFilePreview"),
                 object: nil,

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Full cycle: build first (verify) -> bump version -> commit+push -> open app.
+# Full cycle: build first (verify) -> (optionally bump version) -> commit+push -> open app.
 # If build fails AFTER bump, version files are rolled back automatically.
 #
 # Usage:
-#   Scripts/full-cycle.sh [patch|minor|major] [--version X.Y.Z] [--build N]
+#   Scripts/full-cycle.sh [patch|minor|major] [--version X.Y.Z] [--build N] [--no-bump]
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -12,17 +12,27 @@ cd "$ROOT"
 usage() {
   cat <<'USAGE'
 Usage:
-  Scripts/full-cycle.sh [patch|minor|major] [--version X.Y.Z] [--build N]
+  Scripts/full-cycle.sh [patch|minor|major] [--version X.Y.Z] [--build N] [--no-bump]
 
 Runs:
   1. Pre-build verification (swift build).
-  2. Bump release metadata.
+  2. Bump release metadata (skipped with --no-bump).
   3. Build production app.
   4. If prod build fails → rollback version bump.
   5. Commit, push, CHANGELOG, tag, GitHub release.
   6. Install to /Applications (no rebuild — reuses step 4 binary).
 USAGE
 }
+
+NO_BUMP=0
+BUMP_ARGS=()
+for arg in "$@"; do
+  if [[ "$arg" == "--no-bump" ]]; then
+    NO_BUMP=1
+  else
+    BUMP_ARGS+=("$arg")
+  fi
+done
 
 case "${1:-}" in
   -h|--help|help)
@@ -41,10 +51,15 @@ if ! swift build 2>&1 | tail -3; then
 fi
 echo "✅ Build verified."
 
-# Step 2: Bump version.
-echo ""
-echo "▶ Step 2: Bumping version..."
-./Scripts/prepare-release.sh "$@"
+# Step 2: Bump version (skipped with --no-bump).
+if [[ "$NO_BUMP" -eq 1 ]]; then
+  echo ""
+  echo "▶ Step 2: Skipping version bump (--no-bump)."
+else
+  echo ""
+  echo "▶ Step 2: Bumping version..."
+  ./Scripts/prepare-release.sh "${BUMP_ARGS[@]}"
+fi
 
 # Step 3: Commit and push.
 git_dir="$(git rev-parse --git-dir)"
