@@ -176,6 +176,10 @@ final class MainSplitViewController: NSViewController {
             : c.border.withAlphaComponent(0.65)
     }
 
+    func previewExternalFile(path: String) {
+        sidebar.previewFile(path: path)
+    }
+
     func applyChrome() {
         // Never `makeClear(view)` here: the root contentView must stay non-layer-backed
         // (see loadView) so the window stays rounded with no dark perimeter seam. It is

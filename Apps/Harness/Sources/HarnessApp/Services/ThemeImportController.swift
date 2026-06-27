@@ -7,19 +7,24 @@ import HarnessTheme
 enum ExternalOpenKind: Equatable {
     /// A `.harnesstheme` document — import + install + offer to apply.
     case theme
-    /// Everything else (folders, ssh/telnet/man URLs, `.command`/`.tool`/scripts/executables)
-    /// routes through `DefaultTerminalOpener` exactly as before.
+    /// Directories, shell scripts, executables, and non-file URLs open in a terminal session.
     case terminal
+    /// Regular source/text files open in the sidebar file viewer.
+    case filePreview
 
-    /// Classify by file extension only. A theme file is a regular `.harnesstheme` file; any
-    /// other URL (including non-file URL schemes like `ssh://`) is a terminal open.
+    // Shell-script extensions that should open in a terminal, not the viewer.
+    private static let shellExtensions: Set<String> = [
+        "command", "tool", "sh", "zsh", "bash", "csh", "ksh", "fish",
+    ]
+
     init(for url: URL) {
-        if url.isFileURL,
-           url.pathExtension.lowercased() == ThemeDocument.fileExtension {
-            self = .theme
-        } else {
-            self = .terminal
-        }
+        guard url.isFileURL else { self = .terminal; return }
+        let ext = url.pathExtension.lowercased()
+        if ext == ThemeDocument.fileExtension { self = .theme; return }
+        var isDir: ObjCBool = false
+        FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir)
+        if isDir.boolValue || Self.shellExtensions.contains(ext) { self = .terminal; return }
+        self = .filePreview
     }
 }
 

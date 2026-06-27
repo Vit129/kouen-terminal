@@ -9,12 +9,13 @@
 
 **Commits:**
 - `bb68fd3` — `HarnessControls.swift` deleted (−998 lines, 9 AppKit control classes, zero callers after Settings SwiftUI migration)
-- `a072edf` — sidebar section label + footer → SwiftUI (−119 AppKit lines from VC; chromeEpoch pattern for both; SwiftUI Menu for recent projects; agentsInbox anchors above footerHostingView)
+- `a072edf` — sidebar section label + footer → SwiftUI (−119 AppKit lines; SwiftUI Menu for recent projects; agentsInbox anchors above footerHostingView)
+- `a6d59a9` — sidebar tab bar → SwiftUI Picker(.segmented); selectedTab onto SidebarSectionModel; @objc sidebarTabChanged removed
 
-**Sidebar VC now SwiftUI for:** WorkspacePillView ✓, SidebarSessionListView ✓, SidebarSectionLabelView ✓, SidebarFooterView ✓
-**Still AppKit in sidebar VC:** NSSegmentedControl (sidebarTabs), SoftIconButton (sidebarToggleButton), SidebarTitlebarHeaderView (mouseDownCanMoveWindow — stays), child panels (GitPanelView, WorkspaceFileTreeView, FileViewerVC)
+**Sidebar VC chrome is now 100% SwiftUI:** WorkspacePillView ✓, SidebarSessionListView ✓, SidebarSectionLabelView ✓, SidebarTabBarView ✓, SidebarFooterView ✓
+**Still AppKit:** SoftIconButton (sidebarToggleButton — tiny, low ROI), SidebarTitlebarHeaderView (mouseDownCanMoveWindow — stays permanently), child panels (GitPanelView, WorkspaceFileTreeView, FileViewerVC)
 
-**"Like cmux" status:** Settings ✅, SwiftUI sidebar chrome ✅, modular packages — deferred
+**"Like cmux" status:** Settings ✅, sidebar chrome SwiftUI-first ✅, modular packages — deferred
 
 ### This session (2026-06-27) — AppKit → SwiftUI wave 1
 
