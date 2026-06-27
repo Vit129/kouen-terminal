@@ -79,14 +79,16 @@ public actor AgentProcessManager {
                     return
                 }
 
-                // Stream stdout line-by-line
+                // Stream stdout until EOF. availableData blocks on a Pipe until data
+                // arrives or the write-end closes — no isRunning check needed (and the
+                // old `isRunning || availableData.count > 0` pattern double-read the
+                // pipe, discarding the final batch for CLIs that batch-write on exit).
                 let handle = stdoutPipe.fileHandleForReading
                 var buffer = Data()
-                while proc.isRunning || handle.availableData.count > 0 {
-                    let chunk = handle.availableData
-                    if chunk.isEmpty { break }
+                while true {
+                    let chunk = handle.availableData   // blocks until data or EOF
+                    if chunk.isEmpty { break }         // write-end closed → done
                     buffer.append(chunk)
-                    // Yield complete lines, hold partial last line in buffer
                     while let newline = buffer.firstIndex(of: UInt8(ascii: "\n")) {
                         let lineData = buffer[buffer.startIndex...newline]
                         if let line = String(data: lineData, encoding: .utf8) {
@@ -95,7 +97,6 @@ public actor AgentProcessManager {
                         buffer = buffer[buffer.index(after: newline)...]
                     }
                 }
-                // Flush remaining partial line (no trailing newline)
                 if !buffer.isEmpty, let tail = String(data: buffer, encoding: .utf8) {
                     continuation.yield(.text(tail))
                 }
