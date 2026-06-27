@@ -65,24 +65,25 @@ final class TabOverviewController {
             ])
         }
 
+        let thumbSize = NSSize(width: cellW - 8, height: cellH - 28)
         let container = NSView()
-        var y = gridH - cellH - gap
+        var pendingRenders: [(cell: TabCell, surfaceView: HarnessTerminalSurfaceView)] = []
         for (i, tab) in tabs.enumerated() {
             let col = i % cols
             let row = i / cols
             let x = gap + CGFloat(col) * (cellW + gap)
-            y = gridH - CGFloat(row + 1) * (cellH + gap)
-            let image = tab.rootPane.allSurfaceIDs().first
-                .flatMap { coord.terminalHostIfExists(for: $0) }
-                .flatMap { $0.surfaceView.renderThumbnail(size: NSSize(width: cellW - 8, height: cellH - 28)) }
+            let y = gridH - CGFloat(row + 1) * (cellH + gap)
             let title = tab.title.isEmpty ? "Terminal" : tab.title
             let tabID = tab.id
+            let sv = tab.rootPane.allSurfaceIDs().first
+                .flatMap { coord.terminalHostIfExists(for: $0) }?.surfaceView
             let cell = TabCell(frame: NSRect(x: x, y: y, width: cellW, height: cellH),
-                               title: title, image: image) { [weak self] in
+                               title: title, image: nil) { [weak self] in
                 self?.dismiss()
                 coord.selectTab(workspaceID: wsID, tabID: tabID)
             }
             container.addSubview(cell)
+            if let sv { pendingRenders.append((cell, sv)) }
         }
         container.frame = NSRect(origin: .zero, size: NSSize(width: gridW, height: gridH))
 
@@ -101,6 +102,16 @@ final class TabOverviewController {
 
         panel = p
         p.makeKeyAndOrderFront(nil)
+
+        // Render thumbnails after the panel is on screen so open feels instant.
+        // Task.yield() between renders gives AppKit a run-loop cycle to process events.
+        Task { @MainActor [weak self] in
+            for (cell, sv) in pendingRenders {
+                guard self?.panel != nil else { break }
+                await Task.yield()
+                cell.setThumbnail(sv.renderThumbnail(size: thumbSize))
+            }
+        }
     }
 }
 
@@ -109,6 +120,7 @@ final class TabOverviewController {
 @MainActor
 private final class TabCell: NSView {
     private let action: () -> Void
+    private var imageView: NSImageView!
 
     init(frame: NSRect, title: String, image: NSImage?, action: @escaping () -> Void) {
         self.action = action
@@ -119,16 +131,14 @@ private final class TabCell: NSView {
         layer?.backgroundColor = NSColor.black.withAlphaComponent(0.35).cgColor
 
         let thumbH = frame.height - 28
-        let imageView = NSImageView(frame: NSRect(x: 4, y: 24, width: frame.width - 8, height: thumbH))
-        imageView.imageScaling = .scaleProportionallyUpOrDown
-        if let img = image {
-            imageView.image = img
-        } else {
-            imageView.wantsLayer = true
-            imageView.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.5).cgColor
-            imageView.layer?.cornerRadius = 4
-        }
-        addSubview(imageView)
+        let iv = NSImageView(frame: NSRect(x: 4, y: 24, width: frame.width - 8, height: thumbH))
+        iv.imageScaling = .scaleProportionallyUpOrDown
+        iv.wantsLayer = true
+        iv.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.5).cgColor
+        iv.layer?.cornerRadius = 4
+        if let img = image { iv.image = img }
+        imageView = iv
+        addSubview(iv)
 
         let label = NSTextField(labelWithString: title)
         label.frame = NSRect(x: 6, y: 4, width: frame.width - 12, height: 18)
@@ -140,6 +150,12 @@ private final class TabCell: NSView {
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
+
+    func setThumbnail(_ image: NSImage?) {
+        guard let image else { return }
+        imageView.image = image
+        imageView.layer?.backgroundColor = nil
+    }
 
     override func mouseUp(with event: NSEvent) { action() }
 

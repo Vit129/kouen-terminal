@@ -487,6 +487,22 @@ public enum AgentHookInstaller {
         "\(notifyPrefix) --surface \"$HARNESS_SURFACE\" --title \"\(title)\" --from-hook"
     }
 
+    /// Emit OSC 26 agent status into the PTY stream. The hook runs inside the same PTY as the
+    /// terminal, so printf output is parsed by the emulator and drives the status dot + approval bar.
+    private static func osc26Emit(identity: AgentKind, status: String) -> String {
+        "printf '\\033]26;identity=\(identity.rawValue);status=\(status)\\007'"
+    }
+
+    /// Chain OSC 26 emit + notify. Status updates the indicator immediately; notify surfaces the tab.
+    private static func osc26AndNotify(identity: AgentKind, status: String,
+                                       title: String, body: String) -> String {
+        "\(osc26Emit(identity: identity, status: status)); \(notifyCommand(title: title, body: body))"
+    }
+
+    private static func osc26AndNotifyFromHook(identity: AgentKind, status: String, title: String) -> String {
+        "\(osc26Emit(identity: identity, status: status)); \(notifyFromHookCommand(title: title))"
+    }
+
     // MARK: - Per-agent payloads
 
     private static var claudePayload: [String: Any] {
@@ -494,11 +510,11 @@ public enum AgentHookInstaller {
             "hooks": [
                 "Notification": [[
                     "matcher": "*",
-                    "hooks": [["type": "command", "command": notifyFromHookCommand(title: "Claude Code")]],
+                    "hooks": [["type": "command", "command": osc26AndNotifyFromHook(identity: .claudeCode, status: "working", title: "Claude Code")]],
                 ]],
                 "Stop": [[
                     "matcher": "*",
-                    "hooks": [["type": "command", "command": notifyCommand(title: "Claude Code", body: "Done")]],
+                    "hooks": [["type": "command", "command": osc26AndNotify(identity: .claudeCode, status: "idle", title: "Claude Code", body: "Done")]],
                 ]],
             ],
         ]
@@ -509,15 +525,15 @@ public enum AgentHookInstaller {
             "hooks": [
                 "PermissionRequest": [[
                     "matcher": "*",
-                    "hooks": [["type": "command", "command": notifyCommand(title: "Codex", body: "Awaiting input")]],
+                    "hooks": [["type": "command", "command": osc26AndNotify(identity: .codex, status: "waiting_input", title: "Codex", body: "Awaiting input")]],
                 ]],
                 "Notification": [[
                     "matcher": "*",
-                    "hooks": [["type": "command", "command": notifyCommand(title: "Codex", body: "Notification")]],
+                    "hooks": [["type": "command", "command": osc26AndNotify(identity: .codex, status: "working", title: "Codex", body: "Notification")]],
                 ]],
                 "Stop": [[
                     "matcher": "*",
-                    "hooks": [["type": "command", "command": notifyCommand(title: "Codex", body: "Done")]],
+                    "hooks": [["type": "command", "command": osc26AndNotify(identity: .codex, status: "idle", title: "Codex", body: "Done")]],
                 ]],
             ],
         ]
@@ -527,28 +543,32 @@ public enum AgentHookInstaller {
         [
             "version": 1,
             "hooks": [
-                "stop": [["command": notifyCommand(title: "Cursor", body: "Done")]],
+                "stop": [["command": osc26AndNotify(identity: .cursor, status: "idle", title: "Cursor", body: "Done")]],
             ],
         ]
     }
 
     private static var grokPayload: [String: Any] {
         [
-            "on-complete": notifyCommand(title: "Grok", body: "Done"),
-            "on-error": notifyCommand(title: "Grok", body: "Error"),
+            "on-complete": osc26AndNotify(identity: .grok, status: "idle", title: "Grok", body: "Done"),
+            "on-error": osc26AndNotify(identity: .grok, status: "errored", title: "Grok", body: "Error"),
         ]
     }
 
     /// OpenCode plugin: surfaces session-idle / permission events in Harness via Bun's `$` shell.
     /// Contains `harness-cli notify`, so `isInstalled` detects it.
     private static var openCodePlugin: String {
+        // Use process.stdout.write with hex escapes — octal (\033) is illegal in strict-mode
+        // JS template literals, so the raw PTY bytes must go through stdout.write instead.
         """
         // harness-managed — surfaces OpenCode session events in Harness. Safe to delete.
         export const HarnessNotify = async ({ $ }) => ({
           "session.idle": async () => {
+            process.stdout.write('\\x1b]26;identity=opencode;status=idle\\x07')
             await $`\(notifyPrefix) --surface "${process.env.HARNESS_SURFACE ?? ""}" --title OpenCode --body Done`
           },
           "permission.asked": async () => {
+            process.stdout.write('\\x1b]26;identity=opencode;status=waiting_input\\x07')
             await $`\(notifyPrefix) --surface "${process.env.HARNESS_SURFACE ?? ""}" --title OpenCode --body "Awaiting input"`
           },
         })
@@ -568,8 +588,9 @@ public enum AgentHookInstaller {
               `\(notifyPrefix) --surface "${process.env.HARNESS_SURFACE ?? ""}" --title "Pi" --body "${body}"`,
               { stdio: "ignore" }
             )
-          api.on?.("session_end", () => notify("Done"))
-          api.on?.("stop", () => notify("Done"))
+          const osc26idle = () => process.stdout.write('\\x1b]26;identity=pi;status=idle\\x07')
+          api.on?.("session_end", () => { osc26idle(); notify("Done") })
+          api.on?.("stop",        () => { osc26idle(); notify("Done") })
         }
         """
     }
@@ -580,7 +601,7 @@ public enum AgentHookInstaller {
         """
         hooks:
           - event: stop
-            command: '\(notifyCommand(title: "Hermes", body: "Done"))'
+            command: '\(osc26AndNotify(identity: .hermes, status: "idle", title: "Hermes", body: "Done"))'
         """
     }
 
@@ -589,7 +610,7 @@ public enum AgentHookInstaller {
         """
         "hooks": {
           "harness-notify": {
-            "command": "\(escapedForJSON(notifyCommand(title: "OpenClaw", body: "Done")))",
+            "command": "\(escapedForJSON(osc26AndNotify(identity: .openClaw, status: "idle", title: "OpenClaw", body: "Done")))",
           },
         },
         """
