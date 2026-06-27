@@ -428,13 +428,13 @@ final class SessionCoordinator: NSObject {
 
     // MARK: - Composer (⌘⇧E)
 
-    func openComposer() {
+    func openComposer(withInitialText text: String = "") {
         ComposerPanel.shared.onSubmit = { [weak self] text in
             guard let surfaceID = self?.activeSurfaceID,
                   let host = self?.terminalHosts.host(for: surfaceID) else { return }
             host.sendInput((text + "\n").data(using: .utf8) ?? Data())
         }
-        ComposerPanel.shared.present(relativeTo: NSApp.keyWindow)
+        ComposerPanel.shared.present(relativeTo: NSApp.keyWindow, initialText: text)
     }
 
     // MARK: - Find bar / Copy mode / Detach / Prompts

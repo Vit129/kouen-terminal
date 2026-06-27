@@ -188,6 +188,16 @@ public enum BannerShortcutRegistry {
         modifiers: [.command, .shift], keyChar: "e",
         showInBanner: false)
 
+    public static let recipes = Keybinding(
+        id: "recipes", title: "Recipes…",
+        modifiers: [.command, .shift], keyChar: "r",
+        showInBanner: false)
+
+    public static let jumpToDirectory = Keybinding(
+        id: "jumpToDirectory", title: "Jump to Directory…",
+        modifiers: [.command, .shift], keyChar: "j",
+        showInBanner: false)
+
     // MARK: - Banner shortcuts (legacy format for terminal banner rendering)
 
     /// All registered shortcuts for banner display, derived from keybindings above.
