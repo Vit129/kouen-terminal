@@ -85,6 +85,8 @@ These are fixed `NSMenuItem` bindings defined in `MainMenuBuilder` — not prefi
 | Focus Pane direction | `⌘⌥←/→/↑/↓` |
 | **Find File (fuzzy)** | **`⌘P`** |
 | **Find in Files (grep)** | **`⌘F`** |
+| **Jump to Directory** | **`⌘⇧J`** — `↩` cd here · `⌘↩` open new tab · reads zoxide list |
+| **Recipes** | **`⌘⇧R`** — run or send a saved command to Composer |
 | Command prompt | `⌘;` |
 | Search command history | `⌃R` |
 | Toggle sidebar | `⌘\` |

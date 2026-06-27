@@ -203,6 +203,16 @@ public enum BannerShortcutRegistry {
         modifiers: [.command, .control], keyChar: "v",
         showInBanner: false)
 
+    public static let floatingPane = Keybinding(
+        id: "floatingPane", title: "Floating Terminal",
+        modifiers: [.command, .option], keyChar: "f",
+        showInBanner: false)
+
+    public static let tabOverview = Keybinding(
+        id: "tabOverview", title: "Tab Overview",
+        modifiers: [.command, .shift], keyChar: "\\",
+        showInBanner: false)
+
     // MARK: - Banner shortcuts (legacy format for terminal banner rendering)
 
     /// All registered shortcuts for banner display, derived from keybindings above.
@@ -216,10 +226,12 @@ public enum BannerShortcutRegistry {
         .init(key: "\(previousPane.displayKey) / \(nextPane.displayKey) / ⌘←→", description: "navigate & reorder panes"),
         .init(key: "", description: "Search & Navigate", showInBanner: true),
         .init(key: commandPalette.displayKey, description: "fuzzy file / directory jump (zoxide)"),
+        .init(key: jumpToDirectory.displayKey, description: "frecency dir picker — ↩ cd · ⌘↩ new tab (zoxide)"),
+        .init(key: recipes.displayKey, description: "run a saved command recipe"),
         .init(key: findInFiles.displayKey, description: "find in files"),
         .init(key: "\(commandPrompt.displayKey)", description: "command prompt · try: find, grep, cd"),
         .init(key: "", description: "Shell", showInBanner: true),
-        .init(key: "z <dir>", description: "smart cd — learns your frequent dirs"),
+        .init(key: "z <dir>", description: "smart cd — same list as ⌘⇧J"),
         .init(key: "fd <pattern>", description: "find files by name (respects .gitignore)"),
         .init(key: "rg <pattern>", description: "search file contents (ripgrep)"),
         .init(key: "bat <file>", description: "cat with syntax highlighting + line numbers"),

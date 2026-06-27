@@ -29,6 +29,8 @@ struct CompleteStepView: View {
                 ShortcutRow(key: BannerShortcutRegistry.newSession.displayKey, action: "New tab")
                 ShortcutRow(key: BannerShortcutRegistry.commandPalette.displayKey, action: "Command palette")
                 ShortcutRow(key: BannerShortcutRegistry.commandPrompt.displayKey, action: "Command prompt")
+                ShortcutRow(key: BannerShortcutRegistry.jumpToDirectory.displayKey, action: "Jump to directory — ↩ cd · ⌘↩ new tab")
+                ShortcutRow(key: BannerShortcutRegistry.recipes.displayKey, action: "Run a saved command")
                 ShortcutRow(key: "Double-click folder", action: "cd terminal")
             }
             .frame(maxWidth: 420)
