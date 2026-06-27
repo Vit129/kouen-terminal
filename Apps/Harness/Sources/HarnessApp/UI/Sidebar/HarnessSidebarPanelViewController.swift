@@ -21,7 +21,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
     /// the divider; when the sidebar is collapsed it's gone with it (re-open via ⌘\).
     /// Flat `.plain` style + 30×30 so it matches the neighbouring notification bell.
     private let sidebarToggleButton = SoftIconButton(frame: NSRect(x: 0, y: 0, width: 30, height: 30))
-    private let sidebarTabs = NSSegmentedControl(labels: ["Sessions", "Files", "Git"], trackingMode: .selectOne, target: nil, action: nil)
+    private var tabBarHostingView: NSView!
 #if HARNESS_ACP
     private let agentChatPanel = AgentChatPanelView()
 #endif
@@ -339,17 +339,18 @@ final class HarnessSidebarPanelViewController: NSViewController {
     }
 
     private func setupSidebarTabs() {
-        sidebarTabs.translatesAutoresizingMaskIntoConstraints = false
-        sidebarTabs.selectedSegment = 0
-        sidebarTabs.target = self
-        sidebarTabs.action = #selector(sidebarTabChanged)
-        sidebarTabs.segmentStyle = .rounded
-        chromeHeader.addSubview(sidebarTabs)
+        let hosting = NSHostingView(rootView: SidebarTabBarView(
+            model: sidebarSectionModel,
+            onTabChange: { [weak self] index in self?.selectSidebarTab(index: index) }
+        ))
+        hosting.translatesAutoresizingMaskIntoConstraints = false
+        tabBarHostingView = hosting
+        chromeHeader.addSubview(hosting)
         NSLayoutConstraint.activate([
-            sidebarTabs.leadingAnchor.constraint(equalTo: chromeHeader.leadingAnchor, constant: HarnessDesign.horizontalInset),
-            sidebarTabs.trailingAnchor.constraint(equalTo: sidebarToggleButton.leadingAnchor, constant: -8),
-            sidebarTabs.topAnchor.constraint(equalTo: chromeHeader.topAnchor, constant: WindowTitleStripView.height + 4),
-            sidebarTabs.heightAnchor.constraint(equalToConstant: 26),
+            hosting.leadingAnchor.constraint(equalTo: chromeHeader.leadingAnchor, constant: HarnessDesign.horizontalInset),
+            hosting.trailingAnchor.constraint(equalTo: sidebarToggleButton.leadingAnchor, constant: -8),
+            hosting.topAnchor.constraint(equalTo: chromeHeader.topAnchor, constant: WindowTitleStripView.height + 4),
+            hosting.heightAnchor.constraint(equalToConstant: 26),
         ])
     }
 
@@ -496,20 +497,18 @@ final class HarnessSidebarPanelViewController: NSViewController {
     private var agentSession: ACPSession?
 #endif
 
-    @objc private func sidebarTabChanged() {
-        selectSidebarTab(index: sidebarTabs.selectedSegment)
-    }
+
 
     /// Switches the sidebar to the Git tab (used by the "Show Git Panel" ⌘G shortcut).
     func selectGitTab() {
-        sidebarTabs.selectedSegment = 2
+        sidebarSectionModel.selectedTab = 2
         selectSidebarTab(index: 2)
     }
 
     /// Switches the sidebar to the Files tab and reveals `path` in the file tree
     /// (expands ancestors, highlights the row, and scrolls to it).
     func selectFilesTab(revealPath path: String) {
-        sidebarTabs.selectedSegment = 1
+        sidebarSectionModel.selectedTab = 1
         selectSidebarTab(index: 1)
         // Ensure the tree is shown, not the inline file viewer.
         fileViewerVC.view.isHidden = true
@@ -518,7 +517,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
     }
 
     func previewFile(path: String) {
-        sidebarTabs.selectedSegment = 1
+        sidebarSectionModel.selectedTab = 1
         selectSidebarTab(index: 1)
         fileTreeView.isHidden = true
         fileViewerVC.view.isHidden = false
@@ -836,7 +835,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
     }
 
     private func updateRepoSectionHeader() {
-        guard sidebarTabs.selectedSegment == 0 else { return }
+        guard sidebarSectionModel.selectedTab == 0 else { return }
         let path = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd ?? ""
         if path.isEmpty {
             self.sidebarSectionModel.text = "SESSIONS"
@@ -845,7 +844,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
         Task {
             let repoName = await fetchRepoName(for: path)
             await MainActor.run {
-                if self.sidebarTabs.selectedSegment == 0 {
+                if self.sidebarSectionModel.selectedTab == 0 {
                     self.sidebarSectionModel.text = repoName.hasSuffix("/") ? repoName : "\(repoName)/"
                 }
             }
