@@ -317,6 +317,19 @@ extension HarnessTerminalSurfaceView {
         // makes a real selection that copy-on-select copies.
         if let a = selectionAnchor, let h = selectionHead, a == h, selectionGranularity == .character {
             clearSelection()
+            // Click-to-move: single click at scroll-bottom, same row as cursor → send arrow keys
+            // to move readline/shell cursor to the clicked column. Guards: not mouse-reporting
+            // (handled above), not scrolled up, not option (rectangle mode), same visible row.
+            if scrollOffset == 0, !event.modifierFlags.contains(.option),
+               !event.modifierFlags.contains(.command) {
+                let clickedRow = h.line - selectionTopLine
+                let cur = emulatorSync { $0.readGrid().cursor }
+                if clickedRow == cur.row, h.column != cur.col {
+                    let right = h.column > cur.col
+                    let arrow: [UInt8] = right ? [0x1b, 0x5b, 0x43] : [0x1b, 0x5b, 0x44]
+                    emit(Array(repeating: arrow, count: abs(h.column - cur.col)).flatMap { $0 })
+                }
+            }
             return
         }
         if copyOnSelect { copySelection() }
