@@ -122,19 +122,15 @@ async function main() {
   try {
     const options = [
       {
-        display: '1) Commit + Push + Merge (commit-push-merge.sh)',
+        display: '1) Commit + Push (commit-push-merge.sh)',
         value: 'commit-push-merge'
       },
       {
-        display: '2) Preview build, isolated dev/test app (make preview)',
+        display: '2) Preview build — isolated dev/test app (make preview)',
         value: 'preview'
       },
       {
-        display: '3) Production build only, no version bump (make prod)',
-        value: 'prod'
-      },
-      {
-        display: `4) Full cycle: build → bump → commit+push → prod${nextVersions}`,
+        display: `3) Full cycle: build → bump → commit+push → install${nextVersions}`,
         value: 'full-cycle'
       }
     ];
@@ -143,8 +139,8 @@ async function main() {
     const arg = process.argv[2];
     let choice;
     if (arg) {
-      const byNumber = { '1': 'commit-push-merge', '2': 'preview', '3': 'prod', '4': 'full-cycle' };
-      const byName = { 'commit-push-merge': 'commit-push-merge', 'preview': 'preview', 'prod': 'prod', 'full-cycle': 'full-cycle' };
+      const byNumber = { '1': 'commit-push-merge', '2': 'preview', '3': 'full-cycle' };
+      const byName = { 'commit-push-merge': 'commit-push-merge', 'preview': 'preview', 'full-cycle': 'full-cycle' };
       choice = byNumber[arg] || byName[arg];
       if (!choice) { console.error(`❌ Unknown option: ${arg}`); process.exit(1); }
       console.log(`\n✅ Selected: ${options.find(o => o.value === choice)?.display}\n`);
@@ -158,8 +154,6 @@ async function main() {
       await runCommand('make', ['preview-stop']).catch(() => {});
       await runCommand('make', ['preview-clean']);
       await runCommand('./Scripts/run.sh', ['preview']);
-    } else if (choice === 'prod') {
-      await runCommand('./Scripts/run.sh', ['prod']);
     } else if (choice === 'full-cycle') {
       const bumpOptions = [
         { display: '1) patch  — bug fixes', value: 'patch' },
