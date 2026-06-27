@@ -127,13 +127,15 @@ final class AgentApprovalBar: NSView {
     // MARK: - Actions
 
     @objc private func allow() {
-        host?.sendInput(Data([0x0A]))  // \n
-        AgentApprovalBar.hide(from: host!)
+        guard let host else { return }
+        host.sendInput(Data([0x0A]))  // \n
+        AgentApprovalBar.hide(from: host)
     }
 
     @objc private func deny() {
-        host?.sendInput(Data([0x03]))  // Ctrl-C
-        AgentApprovalBar.hide(from: host!)
+        guard let host else { return }
+        host.sendInput(Data([0x03]))  // Ctrl-C
+        AgentApprovalBar.hide(from: host)
     }
 }
 
