@@ -16,6 +16,7 @@ extension SessionCoordinator: TerminalHostDelegate {
     }
 
     func terminalHostDidChangeWorkingDirectory(_ path: String, surfaceID: SurfaceID) {
+        kickBranchRefresh(for: surfaceID, cwd: path)
         Task {
             await daemonSyncService.logIfFailed(.updateTabCwd(surfaceID: surfaceID.uuidString, path: path))
             await syncFromDaemon(metadataOnly: true)
@@ -26,6 +27,7 @@ extension SessionCoordinator: TerminalHostDelegate {
         let current = snapshot.workspaces.flatMap { $0.sessions.flatMap { $0.tabs } }
             .first { $0.rootPane.allSurfaceIDs().contains(surfaceID) }?.cwd
         if current == cwd { return }
+        kickBranchRefresh(for: surfaceID, cwd: cwd)
         Task {
             await daemonSyncService.logIfFailed(.updateTabCwd(surfaceID: surfaceID.uuidString, path: cwd))
             await syncFromDaemon(metadataOnly: true)
@@ -86,5 +88,60 @@ extension SessionCoordinator {
     func clearNotification(for surfaceID: SurfaceID) {
         requestDaemon(.clearNotification(surfaceID: surfaceID.uuidString))
         syncFromDaemon()
+    }
+
+    /// On every CWD change, read `.git/HEAD` directly (no subprocess) and push an
+    /// `updateTabGitBranch` immediately if the branch differs from the snapshot.
+    /// The 5-second polling loop in `DaemonSyncService` still handles the steady-state;
+    /// this just eliminates the lag right after a `cd`.
+    func kickBranchRefresh(for surfaceID: SurfaceID, cwd: String) {
+        var matchedWorkspace: WorkspaceID?
+        var matchedTab: TabID?
+        var matchedBranch: String?
+        search: for ws in snapshot.workspaces {
+            for session in ws.sessions {
+                for tab in session.tabs where tab.rootPane.allSurfaceIDs().contains(surfaceID) {
+                    matchedWorkspace = ws.id
+                    matchedTab = tab.id
+                    matchedBranch = tab.gitBranch
+                    break search
+                }
+            }
+        }
+        guard let workspaceID = matchedWorkspace, let tabID = matchedTab else { return }
+        let knownBranch = matchedBranch
+
+        Task.detached(priority: .utility) { [weak self] in
+            guard let branch = Self.readGitHead(at: cwd), branch != knownBranch else { return }
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                Task {
+                    await self.daemonSyncService.logIfFailed(
+                        .updateTabGitBranch(workspaceID: workspaceID, tabID: tabID, branch: branch))
+                    await self.syncFromDaemon(metadataOnly: true)
+                }
+            }
+        }
+    }
+
+    /// Walk up from `path` to find `.git/HEAD` and return the current branch name.
+    /// Returns nil for detached HEAD, worktrees with non-standard HEAD, or paths outside a repo.
+    /// ponytail: direct file read — no subprocess, no blocking git invocation.
+    private nonisolated static func readGitHead(at path: String) -> String? {
+        var url = URL(fileURLWithPath: path, isDirectory: true)
+        for _ in 0 ..< 16 {
+            let head = url.appendingPathComponent(".git/HEAD")
+            if let content = try? String(contentsOf: head, encoding: .utf8) {
+                let s = content.trimmingCharacters(in: .whitespacesAndNewlines)
+                // "ref: refs/heads/main" → "main"; a detached HEAD is a bare hash → nil
+                guard s.hasPrefix("ref: refs/heads/") else { return nil }
+                let branch = String(s.dropFirst("ref: refs/heads/".count))
+                return branch.isEmpty ? nil : branch
+            }
+            let parent = url.deletingLastPathComponent()
+            if parent.path == url.path { break }
+            url = parent
+        }
+        return nil
     }
 }
