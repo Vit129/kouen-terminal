@@ -1,5 +1,6 @@
 import AppKit
 import HarnessCore
+import SwiftUI
 
 // MARK: - Workspace switcher
 
@@ -230,132 +231,75 @@ private final class WorkspaceSwitcherRow: NSView {
 
 // MARK: - Workspace pill
 
-@MainActor
-final class WorkspacePillButton: NSButton {
-    var onMoreClick: ((NSView) -> Void)?
+@Observable @MainActor
+final class WorkspacePillModel {
+    var name: String = ""
+    // ponytail: toggled by applyChromeColors so the hosted SwiftUI body re-runs and
+    // picks up the fresh HarnessDesign.chrome (static — not @Observable itself).
+    var chromeEpoch: Int = 0
+}
 
-    private let icon = NSImageView()
-    private let nameLabel = NSTextField(labelWithString: "")
-    private let chevron = NSImageView()
-    private let moreButton = NSButton()
-    private var trackingArea: NSTrackingArea?
-    private var isHovered = false { didSet { applyChrome() } }
+struct WorkspacePillView: View {
+    let model: WorkspacePillModel
+    let onClick: () -> Void
+    let onMoreClick: () -> Void
+    @State private var isHovered = false
 
-    init() {
-        super.init(frame: .zero)
-        title = ""
-        bezelStyle = .inline
-        isBordered = false
-        setButtonType(.momentaryChange)
-        wantsLayer = true
-        layer?.cornerCurve = .continuous
-
-        let symbolConfig = NSImage.SymbolConfiguration(pointSize: 13, weight: .medium)
-        icon.image = NSImage(systemSymbolName: "square.stack.3d.up", accessibilityDescription: nil)?
-            .withSymbolConfiguration(symbolConfig)
-        icon.translatesAutoresizingMaskIntoConstraints = false
-        icon.imageScaling = .scaleProportionallyUpOrDown
-
-        nameLabel.font = HarnessDesign.Typography.sidebarLabel
-        nameLabel.lineBreakMode = .byTruncatingTail
-        nameLabel.translatesAutoresizingMaskIntoConstraints = false
-
-        // All header glyphs share one weight (.medium) so the icon set reads as a
-        // single uniform pack rather than a mix of semibold/medium symbols.
-        let chevronConfig = NSImage.SymbolConfiguration(pointSize: 11, weight: .medium)
-        chevron.image = NSImage(systemSymbolName: "chevron.down", accessibilityDescription: nil)?
-            .withSymbolConfiguration(chevronConfig)
-        chevron.translatesAutoresizingMaskIntoConstraints = false
-
-        // Ellipsis: quick actions (rename, delete) without opening the workspace
-        // dropdown first. Its own NSButton so the click is captured here instead
-        // of falling through to the pill's primary action.
-        let moreConfig = NSImage.SymbolConfiguration(pointSize: 12, weight: .medium)
-        moreButton.image = NSImage(systemSymbolName: "ellipsis", accessibilityDescription: "Workspace actions")?
-            .withSymbolConfiguration(moreConfig)
-        moreButton.imagePosition = .imageOnly
-        moreButton.bezelStyle = .accessoryBarAction
-        moreButton.isBordered = false
-        moreButton.translatesAutoresizingMaskIntoConstraints = false
-        moreButton.target = self
-        moreButton.action = #selector(moreClicked)
-        moreButton.toolTip = "Workspace actions"
-
-        addSubview(icon)
-        addSubview(nameLabel)
-        addSubview(moreButton)
-        addSubview(chevron)
-
-        NSLayoutConstraint.activate([
-            icon.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
-            icon.centerYAnchor.constraint(equalTo: centerYAnchor),
-            icon.widthAnchor.constraint(equalToConstant: 16),
-            icon.heightAnchor.constraint(equalToConstant: 16),
-            nameLabel.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 8),
-            nameLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
-            nameLabel.trailingAnchor.constraint(lessThanOrEqualTo: moreButton.leadingAnchor, constant: -4),
-            moreButton.trailingAnchor.constraint(equalTo: chevron.leadingAnchor, constant: -2),
-            moreButton.centerYAnchor.constraint(equalTo: centerYAnchor),
-            moreButton.widthAnchor.constraint(equalToConstant: 20),
-            moreButton.heightAnchor.constraint(equalToConstant: 20),
-            chevron.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
-            chevron.centerYAnchor.constraint(equalTo: centerYAnchor),
-            chevron.widthAnchor.constraint(equalToConstant: 12),
-            chevron.heightAnchor.constraint(equalToConstant: 12),
-        ])
-
-        applyChrome()
-    }
-
-    @objc private func moreClicked() {
-        onMoreClick?(moreButton)
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError() }
-
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        if let trackingArea { removeTrackingArea(trackingArea) }
-        guard window != nil else { trackingArea = nil; return }
-        let area = NSTrackingArea(
-            rect: bounds,
-            options: [.mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect],
-            owner: self,
-            userInfo: nil
-        )
-        addTrackingArea(area)
-        trackingArea = area
-    }
-
-    override func mouseEntered(with event: NSEvent) { isHovered = true }
-    override func mouseExited(with event: NSEvent) { isHovered = false }
-
-    func configure(name: String, count: Int) {
-        // `count` retained in the signature for callers that still pass it; the
-        // visual badge is gone (cleaner pill) but the parameter is kept to avoid
-        // a churn-y signature change at every call site.
-        _ = count
-        nameLabel.stringValue = name
-        toolTip = name
-        applyChrome()
-    }
-
-    func applyChrome() {
+    var body: some View {
+        let _ = model.chromeEpoch
         let c = HarnessDesign.chrome
-        layer?.cornerRadius = HarnessDesign.Radius.card
-        layer?.borderWidth = 1
-        // Defined card rim (matches the session-card "side tab" look) rather than the
-        // near-invisible hairline; brightens further on hover.
-        layer?.borderColor = (isHovered ? c.focusRing.withAlphaComponent(c.isDark ? 0.45 : 0.50) : c.borderStrong).cgColor
-        let resting = c.surfaceElevated
-        let hover = c.textPrimary.withAlphaComponent(c.isDark ? 0.11 : 0.12)
-        layer?.backgroundColor = (isHovered ? hover : resting).cgColor
-        // Resting color matches the search placeholder (textSecondary); brightens to
-        // primary on hover — same resting/active rule used by every other label.
-        nameLabel.textColor = isHovered ? c.textPrimary : c.textSecondary
-        icon.contentTintColor = isHovered ? c.textPrimary : c.textSecondary
-        chevron.contentTintColor = isHovered ? c.textSecondary : c.textTertiary
-        moreButton.contentTintColor = isHovered ? c.textSecondary : c.textTertiary
+        let fg = Color(nsColor: isHovered ? c.textPrimary : c.textSecondary)
+        let trail = Color(nsColor: isHovered ? c.textSecondary : c.textTertiary)
+        HStack(spacing: 0) {
+            Button(action: onClick) {
+                HStack(spacing: 8) {
+                    Image(systemName: "square.stack.3d.up")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(fg)
+                        .frame(width: 16, height: 16)
+                    Text(model.name)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(fg)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+                .padding(.leading, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            Button(action: onMoreClick) {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(trail)
+                    .frame(width: 20, height: 20)
+            }
+            .buttonStyle(.plain)
+            .help("Workspace actions")
+            Image(systemName: "chevron.down")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(trail)
+                .frame(width: 12, height: 12)
+                .padding(.leading, 2)
+                .padding(.trailing, 10)
+                .allowsHitTesting(false)
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(Color(nsColor: isHovered
+                    ? c.textPrimary.withAlphaComponent(c.isDark ? 0.11 : 0.12)
+                    : c.surfaceElevated))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .strokeBorder(
+                            Color(nsColor: isHovered
+                                ? c.focusRing.withAlphaComponent(c.isDark ? 0.45 : 0.50)
+                                : c.borderStrong),
+                            lineWidth: 1
+                        )
+                )
+        )
+        .onHover { isHovered = $0 }
+        .help(model.name)
     }
 }

@@ -6,7 +6,17 @@ import SwiftUI
 @MainActor
 final class HarnessSidebarPanelViewController: NSViewController {
     private let chromeHeader = SidebarTitlebarHeaderView()
-    let workspacePill = WorkspacePillButton()
+    let workspacePillModel = WorkspacePillModel()
+    lazy var workspacePill: NSView = NSHostingView(
+        rootView: WorkspacePillView(
+            model: workspacePillModel,
+            onClick: { [weak self] in self?.showWorkspaceMenu() },
+            onMoreClick: { [weak self] in
+                guard let self else { return }
+                self.showActiveWorkspaceActions(from: self.workspacePill)
+            }
+        )
+    )
     /// Collapses the sidebar (⌘\). Lives at the sidebar's top-trailing edge, against
     /// the divider; when the sidebar is collapsed it's gone with it (re-open via ⌘\).
     /// Flat `.plain` style + 30×30 so it matches the neighbouring notification bell.
@@ -82,7 +92,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
         HarnessDesign.makeClear(sectionHeader)
         HarnessDesign.makeClear(footer)
         sectionLabel.textColor = HarnessDesign.chrome.textTertiary
-        workspacePill.applyChrome()
+        workspacePillModel.chromeEpoch += 1
         
         let sidebarOnRight = SessionCoordinator.shared.settings.sidebarOnRight
         let symbol = sidebarOnRight ? "sidebar.right" : "sidebar.left"
@@ -660,7 +670,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
         activeSessionID = newActiveSessionID
         sessions = snap.activeWorkspace?.sessions ?? []
         let name = snap.activeWorkspace?.name ?? "Workspace"
-        workspacePill.configure(name: name, count: sessions.count)
+        workspacePillModel.name = name
         sidebarListModel.update(from: snap)
         sidebarListModel.updateWorktrees()
 
@@ -705,7 +715,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
         activeSessionID = activeID
         workspaces = snap.workspaces
         let name = snap.activeWorkspace?.name ?? "Workspace"
-        workspacePill.configure(name: name, count: sessions.count)
+        workspacePillModel.name = name
         if let cwd = snap.activeWorkspace?.activeTab?.cwd {
             let activeSessionID = snap.activeWorkspace?.activeSessionID
             let gitBranch = snap.activeWorkspace?.activeTab?.gitBranch
