@@ -161,7 +161,16 @@ async function main() {
     } else if (choice === 'prod') {
       await runCommand('./Scripts/run.sh', ['prod']);
     } else if (choice === 'full-cycle') {
-      await runCommand('Scripts/full-cycle.sh', []);
+      const bumpOptions = [
+        { display: '1) patch  — bug fixes', value: 'patch' },
+        { display: '2) minor  — new features', value: 'minor' },
+        { display: '3) major  — breaking changes', value: 'major' },
+        { display: '4) skip   — keep current version', value: '--no-bump' },
+      ];
+      console.log('\nVersion bump?');
+      const bump = await selectWithArrows(bumpOptions);
+      const bumpArgs = bump === '--no-bump' ? ['--no-bump'] : [bump];
+      await runCommand('Scripts/full-cycle.sh', bumpArgs);
     }
   } catch (err) {
     console.error('\n❌ Error:', err.message);
