@@ -46,6 +46,12 @@ final class HarnessSidebarPanelViewController: NSViewController {
     var lastFileTreeGitBranch: String?
     var lastFileTreeCWD: String?
 
+    deinit {
+        if let monitor = workspaceDropdownMonitor { NSEvent.removeMonitor(monitor) }
+        if let monitor = notificationsDropdownMonitor { NSEvent.removeMonitor(monitor) }
+        if let monitor = agentsInboxMonitor { NSEvent.removeMonitor(monitor) }
+    }
+
     override func loadView() {
         let root = NSView()
         HarnessDesign.applySidebarChrome(to: root)

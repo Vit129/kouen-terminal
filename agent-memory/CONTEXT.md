@@ -1,9 +1,31 @@
 # Context — harness-terminal
 
 ## Now
-- **Task:** idle
-- **Branch:** main
-- **Status:** PaletteModel XCTest coverage added. xctest-macos skill written. Routing updated.
+- **Task:** otty-features — medium phases in progress
+- **Branch:** main (ahead of origin by 10 commits, pushed to d9e74b9)
+- **Status:** Phases 1, 3–9, 17, 20 done and pushed. Medium phases 10, 11, 18, 19 remain. Large phases 2, 12, 14, 15, 16 not started.
+
+### This session (2026-06-27) — otty-features implementation
+
+**Completed phases (on main):**
+- Memory fix: `DispatchSource.makeMemoryPressureSource` → trims inactive scrollback (54f6a0b)
+- Phase 3: right-click → Ask AI prefill (b104eed)
+- Phase 4: scrollback search ⌘F; findInFiles → ⌘⇧F (5fac8a7)
+- Phase 5: click-to-move cursor (ee002b8)
+- Phase 6: `SecureInputMonitor` auto-enables Secure Input on password prompts (be60091)
+- Phase 7: Ctrl+C copies selection first (649cf01)
+- Phase 17: git branch in tab bar via `.git/HEAD` direct read (649cf01)
+- Phase 1: `HintModeOverlay` ⌘⇧U (cba7cdc — pre-existed)
+- Phase 8: `ComposerPanel` ⌘⇧E (f753a14)
+- Phase 9: `PromptQueue` + `PromptQueueBar` ⌘⇧↩ (d9e74b9)
+- Phase 20: session resurrection audit — no gaps found (window frame + scrollback already persisted)
+
+**AI streaming fix:** double-read on pipe (`while true { let chunk = availableData }`) — 160d064
+
+**Key decisions:**
+- ⌘F = scrollback search (terminal convention), ⌘⇧F = findInFiles (IDE convention)
+- Phase 14 floating panes → use ⌘⌥F (⌘⇧F taken)
+- `onRawOutput` hook added to `HarnessTerminalSurfaceView` — `onOutputTrigger` is dead in prod (offMainParserFramePipelineEnabled)
 
 ### This session (2026-06-27) — XCTest coverage + skill infrastructure
 

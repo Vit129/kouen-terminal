@@ -755,6 +755,10 @@ extension SyntaxTextView: NSTextViewDelegate {
             dismissCompletionPopup()
         }
     }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
 }
 
 extension Notification.Name {

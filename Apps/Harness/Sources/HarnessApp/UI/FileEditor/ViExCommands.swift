@@ -40,18 +40,24 @@ extension ViEngine {
         exField = field
 
         // Monitor Enter and Esc
-        NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self, weak panel, weak field] event in
-            guard let panel else { return event }
+        var monitor: Any?
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self, weak panel, weak field] event in
+            guard let panel else {
+                if let monitor { NSEvent.removeMonitor(monitor) }
+                return event
+            }
             switch event.keyCode {
             case 36, 76: // Return / Enter
                 let cmd = field?.stringValue ?? ""
                 panel.orderOut(nil)
                 panel.parent?.removeChildWindow(panel)
                 self?.execEx(cmd, tv: tv)
+                if let monitor { NSEvent.removeMonitor(monitor) }
                 return nil
             case 53: // Esc
                 panel.orderOut(nil)
                 panel.parent?.removeChildWindow(panel)
+                if let monitor { NSEvent.removeMonitor(monitor) }
                 return nil
             default:
                 return event

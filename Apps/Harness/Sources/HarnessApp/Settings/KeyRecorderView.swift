@@ -88,6 +88,10 @@ final class KeyRecorderView: NSView {
     override func resignFirstResponder() -> Bool { stopRecording(); return true }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
+    deinit {
+        if let monitor { NSEvent.removeMonitor(monitor) }
+    }
+
     override func hitTest(_ point: NSPoint) -> NSView? {
         guard bounds.contains(point) else { return nil }
         if !clearButton.isHidden,

@@ -5,6 +5,23 @@ All notable changes to Harness are documented here. The format is based on
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/harness-terminal/releases).
+## [Unreleased]
+
+### Added
+- Memory pressure monitor — trims inactive pane scrollback to 1 000 lines on warning, 0 on critical (frees ~96 MB per idle session)
+- Hint mode ⌘⇧U — Vimium-style keyboard URL picker overlay; home-row-biased labels, 3 s auto-dismiss
+- Send selection → AI chat — right-click selected text → "Ask AI…" prefills ⌘I panel
+- Scrollback search ⌘F — wires existing `TerminalFindBar`; rebinds Find in Files to ⌘⇧F
+- Click-to-move cursor — single click on same row as cursor sends left/right arrow sequences
+- Auto Secure Input — `SecureInputMonitor` detects password prompts via PTY output patterns and toggles macOS Secure Input API
+- Context-aware Ctrl+C — copies selection to clipboard when text is selected; falls through to PTY interrupt otherwise
+- Composer ⌘⇧E — floating multi-line command editor panel; ⌘↩ sends to active PTY
+- Prompt Queue ⌘⇧↩ — queues clipboard contents as sequential commands; each runs after previous shell prompt appears; floating status bar shows queue count
+- Git branch in tab bar — instant update on `cd` by reading `.git/HEAD` directly (no subprocess)
+
+### Fixed
+- AI chat streaming returned no output — pipe double-read anti-pattern (`while isRunning || availableData`) replaced with `while true { let chunk = availableData; if chunk.isEmpty { break } }`
+
 ## [3.10.0] - 2026-06-27
 
 ### Added
