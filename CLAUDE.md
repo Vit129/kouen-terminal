@@ -24,7 +24,23 @@ AppKit/SwiftUI/macOS → `macos-swiftui` | debugging → `debug-mantra` | review
 | `Tests/robot/run.sh` | **Run BEFORE every build** — regression invariants |
 | `EXPORT_THEMES=1 swift test --filter ThemeCatalogEmbedTests` | Regenerate `BundledThemesData.swift` after theme edits |
 
-Release order: `make release` → `make sign` → `make dmg` → `make finalize`
+**Release entry point: always `make start`** — never bump version manually.
+
+| Flow | Command |
+|------|---------|
+| Dev iteration | `make start` → `Preview build` |
+| Release (with bump) | `make start` → `Full cycle` → patch / minor / major |
+| Release (no bump) | `make start` → `Full cycle` → skip |
+
+Full cycle does: verify → bump → commit+push → prod → CHANGELOG → tag → GitHub release → install.
+
+**Version sync rule** — these 4 files must always match. `prepare-release.sh` updates all 4 atomically; never edit one alone:
+- `Apps/Harness/Sources/HarnessApp/Resources/Info.plist` (`CFBundleShortVersionString` + `CFBundleVersion`)
+- `Packages/HarnessCore/Sources/HarnessCore/HarnessVersion.swift` (`short` + `build`)
+- `Packages/HarnessCore/Sources/HarnessCore/ReleaseNotes/GeneratedReleaseNotes.swift` (via `make release-notes`)
+- `CHANGELOG.md` (via `git-cliff --tag vX.Y.Z`)
+
+**Git hooks**: `.githooks/commit-msg` blocks Info.plist in non-version commits. Activate after clone: `git config core.hooksPath .githooks`
 
 ## Non-obvious Constraints
 
