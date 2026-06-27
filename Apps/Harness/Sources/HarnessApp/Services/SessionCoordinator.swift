@@ -412,6 +412,17 @@ final class SessionCoordinator: NSObject {
         aiChatControllers[surfaceID.uuidString]?.toggle()
     }
 
+    // MARK: - Composer (⌘⇧E)
+
+    func openComposer() {
+        ComposerPanel.shared.onSubmit = { [weak self] text in
+            guard let surfaceID = self?.activeSurfaceID,
+                  let host = self?.terminalHosts.host(for: surfaceID) else { return }
+            host.sendInput((text + "\n").data(using: .utf8) ?? Data())
+        }
+        ComposerPanel.shared.present(relativeTo: NSApp.keyWindow)
+    }
+
     // MARK: - Find bar / Copy mode / Detach / Prompts
 
     func toggleFindBar() {

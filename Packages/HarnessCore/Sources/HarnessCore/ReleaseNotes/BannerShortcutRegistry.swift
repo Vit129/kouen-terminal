@@ -183,6 +183,11 @@ public enum BannerShortcutRegistry {
         id: "hintMode", title: "Hint Mode (Open Link)",
         modifiers: [.command, .shift], keyChar: "u")
 
+    public static let composer = Keybinding(
+        id: "composer", title: "Composer",
+        modifiers: [.command, .shift], keyChar: "e",
+        showInBanner: false)
+
     // MARK: - Banner shortcuts (legacy format for terminal banner rendering)
 
     /// All registered shortcuts for banner display, derived from keybindings above.
