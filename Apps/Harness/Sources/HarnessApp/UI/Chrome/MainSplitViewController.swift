@@ -15,6 +15,12 @@ final class MainSplitViewController: NSViewController {
     /// Bumped each time a sidebar collapse/expand starts so any in-flight animation
     /// frame bails out — prevents two toggles from fighting over the divider position.
     private var sidebarAnimToken = 0
+    private var sidebarDisplayLink: CADisplayLink?
+    // params valid while sidebarDisplayLink is non-nil
+    private var _sidebarStart: CGFloat = 0
+    private var _sidebarTarget: CGFloat = 0
+    private var _sidebarT0: CFTimeInterval = 0
+    private var _sidebarVisible: Bool = false
     private var didApplyInitialSidebarState = false
     /// Owned (not a singleton) so collapse state is per-window. Carries the
     /// `allowFullCollapse` flag the divider min-coordinate reads.
@@ -286,8 +292,16 @@ final class MainSplitViewController: NSViewController {
             updateContentLeadingInset()
             return
         }
-        content.collectTerminalHosts().values.forEach { $0.setPresentsWithTransaction(true) }
-        animateSidebar(from: start, to: target, t0: CACurrentMediaTime(), visible: visible, token: sidebarAnimToken)
+        // ponytail: presentsWithTransaction removed from animated path — was blocking main thread every frame.
+        // If black flash reappears during slide, restore only on the final frame (raw >= 1).
+        _sidebarStart = start
+        _sidebarTarget = target
+        _sidebarT0 = CACurrentMediaTime()
+        _sidebarVisible = visible
+        sidebarDisplayLink?.invalidate()
+        let link = view.displayLink(target: self, selector: #selector(_sidebarLinkFired))
+        link.add(to: RunLoop.main, forMode: RunLoop.Mode.common)
+        sidebarDisplayLink = link
     }
 
     private func animateSidebar(from start: CGFloat, to target: CGFloat, t0: CFTimeInterval, visible: Bool, token: Int) {
@@ -312,6 +326,8 @@ final class MainSplitViewController: NSViewController {
         split.layout()
         CATransaction.commit()
         if raw >= 1 {
+            sidebarDisplayLink?.invalidate()
+            sidebarDisplayLink = nil
             if !visible {
                 panel.isHidden = true
             } else {
@@ -321,16 +337,15 @@ final class MainSplitViewController: NSViewController {
                 // one now so content is never blank after the panel opens.
                 panel.layoutSubtreeIfNeeded()
             }
-            content.collectTerminalHosts().values.forEach { $0.setPresentsWithTransaction(false) }
             splitDelegate.allowFullCollapse = false   // restore the 200pt drag floor
             updateContentLeadingInset()
             return
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0 / 60.0) { [weak self] in
-            MainActor.assumeIsolated {
-                self?.animateSidebar(from: start, to: target, t0: t0, visible: visible, token: token)
-            }
-        }
+        // Display link fires next frame — no asyncAfter needed.
+    }
+
+    @objc private func _sidebarLinkFired(_ link: CADisplayLink) {
+        animateSidebar(from: _sidebarStart, to: _sidebarTarget, t0: _sidebarT0, visible: _sidebarVisible, token: sidebarAnimToken)
     }
 
     /// Leading inset the title strip's path readout needs to clear the macOS traffic lights

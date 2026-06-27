@@ -3,7 +3,24 @@
 ## Now
 - **Task:** idle
 - **Branch:** main
-- **Status:** AppKit → SwiftUI migration CLOSED. Remaining AppKit files commented as intentional — GitPanelView, WorkspaceFileTreeView, FileViewerViewController.
+- **Status:** PaletteModel XCTest coverage added. xctest-macos skill written. Routing updated.
+
+### This session (2026-06-27) — XCTest coverage + skill infrastructure
+
+**Commits:**
+- `448f68a` — test: PaletteModel 9 XCTest cases + delete stale S9 orphans (HarnessSliderTests, SettingsWindowCloseProxyTests)
+
+**Infrastructure:**
+- `~/.claude/skills/xctest-macos/SKILL.md` — new skill for XCTest on macOS Swift targets
+- `~/.claude/skills/xctest-macos/references/swift6-xctest.md` — @MainActor patterns, async tests, @Observable model testing
+- `~/.claude/rules/routing.md` — XCTest/unit test keywords now bypass AIDLC → xctest-macos skill
+- `~/.claude/skills/macos-swiftui/SKILL.md` — testing row added pointing to xctest-macos
+
+**Testability fixes in PaletteModel:**
+- `PaletteModel`: `private` → `internal`
+- `PaletteFileEntry`, `PaletteGrepMatch`: `fileprivate` → `internal`
+
+**Previous session (same day):** AppKit → SwiftUI migration CLOSED. Remaining AppKit files commented as intentional — GitPanelView, WorkspaceFileTreeView, FileViewerViewController.
 
 ### This session (2026-06-27) — SwiftUI wave 2: 4 UI components migrated
 
