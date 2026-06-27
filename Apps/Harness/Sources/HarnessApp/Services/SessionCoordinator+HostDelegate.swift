@@ -16,6 +16,7 @@ extension SessionCoordinator: TerminalHostDelegate {
     }
 
     func terminalHostDidChangeWorkingDirectory(_ path: String, surfaceID: SurfaceID) {
+        FrecencyDirectoryStore.shared.recordVisit(path: path)
         kickBranchRefresh(for: surfaceID, cwd: path)
         Task {
             await daemonSyncService.logIfFailed(.updateTabCwd(surfaceID: surfaceID.uuidString, path: path))
@@ -27,6 +28,7 @@ extension SessionCoordinator: TerminalHostDelegate {
         let current = snapshot.workspaces.flatMap { $0.sessions.flatMap { $0.tabs } }
             .first { $0.rootPane.allSurfaceIDs().contains(surfaceID) }?.cwd
         if current == cwd { return }
+        FrecencyDirectoryStore.shared.recordVisit(path: cwd)
         kickBranchRefresh(for: surfaceID, cwd: cwd)
         Task {
             await daemonSyncService.logIfFailed(.updateTabCwd(surfaceID: surfaceID.uuidString, path: cwd))

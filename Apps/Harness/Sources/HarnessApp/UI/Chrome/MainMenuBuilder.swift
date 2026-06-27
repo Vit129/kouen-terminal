@@ -170,6 +170,16 @@ enum MainMenuBuilder {
         view.submenu?.addItem(recipesItem)
         let jumpToDirItem = menuItem("Jump to Directory…", action: #selector(MenuTarget.jumpToDirectory), binding: BannerShortcutRegistry.jumpToDirectory)
         view.submenu?.addItem(jumpToDirItem)
+        let quickTerminalItem = NSMenuItem(title: "Quick Terminal", action: #selector(MenuTarget.toggleQuickTerminal), keyEquivalent: " ")
+        quickTerminalItem.keyEquivalentModifierMask = [.option]
+        quickTerminalItem.target = MenuTarget.shared
+        view.submenu?.addItem(quickTerminalItem)
+        let exportLayoutItem = NSMenuItem(title: "Export Layout…", action: #selector(MenuTarget.exportLayout), keyEquivalent: "")
+        exportLayoutItem.target = MenuTarget.shared
+        view.submenu?.addItem(exportLayoutItem)
+        let importLayoutItem = NSMenuItem(title: "Import Layout…", action: #selector(MenuTarget.importLayout), keyEquivalent: "")
+        importLayoutItem.target = MenuTarget.shared
+        view.submenu?.addItem(importLayoutItem)
         view.submenu?.addItem(.separator())
         let runItem = menuItem("Run Script", action: #selector(MenuTarget.runScript), binding: BannerShortcutRegistry.runScript)
         view.submenu?.addItem(runItem)
@@ -512,6 +522,10 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
     }
 
     @objc func hintMode() { SessionCoordinator.shared.showHintMode() }
+
+    @objc func toggleQuickTerminal() { QuickTerminalController.shared.toggle() }
+    @objc func exportLayout() { LayoutFileStore.exportCurrentLayout() }
+    @objc func importLayout() { LayoutFileStore.importLayout() }
 
     @objc func toggleSidebar() {
         let win = NSApp.keyWindow ?? NSApp.mainWindow
