@@ -71,6 +71,10 @@ final class SyntaxTextView: NSView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+
     var string: String { textView.string }
 
     func load(text: String, fileExtension ext: String, resetScroll: Bool = true) {
