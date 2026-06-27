@@ -3,88 +3,59 @@
 ## Now
 - **Task:** idle
 - **Branch:** main
-- **Status:** AppKit → SwiftUI wave 2 in progress — sidebar chrome now SwiftUI-first.
+- **Status:** AppKit → SwiftUI wave 2 complete — sidebar chrome 100% SwiftUI + Open With Harness
 
-### This session (2026-06-27) — AppKit → SwiftUI wave 2 (like cmux)
+### This session (2026-06-27) — Sidebar chrome SwiftUI + Open With Harness + file tree git root
 
-**Commits:**
-- `bb68fd3` — `HarnessControls.swift` deleted (−998 lines, 9 AppKit control classes, zero callers after Settings SwiftUI migration)
-- `a072edf` — sidebar section label + footer → SwiftUI (−119 AppKit lines; SwiftUI Menu for recent projects; agentsInbox anchors above footerHostingView)
-- `a6d59a9` — sidebar tab bar → SwiftUI Picker(.segmented); selectedTab onto SidebarSectionModel; @objc sidebarTabChanged removed
+**Commits (this session):**
+- `bb68fd3` — `HarnessControls.swift` deleted (−998 lines, 9 dead AppKit classes)
+- `a072edf` — sidebar section label + footer → SwiftUI
+- `a6d59a9` — sidebar tab bar → SwiftUI `Picker(.segmented)`, `selectedTab` onto `SidebarSectionModel`, `@objc sidebarTabChanged` removed
+- `36fde38` — Open With Harness for source files: `ExternalOpenKind.filePreview`, Info.plist `public.source-code`/`public.plain-text`, routing chain AppDelegate → MainSplitVC → sidebar
+- `cabcb86` — Open With file → terminal opens at git root, tree reveals file
+- `d3a700f` — file tree roots at git root; expand+scroll to CWD instead of re-root; `lastFileTreeCWD` guard in all 3 sites
 
-**Sidebar VC chrome is now 100% SwiftUI:** WorkspacePillView ✓, SidebarSessionListView ✓, SidebarSectionLabelView ✓, SidebarTabBarView ✓, SidebarFooterView ✓
-**Still AppKit:** SoftIconButton (sidebarToggleButton — tiny, low ROI), SidebarTitlebarHeaderView (mouseDownCanMoveWindow — stays permanently), child panels (GitPanelView, WorkspaceFileTreeView, FileViewerVC)
+**Sidebar chrome is now 100% SwiftUI:** WorkspacePillView ✓, SidebarSessionListView ✓, SidebarSectionLabelView ✓, SidebarTabBarView ✓, SidebarFooterView ✓
 
-**"Like cmux" status:** Settings ✅, sidebar chrome SwiftUI-first ✅, modular packages — deferred
+**Open With Harness behaviour:**
+- Right-click any source file in Finder → Open With → Harness
+- File tree expands to the file and scrolls to it (no viewer, no back button)
+- Terminal opens at git root of that file (new session if none exists)
 
-### This session (2026-06-27) — AppKit → SwiftUI wave 1
+**Key design decision: panel-only (no back button)**
+- Re-rooting on every `cd` disrupts context — instead tree stays at git root
+- Expanding + scrolling is stateless: no back stack, no terminal state, no force-cd interruption
 
-**Wave summary (5 tasks, all committed on main):**
-- `HarnessSidebarPanelViewController+DragReorder.swift` — deleted (dead stub)
-- `NotificationBellButton.swift` — deleted (zero call sites)
-- `Toast.swift` — rewritten with `NSHostingView<ToastBody>`; -19 lines
-- `AboutPanelController.swift` — rewritten with `NSHostingController<AboutView>`; -50 lines
-- `WorkspacePillButton` (128 lines) — replaced by `WorkspacePillModel (@Observable)` + `WorkspacePillView (SwiftUI)`; theme re-render via `chromeEpoch` pattern
+**Still AppKit (won't migrate):** SoftIconButton, SidebarTitlebarHeaderView (mouseDownCanMoveWindow), child panels (GitPanelView, WorkspaceFileTreeView, FileViewerVC)
 
-**Deferred:** `WorkspaceSwitcherPanelView` (dropdown) — positioning/dismiss stays in AppKit VC; bridge cost ≥ AppKit code; bundle with VC migration when workspace switcher is re-enabled.
+---
 
-**Robot test fix (commit `ad792c9`):** Bug 1 was checking `ContentAreaViewController` for `existingBrowserPanes.removeValue` — refactored into `BrowserIntegrationController`; test updated.
+### Previous: 2026-06-27 — SwiftUI wave 1 + Settings S6–S9 complete
 
-**deep-research skill** disabled in `~/.claude/settings.json` (`skillOverrides`).
+**Wave 1 (same day):**
+- HarnessSidebarPanelViewController+DragReorder.swift — deleted (dead stub)
+- NotificationBellButton.swift — deleted (zero call sites)
+- Toast + AboutPanelController → SwiftUI
+- WorkspacePillButton → WorkspacePillModel + WorkspacePillView (chromeEpoch pattern)
 
-### This session (2026-06-27) — SwiftUI Settings S6–S9 + Cmd+\ fixes
-**Cmd+\ black flash fix** (commits `d5833b0`, `28d0233`):
-- `MainActor.assumeIsolated` replaces `Task { @MainActor in }` in animation loop — stops jitter on macOS 26
-- `presentsWithTransaction` bracketing around sidebar animations — Metal/CA sync, kills black gap
-- `ContentAreaViewController.collectTerminalHosts()` forwarding accessor added
+**Settings S6–S9:**
+- S6: SettingsAdvancedView, S7: SettingsRemoteView, S8: SettingsRootView + NavigationSplitView
+- S9: 10 AppKit files deleted (−2800 lines)
+- Info.plist → 3.9.5 / build 171
 
-**SwiftUI Settings migration complete** (commit `94c9491`):
-- S6: `SettingsAdvancedView` — daemon set-option surface + local perf toggles; `SwiftUI.Binding<>` prefix required due to `HarnessCommands.Binding` shadow via HarnessCore re-export
-- S7: `SettingsRemoteView` — SwiftUI List + master-detail form, SSH host CRUD
-- S8: `SettingsRootView` (NavigationSplitView) + `SettingsHostingController`; `SettingsWindowController` moved here, int-page API preserved
-- S9: 10 AppKit files deleted (−2800 lines); `ansiNames` promoted into `PaletteCell`
+**Cmd+\ black flash fix:** `MainActor.assumeIsolated` + `presentsWithTransaction` bracketing
 
-### This session (2026-06-26) — cwd bleed during builds
-**Symptom:** during `make build`/`install` the session's tab pill, git panel, and file tree all jump to the wrong directory (another repo / `/`) — "1 session = 1 worktree" broke.
-**Root cause:** `RealPty.probeWorkingDirectory()` reported the **deepest foreground descendant's** cwd (`deepestReadableDescendant`). A build subprocess that cd's elsewhere (cp → /Applications, sub-build in /tmp, agent in sibling repo) hijacked the session's cwd → spurious revision bumps → reload storm → blank/wrong panel.
-**Fix:** report the shell's own cwd (`Self.cwd(for: childPID)`); removed `deepestReadableDescendant`. Genuine shell `cd` still tracked. See [knowledge/cases/cwd-worktree-bleed.md].
-**Also:** `WorkspaceFileTreeView` re-attaches its hosting view in `viewDidMoveToWindow` (was blank after sidebar position swap).
-**Repro tool:** headless `HarnessDaemon` + `harness-cli new-session --cwd` + `send` a foreground subshell that cd's to another repo, poll `list-surfaces` cwd.
+---
 
-## Last Session (2026-06-26) — Memory-leak audit + v3.9.4 release prep
+### Previous sessions (abbreviated)
 
-**Diagnosis (live pid via vmmap/footprint):** 34 GB was MALLOC_SMALL (Swift heap), NOT GPU/Metal. Dominant cause = `existingHosts` strongly pinning per-pane TerminalScreen graphs — **already fixed in `0430ed8`**; the leaking process ran a binary built Jun 24, before that Jun-25 fix. → user must rebuild+reinstall (`make install`) and re-measure over a long session.
-
-**Fixed this session (real, smaller leaks remaining on main):**
-- `SessionCoordinator.inlineAIControllers/aiChatControllers` leaked one pair per closed pane (insert-only dicts). Fix: `TerminalPaneRegistry.onRetire` hook from `retire()` (covers removeHost + prune) drops both entries.
-- `BrowserPaneView` injected network capture array uncapped → cap 500 + monotonic id.
-- Guard: `Tests/robot/memory_leak_guards.robot` (3 tests, green) + `Tests/robot/helpers/check_retire_coverage.py` structural guard for future dicts.
-
-**v3.9.4 prep done:**
-- Info.plist → 3.9.4 / build 170
-- HarnessVersion.swift updated
-- CHANGELOG.md entry written with real content (2 Added, 5 Fixed)
-- GeneratedReleaseNotes.swift regenerated
-- graphify updated (16146 nodes, 36693 edges)
-- knowledge/cases/memory-leak-audit.md created
-
-**Reverted:** an autoreleasepool wrap on the Metal present loop — GPU was ruled out by vmmap.
-
-**Flagged, separate:** robot `Bug 1 - Browser Pane Reuse On Rebuild` fails on clean main (pre-existing) — `existingBrowserPanes`/`collectBrowserPanes()` gone from ContentAreaViewController; browser panes may no longer be reused across rebuilds. Needs its own look.
-
-## Previous Sessions
-
-### 2026-06-25 — `harness view` opens sidebar viewer
-- `harness-cli view <file>` now opens the file in the sidebar file editor when inside Harness, instead of printing to stdout. OSC 7735 mechanism.
-
-### 2026-06-24 — Otty Feature Import
-- Hint mode (Cmd+Shift+U) — Vimium-style link picker overlay
-- Vi mode / autocomplete intentionally skipped (shell handles it better)
-- Send selection → AI chat (~30 lines) — still pending, low priority
-
-### 2026-06-23 — Sidebar SwiftUI Migration Complete
-- All 6 phases done; NSTableView removed; VC 1676 → 890 lines
+| Date | Task | Key outcome |
+|------|------|-------------|
+| 2026-06-26 | cwd bleed during builds | `deepestReadableDescendant` removed; shell pid reported directly |
+| 2026-06-26 | Memory-leak audit | `existingHosts` pin fixed; BrowserPaneView capped; v3.9.4 prepped |
+| 2026-06-25 | `harness view` | OSC 7735 → sidebar file viewer |
+| 2026-06-24 | Otty features | Hint mode (Cmd+Shift+U) |
+| 2026-06-23 | Sidebar SwiftUI migration | NSTableView removed; VC 1676 → 890 lines |
 
 ## Unresolved
-- Cmd+\ intermittent failure — PrefixKeymap disarm-on-click fix committed but root cause unknown
-- Pre-existing robot failure: "Bug 1 - Browser Pane Reuse On Rebuild"
+- Pre-existing robot failure: "Bug 1 - Browser Pane Reuse On Rebuild" (BrowserIntegrationController refactor changed call sites)

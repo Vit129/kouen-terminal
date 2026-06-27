@@ -550,8 +550,8 @@
     "semantic_hash": ""
   },
   "Tests/HarnessDaemonTests/RealPtyLifecycleTests.swift": {
-    "mtime": 1781669845.1971328,
-    "ast_hash": "e98dff55a1048adc55560bf77a3971e3",
+    "mtime": 1782479783.2421384,
+    "ast_hash": "440e077ec66d4f8aa94bc3f54099f906",
     "semantic_hash": ""
   },
   "Tests/HarnessDaemonTests/DaemonLifecycleTests.swift": {
@@ -1090,8 +1090,8 @@
     "semantic_hash": ""
   },
   "Scripts/install-app.sh": {
-    "mtime": 1781767105.541591,
-    "ast_hash": "bb9ae4162f4f75eb5605a1ab86346368",
+    "mtime": 1782449779.8790588,
+    "ast_hash": "66ccefdd3abafe4ca8a3afdb6630da28",
     "semantic_hash": ""
   },
   "Scripts/install-linux.sh": {
@@ -1330,8 +1330,8 @@
     "semantic_hash": ""
   },
   "Packages/HarnessCore/Sources/HarnessCore/HarnessVersion.swift": {
-    "mtime": 1782443753.521941,
-    "ast_hash": "5479eae26a84a0ec5e7de8f3ccc6ef1e",
+    "mtime": 1782479783.239226,
+    "ast_hash": "a09f0fcf2e7614e603310f33ebd4d4fe",
     "semantic_hash": ""
   },
   "Packages/HarnessCore/Sources/HarnessCore/Options/EnvironmentStore.swift": {
@@ -1515,8 +1515,8 @@
     "semantic_hash": ""
   },
   "Packages/HarnessCore/Sources/HarnessCore/ReleaseNotes/GeneratedReleaseNotes.swift": {
-    "mtime": 1782443794.3451684,
-    "ast_hash": "cb11a690c319998252d99b0e65b30601",
+    "mtime": 1782479783.2397277,
+    "ast_hash": "6cd88abfa5655eeb100bb23f6276065f",
     "semantic_hash": ""
   },
   "Packages/HarnessCore/Sources/HarnessCore/ReleaseNotes/TerminalBanner.swift": {
@@ -1745,8 +1745,8 @@
     "semantic_hash": ""
   },
   "Packages/HarnessDaemon/Sources/HarnessDaemon/RealPty.swift": {
-    "mtime": 1781937670.8164086,
-    "ast_hash": "3b2351d4f3b32dd4ec35c4c1a7a00934",
+    "mtime": 1782479783.2406938,
+    "ast_hash": "afab827e050984eb92e39530449c37a7",
     "semantic_hash": ""
   },
   "Packages/HarnessDaemon/Sources/HarnessDaemon/DaemonCommandExecutor.swift": {
@@ -1770,8 +1770,8 @@
     "semantic_hash": ""
   },
   "Packages/HarnessDaemon/Sources/HarnessDaemon/SurfaceRegistry.swift": {
-    "mtime": 1782360738.0625398,
-    "ast_hash": "917d7bd89bb338753c3e9211102468c4",
+    "mtime": 1782479783.241434,
+    "ast_hash": "8ce7170988b4f78d2d3856d58419c958",
     "semantic_hash": ""
   },
   "Packages/HarnessDaemon/Sources/HarnessDaemon/WaitForRegistry.swift": {
@@ -1965,8 +1965,8 @@
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/AppDelegate.swift": {
-    "mtime": 1782181568.642885,
-    "ast_hash": "57ddc5d36b356a02fef9012f31670282",
+    "mtime": 1782525488.7263746,
+    "ast_hash": "f55ab5adbd8b09ca3ce33886de086774",
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/main.swift": {
@@ -2025,8 +2025,8 @@
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/UI/Sidebar/SidebarWorkspaceViews.swift": {
-    "mtime": 1781759402.3677146,
-    "ast_hash": "2800e672b951dddffb3188c52aec5572",
+    "mtime": 1782525004.513223,
+    "ast_hash": "617c1b735288508bae901b9d8a45d4dc",
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/UI/Sidebar/BoardViewController.swift": {
@@ -2040,18 +2040,13 @@
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/UI/Sidebar/HarnessSidebarPanelViewController.swift": {
-    "mtime": 1782114002.7558208,
-    "ast_hash": "edcc750a8fffe1c5bfcf1a17503efcb6",
-    "semantic_hash": ""
-  },
-  "Apps/Harness/Sources/HarnessApp/UI/Sidebar/HarnessSidebarPanelViewController+DragReorder.swift": {
-    "mtime": 1782114002.755046,
-    "ast_hash": "6fbd84ff7af136963dca09e3969dabfc",
+    "mtime": 1782526680.0843482,
+    "ast_hash": "cb3ed6615d7e65498c6f3cc40c2c75e2",
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/UI/Sidebar/HarnessSidebarPanelViewController+RecentProjects.swift": {
-    "mtime": 1782114002.7554302,
-    "ast_hash": "c64c8c813645b34bb86c6dabf5931272",
+    "mtime": 1782524301.118935,
+    "ast_hash": "68eb92f6271c9c065d315c3f2bbfddd3",
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/UI/FileEditor/ViRegisters.swift": {
@@ -2125,8 +2120,8 @@
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/UI/FileTree/WorkspaceFileTreeView.swift": {
-    "mtime": 1781937670.8099434,
-    "ast_hash": "7ac95bdab7e8e93cc2ffee1e28f00299",
+    "mtime": 1782479783.2372427,
+    "ast_hash": "c1bdf1a1f73c8961b7b10f86aa304088",
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/UI/Terminal/StatusLineView.swift": {
@@ -2184,19 +2179,14 @@
     "ast_hash": "262496eec83e9e7f9ed8ac31f7e986b4",
     "semantic_hash": ""
   },
-  "Apps/Harness/Sources/HarnessApp/UI/Shared/HarnessControls.swift": {
-    "mtime": 1781759402.3700867,
-    "ast_hash": "c7969b4897a007ff92fdd93ff2d4d646",
-    "semantic_hash": ""
-  },
   "Apps/Harness/Sources/HarnessApp/UI/Shared/AboutPanelController.swift": {
-    "mtime": 1781445714.1671154,
-    "ast_hash": "25e83da6b7cf0b150ddca051bc3dfb68",
+    "mtime": 1782520464.637614,
+    "ast_hash": "de95f1cdc6b439c56729690d65959757",
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/UI/Shared/Toast.swift": {
-    "mtime": 1781445714.1813164,
-    "ast_hash": "9f2d4d2e37e75257164f0f31cf995789",
+    "mtime": 1782520566.3316987,
+    "ast_hash": "9fa54ec2409d7b78dab8c11448e41a96",
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/UI/Chrome/MainWindowController.swift": {
@@ -2215,8 +2205,8 @@
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/UI/Chrome/ContentAreaViewController.swift": {
-    "mtime": 1782364410.6527984,
-    "ast_hash": "0d9e384bdc655aa4fd1789e36c007a15",
+    "mtime": 1782485583.2386284,
+    "ast_hash": "623bcb87170693ca04d20a19d82037b8",
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/UI/Chrome/HarnessChrome.swift": {
@@ -2230,13 +2220,13 @@
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/UI/Chrome/BrowserPaneView.swift": {
-    "mtime": 1782439482.0642772,
+    "mtime": 1782446484.8837714,
     "ast_hash": "ab8e832048a86982c9279e59d13fb8f9",
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/UI/Chrome/MainSplitViewController.swift": {
-    "mtime": 1782184218.244181,
-    "ast_hash": "bc652a0e4fa4842597591734811868e0",
+    "mtime": 1782526112.9269714,
+    "ast_hash": "381ac4a032183bb2ab218fe1568b0fbc",
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/UI/Chrome/WindowBorderOverlayView.swift": {
@@ -2274,64 +2264,14 @@
     "ast_hash": "d8bd07da6b9df59242ae98f5bfa56af9",
     "semantic_hash": ""
   },
-  "Apps/Harness/Sources/HarnessApp/UI/Notifications/NotificationBellButton.swift": {
-    "mtime": 1781759402.371679,
-    "ast_hash": "df1f08d1eb7d690fad47e9b27e99570b",
-    "semantic_hash": ""
-  },
   "Apps/Harness/Sources/HarnessApp/UI/Git/GitPanelView.swift": {
     "mtime": 1782360537.6109054,
     "ast_hash": "d6f3f2705b4f7771c9fbc2183bfa9fe9",
     "semantic_hash": ""
   },
-  "Apps/Harness/Sources/HarnessApp/Settings/SettingsViewController+LiveApply.swift": {
-    "mtime": 1781250652.9536731,
-    "ast_hash": "81c8e172daeab872f5413e068311a414",
-    "semantic_hash": ""
-  },
-  "Apps/Harness/Sources/HarnessApp/Settings/SettingsViewController+Advanced.swift": {
-    "mtime": 1782097937.010789,
-    "ast_hash": "56f4627e43e4b6922572a2807314d5dd",
-    "semantic_hash": ""
-  },
-  "Apps/Harness/Sources/HarnessApp/Settings/SettingsViewController+Terminal.swift": {
-    "mtime": 1781074031.4373891,
-    "ast_hash": "3aafa2350e5503ea05c1a286fcd2fb89",
-    "semantic_hash": ""
-  },
-  "Apps/Harness/Sources/HarnessApp/Settings/SettingsViewController+Keys.swift": {
-    "mtime": 1781074031.4356706,
-    "ast_hash": "846a4962b6529018ea3b2582bee9ba43",
-    "semantic_hash": ""
-  },
-  "Apps/Harness/Sources/HarnessApp/Settings/SettingsViewController+Agents.swift": {
-    "mtime": 1782012834.1468,
-    "ast_hash": "3536d9fb2c075df7995b39eb022a547c",
-    "semantic_hash": ""
-  },
-  "Apps/Harness/Sources/HarnessApp/Settings/SettingsViewController+Primitives.swift": {
-    "mtime": 1781074031.4368699,
-    "ast_hash": "395310bb846dbae2194eb43773d1366f",
-    "semantic_hash": ""
-  },
-  "Apps/Harness/Sources/HarnessApp/Settings/SettingsViewController+Colors.swift": {
-    "mtime": 1781074031.435479,
-    "ast_hash": "091dbd289ae8d31d27890dc95b997ef6",
-    "semantic_hash": ""
-  },
   "Apps/Harness/Sources/HarnessApp/Settings/KeyRecorderView.swift": {
     "mtime": 1780653524.1322603,
     "ast_hash": "25490334982e1b734aa7845aeaf0fed2",
-    "semantic_hash": ""
-  },
-  "Apps/Harness/Sources/HarnessApp/Settings/SettingsViewController+Appearance.swift": {
-    "mtime": 1781250652.9531894,
-    "ast_hash": "4ba6d137ba4d6825cb4055808ec693e9",
-    "semantic_hash": ""
-  },
-  "Apps/Harness/Sources/HarnessApp/Settings/SettingsViewController.swift": {
-    "mtime": 1782012834.1473296,
-    "ast_hash": "43b4466b01d4a23e7d00cf5a2868929e",
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/Scripting/ScriptConfigLocator.swift": {
@@ -2380,8 +2320,8 @@
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/Services/ThemeImportController.swift": {
-    "mtime": 1781668759.5869286,
-    "ast_hash": "94799ad88c3a2d736235ca843bf7cb6d",
+    "mtime": 1782525466.416834,
+    "ast_hash": "fc5c30a851c2b55c7ee390d4dc0188e1",
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/Services/SessionLifecycleService.swift": {
@@ -2435,7 +2375,7 @@
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/Services/TerminalPaneRegistry.swift": {
-    "mtime": 1782441998.599256,
+    "mtime": 1782446484.8831377,
     "ast_hash": "58fa71c62547785be30cf31cbbb58913",
     "semantic_hash": ""
   },
@@ -2445,7 +2385,7 @@
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/Services/SessionCoordinator.swift": {
-    "mtime": 1782442021.057247,
+    "mtime": 1782446484.8825758,
     "ast_hash": "d295197a88f4a73c6617d8a99a3621dd",
     "semantic_hash": ""
   },
@@ -2515,8 +2455,8 @@
     "semantic_hash": ""
   },
   "CHANGELOG.md": {
-    "mtime": 1782443785.6359155,
-    "ast_hash": "84001b1b401c2a18493c488bbaa1dd06",
+    "mtime": 1782479783.2381577,
+    "ast_hash": "71126c112c7c612efc02fbcb5ef7e518",
     "semantic_hash": ""
   },
   "project.yml": {
@@ -2525,8 +2465,8 @@
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1782052637.8533127,
-    "ast_hash": "0fb8919994e0d981751be5ec360be51d",
+    "mtime": 1782453637.0229251,
+    "ast_hash": "91ae0a5a791a656b2d32f8ebd6827f8a",
     "semantic_hash": ""
   },
   "AGENTS.md": {
@@ -2975,8 +2915,8 @@
     "semantic_hash": ""
   },
   "docs/CHANGELOG-archive.md": {
-    "mtime": 1781605597.2402277,
-    "ast_hash": "26c03b1838a3f98e1016e5efafecfcd0",
+    "mtime": 1782479783.244216,
+    "ast_hash": "6ab1361b1844b3392d05111c07c5d54c",
     "semantic_hash": ""
   },
   "agent-memory/completed-tasks-archive.md": {
@@ -2985,8 +2925,8 @@
     "semantic_hash": ""
   },
   "agent-memory/CONTEXT.md": {
-    "mtime": 1782442191.6943467,
-    "ast_hash": "25d88cef4680e4f9d7c407e95f2e6a14",
+    "mtime": 1782525061.1938953,
+    "ast_hash": "ba2ff51d791e1bc0253663fd9f7e4337",
     "semantic_hash": ""
   },
   "agent-memory/USER-PROFILE.md": {
@@ -2995,8 +2935,8 @@
     "semantic_hash": ""
   },
   "agent-memory/MEMORY.md": {
-    "mtime": 1782442155.67792,
-    "ast_hash": "b20ca35874ffb045bd874ffc9382b5eb",
+    "mtime": 1782479783.24283,
+    "ast_hash": "8c2bd0ce9863ebee70196affa8e31f03",
     "semantic_hash": ""
   },
   "agent-memory/index.md": {
@@ -3189,11 +3129,6 @@
     "ast_hash": "76a17462da38b304b8ff7617e8685ea2",
     "semantic_hash": ""
   },
-  "Apps/Harness/Sources/HarnessApp/Settings/SettingsViewController+Remote.swift": {
-    "mtime": 1781945404.813031,
-    "ast_hash": "cc1076d88af0332ed40d2ece071efe06",
-    "semantic_hash": ""
-  },
   "Tools/harness/Sources/HarnessCLI/HarnessCLI+InstallTools.swift": {
     "mtime": 1781937670.821625,
     "ast_hash": "a2aa73d6ced652430739bcdc180d1704",
@@ -3295,13 +3230,13 @@
     "semantic_hash": ""
   },
   "agent-memory/PLAYBOOK.md": {
-    "mtime": 1782179317.235968,
-    "ast_hash": "27bebec4c7455209cdb17a38bd83f768",
+    "mtime": 1782479783.2432454,
+    "ast_hash": "2c66c927383aca1ba18c28364ebb29e0",
     "semantic_hash": ""
   },
   "agent-memory/knowledge/INDEX.md": {
-    "mtime": 1782179185.5979223,
-    "ast_hash": "793e948d8b5e80cecbca3eed7ffaa54d",
+    "mtime": 1782446484.8872206,
+    "ast_hash": "92ec702c864df8bb39e4c032bbc1ddc0",
     "semantic_hash": ""
   },
   "agent-memory/plans/INDEX.md": {
@@ -3625,7 +3560,7 @@
     "semantic_hash": ""
   },
   "Tests/robot/helpers/check_retire_coverage.py": {
-    "mtime": 1782442612.5413122,
+    "mtime": 1782446484.8855739,
     "ast_hash": "e5341d436203088bae22abbabff47d1a",
     "semantic_hash": ""
   },
@@ -3635,8 +3570,8 @@
     "semantic_hash": ""
   },
   ".aidlc/harness/otty-features/PLAN.md": {
-    "mtime": 1782281520.7705483,
-    "ast_hash": "bfa67fb6fc462034d2e6a8616aa4d97a",
+    "mtime": 1782479783.259251,
+    "ast_hash": "2dbf28ef4b5611c7d89525dd0e54e7e2",
     "semantic_hash": ""
   },
   "agent-memory/knowledge/architecture/decisions.md": {
@@ -3645,8 +3580,8 @@
     "semantic_hash": ""
   },
   "agent-memory/knowledge/cases/appkit-ui.md": {
-    "mtime": 1782191595.9878693,
-    "ast_hash": "31f986a3a09c07903c8c7d436a827247",
+    "mtime": 1782479783.2436225,
+    "ast_hash": "9bc6f147ab8c226f157dfcf7e49bfff1",
     "semantic_hash": ""
   },
   "agent-memory/knowledge/cases/metal-displaylink.md": {
@@ -3672,6 +3607,76 @@
   "agent-memory/knowledge/rl-lessons.md": {
     "mtime": 1782191574.1998835,
     "ast_hash": "103d483b87a0bb685678e2ed05ffa332",
+    "semantic_hash": ""
+  },
+  "Apps/Harness/Sources/HarnessApp/Settings/SwiftUI/SettingsAdvancedView.swift": {
+    "mtime": 1782505603.3973541,
+    "ast_hash": "0fa13fa3ff969e704b4d538144a3361e",
+    "semantic_hash": ""
+  },
+  "Apps/Harness/Sources/HarnessApp/Settings/SwiftUI/SettingsAgentsView.swift": {
+    "mtime": 1782479783.2881513,
+    "ast_hash": "9ae6b2a3bfdbb3f941ab0ef9288b0c38",
+    "semantic_hash": ""
+  },
+  "Apps/Harness/Sources/HarnessApp/Settings/SwiftUI/SettingsAppearanceView.swift": {
+    "mtime": 1782479783.2746754,
+    "ast_hash": "62ded5271a42a850d05bfadc5ee9a383",
+    "semantic_hash": ""
+  },
+  "Apps/Harness/Sources/HarnessApp/Settings/SwiftUI/SettingsColorsView.swift": {
+    "mtime": 1782505786.6267438,
+    "ast_hash": "2a6c0d293af53d158fa2e5e70daac544",
+    "semantic_hash": ""
+  },
+  "Apps/Harness/Sources/HarnessApp/Settings/SwiftUI/SettingsHostingController.swift": {
+    "mtime": 1782505682.3456123,
+    "ast_hash": "c7dcaf6d07e6ecb1ca83ec8b7a2cd28b",
+    "semantic_hash": ""
+  },
+  "Apps/Harness/Sources/HarnessApp/Settings/SwiftUI/SettingsKeysView.swift": {
+    "mtime": 1782479783.2887058,
+    "ast_hash": "5ffa953c63e682ee9e578989863c153d",
+    "semantic_hash": ""
+  },
+  "Apps/Harness/Sources/HarnessApp/Settings/SwiftUI/SettingsModel.swift": {
+    "mtime": 1782479783.2749867,
+    "ast_hash": "8e6f12b15a821b8f84e601300eb8156a",
+    "semantic_hash": ""
+  },
+  "Apps/Harness/Sources/HarnessApp/Settings/SwiftUI/SettingsRemoteView.swift": {
+    "mtime": 1782505359.883951,
+    "ast_hash": "1fd2031f89da20858268040182b5fb38",
+    "semantic_hash": ""
+  },
+  "Apps/Harness/Sources/HarnessApp/Settings/SwiftUI/SettingsRootView.swift": {
+    "mtime": 1782505436.3603766,
+    "ast_hash": "f3e847ab51b4a57dcfa3ea6077fa7ccb",
+    "semantic_hash": ""
+  },
+  "Apps/Harness/Sources/HarnessApp/Settings/SwiftUI/SettingsTerminalView.swift": {
+    "mtime": 1782479783.2606106,
+    "ast_hash": "7330af5736087e5d46bed9083e49186e",
+    "semantic_hash": ""
+  },
+  ".aidlc/harness/swiftui-settings/DECISIONS.md": {
+    "mtime": 1782479783.2596016,
+    "ast_hash": "a984ad4546ffbb2acc7e4a0d882ebbff",
+    "semantic_hash": ""
+  },
+  ".aidlc/harness/swiftui-settings/PLAN.md": {
+    "mtime": 1782505831.222762,
+    "ast_hash": "df132870935ea87d1bccba8b91b11884",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/cases/cwd-worktree-bleed.md": {
+    "mtime": 1782479783.243872,
+    "ast_hash": "bc6a10eb15cddf45a3346434f3a535f1",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/cases/memory-leak-audit.md": {
+    "mtime": 1782446484.8876736,
+    "ast_hash": "6452cc4dd0208eac3b68fe9f21e8912c",
     "semantic_hash": ""
   }
 }

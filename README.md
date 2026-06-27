@@ -58,8 +58,8 @@ See [USAGE.md](USAGE.md) for the full install, run, CLI, and remote/headless gui
 - `harness-cli` automation for creating sessions, sending keys, capturing panes, installing hooks, and driving remote/headless daemons.
 - Agent detection and notifications for Claude Code, Codex, Cursor, Grok, Pi, Hermes, OpenClaw, OpenCode, Aider, Gemini, Goose, and generic agents.
 - Optional tmux-style controls: prefix key, status line, copy mode, paste buffers, hooks, command prompt, and many tmux-compatible commands.
-- IDE-like navigation — double-click folders to cd, ⌘P fuzzy jump to any directory via zoxide frecency, ⌘-click file paths, and `:cd` from the command prompt.
-- Sidebar tools for sessions, file navigation with folder cd, real-time Git workflows (including one-step Commit & Push), command palette, and editor/LSP flows. ⌘-clicking a file path in the terminal opens it in the editor and reveals it in the file tree.
+- IDE-like navigation — double-click folders to cd, ⌘P fuzzy jump to any directory via zoxide frecency, ⌘-click file paths, `:cd` from the command prompt, and **Open With Harness** from Finder on any source file (tree expands to the file, terminal opens at git root).
+- Sidebar tools for sessions, file navigation with folder cd, real-time Git workflows (including one-step Commit & Push), command palette, and editor/LSP flows. ⌘-clicking a file path in the terminal opens it in the editor and reveals it in the file tree. The file tree roots at the git root of the active session — `cd`-ing into a subdirectory expands the tree rather than re-rooting it.
 - Stable under long sessions — per-pane controller trees and browser network buffers are bounded and released on pane close; memory stays flat across hours of use.
 
 ## How It Feels
