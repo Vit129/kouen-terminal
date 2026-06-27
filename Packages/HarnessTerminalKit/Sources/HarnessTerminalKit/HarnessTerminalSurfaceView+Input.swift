@@ -249,6 +249,14 @@ extension HarnessTerminalSurfaceView {
             scrollBy(lines: sk == .pageUp ? rows : -rows)
             return
         }
+        // Context-aware Ctrl+C: copy selection when text is selected, else fall through to PTY interrupt.
+        if event.modifierFlags.contains(.control),
+           event.charactersIgnoringModifiers?.lowercased() == "c",
+           currentSelectionRegion != nil {
+            copySelection()
+            clearSelection()
+            return
+        }
         // Any other key returns to the live bottom.
         snapToBottom()
         clearSelection()
