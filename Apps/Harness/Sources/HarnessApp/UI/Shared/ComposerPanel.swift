@@ -64,14 +64,14 @@ final class ComposerPanel: NSPanel, NSTextViewDelegate {
         ])
     }
 
-    func present(relativeTo window: NSWindow?) {
+    func present(relativeTo window: NSWindow?, initialText: String = "") {
         if let w = window {
             let wf = w.frame
             setFrameOrigin(NSPoint(x: wf.midX - 310, y: wf.midY - 90))
         } else {
             center()
         }
-        textView.string = ""
+        textView.string = initialText
         makeKeyAndOrderFront(nil)
         makeFirstResponder(textView)
     }

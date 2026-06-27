@@ -166,6 +166,10 @@ enum MainMenuBuilder {
         view.submenu?.addItem(hintItem)
         let composerItem = menuItem("Composer", action: #selector(MenuTarget.openComposer), binding: BannerShortcutRegistry.composer)
         view.submenu?.addItem(composerItem)
+        let recipesItem = menuItem("Recipes…", action: #selector(MenuTarget.recipes), binding: BannerShortcutRegistry.recipes)
+        view.submenu?.addItem(recipesItem)
+        let jumpToDirItem = menuItem("Jump to Directory…", action: #selector(MenuTarget.jumpToDirectory), binding: BannerShortcutRegistry.jumpToDirectory)
+        view.submenu?.addItem(jumpToDirItem)
         view.submenu?.addItem(.separator())
         let runItem = menuItem("Run Script", action: #selector(MenuTarget.runScript), binding: BannerShortcutRegistry.runScript)
         view.submenu?.addItem(runItem)
@@ -462,6 +466,18 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
 
     @objc func openComposer() {
         SessionCoordinator.shared.openComposer()
+    }
+
+    @objc func recipes() {
+        if let window = NSApp.keyWindow {
+            RecipePickerController.present(relativeTo: window)
+        }
+    }
+
+    @objc func jumpToDirectory() {
+        if let window = NSApp.keyWindow {
+            DirectoryPickerController.present(relativeTo: window)
+        }
     }
 
     @objc func showOnboarding() {
