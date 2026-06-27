@@ -185,6 +185,10 @@ final class SessionCoordinator: NSObject {
         sessionLifecycleService.addSession(to: workspaceID, cwd: cwd, name: name)
     }
     func addTab(to workspaceID: WorkspaceID, cwd: String? = nil) { sessionLifecycleService.addTab(to: workspaceID, cwd: cwd) }
+    func forkTab() {
+        guard let wsID = snapshot.activeWorkspace?.id else { return }
+        addTab(to: wsID, cwd: activeTabCWD)
+    }
     func openDefaultTerminalLaunch(_ launch: DefaultTerminalLaunchRequest) { sessionLifecycleService.openDefaultTerminalLaunch(launch) }
     func selectWorkspace(_ id: WorkspaceID) { sessionLifecycleService.selectWorkspace(id) }
     func selectSession(workspaceID: WorkspaceID, sessionID: SessionID) { sessionLifecycleService.selectSession(workspaceID: workspaceID, sessionID: sessionID) }
@@ -419,6 +423,18 @@ final class SessionCoordinator: NSObject {
         ])
         // Auto-enable macOS Secure Input on password prompt patterns (Phase 6).
         SecureInputMonitor.shared.observeSurface(host)
+        // OSC 26 agent status: update AgentDetector + show/hide approval bar.
+        host.surfaceView.onAgentStatus = { [weak host] identity, activity, prompt in
+            let resolved = AgentActivity(rawValue: activity == "waiting_input" ? "awaiting" : activity) ?? .idle
+            let kind = identity.flatMap { AgentKind(rawValue: $0) }
+            AgentDetector.setActivity(resolved, kind: kind, forSurfaceKey: surfaceID.uuidString)
+            guard let host else { return }
+            if activity == "waiting_input", let prompt, !prompt.isEmpty {
+                AgentApprovalBar.show(on: host, prompt: prompt, kind: kind)
+            } else {
+                AgentApprovalBar.hide(from: host)
+            }
+        }
         // Dequeue the next queued command each time a shell prompt appears (OSC 133).
         let existingOnFinished = host.surfaceView.onCommandFinished
         host.surfaceView.onCommandFinished = { [weak host] duration, exitCode in

@@ -213,6 +213,11 @@ public enum BannerShortcutRegistry {
         modifiers: [.command, .shift], keyChar: "\\",
         showInBanner: false)
 
+    public static let forkTab = Keybinding(
+        id: "forkTab", title: "Fork Tab",
+        modifiers: [.command, .shift], keyChar: "k",
+        showInBanner: false)
+
     // MARK: - Banner shortcuts (legacy format for terminal banner rendering)
 
     /// All registered shortcuts for banner display, derived from keybindings above.

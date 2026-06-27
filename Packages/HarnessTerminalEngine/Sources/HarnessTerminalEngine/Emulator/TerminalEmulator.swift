@@ -72,6 +72,9 @@ public final class TerminalEmulator: VTParserHandler {
     public var onPointerShapeChange: ((String?) -> Void)?
     /// OSC 7735 — Harness-specific: open the given absolute path in the sidebar file viewer.
     public var onOpenFile: ((String) -> Void)?
+    /// OSC 26 — Harness agent protocol: `identity=<kind>;status=<activity>[;prompt=<url-encoded>]`.
+    /// Fired when an agent process emits its status into the PTY stream.
+    public var onAgentStatus: ((_ identity: String?, _ status: String, _ prompt: String?) -> Void)?
     /// Last OSC-22 pointer shape (nil = terminal default). Surfaced for hosts that prefer polling.
     public private(set) var pointerShape: String?
     /// When the current command started running (OSC 133 `C`/`B`), for command-duration timing.
@@ -432,6 +435,7 @@ public final class TerminalEmulator: VTParserHandler {
         case "133": handleSemanticPrompt(payload)          // OSC 133 ; A/B/C/D — shell integration
         case "1337": handleITerm2Image(payload)            // iTerm2 inline image (File=…)
         case "7735": onOpenFile?(payload)                  // Harness: open file in sidebar viewer
+        case "26": handleAgentStatus(payload)              // Harness OSC 26 agent protocol
         default: break
         }
     }
@@ -492,6 +496,25 @@ public final class TerminalEmulator: VTParserHandler {
         let title = parts.count >= 3 ? parts[1] : nil
         let body = parts.count >= 3 ? parts[2] : parts[1]
         onNotification?(title, body)
+    }
+
+    /// OSC 26 `identity=<kind>;status=<activity>[;prompt=<url-encoded-text>]`.
+    private func handleAgentStatus(_ payload: String) {
+        var identity: String?
+        var status: String?
+        var prompt: String?
+        for pair in payload.split(separator: ";") {
+            let kv = pair.split(separator: "=", maxSplits: 1).map(String.init)
+            guard kv.count == 2 else { continue }
+            switch kv[0] {
+            case "identity": identity = kv[1]
+            case "status":   status   = kv[1]
+            case "prompt":   prompt   = kv[1].removingPercentEncoding
+            default: break
+            }
+        }
+        guard let status else { return }
+        onAgentStatus?(identity, status, prompt)
     }
 
     private func setPointerShape(_ shape: String) {

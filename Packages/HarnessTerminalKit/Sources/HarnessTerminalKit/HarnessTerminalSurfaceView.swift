@@ -337,6 +337,10 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// — the host forwards this to its delegate.
     public var onDesktopNotification: ((_ title: String?, _ body: String) -> Void)?
     public var onOpenFile: ((String) -> Void)?
+    /// OSC 26 agent status — `(identity, activity, prompt)`. `identity` maps to `AgentKind.rawValue`;
+    /// `activity` maps to `AgentActivity.rawValue` (plus `"waiting_input"` which maps to `.awaiting`).
+    /// `prompt` is set when `status=waiting_input` and carries the permission request text.
+    public var onAgentStatus: ((_ identity: String?, _ activity: String, _ prompt: String?) -> Void)?
     /// Fired when terminal output matches a user-configured trigger pattern.
     public var onOutputTrigger: ((_ trigger: String, _ title: String?) -> Void)?
     /// Raw PTY output bytes — fired before emulator parsing so listeners can scan for
@@ -1230,6 +1234,13 @@ public final class HarnessTerminalSurfaceView: NSView {
                     pasteboard.setString(text, forType: .string)
                     self.onCopy?(text)   // mirror into the daemon paste buffer, like a yank
                 }
+            }
+        }
+        emulator.onAgentStatus = { [weak self] identity, activity, prompt in
+            if Thread.isMainThread {
+                self?.onAgentStatus?(identity, activity, prompt)
+            } else {
+                DispatchQueue.main.async { [weak self] in self?.onAgentStatus?(identity, activity, prompt) }
             }
         }
         // Answer OSC 10/11/12/4 color queries from the resolved theme (light/dark detection).
