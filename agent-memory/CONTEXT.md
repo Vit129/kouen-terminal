@@ -3,7 +3,7 @@
 ## Now
 - **Task:** otty-features — medium phases in progress
 - **Branch:** main
-- **Status:** Phases 1, 3–9, 17, 20 done and pushed. Event monitor leak fixes merged. Medium phases 10, 11, 18, 19 remain. Large phases 2, 12, 14, 15, 16 not started.
+- **Status:** ALL medium phases done ✅ (1, 3–11, 17–20). Large phases 2, 12, 14, 15, 16 not started.
 
 ### This session (2026-06-27) — otty-features implementation
 

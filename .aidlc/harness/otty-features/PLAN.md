@@ -43,8 +43,8 @@
 | ~~**1**~~ | ~~Hint mode~~ ✅ | `HintModeOverlay` — ⌘⇧U; home-row labels; 3 s auto-dismiss | Otty |
 | ~~**8**~~ | ~~Composer~~ ✅ | `ComposerPanel` NSPanel — ⌘⇧E; ⌘↩ sends to PTY | Otty (⌘⇧E) |
 | ~~**9**~~ | ~~Prompt Queue~~ ✅ | `PromptQueue` + `PromptQueueBar` — ⌘⇧↩; dequeues on `onCommandFinished` | Otty |
-| **10** | **Quick Terminal** — hotkey dropdown window | `NSPanel` + global `NSEvent` monitor | Ghostty, iTerm2 Visor |
-| **11** | **Recipes** — saved commands/layouts/snippets | JSON store + picker UI | Otty, Warp Drive |
+| ~~**10**~~ | ~~Quick Terminal~~ ✅ | `QuickTerminalController` NSPanel ⌥Space — dedicated workspace, lazy session | Ghostty, iTerm2 Visor |
+| ~~**11**~~ | ~~Recipes~~ ✅ | `RecipesStore` + `RecipePickerController` ⌘⇧R — JSON store, fuzzy picker | Otty, Warp Drive |
 
 #### Large
 | # | Feature | Ponytail Rung | Source |
@@ -60,8 +60,8 @@
 #### Medium (new)
 | # | Feature | Ponytail Rung | Source |
 |---|---|---|---|
-| **18** | **Layout file export/import** — save/load window layout as JSON | Reuse `LayoutDescriptor` serialization → file picker | Zellij (KDL) |
-| **19** | **Frecency directory jumping** — smart `cd` picker | `SurfaceShellTracker` CWD events → frecency score → fuzzy picker | iTerm2 |
+| ~~**18**~~ | ~~Layout file export/import~~ ✅ | `LayoutFileStore` — export `PaneNode` tree as `.harness-layout` JSON; import recreates splits + cd | Zellij (KDL) |
+| ~~**19**~~ | ~~Frecency directory jumping~~ ✅ | `FrecencyDirectoryStore` + `DirectoryPickerController` ⌘⇧J — score = count/log(age), JSON persist | iTerm2 |
 | ~~**20**~~ | ~~Session Resurrection across reboot~~ ✅ | Audit complete — window frame (`saveFrame`/`setFrameUsingName`) + scrollback (`ScrollbackFile`) already handled | Zellij |
 
 #### Defer
