@@ -53,6 +53,13 @@ final class SessionCoordinator: NSObject {
             self?.aiChatControllers.removeValue(forKey: surfaceID.uuidString)
             SecureInputMonitor.shared.release(surfaceID)
         }
+        // Update the floating queue bar whenever a surface's queue changes.
+        PromptQueue.shared.onQueueChanged = { [weak self] surfaceID in
+            guard let self, surfaceID == self.activeSurfaceID else { return }
+            PromptQueueBar.shared.update(
+                count: PromptQueue.shared.count(for: surfaceID),
+                anchoredTo: NSApp.mainWindow)
+        }
         observeNotifications()
         _ = daemonSyncService; _ = notificationCoordinator
         _ = splitPaneCoordinator; _ = sessionLifecycleService
@@ -402,6 +409,13 @@ final class SessionCoordinator: NSObject {
         host.surfaceView.onAskAI = { [weak chatController] text in chatController?.askAI(prefill: text) }
         // Auto-enable macOS Secure Input on password prompt patterns (Phase 6).
         SecureInputMonitor.shared.observeSurface(host)
+        // Dequeue the next queued command each time a shell prompt appears (OSC 133).
+        let existingOnFinished = host.surfaceView.onCommandFinished
+        host.surfaceView.onCommandFinished = { [weak host] duration, exitCode in
+            existingOnFinished?(duration, exitCode)
+            guard let host else { return }
+            PromptQueue.shared.dequeueAndRun(for: host.surfaceID, via: host)
+        }
         return host
     }
 
@@ -464,6 +478,18 @@ final class SessionCoordinator: NSObject {
     func jumpToNextPrompt() {
         guard let surfaceID = activeSurfaceID, let host = TerminalPaneRegistryAccess.host(for: surfaceID) else { return }
         host.jumpToNextPrompt()
+    }
+
+    // MARK: - Prompt Queue
+
+    func enqueueCommand(_ command: String) {
+        guard let surfaceID = activeSurfaceID else { return }
+        PromptQueue.shared.enqueue(command, for: surfaceID)
+    }
+
+    func cancelQueue() {
+        guard let surfaceID = activeSurfaceID else { return }
+        PromptQueue.shared.cancel(for: surfaceID)
     }
 
     // MARK: - Misc
