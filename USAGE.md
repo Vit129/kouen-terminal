@@ -255,18 +255,19 @@ alias cat="bat --paging=never"
 
 | Tool | What it does | Harness integration |
 |------|-------------|---------------------|
-| `zoxide` | Smart cd — learns your frequent directories | `⌘P` shows zoxide frecency list, select to cd |
+| `zoxide` | Smart cd — learns your frequent directories | `⌘P` fuzzy jump · `⌘⇧J` visual picker (↩ cd · ⌘↩ new tab) |
 | `fzf` | Fuzzy finder for files, history, directories | `ctrl+r` history, `alt+c` cd, `ctrl+t` file |
 | `ripgrep` (`rg`) | Fast grep (10x faster than grep) | `:grep` uses rg when available |
 | `bat` | cat with syntax highlighting | Better `cat` output in terminal |
 
-After install, `z <keyword>` jumps to any directory you've visited:
+After install, `z <keyword>` jumps to any directory you've visited — and `⌘⇧J` opens a visual picker over the same zoxide list:
 
 ```bash
-z myproject     # cd to ~/Git/Personal/My-Project
-z plans         # cd to .../agent-memory/plans
-z downloads     # cd to ~/Downloads
+z myproject     # cd to ~/Git/Personal/My-Project (shell)
+⌘⇧J            # same list, GUI picker — ↩ to cd, ⌘↩ to open new tab
 ```
+
+Save frequently-used commands as **Recipes** (`⌘⇧R`) — select to run immediately or send to Composer for editing.
 
 ## More Docs
 

@@ -19,11 +19,39 @@ public enum DirectoryPickerController {
         windowDelegate = nil
     }
 
+    private static func zoxideRanked() async -> [String] {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let task = Process()
+                task.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+                task.arguments = ["zoxide", "query", "--list"]
+                let pipe = Pipe()
+                task.standardOutput = pipe
+                task.standardError = Pipe()
+                do {
+                    try task.run()
+                    task.waitUntilExit()
+                    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                    let lines = String(data: data, encoding: .utf8)?
+                        .split(separator: "\n").map(String.init).filter { !$0.isEmpty } ?? []
+                    continuation.resume(returning: lines)
+                } catch {
+                    continuation.resume(returning: [])
+                }
+            }
+        }
+    }
+
     public static func present(relativeTo parent: NSWindow?) {
         panel?.close()
 
         let dirs = FrecencyDirectoryStore.shared.ranked()
         let model = DirectoryPickerModel(directories: dirs, parentWindow: parent)
+        Task {
+            let zDirs = await zoxideRanked()
+            guard !zDirs.isEmpty else { return }
+            model.mergeZoxide(zDirs)
+        }
         let controller = NSHostingController(rootView: DirectoryPickerView(model: model))
 
         let panel = DirectoryPanel(
@@ -80,7 +108,7 @@ final class DirectoryPickerModel {
     var selectedIndex: Int = 0
     var filteredDirectories: [String] = []
 
-    let allDirectories: [String]
+    var allDirectories: [String]
     weak var parentWindow: NSWindow?
     weak var panel: NSPanel?
 
@@ -110,6 +138,22 @@ final class DirectoryPickerModel {
            let host = coordinator.terminalHostIfExists(for: surfaceID) {
             host.sendInput(("cd \(path)\n").data(using: .utf8) ?? Data())
         }
+    }
+
+    func activateSelectedInNewTab() {
+        guard filteredDirectories.indices.contains(selectedIndex) else { return }
+        let path = filteredDirectories[selectedIndex]
+        panel?.close()
+
+        let coordinator = SessionCoordinator.shared
+        guard let wsID = coordinator.snapshot.activeWorkspace?.id else { return }
+        coordinator.addTab(to: wsID, cwd: path)
+    }
+
+    func mergeZoxide(_ zDirs: [String]) {
+        let zSet = Set(zDirs)
+        allDirectories = zDirs + allDirectories.filter { !zSet.contains($0) }
+        rebuildFiltered()
     }
 
     func close() {
@@ -210,6 +254,13 @@ private struct DirectoryPickerView: View {
             model.close()
             return .handled
         }
+        .onKeyPress(.return, phases: .down) { press in
+            if press.modifiers.contains(.command) {
+                model.activateSelectedInNewTab()
+                return .handled
+            }
+            return .ignored
+        }
     }
 }
 
@@ -285,7 +336,8 @@ private struct DirectoryPickerFooter: View {
         let c = HarnessChrome.current
         HStack(spacing: HarnessDesign.Spacing.lg) {
             hint(keys: "↑↓", label: "Navigate")
-            hint(keys: "↩", label: "Select")
+            hint(keys: "↩", label: "cd here")
+            hint(keys: "⌘↩", label: "New tab")
             hint(keys: "esc", label: "Close")
         }
         .frame(maxWidth: .infinity)

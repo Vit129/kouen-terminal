@@ -46,6 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         notchController?.start()
         PrefixKeymap.shared.install()
         QuickTerminalController.shared.install()
+        FloatingPaneController.shared.install()
         AppIdleThrottle.shared.install()
         BrowserPaneRegistry.shared.prewarm()
 

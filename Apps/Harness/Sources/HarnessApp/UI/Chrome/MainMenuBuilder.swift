@@ -182,6 +182,10 @@ enum MainMenuBuilder {
         view.submenu?.addItem(importLayoutItem)
         let viModeItem = menuItem("Toggle Vi Mode", action: #selector(MenuTarget.toggleViMode), binding: BannerShortcutRegistry.toggleViMode)
         view.submenu?.addItem(viModeItem)
+        let floatingPaneItem = menuItem("Floating Terminal", action: #selector(MenuTarget.openFloatingPane), binding: BannerShortcutRegistry.floatingPane)
+        view.submenu?.addItem(floatingPaneItem)
+        let tabOverviewItem = menuItem("Tab Overview", action: #selector(MenuTarget.tabOverview), binding: BannerShortcutRegistry.tabOverview)
+        view.submenu?.addItem(tabOverviewItem)
         view.submenu?.addItem(.separator())
         let runItem = menuItem("Run Script", action: #selector(MenuTarget.runScript), binding: BannerShortcutRegistry.runScript)
         view.submenu?.addItem(runItem)
@@ -529,6 +533,8 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
     @objc func exportLayout() { LayoutFileStore.exportCurrentLayout() }
     @objc func importLayout() { LayoutFileStore.importLayout() }
     @objc func toggleViMode() { SessionCoordinator.shared.toggleViMode() }
+    @objc func openFloatingPane() { FloatingPaneController.shared.toggle() }
+    @objc func tabOverview() { TabOverviewController.shared.toggle() }
 
     @objc func toggleSidebar() {
         let win = NSApp.keyWindow ?? NSApp.mainWindow
