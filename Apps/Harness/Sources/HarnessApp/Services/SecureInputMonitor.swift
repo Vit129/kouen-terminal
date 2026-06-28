@@ -25,6 +25,10 @@ final class SecureInputMonitor {
     func observeSurface(_ host: TerminalHostView) {
         let id = host.surfaceID
         let surface = host.surfaceView
+        // Guard against double-install: a second call would overwrite onRawOutput
+        // (losing the first listener) and double-chain onCommandFinished, causing
+        // release(id) to fire twice per OSC 133 — corrupting the active set.
+        guard surface.onRawOutput == nil else { return }
 
         surface.onRawOutput = { [weak self] data in
             guard let self,
