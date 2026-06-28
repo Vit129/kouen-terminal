@@ -671,6 +671,7 @@ public final class HarnessTerminalSurfaceView: NSView {
     public func receive(_ data: Data) {
         onRawOutput?(data)
         if offMainParserFramePipelineEnabled {
+            scanOutputTriggers(data)
             receiveOffMain(data)
             return
         }
@@ -1390,6 +1391,13 @@ public final class HarnessTerminalSurfaceView: NSView {
     private static var retiredSurfaces: [HarnessTerminalSurfaceView] = []
 
     public override func removeFromSuperview() {
+        // Guard against duplicate entries from repeated remove/re-add cycles (e.g.
+        // split-pane drag-and-drop). Each duplicate would add its own 1.5s strong hold
+        // and asyncAfter, keeping the Metal renderer and blink timer alive N× longer.
+        guard !Self.retiredSurfaces.contains(where: { $0 === self }) else {
+            super.removeFromSuperview()
+            return
+        }
         Self.retiredSurfaces.append(self)
         super.removeFromSuperview()
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
