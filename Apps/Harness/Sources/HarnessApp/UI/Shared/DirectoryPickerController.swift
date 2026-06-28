@@ -377,7 +377,7 @@ private final class DirectoryWindowDelegate: NSObject, NSWindowDelegate {
     }
 }
 
-private extension String {
+extension String {
     // Single-quote with internal quotes escaped — safe for all POSIX shells.
     var shellQuoted: String { "'\(replacingOccurrences(of: "'", with: "'\"'\"'"))'" }
 }
