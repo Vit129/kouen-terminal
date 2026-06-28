@@ -52,6 +52,38 @@ enum PasteController {
         }
     }
 
+    private static let imageUTIs: Set<String> = [
+        "public.png", "public.jpeg", "public.tiff", "public.gif",
+        "public.heic", "public.heif", "com.compuserve.gif", "public.webp",
+        "public.image"
+    ]
+
+    /// Build Kitty graphics APC escape bytes for an image on `pasteboard`, or nil if no image.
+    /// Sends `a=T,f=100` (transmit + display, PNG format) in a single frame.
+    static func kittyGraphicsBytes(from pasteboard: NSPasteboard) -> [UInt8]? {
+        guard let png = pngImageData(from: pasteboard) else { return nil }
+        return kittyBytes(for: png)
+    }
+
+    /// Build Kitty graphics APC escape bytes for an image file at `url`, or nil if not an image.
+    static func kittyGraphicsBytes(from url: URL) -> [UInt8]? {
+        guard let uti = try? url.resourceValues(forKeys: [.typeIdentifierKey]).typeIdentifier,
+              imageUTIs.contains(where: { uti == $0 || uti.hasPrefix($0 + ".") })
+                || imageUTIs.contains(uti),
+              let data = try? Data(contentsOf: url),
+              let image = NSImage(data: data),
+              let tiff = image.tiffRepresentation,
+              let rep = NSBitmapImageRep(data: tiff),
+              let png = rep.representation(using: .png, properties: [:])
+        else { return nil }
+        return kittyBytes(for: png)
+    }
+
+    private static func kittyBytes(for png: Data) -> [UInt8] {
+        let b64 = png.base64EncodedString()
+        return Array("\u{1b}_Ga=T,f=100;\(b64)\u{1b}\\".utf8)
+    }
+
     /// Unsafe = contains a line break (would run as a command without bracketed paste) or another
     /// control character. Newlines are already normalized to `\r` before this check.
     static func isUnsafePaste(_ text: String) -> Bool {
