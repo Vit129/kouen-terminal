@@ -33,8 +33,12 @@ final class BlockTintOverlay: NSView {
             prevScroll?(topLine, totalLines, visibleRows)
             self?.topLine = topLine
             self?.visibleRows = visibleRows
-            self?.needsDisplay = true
             self?.dismissActionBar()
+            // Only redraw if there are visible blocks — avoids CPU draw on every scroll
+            // tick when the terminal has no OSC 133-delimited prompt rows.
+            if let self, !self.cachedPromptRows.isEmpty || !self.collapsedBlocks.isEmpty {
+                self.needsDisplay = true
+            }
         }
 
         // Refresh prompt cache when a new shell prompt appears (OSC 133 command-finish).
@@ -232,8 +236,7 @@ private final class BlockActionBar: NSView {
 
     private func makeButton(symbol: String, label: String, action: Selector) -> NSButton {
         let btn = NSButton(title: label, target: self, action: action)
-        btn.bezelStyle  = .regularSquare
-        btn.isBordered  = false
+        btn.bezelStyle  = .rounded
         btn.font        = .systemFont(ofSize: 10.5, weight: .medium)
         if let img = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)?
             .withSymbolConfiguration(.init(pointSize: 10, weight: .medium)) {
