@@ -163,6 +163,7 @@ public final class RealPty: @unchecked Sendable {
     /// Subscribers receive raw output. Multiple subscribers can attach (the
     /// running app + any number of `harness-cli attach` clients).
     private var subscribers: [UUID: (Data, UInt64) -> Void] = [:]
+    private var subscriberSnapshot: [(Data, UInt64) -> Void] = []  // rebuilt on change; avoids Array(dict.values) per chunk
     private let subscribersLock = NSLock()
 
     /// Extra environment injected into the child shell on spawn *and* respawn
@@ -1022,6 +1023,7 @@ public final class RealPty: @unchecked Sendable {
         let token = UUID()
         subscribersLock.lock()
         subscribers[token] = handler
+        subscriberSnapshot = Array(subscribers.values)
         subscribersLock.unlock()
         return token
     }
@@ -1029,6 +1031,7 @@ public final class RealPty: @unchecked Sendable {
     public func cancelSubscription(token: UUID? = nil) {
         subscribersLock.lock()
         if let token { subscribers.removeValue(forKey: token) } else { subscribers.removeAll() }
+        subscriberSnapshot = Array(subscribers.values)
         subscribersLock.unlock()
     }
 
@@ -1130,7 +1133,7 @@ public final class RealPty: @unchecked Sendable {
         deliveryQueue.async { [weak self] in
             guard let self else { return }
             self.subscribersLock.lock()
-            let handlers = Array(self.subscribers.values)
+            let handlers = self.subscriberSnapshot
             self.subscribersLock.unlock()
             for handler in handlers { handler(data, sequence) }
         }
