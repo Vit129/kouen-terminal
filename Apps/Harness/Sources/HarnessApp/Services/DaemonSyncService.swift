@@ -413,13 +413,21 @@ final class DaemonSyncService {
     }
 
     func structureFingerprint(_ snap: SessionSnapshot) -> String {
-        guard let ws = snap.activeWorkspace, let session = ws.activeSession, let tab = session.activeTab else { return "" }
-        // Exclude browser pane IDs — they are app-only and unknown to the daemon.
-        // Including them causes a blink loop: daemon sync removes browser IDs →
-        // structureChanged=true → rebuild removes browser pane → sync again → loop.
-        let surfaces = tab.rootPane.allSurfaceIDs().map(\.uuidString).sorted().joined(separator: ",")
-        let panes = tab.rootPane.allLeaves().map(\.id.uuidString).sorted().joined(separator: ",")
-        return "\(ws.id)|\(session.id)|\(tab.id)|\(surfaces)|\(panes)"
+        // Hash ALL tabs across every workspace/session so pane kills in non-active tabs
+        // trigger structureChanged and prune() runs. allSurfaceIDs() already returns []
+        // for .browser nodes, so browser-pane IDs are excluded automatically — no risk
+        // of the blink loop (daemon snapshot never contains browser IDs either).
+        let surfaces = snap.workspaces.flatMap { ws in
+            ws.sessions.flatMap { session in
+                session.tabs.flatMap { $0.rootPane.allSurfaceIDs() }
+            }
+        }.map(\.uuidString).sorted().joined(separator: ",")
+        let panes = snap.workspaces.flatMap { ws in
+            ws.sessions.flatMap { session in
+                session.tabs.flatMap { $0.rootPane.allLeaves() }
+            }
+        }.map(\.id.uuidString).sorted().joined(separator: ",")
+        return "\(surfaces)|\(panes)"
     }
 
     // MARK: - Daemon request
