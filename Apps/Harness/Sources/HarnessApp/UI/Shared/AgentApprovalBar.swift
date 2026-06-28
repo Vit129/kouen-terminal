@@ -2,6 +2,13 @@ import AppKit
 import HarnessCore
 import HarnessTerminalKit
 
+/// Pure decision produced by `AgentApprovalBar.action(for:prompt:)`.
+enum ApprovalBarAction: Equatable {
+    case show(String)   // prompt text
+    case hide
+    case noop
+}
+
 /// Slim approval bar that slides up from the bottom of a pane when an agent
 /// emits OSC 26 `status=waiting_input;prompt=<text>`.
 /// Allow → sends `\n` to PTY (agent continues). Deny → sends `\x03` (Ctrl-C, agent aborts).
@@ -12,6 +19,20 @@ final class AgentApprovalBar: NSView {
     private var heightConstraint: NSLayoutConstraint?
 
     // MARK: - Static helpers
+
+    /// Maps an OSC 26 activity string to the bar action. Pure — no AppKit dependency, fully testable.
+    /// "working" is intentionally a no-op: concurrent Notification hooks must not hide a pending bar.
+    nonisolated static func action(for activity: String, prompt: String?) -> ApprovalBarAction {
+        switch activity {
+        case "waiting_input":
+            guard let p = prompt, !p.isEmpty else { return .noop }
+            return .show(p)
+        case "idle", "errored":
+            return .hide
+        default:
+            return .noop
+        }
+    }
 
     static func show(on host: TerminalHostView, prompt: String, kind: AgentKind?) {
         if let existing = host.subviews.first(where: { $0 is AgentApprovalBar }) as? AgentApprovalBar {

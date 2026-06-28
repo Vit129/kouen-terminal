@@ -134,6 +134,8 @@ final class MainSplitViewController: NSViewController {
         )
     }
 
+    deinit { NotificationCenter.default.removeObserver(self) }
+
     override func viewDidLayout() {
         super.viewDidLayout()
         if !didApplyInitialSidebarState && split.bounds.width > 0 {
