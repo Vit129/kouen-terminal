@@ -104,7 +104,7 @@ async function selectWithReadline(options) {
 
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   return new Promise((resolve) => {
-    rl.question(`\nEnter choice (1-${options.length}): `, (answer) => {
+    rl.question('\nEnter choice (1-' + options.length + '): ', (answer) => {
       rl.close();
       const idx = parseInt(answer) - 1;
       if (idx >= 0 && idx < options.length) {
@@ -130,11 +130,7 @@ async function main() {
         value: 'preview'
       },
       {
-        display: `3) Fix version — re-sync all 4 version files (current: v${currentVersion})`,
-        value: 'fix-version'
-      },
-      {
-        display: `4) Full cycle: build → bump → commit+push → install${nextVersions}`,
+        display: `3) Full cycle: build → bump → commit+push → install${nextVersions}`,
         value: 'full-cycle'
       }
     ];
@@ -143,8 +139,8 @@ async function main() {
     const arg = process.argv[2];
     let choice;
     if (arg) {
-      const byNumber = { '1': 'commit-push-merge', '2': 'preview', '3': 'fix-version', '4': 'full-cycle' };
-      const byName = { 'commit-push-merge': 'commit-push-merge', 'preview': 'preview', 'fix-version': 'fix-version', 'full-cycle': 'full-cycle' };
+      const byNumber = { '1': 'commit-push-merge', '2': 'preview', '3': 'full-cycle' };
+      const byName = { 'commit-push-merge': 'commit-push-merge', 'preview': 'preview', 'full-cycle': 'full-cycle' };
       choice = byNumber[arg] || byName[arg];
       if (!choice) { console.error(`❌ Unknown option: ${arg}`); process.exit(1); }
       console.log(`\n✅ Selected: ${options.find(o => o.value === choice)?.display}\n`);
@@ -158,16 +154,6 @@ async function main() {
       await runCommand('make', ['preview-stop']).catch(() => {});
       await runCommand('make', ['preview-clean']);
       await runCommand('./Scripts/run.sh', ['preview']);
-    } else if (choice === 'fix-version') {
-      const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-      const targetVersion = await new Promise((resolve) => {
-        rl.question(`\nVersion to set (Enter = keep v${currentVersion}): `, (answer) => {
-          rl.close();
-          resolve(answer.trim() || currentVersion);
-        });
-      });
-      await runCommand('Scripts/prepare-release.sh', ['--version', targetVersion]);
-      console.log(`\n✅ Version files synced to v${targetVersion}\n`);
     } else if (choice === 'full-cycle') {
       const bumpOptions = [
         { display: '1) patch  — bug fixes', value: 'patch' },
