@@ -59,7 +59,6 @@ FloatingPaneController.shared.install()
             }
             return event
         }
-        SurfaceShellTracker.shared.start()
         PRStatusPoller.shared.start()
         ScriptHookCoordinator.shared.start()
         // Follow the macOS system appearance for auto light/dark theme switching. The startup
