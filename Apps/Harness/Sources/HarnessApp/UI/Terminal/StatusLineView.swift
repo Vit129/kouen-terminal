@@ -17,6 +17,8 @@ final class StatusLineView: NSView {
     private static let mainRowHeight: CGFloat = 26
     private static let extraRowHeight: CGFloat = 22
     private nonisolated(unsafe) var refreshTimer: Timer?
+    private nonisolated(unsafe) var snapshotDebounce: Task<Void, Never>?
+    private var lastRendered: [String] = Array(repeating: "", count: 7) // left/right/center + 4 extra
 
     init() {
         super.init(frame: .zero)
@@ -103,6 +105,7 @@ final class StatusLineView: NSView {
     deinit {
         NotificationCenter.default.removeObserver(self)
         refreshTimer?.invalidate()
+        snapshotDebounce?.cancel()
     }
 
     func applyChrome() {
@@ -115,6 +118,9 @@ final class StatusLineView: NSView {
         for label in [leftLabel, rightLabel, centerLabel] {
             label.textColor = color
         }
+        // Force full NSAttributedString rebuild — colors are embedded in the attributed
+        // string, so the plain-text diff cache would suppress the color update otherwise.
+        lastRendered = Array(repeating: "", count: lastRendered.count)
         refresh()
     }
 
@@ -132,7 +138,12 @@ final class StatusLineView: NSView {
     }
 
     @objc private func snapshotChanged(_ note: Notification) {
-        refresh()
+        snapshotDebounce?.cancel()
+        snapshotDebounce = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 80_000_000)
+            guard !Task.isCancelled else { return }
+            self?.refresh()
+        }
     }
 
     private func startTimer() {
@@ -162,21 +173,37 @@ final class StatusLineView: NSView {
             return
         }
         let context = buildContext()
-        leftLabel.attributedStringValue = styledAttributed(options.get("status-left", scope: .global)?.stringValue ?? "", context: context)
-        rightLabel.attributedStringValue = styledAttributed(options.get("status-right", scope: .global)?.stringValue ?? "", context: context, alignment: .right)
-        centerLabel.attributedStringValue = styledAttributed(options.get("status-center", scope: .global)?.stringValue ?? "", context: context, alignment: .center)
+        let fmtLeft   = options.get("status-left",   scope: .global)?.stringValue ?? ""
+        let fmtRight  = options.get("status-right",  scope: .global)?.stringValue ?? ""
+        let fmtCenter = options.get("status-center", scope: .global)?.stringValue ?? ""
+        setLabel(leftLabel,   format: fmtLeft,   context: context, cacheIndex: 0)
+        setLabel(rightLabel,  format: fmtRight,  context: context, cacheIndex: 1, alignment: .right)
+        setLabel(centerLabel, format: fmtCenter, context: context, cacheIndex: 2, alignment: .center)
         // Extra rows above the main band: `status-format-1` is the first row up, etc.
         for (i, label) in extraLabels.enumerated() {
             let lineIndex = i + 1
             if lineIndex < count {
                 label.isHidden = false
-                label.attributedStringValue = styledAttributed(options.get("status-format-\(lineIndex)", scope: .global)?.stringValue ?? "", context: context)
+                let fmt = options.get("status-format-\(lineIndex)", scope: .global)?.stringValue ?? ""
+                setLabel(label, format: fmt, context: context, cacheIndex: 3 + i)
             } else {
                 label.isHidden = true
                 label.attributedStringValue = NSAttributedString()
+                lastRendered[3 + i] = ""
             }
         }
         heightConstraint.constant = Self.mainRowHeight + CGFloat(max(0, count - 1)) * Self.extraRowHeight
+    }
+
+    /// Evaluates `format` to plain text; skips the `NSAttributedString` rebuild when the
+    /// output is identical to the last render. `FormatString.evaluate` is O(format length)
+    /// and cheap; `evaluateStyled` + attributed-string construction is the expensive part.
+    private func setLabel(_ label: NSTextField, format: String, context: FormatContext,
+                          cacheIndex: Int, alignment: NSTextAlignment = .left) {
+        let plain = FormatString.evaluate(format, context: context)
+        guard plain != lastRendered[cacheIndex] else { return }
+        lastRendered[cacheIndex] = plain
+        label.attributedStringValue = styledAttributed(format, context: context, alignment: alignment)
     }
 
     /// Render a status format to an attributed string, honoring `#[fg=…,bg=…,attrs]` style
