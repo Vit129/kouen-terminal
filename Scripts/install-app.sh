@@ -32,7 +32,7 @@ done
 echo "==> Stopping production runtime..."
 launchctl bootout "gui/$(id -u)" "$LAUNCH_AGENT" 2>/dev/null || true
 launchctl bootout "gui/$(id -u)/com.robert.harness.daemon" 2>/dev/null || true
-timeout 2 "$ROOT/Harness.app/Contents/MacOS/harness-cli" daemon stop 2>/dev/null || true
+"$ROOT/Harness.app/Contents/MacOS/harness-cli" daemon stop 2>/dev/null || true
 pkill -f "/Applications/Harness.app/Contents/MacOS/HarnessDaemon" 2>/dev/null || true
 pkill -f "$APP_SUPPORT_BIN/HarnessDaemon" 2>/dev/null || true
 pkill -x Harness 2>/dev/null || true
