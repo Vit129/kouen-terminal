@@ -102,6 +102,7 @@ private struct FileTabPillView: View {
                     .strokeBorder(Color(c.accent).opacity(0.5), lineWidth: 1)
             }
         }
+        .contentShape(Rectangle())
         .onHover { isHovered = $0 }
         .onTapGesture { onSelect(tab.id) }
     }

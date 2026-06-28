@@ -82,7 +82,9 @@ enum FuzzyPathResolver {
     }
 
     static func resolve(query: String, root: String, limit: Int = 10, fileManager: FileManager = .default) -> FuzzyPathResolution {
-        resolve(query: query, ranked: FileFuzzyMatcher.rank(query: query, candidates: scanFiles(root: root, fileManager: fileManager), limit: limit))
+        // Absolute path that exists on disk → skip fuzzy scan entirely
+        if query.hasPrefix("/"), fileManager.fileExists(atPath: query) { return .unique(query) }
+        return resolve(query: query, ranked: FileFuzzyMatcher.rank(query: query, candidates: scanFiles(root: root, fileManager: fileManager), limit: limit))
     }
 
     static func resolve(query: String, ranked: [(candidate: String, score: Int)]) -> FuzzyPathResolution {
