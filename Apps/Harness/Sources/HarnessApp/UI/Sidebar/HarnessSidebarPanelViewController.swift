@@ -371,7 +371,6 @@ final class HarnessSidebarPanelViewController: NSViewController {
             onAddInGroup: { [weak self] rootPath in
                 self?.addSessionInGroup(rootPath: rootPath)
             },
-            onGroupOptions: { rootPath, name in },
             onCloseSession: { [weak self] id in
                 guard let self, let session = self.sessions.first(where: { $0.id == id }) else { return }
                 SessionCoordinator.shared.closeSession(session)

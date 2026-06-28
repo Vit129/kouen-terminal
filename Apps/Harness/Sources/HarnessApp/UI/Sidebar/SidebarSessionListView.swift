@@ -7,7 +7,6 @@ struct SidebarSessionListView: View {
     var model: SidebarListModel
     var onSelect: (SessionID) -> Void
     var onAddInGroup: (String) -> Void
-    var onGroupOptions: (String, String) -> Void
     var onCloseSession: (SessionID) -> Void
     var onPRClick: (String) -> Void
     var onWorktreeActivate: (SidebarWorktreeEntry, WorkspaceID?) -> Void
@@ -35,8 +34,7 @@ struct SidebarSessionListView: View {
                 status: status,
                 model: model,
                 onToggleCollapse: { model.toggleCollapse(rootPath: rootPath) },
-                onAdd: { onAddInGroup(rootPath) },
-                onOptions: { onGroupOptions(rootPath, name) }
+                onAdd: { onAddInGroup(rootPath) }
             )
             .frame(height: 28)
 
@@ -91,7 +89,6 @@ private struct SidebarGroupHeaderRow: View {
     var model: SidebarListModel
     var onToggleCollapse: () -> Void
     var onAdd: () -> Void
-    var onOptions: () -> Void
 
     @State private var isHovered = false
 
@@ -133,12 +130,22 @@ private struct SidebarGroupHeaderRow: View {
                 .frame(width: 20, height: 20)
                 .help("New session in group")
 
-                Button(action: onOptions) {
+                Menu {
+                    let isPinned = model.pinnedRepos.contains(rootPath)
+                    Button(isPinned ? "Unpin Repo" : "Pin Repo") {
+                        model.togglePinRepo(rootPath: rootPath)
+                    }
+                    Divider()
+                    Button("Close all sessions in \(name)", role: .destructive) {
+                        closeAllSessions(name: name)
+                    }
+                } label: {
                     Image(systemName: "ellipsis")
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(Color(nsColor: c.textSecondary))
                 }
-                .buttonStyle(.plain)
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
                 .frame(width: 20, height: 20)
                 .help("Group options")
             }
