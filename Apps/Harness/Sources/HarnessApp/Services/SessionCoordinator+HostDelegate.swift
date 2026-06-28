@@ -24,18 +24,6 @@ extension SessionCoordinator: TerminalHostDelegate {
         }
     }
 
-    func surfaceShellTrackerDidUpdateCwd(_ surfaceID: SurfaceID, cwd: String) {
-        let current = snapshot.workspaces.flatMap { $0.sessions.flatMap { $0.tabs } }
-            .first { $0.rootPane.allSurfaceIDs().contains(surfaceID) }?.cwd
-        if current == cwd { return }
-        FrecencyDirectoryStore.shared.recordVisit(path: cwd)
-        kickBranchRefresh(for: surfaceID, cwd: cwd)
-        Task {
-            await daemonSyncService.logIfFailed(.updateTabCwd(surfaceID: surfaceID.uuidString, path: cwd))
-            await syncFromDaemon(metadataOnly: true)
-        }
-    }
-
     func terminalHostDidChangeFocus(_ focused: Bool, surfaceID: SurfaceID) {
         guard focused else { return }
         setActiveSurface(surfaceID)
