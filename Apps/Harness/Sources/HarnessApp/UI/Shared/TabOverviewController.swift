@@ -34,7 +34,7 @@ final class TabOverviewController {
         let screenH = NSScreen.main?.visibleFrame.height ?? 800
         let panelW = gridW, panelH = min(gridH + 8, screenH * 0.85)
 
-        let screen = NSScreen.main ?? NSScreen.screens[0]
+        guard let screen = NSScreen.main ?? NSScreen.screens.first else { return }
         let panelFrame = NSRect(
             x: screen.frame.midX - panelW / 2,
             y: screen.frame.midY - panelH / 2,

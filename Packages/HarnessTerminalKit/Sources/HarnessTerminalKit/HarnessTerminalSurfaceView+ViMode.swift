@@ -5,6 +5,7 @@ public enum ViInputMode: Sendable { case insert, normal }
 extension HarnessTerminalSurfaceView {
     // Called from _keyDown — returns true if the event was consumed.
     func handleViMode(_ event: NSEvent) -> Bool {
+        guard viModeEnabled else { return false }
         // Esc in insert mode → enter normal
         if viModeState == .insert, event.keyCode == 53 /* Esc */ {
             setViMode(.normal); return true

@@ -22,8 +22,12 @@ enum ExternalOpenKind: Equatable {
         let ext = url.pathExtension.lowercased()
         if ext == ThemeDocument.fileExtension { self = .theme; return }
         var isDir: ObjCBool = false
-        FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir)
-        if isDir.boolValue || Self.shellExtensions.contains(ext) { self = .terminal; return }
+        let exists = FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir)
+        let representsDir = (exists && isDir.boolValue) || url.hasDirectoryPath
+        if representsDir || ext.isEmpty || Self.shellExtensions.contains(ext) {
+            self = .terminal
+            return
+        }
         self = .filePreview
     }
 }

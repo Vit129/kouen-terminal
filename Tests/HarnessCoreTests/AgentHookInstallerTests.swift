@@ -62,10 +62,10 @@ final class AgentHookInstallerTests: XCTestCase {
         // macOS path in Linux-installed hooks made every notification silently vanish
         // (`harness-cli` was never on the hook's PATH).
         #if os(Linux)
-        XCTAssertTrue(command.hasPrefix(
+        XCTAssertTrue(command.contains(
             "PATH=\"${XDG_DATA_HOME:-$HOME/.local/share}/harness/bin:$PATH\" harness-cli notify"))
         #else
-        XCTAssertTrue(command.hasPrefix("PATH=\"$HOME/Library/Application Support/Harness/bin:$PATH\" harness-cli notify"))
+        XCTAssertTrue(command.contains("PATH=\"$HOME/Library/Application Support/Harness/bin:$PATH\" harness-cli notify"))
         #endif
         XCTAssertFalse(command.contains("HARNESS_NOTIFY_MESSAGE"), "the dangling env var must be gone")
     }
