@@ -366,7 +366,7 @@ enum CommandPaletteController {
             ) {
                 // cd active terminal to this directory (IDE-like Switch Project).
                 if let surfaceID = coordinator.activeSurfaceID {
-                    coordinator.requestDaemon(.sendKeys(surfaceID: surfaceID.uuidString, keys: ["cd \(capturedRoot)", "Enter"]))
+                    coordinator.requestDaemon(.sendKeys(surfaceID: surfaceID.uuidString, keys: ["cd \(capturedRoot.shellQuoted)", "Enter"]))
                 } else if let wsID = coordinator.snapshot.activeWorkspaceID {
                     coordinator.addSession(to: wsID, cwd: capturedRoot)
                 }
