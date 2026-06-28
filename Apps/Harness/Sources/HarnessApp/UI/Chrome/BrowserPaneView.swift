@@ -130,6 +130,7 @@ public final class BrowserPaneView: NSView {
     override public func viewWillMove(toWindow newWindow: NSWindow?) {
         super.viewWillMove(toWindow: newWindow)
         if newWindow == nil {
+            cancelRetry()
             // Defer unregister: during pane tree rebuilds, the view is briefly detached
             // then re-attached in the same runloop cycle. Only unregister if still
             // windowless after the rebuild completes.
@@ -338,6 +339,7 @@ public final class BrowserPaneView: NSView {
         newWeb.translatesAutoresizingMaskIntoConstraints = false
 
         setupConsoleLogRedirection(for: newWeb)
+        setupNetworkCapture(for: newWeb)
 
         let tab = BrowserTab(id: UUID(), webView: newWeb, title: "New Tab")
         tabs.append(tab)
@@ -362,6 +364,7 @@ public final class BrowserPaneView: NSView {
                 mainStack.insertArrangedSubview(newWeb, at: stackIndex)
             }
             webView = newWeb
+            setupProgressObservation()
         }
         urlTextField.stringValue = newWeb.url?.absoluteString ?? ""
         refreshTabBar()
