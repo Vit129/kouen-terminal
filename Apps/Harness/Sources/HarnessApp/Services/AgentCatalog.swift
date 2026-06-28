@@ -164,15 +164,15 @@ public enum AgentCatalog {
 
         let resolvedModel = model ?? config.models.first
         if let m = resolvedModel {
-            parts += [config.modelFlag, m]
+            parts += [config.modelFlag, shellQuote(m)]
         }
 
         if let effort = effort ?? config.defaultEffort,
            let effortFlag = config.effortFlag {
             if effortFlag.hasSuffix("=") {
-                parts.append("\(effortFlag)\(effort)")
+                parts.append("\(effortFlag)\(shellQuote(effort))")
             } else {
-                parts += [effortFlag, effort]
+                parts += [effortFlag, shellQuote(effort)]
             }
         }
 
@@ -181,6 +181,16 @@ public enum AgentCatalog {
         }
 
         return parts.joined(separator: " ")
+    }
+
+    /// POSIX single-quote wrapping for values sourced from disk or user input.
+    /// Clean identifiers (alphanum, dash, dot, slash, @, colon) pass through unquoted.
+    private static func shellQuote(_ s: String) -> String {
+        let safe = CharacterSet.alphanumerics.union(.init(charactersIn: "-_./@:"))
+        guard s.unicodeScalars.allSatisfy({ safe.contains($0) }) else {
+            return "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'"
+        }
+        return s
     }
 
     /// Check if a model name is valid for a given agent.
