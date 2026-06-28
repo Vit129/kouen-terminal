@@ -170,8 +170,8 @@ struct SettingsAppearanceView: View {
                 set: { model.update(\.transparentTitlebar, $0) }
             ))
             Toggle("Status line", isOn: Binding(
-                get: { model.settings.showStatusLine },
-                set: { model.update(\.showStatusLine, $0) }
+                get: { model.settings.effectiveStatusLineEnabled },
+                set: { model.update(\.statusLineEnabled, $0) }
             ))
             Toggle("Sidebar", isOn: Binding(
                 get: { model.settings.sidebarVisible },
