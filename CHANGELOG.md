@@ -7,19 +7,17 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/harness-terminal/releases).
 ## [3.11.2] - 2026-06-28
 
-### Added
-- Release version bump to v3.11.2.
-
-## [3.11.1] - 2026-06-28
-
-### Added
-- Release version bump to v3.11.1.
-
-## [3.11.0] - 2026-06-28
+### Changed
+- Debounce status line refresh + skip redundant NSAttributedString rebuilds ([`a0a343b`](https://github.com/Vit129/harness-terminal/commit/a0a343b3292c02457ef93506cc46a8d8495d3924))
+- Hoist process-table build out of per-surface agent scan loop ([`8076204`](https://github.com/Vit129/harness-terminal/commit/8076204ce43d6760c35c6724b2296ec504f5b7a0))
 
 ### Fixed
-- Full-cycle uses make install (prod+install) before tag/release ([`710580b`](https://github.com/Vit129/harness-terminal/commit/710580bd8959614fb38ab53529aaeabbcac0c6c4))
-- Approval bar freeze + ProMotion render-rate cap ([`6083086`](https://github.com/Vit129/harness-terminal/commit/608308635fcbc20a945ce453909980c0a4b0c393))
+- Remove NotificationCenter observer leaks on window/pane teardown ([`a3f437d`](https://github.com/Vit129/harness-terminal/commit/a3f437d45f74c6033bab019524aaea0019f3a113))
+- Browser routing, GUI-disconnect hang, stale runSurface Ctrl-C, per-chunk alloc ([`d2fa7f5`](https://github.com/Vit129/harness-terminal/commit/d2fa7f5f4c30aa1f47124adc12dbe120ca239148))
+- Shell-quote model/effort in spawnCommand + browser routing + invariant tests ([`1b2628c`](https://github.com/Vit129/harness-terminal/commit/1b2628cc11ecc7358294f125f4e92a478411dff1))
+- 5 Opus round-2 findings — snapshot reconnect, timer leak, progress, network capture, reconnect probe ([`c641239`](https://github.com/Vit129/harness-terminal/commit/c64123976b110d45afe2149a892c94235792b776))
+- PromptQueue surface-key leak + AppIdleThrottle double-install guard ([`2e6fdd0`](https://github.com/Vit129/harness-terminal/commit/2e6fdd039815292d8b927f3bc02908c2ebf55df7))
+- Status line Settings toggle bound to wrong field for non-full modes ([`2159a77`](https://github.com/Vit129/harness-terminal/commit/2159a774e85f202613afc45b9f2d3e2b5a79a4a9))
 
 ## [3.11.0] - 2026-06-28
 
@@ -45,6 +43,8 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 
 ### Fixed
 - Deinit in extension SyntaxTextView — move to class body ([`cac75c5`](https://github.com/Vit129/harness-terminal/commit/cac75c5aeb35bf100c39aee898a304e909b0eaeb))
+- Full-cycle uses make install (prod+install) before tag/release ([`710580b`](https://github.com/Vit129/harness-terminal/commit/710580bd8959614fb38ab53529aaeabbcac0c6c4))
+- Approval bar freeze + ProMotion render-rate cap ([`6083086`](https://github.com/Vit129/harness-terminal/commit/608308635fcbc20a945ce453909980c0a4b0c393))
 
 ## [3.10.1] - 2026-06-27
 
