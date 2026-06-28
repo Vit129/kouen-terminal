@@ -258,10 +258,12 @@ private struct SidebarSessionItemRow: View {
                     if let pr = metadata?.prNumber {
                         let prColor: Color = (metadata?.aheadCount ?? 0) > 0
                             ? .green : Color(nsColor: c.accent)
-                        SidebarBadgeLabel(text: "#\(pr)", color: prColor)
-                            .onTapGesture {
-                                if let url = metadata?.prURL { onPRClick(url) }
-                            }
+                        Button(action: {
+                            if let url = metadata?.prURL { onPRClick(url) }
+                        }) {
+                            SidebarBadgeLabel(text: "#\(pr)", color: prColor)
+                        }
+                        .buttonStyle(.plain)
                     }
                     if let ahead = metadata?.aheadCount, ahead > 0 {
                         SidebarBadgeLabel(text: "+\(ahead)", color: .green)

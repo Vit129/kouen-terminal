@@ -65,6 +65,14 @@
 
 ---
 
+## Phase 20b: Picker Enhancements (⌘⇧J + zoxide + ⌘↩) ✅
+
+- [x] `DirectoryPickerModel` — added `activateSelectedInNewTab()` and `mergeZoxide()`
+- [x] `DirectoryPickerController` — queries zoxide asynchronously and merges zoxide results with frecency directory jumps
+- [x] `DirectoryPickerView` — added ⌘↩ handler to open the directory in a new tab, and updated footer hints
+
+---
+
 ## Remaining (deferred)
 
 | Phase | Feature | Reason |

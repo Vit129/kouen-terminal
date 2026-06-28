@@ -485,7 +485,8 @@ final class SessionCoordinator: NSObject {
     func toggleViMode() {
         guard let surfaceID = activeSurfaceID, let host = TerminalPaneRegistryAccess.host(for: surfaceID) else { return }
         let sv = host.surfaceView
-        sv.setViMode(sv.viModeState == .insert ? .normal : .insert)
+        sv.viModeEnabled.toggle()
+        if !sv.viModeEnabled { sv.setViMode(.insert) }
     }
 
     func detachActiveSurface() {

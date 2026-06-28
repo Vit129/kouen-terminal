@@ -362,7 +362,9 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// Generic key intercept — fires before Command shortcuts and PTY delivery (but after copy-mode).
     /// Return `true` to consume the event. Used by overlay UIs (e.g. `InlineAICompletionView`).
     public var onKeyIntercept: ((NSEvent) -> Bool)?
-    /// Vi modal editing state. `.insert` (default) = passthrough; `.normal` = motion keys intercepted.
+    /// Whether Vi modal editing is active. Off by default — Esc reaches the PTY normally until enabled.
+    public var viModeEnabled: Bool = false
+    /// Vi modal editing state. `.insert` = passthrough; `.normal` = motion keys intercepted.
     public var viModeState: ViInputMode = .insert
     /// Fired on every vi mode transition so the host can update a badge/indicator.
     public var onViModeChanged: ((ViInputMode) -> Void)?

@@ -14,7 +14,7 @@ final class FloatingPaneController {
     private var bootstrapping = false
     nonisolated(unsafe) private var globalMonitor: Any?
     nonisolated(unsafe) private var localMonitor: Any?
-    private var frameObservers: [Any] = []
+    nonisolated(unsafe) private var frameObservers: [NSObjectProtocol] = []
 
     private static let frameKey = "FloatingPaneFrame"
 
@@ -95,12 +95,13 @@ final class FloatingPaneController {
                     host.bottomAnchor.constraint(equalTo: cv.bottomAnchor),
                 ])
             }
-            // Persist frame on every move/resize
-            frameObservers = [NSWindow.didMoveNotification, NSWindow.didResizeNotification].map { name in
-                NotificationCenter.default.addObserver(forName: name, object: p, queue: .main) { [weak p] _ in
+            // Persist frame on every move/resize — store tokens so they can be removed on deinit
+            for name in [NSWindow.didMoveNotification, NSWindow.didResizeNotification] {
+                let token = NotificationCenter.default.addObserver(forName: name, object: p, queue: .main) { [weak p] _ in
                     guard let p else { return }
                     UserDefaults.standard.set(NSStringFromRect(p.frame), forKey: Self.frameKey)
                 }
+                frameObservers.append(token)
             }
             panel = p
         }

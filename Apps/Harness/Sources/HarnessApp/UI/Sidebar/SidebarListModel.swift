@@ -116,6 +116,7 @@ final class SidebarListModel {
                 // @Observable tracks gitMetadataCache; views reading it auto-refresh
                 self.gitMetadataCache[key] = (metadata: metadata, fetchedAt: Date())
                 self.gitMetadataUpdatesInProgress.remove(key)
+                self.rebuildRows()
             }
         }
         return gitMetadataCache[key]?.metadata
