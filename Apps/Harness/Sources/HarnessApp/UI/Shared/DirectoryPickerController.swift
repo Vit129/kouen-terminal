@@ -136,7 +136,7 @@ final class DirectoryPickerModel {
         let coordinator = SessionCoordinator.shared
         if let surfaceID = coordinator.activeSurfaceID,
            let host = coordinator.terminalHostIfExists(for: surfaceID) {
-            host.sendInput(("cd \(path)\n").data(using: .utf8) ?? Data())
+            host.sendInput(("cd \(path.shellQuoted)\n").data(using: .utf8) ?? Data())
         }
     }
 
@@ -375,4 +375,9 @@ private final class DirectoryWindowDelegate: NSObject, NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
         DirectoryPickerController.clearReferences()
     }
+}
+
+private extension String {
+    // Single-quote with internal quotes escaped — safe for all POSIX shells.
+    var shellQuoted: String { "'\(replacingOccurrences(of: "'", with: "'\"'\"'"))'" }
 }
