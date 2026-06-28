@@ -71,6 +71,8 @@ final class BoardViewController: NSViewController {
         )
     }
 
+    deinit { NotificationCenter.default.removeObserver(self) }
+
     /// PBI-BOARD-006: dismissed card IDs (runtime-only, not persisted).
     private var dismissedCardIDs: Set<TabID> = []
 

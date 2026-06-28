@@ -100,7 +100,10 @@ final class StatusLineView: NSView {
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-    deinit { refreshTimer?.invalidate() }
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+        refreshTimer?.invalidate()
+    }
 
     func applyChrome() {
         // Re-run the backdrop install so it re-reads HarnessChrome.backgroundOpacity.
