@@ -66,9 +66,6 @@ final class SessionLifecycleService {
                     await coord.requestDaemon(.sendData(surfaceID: surfaceID.uuidString, data: Data((setup + "\r").utf8)))
                 }
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                SurfaceShellTracker.shared.bumpScan()
-            }
         }
     }
 
@@ -291,9 +288,6 @@ final class SessionLifecycleService {
         if let surfaceID = coord.splitPaneCoordinator.firstSurfaceID(forTab: tabID) {
             coord.setActiveSurface(surfaceID)
             coord.terminalHosts.host(for: surfaceID)?.focusTerminal()
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            SurfaceShellTracker.shared.bumpScan()
         }
     }
 

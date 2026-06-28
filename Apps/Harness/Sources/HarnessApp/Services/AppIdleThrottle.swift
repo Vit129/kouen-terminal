@@ -1,9 +1,9 @@
 import AppKit
 
-/// Suspends expensive *UI-facing* background work (shell tracker polling, status line
-/// timer) while the screen is asleep/locked. The daemon and terminal sessions keep running
-/// normally (agents finish their work). Only visual refresh is paused — it can't be seen
-/// anyway. On screen wake, a single sync catches up instead of replaying every notification.
+/// Suspends expensive *UI-facing* background work (status line timer) while the screen is
+/// asleep/locked. The daemon and terminal sessions keep running normally (agents finish their
+/// work). Only visual refresh is paused — it can't be seen anyway. On screen wake, a single
+/// sync catches up instead of replaying every notification.
 @MainActor
 final class AppIdleThrottle {
     static let shared = AppIdleThrottle()
@@ -27,14 +27,12 @@ final class AppIdleThrottle {
     private func suspend() {
         guard !isSuspended else { return }
         isSuspended = true
-        SurfaceShellTracker.shared.stop()
         NotificationCenter.default.post(name: Self.didSuspend, object: nil)
     }
 
     private func resume() {
         guard isSuspended else { return }
         isSuspended = false
-        SurfaceShellTracker.shared.start()
         // Single sync picks up all state changes at once instead of replaying every
         // queued snapshot notification individually (which causes the post-unlock stutter).
         SessionCoordinator.shared.syncFromDaemon()
