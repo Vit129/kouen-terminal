@@ -158,13 +158,11 @@ final class StatusLineView: NSView {
 
     private func refresh() {
         let options = HarnessOptions.shared
-        // Mode gate first: the status line resolves independently of the prefix now, via
-        // `effectiveStatusLineEnabled` (per-component override → umbrella → mode default), so a
-        // Plain terminal can show a status band without arming the prefix. The GUI `showStatusLine`
-        // toggle is still the hard on/off; when off the band hides regardless of the `status`
-        // option. Otherwise `status` (`off`/`on`/`2..5`) drives how many rows show.
+        // Mode gate: `effectiveStatusLineEnabled` is the sole on/off (per-component override →
+        // umbrella → mode default). `showStatusLine` is no longer written by any Settings control
+        // after the 2159a77 fix and must not gate here. `status` (`off`/`on`/`2..5`) drives rows.
         let settings = SessionCoordinator.shared.settings
-        let showInSettings = settings.effectiveStatusLineEnabled && settings.showStatusLine
+        let showInSettings = settings.effectiveStatusLineEnabled
         let count = showInSettings ? (options.get("status", scope: .global)?.statusLineCount ?? 1) : 0
         let newHeight = count == 0 ? 0 : (Self.mainRowHeight + CGFloat(max(0, count - 1)) * Self.extraRowHeight)
         if newHeight != lastHeight {
