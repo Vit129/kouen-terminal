@@ -113,6 +113,18 @@ final class PaneLifecycleManager {
         CATransaction.commit()
     }
 
+    // MARK: - Cache Pruning
+
+    /// Remove cached containers for tabs that no longer exist. Without pruning, every
+    /// tab ever visited accumulates a hidden Metal-rendered container in memory forever.
+    func pruneCache(keepingTabIDs liveTabIDs: Set<String>) {
+        let staleKeys = containerCache.keys.filter { !liveTabIDs.contains($0) }
+        for key in staleKeys {
+            let container = containerCache.removeValue(forKey: key)
+            container?.removeFromSuperview()
+        }
+    }
+
     // MARK: - Pane Lookup
 
     func paneShell(for paneID: PaneID) -> NSView? {

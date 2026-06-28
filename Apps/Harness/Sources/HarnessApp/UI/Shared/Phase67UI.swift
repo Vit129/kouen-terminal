@@ -98,6 +98,9 @@ enum Phase67UI {
         guard let window = NSApp.keyWindow, let view = window.contentView else { return }
         let location = NSPoint(x: view.bounds.midX, y: view.bounds.midY)
         menu.popUp(positioning: nil, at: location, in: view)
+        // popUp() is synchronous/modal — menu has dismissed by the time we return.
+        // Clear targets now so ClosureTarget objects don't accumulate across menu calls.
+        closureTargets.removeAll()
     }
 
     // MARK: lock-client / clock-mode

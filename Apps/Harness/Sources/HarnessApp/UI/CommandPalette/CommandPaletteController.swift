@@ -56,6 +56,24 @@ enum CommandPaletteController {
     private static let recentDefaultsKey = "com.robert.harness.palette.recent"
     private static let recentLimit = 5
 
+    // Zoxide cache — refreshed in background every 60s so buildActions() never blocks
+    // the main thread with waitUntilExit().
+    private static var zoxideCachedPaths: [String] = []
+    private static var zoxideLastFetch: TimeInterval = 0  // CACurrentMediaTime epoch
+
+    private static func prefetchZoxideAsync() {
+        let now = CACurrentMediaTime()
+        guard now - zoxideLastFetch >= 60 else { return }
+        zoxideLastFetch = now
+        Task.detached(priority: .utility) {
+            let paths = (try? Process.zoxideQueryAll())?
+                .components(separatedBy: "\n")
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty } ?? []
+            await MainActor.run { CommandPaletteController.zoxideCachedPaths = paths }
+        }
+    }
+
     enum PaletteMode: Equatable {
         case normal
         case errors
@@ -328,30 +346,31 @@ enum CommandPaletteController {
                 }
             }
         }
-        // Augment with zoxide frecency list (best effort — silently skip if not installed).
-        if let zoxideOutput = try? Process.zoxideQueryAll(), !zoxideOutput.isEmpty {
-            for path in zoxideOutput.components(separatedBy: "\n") {
-                let root = path.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !root.isEmpty, seenRoots.insert(root).inserted else { continue }
-                let title = HarnessDesign.pathDisplayName(root)
-                let subtitle = HarnessDesign.shortenPath(root)
-                let capturedRoot = root
-                actions.append(PaletteAction(
-                    id: "project.\(root)",
-                    title: title,
-                    subtitle: subtitle,
-                    symbol: "clock.arrow.trianglehead.counterclockwise.rotate.90",
-                    shortcut: "",
-                    section: .projects
-                ) {
-                    // cd active terminal to this directory (IDE-like Switch Project).
-                    if let surfaceID = coordinator.activeSurfaceID {
-                        coordinator.requestDaemon(.sendKeys(surfaceID: surfaceID.uuidString, keys: ["cd \(capturedRoot)", "Enter"]))
-                    } else if let wsID = coordinator.snapshot.activeWorkspaceID {
-                        coordinator.addSession(to: wsID, cwd: capturedRoot)
-                    }
-                })
-            }
+        // Augment with zoxide frecency list — uses a 60s cache to avoid blocking the main
+        // thread with waitUntilExit() on every ⌘K open. First open shows cached (empty) list
+        // while the background fetch runs; subsequent opens show fresh results.
+        prefetchZoxideAsync()
+        for path in zoxideCachedPaths {
+            let root = path
+            guard !root.isEmpty, seenRoots.insert(root).inserted else { continue }
+            let title = HarnessDesign.pathDisplayName(root)
+            let subtitle = HarnessDesign.shortenPath(root)
+            let capturedRoot = root
+            actions.append(PaletteAction(
+                id: "project.\(root)",
+                title: title,
+                subtitle: subtitle,
+                symbol: "clock.arrow.trianglehead.counterclockwise.rotate.90",
+                shortcut: "",
+                section: .projects
+            ) {
+                // cd active terminal to this directory (IDE-like Switch Project).
+                if let surfaceID = coordinator.activeSurfaceID {
+                    coordinator.requestDaemon(.sendKeys(surfaceID: surfaceID.uuidString, keys: ["cd \(capturedRoot)", "Enter"]))
+                } else if let wsID = coordinator.snapshot.activeWorkspaceID {
+                    coordinator.addSession(to: wsID, cwd: capturedRoot)
+                }
+            })
         }
 
         // MARK: - Themes (featured first)

@@ -19,6 +19,7 @@ final class StatusLineView: NSView {
     private nonisolated(unsafe) var refreshTimer: Timer?
     private nonisolated(unsafe) var snapshotDebounce: Task<Void, Never>?
     private var lastRendered: [String] = Array(repeating: "", count: 7) // left/right/center + 4 extra
+    private var lastHeight: CGFloat = Self.mainRowHeight
 
     init() {
         super.init(frame: .zero)
@@ -83,7 +84,7 @@ final class StatusLineView: NSView {
             object: nil
         )
         startTimer()
-        refresh()
+        DispatchQueue.main.async { [weak self] in self?.refresh() }
         NotificationCenter.default.addObserver(
             self, selector: #selector(throttleDidSuspend), name: AppIdleThrottle.didSuspend, object: nil)
         NotificationCenter.default.addObserver(
@@ -165,13 +166,13 @@ final class StatusLineView: NSView {
         let settings = SessionCoordinator.shared.settings
         let showInSettings = settings.effectiveStatusLineEnabled && settings.showStatusLine
         let count = showInSettings ? (options.get("status", scope: .global)?.statusLineCount ?? 1) : 0
-        isHidden = count == 0
-        guard count > 0 else {
-            // Collapse the band to 0 so the terminal split fills the freed space
-            // (a hidden view still reserves its height constraint otherwise).
-            heightConstraint.constant = 0
-            return
+        let newHeight = count == 0 ? 0 : (Self.mainRowHeight + CGFloat(max(0, count - 1)) * Self.extraRowHeight)
+        if newHeight != lastHeight {
+            isHidden = count == 0
+            heightConstraint.constant = newHeight
+            lastHeight = newHeight
         }
+        guard count > 0 else { return }
         let context = buildContext()
         let fmtLeft   = options.get("status-left",   scope: .global)?.stringValue ?? ""
         let fmtRight  = options.get("status-right",  scope: .global)?.stringValue ?? ""
@@ -192,7 +193,6 @@ final class StatusLineView: NSView {
                 lastRendered[3 + i] = ""
             }
         }
-        heightConstraint.constant = Self.mainRowHeight + CGFloat(max(0, count - 1)) * Self.extraRowHeight
     }
 
     /// Evaluates `format` to plain text; skips the `NSAttributedString` rebuild when the

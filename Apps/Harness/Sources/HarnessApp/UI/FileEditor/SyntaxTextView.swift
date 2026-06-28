@@ -503,6 +503,20 @@ private final class SyntaxLineNumberGutterView: NSView {
 
         let diagnosticLines = Set(diagnostics.map { $0.range.start.line + 1 })
         let inset = textView.textContainerInset.height
+
+        // Compute cursor line once — doing it inside the per-visible-line loop is O(N×M)
+        // where N = visible lines and M = file length to cursor.
+        let cursorLine: Int
+        if relativeNumbers {
+            let cursorPos = textView.selectedRange().location
+            var ln = 1
+            text.enumerateSubstrings(in: NSRange(location: 0, length: cursorPos),
+                                     options: [.byLines, .substringNotRequired]) { _, _, _, _ in ln += 1 }
+            cursorLine = ln
+        } else {
+            cursorLine = 0
+        }
+
         text.enumerateSubstrings(in: charRange, options: [.byLines, .substringNotRequired]) { [weak self] _, range, _, _ in
             guard let self else { return }
             let glyphIndex = layoutManager.glyphIndexForCharacter(at: range.location)
@@ -525,18 +539,6 @@ private final class SyntaxLineNumberGutterView: NSView {
                 NSBezierPath(ovalIn: NSRect(x: 6, y: lineRect.midY - 3, width: 6, height: 6)).fill()
             }
 
-            let cursorLine: Int
-            if relativeNumbers {
-                let tv2 = textView  // already non-optional here (inside guard-let scope)
-                let cursorPos = tv2.selectedRange().location
-                var ln = 1
-                (tv2.string as NSString).enumerateSubstrings(
-                    in: NSRange(location: 0, length: cursorPos),
-                    options: [.byLines, .substringNotRequired]) { _, _, _, _ in ln += 1 }
-                cursorLine = ln
-            } else {
-                cursorLine = 0
-            }
             let displayNumber = relativeNumbers ? abs(lineNumber - cursorLine) : lineNumber
             let value = (relativeNumbers && displayNumber == 0 ? "\(lineNumber)" : "\(displayNumber)") as NSString
             let size = value.size(withAttributes: attrs)
