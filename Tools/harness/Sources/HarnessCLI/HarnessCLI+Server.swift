@@ -87,6 +87,20 @@ extension HarnessCLI {
         _ = try checkedRequest(client, .detachClient(clientID: id))
     }
 
+    static func handleStopServer(_ args: [String], client: DaemonClient) {
+        // Wait up to 2 seconds for daemon to respond, then kill it
+        let deadline = Date().addingTimeInterval(2)
+        while Date() < deadline {
+            if case .pong? = try? client.request(.ping, timeout: 0.1) {
+                print("daemon is running; sending SIGTERM...")
+                sleep(1) // Let daemon finish pending IPC before killing
+                break
+            }
+            usleep(50_000)
+        }
+        handleKillServer(args)
+    }
+
     static func printDaemonStats(_ args: [String], client: DaemonClient) throws {
         let response = try checkedRequest(client, .daemonStats)
         guard case let .daemonStats(stats) = response else { throw DaemonClientError.unexpectedResponse }

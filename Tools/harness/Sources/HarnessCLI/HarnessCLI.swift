@@ -42,7 +42,24 @@ struct HarnessCLI {
             case "remote":
                 exit(try handleRemote(args))
             case "daemon":
-                runDaemonForeground() // execs HarnessDaemon; never returns
+                guard args.count > 1 else {
+                    runDaemonForeground() // execs HarnessDaemon; never returns
+                }
+                switch args[1] {
+                case "start":
+                    let client = try makeClient(args)
+                    handleStartServer(Array(args.dropFirst(2)), client: client)
+                    return
+                case "stop":
+                    let client = try makeClient(args)
+                    handleStopServer(Array(args.dropFirst(2)), client: client)
+                    return
+                case "kill":
+                    handleKillServer(Array(args.dropFirst(2)))
+                    return
+                default:
+                    runDaemonForeground() // execs HarnessDaemon; never returns
+                }
             case "version", "--version", "-v":
                 printVersion(args) // best-effort daemon query; works with the daemon down
                 return
