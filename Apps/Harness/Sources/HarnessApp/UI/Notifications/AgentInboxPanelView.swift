@@ -23,7 +23,7 @@ final class AgentInboxPanelView: NSView {
         self.agents = agents
         self.onSelect = onSelect
         let visibleRowCount = min(agents.count, 6)
-        let bodyHeight = agents.isEmpty ? 64 : CGFloat(visibleRowCount * 52 + 10)
+        let bodyHeight = agents.isEmpty ? 64 : CGFloat(visibleRowCount * 52 + 6)
         self.preferredHeight = 28 + bodyHeight + 12
         super.init(frame: .zero)
 

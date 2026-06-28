@@ -45,6 +45,8 @@ final class HarnessSidebarPanelViewController: NSViewController {
     var lastFileTreeSessionID: SessionID?
     var lastFileTreeGitBranch: String?
     var lastFileTreeCWD: String?
+    private var lastRepoHeaderPath = ""
+    private var lastRepoHeaderFetch = Date.distantPast
 
     deinit {
         if let monitor = workspaceDropdownMonitor { NSEvent.removeMonitor(monitor) }
@@ -885,6 +887,11 @@ final class HarnessSidebarPanelViewController: NSViewController {
             self.sidebarSectionModel.text = "SESSIONS"
             return
         }
+        // Skip the git subprocess when the active path hasn't changed and we fetched recently.
+        let now = Date()
+        guard path != lastRepoHeaderPath || now.timeIntervalSince(lastRepoHeaderFetch) > 5 else { return }
+        lastRepoHeaderPath = path
+        lastRepoHeaderFetch = now
         Task {
             let repoName = await fetchRepoName(for: path)
             await MainActor.run {

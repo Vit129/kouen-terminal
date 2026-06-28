@@ -157,7 +157,7 @@ struct SettingsAdvancedView: View {
         }
         .formStyle(.grouped)
         .navigationTitle("Advanced")
-        .onAppear { loadAdvancedValues() }
+        .task { await loadAdvancedValues() }
     }
 
     // MARK: - Bindings
@@ -189,12 +189,12 @@ struct SettingsAdvancedView: View {
 
     // MARK: - Data
 
-    private func loadAdvancedValues() {
+    private func loadAdvancedValues() async {
         var values: [String: String] = [:]
         for (key, value) in OptionStore.builtinDefaults {
             values[key] = value.stringValue
         }
-        if case let .options(entries)? = SessionCoordinator.shared.requestDaemon(.showOptions(scope: nil)) {
+        if case let .options(entries)? = await SessionCoordinator.shared.requestDaemon(.showOptions(scope: nil)) {
             for entry in entries where entry.scope == "global" {
                 values[entry.key] = entry.value
             }
@@ -207,13 +207,15 @@ struct SettingsAdvancedView: View {
 
     private func apply(key: String, rawValue: String) {
         advValues[key] = rawValue
-        SessionCoordinator.shared.requestDaemon(.setOption(scope: "global", target: nil, key: key, rawValue: rawValue))
-        HarnessOptions.reloadFromDisk()
-        NotificationBus.shared.postSnapshotChanged(SnapshotChangedPayload(
-            revision: SessionCoordinator.shared.snapshot.revision,
-            structureChanged: false,
-            metadataOnly: true,
-            chromeChanged: false
-        ))
+        Task {
+            await SessionCoordinator.shared.requestDaemon(.setOption(scope: "global", target: nil, key: key, rawValue: rawValue))
+            HarnessOptions.reloadFromDisk()
+            NotificationBus.shared.postSnapshotChanged(SnapshotChangedPayload(
+                revision: SessionCoordinator.shared.snapshot.revision,
+                structureChanged: false,
+                metadataOnly: true,
+                chromeChanged: false
+            ))
+        }
     }
 }

@@ -420,9 +420,11 @@ private struct TabPillView: View {
         .onTapGesture(count: 2) {
             model.delegate?.tabBarDidRequestRename(tabID: tab.id)
         }
-        .onTapGesture(count: 1) {
+        // simultaneousGesture fires immediately on any tap without waiting for the
+        // double-click disambiguation window (~300 ms delay that onTapGesture(count:1) adds).
+        .simultaneousGesture(TapGesture().onEnded {
             model.delegate?.tabBarDidSelect(tabID: tab.id)
-        }
+        })
         .contextMenu {
             Button("Close Tab") {
                 model.delegate?.tabBarDidRequestClose(tabID: tab.id)
@@ -438,7 +440,11 @@ private struct TabPillView: View {
             Button {
                 model.delegate?.tabBarDidRequestTogglePersistent(tabID: tab.id)
             } label: {
-                Label("Keep Tab Running After Quit", systemImage: tab.persistent ? "checkmark" : "")
+                if tab.persistent {
+                        Label("Keep Tab Running After Quit", systemImage: "checkmark")
+                    } else {
+                        Text("Keep Tab Running After Quit")
+                    }
             }
             Divider()
             Button("Split Right") {
