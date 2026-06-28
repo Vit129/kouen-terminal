@@ -316,7 +316,7 @@ final class DaemonSyncService {
     }
 
     private func applySnapshot(_ remote: SessionSnapshot, metadataOnly: Bool, preserveBrowserPanes: Bool = true) {
-        let structureChanged = structureFingerprint(remote) != structureFingerprint(snapshot)
+        let structureChanged = Self.structureFingerprint(remote) != Self.structureFingerprint(snapshot)
         var merged = remote
         if preserveBrowserPanes {
             // Fast path: skip the O(W×S×T) merge entirely when no browser panes exist
@@ -412,7 +412,7 @@ final class DaemonSyncService {
         return index
     }
 
-    func structureFingerprint(_ snap: SessionSnapshot) -> String {
+    static func structureFingerprint(_ snap: SessionSnapshot) -> String {
         // Hash ALL tabs across every workspace/session so pane kills in non-active tabs
         // trigger structureChanged and prune() runs. allSurfaceIDs() already returns []
         // for .browser nodes, so browser-pane IDs are excluded automatically — no risk
