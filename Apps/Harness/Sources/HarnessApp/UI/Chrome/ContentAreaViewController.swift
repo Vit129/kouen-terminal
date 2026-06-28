@@ -206,6 +206,13 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
             return
         }
         reloadTabBar()
+        if structureChanged {
+            let snap = SessionCoordinator.shared.snapshot
+            let liveTabIDs = Set(snap.workspaces.flatMap { ws in
+                ws.sessions.flatMap { $0.tabs.map { $0.id.uuidString } }
+            })
+            paneLifecycle.pruneCache(keepingTabIDs: liveTabIDs)
+        }
         paneLifecycle.reloadIfNeeded(force: structureChanged)
     }
 
