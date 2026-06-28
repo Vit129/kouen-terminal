@@ -20,6 +20,7 @@ final class FloatingPaneController {
     private init() {}
 
     func install() {
+        guard globalMonitor == nil else { return }  // guard against double-install
         globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { event in
             guard Self.isHotkey(event) else { return }
             Task { @MainActor [weak self] in self?.toggle() }
@@ -65,7 +66,7 @@ final class FloatingPaneController {
 
     private func present(_ host: TerminalHostView) {
         if panel == nil {
-            let screen = NSScreen.main ?? NSScreen.screens[0]
+            guard let screen = NSScreen.main ?? NSScreen.screens.first else { return }
             let defaultFrame = NSRect(
                 x: screen.frame.midX - 400, y: screen.frame.midY - 250,
                 width: 800, height: 500)

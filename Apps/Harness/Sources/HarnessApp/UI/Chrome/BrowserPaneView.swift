@@ -250,8 +250,7 @@ public final class BrowserPaneView: NSView {
         errorDismissButton.translatesAutoresizingMaskIntoConstraints = false
         errorDismissButton.title = ""
         errorDismissButton.image = NSImage(systemSymbolName: "xmark.circle.fill", accessibilityDescription: "Dismiss")
-        errorDismissButton.isBordered = false
-        errorDismissButton.bezelStyle = .regularSquare
+        errorDismissButton.bezelStyle = .rounded
         errorDismissButton.target = self
         errorDismissButton.action = #selector(dismissErrorBanner)
         errorDismissButton.widthAnchor.constraint(equalToConstant: 16).isActive = true
