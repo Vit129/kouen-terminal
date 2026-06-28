@@ -22,14 +22,18 @@ final class PromptQueue {
     func dequeueAndRun(for surfaceID: SurfaceID, via host: TerminalHostView) {
         guard var q = queues[surfaceID], !q.isEmpty else { return }
         let cmd = q.removeFirst()
-        queues[surfaceID] = q
+        queues[surfaceID] = q.isEmpty ? nil : q
         host.sendInput((cmd + "\n").data(using: .utf8) ?? Data())
         onQueueChanged?(surfaceID)
     }
 
     func cancel(for surfaceID: SurfaceID) {
-        queues[surfaceID] = []
+        queues.removeValue(forKey: surfaceID)
         onQueueChanged?(surfaceID)
+    }
+
+    func forget(_ surfaceID: SurfaceID) {
+        queues.removeValue(forKey: surfaceID)
     }
 
     func count(for surfaceID: SurfaceID) -> Int {

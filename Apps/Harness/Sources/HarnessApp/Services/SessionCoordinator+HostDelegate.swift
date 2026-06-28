@@ -63,6 +63,7 @@ extension SessionCoordinator: TerminalHostDelegate {
     func terminalHostDidClose(surfaceID: SurfaceID) {
         terminalHosts.removeHost(for: surfaceID)
         SurfaceProgressTracker.shared.forget(surfaceID)
+        PromptQueue.shared.forget(surfaceID)
     }
 
     func terminalHostDidRequestOpenFile(_ path: String, surfaceID: SurfaceID) {
