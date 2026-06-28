@@ -132,6 +132,7 @@ private struct AgentInboxRowView: View {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(isHovered ? Color(HarnessDesign.chrome.textPrimary).opacity(0.06) : Color.clear)
         )
+        .contentShape(Rectangle())
         .onHover { isHovered = $0 }
         .onTapGesture { onClick() }
     }

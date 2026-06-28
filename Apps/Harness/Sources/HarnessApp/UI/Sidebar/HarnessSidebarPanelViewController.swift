@@ -536,7 +536,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
     func openExternalFile(path: String) {
         let expanded = (path as NSString).expandingTildeInPath
         let cwd = Self.gitRoot(for: expanded) ?? (expanded as NSString).deletingLastPathComponent
-        selectFilesTab(revealPath: expanded)
+        previewFile(path: expanded)
         guard let wsID = activeWorkspaceID else { return }
         if let existing = sessions.first(where: { $0.tabs.contains(where: { $0.cwd == cwd }) }) {
             SessionCoordinator.shared.selectSession(workspaceID: wsID, sessionID: existing.id)
