@@ -135,8 +135,7 @@ final class AgentApprovalBar: NSView {
 
     private func makeButton(_ title: String, action: Selector, accent: Bool) -> NSButton {
         let btn = NSButton(title: title, target: self, action: action)
-        btn.bezelStyle = .regularSquare
-        btn.isBordered = false
+        btn.bezelStyle = .rounded
         btn.font = .systemFont(ofSize: 11, weight: .medium)
         btn.contentTintColor = accent
             ? NSColor.systemGreen.withAlphaComponent(0.9)
@@ -149,14 +148,14 @@ final class AgentApprovalBar: NSView {
 
     @objc private func allow() {
         guard let host else { return }
-        host.sendInput(Data([0x0A]))  // \n
         AgentApprovalBar.hide(from: host)
+        host.sendInput(Data([0x0A]))  // \n
     }
 
     @objc private func deny() {
         guard let host else { return }
-        host.sendInput(Data([0x03]))  // Ctrl-C
         AgentApprovalBar.hide(from: host)
+        host.sendInput(Data([0x03]))  // Ctrl-C
     }
 }
 
