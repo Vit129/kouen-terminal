@@ -19,7 +19,7 @@ final class StatusLineView: NSView {
     private nonisolated(unsafe) var refreshTimer: Timer?
     private nonisolated(unsafe) var snapshotDebounce: Task<Void, Never>?
     private var lastRendered: [String] = Array(repeating: "", count: 7) // left/right/center + 4 extra
-    private var lastHeight: CGFloat = Self.mainRowHeight
+    private var lastHeight: CGFloat = StatusLineView.mainRowHeight
 
     init() {
         super.init(frame: .zero)
