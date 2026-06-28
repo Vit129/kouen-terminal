@@ -1,4 +1,4 @@
-.PHONY: run debug prod start install install-no-build build bench preview preview-stop preview-clean clean-state release release-notes package dmg smoke-dmg sign appcast finalize hotfix-release icon clean video-skills video-dev video-check video-render video-doctor
+.PHONY: run debug prod start install install-no-build install-graceful install-graceful-no-build build bench preview preview-stop preview-clean clean-state release release-notes package dmg smoke-dmg sign appcast finalize hotfix-release icon clean video-skills video-dev video-check video-render video-doctor
 
 run:
 	./Scripts/run.sh run
@@ -22,6 +22,12 @@ install:
 
 install-no-build:
 	./Scripts/install-app.sh --no-build
+
+install-graceful:
+	./Scripts/install-graceful.sh
+
+install-graceful-no-build:
+	./Scripts/install-graceful.sh --no-build
 
 build:
 	swift build
