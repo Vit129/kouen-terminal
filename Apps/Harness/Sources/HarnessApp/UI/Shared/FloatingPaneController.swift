@@ -14,6 +14,7 @@ final class FloatingPaneController {
     private var bootstrapping = false
     nonisolated(unsafe) private var globalMonitor: Any?
     nonisolated(unsafe) private var localMonitor: Any?
+    private var frameObservers: [Any] = []
 
     private static let frameKey = "FloatingPaneFrame"
 
@@ -95,7 +96,7 @@ final class FloatingPaneController {
                 ])
             }
             // Persist frame on every move/resize
-            for name in [NSWindow.didMoveNotification, NSWindow.didResizeNotification] {
+            frameObservers = [NSWindow.didMoveNotification, NSWindow.didResizeNotification].map { name in
                 NotificationCenter.default.addObserver(forName: name, object: p, queue: .main) { [weak p] _ in
                     guard let p else { return }
                     UserDefaults.standard.set(NSStringFromRect(p.frame), forKey: Self.frameKey)
@@ -110,5 +111,6 @@ final class FloatingPaneController {
     deinit {
         if let m = globalMonitor { NSEvent.removeMonitor(m) }
         if let m = localMonitor { NSEvent.removeMonitor(m) }
+        frameObservers.forEach { NotificationCenter.default.removeObserver($0) }
     }
 }
