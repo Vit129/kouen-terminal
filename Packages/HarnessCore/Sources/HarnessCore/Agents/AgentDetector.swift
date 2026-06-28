@@ -128,9 +128,16 @@ public enum AgentDetector {
         rootsLock.lock()
         let roots = surfaceRoots
         rootsLock.unlock()
+        // Build the process table once per scan rather than once per surface.
+        // With N surfaces this reduces proc_listpids + N×P proc_pidinfo calls to
+        // proc_listpids + P proc_pidinfo calls — O(P) total instead of O(N×P).
+        let allPIDs = ProcessScan.livePIDs()
+        var parentMap: [Int32: Int32] = [:]
+        parentMap.reserveCapacity(allPIDs.count)
+        for pid in allPIDs { parentMap[pid] = ProcessScan.parentPID(pid) }
         var changes: [String: AgentSnapshot?] = [:]
         for (key, rootPID) in roots {
-            let detected = detect(pid: rootPID, table: table)
+            let detected = detect(pid: rootPID, table: table, allPIDs: allPIDs, parentMap: parentMap)
             outputLock.lock()
             let lastOutput = lastOutputAt[key]
             outputLock.unlock()
@@ -167,8 +174,19 @@ public enum AgentDetector {
     /// argv[0], or wrapper-launched executable matches any agent in `table`.
     /// Returns the deepest match so a real child agent wins over its shell.
     public static func detect(pid: Int32, table: AgentTable) -> AgentSnapshot? {
+        let allPIDs = ProcessScan.livePIDs()
+        var parentMap: [Int32: Int32] = [:]
+        parentMap.reserveCapacity(allPIDs.count)
+        for p in allPIDs { parentMap[p] = ProcessScan.parentPID(p) }
+        return detect(pid: pid, table: table, allPIDs: allPIDs, parentMap: parentMap)
+    }
+
+    /// Fast variant used by `scan()` — reuses a pre-built parent map so the
+    /// process table is only fetched once per scan cycle across all surfaces.
+    private static func detect(pid: Int32, table: AgentTable,
+                               allPIDs: [Int32], parentMap: [Int32: Int32]) -> AgentSnapshot? {
         var best: AgentSnapshot?
-        for descendant in descendantPIDs(of: pid) {
+        for descendant in descendantPIDs(of: pid, allPIDs: allPIDs, parentMap: parentMap) {
             guard let path = pidPath(descendant) else { continue }
             let arguments = processArguments(descendant) ?? []
             for entry in table.entries where entry.matchesProcess(resolvedExecutable: path, arguments: arguments) {
@@ -188,14 +206,20 @@ public enum AgentDetector {
         let allPIDs = ProcessScan.livePIDs()
         guard !allPIDs.isEmpty else { return [] }
         var parents: [Int32: Int32] = [:]
-        for candidate in allPIDs {
-            parents[candidate] = ProcessScan.parentPID(candidate)
-        }
+        parents.reserveCapacity(allPIDs.count)
+        for candidate in allPIDs { parents[candidate] = ProcessScan.parentPID(candidate) }
+        return descendantPIDs(of: pid, allPIDs: allPIDs, parentMap: parents)
+    }
+
+    private static func descendantPIDs(of pid: Int32,
+                                       allPIDs: [Int32],
+                                       parentMap: [Int32: Int32]) -> [Int32] {
+        guard !allPIDs.isEmpty else { return [] }
         var result: [Int32] = []
         for candidate in allPIDs where candidate != pid {
             var cursor: Int32 = candidate
             var depth = 0
-            while let parent = parents[cursor], parent != 0, depth < 32 {
+            while let parent = parentMap[cursor], parent != 0, depth < 32 {
                 if parent == pid {
                     result.append(candidate)
                     break
