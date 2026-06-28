@@ -5,6 +5,11 @@ All notable changes to Harness are documented here. The format is based on
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/harness-terminal/releases).
+## [3.11.4] - 2026-06-28
+
+### Added
+- Release version bump to v3.11.4.
+
 ## [3.11.3] - 2026-06-28
 
 ### Added
