@@ -39,8 +39,8 @@ struct SettingsTerminalView: View {
             .help("Auto follows the mode above.")
 
             Toggle("Show status line", isOn: Binding(
-                get: { model.settings.showStatusLine },
-                set: { model.update(\.showStatusLine, $0) }
+                get: { model.settings.effectiveStatusLineEnabled },
+                set: { model.update(\.statusLineEnabled, $0) }
             ))
         }
     }
