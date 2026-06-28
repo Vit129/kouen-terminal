@@ -43,7 +43,15 @@ public final class DaemonServer: @unchecked Sendable {
 
     private struct PendingBrowserRequest {
         let continuation: CheckedContinuation<BrowserResponsePayload, Never>
+        let guiFD: Int32
         let createdAt: Date
+    }
+
+    /// The snapshot subscriber fd for the main GUI app — label "HarnessGUI".
+    /// Falls back to any subscriber when only one exists (e.g. tests).
+    private var guiBrowserFD: Int32? {
+        snapshotSubscribers.first(where: { clients[$0]?.label == "HarnessGUI" })
+            ?? (snapshotSubscribers.count == 1 ? snapshotSubscribers.first : nil)
     }
     private var pendingBrowserRequests: [UUID: PendingBrowserRequest] = [:]
 
@@ -737,6 +745,13 @@ public final class DaemonServer: @unchecked Sendable {
         // size take over (a surface can grow back when a small client detaches).
         let droppedSizes = clientSurfaceSizes.removeValue(forKey: fd) ?? [:]
         for surfaceID in droppedSizes.keys { applyEffectiveSize(surfaceID: surfaceID) }
+        // Fail any browser requests we already forwarded to this fd — don't leave MCP callers
+        // blocked for 30 s after the GUI disconnects.
+        let stale = pendingBrowserRequests.filter { $0.value.guiFD == fd }
+        for (id, pending) in stale {
+            pendingBrowserRequests.removeValue(forKey: id)
+            pending.continuation.resume(returning: .error("GUI disconnected"))
+        }
     }
 
     public func runLoop() {
@@ -750,13 +765,14 @@ public final class DaemonServer: @unchecked Sendable {
     ) async -> BrowserResponsePayload {
         await withCheckedContinuation { continuation in
             queue.async {
-                guard let guiFD = self.snapshotSubscribers.first else {
+                guard let guiFD = self.guiBrowserFD else {
                     continuation.resume(returning: .error("Harness GUI is not running or connected"))
                     return
                 }
 
                 self.pendingBrowserRequests[id] = PendingBrowserRequest(
                     continuation: continuation,
+                    guiFD: guiFD,
                     createdAt: Date()
                 )
 

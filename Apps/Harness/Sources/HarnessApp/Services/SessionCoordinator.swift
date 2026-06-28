@@ -52,6 +52,7 @@ final class SessionCoordinator: NSObject {
             self?.inlineAIControllers.removeValue(forKey: surfaceID.uuidString)
             self?.aiChatControllers.removeValue(forKey: surfaceID.uuidString)
             SecureInputMonitor.shared.release(surfaceID)
+            if self?.runSurfaceID == surfaceID { self?.runSurfaceID = nil }
         }
         // Update the floating queue bar whenever a surface's queue changes.
         PromptQueue.shared.onQueueChanged = { [weak self] surfaceID in
@@ -429,18 +430,10 @@ final class SessionCoordinator: NSObject {
             let kind = identity.flatMap { AgentKind(rawValue: $0) }
             AgentDetector.setActivity(resolved, kind: kind, forSurfaceKey: surfaceID.uuidString)
             guard let host else { return }
-            switch activity {
-            case "waiting_input":
-                if let prompt, !prompt.isEmpty {
-                    AgentApprovalBar.show(on: host, prompt: prompt, kind: kind)
-                }
-            case "idle", "errored":
-                // Only dismiss on terminal states — "working" must NOT hide a pending bar,
-                // or a concurrent Notification hook from another agent in the same PTY
-                // will silently cancel a PermissionRequest the user never saw.
-                AgentApprovalBar.hide(from: host)
-            default:
-                break
+            switch AgentApprovalBar.action(for: activity, prompt: prompt) {
+            case .show(let p): AgentApprovalBar.show(on: host, prompt: p, kind: kind)
+            case .hide:        AgentApprovalBar.hide(from: host)
+            case .noop:        break
             }
         }
         // Dequeue the next queued command each time a shell prompt appears (OSC 133).
