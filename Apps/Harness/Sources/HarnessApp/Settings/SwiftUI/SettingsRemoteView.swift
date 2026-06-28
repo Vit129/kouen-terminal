@@ -133,10 +133,12 @@ struct SettingsRemoteView: View {
     private var canConnect: Bool {
         let active = RemoteHostsService.shared.activeHostName
         let hasSelection = selectedID != nil
-        let formFilled = !editName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let trimmedName = editName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let formFilled = !trimmedName.isEmpty
             && !editTarget.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && !editSocket.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        return (hasSelection || formFilled) && active != selectedID
+        let targetName = selectedID ?? (trimmedName.isEmpty ? nil : trimmedName)
+        return (hasSelection || formFilled) && active != targetName
     }
 
     private func reloadHosts(selecting name: String? = nil) {

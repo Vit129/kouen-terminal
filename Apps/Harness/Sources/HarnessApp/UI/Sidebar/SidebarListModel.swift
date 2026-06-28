@@ -61,6 +61,7 @@ final class SidebarListModel {
     @ObservationIgnored private var gitMetadataCache: [String: (metadata: RepoGitMetadata, fetchedAt: Date)] = [:]
     @ObservationIgnored private var gitMetadataUpdatesInProgress: Set<String> = []
     private var lastWorktreeFetchTime: [String: Date] = [:]
+    @ObservationIgnored private var pendingRebuild: Task<Void, Never>?
 
     // MARK: - Main update
 
@@ -113,10 +114,9 @@ final class SidebarListModel {
         if gitMetadataUpdatesInProgress.insert(key).inserted {
             Task {
                 let metadata = await self.fetchGitMetadata(for: path, branch: branch)
-                // @Observable tracks gitMetadataCache; views reading it auto-refresh
                 self.gitMetadataCache[key] = (metadata: metadata, fetchedAt: Date())
                 self.gitMetadataUpdatesInProgress.remove(key)
-                self.rebuildRows()
+                self.scheduleRebuild()
             }
         }
         return gitMetadataCache[key]?.metadata
@@ -135,13 +135,24 @@ final class SidebarListModel {
                 let worktrees = await self.fetchWorktrees(for: rootPath)
                 if self.projectWorktrees[rootPath] != worktrees {
                     self.projectWorktrees[rootPath] = worktrees
-                    self.rebuildRows()
+                    self.scheduleRebuild()
                 }
             }
         }
     }
 
     // MARK: - Row rebuild
+
+    // Batch concurrent async completions (git metadata, repo root, worktrees) into a
+    // single rebuild 80 ms after the last one fires instead of one rebuild per result.
+    private func scheduleRebuild() {
+        pendingRebuild?.cancel()
+        pendingRebuild = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 80_000_000)
+            guard !Task.isCancelled, let self else { return }
+            self.rebuildRows()
+        }
+    }
 
     private func rebuildRows() {
         guard !isRebuilding else { return }
@@ -213,8 +224,7 @@ final class SidebarListModel {
                 let root = await self.resolveGitRepoRoot(for: path)
                 self.repoRootCache[path] = (repoRoot: root, fetchedAt: Date())
                 self.repoRootUpdatesInProgress.remove(path)
-                // Safe to rebuild: cache is now populated so gitRepoRoot won't spawn new Tasks
-                self.rebuildRows()
+                self.scheduleRebuild()
             }
         }
         return repoRootCache[path]?.repoRoot

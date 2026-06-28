@@ -38,7 +38,6 @@ struct KeyRecorderRepresentable: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: KeyRecorderView, context: Context) {
-        // KeyRecorderView owns its displayed value; external updates (snapshot refresh)
-        // can't be pushed in — the recorder reflects whatever was last committed via onChange.
+        if !nsView.isRecording { nsView.setValue(value) }
     }
 }

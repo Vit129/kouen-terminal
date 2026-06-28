@@ -200,6 +200,7 @@ private struct AgentRow: View {
     var model: SettingsModel
     let hookState: SettingsAgentsView.HookState
     let onHookState: (SettingsAgentsView.HookState) -> Void
+    @State private var mcpIsConfigured = false
 
     private var executables: String {
         let execs = AgentTable.default.entries.first { $0.kind == kind }?.executables ?? []
@@ -254,6 +255,7 @@ private struct AgentRow: View {
                 mcpButton
             }
         }
+        .task { mcpIsConfigured = MCPConfigWriter.isConfigured(kind) }
     }
 
     private var agentColor: Color {
@@ -288,19 +290,20 @@ private struct AgentRow: View {
     }
 
     private var mcpButton: some View {
-        let configured = MCPConfigWriter.isConfigured(kind)
         let mcpPath = resolveMCPPath()
-        return Button(configured ? "✓ MCP" : "Add MCP") {
+        return Button(mcpIsConfigured ? "✓ MCP" : "Add MCP") {
+            let removing = mcpIsConfigured
             Task.detached(priority: .userInitiated) {
-                if configured {
+                if removing {
                     try? MCPConfigWriter.remove(kind)
                 } else {
                     try? MCPConfigWriter.add(kind, mcpBinaryPath: mcpPath)
                 }
+                await MainActor.run { mcpIsConfigured = !removing }
             }
         }
         .buttonStyle(.bordered)
-        .foregroundStyle(configured ? Color.green : Color.primary)
+        .foregroundStyle(mcpIsConfigured ? Color.green : Color.primary)
     }
 
     private func resolveMCPPath() -> String {

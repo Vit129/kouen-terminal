@@ -37,10 +37,11 @@ final class SettingsModel {
         }
     }
 
-    /// Write a single HarnessSettings field and persist to disk.
+    /// Write a single HarnessSettings field, persist to disk, and apply to live terminals.
     func update<T>(_ keyPath: WritableKeyPath<HarnessSettings, T>, _ value: T) {
         SessionCoordinator.shared.settings[keyPath: keyPath] = value
         try? SessionCoordinator.shared.settings.save()
+        SessionCoordinator.shared.applySettingsToHosts()
         settings = SessionCoordinator.shared.settings
     }
 
@@ -60,6 +61,7 @@ final class SettingsModel {
     func resetToDefaults() {
         SessionCoordinator.shared.settings.resetToImportedConfig(imported: TerminalConfigImporter.load())
         try? SessionCoordinator.shared.settings.save()
+        SessionCoordinator.shared.applySettingsToHosts()
         settings = SessionCoordinator.shared.settings
     }
 }

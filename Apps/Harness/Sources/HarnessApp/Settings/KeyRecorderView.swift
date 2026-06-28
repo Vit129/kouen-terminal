@@ -13,6 +13,7 @@ final class KeyRecorderView: NSView {
     private(set) var value: String
 
     var onChange: ((String) -> Void)?
+    var isRecording: Bool { recording }
 
     private let label = NSTextField(labelWithString: "")
     private let hint = NSTextField(labelWithString: "Click to record")
@@ -133,6 +134,12 @@ final class KeyRecorderView: NSView {
         monitor = nil
         recording = false
         PrefixKeymap.shared.setShortcutRecordingActive(false)
+        refresh()
+    }
+
+    func setValue(_ newValue: String) {
+        guard value != newValue else { return }
+        value = newValue
         refresh()
     }
 
