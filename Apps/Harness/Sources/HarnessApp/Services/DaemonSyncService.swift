@@ -50,6 +50,14 @@ final class DaemonSyncService {
                     Task { @MainActor in
                         await self.handleBrowserRequest(id: id, req: req)
                     }
+                },
+                onEnd: { [weak self] in
+                    // Daemon restarted or socket dropped — clear the dead sub so
+                    // ensureSnapshotSubscription() can re-subscribe on next call.
+                    Task { @MainActor in
+                        self?.snapshotSub = nil
+                        self?.ensureSnapshotSubscription()
+                    }
                 }
             )
         } catch {

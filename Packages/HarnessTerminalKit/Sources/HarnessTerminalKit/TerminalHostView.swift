@@ -60,6 +60,8 @@ public final class TerminalHostView: NSView {
     private var reconnectAttempts = 0
     /// Off-main probe queue for reconnect so a still-restarting daemon never blocks the main thread.
     private let reconnectQueue = DispatchQueue(label: "com.robert.harness.reconnect")
+    /// Tripped in `deinit` so in-flight `reconnectQueue.asyncAfter` blocks bail before blocking RPCs.
+    private let reconnectLatch = ReconnectLatch()
     /// Theme-derived indicator colors. This package can't reach the app's palette,
     /// so the app pushes them via `applyBorderColors`. Default until the first push.
     public var activeBorderColor: NSColor = .systemBlue
@@ -903,7 +905,9 @@ public final class TerminalHostView: NSView {
                 }
             }
         }
+        let latch = reconnectLatch
         reconnectQueue.asyncAfter(deadline: .now() + delay) {
+            guard !latch.isTripped else { return }
             // Ping first: a still-restarting daemon answers nothing, so bail to a retry rather than
             // block. Then re-ensure the surface (idempotent — the respawned daemon already recreated
             // it from layout.json); subscribing while the surface is still missing would be rejected
@@ -929,6 +933,7 @@ public final class TerminalHostView: NSView {
     }
 
     deinit {
+        reconnectLatch.trip()
         outputSubscription?.cancel()
         NotificationCenter.default.removeObserver(self)
     }
@@ -1252,4 +1257,13 @@ enum DaemonReconnectPolicy {
     }
 
     static func isExhausted(attempts: Int) -> Bool { attempts >= maxAttempts }
+}
+
+/// Thread-safe one-shot flag: tripped in `TerminalHostView.deinit` so in-flight
+/// `reconnectQueue.asyncAfter` blocks bail before issuing blocking daemon RPCs.
+final class ReconnectLatch: @unchecked Sendable {
+    private let lock = NSLock()
+    private var tripped = false
+    func trip() { lock.lock(); tripped = true; lock.unlock() }
+    var isTripped: Bool { lock.lock(); defer { lock.unlock() }; return tripped }
 }
