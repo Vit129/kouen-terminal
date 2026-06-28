@@ -14,6 +14,7 @@ final class AppIdleThrottle {
     private init() {}
 
     func install() {
+        guard observers.isEmpty else { return }
         let nc = NSWorkspace.shared.notificationCenter
         observers.append(nc.addObserver(
             forName: NSWorkspace.screensDidSleepNotification, object: nil, queue: .main
