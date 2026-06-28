@@ -142,8 +142,7 @@ final class TerminalFindBar: NSView, NSSearchFieldDelegate {
         button.translatesAutoresizingMaskIntoConstraints = false
         button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: tooltip)
         button.imagePosition = .imageOnly
-        button.isBordered = false
-        button.bezelStyle = .regularSquare
+        button.bezelStyle = .rounded
         button.toolTip = tooltip
         button.target = self
         button.action = action
