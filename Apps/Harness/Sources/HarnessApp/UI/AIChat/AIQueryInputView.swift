@@ -1,5 +1,36 @@
 import AppKit
 import HarnessCore
+import HarnessTerminalKit
+
+// NSTextField subclass: image paste (⌘V) → save to disk, insert path as text.
+// File URL paste → insert path. Anything else → normal text paste via field editor.
+@MainActor
+private final class AIInputTextField: NSTextField {
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        guard event.modifierFlags.contains(.command),
+              event.charactersIgnoringModifiers == "v" else {
+            return super.performKeyEquivalent(with: event)
+        }
+        let pb = NSPasteboard.general
+        if let path = PasteController.writePastedImage(from: pb) {
+            insertAtCursor(path); return true
+        }
+        if let urls = pb.readObjects(forClasses: [NSURL.self],
+                                     options: [.urlReadingFileURLsOnly: true]) as? [URL],
+           let url = urls.first {
+            insertAtCursor(url.path); return true
+        }
+        return super.performKeyEquivalent(with: event)
+    }
+
+    private func insertAtCursor(_ text: String) {
+        if let ed = currentEditor() as? NSTextView {
+            ed.insertText(text, replacementRange: ed.selectedRange())
+        } else {
+            stringValue += text
+        }
+    }
+}
 
 /// Bottom-pinned floating input bar for the inline terminal AI chat (⌘I).
 /// Shows a text field with agent name pill, submit on Return, dismiss on Esc.
@@ -40,7 +71,7 @@ final class AIQueryInputView: NSView {
     private var currentAgent: AgentKind = .claudeCode
 
     private let field: NSTextField = {
-        let f = NSTextField()
+        let f = AIInputTextField()
         f.placeholderString = "Ask AI about this terminal…"
         f.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
         f.textColor = .white
@@ -97,6 +128,10 @@ final class AIQueryInputView: NSView {
         field.delegate = self
         agentPill.target = self
         agentPill.action = #selector(agentPillClicked(_:))
+
+        // Accept image and file drags — converts to path text, not inline rendering.
+        registerForDraggedTypes([.fileURL, .png, .tiff,
+                                 NSPasteboard.PasteboardType("public.image")])
     }
 
     // MARK: - Agent Picker
@@ -158,6 +193,39 @@ final class AIQueryInputView: NSView {
             onDismiss?()
         } else {
             super.keyDown(with: event)
+        }
+    }
+}
+
+// MARK: - Drag destination (image / file → insert path)
+
+extension AIQueryInputView {
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        let pb = sender.draggingPasteboard
+        let hasImage = PasteController.pngImageData(from: pb) != nil
+        let hasFile = pb.canReadObject(forClasses: [NSURL.self],
+                                       options: [.urlReadingFileURLsOnly: true])
+        return (hasImage || hasFile) ? .copy : []
+    }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        let pb = sender.draggingPasteboard
+        if let path = PasteController.writePastedImage(from: pb) {
+            insertIntoField(path); return true
+        }
+        if let urls = pb.readObjects(forClasses: [NSURL.self],
+                                     options: [.urlReadingFileURLsOnly: true]) as? [URL],
+           let url = urls.first {
+            insertIntoField(url.path); return true
+        }
+        return false
+    }
+
+    private func insertIntoField(_ text: String) {
+        if let ed = field.currentEditor() as? NSTextView {
+            ed.insertText(text, replacementRange: ed.selectedRange())
+        } else {
+            field.stringValue += text
         }
     }
 }
