@@ -27,6 +27,8 @@
 | bugs/browser-tab-close-unresponsive.md | AppKit/UI | NSClickGestureRecognizer, BrowserTabButton, closeBtn, hit-test, P24 | 0/0 | Browser tab close button unresponsive — gesture recognizer intercepts click before NSButton action fires. Fix: check click location in gesture handler, return early if in close button rect. |
 | bugs/nstextfield-leak-board.md | AppKit/Perf | NSTextField, leak, BoardViewController, agentStateChanged, snapshotChanged, removeFromSuperview, P20 | 1/0 | 21GB memory leak from unconditional board UI rebuild on every notification — NSTextField internal observers prevent deallocation. Fix: diff columns before rebuild. |
 | cases/memory-leak-audit.md | Performance | memory, leak, vmmap, footprint, onRetire, SessionCoordinator, insert-only-dict, BrowserPaneView, network-cap | 2/0 | 34 GB long-session leak audit (2026-06-26): triage via vmmap (MALLOC_SMALL not GPU), dominant cause = existingHosts (0430ed8), secondary = insert-only AI controller dicts + uncapped browser network array. onRetire pattern + Robot guard added. |
+| bugs/notch-cpu-animation.md | Performance/AppKit | AnimatableFrameAttribute, NSHostingView, CASpring, setFrame, snapshotChanged, NotchPanel, AgentScanner, proc_listpids, SnapshotCoalescer, gpu-animation | 1/0 | 100% CPU from SwiftUI spring animation never converging: snapshotChanged → setFrame → NSHostingView.layout() → AnimatableFrameAttribute at 60fps. Fix: data/geometry separation + CA mask GPU animation. |
+| patterns/gpu-animation-ca.md | Performance/AppKit | CAShapeLayer, CABasicAnimation, path-morph, SnapshotCoalescer, NotchMaskAnimator, Zed, Otty, cmux, hasShadow, CombineLatest | 1/0 | GPU animation pattern for overlay panels: CAShapeLayer mask + CABasicAnimation path morph replaces SwiftUI AnimatableFrameAttribute. Layout once, GPU paints. System shadow from hasShadow=true + mask alpha. |
 | patterns/build-self-kill-protection.md | Build/Scripts | TERM_PROGRAM, kill_stale_prod, run.sh, self-kill, Harness-hosted | 1/0 | Build scripts killing Harness while running inside Harness. Fix: detect TERM_PROGRAM=Harness, skip kill of /Applications instance and runtime state clear. |
 | patterns/fsevents-pattern.md | Swift/FSEvents | FSEventStreamCreate, recursive, DispatchSource, WatcherContext, Unmanaged, CASE-016, CASE-021 | 1/0 | Reusable FSEvents recursive watcher pattern for Swift actors — replaces non-recursive DispatchSource for nested directory watching. |
 | architecture/command-prompt.md | Commands/Parser | CommandParser, CommandPrompt, knownVerbs, aliases, sendKeys, zoxide, passthrough | 1/0 | Command prompt 2-layer architecture: CommandParser (text→Command) + MainExecutor (Command→effect). Every documented verb needs both layers or throws unknownCommand. |
@@ -55,6 +57,8 @@
 | patterns/build-self-kill-protection.md | `Scripts/run.sh`, `Scripts/clear-runtime-state.sh` |
 | patterns/fsevents-pattern.md | `HarnessApp/Services/FileExplorer/FileTreeWatcher.swift`, `HarnessApp/UI/Git/GitPanelView.swift` |
 | architecture/command-prompt.md | `HarnessCore/Commands/CommandParser.swift`, `HarnessApp/Services/MainExecutor.swift`, `HarnessCore/Workbench/WorkbenchCommand.swift`, `HarnessApp/UI/CommandPalette/CommandPromptController.swift` |
+| bugs/notch-cpu-animation.md | `HarnessApp/UI/Notch/NotchPanelController.swift`, `HarnessApp/UI/Notch/AgentNotchViewModel.swift`, `HarnessApp/UI/Notch/NotchMaskAnimator.swift`, `HarnessApp/UI/Notch/NotchShape.swift`, `HarnessApp/Services/SnapshotCoalescer.swift`, `HarnessDaemon/AgentScanner.swift` |
+| patterns/gpu-animation-ca.md | `HarnessApp/UI/Notch/NotchMaskAnimator.swift`, `HarnessApp/UI/Notch/NotchPanelController.swift`, `HarnessApp/UI/Notch/NotchPanel.swift`, `HarnessApp/Services/SnapshotCoalescer.swift` |
 | bugs/zombie-crash-macos26.md | `HarnessApp/Services/TerminalPaneRegistry.swift`, `HarnessApp/UI/Chrome/ContentAreaViewController.swift`, `HarnessApp/UI/FileTree/WorkspaceFileTreeView.swift`, `HarnessApp/Services/ActivePaneService.swift`, `HarnessTerminalKit/HarnessTerminalSurfaceView+Scrollback.swift`, `HarnessTerminalKit/TerminalScrollbarView.swift`, `HarnessTerminalKit/ResizeHUDView.swift` |
 
 ## Edges
@@ -86,6 +90,10 @@
 | bugs/browser-tab-close-unresponsive.md | ui/browser-pane.md | BrowserPaneView, BrowserTabButton, close button |
 | bugs/nstextfield-leak-board.md | ui/agent-session-board.md | BoardViewController, reload, agentStateChanged |
 | bugs/nstextfield-leak-board.md | architecture/background-polling.md | snapshotChanged, notification frequency |
+| bugs/notch-cpu-animation.md | architecture/background-polling.md | snapshotChanged fanout, AgentScanner, proc_listpids — same notification path |
+| bugs/notch-cpu-animation.md | patterns/gpu-animation-ca.md | fix uses CA mask pattern |
+| bugs/notch-cpu-animation.md | bugs/nstextfield-leak-board.md | both: snapshot-driven rebuild causing CPU/memory blowup |
+| patterns/gpu-animation-ca.md | ui/appkit-metal.md | CALayer, NSHostingView, render server — shared layer model |
 | patterns/fsevents-pattern.md | ui/git-panel.md | FSEvents, recursive watch, real-time |
 
 ## Search Instructions

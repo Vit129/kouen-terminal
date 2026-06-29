@@ -16,7 +16,7 @@ final class NotchPanel: NSPanel {
         titleVisibility = .hidden
         titlebarAppearsTransparent = true
         isMovable = false
-        hasShadow = false
+        hasShadow = true  // system shadow follows mask alpha — no separate shadow layer needed
         isReleasedWhenClosed = false
         hidesOnDeactivate = false
         level = .mainMenu + 3

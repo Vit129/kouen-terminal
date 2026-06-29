@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import HarnessCore
 import SwiftUI
 
@@ -7,6 +8,9 @@ final class NotchPanelController: NSObject {
     static let shared = NotchPanelController()
 
     private let model = AgentNotchViewModel()
+    private let coalescer = SnapshotCoalescer()  // cmux: burst → one refresh per runloop turn
+    private let maskAnimator = NotchMaskAnimator()  // Zed/Otty: GPU path animation
+    private var maskObserver: AnyCancellable?
     private var panel: NotchPanel?
     private var started = false
 
@@ -81,8 +85,19 @@ final class NotchPanelController: NSObject {
         model.updateGeometry(metrics)
         let frame = nsRect(metrics.panelFrame)
         let panel = NotchPanel(contentRect: frame)
-        panel.contentView = NSHostingView(rootView: AgentNotchRootView(model: model))
+        let hosting = NSHostingView(rootView: AgentNotchRootView(model: model))
+        maskAnimator.install(on: hosting)
+        panel.contentView = hosting
         self.panel = panel
+
+        // Snap mask to closed state (no animation on first paint)
+        updateNotchMask(animated: false)
+
+        // GPU path: mask tracks presentation + content height changes via Combine
+        maskObserver = Publishers.CombineLatest(model.$presentation, model.$openContentHeight)
+            .receive(on: RunLoop.main)
+            .dropFirst()  // initial handled by updateNotchMask(animated: false) above
+            .sink { [weak self] _, _ in self?.updateNotchMask(animated: true) }
     }
 
     private func updatePanelGeometry() {
@@ -91,12 +106,53 @@ final class NotchPanelController: NSObject {
         else { return }
         let metrics = NotchGeometry.metrics(for: screen)
         model.updateGeometry(metrics)
-        panel.setFrame(nsRect(metrics.panelFrame), display: true)
+        let newFrame = nsRect(metrics.panelFrame)
+        guard panel.frame != newFrame else { return }
+        panel.setFrame(newFrame, display: true)
+        updateNotchMask(animated: false)  // geometry changed — re-snap mask to new coordinate space
+    }
+
+    private func updateNotchMask(animated: Bool) {
+        let metrics = model.geometry
+        let panelW = CGFloat(metrics.panelFrame.width)
+        let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+
+        let width: CGFloat
+        let height: CGFloat
+        let topRadius: CGFloat = metrics.hasPhysicalNotch ? 2 : 9
+        let bottomRadius: CGFloat
+        let isOpening: Bool
+
+        switch model.presentation {
+        case .closed:
+            width = CGFloat(metrics.closedWidth)
+            height = CGFloat(metrics.closedHeight)
+            bottomRadius = metrics.hasPhysicalNotch ? 14 : 15
+            isOpening = false
+        case .peek:
+            width = CGFloat(metrics.peekWidth)
+            height = CGFloat(metrics.peekHeight)
+            bottomRadius = 18
+            isOpening = true
+        case .open:
+            width = CGFloat(metrics.openWidth)
+            height = model.openContentHeight
+            bottomRadius = 22
+            isOpening = true
+        }
+
+        // NSHostingView is flipped (isFlipped=true) → layer y=0 is the top of the view.
+        let x = (panelW - width) / 2
+        let rect = CGRect(x: x, y: 0, width: width, height: height)
+        maskAnimator.update(to: rect, topRadius: topRadius, bottomRadius: bottomRadius,
+                            isOpening: isOpening, reduceMotion: reduceMotion, animated: animated)
     }
 
     @objc private func snapshotChanged(_ note: Notification) {
         guard !note.snapshotPayload.metadataOnly else { return }
-        refreshVisibility()
+        // cmux pattern: coalesce snapshot bursts → one model refresh per runloop turn.
+        // Geometry stays frozen here — only screen changes (screenParametersChanged) move the panel.
+        coalescer.signal { [weak self] in self?.model.refreshFromCoordinator() }
     }
 
     @objc private func screenParametersChanged(_ note: Notification) {

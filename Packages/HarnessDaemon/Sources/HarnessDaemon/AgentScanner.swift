@@ -1,51 +1,61 @@
 import Foundation
 import HarnessCore
 
-/// Periodically walks each surface's process tree, identifies running agents,
-/// and writes the resulting `AgentSnapshot` back into the snapshot. UI clients
-/// observe the change via the existing `snapshotChanged` notification.
-/// @unchecked Sendable: scan state is confined to the serial `queue`.
+/// Drives three periodic background jobs for the daemon:
+///   1. metadataTimer (1.5s)   — cwd + foreground command per surface; O(N) cheap syscalls.
+///   2. agentScanTimer (30s)   — proc_listpids fallback for agents without OSC 26 hooks;
+///                               OSC 26 is the primary real-time path, this is just a safety net.
+///   3. cwdTimer (0.5s)        — lightweight shell-cwd-only probe when a subprocess is in the fg.
+/// @unchecked Sendable: all mutable state confined to the serial `queue`.
 public final class AgentScanner: @unchecked Sendable {
     public static let shared = AgentScanner()
-    private var timer: DispatchSourceTimer?
+    private var metadataTimer: DispatchSourceTimer?
+    private var agentScanTimer: DispatchSourceTimer?
     private var cwdTimer: DispatchSourceTimer?
     private weak var registry: SurfaceRegistry?
     private let queue = DispatchQueue(label: "com.robert.harness.agent-scanner")
 
     public func start(registry: SurfaceRegistry) {
         self.registry = registry
-        timer?.cancel()
+        metadataTimer?.cancel()
+        agentScanTimer?.cancel()
         cwdTimer?.cancel()
 
-        // Full metadata scan (process tree walk + agent detection) — every 1.5s
-        let timer = DispatchSource.makeTimerSource(queue: queue)
-        timer.schedule(deadline: .now() + 1.5, repeating: 1.5)
-        timer.setEventHandler { [weak self] in
-            self?.scan()
-        }
-        timer.resume()
-        self.timer = timer
+        // Surface metadata: cwd + foreground command (cheap per-surface proc_pidinfo) — every 1.5s
+        let mt = DispatchSource.makeTimerSource(queue: queue)
+        mt.schedule(deadline: .now() + 1.5, repeating: 1.5)
+        mt.setEventHandler { [weak self] in self?.registry?.refreshSurfaceMetadata() }
+        mt.resume()
+        metadataTimer = mt
+
+        // Agent proc-scan: proc_listpids(ALL_PIDS) fallback — every 30s.
+        // OSC 26 hooks are the primary path (push-based, zero CPU cost).
+        // This only matters for agents launched without hooks installed.
+        let at = DispatchSource.makeTimerSource(queue: queue)
+        at.schedule(deadline: .now() + 5, repeating: 30)
+        at.setEventHandler { [weak self] in self?.scanAgents() }
+        at.resume()
+        agentScanTimer = at
 
         // Lightweight CWD-only probe (single proc_pidinfo per surface) — every 500ms
         let cwdTimer = DispatchSource.makeTimerSource(queue: queue)
         cwdTimer.schedule(deadline: .now() + 0.5, repeating: 0.5)
-        cwdTimer.setEventHandler { [weak self] in
-            self?.registry?.refreshCwdOnly()
-        }
+        cwdTimer.setEventHandler { [weak self] in self?.registry?.refreshCwdOnly() }
         cwdTimer.resume()
         self.cwdTimer = cwdTimer
     }
 
-    /// Stop the periodic scan (orderly daemon shutdown / between tests). Safe to call repeatedly.
+    /// Stop all timers (orderly daemon shutdown / between tests). Safe to call repeatedly.
     public func stop() {
-        timer?.cancel()
-        timer = nil
+        metadataTimer?.cancel()
+        metadataTimer = nil
+        agentScanTimer?.cancel()
+        agentScanTimer = nil
         cwdTimer?.cancel()
         cwdTimer = nil
     }
 
-    private func scan() {
-        registry?.refreshSurfaceMetadata()
+    private func scanAgents() {
         let table = AgentTable.loadFromDisk()
         let changes = AgentDetector.scan(table: table)
         guard !changes.isEmpty, let registry else { return }

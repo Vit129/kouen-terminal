@@ -1,43 +1,43 @@
-# Graph Summary — harness-terminal
+# Graph Summary — .
 _Auto-generated from graphify-out/GRAPH_REPORT.md · do not edit manually_
 _Regen: `~/.claude/scripts/generate-graph-summary.sh .` after `graphify update .`_
 
 ## Summary
-- 16103 nodes · 35422 edges · 1203 communities (651 shown, 552 thin omitted)
-- Extraction: 86% EXTRACTED · 14% INFERRED · 0% AMBIGUOUS · INFERRED: 5125 edges (avg confidence: 0.8)
+- 15948 nodes · 35365 edges · 1254 communities (655 shown, 599 thin omitted)
+- Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 5174 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 
 ## Graph Freshness
-- Built from commit: `0e608ce2`
+- Built from commit: `cc67abdb`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 
 ## God Nodes (most connected - your core abstractions)
 1. `HarnessTerminalSurfaceView` - 371 edges
-2. `String` - 284 edges
+2. `String` - 283 edges
 3. `Foundation` - 274 edges
-4. `HarnessCore` - 270 edges
+4. `HarnessCore` - 272 edges
 5. `SessionCoordinator` - 173 edges
-6. `XCTest` - 168 edges
+6. `XCTest` - 171 edges
 7. `SessionEditor` - 164 edges
-8. `TerminalEmulator` - 159 edges
-9. `AppKit` - 138 edges
+8. `TerminalEmulator` - 160 edges
+9. `AppKit` - 140 edges
 10. `SurfaceRegistry` - 125 edges
 
 
 ## Surprising Connections (you probably didn't know these)
 - `SUI` --references--> `Color`  [INFERRED]
   Packages/HarnessOnboarding/Sources/HarnessOnboarding/Design/ImmersivePalette.swift → Apps/Harness/Sources/HarnessApp/Settings/SwiftUI/SettingsColorsView.swift
-- `Notification.Name` --references--> `Notification`  [INFERRED]
-  Apps/Harness/Sources/HarnessApp/UI/FileEditor/SyntaxTextView.swift → Packages/HarnessIPC/Sources/HarnessIPC/NotificationBus.swift
-- `Notification.Name` --references--> `Notification`  [INFERRED]
-  Apps/Harness/Sources/HarnessApp/UI/FileTree/FileTreeSwiftUIView.swift → Packages/HarnessIPC/Sources/HarnessIPC/NotificationBus.swift
-- `ACPSession` --inherits--> `ACPClientDelegate`  [EXTRACTED]
-  .aidlc/harness/acp/outputs/inception/domain-design.md → Packages/HarnessCore/Sources/HarnessCore/ACP/ACPClient.swift
 - `AppIdleThrottle` --references--> `Notification`  [INFERRED]
   Apps/Harness/Sources/HarnessApp/Services/AppIdleThrottle.swift → Packages/HarnessIPC/Sources/HarnessIPC/NotificationBus.swift
+- `DaemonSyncService` --calls--> `DaemonSessionService`  [INFERRED]
+  Apps/Harness/Sources/HarnessApp/Services/DaemonSyncService.swift → Packages/HarnessCore/Sources/HarnessCore/IPC/DaemonSessionService.swift
+- `RemoteHostsService` --references--> `Notification`  [INFERRED]
+  Apps/Harness/Sources/HarnessApp/Services/RemoteHostsService.swift → Packages/HarnessIPC/Sources/HarnessIPC/NotificationBus.swift
+- `RemoteHostsService` --calls--> `RemoteHostStore`  [INFERRED]
+  Apps/Harness/Sources/HarnessApp/Services/RemoteHostsService.swift → Packages/HarnessCore/Sources/HarnessCore/Remote/RemoteHostStore.swift
 
 
 ## Community Hubs (top 25)
