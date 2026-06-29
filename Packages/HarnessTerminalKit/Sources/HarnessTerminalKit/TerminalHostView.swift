@@ -575,6 +575,10 @@ public final class TerminalHostView: NSView {
         nativeView.stopDisplayLinkForRetire()
     }
 
+    public func scheduleRepaint() {
+        nativeView.scheduleRender()
+    }
+
     public func focusTerminal() {
         window?.makeFirstResponder(nativeView)
         hostDelegate?.terminalHostDidChangeFocus(true, surfaceID: surfaceID)
