@@ -12,3 +12,5 @@ Grep target: `grep -n "CASE-\|<keyword>" knowledge/cases/metal-displaylink.md`
 | CASE-028 | Metal surfaces accumulate (async sync skips prune) | Add `terminalHosts.prune(keeping:)` to async syncFromDaemon variant |
 | CASE-031 | Crash: CADisplayLink fires on deallocated surface | `deinit { renderLink?.invalidate() }` — macOS doesn't retain target |
 | CASE-039 | Terminal blink on sidebar toggle/file preview/split after adding `adjustSubviews()` | Remove `adjustSubviews()` from sidebar toggle path — use `setSidebarWidth() + split.layout()`. See RL-058. |
+| CASE-040 | Tab switch (⌘1/2/3) shows black screen on revisit | 4 compounding failure modes in container-caching fast path — see `knowledge/bugs/tab-switch-black-screen.md`. Key: never call `detachHostsOnly()` before caching; validate host set before fast-path reveal. |
+| CASE-041 | Metal black after external display switch | `CAMetalLayer` loses drawable on display reconfiguration. Fix: `displayLink.preferredFrameRateRange` reset + `scheduler.forceRender()` in `viewDidChangeBackingProperties`. |
