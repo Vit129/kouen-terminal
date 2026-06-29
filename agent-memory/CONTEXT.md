@@ -1,6 +1,23 @@
 # Context — harness-terminal
 
 ## Now
+- **Task:** tab-switch black screen ✅ + display-switch Metal fix ✅
+- **Branch:** `fix/display-switch-black-screen` (ready to merge; squash debug commit `d1e0424` first)
+- **Status:** All 4 failure modes fixed. See `knowledge/bugs/tab-switch-black-screen.md`.
+
+### 2026-06-29 — Tab-switch black screen
+
+4 fix commits on `fix/display-switch-black-screen`:
+- `f6a0182` skip `detachHostsOnly()` on tab switch (FM-1: detach-then-cache)
+- `2b9295d` `forceRepaint()` via `nativeView.layout()` (synchronous Metal repaint on reveal)
+- `1a2ca4c` evict cache on `force=true` rebuild (FM-2: structural rebuild caches empty shell)
+- `9c5c1fa` validate host set before fast-path reveal + plug orphan overwrite (FM-3 host theft, FM-4 leak)
+- `0a5f2fe` restore Metal after display switch (separate fix, same branch)
+- `d1e0424` NSLog debug probes — **squash before merge**
+
+---
+
+## Previous
 - **Task:** otty-features — ALL phases complete ✅
 - **Branch:** main
 - **Status:** P1–P12b, P14–P20 shipped. P13 (Kitty Graphics) + P21 (WASM) deferred. P16 was pre-existing.
