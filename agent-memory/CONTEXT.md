@@ -4,6 +4,22 @@
 - **Task:** idle
 - **Branch:** `main`
 
+### 2026-06-29 — Live perf profile of running Harness 3.11.7/183 ✅ (diagnosis only)
+
+Profiled the actually-running app (PID via `ps aux | grep MACOS/Harness`; build mtime
+newer than all fix commits → fixes ARE live).
+- **Memory: CLEAN** — RSS ~110 MB, delta 0 MB over 3 s. No leak. The 34 GB / 21 GB leak
+  fixes are confirmed working in build 183.
+- **CPU: ~42%** — `sample` shows main thread ~33% in `NSHostingView.layout()` →
+  `ViewGraph.updateOutputs(at:)`, i.e. a SwiftUI hosting view re-rendering its **whole**
+  ViewGraph every display frame.
+- **Root cause:** SwiftUI `.repeatForever` animation near a hosting-view root. Primary
+  suspect `TerminalTabBarView.swift:469` `workingDot` (`.easeInOut.repeatForever`) — pulses
+  while any tab is `working` (an agent was working during the profile). Same class as the
+  fixed Notch CPU bug, different always-visible view. Details + fix in
+  `knowledge/bugs/notch-cpu-animation.md` (Instance 2). **Not yet fixed** — fix = move pulse
+  to `CABasicAnimation` on a CALayer, or isolate the dot in its own NSHostingView.
+
 ### 2026-06-29 — Claude Code statusLine/advisor/remote-control "broke after migrate" ✅
 
 **User report:** statusLine, advisor, remote-control all stopped after the SwiftUI
@@ -19,7 +35,7 @@ single invalid value → `statusLine`, `advisorModel`, `remoteControlAtStartup`,
 
 **Diagnostic that cracked it:** `script -q /dev/null claude` (real PTY) surfaced the
 `SettingsError` startup dialog — invisible in background/`-p` sessions. See
-`knowledge/cases/misc.md` CASE-042.
+`knowledge/cases/misc.md` CASE-057.
 
 **Secondary (separate) issues:** remote-control needs re-auth (`daemon-auth-status.json`
 = `auth_required`, cooldown expired → `claude --remote-control`); advisor on/off is a
