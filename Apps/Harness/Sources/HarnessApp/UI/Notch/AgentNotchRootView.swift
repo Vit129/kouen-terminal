@@ -472,37 +472,105 @@ private struct NotchStatusDot: View {
     let working: Bool
     let waiting: Bool
     let reduceMotion: Bool
-    @State private var pulse = false
-
-    private var animates: Bool { working && !reduceMotion }
 
     var body: some View {
-        Group {
-            if let chip {
-                Text(chip)
-                    .font(.system(size: 8, weight: .heavy, design: .rounded))
-                    .foregroundStyle(.white)
-                    .frame(width: 20, height: 14)
-                    .background(color, in: RoundedRectangle(cornerRadius: 4, style: .continuous))
-            } else {
-                Circle()
-                    .fill(color)
-                    .frame(width: 9, height: 9)
+        // Breathing runs as a CALayer animation on the render server, not a SwiftUI
+        // .repeatForever — the latter keeps the notch's NSHostingView ViewGraph re-rendering
+        // every frame while an agent works (same CPU class as TerminalTabBarView.workingDot;
+        // see knowledge/bugs/notch-cpu-animation.md). The chip/circle still render in SwiftUI;
+        // only the scale+opacity pulse is moved off the ViewGraph.
+        NotchPulseHost(animates: working && !reduceMotion) {
+            Group {
+                if let chip {
+                    Text(chip)
+                        .font(.system(size: 8, weight: .heavy, design: .rounded))
+                        .foregroundStyle(.white)
+                        .frame(width: 20, height: 14)
+                        .background(color, in: RoundedRectangle(cornerRadius: 4, style: .continuous))
+                } else {
+                    Circle()
+                        .fill(color)
+                        .frame(width: 9, height: 9)
+                }
             }
+            .shadow(color: color.opacity(waiting ? 0.6 : 0.25), radius: waiting ? 5 : 2)
         }
-        .scaleEffect(animates && pulse ? 1.18 : 1.0)
-        .opacity(animates && pulse ? 0.62 : 1.0)
-        .shadow(color: color.opacity(waiting ? 0.6 : 0.25), radius: waiting ? 5 : 2)
-        .onAppear { syncPulse() }
-        .onChange(of: working) { _, _ in syncPulse() }
-        .onChange(of: reduceMotion) { _, _ in syncPulse() }
+        .frame(width: chip != nil ? 20 : 9, height: chip != nil ? 14 : 9)
+    }
+}
+
+private let notchBreatheAnimationKey = "notch-breathe"
+
+/// Hosts SwiftUI content in a layer-backed view and breathes it (scale + opacity) via a
+/// repeating `CAAnimationGroup`. Moving the loop off SwiftUI stops the per-frame ViewGraph
+/// re-render that a `.repeatForever` would otherwise force on the whole NSHostingView.
+private struct NotchPulseHost<Content: View>: NSViewRepresentable {
+    let animates: Bool
+    @ViewBuilder var content: Content
+
+    func makeNSView(context: Context) -> Container { Container() }
+
+    func updateNSView(_ view: Container, context: Context) {
+        view.set(content: content, animates: animates)
     }
 
-    private func syncPulse() {
-        if animates {
-            withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) { pulse = true }
-        } else {
-            withAnimation(.easeOut(duration: 0.2)) { pulse = false }
+    final class Container: NSView {
+        private var hosting: NSHostingView<Content>?
+        private var animates = false
+
+        override init(frame frameRect: NSRect) {
+            super.init(frame: frameRect)
+            wantsLayer = true
+            layer?.masksToBounds = false   // breathing scale + shadow draw past the dot bounds
+        }
+
+        required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+        func set(content: Content, animates: Bool) {
+            if let hosting {
+                hosting.rootView = content
+            } else {
+                let host = NSHostingView(rootView: content)
+                addSubview(host)
+                hosting = host
+            }
+            self.animates = animates
+            needsLayout = true
+            applyPulse()
+        }
+
+        override func layout() {
+            super.layout()
+            guard let host = hosting else { return }
+            host.frame = bounds
+            // Anchor at center so the scale pulse breathes in place instead of drifting.
+            if let hostLayer = host.layer {
+                hostLayer.anchorPoint = CGPoint(x: 0.5, y: 0.5)
+                hostLayer.position = CGPoint(x: bounds.midX, y: bounds.midY)
+            }
+            applyPulse()   // layer may not have existed at makeNSView time
+        }
+
+        private func applyPulse() {
+            guard let hostLayer = hosting?.layer else { return }
+            guard animates else {
+                hostLayer.removeAnimation(forKey: notchBreatheAnimationKey)
+                return
+            }
+            guard hostLayer.animation(forKey: notchBreatheAnimationKey) == nil else { return }
+            let scale = CABasicAnimation(keyPath: "transform.scale")
+            scale.fromValue = 1.0
+            scale.toValue = 1.18
+            let opacity = CABasicAnimation(keyPath: "opacity")
+            opacity.fromValue = 1.0
+            opacity.toValue = 0.62
+            let group = CAAnimationGroup()
+            group.animations = [scale, opacity]
+            group.duration = 0.9
+            group.autoreverses = true
+            group.repeatCount = .infinity
+            group.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            hostLayer.add(group, forKey: notchBreatheAnimationKey)
         }
     }
 }
