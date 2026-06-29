@@ -43,7 +43,9 @@ final class AITerminalChatController {
 
     func updateSettings(_ settings: HarnessSettings) {
         self.settings = settings
-        queryInput?.configure(agent: settings.aiAgent.activeAgent)
+        queryInput?.configure(agent: settings.aiAgent.activeAgent,
+                              model: settings.aiAgent.activeModel,
+                              effort: settings.aiAgent.activeEffort)
     }
 
     // MARK: - Toggle
@@ -69,10 +71,14 @@ final class AITerminalChatController {
         isVisible = true
 
         let input = AIQueryInputView(frame: .zero)
-        input.configure(agent: settings.aiAgent.activeAgent)
+        input.configure(agent: settings.aiAgent.activeAgent,
+                        model: settings.aiAgent.activeModel,
+                        effort: settings.aiAgent.activeEffort)
         input.onSubmit = { [weak self] text in self?.submit(text) }
         input.onDismiss = { [weak self] in self?.dismiss(clearBlocks: false) }
         input.onAgentChanged = { [weak self] kind in self?.changeAgent(kind) }
+        input.onModelChanged = { [weak self] model in self?.changeModel(model) }
+        input.onEffortChanged = { [weak self] effort in self?.changeEffort(effort) }
 
         host.addSubview(input, positioned: .above, relativeTo: nil)
         NSLayoutConstraint.activate(inputConstraints(for: input, in: host))
@@ -91,10 +97,23 @@ final class AITerminalChatController {
         }
     }
 
-    // MARK: - Agent switching
+    // MARK: - Agent / model / effort switching
 
     private func changeAgent(_ kind: AgentKind) {
         settings.aiAgent.activeAgent = kind
+        // Clear model/effort when switching agents — each agent has different valid values
+        settings.aiAgent.activeModel = nil
+        settings.aiAgent.activeEffort = nil
+        try? settings.save()
+    }
+
+    private func changeModel(_ model: String?) {
+        settings.aiAgent.activeModel = model
+        try? settings.save()
+    }
+
+    private func changeEffort(_ effort: String?) {
+        settings.aiAgent.activeEffort = effort
         try? settings.save()
     }
 

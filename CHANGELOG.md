@@ -5,6 +5,20 @@ All notable changes to Harness are documented here. The format is based on
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/harness-terminal/releases).
+## [3.11.7] - 2026-06-29
+
+### Added
+- AI chat input bar: model picker pill and effort picker pill — select model override (e.g. claude-opus-4-8) and effort level per query without leaving the chat panel.
+- `AIAgentConfig` gains `activeModel` and `activeEffort` fields, persisted per agent kind.
+
+### Fixed
+- CPU peaks on every daemon snapshot change: all 5 UI snapshot observers now skip Phase-1 revision pings (no typed payload) and act only on Phase-2 (real flags). Previously each change triggered two full reloads — one with worst-case fallback flags before data arrived.
+- `SessionCoordinator` coalesces burst Phase-1 pings via `SnapshotCoalescer` so rapid `cwdTimer` / agent-scanner commits collapse to one `scheduleSnapshotRefresh()` per runloop turn.
+- `FrecencyDirectoryStore` directory entries now capped at 500; lowest-scored entries evicted on overflow.
+
+### Internal
+- Retire guard (`check_retire_coverage.py`) extended with `--mode filter` for snapshot-sweep cleanup pattern; Leak D robot test enforces this for `NotificationCoordinator`.
+
 ## [3.11.6] - 2026-06-29
 
 ### Added
