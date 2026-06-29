@@ -55,9 +55,11 @@ final class PaneLifecycleManager {
             activeTabID = tabID
             coordinator.ensureActivePane(for: tab)
             paneContainer?.refreshChrome(snapshot: coordinator.snapshot)
-            // Kick the display link on every host in the now-visible container so the
-            // Metal layer presents a fresh frame even if the link was paused while hidden.
-            cached.collectTerminalHosts().values.forEach { $0.scheduleRepaint() }
+            // Re-present synchronously via layout()'s repaintLastFrame→forceRender path.
+            // The Metal layer loses its content while hidden; an async scheduleRender()
+            // (16 ms+ lag) shows black until the display link fires. forceRepaint() mirrors
+            // what the slow path's containerView.layout() does for newly-built containers.
+            cached.collectTerminalHosts().values.forEach { $0.forceRepaint() }
             return
         }
 
