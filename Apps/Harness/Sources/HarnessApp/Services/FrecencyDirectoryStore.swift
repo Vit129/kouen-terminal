@@ -49,15 +49,28 @@ public final class FrecencyDirectoryStore: @unchecked Sendable {
         }
     }
     
+    private static let maxEntries = 500
+
     public func recordVisit(path: String) {
         let cleanPath = (path as NSString).standardizingPath
         guard !cleanPath.isEmpty, cleanPath != "/" else { return }
-        
+
         var entry = entries[cleanPath] ?? FrecencyEntry(path: cleanPath, count: 0, lastVisited: Date())
         entry.count += 1
         entry.lastVisited = Date()
         entries[cleanPath] = entry
+        if entries.count > Self.maxEntries { evictTail() }
         save()
+    }
+
+    private func evictTail() {
+        let now = Date()
+        let sorted = entries.sorted {
+            let s0 = $0.value.count / log(1 + max(1, now.timeIntervalSince($0.value.lastVisited)))
+            let s1 = $1.value.count / log(1 + max(1, now.timeIntervalSince($1.value.lastVisited)))
+            return s0 > s1
+        }
+        entries = Dictionary(uniqueKeysWithValues: sorted.prefix(Self.maxEntries).map { ($0.key, $0.value) })
     }
     
     public func ranked() -> [String] {

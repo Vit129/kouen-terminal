@@ -37,6 +37,7 @@ final class SessionCoordinator: NSObject {
     private var inlineAIControllers: [String: InlineAICompletionController] = [:]
     private var aiChatControllers: [String: AITerminalChatController] = [:]
     private var lastDaemonErrorNotice: Date?
+    private let snapshotCoalescer = SnapshotCoalescer()
 
     var activeTabCWD: String? {
         guard let cwd = snapshot.activeWorkspace?.activeTab?.cwd, !cwd.isEmpty else { return nil }
@@ -104,7 +105,12 @@ final class SessionCoordinator: NSObject {
         guard revision != daemonSyncService.lastRevision,
               revision != daemonSyncService.pendingSnapshotRevision else { return }
         daemonSyncService.pendingSnapshotRevision = revision
-        daemonSyncService.scheduleSnapshotRefresh()
+        // Coalesce burst pings (rapid cwd timer / agent scanner commits) into one sync per
+        // runloop turn. pendingSnapshotRevision is already updated above; the flushed action
+        // always reads the latest value so no revision is silently dropped.
+        snapshotCoalescer.signal { [weak self] in
+            self?.daemonSyncService.scheduleSnapshotRefresh()
+        }
     }
 
     @objc private func notificationPosted(_ note: Notification) {
