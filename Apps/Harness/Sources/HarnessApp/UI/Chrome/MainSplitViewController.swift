@@ -77,6 +77,13 @@ final class MainSplitViewController: NSViewController {
         addChild(content)
 
         split.translatesAutoresizingMaskIntoConstraints = false
+        // Layer-back the split so the terminal's CAMetalLayer islands are contained within
+        // split.layer rather than promoted to the window CA root as separate islands.
+        // Without this, dynamically-added terminal Metal layers land above statusLine.layer
+        // in the window-root CA compositor (later insertion = higher z), hiding the status bar.
+        // With split.layer in play, split.layer vs statusLine.layer ordering follows subview
+        // insertion order (split first → statusLine on top), which is correct.
+        HarnessDesign.makeClear(split)
         statusLine.translatesAutoresizingMaskIntoConstraints = false
         edgeDivider.wantsLayer = true
         edgeDivider.translatesAutoresizingMaskIntoConstraints = false
