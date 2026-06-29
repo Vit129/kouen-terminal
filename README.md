@@ -1,6 +1,6 @@
 # Harness
 
-> Forked from [robzilla1738/harness-terminal](https://github.com/robzilla1738/harness-terminal). Current release: **v3.9.4**.
+> Forked from [robzilla1738/harness-terminal](https://github.com/robzilla1738/harness-terminal). Current release: **v3.11.5**.
 
 Harness is a native macOS terminal built for AI agent workflows. A first-party Swift terminal engine, a background session daemon, a scriptable CLI, embedded browser with MCP control, and multi-agent awareness — all in one app.
 
@@ -53,16 +53,59 @@ See [USAGE.md](USAGE.md) for the full install, run, CLI, and remote/headless gui
 
 ## Why Harness
 
-- Native terminal rendering with Swift, CoreText, Metal, inline image support, ligatures, and a large built-in theme catalog.
-- Daemon-owned sessions, tabs, panes, scrollback, and layouts so work can survive app restarts and be attached from another client.
+- Native terminal rendering with Swift, CoreText, Metal, ligatures, and a large built-in theme catalog.
+- Daemon-owned sessions, tabs, panes, scrollback, and layouts so work survives app restarts and can be attached from another client.
 - `harness-cli` automation for creating sessions, sending keys, capturing panes, installing hooks, and driving remote/headless daemons.
 - Agent detection and notifications for Claude Code, Codex, Cursor, Grok, Pi, Hermes, OpenClaw, OpenCode, Aider, Gemini, Goose, and generic agents.
 - Embedded browser pane with `harness-mcp` — AI agents can open URLs, read DOM snapshots, click elements, fill forms, capture screenshots, and inspect network/storage without a separate Playwright process.
 - Multi-agent workflows — run Claude Code, Codex, and Gemini CLI in parallel panes with per-agent statusline showing model, context usage, and rate limits.
 - Optional tmux-style controls: prefix key, status line, copy mode, paste buffers, hooks, command prompt, and many tmux-compatible commands.
-- IDE-like navigation — double-click folders to cd, ⌘P fuzzy jump to any directory via zoxide frecency, ⌘⇧J frecency dir picker (↩ cd · ⌘↩ open new tab · powered by zoxide), ⌘⇧R saved command recipes, ⌘-click file paths, `:cd` from the command prompt, and **Open With Harness** from Finder on any source file (tree expands to the file, terminal opens at git root).
-- Sidebar tools for sessions, file navigation with folder cd, real-time Git workflows (including one-step Commit & Push), command palette, and editor/LSP flows. ⌘-clicking a file path in the terminal opens it in the editor and reveals it in the file tree. The file tree roots at the git root of the active session — `cd`-ing into a subdirectory expands the tree rather than re-rooting it.
+- IDE-like navigation — double-click folders to cd, ⌘P fuzzy jump to any directory via zoxide frecency, ⌘⇧J frecency dir picker (↩ cd · ⌘↩ open new tab), ⌘⇧R saved command recipes, ⌘-click file paths, `:cd` from the command prompt, and **Open With Harness** from Finder on any source file.
+- Sidebar tools for sessions, file navigation, real-time Git workflows (one-step Commit & Push), command palette, and editor/LSP flows.
 - Stable under long sessions — per-pane controller trees and browser network buffers are bounded and released on pane close; memory stays flat across hours of use.
+
+## Keyboard Shortcuts
+
+### Terminal editing
+
+| Shortcut | Action |
+|----------|--------|
+| ⌘⌃V | Toggle Vi modal editing (normal / insert mode) |
+| Esc (Vi normal) | Enter normal mode — `hjkl` move, `wb` word, `0`/`$` line, `x` delete, `i`/`a`/`A` insert |
+| ⌘-click output block | Select OSC 133 command block — copy or send to AI |
+| ⌃C (with selection) | Copy selection first, then send interrupt |
+| ⌘⇧U | Hint mode — keyboard-driven link/path opening |
+
+### AI chat
+
+| Shortcut | Action |
+|----------|--------|
+| ⌘I | Toggle inline AI chat (Claude / Codex / Gemini / Kiro) |
+| ⌘⇧↩ | Prompt queue — batch prompts, run sequentially |
+| ⌥Space | Inline AI command suggestion overlay |
+| Right-click selection | Ask AI → prefill chat with selected text |
+| ⌘V (in AI chat) | Paste image → inserts file path (not inline render) |
+| Drag image to AI chat | Inserts image file path |
+
+### Navigation & layout
+
+| Shortcut | Action |
+|----------|--------|
+| ⌘⇧J | Frecency directory picker (zoxide-powered) |
+| ⌘⇧R | Recipes — saved command picker |
+| ⌘⇧E | Composer panel — multi-line command editor |
+| ⌘⌥F | Floating terminal pane (NSPanel, persisted frame) |
+| ⌘⇧\ | Tab overview — thumbnail grid, click to switch |
+| ⌘F | Scrollback search |
+| ⌘⇧F | Find in files |
+
+### Session & layout files
+
+| Shortcut / command | Action |
+|-------------------|--------|
+| ⌘⇧S (export) | Export current layout to `.harness-layout` JSON |
+| ⌘⇧O (import) | Restore a saved `.harness-layout` |
+| OSC 26 | Agent protocol — Fork Tab, approval bar, agent activity |
 
 ## How It Feels
 
