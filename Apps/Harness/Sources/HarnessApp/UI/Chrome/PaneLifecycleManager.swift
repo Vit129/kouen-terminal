@@ -55,6 +55,9 @@ final class PaneLifecycleManager {
             activeTabID = tabID
             coordinator.ensureActivePane(for: tab)
             paneContainer?.refreshChrome(snapshot: coordinator.snapshot)
+            // Kick the display link on every host in the now-visible container so the
+            // Metal layer presents a fresh frame even if the link was paused while hidden.
+            cached.collectTerminalHosts().values.forEach { $0.scheduleRepaint() }
             return
         }
 
@@ -67,12 +70,22 @@ final class PaneLifecycleManager {
         let allHosts = coordinator.terminalHosts.allHosts()
         allHosts.forEach { $0.setPresentsWithTransaction(true) }
 
-        let existingHosts = paneContainer?.collectTerminalHosts() ?? [:]
-        let existingBrowserPanes = paneContainer?.collectBrowserPanes() ?? [:]
-        paneContainer?.detachHostsOnly()
-
-        let detached = Array(existingHosts.values)
-        for host in detached { ZombieHoldRegistry.shared.hold(host) }
+        // Structural rebuild (force=true): harvest and detach hosts so the new container
+        // can reuse surviving ones (same surface IDs). Tab switch (!force): leave the old
+        // container's hosts intact — they stay alive in the hidden view and the fast path
+        // above renders them correctly on the next switch back. Without this guard,
+        // detachHostsOnly() empties the cached container so the fast path reveals black.
+        let existingHosts: [SurfaceID: TerminalHostView]
+        let existingBrowserPanes: [PaneID: BrowserPaneView]
+        if force {
+            existingHosts = paneContainer?.collectTerminalHosts() ?? [:]
+            existingBrowserPanes = paneContainer?.collectBrowserPanes() ?? [:]
+            paneContainer?.detachHostsOnly()
+            for host in existingHosts.values { ZombieHoldRegistry.shared.hold(host) }
+        } else {
+            existingHosts = [:]
+            existingBrowserPanes = [:]
+        }
 
         // Hide old container (keep in cache if it belongs to a tab)
         if let old = paneContainer {
@@ -80,7 +93,7 @@ final class PaneLifecycleManager {
             if let prevTabID = activeTabID {
                 containerCache[prevTabID] = old
             } else {
-                ZombieHoldRegistry.shared.hold(old)
+                if force { ZombieHoldRegistry.shared.hold(old) }
                 old.removeFromSuperview()
             }
         }
