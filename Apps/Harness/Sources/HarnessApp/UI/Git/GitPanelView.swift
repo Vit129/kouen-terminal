@@ -26,6 +26,8 @@ final class GitPanelView: NSView {
     private nonisolated(unsafe) var watchStream: FSEventStreamRef?
     private nonisolated(unsafe) var contextPointer: UnsafeMutableRawPointer?
     private nonisolated(unsafe) var watchDebounce: DispatchWorkItem?
+    /// Set true while our own git operations run to suppress FSEvent self-triggering.
+    private nonisolated(unsafe) var suppressingFSEvents = false
 
     deinit {
         if let stream = watchStream {
@@ -141,6 +143,17 @@ final class GitPanelView: NSView {
 
         let callback: FSEventStreamCallback = { (streamRef, clientInfo, numEvents, eventPaths, eventFlags, eventIds) in
             guard let clientInfo = clientInfo else { return }
+            // Filter: ignore changes inside .git/ (index writes, reflog, etc.)
+            let cfPaths = Unmanaged<CFArray>.fromOpaque(eventPaths).takeUnretainedValue()
+            var hasRelevantChange = false
+            for i in 0..<numEvents {
+                let p = unsafeBitCast(CFArrayGetValueAtIndex(cfPaths, i), to: CFString.self) as String
+                if !p.contains("/.git/") {
+                    hasRelevantChange = true
+                    break
+                }
+            }
+            guard hasRelevantChange else { return }
             let wrapper = Unmanaged<WatcherContext>.fromOpaque(clientInfo).takeUnretainedValue()
             Task { @MainActor in
                 wrapper.onChange()
@@ -155,7 +168,7 @@ final class GitPanelView: NSView {
             paths,
             FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
             0.5,
-            FSEventStreamCreateFlags(kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagNoDefer | kFSEventStreamCreateFlagUseCFTypes)
+            FSEventStreamCreateFlags(kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagUseCFTypes)
         ) else {
             Unmanaged<WatcherContext>.fromOpaque(ptr).release()
             contextPointer = nil
@@ -184,6 +197,8 @@ final class GitPanelView: NSView {
     }
 
     private func debouncedRefresh() {
+        // Fix 6: Ignore FSEvents triggered by our own git operations
+        guard !suppressingFSEvents else { return }
         watchDebounce?.cancel()
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
@@ -859,14 +874,23 @@ final class GitPanelView: NSView {
 
     private func refresh() async {
         guard let path = currentPath else { return }
+        // Fix 5: Skip refresh when panel is not visible
+        guard window != nil, !isHiddenOrHasHiddenAncestor else { return }
         refreshGeneration += 1
         let generation = refreshGeneration
 
-        let branch = await runGit(["branch", "--show-current"], in: path)
-        let aheadBehind = await runGit(["rev-list", "--left-right", "--count", "@{upstream}...HEAD"], in: path)
-        var numstat = await runGit(["diff", "--numstat", "HEAD"], in: path)
-        var porcelain = await runGit(["status", "--porcelain"], in: path)
-        let log = await runGit(["log", "--format=%H|%an|%ar|%s", "-25"], in: path)
+        // Fix 4: Run independent git queries in parallel
+        async let branchTask = runGit(["branch", "--show-current"], in: path)
+        async let aheadBehindTask = runGit(["rev-list", "--left-right", "--count", "@{upstream}...HEAD"], in: path)
+        async let numstatTask = runGit(["diff", "--numstat", "HEAD"], in: path)
+        async let porcelainTask = runGit(["status", "--porcelain"], in: path)
+        async let logTask = runGit(["log", "--format=%H|%an|%ar|%s", "-25"], in: path)
+
+        let branch = await branchTask
+        let aheadBehind = await aheadBehindTask
+        var numstat = await numstatTask
+        var porcelain = await porcelainTask
+        let log = await logTask
 
         // A newer refresh started while these git calls were in flight — its
         // result will supersede ours, so discard this stale snapshot instead
@@ -887,9 +911,9 @@ final class GitPanelView: NSView {
         }
         
         if !filesToAutoStage.isEmpty {
-            for file in filesToAutoStage {
-                _ = await runGit(["add", file], in: path)
-            }
+            suppressingFSEvents = true
+            _ = await runGit(["add", "--"] + filesToAutoStage, in: path)
+            suppressingFSEvents = false
             porcelain = await runGit(["status", "--porcelain"], in: path)
             numstat = await runGit(["diff", "--numstat", "HEAD"], in: path)
         }

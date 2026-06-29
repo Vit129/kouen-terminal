@@ -36,6 +36,7 @@ public struct AIAgentConfig: Codable, Sendable, Equatable {
     public func cliArgs(query: String) -> [String] {
         switch activeAgent {
         case .claudeCode:
+            // activeEffort shown in UI but not passed — Claude uses /effort in-session instead.
             var args: [String] = []
             if let model = activeModel { args += ["--model", model] }
             args += ["-p", query]

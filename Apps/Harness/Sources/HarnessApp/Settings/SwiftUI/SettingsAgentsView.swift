@@ -130,11 +130,24 @@ struct SettingsAgentsView: View {
             Text("Harness identifies agents by walking each pane's process tree and matching the executables shown below — it works for any shell, no setup. Install hooks so an agent can ping you the moment it stops or needs input.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            Button("Edit agents.json…") {
-                let url = HarnessPaths.applicationSupport.appendingPathComponent("agents.json")
-                NSWorkspace.shared.open(url)
+            HStack(spacing: 8) {
+                Button("Edit agents.json…") {
+                    let url = HarnessPaths.applicationSupport.appendingPathComponent("agents.json")
+                    NSWorkspace.shared.open(url)
+                }
+                .buttonStyle(.bordered)
+
+                Button("Edit agent-catalog.json…") {
+                    let url = HarnessPaths.applicationSupport.appendingPathComponent("agent-catalog.json")
+                    if !FileManager.default.fileExists(atPath: url.path) {
+                        // Create a starter file from current defaults so user has something to edit
+                        let starter = AgentCatalog.exportDefaultsJSON()
+                        try? starter.write(to: url, atomically: true, encoding: .utf8)
+                    }
+                    NSWorkspace.shared.open(url)
+                }
+                .buttonStyle(.bordered)
             }
-            .buttonStyle(.bordered)
 
             Divider()
 
