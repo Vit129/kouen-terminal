@@ -97,3 +97,37 @@ Split 1.5s combined timer into:
 ```bash
 sample $(pgrep Harness) 5 | grep -A5 "AnimatableFrame\|proc_listpids\|NSHostingView"
 ```
+
+---
+
+## Instance 2 — `.repeatForever` in TerminalTabBarView.workingDot (2026-06-29, build 3.11.7/183)
+
+Same root class as the notch, **different always-visible view**. Profiled the live
+running app (PID via `ps aux | grep MACOS/Harness`): **42% CPU, memory healthy
+(RSS ~110 MB stable, delta 0 over 3 s — no leak; all leak fixes confirmed live).**
+
+`sample <pid> 4` → main thread dominated (~33% of all samples) by:
+```
+NSHostingView.layout()  (SwiftUI)
+  → ViewGraphRootValueUpdater.render(interval:updateDisplayList:targetTimestamp:)
+    → ViewGraph.updateOutputs(at:)        ← 1048 samples
+```
+i.e. an NSHostingView re-renders its **entire** ViewGraph every display frame.
+
+**Primary suspect (strong, not yet experimentally isolated):**
+`TerminalTabBarView.swift:469` `workingDot` →
+`.animation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true), value:…)`.
+`repeatForever` keeps the ViewGraph perpetually dirty, so the whole
+`NSHostingView(rootView: TerminalTabBarBody)` (always on screen) re-evaluates 60×/s
+while **any** tab is in `working` state. Confirmed an agent was `working` during the
+profile. A pulsing dot costing 33% CPU is the tell — SwiftUI re-runs the full body, not
+just the dot.
+
+**Fix (same as notch #5):** move the pulse off SwiftUI onto the render server —
+`CABasicAnimation(opacity/scale)` on a `CALayer`, or isolate the dot in its own tiny
+NSHostingView so the storm can't re-render the whole tab bar. See `patterns/gpu-animation-ca.md`.
+
+**Rule:** any `.repeatForever` / `TimelineView` / continuous `.animation` at or near the
+root of an NSHostingView re-renders that host's whole ViewGraph every frame. Grep
+`repeatForever|TimelineView|Timer\.publish` in SwiftUI views before blaming snapshot/data.
+Remaining live candidates to audit: `TerminalTabBarView`, `AgentNotchRootView`.
