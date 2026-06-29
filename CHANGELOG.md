@@ -5,13 +5,9 @@ All notable changes to Harness are documented here. The format is based on
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/harness-terminal/releases).
-## [Unreleased]
-
-### Changed
-- AI chat image paste (⌘V) and drag-drop now inserts the saved file path instead of Kitty graphics bytes — agents (Claude/Codex) can read the file path directly.
-- Terminal image paste/drag reverted to original path-paste behaviour (inline Kitty rendering removed).
-
 ## [3.11.5] - 2026-06-28
+
+<!-- otty-features project — all phases closed -->
 
 ### Added
 - Vi modal editing (⌘⌃V toggle): Esc enters normal mode, `hjkl`/`wb`/`0$`/`x`/`i`/`a`/`A` work as expected; sends cursor-move escape sequences to PTY.
