@@ -71,12 +71,23 @@ final class PaneLifecycleManager {
         let allHosts = coordinator.terminalHosts.allHosts()
         allHosts.forEach { $0.setPresentsWithTransaction(true) }
 
-        let existingHosts = paneContainer?.collectTerminalHosts() ?? [:]
-        let existingBrowserPanes = paneContainer?.collectBrowserPanes() ?? [:]
-        paneContainer?.detachHostsOnly()
-
-        let detached = Array(existingHosts.values)
-        for host in detached { ZombieHoldRegistry.shared.hold(host) }
+        // Structural rebuild (force=true): harvest and detach existing hosts so the new
+        // container can reuse the surviving ones (same surface IDs, pane was not closed).
+        // Tab switch (!force): leave the old container intact — its hosts stay alive in
+        // the hidden view and the fast path restores them on the next switch back.
+        // Without this guard, detachHostsOnly() empties the cached container, causing
+        // the fast path to reveal an empty view → black screen.
+        let existingHosts: [SurfaceID: TerminalHostView]
+        let existingBrowserPanes: [PaneID: BrowserPaneView]
+        if force {
+            existingHosts = paneContainer?.collectTerminalHosts() ?? [:]
+            existingBrowserPanes = paneContainer?.collectBrowserPanes() ?? [:]
+            paneContainer?.detachHostsOnly()
+            for host in existingHosts.values { ZombieHoldRegistry.shared.hold(host) }
+        } else {
+            existingHosts = [:]
+            existingBrowserPanes = [:]
+        }
 
         // Hide old container (keep in cache if it belongs to a tab)
         if let old = paneContainer {
@@ -84,7 +95,7 @@ final class PaneLifecycleManager {
             if let prevTabID = activeTabID {
                 containerCache[prevTabID] = old
             } else {
-                ZombieHoldRegistry.shared.hold(old)
+                if force { ZombieHoldRegistry.shared.hold(old) }
                 old.removeFromSuperview()
             }
         }
