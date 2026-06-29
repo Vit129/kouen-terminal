@@ -209,16 +209,14 @@ extension HarnessTerminalSurfaceView {
     /// image-file paths (Claude Code, etc.) attach it. Mirrors the file-drop path.
     @objc public func paste(_ sender: Any?) {
         let pasteboard = NSPasteboard.general
-        // Image takes priority: browser "Copy Image" puts both PNG data and a URL string on the
-        // clipboard — check image first so we render inline instead of pasting the URL.
-        if let bytes = PasteController.kittyGraphicsBytes(from: pasteboard) {
-            snapToBottom()
-            receive(Data(bytes))
-            return
-        }
         // Text fast path.
         if let raw = pasteboard.string(forType: .string), !raw.isEmpty {
             pasteText(raw)
+            return
+        }
+        // Image on the clipboard → write a temp PNG, paste its quoted path.
+        if let path = Self.writePastedImage(from: pasteboard) {
+            pasteText(Self.shellQuotedPath(path))
             return
         }
         // A file copied in Finder (⌘C → ⌘V) → paste the quoted path(s), like a drag-drop.
@@ -242,23 +240,17 @@ extension HarnessTerminalSurfaceView {
 
     public override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
         let pasteboard = sender.draggingPasteboard
-        // File URLs: image files render inline; everything else → paste shell-quoted path.
+        // File URLs (files, folders) → paste shell-quoted paths.
         let urls = Self.droppedFileURLs(from: pasteboard)
         if !urls.isEmpty {
             window?.makeFirstResponder(self)
-            if urls.count == 1, let bytes = PasteController.kittyGraphicsBytes(from: urls[0]) {
-                snapToBottom()
-                receive(Data(bytes))
-            } else {
-                pasteText(Self.droppedPathText(for: urls))
-            }
+            pasteText(Self.droppedPathText(for: urls))
             return true
         }
-        // Raw image drag (browser screenshot, Photos, etc.) → render inline via Kitty graphics.
-        if let bytes = PasteController.kittyGraphicsBytes(from: pasteboard) {
+        // Image drag (browser screenshot, Photos, etc.) → write temp PNG, paste path.
+        if let path = Self.writePastedImage(from: pasteboard) {
             window?.makeFirstResponder(self)
-            snapToBottom()
-            receive(Data(bytes))
+            pasteText(Self.shellQuotedPath(path))
             return true
         }
         return false
