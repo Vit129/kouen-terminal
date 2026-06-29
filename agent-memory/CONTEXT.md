@@ -1,29 +1,35 @@
 # Context — harness-terminal
 
 ## Now
-- **Task:** CPU peaks + memory guards session ✅
+- **Task:** idle
 - **Branch:** `main`
-- **Status:** 3 perf commits + 1 guard commit pushed. Patch release in progress.
 
-### 2026-06-29 — CPU/memory hardening
+### 2026-06-29 — Claude Code statusLine/advisor/remote-control "broke after migrate" ✅
 
-**Root cause:** Every daemon snapshot commit fired all UI observers **twice**:
-- Phase-1: `DaemonClient` posts `postSnapshotChanged(revision:)` — no typed payload → fallback `(structureChanged=true, metadataOnly=false)` → full work before data changed
-- Phase-2: `DaemonSyncService` applies snapshot → posts `postSnapshotChanged(payload:)` with real flags → correct work
+**User report:** statusLine, advisor, remote-control all stopped after the SwiftUI
+settings migration → blamed the migration. **It was NOT the migration.**
 
-**Fix commits (all on main, pushed):**
-| Commit | What |
-|--------|------|
-| `5cbbe82` | `guard note.userInfo?["payload"] is SnapshotChangedPayload` in 5 UI observers (ContentAreaVC, MainSplitVC, BoardVC, StatusLineView, SettingsModel) |
-| `ffb059a` | `SnapshotCoalescer` in `SessionCoordinator` — burst Phase-1 pings → 1 `scheduleSnapshotRefresh()` per runloop turn |
-| `ffb059a` | `FrecencyDirectoryStore` capped at 500 entries; `evictTail()` drops lowest-scored on overflow |
-| `81fe735` | `check_retire_coverage.py` gains `--mode filter`; Leak D robot test enforces snapshot-sweep pattern for `NotificationCoordinator` |
+**Root cause:** `~/.claude/settings.json` had `skillOverrides.deep-research: "disabled"`
+(invalid; valid = `on|name-only|user-invocable-only|off`). **Claude Code 2.1.195**
+(updated Jun 28) tightened validation and now **skips the ENTIRE settings.json** on any
+single invalid value → `statusLine`, `advisorModel`, `remoteControlAtStartup`, `tui`,
+`model` all ignored. Timing coincided with the Harness migration → looked migration-caused.
 
-**Key pattern:** Phase-1 ping guard = `note.userInfo?["payload"] is SnapshotChangedPayload`. SessionCoordinator intentionally handles Phase-1 (needs it to schedule sync), but now coalesced.
+**Fix:** `"disabled"` → `"off"`. Verified: statusLine invocation 0 → 36 calls.
+
+**Diagnostic that cracked it:** `script -q /dev/null claude` (real PTY) surfaced the
+`SettingsError` startup dialog — invisible in background/`-p` sessions. See
+`knowledge/cases/misc.md` CASE-042.
+
+**Secondary (separate) issues:** remote-control needs re-auth (`daemon-auth-status.json`
+= `auth_required`, cooldown expired → `claude --remote-control`); advisor on/off is a
+per-session toggle by design (no persist field — only `advisorModel` persists).
 
 ---
 
 ## Previous
+- **Task:** CPU peaks + memory guards session ✅ (`5cbbe82`, `ffb059a`, `81fe735` on main)
+  - Phase-1/Phase-2 double snapshot fanout → payload-type guard in 5 UI observers + SnapshotCoalescer
 - **Task:** tab-switch black screen ✅
 - **Commits:** `f6a0182`, `2b9295d`, `1a2ca4c`, `9c5c1fa`, `0a5f2fe` on main (squash-merged from fix branch)
 - **4 failure modes fixed:** detach-then-cache, structural rebuild caches empty shell, host theft, orphan overwrite
