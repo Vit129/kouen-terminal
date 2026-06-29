@@ -118,6 +118,25 @@ final class ExperienceModeTests: XCTestCase {
         XCTAssertFalse(decoded.effectiveStatusLineEnabled)
     }
 
+    func testPlainModeWithNoExplicitToggleShowsStatusLine() throws {
+        // Migration scenario: user on plain mode, never touched the status line toggle in the
+        // new SwiftUI Settings panel → statusLineEnabled=nil, harnessControlsEnabled=nil.
+        // Before 71e3c05 the chain fell to showsStatusLineByDefault=false and hid the band.
+        // The fix falls back to showStatusLine (default true) so the band stays visible.
+        let json = #"{"experienceMode":"plain","showStatusLine":true}"#
+        let s = try JSONDecoder().decode(HarnessSettings.self, from: Data(json.utf8))
+        XCTAssertNil(s.statusLineEnabled)
+        XCTAssertNil(s.harnessControlsEnabled)
+        XCTAssertTrue(s.effectiveStatusLineEnabled, "plain mode + showStatusLine=true should show status line")
+    }
+
+    func testPlainModeWithExplicitlyDisabledLegacyToggleHidesStatusLine() throws {
+        // If the user actively disabled showStatusLine under the old AppKit Settings, honour it.
+        let json = #"{"experienceMode":"plain","showStatusLine":false}"#
+        let s = try JSONDecoder().decode(HarnessSettings.self, from: Data(json.utf8))
+        XCTAssertFalse(s.effectiveStatusLineEnabled, "plain mode + showStatusLine=false should hide status line")
+    }
+
     func testLegacyFileWithoutGranularOverridesPreservesBehavior() throws {
         // Older files have no prefixKeyEnabled/statusLineEnabled → nil, so behavior is preserved
         // through the umbrella fallback (umbrella off ⇒ both components off, even for Full).
