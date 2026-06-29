@@ -14,11 +14,14 @@ newer than all fix commits → fixes ARE live).
   `ViewGraph.updateOutputs(at:)`, i.e. a SwiftUI hosting view re-rendering its **whole**
   ViewGraph every display frame.
 - **Root cause:** SwiftUI `.repeatForever` animation near a hosting-view root. Primary
-  suspect `TerminalTabBarView.swift:469` `workingDot` (`.easeInOut.repeatForever`) — pulses
+  suspect `TerminalTabBarView.swift` `workingDot` (`.easeInOut.repeatForever`) — pulses
   while any tab is `working` (an agent was working during the profile). Same class as the
-  fixed Notch CPU bug, different always-visible view. Details + fix in
-  `knowledge/bugs/notch-cpu-animation.md` (Instance 2). **Not yet fixed** — fix = move pulse
-  to `CABasicAnimation` on a CALayer, or isolate the dot in its own NSHostingView.
+  Notch CPU bug.
+- **FIXED (`dd7a78c`, pushed):** both `workingDot` and notch `NotchStatusDot` pulses moved off
+  SwiftUI `.repeatForever` to `CABasicAnimation`/`CAAnimationGroup` on a CALayer (render server
+  paints; ViewGraph no longer re-renders per frame). Build + robot guards green. Live CPU
+  re-profile pending `make install` (running instance hosts this session). See
+  `knowledge/bugs/notch-cpu-animation.md` Instance 2.
 
 ### 2026-06-29 — Claude Code statusLine/advisor/remote-control "broke after migrate" ✅
 
