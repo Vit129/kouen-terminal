@@ -123,9 +123,18 @@ while **any** tab is in `working` state. Confirmed an agent was `working` during
 profile. A pulsing dot costing 33% CPU is the tell — SwiftUI re-runs the full body, not
 just the dot.
 
-**Fix (same as notch #5):** move the pulse off SwiftUI onto the render server —
-`CABasicAnimation(opacity/scale)` on a `CALayer`, or isolate the dot in its own tiny
-NSHostingView so the storm can't re-render the whole tab bar. See `patterns/gpu-animation-ca.md`.
+**Fix — DONE in `dd7a78c` (both views):**
+- `TerminalTabBarView.workingDot` → `WorkingDotView: NSViewRepresentable`; the ±2.5pt
+  horizontal pulse is a `CABasicAnimation(keyPath: "transform.translation.x")` on a CALayer.
+- `AgentNotchRootView.NotchStatusDot` → `NotchPulseHost<Content>: NSViewRepresentable` hosts
+  the unchanged SwiftUI chip/circle in a layer-backed view and breathes it via a
+  `CAAnimationGroup` (scale 1.0↔1.18 + opacity 1.0↔0.62) with center anchorPoint so it pulses
+  in place. The SwiftUI rendering is untouched — only the animation moved off the ViewGraph.
+
+Both are idempotent (animation added once, removed when idle) and honor reduce-motion. Build
++ robot guards green. **Live CPU re-profile pending a build install** — the running instance
+hosts the dev session, so it can't be restarted from inside it; verify with `sample <pid>`
+after `make install`. See `patterns/gpu-animation-ca.md`.
 
 **Rule:** any `.repeatForever` / `TimelineView` / continuous `.animation` at or near the
 root of an NSHostingView re-renders that host's whole ViewGraph every frame. Grep
