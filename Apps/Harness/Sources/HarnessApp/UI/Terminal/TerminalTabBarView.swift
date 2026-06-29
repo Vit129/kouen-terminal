@@ -471,6 +471,10 @@ private struct TabPillView: View {
         return Rectangle()
             .fill(Color(HarnessDesign.chrome.textSecondary))
             .frame(width: 2, height: 2)
+            // RepeatAnimation must not bleed into the constant .frame() above — SwiftUI will
+            // still create AnimatableFrameAttribute and call updateValue() at 60fps even when
+            // width/height don't change, burning CPU forever. nil barrier stops the bleed.
+            .animation(nil, value: animateWorkingDot)
             .opacity(isWorking ? 1 : 0)
             .offset(x: isWorking && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? (animateWorkingDot ? 2.5 : -2.5) : 0)
             .animation(
