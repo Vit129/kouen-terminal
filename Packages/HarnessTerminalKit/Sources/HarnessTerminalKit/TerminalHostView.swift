@@ -575,6 +575,13 @@ public final class TerminalHostView: NSView {
         nativeView.stopDisplayLinkForRetire()
     }
 
+    /// Wake the Metal renderer after the host becomes visible again (e.g. tab fast-switch
+    /// restores a cached container via isHidden toggle — the display link is paused while
+    /// idle, so nothing wakes it automatically when the view un-hides).
+    public func scheduleRepaint() {
+        nativeView.scheduleRender()
+    }
+
     public func focusTerminal() {
         window?.makeFirstResponder(nativeView)
         hostDelegate?.terminalHostDidChangeFocus(true, surfaceID: surfaceID)
