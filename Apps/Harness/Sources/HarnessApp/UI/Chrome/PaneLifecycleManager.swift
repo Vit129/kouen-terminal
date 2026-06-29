@@ -55,10 +55,6 @@ final class PaneLifecycleManager {
             activeTabID = tabID
             coordinator.ensureActivePane(for: tab)
             paneContainer?.refreshChrome(snapshot: coordinator.snapshot)
-            // The display link on each surface is paused while idle. Toggling isHidden
-            // doesn't wake it, so the Metal layer shows black until new PTY output arrives.
-            // Wake every renderer in the now-visible container.
-            cached.collectTerminalHosts().values.forEach { $0.scheduleRepaint() }
             return
         }
 
