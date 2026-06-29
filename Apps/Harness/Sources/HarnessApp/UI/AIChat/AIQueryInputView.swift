@@ -68,13 +68,13 @@ final class AIQueryInputView: NSView {
     }()
 
     private let agentPill: NSButton = {
-        let b = NSButton(title: "✦ Claude", target: nil, action: nil)
+        let b = NSButton(title: "", target: nil, action: nil)
         b.bezelStyle = .recessed
         b.isBordered = false
-        b.font = .monospacedSystemFont(ofSize: 11, weight: .medium)
-        b.contentTintColor = .systemTeal
+        b.font = .systemFont(ofSize: 11, weight: .medium)
+        b.imagePosition = .imageLeft
+        b.imageHugsTitle = true
         b.wantsLayer = true
-        b.layer?.backgroundColor = NSColor.systemTeal.withAlphaComponent(0.12).cgColor
         b.layer?.cornerRadius = 4
         return b
     }()
@@ -84,9 +84,9 @@ final class AIQueryInputView: NSView {
         b.bezelStyle = .recessed
         b.isBordered = false
         b.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
-        b.contentTintColor = NSColor.white.withAlphaComponent(0.55)
+        b.contentTintColor = NSColor.white.withAlphaComponent(0.88)
         b.wantsLayer = true
-        b.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.07).cgColor
+        b.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.10).cgColor
         b.layer?.cornerRadius = 4
         return b
     }()
@@ -177,6 +177,9 @@ final class AIQueryInputView: NSView {
         effortPill.target = self
         effortPill.action = #selector(effortPillClicked(_:))
 
+        // Paint initial state — caller will override via configure(agent:model:effort:)
+        configure(agent: .claudeCode)
+
         // Accept image and file drags — converts to path text, not inline rendering.
         registerForDraggedTypes([.fileURL, .png, .tiff,
                                  NSPasteboard.PasteboardType("public.image")])
@@ -266,7 +269,12 @@ final class AIQueryInputView: NSView {
 
     func configure(agent: AgentKind, model: String? = nil, effort: String? = nil) {
         currentAgent = agent
-        agentPill.title = "✦ \(agent.displayName) ▾"
+        let color = NSColor.fromHex(agent.dotHex) ?? .systemTeal
+        let icon = AgentIconRenderer.coloredOrMonogramImage(for: agent, size: 12, color: color)
+        agentPill.image = icon
+        agentPill.title = "\(agent.displayName) ▾"
+        agentPill.contentTintColor = color
+        agentPill.layer?.backgroundColor = color.withAlphaComponent(0.15).cgColor
 
         // Reset model to passed value (or first available)
         let catalog = AgentCatalog.agents[agent]

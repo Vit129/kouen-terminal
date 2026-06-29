@@ -124,9 +124,15 @@ public actor FileTreeWatcher {
 
         let callback: FSEventStreamCallback = { (streamRef, clientInfo, numEvents, eventPaths, eventFlags, eventIds) in
             guard let clientInfo = clientInfo else { return }
-            let wrapper = Unmanaged<WatcherContext>.fromOpaque(clientInfo).takeUnretainedValue()
-            Task { @MainActor in
-                wrapper.onChange()
+            // Skip events inside .git/ — only working tree changes matter for file tree.
+            let cfPaths = Unmanaged<CFArray>.fromOpaque(eventPaths).takeUnretainedValue()
+            for i in 0..<numEvents {
+                let p = unsafeBitCast(CFArrayGetValueAtIndex(cfPaths, i), to: CFString.self) as String
+                if !p.contains("/.git/") {
+                    let wrapper = Unmanaged<WatcherContext>.fromOpaque(clientInfo).takeUnretainedValue()
+                    Task { @MainActor in wrapper.onChange() }
+                    return
+                }
             }
         }
 
@@ -138,7 +144,7 @@ public actor FileTreeWatcher {
             paths,
             FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
             0.5,
-            FSEventStreamCreateFlags(kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagNoDefer | kFSEventStreamCreateFlagUseCFTypes)
+            FSEventStreamCreateFlags(kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagUseCFTypes)
         ) else {
             Unmanaged<WatcherContext>.fromOpaque(contextPointer).release()
             return
