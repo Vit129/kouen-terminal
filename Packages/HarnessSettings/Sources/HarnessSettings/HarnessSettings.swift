@@ -298,9 +298,12 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
     }
 
     /// Whether the bottom status line should show. Same precedence as the prefix, but resolved
-    /// separately. Consulted by `StatusLineView` (alongside the explicit `showStatusLine` toggle).
+    /// separately. Consulted by `StatusLineView`.
+    /// Final fallback is `showStatusLine` (default true) — acts as a migration shim for users
+    /// who never explicitly toggled the status line in Settings after the SwiftUI migration
+    /// (2159a77). Without it, plain-mode users silently inherit showsStatusLineByDefault=false.
     public var effectiveStatusLineEnabled: Bool {
-        statusLineEnabled ?? harnessControlsEnabled ?? experienceMode.showsStatusLineByDefault
+        statusLineEnabled ?? harnessControlsEnabled ?? showStatusLine
     }
 
     /// The prefix shortcut string to actually arm, or `nil` to disable the prefix entirely.
