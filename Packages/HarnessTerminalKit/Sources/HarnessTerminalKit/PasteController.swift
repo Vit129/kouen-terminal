@@ -4,11 +4,11 @@ import HarnessCore
 /// Handles paste operations (text, images, file drops) for the terminal surface.
 /// Extracted from `HarnessTerminalSurfaceView+Find.swift` to reduce file size.
 @MainActor
-enum PasteController {
+public enum PasteController {
     /// If the pasteboard holds a valid image, write it to the pasted-images directory as a PNG and
     /// return the file path. Prefers raw PNG bytes; converts TIFF / other image reps via a bitmap
     /// rep. Returns nil when there's no usable image.
-    static func writePastedImage(from pasteboard: NSPasteboard) -> String? {
+    public static func writePastedImage(from pasteboard: NSPasteboard) -> String? {
         guard let png = pngImageData(from: pasteboard) else { return nil }
         let dir = HarnessPaths.pastedImagesDirectory
         let readableDir: [FileAttributeKey: Any] = [.posixPermissions: 0o755]
@@ -28,7 +28,7 @@ enum PasteController {
     }
 
     /// Best-effort PNG bytes for whatever image the pasteboard carries (screenshot = PNG/TIFF).
-    static func pngImageData(from pasteboard: NSPasteboard) -> Data? {
+    public static func pngImageData(from pasteboard: NSPasteboard) -> Data? {
         if let png = pasteboard.data(forType: .png), NSBitmapImageRep(data: png) != nil {
             return png
         }
