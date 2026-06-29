@@ -89,11 +89,19 @@ final class PaneLifecycleManager {
             existingBrowserPanes = [:]
         }
 
-        // Hide old container (keep in cache if it belongs to a tab)
+        // Hide old container.
+        // force=false (tab switch): hosts are intact — cache for fast-path revisit.
+        // force=true (structural rebuild): detachHostsOnly() already stripped the hosts —
+        //   caching the empty shell causes a black screen on the next revisit. Evict instead.
         if let old = paneContainer {
             old.isHidden = true
             if let prevTabID = activeTabID {
-                containerCache[prevTabID] = old
+                if force {
+                    containerCache.removeValue(forKey: prevTabID)
+                    old.removeFromSuperview()
+                } else {
+                    containerCache[prevTabID] = old
+                }
             } else {
                 if force { ZombieHoldRegistry.shared.hold(old) }
                 old.removeFromSuperview()
