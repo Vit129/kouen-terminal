@@ -8,6 +8,9 @@ Documentation    Regression guards for memory-leak fixes.
 ...              Leak C: Structural guard — any NEW [String: T] dict added to
 ...                      SessionCoordinator must have a .removeValue in the onRetire closure.
 ...                      Prevents future contributors from repeating the insert-only pattern.
+...              Leak D: Structural guard — any NEW [String: T] dict added to
+...                      NotificationCoordinator must be swept via .filter { live.contains }
+...                      on each snapshot sync. Same insert-only prevention, different cleanup strategy.
 Library          OperatingSystem
 Library          Process
 
@@ -15,6 +18,7 @@ Library          Process
 ${ROOT}              ${CURDIR}/../..
 ${PANE_REGISTRY}     ${ROOT}/Apps/Harness/Sources/HarnessApp/Services/TerminalPaneRegistry.swift
 ${COORDINATOR}       ${ROOT}/Apps/Harness/Sources/HarnessApp/Services/SessionCoordinator.swift
+${NOTIFICATION_COORD}    ${ROOT}/Apps/Harness/Sources/HarnessApp/Services/NotificationCoordinator.swift
 ${BROWSER_PANE}      ${ROOT}/Apps/Harness/Sources/HarnessApp/UI/Chrome/BrowserPaneView.swift
 ${RETIRE_CHECKER}    ${CURDIR}/helpers/check_retire_coverage.py
 
@@ -50,3 +54,15 @@ Leak C - Every Per-Surface Dict In Coordinator Has Retire Cleanup
     Log    ${result.stdout}
     Should Be Equal As Integers    ${result.rc}    0
     ...    msg=Missing onRetire cleanup — ${result.stdout}
+
+Leak D - Every Per-Surface Dict In NotificationCoordinator Is Snapshot-Swept
+    [Documentation]    Every private var [String: T] in NotificationCoordinator must be
+    ...                reassigned via .filter { live.contains } inside the snapshot-sync sweep.
+    ...                NotificationCoordinator uses snapshot iteration (not onRetire) for cleanup —
+    ...                this guard enforces the same insert-only prevention with the correct strategy.
+    ${result}=    Run Process    python3    ${RETIRE_CHECKER}    ${NOTIFICATION_COORD}
+    ...           --mode    filter
+    ...           stdout=PIPE    stderr=PIPE
+    Log    ${result.stdout}
+    Should Be Equal As Integers    ${result.rc}    0
+    ...    msg=Missing snapshot-sweep cleanup — ${result.stdout}
