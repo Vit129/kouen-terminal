@@ -209,6 +209,7 @@ final class MainSplitViewController: NSViewController {
     }
 
     @objc private func snapshotChanged(_ note: Notification) {
+        guard note.userInfo?["payload"] is SnapshotChangedPayload else { return }
         let payload = note.snapshotPayload
         let metadataOnly = payload.metadataOnly
         if payload.chromeChanged {

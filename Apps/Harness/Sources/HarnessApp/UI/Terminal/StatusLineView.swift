@@ -139,6 +139,7 @@ final class StatusLineView: NSView {
     }
 
     @objc private func snapshotChanged(_ note: Notification) {
+        guard note.userInfo?["payload"] is SnapshotChangedPayload else { return }
         snapshotDebounce?.cancel()
         snapshotDebounce = Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: 80_000_000)

@@ -21,9 +21,10 @@ final class SettingsModel {
             forName: NotificationBus.shared.snapshotChanged,
             object: nil,
             queue: .main
-        ) { [weak self] _ in
+        ) { [weak self] note in
+            let hasPayload = note.userInfo?["payload"] is SnapshotChangedPayload
             MainActor.assumeIsolated {
-                guard let self else { return }
+                guard let self, hasPayload else { return }
                 self.settings = SessionCoordinator.shared.settings
                 self.keepSessions = SessionCoordinator.shared.snapshot.keepSessionsOnQuit
                 self.currentThemeName = SessionCoordinator.shared.snapshot.themeName
