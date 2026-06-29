@@ -48,19 +48,26 @@ final class PaneLifecycleManager {
         // this path for tab-switch restores, not for in-place structural changes
         // (e.g. adding a browser pane) where a full rebuild is required.
         if !force, let cached = containerCache[tabID], cached !== paneContainer, cached.superview == terminalHost {
-            paneContainer?.isHidden = true
-            cached.isHidden = false
-            paneContainer = cached
-            lastStructureKey = key
-            activeTabID = tabID
-            coordinator.ensureActivePane(for: tab)
-            paneContainer?.refreshChrome(snapshot: coordinator.snapshot)
-            // Re-present synchronously via layout()'s repaintLastFrame→forceRender path.
-            // The Metal layer loses its content while hidden; an async scheduleRender()
-            // (16 ms+ lag) shows black until the display link fires. forceRepaint() mirrors
-            // what the slow path's containerView.layout() does for newly-built containers.
-            cached.collectTerminalHosts().values.forEach { $0.forceRepaint() }
-            return
+            // Validate that every expected terminal surface is still present in the cached
+            // container. Hosts are shared single-instance per surfaceID — any other tab's
+            // build can silently steal a host via addSubview, leaving the cache empty.
+            // A stale structure (new split added while hidden) also fails this check.
+            let expectedSurfaces = Set(displayNode.allSurfaceIDs())
+            let cachedHosts = cached.collectTerminalHosts()
+            if expectedSurfaces.isSubset(of: Set(cachedHosts.keys)) {
+                paneContainer?.isHidden = true
+                cached.isHidden = false
+                paneContainer = cached
+                lastStructureKey = key
+                activeTabID = tabID
+                coordinator.ensureActivePane(for: tab)
+                paneContainer?.refreshChrome(snapshot: coordinator.snapshot)
+                cachedHosts.values.forEach { $0.forceRepaint() }
+                return
+            }
+            // Hosts were stolen or structure is stale — evict and fall through to rebuild.
+            containerCache.removeValue(forKey: tabID)
+            cached.removeFromSuperview()
         }
 
         lastStructureKey = key
@@ -125,6 +132,12 @@ final class PaneLifecycleManager {
         ])
         paneContainer = container
         activeTabID = tabID
+        // Evict any previous entry for this tab before storing the new one — the old
+        // container (if different) would become an orphaned hidden subview with a live
+        // Metal surface and display link.
+        if let orphan = containerCache[tabID], orphan !== container {
+            orphan.removeFromSuperview()
+        }
         containerCache[tabID] = container
         coordinator.ensureActivePane(for: tab)
 
