@@ -7,8 +7,6 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/harness-terminal/releases).
 ## [3.11.5] - 2026-06-28
 
-<!-- otty-features project — all phases closed -->
-
 ### Added
 - Vi modal editing (⌘⌃V toggle): Esc enters normal mode, `hjkl`/`wb`/`0$`/`x`/`i`/`a`/`A` work as expected; sends cursor-move escape sequences to PTY.
 - ⌘-click on OSC 133 output block selects the block; Copy or **Ask AI ✦** action bar appears.
