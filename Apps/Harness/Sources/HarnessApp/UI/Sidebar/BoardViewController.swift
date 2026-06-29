@@ -77,6 +77,7 @@ final class BoardViewController: NSViewController {
     private var dismissedCardIDs: Set<TabID> = []
 
     @objc private func snapshotChanged(_ note: Notification) {
+        guard note.userInfo?["payload"] is SnapshotChangedPayload else { return }
         guard !note.snapshotPayload.metadataOnly else { return }
         reload()
     }

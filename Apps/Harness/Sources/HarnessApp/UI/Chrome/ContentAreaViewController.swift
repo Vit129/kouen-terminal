@@ -198,6 +198,10 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
     // MARK: - Snapshot
 
     @objc private func snapshotChanged(_ note: Notification) {
+        // Phase-1 revision pings carry no typed payload; skip until DaemonSyncService applies
+        // the snapshot and re-posts with real flags (Phase 2). Acting on Phase 1 causes a full
+        // reload with worst-case fallback flags before the data is actually updated.
+        guard note.userInfo?["payload"] is SnapshotChangedPayload else { return }
         let payload = note.snapshotPayload
         let structureChanged = payload.structureChanged
         let metadataOnly = payload.metadataOnly
