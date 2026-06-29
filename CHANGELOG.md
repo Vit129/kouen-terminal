@@ -5,10 +5,38 @@ All notable changes to Harness are documented here. The format is based on
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/harness-terminal/releases).
+## [Unreleased]
+
+### Changed
+- AI chat image paste (⌘V) and drag-drop now inserts the saved file path instead of Kitty graphics bytes — agents (Claude/Codex) can read the file path directly.
+- Terminal image paste/drag reverted to original path-paste behaviour (inline Kitty rendering removed).
+
 ## [3.11.5] - 2026-06-28
 
 ### Added
-- Release version bump to v3.11.5.
+- Vi modal editing (⌘⌃V toggle): Esc enters normal mode, `hjkl`/`wb`/`0$`/`x`/`i`/`a`/`A` work as expected; sends cursor-move escape sequences to PTY.
+- ⌘-click on OSC 133 output block selects the block; Copy or **Ask AI ✦** action bar appears.
+- Block output tint overlay (alternating 2.8%/5.8% alpha) + AI explain action bar (Phase 12b).
+- Block border, collapse/expand toggle, and re-run button (Phase 12c).
+- Inline AI chat overlay ⌘I (Warp-style): streams Claude / Codex / Gemini / Kiro responses into floating blocks above the terminal; `[▶ Run]` sends code to PTY.
+- Inline AI command suggestion overlay (⌥Space).
+- Prompt queue ⌘⇧↩ — batch prompts run sequentially with a progress bar.
+- Composer panel ⌘⇧E — multi-line command editor before sending to PTY.
+- Floating terminal pane ⌘⌥F (NSPanel, frame persisted across restarts).
+- Tab overview ⌘⇧\ — 4-column thumbnail grid, click or arrow-key to switch tabs.
+- Frecency directory picker ⌘⇧J (zoxide-powered): ↩ cd, ⌘↩ open new tab.
+- Recipes picker ⌘⇧R — saved command library.
+- Scrollback search ⌘F; find-in-files ⌘⇧F.
+- Click-to-move cursor in terminal input line.
+- `SecureInputMonitor` auto-enables Secure Input on password prompts, disables on return.
+- ⌃C with active selection copies the selection first, then sends interrupt.
+- Hint mode ⌘⇧U — keyboard-driven link and path opening.
+- Git branch shown in tab bar (reads `.git/HEAD` directly, zero-cost).
+- Layout export/import — `.harness-layout` JSON round-trip for workspace snapshots.
+- OSC 26 agent protocol: Fork Tab, approval bar, and agent activity hooks.
+- Right-click selected text → **Ask AI** prefills chat.
+- Inline image paste & drag-drop write PNG to disk and paste the shell-quoted path.
+- Remove SurfaceShellTracker (proc_listpids ALL_PIDS every 500ms) — daemon AgentScanner covers it at O(N surfaces).
 
 ## [3.11.4] - 2026-06-28
 
