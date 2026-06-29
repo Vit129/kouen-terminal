@@ -579,6 +579,14 @@ public final class TerminalHostView: NSView {
         nativeView.scheduleRender()
     }
 
+    /// Synchronously re-present the last frame (or force-build one) so the Metal
+    /// layer shows content immediately when a hidden container is revealed.
+    /// Mirrors layout()'s repaintLastFrame → forceRender path without a resize.
+    public func forceRepaint() {
+        nativeView.needsLayout = true
+        nativeView.layout()
+    }
+
     public func focusTerminal() {
         window?.makeFirstResponder(nativeView)
         hostDelegate?.terminalHostDidChangeFocus(true, surfaceID: surfaceID)
