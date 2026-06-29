@@ -278,8 +278,6 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
     /// Post-processing shader effect applied over the rendered terminal frame.
     /// Values: "none" (default), "scanlines", "grain", "bloom".
     public var terminalShaderEffect: String
-    /// Configuration for the Warp-style inline terminal AI chat (⌘I).
-    public var aiAgent: AIAgentConfig
     /// Default URL opened when a new browser pane or tab is created.
     public var browserHomePage: String
 
@@ -393,7 +391,6 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         claudeAPIKey: String? = nil,
         inlineAICompletion: Bool = false,
         terminalShaderEffect: String = "none",
-        aiAgent: AIAgentConfig = AIAgentConfig(),
         browserHomePage: String = "https://www.google.com"
     ) {
         self.fontSize = HarnessSettings.clampedFontSize(fontSize)
@@ -467,7 +464,6 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         self.claudeAPIKey = claudeAPIKey
         self.inlineAICompletion = inlineAICompletion
         self.terminalShaderEffect = terminalShaderEffect
-        self.aiAgent = aiAgent
         self.browserHomePage = browserHomePage
     }
 
@@ -657,7 +653,6 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         claudeAPIKey = try container.decodeIfPresent(String.self, forKey: .claudeAPIKey)
         inlineAICompletion = try container.decodeIfPresent(Bool.self, forKey: .inlineAICompletion) ?? fallback.inlineAICompletion
         terminalShaderEffect = try container.decodeIfPresent(String.self, forKey: .terminalShaderEffect) ?? fallback.terminalShaderEffect
-        aiAgent = try container.decodeIfPresent(AIAgentConfig.self, forKey: .aiAgent) ?? fallback.aiAgent
         browserHomePage = try container.decodeIfPresent(String.self, forKey: .browserHomePage) ?? fallback.browserHomePage
     }
 

@@ -22,8 +22,6 @@ public enum AgentCatalog {
         public let effortFlag: String?
         /// Default effort level
         public let defaultEffort: String?
-        /// ACP mode flag (nil = no ACP support yet)
-        public let acpFlag: String?
     }
 
     public static let agents: [AgentKind: AgentConfig] = loadCatalog()
@@ -41,7 +39,6 @@ public enum AgentCatalog {
         let modelFlag: String
         let effortFlag: String?
         let defaultEffort: String?
-        let acpFlag: String?
     }
 
     private static func loadFromDisk() -> [AgentKind: AgentConfig]? {
@@ -55,8 +52,7 @@ public enum AgentCatalog {
             result[kind] = AgentConfig(
                 id: kind, binary: entry.binary, models: entry.models,
                 effortLevels: entry.effortLevels, modelFlag: entry.modelFlag,
-                effortFlag: entry.effortFlag, defaultEffort: entry.defaultEffort,
-                acpFlag: entry.acpFlag
+                effortFlag: entry.effortFlag, defaultEffort: entry.defaultEffort
             )
         }
         return result.isEmpty ? nil : result
@@ -67,19 +63,14 @@ public enum AgentCatalog {
             id: .claudeCode,
             binary: "claude",
             models: [
-                "claude-opus-4.8",   // most reliable, flags errors
-                "claude-opus-4.7",   // adaptive thinking
-                "claude-opus-4.6",   // long sessions
-                "claude-sonnet-4.6", // efficient near-opus
-                "claude-sonnet-4.5", // agentic coding
-                "claude-sonnet-4.0", // stable baseline
-                "claude-haiku-4.5",  // fast/cheap
+                "claude-opus-4-8",
+                "claude-sonnet-4-6",
+                "claude-haiku-4-5-20251001",
             ],
-            effortLevels: nil, // Claude uses /effort slash command in-session, not CLI flag
+            effortLevels: ["low", "medium", "high"], // UI-only; no CLI flag — use /effort in-session
             modelFlag: "--model",
             effortFlag: nil,
-            defaultEffort: nil,
-            acpFlag: nil // Claude ACP via adapter binary (claude-code-acp)
+            defaultEffort: "medium",
         ),
 
         .codex: AgentConfig(
@@ -95,7 +86,6 @@ public enum AgentCatalog {
             modelFlag: "--model",
             effortFlag: "-c model_reasoning_effort=",
             defaultEffort: "medium",
-            acpFlag: nil // Codex ACP via adapter (codex-acp)
         ),
 
         .kiro: AgentConfig(
@@ -119,7 +109,6 @@ public enum AgentCatalog {
             modelFlag: "--model",
             effortFlag: "--effort",
             defaultEffort: "medium",
-            acpFlag: "--acp"
         ),
 
         .gemini: AgentConfig(
@@ -134,7 +123,6 @@ public enum AgentCatalog {
             modelFlag: "--model",
             effortFlag: nil,
             defaultEffort: nil,
-            acpFlag: "--acp" // Gemini CLI is reference ACP implementation
         ),
 
         .cursor: AgentConfig(
@@ -145,7 +133,6 @@ public enum AgentCatalog {
             modelFlag: "--model",
             effortFlag: "--effort",
             defaultEffort: "normal",
-            acpFlag: "--acp"
         ),
     ]
 
@@ -155,8 +142,7 @@ public enum AgentCatalog {
     public static func spawnCommand(
         kind: AgentKind,
         model: String? = nil,
-        effort: String? = nil,
-        acp: Bool = false
+        effort: String? = nil
     ) -> String? {
         guard let config = agents[kind] else { return nil }
 
@@ -176,9 +162,7 @@ public enum AgentCatalog {
             }
         }
 
-        if acp, let acpFlag = config.acpFlag {
-            parts.append(acpFlag)
-        }
+
 
         return parts.joined(separator: " ")
     }
@@ -201,5 +185,29 @@ public enum AgentCatalog {
     /// Check if an effort level is valid for a given agent.
     public static func isValidEffort(_ effort: String, for kind: AgentKind) -> Bool {
         agents[kind]?.effortLevels?.contains(effort) ?? false
+    }
+
+    /// Serialize current defaults to JSON string for the starter agent-catalog.json.
+    public static func exportDefaultsJSON() -> String {
+        let entries = defaultAgents.values.sorted { $0.id.rawValue < $1.id.rawValue }.map { c in
+            var lines = [
+                "    {",
+                "      \"id\": \"\(c.id.rawValue)\",",
+                "      \"binary\": \"\(c.binary)\",",
+                "      \"models\": [\(c.models.map { "\"\($0)\"" }.joined(separator: ", "))],",
+                "      \"modelFlag\": \"\(c.modelFlag)\",",
+            ]
+            if let levels = c.effortLevels {
+                lines.append("      \"effortLevels\": [\(levels.map { "\"\($0)\"" }.joined(separator: ", "))],")
+            }
+            if let flag = c.effortFlag  { lines.append("      \"effortFlag\": \"\(flag)\",") }
+            if let def  = c.defaultEffort { lines.append("      \"defaultEffort\": \"\(def)\",") }
+            // Trim trailing comma on last field
+            lines[lines.count - 1] = lines[lines.count - 1].hasSuffix(",")
+                ? String(lines[lines.count - 1].dropLast()) : lines[lines.count - 1]
+            lines.append("    }")
+            return lines.joined(separator: "\n")
+        }
+        return "[\n\(entries.joined(separator: ",\n"))\n]\n"
     }
 }

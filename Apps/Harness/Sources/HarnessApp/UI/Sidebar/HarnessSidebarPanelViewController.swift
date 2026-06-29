@@ -22,9 +22,6 @@ final class HarnessSidebarPanelViewController: NSViewController {
     /// Flat `.plain` style + 30×30 so it matches the neighbouring notification bell.
     private let sidebarToggleButton = SoftIconButton(frame: NSRect(x: 0, y: 0, width: 30, height: 30))
     private var tabBarHostingView: NSView!
-#if HARNESS_ACP
-    private let agentChatPanel = AgentChatPanelView()
-#endif
     let sidebarSectionModel = SidebarSectionModel()
     private var sectionLabelHostingView: NSView!
     let fileTreeView = WorkspaceFileTreeView()
@@ -71,9 +68,6 @@ final class HarnessSidebarPanelViewController: NSViewController {
         setupFileTree()
         setupFileViewer()
         setupGitPlaceholder()
-#if HARNESS_ACP
-        setupAgentPanel()
-#endif
         selectSidebarTab(index: 0)
         reload()
         applyChromeColors()
@@ -469,44 +463,6 @@ final class HarnessSidebarPanelViewController: NSViewController {
         ])
     }
 
-
-
-#if HARNESS_ACP
-    private func setupAgentPanel() {
-        agentChatPanel.translatesAutoresizingMaskIntoConstraints = false
-        agentChatPanel.isHidden = true
-        view.addSubview(agentChatPanel)
-        NSLayoutConstraint.activate([
-            agentChatPanel.topAnchor.constraint(equalTo: sectionLabelHostingView.bottomAnchor),
-            agentChatPanel.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            agentChatPanel.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            agentChatPanel.bottomAnchor.constraint(equalTo: footerHostingView.topAnchor),
-        ])
-    }
-
-    private func connectAgentIfNeeded() {
-        guard agentSession == nil else { return }
-        let registryStore = AgentRegistryStore()
-        let configs = registryStore.load()
-        guard let config = configs.first(where: { $0.isEnabled }) else {
-            agentChatPanel.showEmptyState()
-            return
-        }
-        let client = ACPClient()
-        let session = ACPSession(client: client)
-        agentSession = session
-        agentChatPanel.bind(session: session)
-        let cwd = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd ?? FileManager.default.currentDirectoryPath
-        Task {
-            await session.connect(config: config, cwd: cwd)
-        }
-    }
-
-    private var agentSession: ACPSession?
-#endif
-
-
-
     /// Switches the sidebar to the Git tab (used by the "Show Git Panel" ⌘G shortcut).
     func selectGitTab() {
         sidebarSectionModel.selectedTab = 2
@@ -592,9 +548,6 @@ final class HarnessSidebarPanelViewController: NSViewController {
             fileTreeView.isHidden = fileViewerVC.view.isHidden == false
         }
         gitPanelView.isHidden = index != 2
-#if HARNESS_ACP
-        agentChatPanel.isHidden = index != 3
-#endif
         switch index {
         case 1:
             sidebarSectionModel.text = "FILES"
@@ -613,10 +566,6 @@ final class HarnessSidebarPanelViewController: NSViewController {
             } else {
                 gitPanelView.clearRoot()
             }
-        case 3:
-            sidebarSectionModel.text = "AGENT"
-            sidebarSectionModel.isRepoHeader = false
-            // [ACP SHELVED] connectAgentIfNeeded()
         default:
             sidebarSectionModel.isRepoHeader = true
             updateRepoSectionHeader()

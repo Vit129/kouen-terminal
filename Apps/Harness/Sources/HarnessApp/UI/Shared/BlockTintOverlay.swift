@@ -215,9 +215,8 @@ private final class BlockActionBar: NSView {
         layer?.borderColor = NSColor.white.withAlphaComponent(0.14).cgColor
 
         let copyBtn  = makeButton(symbol: "doc.on.doc",  label: "Copy",   action: #selector(copyBlock))
-        let aiBtn    = makeButton(symbol: "sparkles",    label: "AI ✦",   action: #selector(aiExplain))
         let rerunBtn = makeButton(symbol: "arrow.counterclockwise", label: "Re-run", action: #selector(rerunBlock))
-        let stack = NSStackView(views: [copyBtn, aiBtn, rerunBtn])
+        let stack = NSStackView(views: [copyBtn, rerunBtn])
         stack.orientation  = .horizontal
         stack.spacing      = 1
         stack.distribution = .fillEqually
@@ -252,13 +251,6 @@ private final class BlockActionBar: NSView {
         removeFromSuperview()
     }
 
-    @objc private func aiExplain() {
-        guard let sv = surfaceView else { return }
-        let text = sv.selectionString ?? ""
-        guard !text.isEmpty else { removeFromSuperview(); return }
-        sv.onAskAI?("Explain this terminal output:\n\n```\n\(text)\n```")
-        removeFromSuperview()
-    }
 
     @objc private func rerunBlock() {
         guard let sv = surfaceView,

@@ -100,7 +100,6 @@ public indirect enum Command: Codable, Sendable, Equatable {
     case lockClient                                // lock-client / lock-session
     case clockMode                                 // clock-mode
     case openBrowser(url: URL, direction: SplitDirection) // open-browser [-h|-v] <url>
-    case openAIChat                                  // ⌘I — toggle inline AI chat in focused pane
     /// `switch-client -T <table>`: resolve the next key press in `<table>` (client-local
     /// state — builds modal/multi-key bindings on top of the prefix). One-shot, like tmux.
     case switchClientTable(table: String)          // switch-client -T <table>
@@ -251,7 +250,6 @@ extension Command {
         case let .linkWindow(target): return "link-window -t \(target)"
         case .unlinkWindow: return "unlink-window"
         case let .openBrowser(url, direction): return "open-browser -\(direction == .horizontal ? "v" : "h") \(url.absoluteString)"
-        case .openAIChat: return "open-ai-chat"
         case let .displayPopup(command): return command.map { "display-popup -E '\($0)'" } ?? "display-popup"
         case let .displayMenu(items): return "display-menu (\(items.count) items)"
         case let .setOption(scope, target, key, rawValue):
