@@ -42,6 +42,8 @@ final class AIQueryInputView: NSView {
     var onSubmit: ((String) -> Void)?
     var onDismiss: (() -> Void)?
     var onAgentChanged: ((AgentKind) -> Void)?
+    var onModelChanged: ((String?) -> Void)?
+    var onEffortChanged: ((String?) -> Void)?
 
     // MARK: - Subviews
 
@@ -56,6 +58,15 @@ final class AIQueryInputView: NSView {
         return v
     }()
 
+    private let pillStack: NSStackView = {
+        let s = NSStackView()
+        s.orientation = .horizontal
+        s.spacing = 5
+        s.alignment = .centerY
+        s.translatesAutoresizingMaskIntoConstraints = false
+        return s
+    }()
+
     private let agentPill: NSButton = {
         let b = NSButton(title: "✦ Claude", target: nil, action: nil)
         b.bezelStyle = .recessed
@@ -68,7 +79,33 @@ final class AIQueryInputView: NSView {
         return b
     }()
 
+    private let modelPill: NSButton = {
+        let b = NSButton(title: "", target: nil, action: nil)
+        b.bezelStyle = .recessed
+        b.isBordered = false
+        b.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
+        b.contentTintColor = NSColor.white.withAlphaComponent(0.55)
+        b.wantsLayer = true
+        b.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.07).cgColor
+        b.layer?.cornerRadius = 4
+        return b
+    }()
+
+    private let effortPill: NSButton = {
+        let b = NSButton(title: "", target: nil, action: nil)
+        b.bezelStyle = .recessed
+        b.isBordered = false
+        b.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
+        b.contentTintColor = NSColor.white.withAlphaComponent(0.45)
+        b.wantsLayer = true
+        b.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.05).cgColor
+        b.layer?.cornerRadius = 4
+        return b
+    }()
+
     private var currentAgent: AgentKind = .claudeCode
+    private var currentModel: String?
+    private var currentEffort: String?
 
     private let field: NSTextField = {
         let f = AIInputTextField()
@@ -102,10 +139,17 @@ final class AIQueryInputView: NSView {
     private func setup() {
         translatesAutoresizingMaskIntoConstraints = false
 
-        [background, agentPill, field, hintLabel].forEach {
-            $0.translatesAutoresizingMaskIntoConstraints = false
-            addSubview($0)
-        }
+        background.translatesAutoresizingMaskIntoConstraints = false
+        field.translatesAutoresizingMaskIntoConstraints = false
+        hintLabel.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(background)
+        addSubview(pillStack)
+        addSubview(field)
+        addSubview(hintLabel)
+
+        pillStack.addArrangedSubview(agentPill)
+        pillStack.addArrangedSubview(modelPill)
+        pillStack.addArrangedSubview(effortPill)
 
         NSLayoutConstraint.activate([
             background.topAnchor.constraint(equalTo: topAnchor),
@@ -113,21 +157,25 @@ final class AIQueryInputView: NSView {
             background.trailingAnchor.constraint(equalTo: trailingAnchor),
             background.bottomAnchor.constraint(equalTo: bottomAnchor),
 
-            agentPill.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
-            agentPill.centerYAnchor.constraint(equalTo: centerYAnchor, constant: -8),
+            pillStack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
+            pillStack.centerYAnchor.constraint(equalTo: centerYAnchor, constant: -8),
 
-            field.leadingAnchor.constraint(equalTo: agentPill.trailingAnchor, constant: 8),
+            field.leadingAnchor.constraint(equalTo: pillStack.trailingAnchor, constant: 8),
             field.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
-            field.centerYAnchor.constraint(equalTo: agentPill.centerYAnchor),
+            field.centerYAnchor.constraint(equalTo: pillStack.centerYAnchor),
 
-            hintLabel.leadingAnchor.constraint(equalTo: agentPill.leadingAnchor),
-            hintLabel.topAnchor.constraint(equalTo: agentPill.bottomAnchor, constant: 4),
+            hintLabel.leadingAnchor.constraint(equalTo: pillStack.leadingAnchor),
+            hintLabel.topAnchor.constraint(equalTo: pillStack.bottomAnchor, constant: 4),
             hintLabel.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -10),
         ])
 
         field.delegate = self
         agentPill.target = self
         agentPill.action = #selector(agentPillClicked(_:))
+        modelPill.target = self
+        modelPill.action = #selector(modelPillClicked(_:))
+        effortPill.target = self
+        effortPill.action = #selector(effortPillClicked(_:))
 
         // Accept image and file drags — converts to path text, not inline rendering.
         registerForDraggedTypes([.fileURL, .png, .tiff,
@@ -159,21 +207,98 @@ final class AIQueryInputView: NSView {
         currentAgent = kind
         configure(agent: kind)
         onAgentChanged?(kind)
+        // Reset model/effort after agent switch
+        onModelChanged?(currentModel)
+        onEffortChanged?(currentEffort)
+    }
+
+    // MARK: - Model Picker
+
+    @objc private func modelPillClicked(_ sender: NSButton) {
+        let models = AgentCatalog.agents[currentAgent]?.models ?? []
+        guard !models.isEmpty else { return }
+        let menu = NSMenu()
+        for model in models {
+            let item = NSMenuItem(title: shortModelName(model), action: #selector(modelSelected(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = model
+            item.state = (model == currentModel) ? .on : .off
+            menu.addItem(item)
+        }
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.height), in: sender)
+    }
+
+    @objc private func modelSelected(_ item: NSMenuItem) {
+        guard let model = item.representedObject as? String else { return }
+        updateModel(model)
+        onModelChanged?(model)
+    }
+
+    // MARK: - Effort Picker
+
+    @objc private func effortPillClicked(_ sender: NSButton) {
+        guard let levels = AgentCatalog.agents[currentAgent]?.effortLevels, !levels.isEmpty else { return }
+        let menu = NSMenu()
+        // "auto" option to clear effort (use agent default)
+        let autoItem = NSMenuItem(title: "auto (default)", action: #selector(effortSelected(_:)), keyEquivalent: "")
+        autoItem.target = self
+        autoItem.representedObject = Optional<String>.none as AnyObject
+        autoItem.state = (currentEffort == nil) ? .on : .off
+        menu.addItem(autoItem)
+        menu.addItem(.separator())
+        for level in levels {
+            let item = NSMenuItem(title: level, action: #selector(effortSelected(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = level
+            item.state = (level == currentEffort) ? .on : .off
+            menu.addItem(item)
+        }
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.height), in: sender)
+    }
+
+    @objc private func effortSelected(_ item: NSMenuItem) {
+        let effort = item.representedObject as? String
+        updateEffort(effort)
+        onEffortChanged?(effort)
     }
 
     // MARK: - Configuration
 
-    func configure(agent: AgentKind) {
+    func configure(agent: AgentKind, model: String? = nil, effort: String? = nil) {
         currentAgent = agent
-        let name: String
-        switch agent {
-        case .claudeCode:  name = "Claude"
-        case .codex:       name = "Codex"
-        case .antigravity: name = "Gemini"
-        case .kiro:        name = "Kiro"
-        default:           name = agent.rawValue
+        agentPill.title = "✦ \(agent.displayName) ▾"
+
+        // Reset model to passed value (or first available)
+        let catalog = AgentCatalog.agents[agent]
+        let resolvedModel = model ?? catalog?.models.first
+        currentModel = resolvedModel
+        modelPill.title = resolvedModel.map { shortModelName($0) + " ▾" } ?? ""
+        modelPill.isHidden = catalog?.models.isEmpty ?? true
+
+        // Effort: only shown when agent supports it
+        let resolvedEffort = effort ?? catalog?.defaultEffort
+        currentEffort = resolvedEffort
+        effortPill.title = resolvedEffort.map { $0 + " ▾" } ?? ""
+        effortPill.isHidden = catalog?.effortLevels == nil
+    }
+
+    func updateModel(_ model: String?) {
+        currentModel = model
+        modelPill.title = model.map { shortModelName($0) + " ▾" } ?? ""
+    }
+
+    func updateEffort(_ effort: String?) {
+        currentEffort = effort
+        effortPill.title = effort.map { $0 + " ▾" } ?? ""
+    }
+
+    // Strips provider prefix: "claude-opus-4.8" → "opus-4.8", "gemini-2.5-pro" → "2.5-pro"
+    private func shortModelName(_ model: String) -> String {
+        let prefixes = ["claude-", "gemini-", "gpt-"]
+        for prefix in prefixes {
+            if model.hasPrefix(prefix) { return String(model.dropFirst(prefix.count)) }
         }
-        agentPill.title = "✦ \(name) ▾"
+        return model
     }
 
     func focus() {

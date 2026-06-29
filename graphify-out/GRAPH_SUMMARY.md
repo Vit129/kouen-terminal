@@ -1,4 +1,4 @@
-# Graph Summary — .
+# Graph Summary — harness-terminal
 _Auto-generated from graphify-out/GRAPH_REPORT.md · do not edit manually_
 _Regen: `~/.claude/scripts/generate-graph-summary.sh .` after `graphify update .`_
 
