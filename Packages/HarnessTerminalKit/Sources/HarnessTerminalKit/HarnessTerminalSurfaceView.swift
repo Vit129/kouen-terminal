@@ -1460,6 +1460,20 @@ public final class HarnessTerminalSurfaceView: NSView {
                     self.setWindowOccluded(!window.occlusionState.contains(.visible))
                 }
             })
+            // Track display changes regardless of backing-scale: moving between two Retina
+            // displays (same 2× scale) never fires viewDidChangeBackingProperties, so the
+            // idle display link stays paused and the Metal layer content is lost on the new
+            // display. Waking the link here — and re-tuning the frame-rate range — fixes
+            // the persistent black terminal after a same-scale display switch.
+            windowKeyObservers.append(nc.addObserver(
+                forName: NSWindow.didChangeScreenNotification, object: window, queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    self.applyPreferredFrameRateRange()
+                    self.scheduleRender()
+                }
+            })
             window.makeFirstResponder(self)
             focusStateChanged()
         } else {
@@ -1568,7 +1582,11 @@ public final class HarnessTerminalSurfaceView: NSView {
         liveResizeFrozenOrigin = nil
         updateGridSize()
         if wasFrozen, hasSizedGrid { liveResizeFrozenOrigin = (originOffsetX, originOffsetY) }
-        scheduleRender()
+        // Force an immediate synchronous present so the new-scale frame lands THIS turn —
+        // scheduleRender would leave one vsync of blank content visible after the scale change.
+        // (didChangeScreenNotification handles same-scale switches via the async path, which
+        // is fine there because the drawable size is unchanged and no black gap opens.)
+        scheduler.forceRender()
     }
 
     /// Glitchless live resize (Hume's technique; Ghostty parity). While the user drags the window
