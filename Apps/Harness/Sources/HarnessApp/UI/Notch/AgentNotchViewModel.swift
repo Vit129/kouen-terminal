@@ -76,19 +76,7 @@ final class AgentNotchViewModel: ObservableObject {
         )
     }
 
-    var openContentHeight: CGFloat {
-        let rowCount = max(1, visibleRows.count)
-        let rowHeight: CGFloat = 38
-        let rowSpacing: CGFloat = 5
-        let headerHeight: CGFloat = 30
-        let sectionSpacing: CGFloat = 6
-        let verticalPadding: CGFloat = 20
-        let overflowHint: CGFloat = hasOverflowRows ? 18 : 0
-        let rowStack = CGFloat(rowCount) * rowHeight + CGFloat(max(0, rowCount - 1)) * rowSpacing
-        let ideal = verticalPadding + headerHeight + sectionSpacing + rowStack + overflowHint
-        let minimum = rows.isEmpty ? CGFloat(86) : CGFloat(98)
-        return min(CGFloat(geometry.openHeight), max(minimum, ideal.rounded(.up)))
-    }
+    @Published private(set) var openContentHeight: CGFloat = 86
 
     // MARK: - Motion
 
@@ -106,7 +94,17 @@ final class AgentNotchViewModel: ObservableObject {
     }
 
     func updateGeometry(_ geometry: NotchLayoutMetrics) {
+        guard geometry != self.geometry else { return }
         self.geometry = geometry
+        recomputeOpenContentHeight()
+    }
+
+    private func recomputeOpenContentHeight() {
+        let rowCount = max(1, visibleRows.count)
+        let rowStack = CGFloat(rowCount) * 38 + CGFloat(max(0, rowCount - 1)) * 5
+        let ideal = 20 + 30 + 6 + rowStack + (hasOverflowRows ? 18 : 0)
+        let minimum: CGFloat = rows.isEmpty ? 86 : 98
+        openContentHeight = min(CGFloat(geometry.openHeight), max(minimum, ideal.rounded(.up)))
     }
 
     // MARK: - Data refresh
@@ -142,6 +140,7 @@ final class AgentNotchViewModel: ObservableObject {
         rows = updatedRows
         rowProgress = progress
         sessionCount = Set(rows.map(\.sessionID)).count
+        recomputeOpenContentHeight()
         considerPeek()
     }
 

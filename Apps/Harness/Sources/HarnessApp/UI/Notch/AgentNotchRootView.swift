@@ -19,7 +19,6 @@ struct AgentNotchRootView: View {
                         .frame(height: 1)
                         .accessibilityHidden(true)
                 }
-                .shadow(color: shadowColor, radius: isExpanded ? 12 : 0, y: isExpanded ? 8 : 0)
                 // Closed state: only the inner ~3/4 of the pill is hover/click-sensitive, so
                 // a fly-by across the menu bar (or a fling to the top edge) never triggers
                 // the HUD. Peek/open keep the whole card interactive.
@@ -28,8 +27,6 @@ struct AgentNotchRootView: View {
                 .onTapGesture {
                     if !model.isOpen { model.open() }
                 }
-                .animation(contentAnimation, value: model.openContentHeight)
-                .animation(contentAnimation, value: model.waitingCount)
                 .accessibilityElement(children: .contain)
         }
         .frame(
@@ -278,13 +275,6 @@ struct AgentNotchRootView: View {
         }
     }
 
-    private var isExpanded: Bool {
-        switch model.presentation {
-        case .closed: return false
-        case .peek, .open: return true
-        }
-    }
-
     private var topRadius: CGFloat {
         model.geometry.hasPhysicalNotch ? 2 : 9
     }
@@ -305,18 +295,6 @@ struct AgentNotchRootView: View {
     private var hotZoneInset: CGFloat {
         if case .closed = model.presentation { return 24 }
         return 0
-    }
-
-    private var shadowColor: Color {
-        reduceTransparency ? .clear : .black.opacity(0.52)
-    }
-
-    /// In-place value changes while open (row count, badges) — presentation changes are
-    /// animated by the model's asymmetric springs instead.
-    private var contentAnimation: Animation {
-        reduceMotion
-            ? .easeOut(duration: 0.12)
-            : .spring(response: 0.30, dampingFraction: 0.88)
     }
 
     private var closedTransition: AnyTransition {
