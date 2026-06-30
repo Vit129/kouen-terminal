@@ -6,14 +6,8 @@ public enum JSONRPCId: Codable, Equatable, Sendable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
-        if let value = try? container.decode(Int.self) {
-            self = .int(value)
-            return
-        }
-        if let value = try? container.decode(String.self) {
-            self = .string(value)
-            return
-        }
+        if let value = try? container.decode(Int.self) { self = .int(value); return }
+        if let value = try? container.decode(String.self) { self = .string(value); return }
         throw DecodingError.typeMismatch(
             JSONRPCId.self,
             DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Expected string or int JSON-RPC id")
@@ -23,10 +17,8 @@ public enum JSONRPCId: Codable, Equatable, Sendable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         switch self {
-        case let .string(value):
-            try container.encode(value)
-        case let .int(value):
-            try container.encode(value)
+        case let .string(value): try container.encode(value)
+        case let .int(value):    try container.encode(value)
         }
     }
 }
@@ -34,40 +26,26 @@ public enum JSONRPCId: Codable, Equatable, Sendable {
 public struct JSONRPCError: Codable, Equatable, Sendable {
     public var code: Int
     public var message: String
-
-    public init(code: Int, message: String) {
-        self.code = code
-        self.message = message
-    }
+    public init(code: Int, message: String) { self.code = code; self.message = message }
 }
 
-public enum ACPMessage: Codable, Equatable, Sendable {
+public enum JSONRPCMessage: Codable, Equatable, Sendable {
     case request(id: JSONRPCId, method: String, params: AnyCodable?)
     case response(id: JSONRPCId, result: AnyCodable?, error: JSONRPCError?)
     case notification(method: String, params: AnyCodable?)
 
     private enum CodingKeys: String, CodingKey {
-        case jsonrpc
-        case id
-        case method
-        case params
-        case result
-        case error
+        case jsonrpc, id, method, params, result, error
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let version = try container.decode(String.self, forKey: .jsonrpc)
         guard version == "2.0" else {
-            throw DecodingError.dataCorruptedError(
-                forKey: .jsonrpc,
-                in: container,
-                debugDescription: "Expected JSON-RPC 2.0 message"
-            )
+            throw DecodingError.dataCorruptedError(forKey: .jsonrpc, in: container, debugDescription: "Expected JSON-RPC 2.0 message")
         }
-
         if let method = try container.decodeIfPresent(String.self, forKey: .method) {
-            let params = try Self.decodeExplicitNullableValue(from: container, forKey: .params)
+            let params = try Self.decodeNullable(from: container, forKey: .params)
             if let id = try container.decodeIfPresent(JSONRPCId.self, forKey: .id) {
                 self = .request(id: id, method: method, params: params)
             } else {
@@ -75,21 +53,15 @@ public enum ACPMessage: Codable, Equatable, Sendable {
             }
             return
         }
-
         let id = try container.decode(JSONRPCId.self, forKey: .id)
-        let result = try Self.decodeExplicitNullableValue(from: container, forKey: .result)
+        let result = try Self.decodeNullable(from: container, forKey: .result)
         let error = try container.decodeIfPresent(JSONRPCError.self, forKey: .error)
         self = .response(id: id, result: result, error: error)
     }
 
-    private static func decodeExplicitNullableValue(
-        from container: KeyedDecodingContainer<CodingKeys>,
-        forKey key: CodingKeys
-    ) throws -> AnyCodable? {
+    private static func decodeNullable(from container: KeyedDecodingContainer<CodingKeys>, forKey key: CodingKeys) throws -> AnyCodable? {
         guard container.contains(key) else { return nil }
-        if try container.decodeNil(forKey: key) {
-            return .null
-        }
+        if try container.decodeNil(forKey: key) { return .null }
         return try container.decode(AnyCodable.self, forKey: key)
     }
 
@@ -123,45 +95,26 @@ public indirect enum AnyCodable: Codable, Equatable, Sendable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
-        if container.decodeNil() {
-            self = .null
-        } else if let value = try? container.decode(Bool.self) {
-            self = .bool(value)
-        } else if let value = try? container.decode(Int.self) {
-            self = .int(value)
-        } else if let value = try? container.decode(Double.self) {
-            self = .double(value)
-        } else if let value = try? container.decode(String.self) {
-            self = .string(value)
-        } else if let value = try? container.decode([AnyCodable].self) {
-            self = .array(value)
-        } else if let value = try? container.decode([String: AnyCodable].self) {
-            self = .object(value)
-        } else {
-            throw DecodingError.typeMismatch(
-                AnyCodable.self,
-                DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Unsupported JSON value")
-            )
-        }
+        if container.decodeNil()                                        { self = .null }
+        else if let v = try? container.decode(Bool.self)                { self = .bool(v) }
+        else if let v = try? container.decode(Int.self)                 { self = .int(v) }
+        else if let v = try? container.decode(Double.self)              { self = .double(v) }
+        else if let v = try? container.decode(String.self)              { self = .string(v) }
+        else if let v = try? container.decode([AnyCodable].self)        { self = .array(v) }
+        else if let v = try? container.decode([String: AnyCodable].self){ self = .object(v) }
+        else { throw DecodingError.typeMismatch(AnyCodable.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Unsupported JSON value")) }
     }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         switch self {
-        case let .string(value):
-            try container.encode(value)
-        case let .int(value):
-            try container.encode(value)
-        case let .double(value):
-            try container.encode(value)
-        case let .bool(value):
-            try container.encode(value)
-        case let .array(value):
-            try container.encode(value)
-        case let .object(value):
-            try container.encode(value)
-        case .null:
-            try container.encodeNil()
+        case let .string(v): try container.encode(v)
+        case let .int(v):    try container.encode(v)
+        case let .double(v): try container.encode(v)
+        case let .bool(v):   try container.encode(v)
+        case let .array(v):  try container.encode(v)
+        case let .object(v): try container.encode(v)
+        case .null:          try container.encodeNil()
         }
     }
 }

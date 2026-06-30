@@ -35,7 +35,6 @@ final class SessionCoordinator: NSObject {
     let terminalHosts = TerminalPaneRegistry()
     /// One inline AI completion controller per terminal pane — keyed by surface UUID string.
     private var inlineAIControllers: [String: InlineAICompletionController] = [:]
-    private var aiChatControllers: [String: AITerminalChatController] = [:]
     private var lastDaemonErrorNotice: Date?
     private let snapshotCoalescer = SnapshotCoalescer()
 
@@ -46,12 +45,9 @@ final class SessionCoordinator: NSObject {
 
     private override init() {
         super.init()
-        // Drop the per-surface AI controllers when their host is retired — these dicts only
-        // ever inserted (one pair per pane), so without this every closed pane leaked its
-        // InlineAICompletionController + AITerminalChatController (and their subviews) forever.
+        // Drop the per-surface AI controllers when their host is retired.
         terminalHosts.onRetire = { [weak self] surfaceID in
             self?.inlineAIControllers.removeValue(forKey: surfaceID.uuidString)
-            self?.aiChatControllers.removeValue(forKey: surfaceID.uuidString)
             SecureInputMonitor.shared.release(surfaceID)
             if self?.runSurfaceID == surfaceID { self?.runSurfaceID = nil }
         }
@@ -414,10 +410,6 @@ final class SessionCoordinator: NSObject {
         let aiController = InlineAICompletionController()
         aiController.install(in: host)
         inlineAIControllers[surfaceID.uuidString] = aiController
-        // Wire the terminal chat controller (⌘I → Warp-style inline AI blocks).
-        let chatController = AITerminalChatController(hostView: host, settings: settings)
-        aiChatControllers[surfaceID.uuidString] = chatController
-        host.surfaceView.onAskAI = { [weak chatController] text in chatController?.askAI(prefill: text) }
         // Block output tint + AI explain action bar (Phase 12b).
         let tintOverlay = BlockTintOverlay(surfaceView: host.surfaceView)
         tintOverlay.translatesAutoresizingMaskIntoConstraints = false
@@ -450,13 +442,6 @@ final class SessionCoordinator: NSObject {
             PromptQueue.shared.dequeueAndRun(for: host.surfaceID, via: host)
         }
         return host
-    }
-
-    // MARK: - Terminal AI Chat (⌘I)
-
-    func toggleAIChat() {
-        guard let surfaceID = activeSurfaceID else { return }
-        aiChatControllers[surfaceID.uuidString]?.toggle()
     }
 
     // MARK: - Composer (⌘⇧E)

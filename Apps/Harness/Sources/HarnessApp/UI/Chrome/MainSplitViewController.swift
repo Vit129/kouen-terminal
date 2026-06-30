@@ -274,7 +274,6 @@ final class MainSplitViewController: NSViewController {
         sidebarAnimToken &+= 1
         let target = visible ? HarnessDesign.sidebarWidth : 0
         splitDelegate.allowFullCollapse = true
-
         guard animated, let panel = sidebarContainerView else {
             let panel = sidebarContainerView
             panel?.isHidden = false              // unhide so setPosition can size it to 0
@@ -289,6 +288,13 @@ final class MainSplitViewController: NSViewController {
             updateContentLeadingInset()
             return
         }
+
+        // Kill any in-flight animation before reading panel.frame.width.
+        // Without this, a zero-delta early-exit returns without replacing sidebarDisplayLink,
+        // leaving the old link running with stale _sidebarVisible — causing the sidebar to
+        // collapse even when the user requested expand.
+        sidebarDisplayLink?.invalidate()
+        sidebarDisplayLink = nil
 
         // Unhide before the slide so the panel is visible as it shrinks/grows.
         panel.isHidden = false
@@ -308,7 +314,6 @@ final class MainSplitViewController: NSViewController {
         _sidebarTarget = target
         _sidebarT0 = CACurrentMediaTime()
         _sidebarVisible = visible
-        sidebarDisplayLink?.invalidate()
         let link = view.displayLink(target: self, selector: #selector(_sidebarLinkFired))
         link.add(to: RunLoop.main, forMode: RunLoop.Mode.common)
         sidebarDisplayLink = link
@@ -465,7 +470,6 @@ final class MainSplitViewController: NSViewController {
     private func setSidebarWidth(_ width: CGFloat) {
         let totalWidth = split.bounds.width
         guard totalWidth > 0 else {
-            // Not yet laid out — defer until first layout fires
             DispatchQueue.main.async { [weak self] in self?.setSidebarWidth(width) }
             return
         }
