@@ -279,6 +279,8 @@ public final class SurfaceRegistry: @unchecked Sendable {
         acquireRegistryLock()
         defer { lock.unlock() }
         switch request {
+        case .openGitPanel:
+            return .ok // intercepted at connection layer; never reaches here
         case .ping:
             return .pong
         case .listWorkspaces:
