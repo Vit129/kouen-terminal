@@ -40,6 +40,7 @@ Grep target: `grep -n "CASE-\|<keyword>" knowledge/cases/misc.md`
 | ID | Trigger | Fix |
 |----|---------|-----|
 | CASE-057 | statusLine + advisor + remote-control all "broke after Harness migration" | NOT Harness. `~/.claude/settings.json` had invalid `skillOverrides.deep-research:"disabled"` (valid: `on\|name-only\|user-invocable-only\|off`). CC **2.1.195** skips the **whole** file on one bad value → every setting ignored. Fix: `"disabled"`→`"off"`. Verified statusLine 0→36 invokes |
+| CASE-058 | Cmd+\ after collapse → sidebar gone until relaunch (not 100%) | `sidebarCollapsedOnLaunch=true` + timing race in CADisplayLink sidebar animation. Two suspects: **A** dead token guard (`_sidebarLinkFired` passes live `sidebarAnimToken` → `guard token == sidebarAnimToken` always true, old link never cancelled); **B** zero-delta early exit (`start==target` mid-collapse → no animation, `isHidden=false`, then old collapse finishes with `isHidden=true`). `[DBG-sb]` instrumentation added to `MainSplitViewController.swift`. See `knowledge/bugs/sidebar-cmdbackslash-toggle.md` |
 
 **CASE-057 diagnostic technique (reusable):** symptoms that look like a Harness regression
 may be a rejected `~/.claude/settings.json`. The `SettingsError` startup dialog is invisible
