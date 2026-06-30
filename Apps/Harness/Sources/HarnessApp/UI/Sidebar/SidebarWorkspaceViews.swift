@@ -238,6 +238,9 @@ final class SidebarSectionModel {
     var isRepoHeader: Bool = true
     var chromeEpoch: Int = 0
     var selectedTab: Int = 0
+    var showBoardView: Bool = false
+    // ponytail: closure avoids bridging @Observable back to NSViewController for one action
+    var onToggleBoardView: (() -> Void)? = nil
 }
 
 struct SidebarTabBarView: View {
@@ -255,8 +258,7 @@ struct SidebarTabBarView: View {
             Text("Sessions").tag(0)
             Text("Files").tag(1)
             Text("Git").tag(2)
-            Text("Board").tag(3)
-            Text("Spaces").tag(4)
+            Text("Spaces").tag(3)
         }
         .pickerStyle(.segmented)
         .labelsHidden()
@@ -270,14 +272,28 @@ struct SidebarSectionLabelView: View {
     var body: some View {
         let _ = model.chromeEpoch
         let c = HarnessDesign.chrome
-        Text(model.text)
-            .font(model.isRepoHeader
-                ? .system(size: 11.5, weight: .bold)
-                : Font(HarnessDesign.Typography.sectionLabel))
-            .foregroundColor(Color(nsColor: c.textTertiary))
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-            .padding(.leading, HarnessDesign.horizontalInset)
-            .padding(.bottom, 4)
+        HStack(alignment: .bottom) {
+            Text(model.selectedTab == 0 && model.showBoardView ? "BOARD" : model.text)
+                .font(model.isRepoHeader
+                    ? .system(size: 11.5, weight: .bold)
+                    : Font(HarnessDesign.Typography.sectionLabel))
+                .foregroundColor(Color(nsColor: c.textTertiary))
+            Spacer()
+            if model.selectedTab == 0 {
+                Button {
+                    model.onToggleBoardView?()
+                } label: {
+                    Image(systemName: model.showBoardView ? "list.bullet" : "square.grid.2x2")
+                        .font(.system(size: 11))
+                        .foregroundColor(Color(nsColor: c.textTertiary))
+                }
+                .buttonStyle(.plain)
+                .padding(.trailing, HarnessDesign.horizontalInset)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+        .padding(.leading, HarnessDesign.horizontalInset)
+        .padding(.bottom, 4)
     }
 }
 
