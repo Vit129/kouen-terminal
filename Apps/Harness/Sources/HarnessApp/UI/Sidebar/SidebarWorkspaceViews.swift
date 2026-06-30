@@ -255,6 +255,8 @@ struct SidebarTabBarView: View {
             Text("Sessions").tag(0)
             Text("Files").tag(1)
             Text("Git").tag(2)
+            Text("Board").tag(3)
+            Text("Spaces").tag(4)
         }
         .pickerStyle(.segmented)
         .labelsHidden()

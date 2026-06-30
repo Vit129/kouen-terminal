@@ -202,4 +202,27 @@ public enum AgentCatalog {
     public static func isValidEffort(_ effort: String, for kind: AgentKind) -> Bool {
         agents[kind]?.effortLevels?.contains(effort) ?? false
     }
+
+    /// Serialize current defaults to JSON string for the starter agent-catalog.json.
+    public static func exportDefaultsJSON() -> String {
+        let entries = defaultAgents.values.sorted { $0.id.rawValue < $1.id.rawValue }.map { c in
+            var lines = [
+                "    {",
+                "      \"id\": \"\(c.id.rawValue)\",",
+                "      \"binary\": \"\(c.binary)\",",
+                "      \"models\": [\(c.models.map { "\"\($0)\"" }.joined(separator: ", "))],",
+                "      \"modelFlag\": \"\(c.modelFlag)\",",
+            ]
+            if let levels = c.effortLevels {
+                lines.append("      \"effortLevels\": [\(levels.map { "\"\($0)\"" }.joined(separator: ", "))],")
+            }
+            if let flag = c.effortFlag  { lines.append("      \"effortFlag\": \"\(flag)\",") }
+            if let def  = c.defaultEffort { lines.append("      \"defaultEffort\": \"\(def)\",") }
+            lines[lines.count - 1] = lines[lines.count - 1].hasSuffix(",")
+                ? String(lines[lines.count - 1].dropLast()) : lines[lines.count - 1]
+            lines.append("    }")
+            return lines.joined(separator: "\n")
+        }
+        return "[\n\(entries.joined(separator: ",\n"))\n]\n"
+    }
 }
