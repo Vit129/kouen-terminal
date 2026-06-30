@@ -79,6 +79,11 @@ final class HarnessSidebarPanelViewController: NSViewController {
 #if HARNESS_ACP
         setupAgentPanel()
 #endif
+        sidebarSectionModel.onToggleBoardView = { [weak self] in
+            guard let self else { return }
+            sidebarSectionModel.showBoardView.toggle()
+            selectSidebarTab(index: sidebarSectionModel.selectedTab)
+        }
         selectSidebarTab(index: 0)
         reload()
         applyChromeColors()
@@ -627,7 +632,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
     }
 
     private func selectSidebarTab(index: Int) {
-        sessionHostingView?.isHidden = index != 0
+        sessionHostingView?.isHidden = index != 0 || sidebarSectionModel.showBoardView
         if index != 1 {
             // Leaving the Files tab: collapse any open preview back to the tree
             // so returning to Files always starts from the file list.
@@ -637,8 +642,8 @@ final class HarnessSidebarPanelViewController: NSViewController {
             fileTreeView.isHidden = fileViewerVC.view.isHidden == false
         }
         gitPanelView.isHidden = index != 2
-        boardVC.view.isHidden = index != 3
-        spacesHostingView.isHidden = index != 4
+        boardVC.view.isHidden = !(index == 0 && sidebarSectionModel.showBoardView)
+        spacesHostingView.isHidden = index != 3
         switch index {
         case 1:
             sidebarSectionModel.text = "FILES"
@@ -658,9 +663,6 @@ final class HarnessSidebarPanelViewController: NSViewController {
                 gitPanelView.clearRoot()
             }
         case 3:
-            sidebarSectionModel.text = "BOARD"
-            sidebarSectionModel.isRepoHeader = false
-        case 4:
             sidebarSectionModel.text = "SPACES"
             sidebarSectionModel.isRepoHeader = false
         default:
