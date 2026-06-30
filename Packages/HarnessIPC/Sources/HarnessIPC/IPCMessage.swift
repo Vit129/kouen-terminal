@@ -170,6 +170,8 @@ public enum IPCRequest: Codable, Sendable {
     case browserGoForward(paneID: UUID)
     case browserReload(paneID: UUID)
     case browserResponse(id: UUID, response: BrowserResponsePayload)
+    // Sidebar navigation
+    case openGitPanel(repoPath: String?)
 }
 
 public enum BrowserRequestPayload: Codable, Sendable {
@@ -315,6 +317,8 @@ public enum IPCResponse: Codable, Sendable {
     // Browser tool integration (P14)
     case browserRequest(id: UUID, paneID: UUID?, req: BrowserRequestPayload)
     case browserSuccess(BrowserResponsePayload)
+    // Sidebar navigation push
+    case openGitPanel(repoPath: String?)
 }
 
 public struct OptionEntry: Codable, Sendable, Equatable {
