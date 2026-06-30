@@ -814,7 +814,7 @@ final class HarnessSplitView: NSSplitView, NSSplitViewDelegate {
     private var isApplyingPositions = false
     private var ratioDebounce: DispatchWorkItem?
 
-    override var dividerColor: NSColor { HarnessChrome.current.border }
+    override var dividerColor: NSColor { HarnessChrome.current.paneDivider }
     override var dividerThickness: CGFloat { HarnessDesign.Divider.thickness }
 
     override func layout() {
@@ -844,6 +844,7 @@ final class HarnessSplitView: NSSplitView, NSSplitViewDelegate {
             $0.needsLayout = true
             $0.layoutSubtreeIfNeeded()
         }
+        updateTrackingAreas()
     }
 
     override func adjustSubviews() {
@@ -865,6 +866,119 @@ final class HarnessSplitView: NSSplitView, NSSplitViewDelegate {
     func splitViewDidResizeSubviews(_ notification: Notification) {
         guard notification.userInfo?["NSSplitViewDividerIndex"] != nil else { return }
         persistRatio()
+        // Refresh corner handle position for self and any enclosing outer split.
+        updateTrackingAreas()
+        (superview?.superview as? HarnessSplitView)?.updateTrackingAreas()
+    }
+
+    // MARK: — Corner handle (3-way intersection drag)
+
+    private struct CornerInfo {
+        let outerDividerIndex: Int
+        weak var innerSplit: HarnessSplitView?
+        let innerDividerIndex: Int
+        let rect: NSRect  // in self's coordinate space
+    }
+
+    private var _cornerInfo: CornerInfo?
+    private var _cornerTrackingArea: NSTrackingArea?
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let a = _cornerTrackingArea { removeTrackingArea(a); _cornerTrackingArea = nil }
+        guard let info = buildCornerInfo() else { _cornerInfo = nil; return }
+        _cornerInfo = info
+        let area = NSTrackingArea(
+            rect: info.rect,
+            options: [.cursorUpdate, .activeInKeyWindow],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(area)
+        _cornerTrackingArea = area
+    }
+
+    override func cursorUpdate(with event: NSEvent) {
+        let p = convert(event.locationInWindow, from: nil)
+        if let info = _cornerInfo, info.rect.contains(p) {
+            NSCursor.crosshair.set()
+        } else {
+            super.cursorUpdate(with: event)
+        }
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        let p = convert(event.locationInWindow, from: nil)
+        guard let info = _cornerInfo, info.rect.contains(p), let inner = info.innerSplit else {
+            super.mouseDown(with: event)
+            return
+        }
+        runCornerDrag(startEvent: event, inner: inner,
+                      outerIdx: info.outerDividerIndex, innerIdx: info.innerDividerIndex)
+    }
+
+    private func runCornerDrag(startEvent: NSEvent, inner: HarnessSplitView, outerIdx: Int, innerIdx: Int) {
+        // Positions measured from leading edge: left for isVertical=true, top for isVertical=false.
+        let outerStart: CGFloat = isVertical
+            ? subviews[outerIdx].frame.maxX
+            : subviews[outerIdx].frame.height
+        let innerStart: CGFloat = inner.isVertical
+            ? inner.subviews[innerIdx].frame.maxX
+            : inner.subviews[innerIdx].frame.height
+        let startPt = convert(startEvent.locationInWindow, from: nil)
+
+        while true {
+            guard let e = window?.nextEvent(matching: [.leftMouseUp, .leftMouseDragged]) else { break }
+            if e.type == .leftMouseUp { break }
+            let cur = convert(e.locationInWindow, from: nil)
+            let dx = cur.x - startPt.x
+            // dy is positive-up in AppKit; "from top" = innerStart - dy (down drag = smaller dy = larger from-top)
+            let dy = cur.y - startPt.y
+            setPosition(isVertical ? outerStart + dx : outerStart - dy, ofDividerAt: outerIdx)
+            inner.setPosition(inner.isVertical ? innerStart + dx : innerStart - dy, ofDividerAt: innerIdx)
+        }
+    }
+
+    private func buildCornerInfo() -> CornerInfo? {
+        guard subviews.count >= 2 else { return nil }
+        for i in subviews.indices {
+            // Walk one level into each container to find a nested opposite-axis HarnessSplitView.
+            guard let inner = subviews[i].subviews.first(where: { $0 is HarnessSplitView }) as? HarnessSplitView,
+                  inner.isVertical != self.isVertical,
+                  inner.subviews.count >= 2 else { continue }
+
+            // Outer divider is between subviews[outerDividerIndex] and subviews[outerDividerIndex+1].
+            let outerDividerIndex = max(0, i - 1)
+            guard outerDividerIndex + 1 < subviews.count else { continue }
+
+            let cornerX: CGFloat
+            let cornerY: CGFloat
+
+            if isVertical {
+                // Outer splits left/right — divider is vertical.
+                cornerX = (subviews[outerDividerIndex].frame.maxX + subviews[outerDividerIndex + 1].frame.minX) / 2
+                // Inner splits top/bottom: divider is the gap between inner.subviews[0] (top) and [1] (bottom).
+                // In AppKit Y-up, top pane's bottom edge = subviews[0].frame.minY.
+                let divCenterInInner = (inner.subviews[0].frame.minY + inner.subviews[1].frame.maxY) / 2
+                cornerY = inner.convert(NSPoint(x: 0, y: divCenterInInner), to: self).y
+            } else {
+                // Outer splits top/bottom — divider is horizontal.
+                // In AppKit Y-up, top subview's bottom = subviews[outerDividerIndex].frame.minY.
+                cornerY = (subviews[outerDividerIndex].frame.minY + subviews[outerDividerIndex + 1].frame.maxY) / 2
+                // Inner splits left/right.
+                let divCenterInInner = (inner.subviews[0].frame.maxX + inner.subviews[1].frame.minX) / 2
+                cornerX = inner.convert(NSPoint(x: divCenterInInner, y: 0), to: self).x
+            }
+
+            let size: CGFloat = 20
+            return CornerInfo(
+                outerDividerIndex: outerDividerIndex,
+                innerSplit: inner,
+                innerDividerIndex: 0,
+                rect: NSRect(x: cornerX - size / 2, y: cornerY - size / 2, width: size, height: size)
+            )
+        }
+        return nil
     }
 
     private func persistRatio() {

@@ -9,6 +9,9 @@ struct HarnessChromePalette {
     let surfaceElevated: NSColor
     let border: NSColor
     let borderStrong: NSColor
+    /// Clearly-visible separator between split panes — higher opacity than `border`
+    /// so the seam between two terminals reads as an intentional boundary.
+    let paneDivider: NSColor
     let accent: NSColor
     let accentSoft: NSColor
     /// Stroke color for keyboard-focus rings and the active-pane border. Consumers
@@ -94,6 +97,7 @@ struct HarnessChromePalette {
             surfaceElevated: elevated,
             border: foreground.withAlphaComponent(isDark ? 0.07 : 0.14),
             borderStrong: foreground.withAlphaComponent(isDark ? 0.12 : 0.20),
+            paneDivider: foreground.withAlphaComponent(isDark ? 0.28 : 0.35),
             accent: accent,
             accentSoft: accent.withAlphaComponent(0.16),
             focusRing: accent,
