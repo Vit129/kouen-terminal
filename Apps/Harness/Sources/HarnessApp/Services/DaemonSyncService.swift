@@ -51,6 +51,15 @@ final class DaemonSyncService {
                         await self.handleBrowserRequest(id: id, req: req)
                     }
                 },
+                onOpenGitPanel: { repoPath in
+                    Task { @MainActor in
+                        NotificationCenter.default.post(
+                            name: .harnessOpenGitPanel,
+                            object: nil,
+                            userInfo: repoPath.map { ["repoPath": $0] }
+                        )
+                    }
+                },
                 onEnd: { [weak self] in
                     // Daemon restarted or socket dropped — clear the dead sub so
                     // ensureSnapshotSubscription() can re-subscribe on next call.

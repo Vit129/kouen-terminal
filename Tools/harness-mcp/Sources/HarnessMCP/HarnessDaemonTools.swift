@@ -129,6 +129,14 @@ struct HarnessDaemonTools: Sendable {
         return (toolResult(json: .object(["columns": json])), nil)
     }
 
+    // MARK: - openDiffReview
+
+    func openDiffReview(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        let repoPath: String?
+        if case let .string(p) = args["repoPath"] { repoPath = p } else { repoPath = nil }
+        return await okResponse(for: .openGitPanel(repoPath: repoPath), expected: "openGitPanel")
+    }
+
     // MARK: - readPaneOutput
 
     func readPaneOutput(

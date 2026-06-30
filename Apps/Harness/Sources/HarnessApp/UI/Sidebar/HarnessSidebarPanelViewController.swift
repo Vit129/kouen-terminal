@@ -30,6 +30,9 @@ final class HarnessSidebarPanelViewController: NSViewController {
     let fileTreeView = WorkspaceFileTreeView()
     private let fileViewerVC = FileViewerViewController()
     let gitPanelView = GitPanelView()
+    private lazy var boardVC = BoardViewController()
+    let spacesModel = SpacesModel()
+    private lazy var spacesHostingView = NSHostingView(rootView: SpacesPanelView(model: spacesModel))
     let sidebarFooterModel = SidebarFooterModel()
     private var footerHostingView: NSView!
     let sidebarListModel = SidebarListModel()
@@ -71,6 +74,8 @@ final class HarnessSidebarPanelViewController: NSViewController {
         setupFileTree()
         setupFileViewer()
         setupGitPlaceholder()
+        setupBoardView()
+        setupSpacesView()
 #if HARNESS_ACP
         setupAgentPanel()
 #endif
@@ -88,6 +93,12 @@ final class HarnessSidebarPanelViewController: NSViewController {
             self,
             selector: #selector(viViewFileCommand(_:)),
             name: .viViewFileCommand,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleOpenGitPanel(_:)),
+            name: .harnessOpenGitPanel,
             object: nil
         )
     }
@@ -469,6 +480,40 @@ final class HarnessSidebarPanelViewController: NSViewController {
         ])
     }
 
+    private func setupBoardView() {
+        addChild(boardVC)
+        boardVC.view.translatesAutoresizingMaskIntoConstraints = false
+        boardVC.view.isHidden = true
+        view.addSubview(boardVC.view)
+        NSLayoutConstraint.activate([
+            boardVC.view.topAnchor.constraint(equalTo: sectionLabelHostingView.bottomAnchor),
+            boardVC.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            boardVC.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            boardVC.view.bottomAnchor.constraint(equalTo: footerHostingView.topAnchor),
+        ])
+    }
+
+    private func setupSpacesView() {
+        spacesHostingView.translatesAutoresizingMaskIntoConstraints = false
+        spacesHostingView.isHidden = true
+        view.addSubview(spacesHostingView)
+        NSLayoutConstraint.activate([
+            spacesHostingView.topAnchor.constraint(equalTo: sectionLabelHostingView.bottomAnchor),
+            spacesHostingView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            spacesHostingView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            spacesHostingView.bottomAnchor.constraint(equalTo: footerHostingView.topAnchor),
+        ])
+    }
+
+    @objc private func handleOpenGitPanel(_ note: Notification) {
+        let repoPath = note.userInfo?["repoPath"] as? String
+        sidebarSectionModel.selectedTab = 2
+        selectSidebarTab(index: 2)
+        if let path = repoPath {
+            gitPanelView.updateRoot(path: path)
+        }
+    }
+
 
 
 #if HARNESS_ACP
@@ -592,9 +637,8 @@ final class HarnessSidebarPanelViewController: NSViewController {
             fileTreeView.isHidden = fileViewerVC.view.isHidden == false
         }
         gitPanelView.isHidden = index != 2
-#if HARNESS_ACP
-        agentChatPanel.isHidden = index != 3
-#endif
+        boardVC.view.isHidden = index != 3
+        spacesHostingView.isHidden = index != 4
         switch index {
         case 1:
             sidebarSectionModel.text = "FILES"
@@ -614,9 +658,11 @@ final class HarnessSidebarPanelViewController: NSViewController {
                 gitPanelView.clearRoot()
             }
         case 3:
-            sidebarSectionModel.text = "AGENT"
+            sidebarSectionModel.text = "BOARD"
             sidebarSectionModel.isRepoHeader = false
-            // [ACP SHELVED] connectAgentIfNeeded()
+        case 4:
+            sidebarSectionModel.text = "SPACES"
+            sidebarSectionModel.isRepoHeader = false
         default:
             sidebarSectionModel.isRepoHeader = true
             updateRepoSectionHeader()
@@ -665,6 +711,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
         workspacePillModel.name = name
         sidebarListModel.update(from: snap)
         sidebarListModel.updateWorktrees()
+        spacesModel.update(from: snap)
 
         if let cwd = snap.activeWorkspace?.activeTab?.cwd {
             let activeSessionID = snap.activeWorkspace?.activeSessionID
@@ -738,6 +785,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
         // Skip entirely when session data hasn't changed (common on metadata-only ticks).
         // SwiftUI model sync — always update so badges/agent status stay fresh
         sidebarListModel.update(from: snap)
+        spacesModel.update(from: snap)
 
         updateRepoSectionHeader()
     }
@@ -904,5 +952,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
 
 }
 
-
+extension Notification.Name {
+    static let harnessOpenGitPanel = Notification.Name("HarnessOpenGitPanel")
+}
 
