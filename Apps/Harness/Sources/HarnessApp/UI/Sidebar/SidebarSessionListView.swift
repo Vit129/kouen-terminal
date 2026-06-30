@@ -251,11 +251,22 @@ private struct SidebarSessionItemRow: View {
                         .lineLimit(1)
                         .truncationMode(.tail)
 
-                    Text(subtitle)
-                        .font(.system(size: 10))
-                        .foregroundStyle(Color(nsColor: c.textSecondary).opacity(0.6))
-                        .lineLimit(1)
-                        .truncationMode(.tail)
+                    HStack(spacing: 3) {
+                        Text(subtitle)
+                            .font(.system(size: 10))
+                            .foregroundStyle(Color(nsColor: c.textSecondary).opacity(0.6))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                        if sessionBoardStatus == .needsAttention {
+                            Text("·")
+                                .font(.system(size: 10))
+                                .foregroundStyle(Color(nsColor: c.textSecondary).opacity(0.4))
+                            Text("Needs Attention")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(Color(.systemOrange))
+                                .lineLimit(1)
+                        }
+                    }
                 }
                 .padding(.leading, 6)
 
@@ -399,6 +410,24 @@ private struct SidebarSessionItemRow: View {
         }
         SessionCoordinator.shared.selectSession(workspaceID: wsID, sessionID: session.id)
         SessionCoordinator.shared.syncFromDaemon()
+    }
+
+    private var sessionBoardStatus: BoardColumnKind {
+        let kinds = session.tabs.map { BoardModel.columnKind(for: $0) }
+        for k in [BoardColumnKind.needsAttention, .error, .running, .done] {
+            if kinds.contains(k) { return k }
+        }
+        return .idle
+    }
+
+    private func boardStatusColor(_ status: BoardColumnKind) -> Color {
+        switch status {
+        case .needsAttention: return Color(.systemOrange)
+        case .running:        return Color(.systemGreen)
+        case .done:           return Color(.systemBlue)
+        case .error:          return Color(.systemRed)
+        case .idle:           return Color(.systemGray)
+        }
     }
 
     private func agentDotColor(c: HarnessChromePalette) -> NSColor {

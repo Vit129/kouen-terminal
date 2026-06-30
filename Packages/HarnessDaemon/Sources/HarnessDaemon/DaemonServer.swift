@@ -294,6 +294,12 @@ public final class DaemonServer: @unchecked Sendable {
 
             // Intercept browser requests from MCP / CLI clients
             switch request {
+            case let .openGitPanel(repoPath):
+                if let guiFD = guiBrowserFD {
+                    self.send(.openGitPanel(repoPath: repoPath), to: guiFD)
+                }
+                send(.ok, to: fd)
+                continue
             case let .browserOpen(url, direction):
                 Task {
                     let resp = await self.forwardBrowserRequest(paneID: nil, req: .open(url: url, direction: direction))

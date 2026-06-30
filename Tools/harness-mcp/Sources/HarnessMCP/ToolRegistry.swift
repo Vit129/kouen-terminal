@@ -26,6 +26,9 @@ struct ToolRegistry: Sendable {
                 param("includeAgents", "boolean", "Include detected agent info per tab (optional, default true)"),
             ]),
             toolDef("harnessBoard", "Kanban-style board of Harness sessions grouped by status (Needs Attention/Running/Idle/Done/Error)", []),
+            toolDef("openDiffReview", "Open the Git diff panel in the Harness sidebar (switches sidebar to Git tab)", [
+                param("repoPath", "string", "Repository path to show diffs for (optional)"),
+            ]),
             toolDef("readPaneOutput", "Read recent output from a Harness pane", [
                 param("surfaceId", "string", "Surface id from harnessList"),
                 param("lines", "number", "Number of lines to read from the bottom (optional, default 200, max 2000)"),
@@ -170,6 +173,7 @@ struct ToolRegistry: Sendable {
         switch name {
         case "harnessList": return await harnessList(args)
         case "harnessBoard": return await daemonTools.harnessBoard()
+        case "openDiffReview": return await daemonTools.openDiffReview(args)
         case "readPaneOutput": return await readPaneOutput(args)
         case "sendPaneText": return await sendPaneText(args)
         case "sendPaneKeys": return await sendPaneKeys(args)

@@ -27,6 +27,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
     let fileTreeView = WorkspaceFileTreeView()
     private let fileViewerVC = FileViewerViewController()
     let gitPanelView = GitPanelView()
+    private lazy var boardVC = BoardViewController()
     let sidebarFooterModel = SidebarFooterModel()
     private var footerHostingView: NSView!
     let sidebarListModel = SidebarListModel()
@@ -68,6 +69,12 @@ final class HarnessSidebarPanelViewController: NSViewController {
         setupFileTree()
         setupFileViewer()
         setupGitPlaceholder()
+        setupBoardView()
+        sidebarSectionModel.onToggleBoardView = { [weak self] in
+            guard let self else { return }
+            sidebarSectionModel.showBoardView.toggle()
+            selectSidebarTab(index: sidebarSectionModel.selectedTab)
+        }
         selectSidebarTab(index: 0)
         reload()
         applyChromeColors()
@@ -82,6 +89,12 @@ final class HarnessSidebarPanelViewController: NSViewController {
             self,
             selector: #selector(viViewFileCommand(_:)),
             name: .viViewFileCommand,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleOpenGitPanel(_:)),
+            name: .harnessOpenGitPanel,
             object: nil
         )
     }
@@ -463,6 +476,30 @@ final class HarnessSidebarPanelViewController: NSViewController {
         ])
     }
 
+    private func setupBoardView() {
+        addChild(boardVC)
+        boardVC.view.translatesAutoresizingMaskIntoConstraints = false
+        boardVC.view.isHidden = true
+        view.addSubview(boardVC.view)
+        NSLayoutConstraint.activate([
+            boardVC.view.topAnchor.constraint(equalTo: sectionLabelHostingView.bottomAnchor),
+            boardVC.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            boardVC.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            boardVC.view.bottomAnchor.constraint(equalTo: footerHostingView.topAnchor),
+        ])
+    }
+
+    @objc private func handleOpenGitPanel(_ note: Notification) {
+        let repoPath = note.userInfo?["repoPath"] as? String
+        sidebarSectionModel.selectedTab = 2
+        selectSidebarTab(index: 2)
+        if let path = repoPath {
+            gitPanelView.updateRoot(path: path)
+        }
+    }
+
+
+
     /// Switches the sidebar to the Git tab (used by the "Show Git Panel" ⌘G shortcut).
     func selectGitTab() {
         sidebarSectionModel.selectedTab = 2
@@ -538,7 +575,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
     }
 
     private func selectSidebarTab(index: Int) {
-        sessionHostingView?.isHidden = index != 0
+        sessionHostingView?.isHidden = index != 0 || sidebarSectionModel.showBoardView
         if index != 1 {
             // Leaving the Files tab: collapse any open preview back to the tree
             // so returning to Files always starts from the file list.
@@ -548,6 +585,9 @@ final class HarnessSidebarPanelViewController: NSViewController {
             fileTreeView.isHidden = fileViewerVC.view.isHidden == false
         }
         gitPanelView.isHidden = index != 2
+        let showBoard = index == 0 && sidebarSectionModel.showBoardView
+        if showBoard { boardVC.view.layoutSubtreeIfNeeded() }
+        boardVC.view.isHidden = !showBoard
         switch index {
         case 1:
             sidebarSectionModel.text = "FILES"
@@ -853,5 +893,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
 
 }
 
-
+extension Notification.Name {
+    static let harnessOpenGitPanel = Notification.Name("HarnessOpenGitPanel")
+}
 
