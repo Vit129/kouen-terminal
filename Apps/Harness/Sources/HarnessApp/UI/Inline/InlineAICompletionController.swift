@@ -18,12 +18,6 @@ final class InlineAICompletionController {
     // MARK: - Private
 
     private weak var terminalHost: TerminalHostView?
-    private var inFlight = false
-
-    private static let systemPrompt =
-        "You are a shell command assistant. Given recent terminal output, suggest ONE shell " +
-        "command that the user would logically run next. Reply with ONLY the command, no " +
-        "explanation, no backticks."
 
     // MARK: - Install
 
@@ -67,42 +61,7 @@ final class InlineAICompletionController {
 
     // MARK: - Trigger
 
-    /// Fetch a suggestion from Claude and populate the overlay.
     func trigger(paneOutput: String, cwd: String?, settings: HarnessSettings) {
-        guard !inFlight else { return }
-        guard settings.inlineAICompletion else { return }
-
-        guard let client = ClaudeDirectClient(settings: settings) else {
-            completionView.suggestion = "(no API key — set Claude API key in Settings)"
-            return
-        }
-
-        inFlight = true
-        completionView.suggestion = "…"
-
-        let context: String
-        if let dir = cwd, !dir.isEmpty {
-            context = "cwd: \(dir)\n\n\(paneOutput)"
-        } else {
-            context = paneOutput
-        }
-
-        Task { [weak self] in
-            guard let self else { return }
-            let result = await client.complete(
-                messages: [.init(role: "user", content: context)],
-                systemPrompt: Self.systemPrompt,
-                maxTokens: 256
-            )
-            await MainActor.run {
-                self.inFlight = false
-                if let cmd = result.text {
-                    let trimmed = cmd.trimmingCharacters(in: .whitespacesAndNewlines)
-                    self.completionView.suggestion = trimmed.isEmpty ? nil : trimmed
-                } else {
-                    self.completionView.suggestion = nil
-                }
-            }
-        }
+        // Inline AI completion disabled — no backend client.
     }
 }

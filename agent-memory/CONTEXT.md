@@ -4,6 +4,14 @@
 - **Task:** idle
 - **Branch:** `main`
 
+### 2026-06-30 — Cmd+\ sidebar toggle gone after collapse ✅ FIXED
+
+**Root cause:** B triggers A — zero-delta early exit in `applySidebarVisibility` returned without replacing `sidebarDisplayLink`, leaving the old collapse link running. Dead token guard (A) allowed it to continue despite `sidebarAnimToken` increment. Old link completed with `_sidebarVisible=false` → `panel.isHidden=true` → sidebar gone.
+
+**Fix (MainSplitViewController.swift):** Move `sidebarDisplayLink?.invalidate(); sidebarDisplayLink = nil` to BEFORE reading `panel.frame.width` — kills in-flight animation before any early-exit path, making all return paths safe. Removed `[DBG-sb]` instrumentation.
+
+See `knowledge/bugs/sidebar-cmdbackslash-toggle.md`.
+
 ### 2026-06-29 — Live perf profile of running Harness 3.11.7/183 ✅ (diagnosis only)
 
 Profiled the actually-running app (PID via `ps aux | grep MACOS/Harness`; build mtime
@@ -57,7 +65,6 @@ per-session toggle by design (no persist field — only `advisorModel` persists)
 
 | Date | Task | Key outcome |
 |------|------|-------------|
-| 2026-06-29 | Notch animation CPU | SwiftUI AnimatableFrameAttribute → CAShapeLayer/CABasicAnimation (`9d49488`) |
 | 2026-06-27 | otty-features P1–P20 | All phases shipped; P13/P21 deferred |
 | 2026-06-26 | Memory-leak audit | existingHosts pin, BrowserPaneView cap, AI controller retire → v3.9.4 |
 | 2026-06-26 | cwd bleed | deepestReadableDescendant removed; shell pid direct |

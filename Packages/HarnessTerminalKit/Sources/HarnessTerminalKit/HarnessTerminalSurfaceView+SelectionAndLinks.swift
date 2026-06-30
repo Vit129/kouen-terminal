@@ -358,21 +358,7 @@ extension HarnessTerminalSurfaceView {
             reportMouse(event, button: .right, kind: .release)
             return
         }
-        if let text = selectionTextIfAny(), onAskAI != nil {
-            let menu = NSMenu()
-            let item = NSMenuItem(title: "Ask AI\u{2026}", action: #selector(askAIMenuAction(_:)), keyEquivalent: "")
-            item.representedObject = text
-            item.target = self
-            menu.addItem(item)
-            NSMenu.popUpContextMenu(menu, with: event, for: self)
-        } else {
-            super.rightMouseUp(with: event)
-        }
-    }
-
-    @objc private func askAIMenuAction(_ sender: NSMenuItem) {
-        guard let text = sender.representedObject as? String else { return }
-        onAskAI?(text)
+        super.rightMouseUp(with: event)
     }
 
     public override func otherMouseDown(with event: NSEvent) {

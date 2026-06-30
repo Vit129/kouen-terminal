@@ -26,6 +26,7 @@ struct SettingsTerminalView: View {
             )) {
                 Text("Plain").tag(ExperienceMode.plain)
                 Text("Full").tag(ExperienceMode.full)
+                Text("Agent Workspace").tag(ExperienceMode.agent)
             }
             .pickerStyle(.segmented)
 

@@ -140,10 +140,6 @@ enum MainMenuBuilder {
         notchItem.keyEquivalentModifierMask = [.command, .shift]
         notchItem.target = MenuTarget.shared
         view.submenu?.addItem(notchItem)
-        let aiChatItem = NSMenuItem(title: "Ask AI…", action: #selector(MenuTarget.openAIChat), keyEquivalent: "i")
-        aiChatItem.keyEquivalentModifierMask = [.command]
-        aiChatItem.target = MenuTarget.shared
-        view.submenu?.addItem(aiChatItem)
         let paletteItem = menuItem("Command Palette", action: #selector(MenuTarget.commandPalette), binding: BannerShortcutRegistry.commandPalette)
         view.submenu?.addItem(paletteItem)
         let promptItem = menuItem("Command Prompt", action: #selector(MenuTarget.commandPrompt), binding: BannerShortcutRegistry.commandPrompt)
@@ -472,10 +468,6 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
 
     @objc func toggleAgentNotch() {
         NotchPanelController.shared.toggleFromMenu()
-    }
-
-    @objc func openAIChat() {
-        SessionCoordinator.shared.toggleAIChat()
     }
 
     @objc func openComposer() {

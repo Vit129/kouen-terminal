@@ -17,7 +17,7 @@ actor MCPServer {
         }
     }
 
-    private func handle(_ message: ACPMessage) async -> ACPMessage? {
+    private func handle(_ message: JSONRPCMessage) async -> JSONRPCMessage? {
         switch message {
         case let .request(id, method, params):
             let (result, error) = await dispatch(method: method, params: params)

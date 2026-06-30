@@ -22,9 +22,6 @@ final class HarnessSidebarPanelViewController: NSViewController {
     /// Flat `.plain` style + 30×30 so it matches the neighbouring notification bell.
     private let sidebarToggleButton = SoftIconButton(frame: NSRect(x: 0, y: 0, width: 30, height: 30))
     private var tabBarHostingView: NSView!
-#if HARNESS_ACP
-    private let agentChatPanel = AgentChatPanelView()
-#endif
     let sidebarSectionModel = SidebarSectionModel()
     private var sectionLabelHostingView: NSView!
     let fileTreeView = WorkspaceFileTreeView()
@@ -73,9 +70,6 @@ final class HarnessSidebarPanelViewController: NSViewController {
         setupFileViewer()
         setupGitPlaceholder()
         setupBoardView()
-#if HARNESS_ACP
-        setupAgentPanel()
-#endif
         sidebarSectionModel.onToggleBoardView = { [weak self] in
             guard let self else { return }
             sidebarSectionModel.showBoardView.toggle()
@@ -503,42 +497,6 @@ final class HarnessSidebarPanelViewController: NSViewController {
             gitPanelView.updateRoot(path: path)
         }
     }
-
-
-
-#if HARNESS_ACP
-    private func setupAgentPanel() {
-        agentChatPanel.translatesAutoresizingMaskIntoConstraints = false
-        agentChatPanel.isHidden = true
-        view.addSubview(agentChatPanel)
-        NSLayoutConstraint.activate([
-            agentChatPanel.topAnchor.constraint(equalTo: sectionLabelHostingView.bottomAnchor),
-            agentChatPanel.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            agentChatPanel.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            agentChatPanel.bottomAnchor.constraint(equalTo: footerHostingView.topAnchor),
-        ])
-    }
-
-    private func connectAgentIfNeeded() {
-        guard agentSession == nil else { return }
-        let registryStore = AgentRegistryStore()
-        let configs = registryStore.load()
-        guard let config = configs.first(where: { $0.isEnabled }) else {
-            agentChatPanel.showEmptyState()
-            return
-        }
-        let client = ACPClient()
-        let session = ACPSession(client: client)
-        agentSession = session
-        agentChatPanel.bind(session: session)
-        let cwd = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd ?? FileManager.default.currentDirectoryPath
-        Task {
-            await session.connect(config: config, cwd: cwd)
-        }
-    }
-
-    private var agentSession: ACPSession?
-#endif
 
 
 

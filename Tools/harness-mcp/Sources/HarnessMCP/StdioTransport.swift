@@ -1,6 +1,8 @@
 import Foundation
 import HarnessCore
 
+enum TransportError: Error { case invalidUTF8Header, missingContentLength }
+
 enum MCPStdioFraming {
     case contentLength
     case newline
@@ -13,7 +15,7 @@ final class MCPStdioBuffer {
         data.append(newData)
     }
 
-    func nextMessage() throws -> (ACPMessage, MCPStdioFraming)? {
+    func nextMessage() throws -> (JSONRPCMessage, MCPStdioFraming)? {
         trimLeadingNewlines()
         guard !data.isEmpty else { return nil }
 
@@ -23,31 +25,31 @@ final class MCPStdioBuffer {
         return try nextNewlineMessage()
     }
 
-    private func nextContentLengthMessage() throws -> (ACPMessage, MCPStdioFraming)? {
+    private func nextContentLengthMessage() throws -> (JSONRPCMessage, MCPStdioFraming)? {
         guard let headerRange = data.range(of: Data("\r\n\r\n".utf8)) else {
             return nil
         }
         guard let header = String(data: data[..<headerRange.lowerBound], encoding: .utf8) else {
-            throw ACPTransport.TransportError.invalidUTF8Header
+            throw TransportError.invalidUTF8Header
         }
         guard let contentLength = header
             .components(separatedBy: "\r\n")
             .first(where: { $0.lowercased().hasPrefix("content-length:") })
             .flatMap({ Int($0.split(separator: ":", maxSplits: 1)[1].trimmingCharacters(in: .whitespaces)) })
         else {
-            throw ACPTransport.TransportError.missingContentLength
+            throw TransportError.missingContentLength
         }
 
         let bodyStart = headerRange.upperBound
         let bodyEnd = bodyStart + contentLength
         guard data.count >= bodyEnd else { return nil }
 
-        let message = try JSONDecoder().decode(ACPMessage.self, from: data[bodyStart..<bodyEnd])
+        let message = try JSONDecoder().decode(JSONRPCMessage.self, from: data[bodyStart..<bodyEnd])
         data.removeSubrange(..<bodyEnd)
         return (message, .contentLength)
     }
 
-    private func nextNewlineMessage() throws -> (ACPMessage, MCPStdioFraming)? {
+    private func nextNewlineMessage() throws -> (JSONRPCMessage, MCPStdioFraming)? {
         guard let newlineIndex = data.firstIndex(of: 0x0A) else {
             return nil
         }
@@ -59,7 +61,7 @@ final class MCPStdioBuffer {
         guard !line.isEmpty else {
             return try nextMessage()
         }
-        return (try JSONDecoder().decode(ACPMessage.self, from: line), .newline)
+        return (try JSONDecoder().decode(JSONRPCMessage.self, from: line), .newline)
     }
 
     private func trimLeadingNewlines() {
@@ -71,19 +73,19 @@ final class MCPStdioBuffer {
 
 /// Reads JSON-RPC messages from stdin and mirrors the client's framing for responses.
 final class StdioTransport: @unchecked Sendable {
-    let incoming: AsyncStream<ACPMessage>
-    private let continuation: AsyncStream<ACPMessage>.Continuation
+    let incoming: AsyncStream<JSONRPCMessage>
+    private let continuation: AsyncStream<JSONRPCMessage>.Continuation
     private let framingLock = NSLock()
     private var framing = MCPStdioFraming.contentLength
 
     init() {
-        var cont: AsyncStream<ACPMessage>.Continuation?
+        var cont: AsyncStream<JSONRPCMessage>.Continuation?
         incoming = AsyncStream { cont = $0 }
         continuation = cont!
         startReading()
     }
 
-    func send(_ message: ACPMessage) {
+    func send(_ message: JSONRPCMessage) {
         guard let body = try? JSONEncoder().encode(message) else { return }
         framingLock.lock()
         let currentFraming = framing
