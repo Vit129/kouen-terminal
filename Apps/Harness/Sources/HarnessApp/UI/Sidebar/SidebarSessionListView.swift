@@ -257,14 +257,13 @@ private struct SidebarSessionItemRow: View {
                             .foregroundStyle(Color(nsColor: c.textSecondary).opacity(0.6))
                             .lineLimit(1)
                             .truncationMode(.tail)
-                        let st = sessionBoardStatus
-                        if st != .idle {
+                        if sessionBoardStatus == .needsAttention {
                             Text("·")
                                 .font(.system(size: 10))
                                 .foregroundStyle(Color(nsColor: c.textSecondary).opacity(0.4))
-                            Text(st.displayName)
+                            Text("Needs Attention")
                                 .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(boardStatusColor(st))
+                                .foregroundStyle(Color(.systemOrange))
                                 .lineLimit(1)
                         }
                     }
