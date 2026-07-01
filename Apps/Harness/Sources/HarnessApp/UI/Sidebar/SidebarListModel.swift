@@ -255,14 +255,6 @@ final class SidebarListModel {
         }.value
     }
 
-    private func columnKind(for tab: Tab) -> BoardColumnKind {
-        if tab.agent?.activity == .awaiting { return .needsAttention }
-        if let exitStatus = tab.exitStatus { return exitStatus == 0 ? .done : .error }
-        let shellNames: Set<String> = ["zsh", "bash", "sh", "fish", "csh", "tcsh", "login"]
-        if let cmd = tab.currentCommand, !cmd.isEmpty, !shellNames.contains(cmd.lowercased()) { return .running }
-        return .idle
-    }
-
     private func highestBoardStatus(for sessions: [SessionGroup]) -> BoardColumnKind {
         func priority(_ s: BoardColumnKind) -> Int {
             switch s {
@@ -276,7 +268,7 @@ final class SidebarListModel {
         var highest = BoardColumnKind.idle
         for session in sessions {
             for tab in session.tabs {
-                let status = columnKind(for: tab)
+                let status = BoardModel.columnKind(for: tab)
                 if priority(status) > priority(highest) { highest = status }
             }
         }

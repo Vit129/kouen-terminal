@@ -109,7 +109,7 @@ private struct SidebarGroupHeaderRow: View {
                 .truncationMode(.tail)
 
             Circle()
-                .fill(statusColor(status))
+                .fill(Color(nsColor: status.color))
                 .frame(width: 6, height: 6)
 
             Text("\(count)")
@@ -184,15 +184,6 @@ private struct SidebarGroupHeaderRow: View {
         SessionCoordinator.shared.syncFromDaemon()
     }
 
-    private func statusColor(_ status: BoardColumnKind) -> Color {
-        switch status {
-        case .needsAttention: .orange
-        case .running: .blue
-        case .done: .green
-        case .error: .red
-        case .idle: Color(nsColor: HarnessDesign.chrome.idleStatus)
-        }
-    }
 }
 
 // MARK: - Session card row
@@ -231,16 +222,20 @@ private struct SidebarSessionItemRow: View {
                 )
 
             HStack(spacing: 0) {
-                Circle()
-                    .fill(Color(nsColor: agentDotColor(c: c)))
-                    .frame(width: 6, height: 6)
-                    .padding(.leading, 8)
-
-                Image(systemName: "arrow.triangle.branch")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(Color(nsColor: agentDotColor(c: c)))
-                    .frame(width: 12, height: 12)
-                    .padding(.leading, 6)
+                Group {
+                    if let kind = tab?.effectiveAgentKind {
+                        Image(nsImage: AgentIconRenderer.templateOrMonogramImage(for: kind, size: 12))
+                            .resizable()
+                            .renderingMode(.template)
+                            .foregroundStyle(agentColor(for: kind))
+                    } else {
+                        Image(systemName: "arrow.triangle.branch")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(Color(nsColor: c.textSecondary))
+                    }
+                }
+                .frame(width: 12, height: 12)
+                .padding(.leading, 8)
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text(displayTitle)
@@ -257,13 +252,13 @@ private struct SidebarSessionItemRow: View {
                             .foregroundStyle(Color(nsColor: c.textSecondary).opacity(0.6))
                             .lineLimit(1)
                             .truncationMode(.tail)
-                        if sessionBoardStatus == .needsAttention {
+                        if let label = boardStatusLabel {
                             Text("·")
                                 .font(.system(size: 10))
                                 .foregroundStyle(Color(nsColor: c.textSecondary).opacity(0.4))
-                            Text("Needs Attention")
+                            Text(label)
                                 .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(Color(.systemOrange))
+                                .foregroundStyle(Color(nsColor: sessionBoardStatus.color))
                                 .lineLimit(1)
                         }
                     }
@@ -420,23 +415,16 @@ private struct SidebarSessionItemRow: View {
         return .idle
     }
 
-    private func boardStatusColor(_ status: BoardColumnKind) -> Color {
-        switch status {
-        case .needsAttention: return Color(.systemOrange)
-        case .running:        return Color(.systemGreen)
-        case .done:           return Color(.systemBlue)
-        case .error:          return Color(.systemRed)
-        case .idle:           return Color(.systemGray)
+    private var boardStatusLabel: String? {
+        switch sessionBoardStatus {
+        case .needsAttention: return "Needs Attention"
+        case .running: return "Running"
+        default: return nil
         }
     }
 
-    private func agentDotColor(c: HarnessChromePalette) -> NSColor {
-        let tabsWithAgents = session.tabs.filter { $0.effectiveAgentKind != nil }
-        guard !tabsWithAgents.isEmpty else { return c.idleStatus }
-        if tabsWithAgents.contains(where: { $0.agent?.activity == .errored }) { return .systemRed }
-        if tabsWithAgents.contains(where: { $0.agent?.activity == .awaiting }) { return .systemOrange }
-        if tabsWithAgents.contains(where: { $0.agent?.activity == .working }) { return .systemGreen }
-        return .systemYellow
+    private func agentColor(for kind: AgentKind) -> Color {
+        Color(nsColor: NSColor.fromHex(SessionCoordinator.shared.settings.agentColorHex(for: kind)) ?? HarnessDesign.chrome.textSecondary)
     }
 }
 
