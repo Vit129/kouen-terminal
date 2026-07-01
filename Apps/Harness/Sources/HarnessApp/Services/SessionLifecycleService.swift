@@ -22,7 +22,14 @@ final class SessionLifecycleService {
         }
     }
 
-    func addSession(to workspaceID: WorkspaceID, cwd: String? = nil, name: String? = nil) {
+    func addSession(
+        to workspaceID: WorkspaceID,
+        cwd: String? = nil,
+        name: String? = nil,
+        worktreePath: String? = nil,
+        parentRepoPath: String? = nil,
+        taskName: String? = nil
+    ) {
         let resolvedCWD = cwd ?? coord.activeTabCWD ?? coord.settings.defaultCWD
         let targetRoot = HarnessDesign.projectGroupRootPath(for: resolvedCWD)
         let targetIndex: Int?
@@ -46,7 +53,10 @@ final class SessionLifecycleService {
                 workspaceID: workspaceID,
                 cwd: resolvedCWD,
                 name: name,
-                shell: coord.settings.defaultShell
+                shell: coord.settings.defaultShell,
+                worktreePath: worktreePath,
+                parentRepoPath: parentRepoPath,
+                taskName: taskName
             )) else {
                 await coord.syncFromDaemon()
                 return
@@ -100,7 +110,14 @@ final class SessionLifecycleService {
             return "Failed to create worktree for branch \"\(sanitized)\" — it may already exist."
         }
 
-        addSession(to: workspaceID, cwd: worktreePath, name: taskName)
+        addSession(
+            to: workspaceID,
+            cwd: worktreePath,
+            name: taskName,
+            worktreePath: worktreePath,
+            parentRepoPath: repoPath,
+            taskName: taskName
+        )
         return nil
     }
 
