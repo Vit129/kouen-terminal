@@ -6,8 +6,6 @@
 |------|-------|--------|
 | [p25-ios-ipados-support.md](p25-ios-ipados-support.md) | P25 — iOS/iPadOS Support | Planning |
 | [p8-macos27-adoption.md](p8-macos27-adoption.md) | P8 — macOS 27 Golden Gate Adoption | Active |
-| [p29-acp-reactivation.md](p29-acp-reactivation.md) | P29 — ACP Reactivation (Terminal + IDE) | Planning |
-| [p31-agent-terminal.md](p31-agent-terminal.md) | P31 — Agent Terminal Enhancements | Planning — no real plan content yet |
 
 ## Pending
 
@@ -37,4 +35,4 @@
 | Command History Search | v3.9.x | ⌘R overlay, fuzzy match, shell history integration |
 | IDE File Tree (Phase 1) | v3.9.x | Sidebar file tree, project root follows git root, session switching |
 | Git Panel Memory Leak | v3.9.4 | State caching prevents NSTextField allocation spikes |
-| P5 — ACP Client | Shelved→P29 | Superseded by P29 ACP Reactivation |
+| P5 — ACP Client | Shelved | Erased entirely by `c4e1e15` ("remove: ACP + ⌘I"); P29 reactivation plan abandoned, not pursuing |
