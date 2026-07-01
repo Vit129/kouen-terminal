@@ -188,6 +188,10 @@ final class SessionCoordinator: NSObject {
         sessionLifecycleService.addSession(to: workspaceID, cwd: cwd, name: name)
     }
     func addTab(to workspaceID: WorkspaceID, cwd: String? = nil) { sessionLifecycleService.addTab(to: workspaceID, cwd: cwd) }
+    @discardableResult
+    func addAgentTask(to workspaceID: WorkspaceID, taskName: String) -> String? {
+        sessionLifecycleService.addAgentTask(to: workspaceID, taskName: taskName)
+    }
     func forkTab() {
         guard let wsID = snapshot.activeWorkspace?.id else { return }
         addTab(to: wsID, cwd: activeTabCWD)

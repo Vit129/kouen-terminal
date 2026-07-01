@@ -1,8 +1,44 @@
 # Context — harness-terminal
 
 ## Now
-- **Task:** idle
+- **Task:** P32 Phase 1 verified end-to-end in preview build — awaiting confirmation to start Phase 2 (task metadata + UI)
 - **Branch:** `main`
+
+### 2026-07-01 — P32 Phase 1 live verification + 2 bugs fixed
+Live-tested "New Agent Task" in the preview build (not production `/Applications/Harness.app` —
+that's a stale install and won't reflect uncommitted work; always verify against
+`.harness-preview/HarnessPreview.app`). Found and fixed:
+- **Palette not appearing / clipped**: `CommandPaletteController.present()` was missing
+  `panel.setContentSize(NSSize(width: 620, height: 440))` (present in the working
+  `DirectoryPickerController` reference pattern) — without it the origin-centering math read a
+  stale `panel.frame`. Fixed by adding the call right after `contentViewController` assignment.
+- **Silent failure on "New Agent Task"**: `SessionLifecycleService.addAgentTask` had 3 silent
+  `guard ... else { return }` paths (repo-root resolution, empty sanitized name, worktree create
+  failure) — nothing was ever shown to the user. Root cause of "nothing happens": active tab's
+  cwd was `~` (not a git repo) so `repoRoot(for:)` returned nil. Fixed by changing the method to
+  return `String?` (error message) instead of silently swallowing, and showing an `NSAlert` in
+  `CommandPaletteController`'s handler when non-nil. `SessionCoordinator.addAgentTask` updated to
+  propagate the return value.
+- **`.harness-worktrees/` was not gitignored** — task worktrees were getting staged as regular
+  files. Added to `.gitignore`.
+- Verified happy path: New Agent Task from a tab cd'd into the repo → new tab "testing", branch
+  `testing`, worktree at `.harness-worktrees/testing`, correct cwd. Test worktree/branch removed
+  after verification via `git worktree remove --force` + `git branch -D`.
+
+### 2026-07-01 — P32 interview-doc pass (before implementation)
+Cross-checked `agent-memory/plans/p32-task-based-worktrees.md` against code — 2 corrections:
+- **F1/Phase 1:** integrate via existing `SessionLifecycleService.addSession(to:cwd:name:)`
+  (`Apps/Harness/Sources/HarnessApp/Services/SessionLifecycleService.swift:25`), NOT a new
+  pipeline — it already resolves `ProjectConfig` + auto-runs `setupScript` (P24). New task flow
+  = `WorktreeManager.create()` → `addSession(cwd: wtPath, name: taskName)`.
+- **F3:** `ProjectConfig.setupScript`/`archiveScript` already exist
+  (`Packages/HarnessSettings/Sources/HarnessSettings/ProjectConfig.swift:7,11`) — no new config
+  fields needed. `setupScript` already wired (P24); `archiveScript` exists in schema but has
+  **zero call sites** — Phase 3 = wire up this dead field on task close, not invent new ones.
+- `Tab.taskName` (F2) confirmed as genuinely new — `Tab.swift` has `worktreePath`/`parentRepoPath`
+  but no task-name field.
+- No `docs/adr/` in this repo — decisions live in the plan file itself + this CONTEXT.md, per
+  existing project convention.
 
 ### 2026-07-01 — P23 socket auto-detect (PBI-SSH-008) ✅ FIXED — P23 now Complete
 
