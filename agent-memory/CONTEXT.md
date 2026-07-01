@@ -1,9 +1,9 @@
 # Context — harness-terminal
 
 ## Now
-- **Task:** Sidebar width/visibility polish pass done, user-confirmed live in preview
+- **Task:** Sidebar width/visibility polish pass done, user-confirmed live in preview — committed
 - **Branch:** `main`
-- **Not committed** — awaiting explicit go-ahead per standing "don't commit without permission" rule
+- **Committed (4 commits ahead of origin/main)**: d9c1ad1, 36cf813, 80b82db (+ prior 5641273) — not pushed, awaiting explicit go-ahead
 
 ### 2026-07-01 — Sidebar default width/visibility + resize-proportional-growth bug ✅ FIXED (user-confirmed)
 User: sidebar too big → reduce default width `HarnessDesign.sidebarWidth` 264→220

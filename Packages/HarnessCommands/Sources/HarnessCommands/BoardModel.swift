@@ -97,8 +97,12 @@ public struct BoardColumn: Codable, Sendable, Equatable {
 ///    below, since an agent waiting for input is the most actionable state.
 /// 2. **Error** — `tab.exitStatus != 0`.
 /// 3. **Done** — `tab.exitStatus == 0`.
-/// 4. **Running** — `tab.currentCommand` is set and is not a known interactive
-///    shell name (mirrors the Session State Dot in `SidebarSessionRows`).
+/// 4. **Running** — `agent.activity == .working`, OR `tab.currentCommand` is
+///    set and is not a known interactive shell name (mirrors the Session State
+///    Dot in `SidebarSessionRows`). The activity check matters for agent CLIs
+///    that stay attached to the shell's foreground process (no distinct
+///    `currentCommand`) while actively working — without it they'd wrongly
+///    fall through to Idle.
 /// 5. **Idle** — everything else (shell idle, no foreground process).
 public enum BoardModel {
     /// Interactive shell names that don't count as a "running" foreground
@@ -143,6 +147,9 @@ public enum BoardModel {
         }
         if let exitStatus = tab.exitStatus {
             return exitStatus == 0 ? .done : .error
+        }
+        if tab.agent?.activity == .working {
+            return .running
         }
         if let cmd = tab.currentCommand, !cmd.isEmpty, !shellNames.contains(cmd.lowercased()) {
             return .running
