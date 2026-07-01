@@ -594,7 +594,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
             sidebarSectionModel.isRepoHeader = false
             if let cwd = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd {
                 let activeSessionID = SessionCoordinator.shared.snapshot.activeWorkspace?.activeSessionID
-                let root = Self.gitRoot(for: cwd) ?? cwd
+                let root = WorktreeManager().repoRoot(for: cwd) ?? cwd
                 fileTreeView.updateRoot(path: root, sessionID: activeSessionID)
                 fileTreeView.revealFileInTree(path: cwd)
             }
@@ -664,7 +664,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
                 lastFileTreeCWD = nil
             }
 
-            let root = Self.gitRoot(for: cwd) ?? cwd
+            let root = WorktreeManager().repoRoot(for: cwd) ?? cwd
             fileTreeView.updateRoot(path: root, sessionID: activeSessionID)
             if cwd != lastFileTreeCWD {
                 fileTreeView.revealFileInTree(path: cwd)
@@ -710,7 +710,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
             }
             let branchChanged = gitBranch != lastFileTreeGitBranch
             if sessionChanged || branchChanged {
-                let root = Self.gitRoot(for: cwd) ?? cwd
+                let root = WorktreeManager().repoRoot(for: cwd) ?? cwd
                 fileTreeView.updateRoot(path: root, sessionID: activeSessionID)
             }
             if cwd != lastFileTreeCWD {

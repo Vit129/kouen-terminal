@@ -58,12 +58,13 @@ public struct SessionEditor: Sendable {
     }
 
     /// Tags the first tab of a session with worktree isolation metadata.
-    public mutating func setWorktree(sessionID: SessionID, worktreePath: String, parentRepoPath: String?) {
+    public mutating func setWorktree(sessionID: SessionID, worktreePath: String, parentRepoPath: String?, taskName: String? = nil) {
         for wi in snapshot.workspaces.indices {
             if let si = snapshot.workspaces[wi].sessions.firstIndex(where: { $0.id == sessionID }) {
                 if !snapshot.workspaces[wi].sessions[si].tabs.isEmpty {
                     snapshot.workspaces[wi].sessions[si].tabs[0].worktreePath = worktreePath
                     snapshot.workspaces[wi].sessions[si].tabs[0].parentRepoPath = parentRepoPath
+                    snapshot.workspaces[wi].sessions[si].tabs[0].taskName = taskName
                 }
                 return
             }
@@ -497,6 +498,19 @@ public struct SessionEditor: Sendable {
         guard snapshot.workspaces[match.workspaceIndex].sessions[match.sessionIndex].tabs[match.tabIndex].persistent != persistent
         else { return true }
         snapshot.workspaces[match.workspaceIndex].sessions[match.sessionIndex].tabs[match.tabIndex].persistent = persistent
+        bumpRevision()
+        return true
+    }
+
+    /// Tags an already-existing tab with worktree isolation metadata (P32). Used by
+    /// branch-reactive auto-isolate, which moves an existing tab's shell into a worktree rather
+    /// than creating a new tab — mirrors `setWorktree(sessionID:)` but targets any tab by ID.
+    @discardableResult
+    public mutating func setTabWorktree(_ tabID: TabID, worktreePath: String, parentRepoPath: String?, taskName: String? = nil) -> Bool {
+        guard let match = tabIndex(tabID: tabID) else { return false }
+        snapshot.workspaces[match.workspaceIndex].sessions[match.sessionIndex].tabs[match.tabIndex].worktreePath = worktreePath
+        snapshot.workspaces[match.workspaceIndex].sessions[match.sessionIndex].tabs[match.tabIndex].parentRepoPath = parentRepoPath
+        snapshot.workspaces[match.workspaceIndex].sessions[match.sessionIndex].tabs[match.tabIndex].taskName = taskName
         bumpRevision()
         return true
     }

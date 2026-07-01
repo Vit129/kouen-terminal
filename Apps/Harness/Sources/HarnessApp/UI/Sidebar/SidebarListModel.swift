@@ -205,7 +205,11 @@ final class SidebarListModel {
     func repoRootForSession(_ session: SessionGroup) -> String {
         guard let tab = session.activeTab ?? session.tabs.first else { return "Other" }
         if let parentRepoPath = tab.parentRepoPath?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !parentRepoPath.isEmpty { return parentRepoPath }
+           !parentRepoPath.isEmpty {
+            // Normalize through the same --git-common-dir key as non-worktree tabs of this repo,
+            // so a task worktree's session groups with the main repo instead of splitting off.
+            return gitRepoRoot(for: parentRepoPath) ?? parentRepoPath
+        }
         if let gitRoot = gitRepoRoot(for: tab.cwd) { return gitRoot }
         return tab.cwd.isEmpty ? "Other" : tab.cwd
     }
