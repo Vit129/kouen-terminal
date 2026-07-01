@@ -23,6 +23,13 @@ final class RemoteHostsService: @unchecked Sendable {
 
     func addHost(_ host: RemoteHost) { store.upsert(host) }
 
+    /// Runs `harness-cli socket-path` on the remote over ssh and returns the path it prints, so the
+    /// GUI can auto-fill the Socket path field instead of asking the user to SSH in and run
+    /// `harness-cli doctor` by hand. Blocking — call off the main thread.
+    func detectSocketPath(sshTarget: String, sshArgs: [String]) throws -> String {
+        try SSHTunnelManager.detectSocketPath(sshTarget: sshTarget, sshArgs: sshArgs)
+    }
+
     func removeHost(named name: String) {
         store.remove(name: name)
         SSHTunnelManager.shared.stop(host: name)

@@ -57,9 +57,12 @@ Full cycle does: verify → bump → commit+push → prod → CHANGELOG → tag 
 
 ## Graphify
 
+```
+mcp__graphify__query_graph   # focused question
+mcp__graphify__shortest_path # dependency path A → B
+mcp__graphify__get_node      # explain concept/symbol
+```
+
 ```bash
-graphify query "..."        # first nav layer
-graphify path "A" "B"       # dependency path
-graphify explain "concept"
-graphify update . && ~/.claude/scripts/generate-graph-summary.sh .
+graphify update . && ~/.claude/scripts/generate-graph-summary.sh .  # rebuild index (CLI)
 ```

@@ -285,6 +285,50 @@ final class SSHTunnelManagerTests: XCTestCase {
         XCTAssertFalse(manager.isConnected("devbox"))
     }
 
+    // MARK: - Socket-path detection
+
+    func testDetectSocketPathTrimsAndReturnsRemoteStdout() throws {
+        let path = try SSHTunnelManager.detectSocketPath(
+            sshTarget: "rob@devbox",
+            makeProcess: { _ in
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: "/bin/sh")
+                process.arguments = ["-c", "printf '/home/rob/.local/share/harness/harness.sock\\n'"]
+                return process
+            })
+        XCTAssertEqual(path, "/home/rob/.local/share/harness/harness.sock")
+    }
+
+    func testDetectSocketPathThrowsOnNonZeroExit() {
+        XCTAssertThrowsError(try SSHTunnelManager.detectSocketPath(
+            sshTarget: "rob@devbox",
+            makeProcess: { _ in
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: "/bin/sh")
+                process.arguments = ["-c", "exit 255"]
+                return process
+            })) { error in
+            guard case SSHTunnelError.launchFailed = error else {
+                return XCTFail("expected .launchFailed, got \(error)")
+            }
+        }
+    }
+
+    func testDetectSocketPathRejectsGarbageOutput() {
+        XCTAssertThrowsError(try SSHTunnelManager.detectSocketPath(
+            sshTarget: "rob@devbox",
+            makeProcess: { _ in
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: "/bin/sh")
+                process.arguments = ["-c", "printf 'bash: harness-cli: command not found\\n'"]
+                return process
+            })) { error in
+            guard case SSHTunnelError.invalidConfiguration = error else {
+                return XCTFail("expected .invalidConfiguration, got \(error)")
+            }
+        }
+    }
+
     func testMalformedHostPropagatesInvalidConfigurationFromEndpoint() {
         // An unsafe target reaches the default process builder (the real sshArguments) and throws
         // invalidConfiguration before any child is spawned.

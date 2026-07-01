@@ -4,13 +4,8 @@
 
 | File | Title | Status |
 |------|-------|--------|
-| [swiftui-migration.md](swiftui-migration.md) | SwiftUI Migration (remaining components) | Active |
 | [p25-ios-ipados-support.md](p25-ios-ipados-support.md) | P25 — iOS/iPadOS Support | Planning |
-| [p23-ssh-remote-ui.md](p23-ssh-remote-ui.md) | P23 — SSH Remote Host Manager (PuTTY-style UI) | Active |
 | [p8-macos27-adoption.md](p8-macos27-adoption.md) | P8 — macOS 27 Golden Gate Adoption | Active |
-| [p29-acp-reactivation.md](p29-acp-reactivation.md) | P29 — ACP Reactivation (Terminal + IDE) | Planning |
-| [p30-otty-features.md](p30-otty-features.md) | P30 — Otty Feature Parity | Active |
-| [p31-agent-terminal.md](p31-agent-terminal.md) | P31 — Agent Terminal Enhancements | Planning |
 
 ## Pending
 
@@ -26,6 +21,9 @@
 
 | Plan | Version | Notes |
 |------|---------|-------|
+| P23 — SSH Remote Host Manager | v3.9.x | Settings → Remote tab, toolbar badge, `harness-cli remote add/list/remove`, socket auto-detect via new `harness-cli socket-path` command (2026-07-01) — see completed-archive.md |
+| SwiftUI Migration | v3.9.0–v3.11.x | Sidebar, Settings, Command palette, Notifications, Agent notch, Terminal tab bar all migrated; Browser tab bar deliberately skipped (2026-07-01, low value/high risk) — see completed-archive.md |
+| P30 — Otty Feature Parity | v3.11.x | Recipes, Floating Panes, Tab Thumbnails, Frecency, Session Resurrection audit — all done; Kitty Graphics + WASM plugins deferred (see completed-archive.md) |
 | P28 — Browser DevTools API | v3.7.0–v3.9.0 | harness-mcp 14 browser tools, replaces chrome-devtools-mcp |
 | Sidebar SwiftUI Migration (Option B) | v3.9.0 | NSTableView → SwiftUI List; RL-051 eliminated permanently |
 | HarnessCore Package Split | v3.9.0 | Core → Core + Commands + IPC + Settings (4 packages) |
@@ -37,4 +35,4 @@
 | Command History Search | v3.9.x | ⌘R overlay, fuzzy match, shell history integration |
 | IDE File Tree (Phase 1) | v3.9.x | Sidebar file tree, project root follows git root, session switching |
 | Git Panel Memory Leak | v3.9.4 | State caching prevents NSTextField allocation spikes |
-| P5 — ACP Client | Shelved→P29 | Superseded by P29 ACP Reactivation |
+| P5 — ACP Client | Shelved | Erased entirely by `c4e1e15` ("remove: ACP + ⌘I"); P29 reactivation plan abandoned, not pursuing |
