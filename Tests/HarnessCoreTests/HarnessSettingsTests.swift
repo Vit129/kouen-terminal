@@ -16,9 +16,9 @@ final class HarnessSettingsTests: XCTestCase {
         }
     }
 
-    func testSidebarVisibleDefaultsToFalse() {
-        XCTAssertFalse(HarnessSettings().sidebarVisible)
-        XCTAssertFalse(HarnessSettings.makeDefaults(imported: nil).sidebarVisible)
+    func testSidebarVisibleDefaultsToTrue() {
+        XCTAssertTrue(HarnessSettings().sidebarVisible)
+        XCTAssertTrue(HarnessSettings.makeDefaults(imported: nil).sidebarVisible)
     }
 
     func testSidebarVisibleLoadPreservesTrue() throws {

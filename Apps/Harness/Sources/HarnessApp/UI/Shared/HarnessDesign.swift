@@ -15,7 +15,7 @@ enum HarnessDesign {
         return NSApp.applicationIconImage
     }
 
-    static let sidebarWidth: CGFloat = 264
+    static let sidebarWidth: CGFloat = 220
     static let titlebarChromeHeight: CGFloat = 44
     static let tabBarHeight: CGFloat = 34
     static let workspaceBarHeight: CGFloat = 42

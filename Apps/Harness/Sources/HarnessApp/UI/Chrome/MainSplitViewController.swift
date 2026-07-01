@@ -185,10 +185,9 @@ final class MainSplitViewController: NSViewController {
         if let hex = SessionCoordinator.shared.settings.dividerHex, let color = NSColor.fromHex(hex) {
             return color
         }
-        let c = HarnessChrome.current
-        return c.isDark
-            ? (NSColor.fromHex(HarnessChromePalette.defaultDarkDividerHex) ?? c.border)
-            : c.border.withAlphaComponent(0.65)
+        // Match the visibility of the terminal pane-split divider (HarnessSplitView)
+        // rather than the faint `.border` hairline previously used here.
+        return HarnessChrome.current.paneDivider
     }
 
     func previewExternalFile(path: String) {
@@ -525,5 +524,16 @@ private final class SplitChromeDelegate: NSObject, NSSplitViewDelegate {
         var rect = proposedEffectiveRect
         rect.size.width = 4
         return rect
+    }
+
+    // `setHoldingPriority` alone doesn't stick here — with a classic constrainMin/Max
+    // delegate present, NSSplitView still redistributes width proportionally on window
+    // resize. Explicitly opt the sidebar out of auto-resize so only the terminal side
+    // absorbs window growth/shrink.
+    func splitView(_ splitView: NSSplitView, shouldAdjustSizeOfSubview subview: NSView) -> Bool {
+        let right = SessionCoordinator.shared.settings.sidebarOnRight
+        let sidebarIndex = right ? 1 : 0
+        guard splitView.subviews.count > sidebarIndex, splitView.subviews[sidebarIndex] === subview else { return true }
+        return false
     }
 }
