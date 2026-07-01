@@ -54,3 +54,6 @@ graphify-out/20*/
 
 # Shared agent protocol (symlinked)
 .ai/
+
+# Agent-task worktrees (P32) — sandboxes, not source
+.harness-worktrees/

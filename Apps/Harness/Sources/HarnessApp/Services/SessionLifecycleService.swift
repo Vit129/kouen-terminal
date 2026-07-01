@@ -69,6 +69,41 @@ final class SessionLifecycleService {
         }
     }
 
+    /// P32 F1: explicit task-worktree creation, bypassing the branch-change-reactive
+    /// `WorktreeAutoIsolateService`. Creates a dedicated worktree for `taskName`, then routes
+    /// through the normal `addSession` path so it gets `setupScript` auto-run (P24) for free.
+    /// Returns an error message on failure so the caller can surface it to the user —
+    /// every failure path here used to be a silent no-op.
+    @discardableResult
+    func addAgentTask(to workspaceID: WorkspaceID, taskName: String) -> String? {
+        let repoCandidate = coord.activeTabCWD ?? coord.settings.defaultCWD
+        let manager = WorktreeManager()
+        guard let repoPath = manager.repoRoot(for: repoCandidate) else {
+            return "The active tab (\(repoCandidate)) isn't inside a git repository."
+        }
+
+        let sanitized = taskName
+            .lowercased()
+            .replacingOccurrences(of: #"[^a-z0-9-]+"#, with: "-", options: .regularExpression)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+        guard !sanitized.isEmpty else {
+            return "Task name must contain at least one letter or number."
+        }
+
+        let baseRef = ProjectConfig.load(from: repoPath)?.baseRef
+        guard let worktreePath = manager.create(
+            repoPath: repoPath,
+            sessionID: sanitized,
+            branch: sanitized,
+            baseRef: baseRef
+        ) else {
+            return "Failed to create worktree for branch \"\(sanitized)\" — it may already exist."
+        }
+
+        addSession(to: workspaceID, cwd: worktreePath, name: taskName)
+        return nil
+    }
+
     func addTab(to workspaceID: WorkspaceID, cwd: String? = nil) {
         Task {
             await coord.requestDaemon(.newTab(workspaceID: workspaceID, cwd: cwd ?? coord.activeTabCWD ?? coord.settings.defaultCWD, shell: coord.settings.defaultShell))

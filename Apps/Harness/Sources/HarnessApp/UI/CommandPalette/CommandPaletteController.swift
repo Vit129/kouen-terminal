@@ -123,6 +123,7 @@ enum CommandPaletteController {
         panel.isOpaque = false
         panel.hasShadow = true
         panel.contentViewController = controller
+        panel.setContentSize(NSSize(width: 620, height: 440))
         let delegate = PaletteWindowDelegate()
         delegate.panel = panel
         panel.delegate = delegate
@@ -216,6 +217,28 @@ enum CommandPaletteController {
         let handlers: [String: () -> Void] = [
             "action.newSession": { if let id = coordinator.snapshot.activeWorkspaceID { coordinator.addSession(to: id) } },
             "action.newTab": { if let id = coordinator.snapshot.activeWorkspaceID { coordinator.addTab(to: id) } },
+            "action.newAgentTask": {
+                guard let id = coordinator.snapshot.activeWorkspaceID else { return }
+                let alert = NSAlert()
+                alert.messageText = "New Agent Task"
+                alert.informativeText = "Creates an isolated git worktree + branch for this task."
+                alert.alertStyle = .informational
+                alert.addButton(withTitle: "Create")
+                alert.addButton(withTitle: "Cancel")
+                let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 22))
+                alert.accessoryView = input
+                alert.window.initialFirstResponder = input
+                guard alert.runModal() == .alertFirstButtonReturn else { return }
+                let name = input.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !name.isEmpty else { return }
+                if let error = coordinator.addAgentTask(to: id, taskName: name) {
+                    let errorAlert = NSAlert()
+                    errorAlert.messageText = "Couldn't Create Agent Task"
+                    errorAlert.informativeText = error
+                    errorAlert.alertStyle = .warning
+                    errorAlert.runModal()
+                }
+            },
             "action.splitH": { coordinator.splitActivePane(direction: .horizontal) },
             "action.splitV": { coordinator.splitActivePane(direction: .vertical) },
             "action.zoomPane": { coordinator.zoomActivePane() },
@@ -255,6 +278,7 @@ enum CommandPaletteController {
         let defaultConfigs: [PaletteCommandConfig] = [
             .init(id: "action.newSession",    title: "New Session",               subtitle: "Create a fresh session",                         symbol: "rectangle.stack.badge.plus",         shortcut: "⇧⌘N",      section: "actions"),
             .init(id: "action.newTab",        title: "New Tab",                   subtitle: "Open a new shell in the active session",         symbol: "plus.rectangle.on.rectangle",        shortcut: "",          section: "actions"),
+            .init(id: "action.newAgentTask",  title: "New Agent Task",            subtitle: "Create an isolated worktree + branch for a named task", symbol: "shippingbox",                  shortcut: "",          section: "actions"),
             .init(id: "action.splitH",        title: "Split Right",               subtitle: "Split the active pane to the right",             symbol: "square.split.2x1",                   shortcut: "⌘D",       section: "actions"),
             .init(id: "action.splitV",        title: "Split Down",                subtitle: "Split the active pane down",                     symbol: "square.split.1x2",                   shortcut: "⌘⇧D",      section: "actions"),
             .init(id: "action.zoomPane",      title: "Zoom Pane",                 subtitle: "Toggle full-tab zoom on the active pane",        symbol: "arrow.up.left.and.arrow.down.right",  shortcut: "Prefix z",  section: "actions"),
@@ -788,6 +812,7 @@ private struct PaletteView: View {
             PaletteFooter()
                 .frame(height: 40)
         }
+        .frame(width: 620, height: 440)
         .background(OverlayBackground())
         .clipShape(RoundedRectangle(cornerRadius: HarnessDesign.Radius.overlay, style: .continuous))
         .onAppear {

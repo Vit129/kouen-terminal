@@ -6,6 +6,7 @@
 |------|-------|--------|
 | [p25-ios-ipados-support.md](p25-ios-ipados-support.md) | P25 — iOS/iPadOS Support | Planning |
 | [p8-macos27-adoption.md](p8-macos27-adoption.md) | P8 — macOS 27 Golden Gate Adoption | Active |
+| [p32-task-based-worktrees.md](p32-task-based-worktrees.md) | P32 — Task-Based Agent Worktrees | Planning |
 
 ## Pending
 
