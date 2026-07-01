@@ -1,9 +1,45 @@
 # Context — harness-terminal
 
 ## Now
-- **Task:** P32 Phase 2 gap-close done; live worktree testing (incl. Claude-created `.claude/worktrees/*`) surfaced 2 sidebar bugs — both fixed, 2nd fix awaiting user's live confirmation in preview
+- **Task:** Sidebar width/visibility polish pass done, user-confirmed live in preview
 - **Branch:** `main`
 - **Not committed** — awaiting explicit go-ahead per standing "don't commit without permission" rule
+
+### 2026-07-01 — Sidebar default width/visibility + resize-proportional-growth bug ✅ FIXED (user-confirmed)
+User: sidebar too big → reduce default width `HarnessDesign.sidebarWidth` 264→220
+(`Apps/Harness/Sources/HarnessApp/UI/Shared/HarnessDesign.swift:18`). Then asked for
+always-open-on-launch + divider styling to match the pane-split divider from `b83773e`.
+
+- **`sidebarVisible` default → `true`** (`Packages/HarnessSettings/Sources/HarnessSettings/HarnessSettings.swift:324`,
+  init param default `false`→`true`). Test `testSidebarVisibleDefaultsToFalse` renamed/flipped to
+  `testSidebarVisibleDefaultsToTrue` in `Tests/HarnessCoreTests/HarnessSettingsTests.swift`. Also had to
+  hand-patch already-persisted `~/Library/Application Support/HarnessDebug/settings.json` (`sidebarVisible: true`)
+  since the debug build variant's existing settings.json predates this default and isn't a fresh install.
+- **Divider color** (`MainSplitViewController.swift` `resolvedDividerColor()`): now returns
+  `HarnessChrome.current.paneDivider` (same token `ContentAreaViewController.swift`/`HarnessSplitView`
+  use for terminal pane splits, cmd+d/cmd+shift+d) instead of the fainter `.border`/hardcoded-hex scheme —
+  visually unifies the sidebar/content boundary with pane dividers.
+- **Real bug (root cause of "ยังใหญ่เกือบครึ่งจอ" after width was already 220pt in code):**
+  `NSSplitView` redistributes divider position **proportionally** on window resize
+  (`resizeSubviews(withOldSize:)`), not just on user drag. `HarnessDesign.sidebarWidth` only sets
+  the *initial* position via `setPosition(_:ofDividerAt:)` at first layout — any subsequent window
+  resize/restore-to-larger-frame balloons the sidebar proportionally (confirmed via temp `NSLog`:
+  480pt window → sidebar 220 correct; window then resized to 1440pt → sidebar ballooned to 661,
+  exact same 45.9% ratio). `constrainMinCoordinate`/`constrainMaxCoordinate` (200–320pt cap) only
+  governs **user drags**, not automatic/programmatic resize — doesn't help here.
+  - **First attempt failed:** `split.setHoldingPriority(.defaultHigh/.defaultLow, forSubviewAt:)`
+    had **zero effect** — holding priority only governs pure-Auto-Layout-arranged NSSplitViews;
+    with a classic `constrainMinCoordinate`/`constrainMaxCoordinate` delegate present
+    (`SplitChromeDelegate`), NSSplitView still uses proportional redistribution regardless.
+  - **Actual fix:** implemented `NSSplitViewDelegate.splitView(_:shouldAdjustSizeOfSubview:)` on
+    `SplitChromeDelegate`, returning `false` for the sidebar subview (index depends on
+    `settings.sidebarOnRight`) — explicitly opts the sidebar out of auto-resize so only the
+    terminal/content side absorbs window growth/shrink. Confirmed via the same `NSLog` probe:
+    1440pt window → sidebar stays 220, content absorbs to 1219. User confirmed fixed live in preview.
+  - Temp `NSLog` debug probe added then removed once confirmed (not committed).
+
+See `knowledge/cases/misc.md` — worth promoting as a case: "NSSplitView holdingPriority does nothing
+when a classic constrain-coordinate delegate is present; use shouldAdjustSizeOfSubview instead."
 
 ### 2026-07-01 — P32 Phase 2: worktree tabs invisible to git UI ✅ FIXED (pending live confirm)
 User tested opening a tab inside a `.claude/worktrees/*` dir (created by a Claude Code agent,
