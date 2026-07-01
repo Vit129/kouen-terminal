@@ -192,3 +192,29 @@ All plans below are **done** and merged into main.
 - IPC types moved to HarnessIPC (IPCMessage, IPCCodec, models)
 - Settings moved to HarnessSettings (AIAgentConfig, HarnessSettings, ProjectConfig)
 - Faster incremental builds, cleaner dependency graph
+
+## SwiftUI Migration (v3.9.0 – v3.11.x)
+- Sidebar session list + chrome (pill, tab bar, section label, footer) → SwiftUI List + @Observable, `HarnessControls.swift` deleted, eliminated RL-051 (row-index out-of-range) crash class
+- Settings (S1–S9) → SwiftUI, `SettingsViewController` eliminated
+- Command palette → `NSHostingController(rootView: PaletteView)` (wave 2, `760705a`)
+- Notifications inbox → `AgentInboxPanelView` SwiftUI (wave 2)
+- Agent notch → `AgentNotchRootView: View` SwiftUI content, `NSPanel` shell (wave 2)
+- Terminal tab bar → hybrid: `TerminalTabBarView: NSView` shell + SwiftUI pills (`TerminalTabBarBody`, `TabPillView`), drag-drop stays AppKit (wave 2)
+- Net −424 lines across the wave-2 four components; no manual `NSTableViewDataSource`/cell-reuse left in these paths
+- **Browser tab bar deliberately skipped (2026-07-01)** — still `NSStackView`/`NSButton` in `BrowserPaneView.swift`; works fine, no bug class to eliminate, not worth WKWebView-bridging regression risk
+
+## P30 — Otty Feature Parity (v3.11.x)
+- Command Recipes (⌘⇧R) — `RecipesStore` + `RecipePickerController`, fuzzy picker
+- Floating Terminal (⌘⌥F) — `FloatingPaneController`, NSPanel, persisted frame
+- Tab Overview (⌘⇧\\) — `TabOverviewController`, thumbnail grid, click to switch
+- Frecency dir picker (⌘⇧J) — zoxide-powered, ↩ cd / ⌘↩ new tab
+- Session Resurrection audit (Zellij-inspired) — verified quit/relaunch, daemon crash/restart, reboot, multi-window restore
+- Block output tint + AI explain (Phase 12b/12c) — border, collapse/expand, re-run button
+- Vi mode at terminal input layer
+- Deferred (intentional, not blocked): Kitty Graphics Protocol, WASM plugin runtime — no demand yet
+
+## P23 — SSH Remote Host Manager (v3.9.x – 2026-07-01)
+- Settings → Remote tab: host list (add/remove/duplicate), detail form (Name/SSH target/Port/Identity/Jump/Socket path), Save/Revert, Connect/Disconnect
+- Toolbar badge showing active remote host name; click disconnects (or opens Settings → Remote when local)
+- Socket auto-detect (PBI-SSH-008, 2026-07-01): new `harness-cli socket-path` command prints `HarnessPaths.socketURL.path`; `SSHTunnelManager.detectSocketPath` runs it over `ssh` reusing the tunnel's arg-validation seams (`validatedSSHTarget`/`validatedUserSSHArgs`); consumed by both `SettingsRemoteView`'s "Detect" button and `harness-cli remote add --detect` (alternative to passing `--socket` by hand)
+- TCP transport remains suspended — no TLS layer, SSH tunnel covers all current remote use cases
