@@ -12,6 +12,7 @@ struct SettingsRemoteView: View {
     @State private var editJump = ""
     @State private var editSocket = ""
     @State private var statusMessage = ""
+    @State private var isDetectingSocket = false
 
     var body: some View {
         ScrollView {
@@ -101,8 +102,13 @@ struct SettingsRemoteView: View {
                         .frame(width: 280)
                 }
                 LabeledContent("Socket path") {
-                    TextField("/home/user/.config/harness/harness.sock", text: $editSocket)
-                        .frame(width: 280)
+                    HStack(spacing: 8) {
+                        TextField("/home/user/.config/harness/harness.sock", text: $editSocket)
+                            .frame(width: 230)
+                        Button(isDetectingSocket ? "Detecting…" : "Detect") { detectSocketPath() }
+                            .disabled(isDetectingSocket
+                                || editTarget.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
                 }
 
                 HStack(spacing: 8) {
@@ -255,6 +261,32 @@ struct SettingsRemoteView: View {
         panel.title = "Choose SSH Identity"
         if panel.runModal() == .OK, let url = panel.url {
             editIdentity = url.path
+        }
+    }
+
+    private func detectSocketPath() {
+        let target = editTarget.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !target.isEmpty else { return }
+        var args: [String] = []
+        appendSSHArg("-p", editPort, to: &args)
+        appendSSHArg("-i", editIdentity, to: &args)
+        appendSSHArg("-J", editJump, to: &args)
+        isDetectingSocket = true
+        refreshStatus("Detecting socket path on \(target)…")
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                let path = try RemoteHostsService.shared.detectSocketPath(sshTarget: target, sshArgs: args)
+                DispatchQueue.main.async {
+                    editSocket = path
+                    isDetectingSocket = false
+                    refreshStatus("Detected socket path.")
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    isDetectingSocket = false
+                    refreshStatus("⚠️ Detect failed: \(error)")
+                }
+            }
         }
     }
 

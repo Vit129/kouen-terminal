@@ -159,6 +159,55 @@ public final class SSHTunnelManager: @unchecked Sendable {
         }
     }
 
+    /// Runs `harness-cli socket-path` on the remote host over ssh and returns the path it prints —
+    /// a one-shot exec (no `-N -L` forward) used to auto-fill a `RemoteHost`'s socket path instead of
+    /// asking the user to run `harness-cli doctor` on the remote by hand. Blocking — call off the
+    /// main thread. `makeProcess` is a test seam; production callers omit it.
+    public static func detectSocketPath(
+        sshTarget: String,
+        sshArgs: [String] = [],
+        timeout: TimeInterval = 8,
+        makeProcess: ((_ args: [String]) -> Process)? = nil
+    ) throws -> String {
+        var args = [
+            "ssh",
+            "-o", "BatchMode=yes",
+            "-o", "ConnectTimeout=\(max(1, Int(timeout)))",
+            "-o", "ServerAliveInterval=5",
+            "-o", "ServerAliveCountMax=2",
+        ]
+        args += try validatedUserSSHArgs(sshArgs)
+        args += [try validatedSSHTarget(sshTarget), "harness-cli", "socket-path"]
+
+        let process = (makeProcess ?? { a in
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+            p.arguments = a
+            return p
+        })(args)
+        let stdoutPipe = Pipe()
+        process.standardOutput = stdoutPipe
+        process.standardError = FileHandle.nullDevice
+        do {
+            try process.run()
+        } catch {
+            throw SSHTunnelError.launchFailed("\(error)")
+        }
+        let data = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+
+        guard process.terminationStatus == 0 else {
+            throw SSHTunnelError.launchFailed(
+                "ssh exited with status \(process.terminationStatus) while detecting the remote socket "
+                    + "path — check the host is reachable and `harness-cli` is on its PATH")
+        }
+        let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard path.hasPrefix("/"), isSafeArgumentToken(path), !path.contains(":") else {
+            throw SSHTunnelError.invalidConfiguration("remote returned an unexpected socket path: '\(path)'")
+        }
+        return path
+    }
+
     static func sshArguments(for host: RemoteHost, localSocket: URL) throws -> [String] {
         var args = [
             "ssh",

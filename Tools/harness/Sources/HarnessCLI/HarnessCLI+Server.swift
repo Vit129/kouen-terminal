@@ -144,12 +144,7 @@ extension HarnessCLI {
         case "add":
             guard let name = flagValue(args, flag: "--name"), let ssh = flagValue(args, flag: "--ssh") else {
                 fputs("Usage: harness-cli remote add --name <name> --ssh <user@host> "
-                    + "--socket <remote-path> [--ssh-arg <arg> ...]\n", harnessStderr)
-                return 64
-            }
-            guard let socketPath = flagValue(args, flag: "--socket") else {
-                fputs("harness-cli remote add: could not infer the remote socket path; pass --socket "
-                    + "<remote-path> (see `harness-cli doctor` on the remote for its value).\n", harnessStderr)
+                    + "--socket <remote-path> | --detect [--ssh-arg <arg> ...]\n", harnessStderr)
                 return 64
             }
             var sshArgs: [String] = []
@@ -163,6 +158,22 @@ extension HarnessCLI {
                     }
                     sshArgs.append(args[i + 1]); i += 2
                 } else { i += 1 }
+            }
+            let socketPath: String
+            if let explicit = flagValue(args, flag: "--socket") {
+                socketPath = explicit
+            } else if args.contains("--detect") {
+                do {
+                    socketPath = try SSHTunnelManager.detectSocketPath(sshTarget: ssh, sshArgs: sshArgs)
+                } catch {
+                    fputs("harness-cli remote add: socket auto-detect failed (\(error)); "
+                        + "pass --socket <remote-path> instead.\n", harnessStderr)
+                    return 1
+                }
+            } else {
+                fputs("harness-cli remote add: pass --socket <remote-path>, or --detect to auto-detect it "
+                    + "via `harness-cli socket-path` on the remote.\n", harnessStderr)
+                return 64
             }
             let result = store.upsert(RemoteHost(name: name, sshTarget: ssh, remoteSocketPath: socketPath, sshArgs: sshArgs))
             guard result.saved else {

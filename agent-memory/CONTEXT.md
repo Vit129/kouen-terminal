@@ -4,6 +4,20 @@
 - **Task:** idle
 - **Branch:** `main`
 
+### 2026-07-01 — P23 socket auto-detect (PBI-SSH-008) ✅ FIXED — P23 now Complete
+
+Added `harness-cli socket-path` (prints `HarnessPaths.socketURL.path`) as the single source of
+truth; `SSHTunnelManager.detectSocketPath(sshTarget:sshArgs:)` runs it over `ssh` reusing the
+tunnel's existing arg-validation seams (`validatedSSHTarget`/`validatedUserSSHArgs`,
+`isSafeArgumentToken`) — no new injection surface. Consumed by both surfaces: `SettingsRemoteView`'s
+new "Detect" button (async off main thread via `RemoteHostsService.detectSocketPath`) and
+`harness-cli remote add --detect` (alternative to passing `--socket` by hand). 3 new unit tests in
+`SSHTunnelManagerTests.swift` using the existing injectable-process-seam pattern.
+
+`swift build --product Harness` and `--product harness-cli` both clean. `swift test` could **not**
+be run to completion — see Unresolved below (pre-existing, unrelated breakage). P23 moved to
+`completed-archive.md`; plan file deleted.
+
 ### 2026-06-30 — Cmd+\ sidebar toggle gone after collapse ✅ FIXED
 
 **Root cause:** B triggers A — zero-delta early exit in `applySidebarVisibility` returned without replacing `sidebarDisplayLink`, leaving the old collapse link running. Dead token guard (A) allowed it to continue despite `sidebarAnimToken` increment. Old link completed with `_sidebarVisible=false` → `panel.isHidden=true` → sidebar gone.
@@ -72,4 +86,22 @@ per-session toggle by design (no persist field — only `advisorModel` persists)
 | 2026-06-23 | Sidebar SwiftUI | NSTableView removed; VC 1676 → 890 lines |
 
 ## Unresolved
-- Pre-existing robot failure: "Bug 1 - Browser Pane Reuse On Rebuild" (BrowserIntegrationController refactor changed call sites)
+- 2 pre-existing `swift test` failures unrelated to any recent work: `ExperienceModeTests.testShowsHarnessControlsDerivesFromMode`,
+  `Phase6KeysTests.testRootTableSeededAndBindable`. Not investigated this session.
+
+### 2026-07-01 — ACP-removal cleanup (items 1 & 2 from P23 wrap-up) ✅ FIXED
+- **`swift test` couldn't build** — `Tests/HarnessCoreTests/ACPTransportTests.swift` and
+  `Tests/HarnessMCPTests/StdioTransportTests.swift` referenced `ACPMessage`/`ACPTransport`/`TransportBuffer`
+  removed by `c4e1e15` ("remove: ACP + ⌘I — erase as if never built"). Root cause for both this and the
+  robot failure below.
+  - `ACPTransportTests.swift` deleted — `ACPTransport`/`TransportBuffer` have no live equivalent (pure
+    ACP transport-layer types, intentionally erased with no replacement).
+  - `StdioTransportTests.swift` repaired, not deleted — it tests `MCPStdioBuffer`
+    (`Tools/harness-mcp/Sources/HarnessMCP/StdioTransport.swift`), which is still live and already uses
+    `JSONRPCMessage`. Swapped `ACPMessage` → `JSONRPCMessage`, replaced `ACPTransport.encode` with a local
+    `contentLengthFrame` helper matching the same `Content-Length: N\r\n\r\n<body>` framing `StdioTransport.send` uses.
+  - `swift test` now builds and runs 1673 tests (only the 2 unrelated failures above).
+- Robot "Leak A - Retiring A Host Drops Its AI Controllers" stale assertion removed from
+  `Tests/robot/memory_leak_guards.robot` — it checked for `aiChatControllers.removeValue`, a dict that
+  `c4e1e15` deliberately deleted along with the ⌘I feature (only `inlineAIControllers` remains). All 10
+  robot tests pass.

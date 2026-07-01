@@ -41,6 +41,9 @@ struct HarnessCLI {
                 exit(handleGrep(args))
             case "remote":
                 exit(try handleRemote(args))
+            case "socket-path":
+                print(HarnessPaths.socketURL.path)
+                return
             case "daemon":
                 guard args.count > 1 else {
                     runDaemonForeground() // execs HarnessDaemon; never returns
