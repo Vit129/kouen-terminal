@@ -214,7 +214,7 @@ private struct SidebarSessionItemRow: View {
         let branch = tab?.gitBranch?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let cwd = tab?.cwd ?? ""
         let sessionTitle = session.name.isEmpty ? HarnessDesign.pathDisplayName(cwd) : session.name
-        let displayTitle = branch.isEmpty ? sessionTitle : branch
+        let displayTitle = tab?.taskName ?? (branch.isEmpty ? sessionTitle : branch)
         let subtitle = HarnessDesign.shortenPath(cwd)
 
         let selectedFill = Color(nsColor: c.accent).opacity(c.isDark ? 0.13 : 0.10)

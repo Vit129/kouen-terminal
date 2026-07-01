@@ -71,6 +71,38 @@ final class WorktreeIsolationTests: XCTestCase {
         XCTAssertEqual(session.tabs.first?.parentRepoPath, "/tmp/repo")
     }
 
+    // P32 Phase 2: explicit task worktrees also tag taskName.
+    func testSetWorktreeTagsTaskName() throws {
+        var editor = SessionEditor()
+        let ws = try XCTUnwrap(editor.snapshot.activeWorkspace)
+        let sessionID = try XCTUnwrap(editor.addSession(to: ws.id, cwd: "/tmp", name: "fix login bug"))
+
+        editor.setWorktree(sessionID: sessionID, worktreePath: "/tmp/wt", parentRepoPath: "/tmp/repo", taskName: "fix login bug")
+
+        let session = try XCTUnwrap(editor.snapshot.activeWorkspace?.sessions.first(where: { $0.id == sessionID }))
+        XCTAssertEqual(session.tabs.first?.worktreePath, "/tmp/wt")
+        XCTAssertEqual(session.tabs.first?.taskName, "fix login bug")
+    }
+
+    // P32 Phase 2 gap-close: branch-reactive auto-isolate tags an *existing* tab by ID,
+    // not just tabs[0] of a freshly-created session.
+    func testSetTabWorktreeTagsExistingTabByID() throws {
+        var editor = SessionEditor()
+        let ws = try XCTUnwrap(editor.snapshot.activeWorkspace)
+        let sessionID = try XCTUnwrap(editor.addSession(to: ws.id, cwd: "/tmp", name: nil))
+        let tabID = try XCTUnwrap(editor.snapshot.activeWorkspace?.sessions.first(where: { $0.id == sessionID })?.tabs.first?.id)
+
+        let ok = editor.setTabWorktree(tabID, worktreePath: "/tmp/wt-auto", parentRepoPath: "/tmp/repo")
+        XCTAssertTrue(ok)
+
+        let session = try XCTUnwrap(editor.snapshot.activeWorkspace?.sessions.first(where: { $0.id == sessionID }))
+        XCTAssertEqual(session.tabs.first?.worktreePath, "/tmp/wt-auto")
+        XCTAssertEqual(session.tabs.first?.parentRepoPath, "/tmp/repo")
+        XCTAssertNil(session.tabs.first?.taskName)
+
+        XCTAssertFalse(editor.setTabWorktree(UUID(), worktreePath: "/tmp/x", parentRepoPath: nil))
+    }
+
     // MARK: - Tab model persistence
 
     func testTabWorktreeFieldsRoundTrip() throws {

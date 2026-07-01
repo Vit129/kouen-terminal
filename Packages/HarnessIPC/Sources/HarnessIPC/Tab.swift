@@ -43,6 +43,9 @@ public struct Tab: Codable, Sendable, Identifiable, Equatable {
     public var worktreePath: String?
     /// The parent repository root that owns the worktree. Used for cleanup and branch display.
     public var parentRepoPath: String?
+    /// User-supplied name for an explicitly-created agent task worktree (P32).
+    /// nil for branch-auto-isolated tabs and tabs outside any worktree.
+    public var taskName: String?
 
     /// The tmux activity/silence/bell portion of `#{window_flags}`.
     public var alertFlags: String {
@@ -71,7 +74,8 @@ public struct Tab: Codable, Sendable, Identifiable, Equatable {
         persistent: Bool = false,
         lastMCPControlAt: Date? = nil,
         worktreePath: String? = nil,
-        parentRepoPath: String? = nil
+        parentRepoPath: String? = nil,
+        taskName: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -96,6 +100,7 @@ public struct Tab: Codable, Sendable, Identifiable, Equatable {
         self.lastMCPControlAt = lastMCPControlAt
         self.worktreePath = worktreePath
         self.parentRepoPath = parentRepoPath
+        self.taskName = taskName
     }
 
     /// Effective agent kind — daemon-detected first, then inferred from OSC title.
@@ -105,6 +110,9 @@ public struct Tab: Codable, Sendable, Identifiable, Equatable {
     }
 
     public var displaySubtitle: String {
+        if let task = taskName, !task.isEmpty {
+            return task
+        }
         if let branch = gitBranch, !branch.isEmpty {
             return branch
         }
@@ -145,6 +153,8 @@ public struct Tab: Codable, Sendable, Identifiable, Equatable {
         // Worktree isolation — absent in older layout.json; nil = shared repo (no isolation).
         worktreePath = try container.decodeIfPresent(String.self, forKey: .worktreePath)
         parentRepoPath = try container.decodeIfPresent(String.self, forKey: .parentRepoPath)
+        // Task name (P32) — absent in older layout.json; nil = not an explicit task worktree.
+        taskName = try container.decodeIfPresent(String.self, forKey: .taskName)
     }
 }
 
@@ -164,6 +174,7 @@ extension Tab {
         persistent == other.persistent &&
         worktreePath == other.worktreePath &&
         parentRepoPath == other.parentRepoPath &&
+        taskName == other.taskName &&
         zoomedPaneID == other.zoomedPaneID &&
         activePaneID == other.activePaneID
     }

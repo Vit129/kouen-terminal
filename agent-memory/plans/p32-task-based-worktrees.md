@@ -102,11 +102,22 @@ Exit criteria: user can create a named task worktree without touching git branch
 
 ### Phase 2 — Task metadata + UI (P0)
 
-- [ ] Add `taskName` to tab model
-- [ ] Sidebar/tab title shows task name when set
-- [ ] Unit test: creating a task tab sets both `worktreePath` and `taskName`
+- [x] Add `taskName: String?` to `Tab` (`Tab.swift`), same optional-backfill decode pattern as
+      `parentRepoPath`; `displaySubtitle` precedence now `taskName > gitBranch > cwd`
+- [x] Sidebar row title (`SidebarSessionListView.displayTitle`) now prefers `tab.taskName` over
+      `gitBranch` over `session.name` — matters when the raw task name differs from its
+      sanitized branch (e.g. "Fix Login Bug" → branch `fix-login-bug`)
+- [x] Unit test: `WorktreeIsolationTests.testSetWorktreeTagsTaskName` — creating a task tab sets
+      both `worktreePath` and `taskName`
 
-Exit criteria: task-created tabs are visually distinguishable from branch-auto-isolated tabs.
+Bonus fix while threading this: `worktreePath`/`parentRepoPath` were never actually being passed
+from the GUI's `addAgentTask` → `addSession` → `.newSession` IPC call (only the CLI's `harness`
+tool did) — so Phase 1 tabs had `tab.worktreePath == nil` despite living in a worktree. Extended
+`IPCRequest.newSession` and `SessionEditor.setWorktree` with a `taskName` param and wired
+`addSession`/`addAgentTask` to pass `worktreePath`/`parentRepoPath`/`taskName` through for real.
+
+Exit criteria: task-created tabs are visually distinguishable from branch-auto-isolated tabs. ✅
+`swift build --product Harness` clean; `swift test --filter WorktreeIsolationTests` 10/10 pass.
 
 ### Phase 3 — Setup/teardown hooks (P1)
 

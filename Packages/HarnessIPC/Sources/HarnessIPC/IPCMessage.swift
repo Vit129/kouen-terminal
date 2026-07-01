@@ -13,7 +13,7 @@ public enum IPCRequest: Codable, Sendable {
     /// with its workspace/session/tab/pane context, state, and `.waiting` signal.
     case listAgents
     case newWorkspace(name: String)
-    case newSession(workspaceID: UUID, cwd: String?, name: String?, shell: String? = nil, worktreePath: String? = nil, parentRepoPath: String? = nil)
+    case newSession(workspaceID: UUID, cwd: String?, name: String?, shell: String? = nil, worktreePath: String? = nil, parentRepoPath: String? = nil, taskName: String? = nil)
     /// tmux `new-session -t <session>`: an independent session grouped with the target,
     /// sharing its window list (linked windows / shared surfaces).
     case newSessionInGroup(targetSessionID: UUID, name: String?)
@@ -42,6 +42,10 @@ public enum IPCRequest: Codable, Sendable {
     /// Pin/unpin an individual tab so it survives a clean quit even when neither
     /// `keepSessionsOnQuit` nor its session's pin is set. `true` = persistent, `false` = ephemeral.
     case setTabPersistent(tabID: UUID, persistent: Bool)
+    /// Tags an existing tab with worktree isolation metadata (P32) — used when moving an
+    /// already-running tab's shell into a worktree (branch-reactive auto-isolate) rather than
+    /// creating a new tab via `newSession`.
+    case setTabWorktree(tabID: UUID, worktreePath: String, parentRepoPath: String?, taskName: String? = nil)
     /// Tear down sessions that are neither globally kept nor individually pinned. The GUI calls
     /// this on a *clean* quit so Plain-mode sessions behave like a normal terminal; pinned and
     /// keep-on-quit sessions are left running.

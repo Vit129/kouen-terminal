@@ -72,6 +72,10 @@ final class WorktreeAutoIsolateService {
                 data: Data(("cd \(wtPath)\r").utf8)
             ))
         }
+
+        // Tag the tab so sidebar grouping/`isStableEqual` and the "already isolated" guard above
+        // (`tab.worktreePath != nil`) see this tab as isolated, same as an explicit task tab.
+        coord.requestDaemon(.setTabWorktree(tabID: tab.id, worktreePath: wtPath, parentRepoPath: cwd, taskName: nil))
     }
 
     /// Returns true if the path is inside a git linked worktree (not the main working tree).

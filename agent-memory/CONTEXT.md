@@ -1,8 +1,39 @@
 # Context — harness-terminal
 
 ## Now
-- **Task:** P32 Phase 1 verified end-to-end in preview build — awaiting confirmation to start Phase 2 (task metadata + UI)
+- **Task:** P32 Phase 2 gap-close done; live worktree testing (incl. Claude-created `.claude/worktrees/*`) surfaced 2 sidebar bugs — both fixed, 2nd fix awaiting user's live confirmation in preview
 - **Branch:** `main`
+- **Not committed** — awaiting explicit go-ahead per standing "don't commit without permission" rule
+
+### 2026-07-01 — P32 Phase 2: worktree tabs invisible to git UI ✅ FIXED (pending live confirm)
+User tested opening a tab inside a `.claude/worktrees/*` dir (created by a Claude Code agent,
+real uncommitted changes on disk) and reported "git changes ไม่ขึ้น" (changes not showing).
+
+Root-caused to `HarnessSidebarPanelViewController.gitRoot(for:)` (private helper, designed for
+**file** paths — used correctly at `openExternalFile`) being reused on **directory** (`cwd`)
+inputs at 3 call sites (`selectSidebarTab`, `reload()`, `refreshMetadata()`). It always starts
+its `.git`-existence walk from the input's *parent*, so for any worktree cwd (`.harness-worktrees/*`
+or `.claude/worktrees/*`, both nested inside the main repo tree) it walks straight past the
+worktree's own `.git` file and resolves to the **main repo** root instead — File Tree pane then
+shows the main repo's (clean) status, not the worktree's real changes. The Git "Changes" panel
+itself was already correct (passes raw `cwd` directly, no walk).
+
+**Fix:** swapped `Self.gitRoot(for: cwd) ?? cwd` → `WorktreeManager().repoRoot(for: cwd) ?? cwd`
+(reuses existing, already-tested `git rev-parse --show-toplevel` wrapper — same primitive
+`WorktreeAutoIsolateService` already relies on) at the 3 directory-input call sites only; left
+`openExternalFile`'s file-path use of `gitRoot(for:)` untouched. Verified `git rev-parse
+--show-toplevel` from inside a real `.claude/worktrees/agent-*` dir correctly returns the
+worktree path, not the main repo. Build clean.
+
+Follow-up: after that fix, user reported the Git panel's Changes tab still took a moment to
+populate ("ต้องรอ") rather than showing instantly. Root cause: `GitPanelView.refresh()` painted
+the UI only at the very end of the function — if the worktree had unstaged files, it ran a
+sequential `git add` + 2 more `git` re-fetches (auto-stage step) *before* the first paint,
+adding a full extra round trip of latency before anything appeared. **Fix:** extracted the
+paint logic into `applyState(...)`, called once immediately after the first parallel git-status
+fetch (so Changes shows up right away), then the auto-stage add + repaint runs as a background
+follow-up only if it changes anything. Build clean, preview relaunched — awaiting user's
+re-test to confirm instant paint.
 
 ### 2026-07-01 — P32 Phase 1 live verification + 2 bugs fixed
 Live-tested "New Agent Task" in the preview build (not production `/Applications/Harness.app` —

@@ -96,6 +96,19 @@ final class GitPanelView: NSView {
         }
     }
 
+    // ponytail: updateRoot()'s `path != currentPath` dedup can set currentPath
+    // while this view is still hidden (refresh() itself bails out via the
+    // isHiddenOrHasHiddenAncestor guard below), so becoming visible again with
+    // an unchanged path would otherwise never repaint. Force one refresh on
+    // hidden->visible transitions to close that gap.
+    override var isHidden: Bool {
+        didSet {
+            if oldValue, !isHidden {
+                Task { [weak self] in await self?.refresh() }
+            }
+        }
+    }
+
     func updateRoot(path: String) {
         guard path != currentPath else { return }
         currentPath = path
@@ -888,8 +901,8 @@ final class GitPanelView: NSView {
 
         let branch = await branchTask
         let aheadBehind = await aheadBehindTask
-        var numstat = await numstatTask
-        var porcelain = await porcelainTask
+        let numstat = await numstatTask
+        let porcelain = await porcelainTask
         let log = await logTask
 
         // A newer refresh started while these git calls were in flight — its
@@ -897,27 +910,37 @@ final class GitPanelView: NSView {
         // of overwriting the UI with out-of-date staged/changed state.
         guard generation == refreshGeneration else { return }
 
-        // Auto-stage unstaged changes that are not manually unstaged
+        // Paint immediately from this first fetch — don't block the initial
+        // render on the auto-stage round trip below.
+        applyState(branch: branch, aheadBehind: aheadBehind, numstat: numstat, porcelain: porcelain, log: log)
+        await refreshWorktrees(generation: generation)
+
+        // Auto-stage unstaged changes that are not manually unstaged, then
+        // repaint in the background if that changed anything.
         var filesToAutoStage: [String] = []
         for line in porcelain.components(separatedBy: "\n") where !line.isEmpty {
             let indexStatus = String(line.prefix(1))
             let workTreeStatus = String(line.dropFirst().prefix(1))
             let file = String(line.dropFirst(3))
-            
+
             let isUnstaged = workTreeStatus != " " || indexStatus == "?"
             if isUnstaged && !manuallyUnstagedFiles.contains(file) {
                 filesToAutoStage.append(file)
             }
         }
-        
-        if !filesToAutoStage.isEmpty {
-            suppressingFSEvents = true
-            _ = await runGit(["add", "--"] + filesToAutoStage, in: path)
-            suppressingFSEvents = false
-            porcelain = await runGit(["status", "--porcelain"], in: path)
-            numstat = await runGit(["diff", "--numstat", "HEAD"], in: path)
-        }
 
+        guard !filesToAutoStage.isEmpty else { return }
+
+        suppressingFSEvents = true
+        _ = await runGit(["add", "--"] + filesToAutoStage, in: path)
+        suppressingFSEvents = false
+        let restagedPorcelain = await runGit(["status", "--porcelain"], in: path)
+        let restagedNumstat = await runGit(["diff", "--numstat", "HEAD"], in: path)
+        guard generation == refreshGeneration else { return }
+        applyState(branch: branch, aheadBehind: aheadBehind, numstat: restagedNumstat, porcelain: restagedPorcelain, log: log)
+    }
+
+    private func applyState(branch: String, aheadBehind: String, numstat: String, porcelain: String, log: String) {
         if porcelain.isEmpty {
             manuallyUnstagedFiles.removeAll()
         }
@@ -930,7 +953,6 @@ final class GitPanelView: NSView {
 
         if !stateChanged {
             refreshRepos()
-            await refreshWorktrees(generation: generation)
             return
         }
 
@@ -965,7 +987,7 @@ final class GitPanelView: NSView {
             let xy = line.prefix(2)
             let indexStatus = String(xy.first ?? Character(" "))
             let workTreeStatus = String(xy.last ?? Character(" "))
-            
+
             let isStaged = indexStatus != " " && indexStatus != "?"
             if isStaged {
                 hasStaged = true
@@ -975,7 +997,7 @@ final class GitPanelView: NSView {
                 hasUnstaged = true
             }
         }
-        
+
         if hasUnstaged {
             stageAllButton.title = "Stage All"
         } else if hasStaged {
@@ -1014,8 +1036,6 @@ final class GitPanelView: NSView {
             card.leadingAnchor.constraint(equalTo: historyStack.leadingAnchor).isActive = true
             card.trailingAnchor.constraint(equalTo: historyStack.trailingAnchor).isActive = true
         }
-
-        await refreshWorktrees(generation: generation)
     }
 
     // MARK: - Row builders

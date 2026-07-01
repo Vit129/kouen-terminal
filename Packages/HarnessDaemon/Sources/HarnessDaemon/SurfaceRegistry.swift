@@ -295,12 +295,12 @@ public final class SurfaceRegistry: @unchecked Sendable {
             let id = editor.addWorkspace(name: name)
             commit()
             return .workspaceID(id)
-        case let .newSession(workspaceID, cwd, name, shell, worktreePath, parentRepoPath):
+        case let .newSession(workspaceID, cwd, name, shell, worktreePath, parentRepoPath, taskName):
             guard let sessionID = editor.addSession(to: workspaceID, cwd: cwd, name: name) else {
                 return .error("Workspace not found")
             }
             if let wt = worktreePath {
-                editor.setWorktree(sessionID: sessionID, worktreePath: wt, parentRepoPath: parentRepoPath)
+                editor.setWorktree(sessionID: sessionID, worktreePath: wt, parentRepoPath: parentRepoPath, taskName: taskName)
             }
             ensureSessionSurfaces(sessionID: sessionID, shell: shell)
             commit()
@@ -555,6 +555,12 @@ public final class SurfaceRegistry: @unchecked Sendable {
             return .ok
         case let .setTabPersistent(tabID, persistent):
             guard editor.setTabPersistent(tabID, persistent) else {
+                return .error("Tab not found")
+            }
+            commit()
+            return .ok
+        case let .setTabWorktree(tabID, worktreePath, parentRepoPath, taskName):
+            guard editor.setTabWorktree(tabID, worktreePath: worktreePath, parentRepoPath: parentRepoPath, taskName: taskName) else {
                 return .error("Tab not found")
             }
             commit()
