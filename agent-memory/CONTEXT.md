@@ -1,8 +1,29 @@
 # Context — harness-terminal
 
 ## Now
-- **Task:** P34 done (F1 `2ca7fbb`, F2/F3 `8049605`) — archived to completed-archive.md; idle
+- **Task:** P32 + P34 backlog items both shipped (`1723136` right-click refactor, `965f7b3e` setPaneLabel) — archived to completed-archive.md; idle
 - **Branch:** `main`
+
+### 2026-07-02 — P32 `setPaneLabel` MCP tool + P34 right-click block menu ✅ DONE, committed (`1723136`, `965f7b3e`)
+User said "ทำ p32,34 ต่อ" to implement two backlog items logged earlier this session.
+
+**P34 (`1723136`):** User rejected ⌘-click as the block-action trigger (not discoverable); chose
+right-click context menu over plain ⌘C/⌘V via AskUserQuestion. Removed `BlockActionBar` (~95 lines)
+from `BlockTintOverlay.swift` entirely; ⌘-click now only opens links. Block actions moved into
+`menu(for:)` (`HarnessTerminalSurfaceView+Find.swift`), gated on whether the right-clicked line
+falls inside a captured OSC-133 block (degrades to Re-run-only for bash panes). `cell(at:)` widened
+`private`→internal (needed cross-file within the same type's extensions). Tests: `BlockContextMenuTests` 2/2.
+
+**P32 (`965f7b3e`):** Backlog note assumed reusing `IPCRequest.updateTabTitle` needed no new
+schema — wrong on inspection (see MEMORY.md lesson). Built a dedicated `PaneSurface.label: String?`
+field instead, wired through `SessionEditor.setPaneLabel` → new `IPCRequest.setPaneLabel` →
+`SurfaceRegistry` handler → `harnessList`'s `paneJSON` (`"label"` key) → policy-gated `setPaneLabel`
+MCP tool (mirrors `sendPaneText`). Tests: `PaneLabelDaemonTests` 4/4.
+
+Both: `swift build`/`swift test` (2 pre-existing unrelated failures only)/`Tests/robot/run.sh` 10/10 clean.
+Consulted `advisor` before starting — recommended committing the already-complete P34 refactor
+first (separate commit, avoid tangling with the new P32 feature) and flagged the `PaneSurface`
+Codable-safety check before adding the field. Both followed.
 
 ### 2026-07-02 — P34 F2 (block actions) + F3 (MCP block access) ✅ DONE, committed (`8049605`)
 Continuation of F1 slice 1 (`2ca7fbb`) — user said "phase 2,3" to proceed.
