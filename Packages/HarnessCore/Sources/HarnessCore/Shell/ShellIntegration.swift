@@ -100,23 +100,36 @@ public enum ShellIntegration {
 
     private static let zshScript = """
     # Harness shell integration for zsh — OSC 133 semantic prompts.
-    # Emits OSC 133;A to mark each prompt and OSC 133;D;<exit> to report the previous command's
-    # status, so Harness draws the prompt gutter, colors success/failure, and jumps between
-    # prompts. Active only inside a Harness pane (the daemon exports $HARNESS).
+    # Emits OSC 133;A to mark each prompt, OSC 133;C;<base64 command> right before a command
+    # runs (so Harness knows the exact typed command, not a screen-scrape guess — this is our
+    # own extension to the C boundary), and OSC 133;D;<exit> to report the finished command's
+    # status. Drives the prompt gutter, success/failure coloring, jump-between-prompts, and
+    # accurate block Copy/Re-run. Active only inside a Harness pane (the daemon exports $HARNESS).
     if [[ -n "$HARNESS" && "$TERM" != "dumb" ]]; then
       autoload -Uz add-zsh-hook 2>/dev/null
       __harness_precmd() {
         printf '\\033]133;D;%s\\007' "$?"
         printf '\\033]133;A\\007'
       }
+      __harness_preexec() {
+        printf '\\033]133;C;%s\\007' "$(printf '%s' "$1" | base64 | tr -d '\\n')"
+      }
       if (( ${+functions[add-zsh-hook]} )); then
         add-zsh-hook precmd __harness_precmd
+        add-zsh-hook preexec __harness_preexec
       else
         precmd_functions+=(__harness_precmd)
+        preexec_functions+=(__harness_preexec)
       fi
     fi
     """
 
+    // ponytail: bash has no native preexec hook (only the DEBUG trap, which fires per
+    // simple-command in a pipeline and needs a PROMPT_COMMAND/COMP_LINE reentrancy guard to be
+    // safe to source into every bash user's rc) — deferred, so bash panes get A+D only (prompt
+    // gutter + exit color) and Re-run/block-command-text falls back to the prior regex-strip.
+    // Ceiling: add a guarded DEBUG trap (the bash-preexec pattern) emitting 133;C;<base64> like
+    // zsh/fish do, once that guard has its own test coverage.
     private static let bashScript = """
     # Harness shell integration for bash — OSC 133 semantic prompts.
     # Emits OSC 133;A to mark each prompt and OSC 133;D;<exit> to report the previous command's
@@ -139,12 +152,20 @@ public enum ShellIntegration {
 
     private static let fishScript = """
     # Harness shell integration for fish — OSC 133 semantic prompts.
-    # Emits OSC 133;A to mark each prompt and OSC 133;D;<exit> to report the previous command's
-    # status, so Harness draws the prompt gutter, colors success/failure, and jumps between
-    # prompts. Active only inside a Harness pane (the daemon exports $HARNESS).
+    # Emits OSC 133;A to mark each prompt, OSC 133;C;<base64 command> right before a command
+    # runs (so Harness knows the exact typed command, not a screen-scrape guess — this is our
+    # own extension to the C boundary), and OSC 133;D;<exit> to report the finished command's
+    # status. Drives the prompt gutter, success/failure coloring, jump-between-prompts, and
+    # accurate block Copy/Re-run. Active only inside a Harness pane (the daemon exports $HARNESS).
     if set -q HARNESS; and test "$TERM" != dumb
         function __harness_osc133_prompt --on-event fish_prompt
             printf '\\033]133;A\\007'
+        end
+        function __harness_osc133_preexec --on-event fish_preexec
+            # base64 may wrap output across lines; command substitution splits on newlines,
+            # so re-join the captured list before emitting a single OSC payload.
+            set -l encoded (echo -n "$argv[1]" | base64)
+            printf '\\033]133;C;%s\\007' (string join '' $encoded)
         end
         function __harness_osc133_postexec --on-event fish_postexec
             printf '\\033]133;D;%s\\007' $status

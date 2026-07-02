@@ -82,6 +82,12 @@ public final class TerminalEmulator: VTParserHandler {
     /// wall-clock step (NTP/DST/manual change) between C and D would make it negative (suppressing a
     /// long-command notification) or inflated (firing a spurious one).
     private var commandStartedAt: DispatchTime?
+    /// Blocks (command + output, OSC 133 `C`→`D`), decoupled from scrollback so they survive
+    /// `dropHistoryHead` eviction. See `commandText(atPromptLine:)`.
+    private let blockStore = TerminalBlockStore()
+    /// Absolute buffer line of the most recent OSC 133 `A`, captured for the block that begins
+    /// at the next `C` — mirrors `commandStartedAt`'s role of bridging two OSC events.
+    private var pendingBlockPromptLine: Int?
 
     /// Active character set per designation slot (`ESC ( …` / `ESC ) …`). DEC special graphics
     /// turns letters into line-drawing glyphs; ASCII is the default. `glUsesG1` is toggled by
@@ -203,6 +209,11 @@ public final class TerminalEmulator: VTParserHandler {
 
     /// The OSC 133 semantic mark on a copy-mode-space line, or nil.
     public func mark(atBufferLine index: Int) -> SemanticMark? { current.mark(atBufferLine: index) }
+
+    /// Exact command text (from OSC 133 `C`'s payload — the shell's own preexec hook, not a
+    /// screen-scrape guess) for the block whose prompt is at buffer line `line`. Nil if that
+    /// prompt's shell doesn't emit `C` yet (e.g. bash panes) or the block hasn't started.
+    public func commandText(atPromptLine line: Int) -> String? { blockStore.commandText(atPromptLine: line) }
 
     /// The full buffer as plain-text lines for `capture-pane`. `joinWrapped` (tmux `-J`)
     /// joins soft-wrapped physical rows into their logical line.
@@ -459,9 +470,10 @@ public final class TerminalEmulator: VTParserHandler {
 
     /// OSC 133 shell integration. `A` marks a prompt line, `D[;exit]`
     /// reports the finished command's status; `B` (command start) and `C` (output start) are the
-    /// input/output delimiters — parsed but not stamped, since the prompt mark + exit status are
-    /// what drive jump-to-prompt and the success/failure gutter. Purely informational: nothing is
-    /// written back to the PTY, and a program that doesn't emit 133 is unaffected.
+    /// input/output delimiters. `C` additionally carries the exact command text (base64, our own
+    /// extension — the shell's preexec hook knows the typed line verbatim, so nothing here is
+    /// screen-scraped) and opens a `TerminalBlock`; `D` closes it. Purely informational: nothing
+    /// is written back to the PTY, and a program that doesn't emit 133 is unaffected.
     private func handleSemanticPrompt(_ payload: String) {
         let parts = payload.split(separator: ";", omittingEmptySubsequences: false).map(String.init)
         guard let kind = parts.first?.first else { return }
@@ -469,16 +481,27 @@ public final class TerminalEmulator: VTParserHandler {
         case "A":
             current.markPromptStart()
             commandStartedAt = nil // new prompt: no command running yet
-        case "B", "C":
-            // Command execution begins. C (output/exec start) deliberately overwrites B
-            // (prompt-end/input start): duration must measure execution (C→D), not the time
-            // the user spent typing at the prompt. B alone still covers integrations that
-            // never emit C.
+            pendingBlockPromptLine = current.historyCount + current.cursorRow
+        case "B":
+            // Prompt-end/input-start. Duration deliberately measures execution (C→D), not the
+            // time the user spent typing — B alone still covers integrations that never emit C.
             commandStartedAt = .now()
+        case "C":
+            commandStartedAt = .now()
+            if let promptLine = pendingBlockPromptLine, parts.count >= 2,
+               let command = Self.decodeBlockCommand(parts[1]) {
+                blockStore.begin(
+                    command: command, promptLine: promptLine,
+                    outputStartLine: current.historyCount + current.cursorRow, startedAt: Date()
+                )
+            }
         case "D":
             let exitCode = parts.count >= 2 ? Int(parts[1]) : nil
             current.markCommandFinished(exit: exitCode)
             modes.resetForShellPrompt()
+            blockStore.finish(
+                outputEndLine: current.historyCount + current.cursorRow, exitCode: exitCode, finishedAt: Date()
+            )
             if let started = commandStartedAt {
                 // Monotonic elapsed seconds — never negative or clock-skewed.
                 let elapsedNanos = DispatchTime.now().uptimeNanoseconds &- started.uptimeNanoseconds
@@ -487,6 +510,14 @@ public final class TerminalEmulator: VTParserHandler {
             }
         default: break
         }
+    }
+
+    /// Decodes `C`'s base64 command-text payload. Base64 (not raw text) because the command can
+    /// contain `;`, which would otherwise collide with the OSC-133 field separator this same
+    /// parser splits on.
+    private static func decodeBlockCommand(_ base64: String) -> String? {
+        guard let data = Data(base64Encoded: base64) else { return nil }
+        return String(data: data, encoding: .utf8)
     }
 
     /// OSC 777 `notify;<title>;<body>`. Other 777 sub-commands are ignored.
