@@ -183,11 +183,16 @@ final class BlockTintOverlay: NSView {
         let rowH = bounds.height / CGFloat(visibleRows)
         let blockEndRow = min(endLine - topLine, visibleRows - 1)
         guard blockEndRow >= 0 else { return }
-        let barW: CGFloat = 192, barH: CGFloat = 28
+        // Output/Command-only copy need real block data (OSC 133 `C`, zsh/fish) — degrade to the
+        // original Copy+Re-run pair for shells that don't emit it yet (bash), rather than
+        // offering an action with nothing precise to act on.
+        let hasBlock = surfaceView?.block(atPromptLine: startLine) != nil
+        let barW: CGFloat = hasBlock ? 320 : 192
+        let barH: CGFloat = 28
         let barX = bounds.width - barW - 8
         let barY = CGFloat(blockEndRow + 1) * rowH - barH - 4
         let bar = BlockActionBar(frame: NSRect(x: barX, y: barY, width: barW, height: barH),
-                                 surfaceView: surfaceView, promptLine: startLine)
+                                 surfaceView: surfaceView, promptLine: startLine, showsBlockOnlyActions: hasBlock)
         addSubview(bar)
         actionBar = bar
     }
@@ -205,7 +210,7 @@ private final class BlockActionBar: NSView {
     private weak var surfaceView: HarnessTerminalSurfaceView?
     private let promptLine: Int
 
-    init(frame: NSRect, surfaceView: HarnessTerminalSurfaceView?, promptLine: Int) {
+    init(frame: NSRect, surfaceView: HarnessTerminalSurfaceView?, promptLine: Int, showsBlockOnlyActions: Bool) {
         self.surfaceView = surfaceView
         self.promptLine = promptLine
         super.init(frame: frame)
@@ -216,9 +221,13 @@ private final class BlockActionBar: NSView {
         layer?.borderWidth = 0.5
         layer?.borderColor = NSColor.white.withAlphaComponent(0.14).cgColor
 
-        let copyBtn  = makeButton(symbol: "doc.on.doc",  label: "Copy",   action: #selector(copyBlock))
-        let rerunBtn = makeButton(symbol: "arrow.counterclockwise", label: "Re-run", action: #selector(rerunBlock))
-        let stack = NSStackView(views: [copyBtn, rerunBtn])
+        var buttons = [makeButton(symbol: "doc.on.doc", label: "Copy", action: #selector(copyBlock))]
+        if showsBlockOnlyActions {
+            buttons.append(makeButton(symbol: "text.alignleft", label: "Output", action: #selector(copyOutputOnly)))
+            buttons.append(makeButton(symbol: "terminal", label: "Command", action: #selector(copyCommandOnly)))
+        }
+        buttons.append(makeButton(symbol: "arrow.counterclockwise", label: "Re-run", action: #selector(rerunBlock)))
+        let stack = NSStackView(views: buttons)
         stack.orientation  = .horizontal
         stack.spacing      = 1
         stack.distribution = .fillEqually
@@ -253,12 +262,25 @@ private final class BlockActionBar: NSView {
         removeFromSuperview()
     }
 
+    @objc private func copyOutputOnly() {
+        defer { removeFromSuperview() }
+        guard let sv = surfaceView, let block = sv.block(atPromptLine: promptLine),
+              let end = block.outputEndLine
+        else { return }
+        sv.copyText(sv.text(fromLine: block.outputStartLine, toLine: end))
+    }
+
+    @objc private func copyCommandOnly() {
+        defer { removeFromSuperview() }
+        guard let sv = surfaceView, let block = sv.block(atPromptLine: promptLine) else { return }
+        sv.copyText(block.command)
+    }
 
     @objc private func rerunBlock() {
         guard let sv = surfaceView else { removeFromSuperview(); return }
         // Exact command text from OSC 133 `C` when the pane's shell emits it (zsh/fish); falls
         // back to a prompt-prefix-strip guess for shells that don't yet (bash).
-        if let exact = sv.commandText(atPromptLine: promptLine) {
+        if let exact = sv.block(atPromptLine: promptLine)?.command {
             sv.sendText(exact + "\r")
             removeFromSuperview()
             return

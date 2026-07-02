@@ -165,6 +165,39 @@ struct HarnessDaemonTools: Sendable {
         }
     }
 
+    // MARK: - getBlock (P34 F3)
+
+    /// `harnessGetLastBlock`/`harnessGetBlock`: a command's exact text, output, and exit code —
+    /// reconstructed from the pane's retained scrollback (works even if no GUI window has that
+    /// pane open). Nil `blockId` = the most recently finished command. Requires the pane's shell
+    /// to emit OSC 133 `C` (zsh/fish, not bash yet — see `ShellIntegration.swift`).
+    func getBlock(surfaceId: String, blockId: Int?) async -> (AnyCodable?, JSONRPCError?) {
+        guard let response = await send(.getBlock(surfaceID: surfaceId, blockID: blockId)) else {
+            return (nil, Self.daemonUnavailableError)
+        }
+        switch response {
+        case let .blockInfo(.some(block)):
+            let formatter = ISO8601DateFormatter()
+            var fields: [String: AnyCodable] = [
+                "id": .int(block.id),
+                "command": .string(block.command),
+                "output": .string(block.output),
+                "startedAt": .string(formatter.string(from: block.startedAt)),
+            ]
+            fields["exitCode"] = block.exitCode.map { .int($0) } ?? .null
+            fields["finishedAt"] = block.finishedAt.map { .string(formatter.string(from: $0)) } ?? .null
+            return (toolResult(json: .object(fields)), nil)
+        case .blockInfo(.none):
+            return (nil, JSONRPCError(code: -32000, message: blockId == nil
+                ? "No finished command block yet on this pane (shell must emit OSC 133 C — zsh/fish)"
+                : "Block \(blockId ?? -1) not found"))
+        case let .error(message):
+            return (nil, JSONRPCError(code: -32000, message: message))
+        default:
+            return (nil, JSONRPCError(code: -32000, message: "Unexpected response to getBlock"))
+        }
+    }
+
     // MARK: - Mutating daemon tools
 
     func sendPaneText(surfaceId: String, text: String, bracketed _: Bool) async -> (AnyCodable?, JSONRPCError?) {

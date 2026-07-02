@@ -6,6 +6,7 @@ import Glibc
 import CHarnessSys
 import Foundation
 import HarnessCore
+import HarnessIPC
 import HarnessTerminalEngine
 
 public enum PtyError: Error {
@@ -916,6 +917,30 @@ public final class RealPty: @unchecked Sendable {
         let hi = resolve(end, fallback: count - 1)
         guard lo <= hi else { return "" }
         return lines[lo ... hi].joined(separator: "\n")
+    }
+
+    /// P34 F3 (`harnessGetLastBlock`/`harnessGetBlock`): a command block reconstructed the same
+    /// way `captureGrid` reconstructs the grid — replay retained scrollback bytes (which already
+    /// contain the original OSC 133 `C`/`D` sequences) through a fresh emulator, then read its
+    /// block store. Nil `id` = the most recently *finished* block. A still-running block (no `D`
+    /// yet) is not returned even by exact id — there's no output range to read yet.
+    public func block(id: Int?) -> BlockSummary? {
+        let size = currentWinsize()
+        guard let term = HarnessGridTerminal(cols: size.cols, rows: size.rows) else { return nil }
+        term.maxScrollbackLines = 100_000
+        term.feed(scrollbackData(includeHistory: true))
+        let block: TerminalBlock?
+        if let id {
+            block = term.block(id: id)
+        } else {
+            block = term.lastBlock
+        }
+        guard let block, let end = block.outputEndLine else { return nil }
+        let output = term.captureLines(fromLine: block.outputStartLine, toLine: end).joined(separator: "\n")
+        return BlockSummary(
+            id: block.id, command: block.command, output: output,
+            exitCode: block.exitCode, startedAt: block.startedAt, finishedAt: block.finishedAt
+        )
     }
 
     /// `capture-pane -S <start> -E <end> -p`: ANSI-stripped display lines in the

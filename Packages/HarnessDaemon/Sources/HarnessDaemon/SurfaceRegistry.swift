@@ -715,6 +715,9 @@ public final class SurfaceRegistry: @unchecked Sendable {
                 return .text(session.captureRange(start: start, end: end, escapeSequences: true))
             }
             return .text(session.captureGrid(start: start, end: end, joinWrapped: joinWrapped))
+        case let .getBlock(surfaceID, blockID):
+            guard let session = sessions[surfaceID] else { return .error("Surface not found") }
+            return .blockInfo(session.block(id: blockID))
         case let .pipePane(surfaceID, shellCommand):
             guard sessions[surfaceID] != nil else { return .error("Surface not found") }
             if let shellCommand, !shellCommand.isEmpty {

@@ -82,6 +82,20 @@ public final class HarnessGridTerminal {
     /// joins soft-wrapped physical rows into their logical line.
     public func captureLines(joinWrapped: Bool) -> [String] { emulator.captureLines(joinWrapped: joinWrapped) }
 
+    /// Plain-text lines for a physical-row range (inclusive) — a `TerminalBlock`'s
+    /// `outputStartLine...outputEndLine`.
+    public func captureLines(fromLine start: Int, toLine end: Int) -> [String] {
+        emulator.captureLines(fromLine: start, toLine: end)
+    }
+
+    /// The most recently *finished* command block — reconstructed the same way `captureGrid`
+    /// reconstructs the grid: replay the pane's retained scrollback bytes (which already
+    /// contain the original OSC 133 sequences) through a fresh emulator. What the daemon-side
+    /// `harnessGetLastBlock` MCP tool reads.
+    public var lastBlock: TerminalBlock? { emulator.lastBlock }
+    /// A specific block by id, from the same replay.
+    public func block(id: Int) -> TerminalBlock? { emulator.block(id: id) }
+
     /// Resolve a cell's OSC 8 `hyperlinkID` to its URL (nil for 0 / unknown).
     public func hyperlinkURL(id: UInt32) -> String? { emulator.hyperlinkURL(id: id) }
 
