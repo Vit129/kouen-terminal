@@ -68,3 +68,15 @@ Archived from agent-memory/MEMORY.md. Active tasks in [MEMORY.md](MEMORY.md).
 | 61 | P32 Phase 2 — worktree tabs invisible to git UI: `gitRoot(for:)` walked past worktree's own `.git` to main repo root for directory inputs; swapped to `WorktreeManager().repoRoot(for:)` at 3 call sites; Git panel paint-before-autostage for instant Changes display | ✅ Done |
 | 62 | Sidebar default width 264→220, always-open on launch, divider color unified with pane-split divider; root cause of "still huge after resize" was NSSplitView proportional redistribution on window resize — fixed via `shouldAdjustSizeOfSubview` (holdingPriority has no effect with a classic constrain-coordinate delegate) | ✅ Done |
 | 63 | ACP-removal test cleanup — `ACPTransportTests.swift` deleted (no live equivalent), `StdioTransportTests.swift` repaired to use `JSONRPCMessage`; stale robot assertion for deleted `aiChatControllers` removed | ✅ Done |
+
+## Pruned from MEMORY.md — 2026-07-02
+- [2026-06-25] OSC 7735 = Harness custom sequence for CLI→app file open. Pattern reusable for any future CLI-triggered app action: emit OSC when HARNESS_SURFACE_ID set → TerminalEmulator callback → SurfaceView → TerminalHostDelegate → SessionCoordinator → MainExecutor.shared.
+- [2026-06-24] Hint mode armed monitor MUST have mouse-dismiss + auto-timeout — same bug class as PrefixKeymap. Pattern: `matching: [.keyDown, .leftMouseDown, .rightMouseDown]` + `asyncAfter(3s)`.
+- [2026-06-24] Vi mode at emulator layer = wrong layer. Shell (`set -o vi`) handles input editing; CopyMode handles buffer nav. Don't build terminal-level vi input mode.
+- [2026-06-24] Otty autocomplete (Fig spec DB + history ghost text) too large to replicate. InlineAICompletionController (Option+Space) covers AI suggestions. Shell plugins cover history.
+- [2026-06-24] `presentsWithTransaction` must be set BEFORE `drawableSize` changes in `layout()`. `viewWillMove(toWindow:nil)` resets the flag — external `setPresentsWithTransaction(true)` calls don't survive `removeFromSuperview()`.
+- [2026-06-23] `NSSplitView.adjustSubviews()` in sidebar toggle path causes terminal blink — NEVER use it in paths containing Metal surfaces. Use `setSidebarWidth() + split.layout()` only. (RL-058)
+- [2026-06-23] `PaneLifecycleManager` fast path: must guard with `cached !== paneContainer` to prevent skipping rebuild on in-place structural changes (e.g. adding browser pane). (RL-057)
+## 2026-06-25 — OSC 7735:  opens sidebar file viewer
+- New CLI→app channel via custom OSC sequence (7735). Pattern: emit OSC from CLI when HARNESS_SURFACE_ID set → TerminalEmulator callback → SurfaceView → TerminalHostDelegate → SessionCoordinator → MainExecutor.shared. Reuse this pattern for any future CLI-triggered app-layer actions.
+

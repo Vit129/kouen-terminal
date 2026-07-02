@@ -60,12 +60,14 @@ struct ToolRegistry: Sendable {
                 param("cwd", "string", "Working directory (optional)"),
                 param("name", "string", "Session name (optional)"),
                 param("shell", "string", "Shell path (optional)"),
+                param("label", "string", "Purpose label for the new pane, set atomically (optional) — e.g. \"build\". Same as calling setPaneLabel right after, without the extra round-trip"),
             ]),
             toolDef("splitPane", "Split an existing Harness pane (requires MCP policy allowlist or HARNESS_MCP_ALLOW_CONTROL=1)", [
                 param("tabId", "string", "Tab UUID"),
                 param("paneId", "string", "Pane UUID"),
                 param("direction", "string", "Split direction: right, left, up, or down"),
                 param("shell", "string", "Shell path (optional)"),
+                param("label", "string", "Purpose label for the new pane, set atomically (optional) — e.g. \"build\". Same as calling setPaneLabel right after, without the extra round-trip"),
             ]),
             toolDef("closePane", "Close a Harness pane (requires MCP policy allowlist or HARNESS_MCP_ALLOW_CONTROL=1)", [
                 param("paneId", "string", "Pane UUID"),
@@ -343,7 +345,8 @@ struct ToolRegistry: Sendable {
             workspaceId: workspaceId,
             cwd: optionalStringArg(args["cwd"]),
             name: optionalStringArg(args["name"]),
-            shell: optionalStringArg(args["shell"])
+            shell: optionalStringArg(args["shell"]),
+            label: optionalStringArg(args["label"])
         )
     }
 
@@ -357,7 +360,8 @@ struct ToolRegistry: Sendable {
             tabId: tabId,
             paneId: paneId,
             direction: direction,
-            shell: optionalStringArg(args["shell"])
+            shell: optionalStringArg(args["shell"]),
+            label: optionalStringArg(args["label"])
         )
     }
 

@@ -233,7 +233,8 @@ struct HarnessDaemonTools: Sendable {
         workspaceId: String,
         cwd: String?,
         name: String?,
-        shell: String?
+        shell: String?,
+        label: String? = nil
     ) async -> (AnyCodable?, JSONRPCError?) {
         guard isToolAllowed("spawnSession") else { return (nil, disabledError("spawnSession")) }
         guard let workspaceID = UUID(uuidString: workspaceId) else {
@@ -244,6 +245,7 @@ struct HarnessDaemonTools: Sendable {
         }
         switch response {
         case let .sessionID(sessionID):
+            await labelPrimarySurface(ofSessionID: sessionID, label: label)
             return (toolResult(json: .object(["sessionId": .string(sessionID.uuidString)])), nil)
         case let .error(message):
             return (nil, JSONRPCError(code: -32000, message: message))
@@ -256,7 +258,8 @@ struct HarnessDaemonTools: Sendable {
         tabId: String,
         paneId: String,
         direction: String,
-        shell: String?
+        shell: String?,
+        label: String? = nil
     ) async -> (AnyCodable?, JSONRPCError?) {
         guard isToolAllowed("splitPane") else { return (nil, disabledError("splitPane")) }
         guard let tabID = UUID(uuidString: tabId) else {
@@ -273,12 +276,35 @@ struct HarnessDaemonTools: Sendable {
         }
         switch response {
         case let .paneID(newPaneID):
+            await labelPaneSurface(tabID: tabID, paneID: newPaneID, label: label)
             return (toolResult(json: .object(["paneId": .string(newPaneID.uuidString)])), nil)
         case let .error(message):
             return (nil, JSONRPCError(code: -32000, message: message))
         default:
             return (nil, JSONRPCError(code: -32000, message: "Unexpected response to newSplit"))
         }
+    }
+
+    /// Labels a newly created pane in the same tool call that created it, so the calling agent
+    /// doesn't need a follow-up harnessList round-trip to resolve a surfaceId first. No-op when
+    /// `label` is nil/empty, or when the surface can't be resolved (best-effort — the pane was
+    /// already created successfully either way).
+    private func labelPrimarySurface(ofSessionID sessionID: UUID, label: String?) async {
+        guard let label, !label.isEmpty,
+              case let .snapshot(snap)? = await send(.getSnapshot),
+              let surfaceID = snap.workspaces.flatMap(\.sessions).first(where: { $0.id == sessionID })?
+                  .tabs.first?.rootPane.surfaceID
+        else { return }
+        _ = await send(.setPaneLabel(surfaceID: surfaceID.uuidString, label: label))
+    }
+
+    private func labelPaneSurface(tabID: UUID, paneID: UUID, label: String?) async {
+        guard let label, !label.isEmpty,
+              case let .snapshot(snap)? = await send(.getSnapshot),
+              let tab = snap.workspaces.flatMap(\.sessions).flatMap(\.tabs).first(where: { $0.id == tabID }),
+              let surfaceID = tab.rootPane.allLeaves().first(where: { $0.id == paneID })?.surfaceID
+        else { return }
+        _ = await send(.setPaneLabel(surfaceID: surfaceID.uuidString, label: label))
     }
 
     func closePane(paneId: String) async -> (AnyCodable?, JSONRPCError?) {
