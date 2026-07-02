@@ -41,7 +41,12 @@ Grep target: `grep -n "RL-<number>\|<keyword>" knowledge/rl-lessons.md`
 - RL-056: High-frequency WKScriptMessageHandler (console.log) must batch writes — spawning one `DispatchQueue.global` work item per message saturates main thread. Throttle: collect into array, flush every 100ms with single async dispatch.
 - RL-057: `PaneLifecycleManager` fast path (`!force && cached tabID → skip rebuild`) fires even when pane structure changes in-place (e.g. adding browser pane to existing tab). Guard: `cached !== paneContainer` — ensures fast path only applies to tab-switch restores, not structural mutations.
 - RL-058: `NSSplitView.adjustSubviews()` after sidebar `isHidden` toggle redistributes ALL subview frames from scratch — triggers Metal surface layout cascade → 1-frame black flash. Use `setSidebarWidth() + split.layout()` instead. `adjustSubviews()` is only safe when no Metal terminal surfaces are in the subtree.
+- RL-059: When an `NSScrollView`'s content looks visually shifted/clipped and each `layoutSubtreeIfNeeded()`/`displayIfNeeded()`/force-rebuild nudge only partially helps, stop adding nudges and check `documentView.isFlipped` first — a plain `NSView()` documentView anchors content to the bottom-left, not top-left. In a non-flipped view, `scroll(to: .zero)` scrolls to the BOTTOM, so a `scrollToTop()` built on it is a silent no-op. Symptom that many small timing fixes only partially converge is itself a signal to check for a structural (coordinate-space) cause instead of a timing one. See CASE-059.
 
 ## Architecture / Daemon
 
 - RL-047: Split pane CWD must prefer `tab.worktreePath` over live process CWD. Agent CWD = repo root. Priority: `worktreePath → sourceCwd → tab.cwd`.
+
+## Git / Process
+
+- RL-060: `git revert --abort` (and `git merge --abort`) does `git reset --merge` back to the pre-operation HEAD — this discards working-tree edits to EVERY file that was part of the operation's index, not just the operation's own changes, including edits made after the operation started. Before aborting, back up (or `git stash`) any file touched since the in-progress operation began.

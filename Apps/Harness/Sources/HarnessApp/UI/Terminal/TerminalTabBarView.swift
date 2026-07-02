@@ -460,8 +460,12 @@ private struct TabPillView: View {
     }
 
     private var workingDot: some View {
-        let status = BoardModel.columnKind(for: tab)
-        return WorkingDotView(color: status.color)
+        // Pulse runs on the render server via CABasicAnimation, NOT SwiftUI. A SwiftUI
+        // .repeatForever here keeps the whole NSHostingView ViewGraph re-rendering every
+        // frame (profiled build 183: ~33% CPU in ViewGraph.updateOutputs while any tab is
+        // working). CALayer animates off the ViewGraph. See knowledge/bugs/notch-cpu-animation.md.
+        WorkingDotView(isWorking: tab.agent != nil && tab.status == .running,
+                       color: HarnessDesign.chrome.textSecondary)
             .frame(width: 2, height: 2)
     }
 
@@ -631,30 +635,52 @@ private func clamp<T: Comparable>(_ value: T, lower: T, upper: T) -> T {
     min(max(value, lower), upper)
 }
 
-/// A 2pt static status dot, colored per `BoardColumnKind.color`.
+/// A 2pt "working" dot whose horizontal pulse runs as a `CABasicAnimation` on the render
+/// server instead of a SwiftUI `.repeatForever`. The SwiftUI version kept the entire
+/// `NSHostingView(rootView: TerminalTabBarBody)` ViewGraph re-rendering every display frame
+/// (profiled: ~33% CPU). A CALayer animation is invisible to the ViewGraph: layout once,
+/// GPU paints. See knowledge/bugs/notch-cpu-animation.md (Instance 2).
 private struct WorkingDotView: NSViewRepresentable {
+    let isWorking: Bool
     let color: NSColor
 
     func makeNSView(context: Context) -> DotView { DotView() }
 
     func updateNSView(_ view: DotView, context: Context) {
-        view.apply(color: color)
+        view.apply(isWorking: isWorking, color: color)
     }
 
     final class DotView: NSView {
+        private static let animationKey = "working-pulse"
         private let dot = CALayer()
 
         override init(frame frameRect: NSRect) {
             super.init(frame: frameRect)
             wantsLayer = true
+            layer?.masksToBounds = false   // pulse travels ±2.5pt outside the 2pt footprint
             dot.frame = CGRect(x: 0, y: 0, width: 2, height: 2)
             layer?.addSublayer(dot)
         }
 
         required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-        func apply(color: NSColor) {
+        func apply(isWorking: Bool, color: NSColor) {
             dot.backgroundColor = color.cgColor
+            dot.isHidden = !isWorking
+            let animate = isWorking && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+            guard animate else {
+                dot.removeAnimation(forKey: Self.animationKey)
+                return
+            }
+            guard dot.animation(forKey: Self.animationKey) == nil else { return }
+            let pulse = CABasicAnimation(keyPath: "transform.translation.x")
+            pulse.fromValue = -2.5
+            pulse.toValue = 2.5
+            pulse.duration = 1.2
+            pulse.autoreverses = true
+            pulse.repeatCount = .infinity
+            pulse.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            dot.add(pulse, forKey: Self.animationKey)
         }
     }
 }

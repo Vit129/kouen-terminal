@@ -252,11 +252,11 @@ private struct SidebarSessionItemRow: View {
                             .foregroundStyle(Color(nsColor: c.textSecondary).opacity(0.6))
                             .lineLimit(1)
                             .truncationMode(.tail)
-                        if let label = boardStatusLabel {
+                        if sessionBoardStatus != .idle {
                             Text("·")
                                 .font(.system(size: 10))
                                 .foregroundStyle(Color(nsColor: c.textSecondary).opacity(0.4))
-                            Text(label)
+                            Text(sessionBoardStatus.displayName)
                                 .font(.system(size: 10, weight: .medium))
                                 .foregroundStyle(Color(nsColor: sessionBoardStatus.color))
                                 .lineLimit(1)
@@ -413,14 +413,6 @@ private struct SidebarSessionItemRow: View {
             if kinds.contains(k) { return k }
         }
         return .idle
-    }
-
-    private var boardStatusLabel: String? {
-        switch sessionBoardStatus {
-        case .needsAttention: return "Needs Attention"
-        case .running: return "Running"
-        default: return nil
-        }
     }
 
     private func agentColor(for kind: AgentKind) -> Color {

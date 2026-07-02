@@ -586,8 +586,21 @@ final class HarnessSidebarPanelViewController: NSViewController {
         }
         gitPanelView.isHidden = index != 2
         let showBoard = index == 0 && sidebarSectionModel.showBoardView
-        if showBoard { boardVC.view.layoutSubtreeIfNeeded() }
+        // Unhide BEFORE forcing layout: AutoLayout skips a hidden view's subtree, so
+        // laying out while boardVC.view.isHidden was still true never resolved its
+        // internal scrollView/columnsStack frame — that's what squashed the first
+        // column header into a sliver on the Sessions → Board switch.
         boardVC.view.isHidden = !showBoard
+        if showBoard {
+            // Force-rebuild columns before laying out. While hidden, the existing
+            // NSTextField column headers keep a stale cached intrinsicContentSize;
+            // force: true guarantees fresh label subviews so layoutSubtreeIfNeeded()
+            // below measures correct frames instead of the stale cropped ones.
+            boardVC.reload(force: true)
+            view.layoutSubtreeIfNeeded()
+            view.displayIfNeeded()
+            boardVC.scrollToTop()
+        }
         switch index {
         case 1:
             sidebarSectionModel.text = "FILES"
