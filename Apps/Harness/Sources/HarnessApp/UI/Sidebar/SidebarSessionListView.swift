@@ -435,12 +435,15 @@ private struct SidebarSessionItemRow: View {
     /// actual message, unlike `sessionBoardStatus`'s coarse category label — surfaced here so
     /// the always-visible sidebar (not just the terminal pane's glow ring or the opt-in Notch
     /// panel) shows which session needs attention and why, without leaving the current tab.
+    /// Scans every tab (like `sessionBoardStatus` does), not just the active one — a
+    /// background tab's notification must still surface here, that's the whole point.
     private var waitingNotificationText: String? {
-        guard let tab = session.activeTab ?? session.tabs.first,
-              tab.status == .waiting,
-              let text = tab.notificationText, !text.isEmpty
-        else { return nil }
-        return text
+        for tab in session.tabs {
+            if tab.status == .waiting, let text = tab.notificationText, !text.isEmpty {
+                return text
+            }
+        }
+        return nil
     }
 
     private func agentColor(for kind: AgentKind) -> Color {
