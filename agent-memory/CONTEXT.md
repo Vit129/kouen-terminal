@@ -1,8 +1,42 @@
 # Context — harness-terminal
 
 ## Now
-- **Task:** P32 + P34 backlog items shipped (`1723136` right-click refactor, `965f7b3e` setPaneLabel, `c9ee32ce` atomic label-on-create) — archived to completed-archive.md; idle
+- **Task:** Two file-preview bugs fixed via `debug-mantra` — selection-drop-on-reload + AI-tool-call-path click — FIXED, not committed
 - **Branch:** `main`
+
+### 2026-07-02 — File preview: selection dropped on background reload + clicking agent tool-call paths failed ✅ FIXED, not committed
+User report (Thai) was two bugs conflated in one message, split via `AskUserQuestion`: (1) drag-selecting
+text in the file preview then scrolling to reach Cmd+C — the gray highlight "disappears too fast to
+register"; (2) clicking a file path inside an AI agent's own tool-call summary line printed in the
+terminal (e.g. Claude Code's `⏺ Update(Apps/Harness/.../SyntaxTextView.swift)`) didn't open the preview,
+while the file tab/tree and MCP paths worked fine.
+
+**Bug 1 root cause (confirmed via `swift` script repro, not guessed):** `SyntaxTextView.load()` and
+`applyDiagnosticAttributes()` (`SyntaxTextView.swift`) both do a full `textView.textStorage?.setAttributedString(...)`
+replace — on file-watcher reload (`FileChangeWatcher` fires on *any* fs event including a bare `.attrib`
+touch, 300ms debounced) and on async LSP diagnostics push, respectively. Repro proved a full textStorage
+swap collapses `NSTextView.selectedRange()` to `{length, 0}` even when the text content is byte-identical
+— and, separately, proved scrolling alone never touches selection (ruled out "scroll" as the literal
+cause). Since Harness previews files that agents are actively writing, one of these two async reloads
+landing mid-select during a multi-second drag+scroll+copy gesture is the actual trigger.
+**Fix:** new `SyntaxTextView.preservingSelection(_:)` helper captures `selectedRange()` before the replace
+and restores it (clamped to the new length) after; applied at both call sites.
+
+**Bug 2 root cause:** `URLDetection.detectFilePath`'s unquoted-token fallback (`URLDetection.swift`)
+only treated whitespace/quotes as token boundaries — not `(`/`)`. Coding-agent CLIs print tool calls with
+no space before the path (`Update(path/to/file)`), so the scan swept `Update(` into the token; the
+trailing-strip only removes trailing punctuation, so the mangled `Update(path...` string never matched a
+real file and the click silently no-opped.
+**Fix:** added `(`/`)` to the boundary-char set in that one fallback branch only (quoted-path branches
+and `detectLocalhost` untouched).
+
+Tests: `testDetectFilePathStripsToolCallParens` (new, `EngineConformanceTests.swift`) — reproduces the
+exact `⏺ Update(...)` line shape. `swift test`: only 3 pre-existing unrelated failures
+(`ExperienceModeTests`, `Phase6KeysTests`, `ReleaseNotesGuardTests` — changelog/checksum drift, none
+touch these files). `Tests/robot/run.sh` 10/10 clean.
+**Lesson:** when a bug report bundles two symptoms, don't assume they share a root cause — `AskUserQuestion`
+to split them up front turned out to be two unrelated defects in two different subsystems (AppKit
+text-view selection vs. terminal link-detection regex).
 
 ### 2026-07-02 — spawnSession/splitPane set a pane label atomically ✅ DONE, committed (`c9ee32ce`)
 User asked to make pane labeling "auto" and whether other terminals do this. No terminal tool
@@ -253,5 +287,6 @@ Full detail for anything below → `COMPLETED-TASKS-ARCHIVE.md` (rows 56–63 = 
 | 2026-06-23 | Sidebar SwiftUI | NSTableView removed; VC 1676 → 890 lines |
 
 ## Unresolved
-- 2 pre-existing `swift test` failures unrelated to any recent work: `ExperienceModeTests.testShowsHarnessControlsDerivesFromMode`,
-  `Phase6KeysTests.testRootTableSeededAndBindable`. Not investigated — check if still failing before next test-suite work.
+- 3 pre-existing `swift test` failures unrelated to any recent work: `ExperienceModeTests.testShowsHarnessControlsDerivesFromMode`,
+  `Phase6KeysTests.testRootTableSeededAndBindable`, `ReleaseNotesGuardTests.testGeneratedNotesMatchChangelogBlock`
+  (changelog changed since notes generated — run `make release-notes` if that's ever the actual task). Not investigated — check if still failing before next test-suite work.

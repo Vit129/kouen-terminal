@@ -91,8 +91,11 @@ public enum URLDetection {
             }
         }
 
-        // 3. Fallback: Check for unquoted whitespace-delimited token containing "/"
-        func isBoundary(_ c: Character) -> Bool { c == " " || c == "\t" || c == "'" || c == "\"" }
+        // 3. Fallback: Check for unquoted whitespace-delimited token containing "/".
+        // "(" / ")" are boundaries too, not just whitespace/quotes — coding-agent CLIs
+        // (Claude Code, Codex) print tool-call summaries like "Update(path/to/file.swift)"
+        // with no space before the path, so the paren itself has to stop the token scan.
+        func isBoundary(_ c: Character) -> Bool { c == " " || c == "\t" || c == "'" || c == "\"" || c == "(" || c == ")" }
         if !isBoundary(chars[column]) {
             lo = column
             hi = column

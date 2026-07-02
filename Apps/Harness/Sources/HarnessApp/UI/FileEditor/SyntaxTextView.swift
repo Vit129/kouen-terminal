@@ -80,10 +80,16 @@ final class SyntaxTextView: NSView {
     func load(text: String, fileExtension ext: String, resetScroll: Bool = true) {
         let previousOrigin = scrollView.contentView.bounds.origin
         fileExtension = ext.lowercased()
-        textView.textStorage?.setAttributedString(SyntaxHighlighter.highlight(text, fileExtension: fileExtension))
         if resetScroll {
+            textView.textStorage?.setAttributedString(SyntaxHighlighter.highlight(text, fileExtension: fileExtension))
             textView.scrollToBeginningOfDocument(nil)
         } else {
+            // Same-file reload (FSEvent touch) — replacing textStorage wholesale collapses
+            // NSTextView's selectedRange to the document end, silently dropping any text
+            // the user was mid-selecting/copying. Preserve it across the swap.
+            preservingSelection {
+                textView.textStorage?.setAttributedString(SyntaxHighlighter.highlight(text, fileExtension: fileExtension))
+            }
             textView.layoutSubtreeIfNeeded()
             scrollView.contentView.scroll(to: previousOrigin)
             scrollView.reflectScrolledClipView(scrollView.contentView)
@@ -376,6 +382,18 @@ final class SyntaxTextView: NSView {
         gutterView.needsDisplay = true
     }
 
+    /// Runs `body` (expected to replace `textView.textStorage` wholesale) while preserving
+    /// the user's active selection, which NSTextView otherwise collapses to the document end
+    /// on a full textStorage swap even when the text content itself is unchanged.
+    private func preservingSelection(_ body: () -> Void) {
+        let previousSelection = textView.selectedRange()
+        body()
+        let length = (textView.string as NSString).length
+        let location = min(previousSelection.location, length)
+        let selectionLength = min(previousSelection.length, length - location)
+        textView.setSelectedRange(NSRange(location: location, length: selectionLength))
+    }
+
     private func applyDiagnosticAttributes() {
         let highlighted = SyntaxHighlighter.highlight(textView.string, fileExtension: fileExtension)
         let mutable = NSMutableAttributedString(attributedString: highlighted)
@@ -389,7 +407,9 @@ final class SyntaxTextView: NSView {
                 .toolTip: diagnostic.message,
             ], range: range)
         }
-        textView.textStorage?.setAttributedString(mutable)
+        preservingSelection {
+            textView.textStorage?.setAttributedString(mutable)
+        }
     }
 
     private func nsRange(for range: LSPRange) -> NSRange {
