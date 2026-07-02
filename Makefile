@@ -111,3 +111,7 @@ video-doctor:
 cheatsheet:
 	node Scripts/generate-cheatsheet.js
 	@echo "Open: open sheet-cheat.html"
+
+# Catch-all target to prevent make from complaining about unknown command line arguments
+%:
+	@:
