@@ -658,7 +658,27 @@ final class GitPanelView: NSView {
     /// Shared by `previewCommitDetail` and `showCommitDetail` so the two diff views (popover
     /// vs full tab) can never drift apart on the underlying `git show` invocation.
     private func fetchCommitDiff(hash: String, path: String) async -> String {
-        await runGit(["show", "--stat", "--patch", hash], in: path)
+        await Self.runGitDiff(["show", "--stat", "--patch", hash], in: path)
+    }
+
+    /// Everything a worktree's branch changed since it diverged from `main` — a three-dot diff
+    /// against the merge-base, not just the latest commit. Matches `refreshWorktrees`' existing
+    /// `git branch --merged main` base-branch assumption rather than introducing a second one.
+    private func fetchWorktreeDiff(worktreePath: String) async -> String {
+        await Self.runGitDiff(["diff", "--stat", "--patch", "main...HEAD"], in: worktreePath)
+    }
+
+    @objc private func previewWorktreeDiffAction(_ sender: NSButton) {
+        guard let worktreePath = sender.identifier?.rawValue else { return }
+        Task {
+            let detail = await fetchWorktreeDiff(worktreePath: worktreePath)
+            guard !detail.isEmpty else {
+                DisplayMessage.show("No changes vs main")
+                return
+            }
+            guard sender.window != nil else { return }
+            self.presentCommitDetail(detail, anchor: sender)
+        }
     }
 
     /// Quick-look popover — file-nav bar + colored diff, anchored to the commit card, no tab
@@ -670,7 +690,10 @@ final class GitPanelView: NSView {
               let hash = card.identifier?.rawValue else { return }
         Task {
             let detail = await fetchCommitDiff(hash: hash, path: path)
-            guard !detail.isEmpty else { return }
+            guard !detail.isEmpty else {
+                DisplayMessage.show("No diff for \(String(hash.prefix(7)))")
+                return
+            }
             // `refresh()` (FSEventStream-driven, debounced) rebuilds the commit-history list —
             // `applyState` detaches every existing card via `removeFromSuperview()` — and can
             // fire while the git-show above was in flight. Presenting a popover anchored to a
@@ -720,15 +743,21 @@ final class GitPanelView: NSView {
         NSPasteboard.general.setString(summary, forType: .string)
     }
 
-    private func presentCommitDetail(_ text: String, anchor: NSView) {
+    /// Colors a `git show`/`git diff` text blob (file headers blue, hunks purple, +/- green/red)
+    /// and returns a scroll view ready to embed. Pure/testable: no popover, no window.
+    ///
+    /// Uses `NSTextView.scrollableTextView()` rather than a bare `NSTextView()` + manual
+    /// `scroll.documentView =` — the manual path never got `isVerticallyResizable`,
+    /// `textContainer.widthTracksTextView`, or a height/leading/trailing constraint for the text
+    /// view, so the popover chrome rendered but the text never actually laid out: `textStorage`
+    /// had the diff, the view just never sized itself to show it.
+    static func makeDiffScrollView(_ text: String) -> (scroll: NSScrollView, textView: NSTextView, fileRanges: [(name: String, location: Int)]) {
         let mono = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
         let monoBold = NSFont.monospacedSystemFont(ofSize: 11, weight: .bold)
         let baseAttrs: [NSAttributedString.Key: Any] = [.font: mono, .foregroundColor: NSColor.labelColor]
 
-        // Build attributed string with diff coloring
         let attributed = NSMutableAttributedString()
         let lines = text.components(separatedBy: "\n")
-        // Track diff file header ranges for navigation
         var fileRanges: [(name: String, location: Int)] = []
 
         for (i, line) in lines.enumerated() {
@@ -753,19 +782,21 @@ final class GitPanelView: NSView {
             }
         }
 
-        // Diff text view
-        let textView = NSTextView()
+        let scroll = NSTextView.scrollableTextView()
+        let textView = scroll.documentView as! NSTextView
         textView.isEditable = false
         textView.isSelectable = true
         textView.textStorage?.setAttributedString(attributed)
         textView.textContainerInset = NSSize(width: 8, height: 8)
-        textView.translatesAutoresizingMaskIntoConstraints = false
 
-        let scroll = NSScrollView()
-        scroll.documentView = textView
         scroll.hasVerticalScroller = true
         scroll.drawsBackground = false
         scroll.translatesAutoresizingMaskIntoConstraints = false
+        return (scroll, textView, fileRanges)
+    }
+
+    private func presentCommitDetail(_ text: String, anchor: NSView) {
+        let (scroll, textView, fileRanges) = Self.makeDiffScrollView(text)
 
         let contentView = NSView(frame: NSRect(x: 0, y: 0, width: 520, height: 400))
 
@@ -810,7 +841,6 @@ final class GitPanelView: NSView {
                 scroll.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
                 scroll.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
                 scroll.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
-                textView.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor),
             ])
         } else {
             contentView.addSubview(scroll)
@@ -819,7 +849,6 @@ final class GitPanelView: NSView {
                 scroll.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
                 scroll.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
                 scroll.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
-                textView.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor),
             ])
         }
 
@@ -1086,6 +1115,24 @@ final class GitPanelView: NSView {
         let isMerged: Bool
     }
 
+    /// Finds the agent (if any) running in a tab whose cwd or tracked worktree root matches
+    /// `path`, so the worktree card can show who's working there — the same `Tab.agent` data
+    /// the Board/Notch HUD already read, just not previously surfaced next to the worktree list.
+    /// `nonisolated static` + explicit `tabs` (mirrors `isNoisyGitInternalPath`) so this stays
+    /// unit-testable without a live `SessionCoordinator`.
+    nonisolated static func agentInfo(forWorktreePath path: String, tabs: [Tab]) -> (kind: AgentKind, activity: AgentActivity)? {
+        for tab in tabs {
+            guard tab.cwd == path || tab.worktreePath == path, let agent = tab.agent else { continue }
+            return (agent.kind, agent.activity)
+        }
+        return nil
+    }
+
+    private func agentInfo(forWorktreePath path: String) -> (kind: AgentKind, activity: AgentActivity)? {
+        let tabs = SessionCoordinator.shared.snapshot.workspaces.flatMap { $0.sessions.flatMap(\.tabs) }
+        return Self.agentInfo(forWorktreePath: path, tabs: tabs)
+    }
+
     private func makeStatusBadge(letter: String, color: NSColor) -> NSView {
         let badge = NSView()
         badge.wantsLayer = true
@@ -1282,7 +1329,23 @@ final class GitPanelView: NSView {
         name.toolTip = worktree.path
         name.translatesAutoresizingMaskIntoConstraints = false
 
-        let titleViews: [NSView]
+        let agent = agentInfo(forWorktreePath: worktree.path)
+
+        var titleViews: [NSView] = [name]
+        if let agent {
+            let dotColor = NSColor.fromHex(agent.kind.dotHex) ?? .secondaryLabelColor
+            let icon = AgentIconRenderer.coloredOrMonogramImage(for: agent.kind, size: 12, color: dotColor)
+            let agentIcon = NSImageView(image: icon)
+            agentIcon.translatesAutoresizingMaskIntoConstraints = false
+            agentIcon.toolTip = "\(agent.kind.displayName) — \(agent.activity.rawValue)"
+            agentIcon.setContentHuggingPriority(.required, for: .horizontal)
+            agentIcon.setContentCompressionResistancePriority(.required, for: .horizontal)
+            NSLayoutConstraint.activate([
+                agentIcon.widthAnchor.constraint(equalToConstant: 12),
+                agentIcon.heightAnchor.constraint(equalToConstant: 12),
+            ])
+            titleViews.append(agentIcon)
+        }
         if worktree.isLocked,
            let image = NSImage(systemSymbolName: "lock.fill", accessibilityDescription: "Locked")?
             .withSymbolConfiguration(HarnessDesign.symbolConfig(pointSize: 10, weight: .semibold)) {
@@ -1291,9 +1354,7 @@ final class GitPanelView: NSView {
             lock.translatesAutoresizingMaskIntoConstraints = false
             lock.setContentHuggingPriority(.required, for: .horizontal)
             lock.setContentCompressionResistancePriority(.required, for: .horizontal)
-            titleViews = [name, lock]
-        } else {
-            titleViews = [name]
+            titleViews.append(lock)
         }
 
         let titleRow = NSStackView(views: titleViews)
@@ -1302,7 +1363,15 @@ final class GitPanelView: NSView {
         titleRow.spacing = 5
         titleRow.translatesAutoresizingMaskIntoConstraints = false
 
-        let meta = NSTextField(labelWithString: worktree.isMerged ? "✓ merged · \(worktree.branch)" : worktree.branch)
+        let metaText: String
+        if worktree.isMerged {
+            metaText = "✓ merged · \(worktree.branch)"
+        } else if let agent {
+            metaText = "\(worktree.branch) · \(agent.kind.displayName) — \(agent.activity.rawValue)"
+        } else {
+            metaText = worktree.branch
+        }
+        let meta = NSTextField(labelWithString: metaText)
         meta.font = .systemFont(ofSize: 10)
         meta.textColor = worktree.isMerged ? NSColor.systemGreen : HarnessDesign.chrome.textTertiary
         meta.lineBreakMode = .byTruncatingTail
@@ -1317,17 +1386,30 @@ final class GitPanelView: NSView {
         removeButton.isHidden = worktree.isMain
         removeButton.translatesAutoresizingMaskIntoConstraints = false
 
+        let diffButton = SoftIconButton(frame: NSRect(x: 0, y: 0, width: 20, height: 20))
+        diffButton.setSymbol("magnifyingglass", accessibilityDescription: "Diff vs main", pointSize: 9, weight: .semibold)
+        diffButton.target = self
+        diffButton.action = #selector(previewWorktreeDiffAction(_:))
+        diffButton.identifier = NSUserInterfaceItemIdentifier(worktree.path)
+        diffButton.toolTip = "Everything on \(worktree.branch) since it diverged from main"
+        diffButton.isHidden = worktree.isMain
+        diffButton.translatesAutoresizingMaskIntoConstraints = false
+
         card.addSubview(titleRow)
         card.addSubview(meta)
+        card.addSubview(diffButton)
         card.addSubview(removeButton)
         NSLayoutConstraint.activate([
             card.heightAnchor.constraint(equalToConstant: 40),
             titleRow.topAnchor.constraint(equalTo: card.topAnchor, constant: 5),
             titleRow.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 10),
-            titleRow.trailingAnchor.constraint(equalTo: removeButton.leadingAnchor, constant: -8),
+            titleRow.trailingAnchor.constraint(equalTo: diffButton.leadingAnchor, constant: -4),
             meta.topAnchor.constraint(equalTo: titleRow.bottomAnchor, constant: 1),
             meta.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 10),
-            meta.trailingAnchor.constraint(equalTo: removeButton.leadingAnchor, constant: -8),
+            meta.trailingAnchor.constraint(equalTo: diffButton.leadingAnchor, constant: -4),
+            diffButton.trailingAnchor.constraint(equalTo: removeButton.leadingAnchor, constant: -2),
+            diffButton.centerYAnchor.constraint(equalTo: card.centerYAnchor),
+            diffButton.widthAnchor.constraint(equalToConstant: 24),
             removeButton.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -8),
             removeButton.centerYAnchor.constraint(equalTo: card.centerYAnchor),
             removeButton.widthAnchor.constraint(equalToConstant: 24),
@@ -1561,6 +1643,44 @@ final class GitPanelView: NSView {
                     continuation.resume(returning: String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "")
                 } catch {
                     continuation.resume(returning: "")
+                }
+            }
+        }
+    }
+
+    /// Like `runGit`, but also surfaces stderr on failure instead of discarding it — used only
+    /// by the two diff-preview call sites (`fetchCommitDiff`, `fetchWorktreeDiff`), where a
+    /// silent empty result means the popover click does nothing with zero feedback. Kept
+    /// separate from `runGit` rather than changing its shared behavior: ~20 other call sites
+    /// (branch queries, ahead/behind counts, porcelain status) parse `runGit`'s output as
+    /// structured data and already treat "" as their failure/empty case — swapping in an error
+    /// string there risks a git failure rendering as garbage instead of the current graceful
+    /// "nothing changed" fallback.
+    nonisolated static func runGitDiff(_ args: [String], in directory: String) async -> String {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+                process.arguments = args
+                process.currentDirectoryURL = URL(fileURLWithPath: directory)
+                let outPipe = Pipe()
+                let errPipe = Pipe()
+                process.standardOutput = outPipe
+                process.standardError = errPipe
+                do {
+                    try process.run()
+                    let outData = outPipe.fileHandleForReading.readDataToEndOfFile()
+                    let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
+                    process.waitUntilExit()
+                    let out = String(data: outData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                    if out.isEmpty, process.terminationStatus != 0 {
+                        let err = String(data: errData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                        continuation.resume(returning: err.isEmpty ? "" : "git \(args.first ?? "") failed: \(err)")
+                        return
+                    }
+                    continuation.resume(returning: out)
+                } catch {
+                    continuation.resume(returning: "git \(args.first ?? "") failed: \(error.localizedDescription)")
                 }
             }
         }
