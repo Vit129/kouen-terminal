@@ -274,9 +274,15 @@ private struct SidebarSessionItemRow: View {
                         Button(action: {
                             if let url = metadata?.prURL { onPRClick(url) }
                         }) {
-                            SidebarBadgeLabel(text: "#\(pr)", color: prColor)
+                            HStack(spacing: 3) {
+                                if let dot = checksStatusColor(metadata?.prChecksStatus) {
+                                    Circle().fill(dot).frame(width: 6, height: 6)
+                                }
+                                SidebarBadgeLabel(text: "#\(pr)", color: prColor)
+                            }
                         }
                         .buttonStyle(.plain)
+                        .help(checksStatusHelp(metadata?.prChecksStatus))
                     }
                     if let ahead = metadata?.aheadCount, ahead > 0 {
                         SidebarBadgeLabel(text: "+\(ahead)", color: .green)
@@ -417,6 +423,26 @@ private struct SidebarSessionItemRow: View {
 
     private func agentColor(for kind: AgentKind) -> Color {
         Color(nsColor: NSColor.fromHex(SessionCoordinator.shared.settings.agentColorHex(for: kind)) ?? HarnessDesign.chrome.textSecondary)
+    }
+
+    private func checksStatusColor(_ status: GitHubCLIClient.ChecksStatus?) -> Color? {
+        guard let status else { return nil }
+        switch status {
+        case .pass: return .green
+        case .fail: return .red
+        case .pending: return .yellow
+        case .none: return nil
+        }
+    }
+
+    private func checksStatusHelp(_ status: GitHubCLIClient.ChecksStatus?) -> String {
+        guard let status else { return "Open PR" }
+        switch status {
+        case .pass: return "Checks passing"
+        case .fail: return "Checks failing"
+        case .pending: return "Checks pending"
+        case .none: return "Open PR"
+        }
     }
 }
 

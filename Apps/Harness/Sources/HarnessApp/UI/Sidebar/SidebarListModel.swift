@@ -7,6 +7,7 @@ import Observation
 struct RepoGitMetadata: Sendable, Equatable {
     let prNumber: Int?
     let prURL: String?
+    let prChecksStatus: GitHubCLIClient.ChecksStatus?
     let aheadCount: Int?
     let behindCount: Int?
 }
@@ -318,30 +319,14 @@ final class SidebarListModel {
     }
 
     private func fetchGitMetadata(for path: String, branch: String) async -> RepoGitMetadata {
-        let empty = RepoGitMetadata(prNumber: nil, prURL: nil, aheadCount: nil, behindCount: nil)
-        guard let ghPath = Self.cachedGhPath, await fetchHasRemote(for: path) else { return empty }
+        let empty = RepoGitMetadata(prNumber: nil, prURL: nil, prChecksStatus: nil, aheadCount: nil, behindCount: nil)
+        guard Self.cachedGhPath != nil, await fetchHasRemote(for: path) else { return empty }
 
         return await Task.detached(priority: .utility) {
-            var prNumber: Int? = nil
-            var prURL: String? = nil
-            let prProcess = Process()
-            prProcess.executableURL = URL(fileURLWithPath: ghPath)
-            prProcess.arguments = ["pr", "view", "--json", "number,url"]
-            prProcess.currentDirectoryURL = URL(fileURLWithPath: path)
-            let prPipe = Pipe()
-            prProcess.standardOutput = prPipe
-            prProcess.standardError = Pipe()
-            do {
-                try prProcess.run()
-                let data = prPipe.fileHandleForReading.readDataToEndOfFile()
-                prProcess.waitUntilExit()
-                if prProcess.terminationStatus == 0,
-                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                   let number = json["number"] as? Int {
-                    prNumber = number
-                    prURL = json["url"] as? String
-                }
-            } catch {}
+            let pr = GitHubCLIClient().prForCurrentBranch(repoPath: path)
+            let prNumber = pr?.number
+            let prURL = pr?.url
+            let prChecksStatus = pr?.checksStatus
 
             var aheadCount: Int? = nil
             var behindCount: Int? = nil
@@ -363,7 +348,7 @@ final class SidebarListModel {
                 }
             } catch {}
 
-            return RepoGitMetadata(prNumber: prNumber, prURL: prURL, aheadCount: aheadCount, behindCount: behindCount)
+            return RepoGitMetadata(prNumber: prNumber, prURL: prURL, prChecksStatus: prChecksStatus, aheadCount: aheadCount, behindCount: behindCount)
         }.value
     }
 
