@@ -834,6 +834,17 @@ public struct SessionEditor: Sendable {
         bumpRevision()
     }
 
+    /// Sets a durable per-surface label — see `IPCRequest.setPaneLabel`. Unlike `updateTabTitle`,
+    /// this is never gated on `automatic-rename` and is never overwritten by an OSC title update.
+    @discardableResult
+    public mutating func setPaneLabel(surfaceID: SurfaceID, label: String?) -> Bool {
+        guard let match = tabIndex(surfaceID: surfaceID) else { return false }
+        let updated = snapshot.workspaces[match.workspaceIndex].sessions[match.sessionIndex]
+            .tabs[match.tabIndex].rootPane.setSurfaceLabel(surfaceID, label: label)
+        if updated { bumpRevision() }
+        return updated
+    }
+
     public mutating func updateTabCwd(surfaceID: SurfaceID, path: String) {
         guard let match = tabIndex(surfaceID: surfaceID) else { return }
         snapshot.workspaces[match.workspaceIndex].sessions[match.sessionIndex].tabs[match.tabIndex].cwd = path

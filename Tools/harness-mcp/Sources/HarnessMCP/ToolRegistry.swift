@@ -42,6 +42,10 @@ struct ToolRegistry: Sendable {
                 param("surfaceId", "string", "Surface id from harnessList"),
                 param("blockId", "number", "Block id to fetch"),
             ]),
+            toolDef("setPaneLabel", "Set (or clear) a durable purpose label on a pane — e.g. \"build\", \"claude\" — so it can be told apart from sibling panes in the same tab via harnessList's paneJSON. Distinct from title: never overwritten by shell/OSC output. Requires MCP policy allowlist or HARNESS_MCP_ALLOW_CONTROL=1", [
+                param("surfaceId", "string", "Surface id from harnessList"),
+                param("label", "string", "Label text; omit or send empty string to clear"),
+            ]),
             toolDef("sendPaneText", "Send text to a Harness pane (requires MCP policy allowlist or HARNESS_MCP_ALLOW_CONTROL=1)", [
                 param("surfaceId", "string", "Surface id from harnessList"),
                 param("text", "string", "Text to send"),
@@ -184,6 +188,7 @@ struct ToolRegistry: Sendable {
         case "readPaneOutput": return await readPaneOutput(args)
         case "harnessGetLastBlock": return await harnessGetBlock(args, requireBlockId: false)
         case "harnessGetBlock": return await harnessGetBlock(args, requireBlockId: true)
+        case "setPaneLabel": return await setPaneLabel(args)
         case "sendPaneText": return await sendPaneText(args)
         case "sendPaneKeys": return await sendPaneKeys(args)
         case "spawnSession": return await spawnSession(args)
@@ -295,6 +300,15 @@ struct ToolRegistry: Sendable {
             return (nil, JSONRPCError(code: -32602, message: "Missing 'blockId' parameter"))
         }
         return await daemonTools.getBlock(surfaceId: surfaceId, blockId: blockId)
+    }
+
+    private func setPaneLabel(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        guard case let .string(surfaceId)? = args["surfaceId"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'surfaceId' parameter"))
+        }
+        var label: String?
+        if case let .string(l)? = args["label"] { label = l }
+        return await daemonTools.setPaneLabel(surfaceId: surfaceId, label: label)
     }
 
     private func sendPaneText(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {

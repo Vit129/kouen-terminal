@@ -651,6 +651,11 @@ public final class SurfaceRegistry: @unchecked Sendable {
                 fireHookLocked(.windowRenamed, surfaceKey: surfaceID)
             }
             return .ok
+        case let .setPaneLabel(surfaceID, label):
+            guard let uuid = UUID(uuidString: surfaceID) else { return .error("Invalid surface id") }
+            guard editor.setPaneLabel(surfaceID: uuid, label: label) else { return .error("Pane surface not found") }
+            commit()
+            return .ok
         case let .updateTabCwd(surfaceID, path):
             if let uuid = UUID(uuidString: surfaceID) {
                 editor.updateTabCwd(surfaceID: uuid, path: path)

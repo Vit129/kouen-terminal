@@ -53,6 +53,11 @@ public enum IPCRequest: Codable, Sendable {
     case notify(surfaceID: String, title: String, body: String)
     case clearNotification(surfaceID: String)
     case updateTabTitle(surfaceID: String, title: String)
+    /// Sets a durable, agent/human-set purpose label on one pane surface (e.g. "build",
+    /// "claude") — distinct from `title`, which is OSC/program-driven and gets overwritten by
+    /// the next shell prompt. Nil `label` clears it. Lets an agent disambiguate panes in a
+    /// multi-pane tab (`harnessList`'s `paneJSON` exposes it) without guessing from output.
+    case setPaneLabel(surfaceID: String, label: String?)
     case updateTabCwd(surfaceID: String, path: String)
     case updateTabGitBranch(workspaceID: UUID, tabID: UUID, branch: String?)
     /// Posted by harness-mcp after a mutating tool succeeds, so the daemon can
