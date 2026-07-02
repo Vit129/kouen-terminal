@@ -123,6 +123,15 @@ final class GitPanelView: NSView {
         Task { [weak self] in await self?.refresh() }
     }
 
+    /// Paths under `.git/` written on every auto-stage/commit that would
+    /// self-trigger a refresh loop if they scheduled one. Everything else
+    /// under `.git/` (HEAD, refs/**, logs/**, COMMIT_EDITMSG, FETCH_HEAD) is
+    /// treated as relevant, since an external `git commit`/`push` only
+    /// touches paths there — never the working tree.
+    nonisolated static func isNoisyGitInternalPath(_ path: String) -> Bool {
+        path.hasSuffix("/.git/index") || path.hasSuffix("/.git/index.lock") || path.contains("/.git/objects/")
+    }
+
     func clearRoot() {
         currentPath = nil
         manuallyUnstagedFiles.removeAll()
@@ -156,12 +165,15 @@ final class GitPanelView: NSView {
 
         let callback: FSEventStreamCallback = { (streamRef, clientInfo, numEvents, eventPaths, eventFlags, eventIds) in
             guard let clientInfo = clientInfo else { return }
-            // Filter: ignore changes inside .git/ (index writes, reflog, etc.)
+            // Filter: ignore noisy internal .git/ writes (index, index.lock, loose/pack
+            // objects) that fire on every auto-stage and would self-trigger a refresh loop.
+            // Do NOT filter all of .git/ — HEAD/refs/logs changes from an external
+            // `git commit`/`push` live there too and must still trigger a refresh.
             let cfPaths = Unmanaged<CFArray>.fromOpaque(eventPaths).takeUnretainedValue()
             var hasRelevantChange = false
             for i in 0..<numEvents {
                 let p = unsafeBitCast(CFArrayGetValueAtIndex(cfPaths, i), to: CFString.self) as String
-                if !p.contains("/.git/") {
+                if !GitPanelView.isNoisyGitInternalPath(p) {
                     hasRelevantChange = true
                     break
                 }
@@ -1166,18 +1178,24 @@ final class GitPanelView: NSView {
         guard let path = currentPath,
               let row = sender.view,
               let file = row.identifier?.rawValue else { return }
-        fputs("CLICKDBG showChangedFileDiff: senderView=\(ObjectIdentifier(row)) identifier=\(file) frame=\(row.frame)\n", harnessStderr)
+        guard let split = self.window?.contentViewController as? MainSplitViewController else { return }
+
+        // File still exists on disk (modified/added/untracked): open it as a normal
+        // syntax-highlighted preview — FileEditorView colors the changed lines itself.
+        let fullPath = path + "/" + file
+        if FileManager.default.fileExists(atPath: fullPath) {
+            split.contentVC.openFileTab(path: fullPath)
+            return
+        }
+
+        // Deleted file: nothing on disk to preview, fall back to the raw diff text.
         Task {
             let diff = await runGit(["diff", "HEAD", "--", file], in: path)
-            let content = diff.isEmpty ? (try? String(contentsOfFile: path + "/" + file, encoding: .utf8)) ?? "" : diff
             let tmpDir = NSTemporaryDirectory() + "harness-diff/"
             try? FileManager.default.createDirectory(atPath: tmpDir, withIntermediateDirectories: true)
             let safeName = file.replacingOccurrences(of: "/", with: "_")
-            let ext = diff.isEmpty ? (file as NSString).pathExtension : "diff"
-            let tmpPath = tmpDir + "\(safeName).\(ext)"
-            fputs("CLICKDBG showChangedFileDiff: opening file=\(file) tmpPath=\(tmpPath)\n", harnessStderr)
-            try? content.write(toFile: tmpPath, atomically: true, encoding: .utf8)
-            guard let split = self.window?.contentViewController as? MainSplitViewController else { return }
+            let tmpPath = tmpDir + "\(safeName).diff"
+            try? diff.write(toFile: tmpPath, atomically: true, encoding: .utf8)
             split.contentVC.openFileTab(path: tmpPath)
         }
     }
