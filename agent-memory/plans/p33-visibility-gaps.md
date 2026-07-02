@@ -1,6 +1,6 @@
 # P33 — Visibility Gaps (PR status, cross-pane notifications, diff viewer polish)
 
-Status: **Planning**
+Status: **Phase 1-2 done, Phase 3 deferred** — build/test/robot green
 Priority: **P1** — closes the remaining gaps vs cmux/Supacode found in the 2026-07-02 competitor
 research (web search: cmux, Supacode, WezTerm, Superset, AgentsRoom), on top of P32's
 task-worktree parity work.

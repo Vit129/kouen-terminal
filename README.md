@@ -1,6 +1,6 @@
 # Harness
 
-> Forked from [robzilla1738/harness-terminal](https://github.com/robzilla1738/harness-terminal). Current release: **v3.11.5**.
+> Forked from [robzilla1738/harness-terminal](https://github.com/robzilla1738/harness-terminal). Current release: **v3.12.0**.
 
 Harness is a native macOS terminal built for AI agent workflows. A first-party Swift terminal engine, a background session daemon, a scriptable CLI, embedded browser with MCP control, and multi-agent awareness — all in one app.
 
@@ -72,20 +72,16 @@ See [USAGE.md](USAGE.md) for the full install, run, CLI, and remote/headless gui
 |----------|--------|
 | ⌘⌃V | Toggle Vi modal editing (normal / insert mode) |
 | Esc (Vi normal) | Enter normal mode — `hjkl` move, `wb` word, `0`/`$` line, `x` delete, `i`/`a`/`A` insert |
-| ⌘-click output block | Select OSC 133 command block — copy or send to AI |
+| ⌘-click output block | Select OSC 133 command block — Copy or Re-run from the action bar |
 | ⌃C (with selection) | Copy selection first, then send interrupt |
 | ⌘⇧U | Hint mode — keyboard-driven link/path opening |
 
-### AI chat
+### Prompt tools
 
 | Shortcut | Action |
 |----------|--------|
-| ⌘I | Toggle inline AI chat (Claude / Codex / Gemini / Kiro) |
-| ⌘⇧↩ | Prompt queue — batch prompts, run sequentially |
-| ⌥Space | Inline AI command suggestion overlay |
-| Right-click selection | Ask AI → prefill chat with selected text |
-| ⌘V (in AI chat) | Paste image → inserts file path (not inline render) |
-| Drag image to AI chat | Inserts image file path |
+| ⌘⇧↩ | Prompt queue — batch shell commands, sends the next one as soon as the previous shell prompt reappears |
+| ⌥Space | Inline AI command suggestion overlay — sends recent pane output to Claude, suggests a next command |
 
 ### Navigation & layout
 
