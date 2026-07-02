@@ -646,7 +646,7 @@ enum SyntaxHighlighter {
         switch ext {
         case "swift":
             return ["import", "func", "var", "let", "class", "struct", "enum", "protocol", "extension", "if", "else", "guard", "return", "switch", "case", "for", "while", "in", "where", "self", "Self", "nil", "true", "false", "private", "public", "internal", "final", "static", "override", "init", "deinit", "throw", "throws", "try", "catch", "await", "async", "actor", "some", "any", "weak", "unowned", "mutating", "typealias"]
-        case "ts", "tsx", "js", "jsx":
+        case "ts", "tsx", "js", "jsx", "gs":
             return ["import", "export", "from", "function", "const", "let", "var", "class", "interface", "type", "if", "else", "return", "switch", "case", "for", "while", "of", "in", "this", "null", "undefined", "true", "false", "new", "async", "await", "try", "catch", "throw", "extends", "implements", "default", "break", "continue"]
         case "py":
             return ["import", "from", "def", "class", "if", "elif", "else", "return", "for", "while", "in", "is", "not", "and", "or", "True", "False", "None", "self", "with", "as", "try", "except", "finally", "raise", "yield", "async", "await", "pass", "lambda"]
@@ -660,7 +660,7 @@ enum SyntaxHighlighter {
             return ["import", "package", "class", "interface", "extends", "implements", "public", "private", "protected", "static", "final", "abstract", "void", "new", "return", "if", "else", "for", "while", "do", "switch", "case", "break", "continue", "try", "catch", "finally", "throw", "throws", "this", "super", "null", "true", "false", "synchronized", "volatile"]
         case "c", "h":
             return ["include", "define", "ifdef", "ifndef", "endif", "if", "else", "for", "while", "do", "switch", "case", "break", "continue", "return", "void", "int", "char", "float", "double", "long", "short", "unsigned", "signed", "const", "static", "extern", "struct", "enum", "typedef", "sizeof", "NULL"]
-        case "cpp", "hpp", "cc", "cxx":
+        case "cpp", "hpp", "cc", "cxx", "hxx":
             return ["include", "define", "ifdef", "ifndef", "endif", "if", "else", "for", "while", "do", "switch", "case", "break", "continue", "return", "void", "int", "char", "float", "double", "long", "short", "unsigned", "signed", "const", "static", "extern", "struct", "enum", "typedef", "sizeof", "NULL", "class", "public", "private", "protected", "virtual", "override", "new", "delete", "namespace", "using", "template", "typename", "auto", "nullptr", "true", "false", "throw", "try", "catch", "constexpr", "noexcept"]
         case "sh", "bash", "zsh":
             return ["if", "then", "else", "elif", "fi", "for", "while", "do", "done", "case", "esac", "in", "function", "return", "local", "export", "source", "echo", "exit", "true", "false", "set", "unset", "readonly"]
@@ -668,7 +668,7 @@ enum SyntaxHighlighter {
             return ["def", "class", "module", "if", "elsif", "else", "unless", "end", "do", "while", "for", "in", "return", "yield", "begin", "rescue", "ensure", "raise", "nil", "true", "false", "self", "require", "include", "attr_accessor", "attr_reader", "puts", "lambda", "proc"]
         case "toml":
             return ["true", "false"]
-        case "json", "yaml", "yml":
+        case "json", "jsonc", "yaml", "yml":
             return ["true", "false", "null", "yes", "no"]
         case "html", "htm":
             return ["html", "head", "body", "div", "span", "p", "a", "img", "script", "style", "link", "meta", "title", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "table", "tr", "td", "th", "form", "input", "button", "select", "option", "textarea"]
@@ -682,6 +682,14 @@ enum SyntaxHighlighter {
             return ["local", "function", "end", "if", "then", "else", "elseif", "for", "while", "do", "repeat", "until", "return", "nil", "true", "false", "and", "or", "not", "in", "require"]
         case "php":
             return ["function", "class", "interface", "extends", "implements", "public", "private", "protected", "static", "final", "abstract", "new", "return", "if", "else", "elseif", "for", "foreach", "while", "do", "switch", "case", "break", "continue", "try", "catch", "finally", "throw", "null", "true", "false", "echo", "require", "include", "namespace", "use", "as"]
+        case "m", "mm":
+            return ["interface", "implementation", "protocol", "property", "synthesize", "dynamic", "end", "selector", "encode", "synchronized", "autoreleasepool", "import", "include", "if", "else", "for", "while", "do", "switch", "case", "break", "continue", "return", "void", "int", "char", "float", "double", "long", "short", "unsigned", "signed", "const", "static", "extern", "struct", "enum", "typedef", "sizeof", "NULL", "self", "super", "nil", "YES", "NO", "id", "instancetype", "IBAction", "IBOutlet", "strong", "weak", "nonatomic", "retain", "copy", "assign", "readonly", "readwrite", "try", "catch", "finally", "throw"]
+        case "cs":
+            return ["using", "namespace", "class", "interface", "struct", "enum", "public", "private", "protected", "internal", "static", "readonly", "const", "virtual", "override", "abstract", "sealed", "async", "await", "void", "var", "new", "return", "if", "else", "for", "foreach", "while", "do", "switch", "case", "break", "continue", "try", "catch", "finally", "throw", "this", "base", "null", "true", "false", "get", "set", "in", "is", "as", "typeof"]
+        case "robot", "resource":
+            return ["Settings", "Variables", "Test Cases", "Keywords", "Library", "Resource", "Documentation", "Suite Setup", "Suite Teardown", "Test Setup", "Test Teardown", "Force Tags", "Default Tags", "Log", "Should Be Equal", "Should Contain", "FOR", "END", "IF", "ELSE", "ELSE IF", "WHILE", "RETURN", "Run Keyword", "Run Keyword If"]
+        case "feature":
+            return ["Feature", "Background", "Scenario", "Scenario Outline", "Examples", "Rule", "Given", "When", "Then", "And", "But"]
         default:
             return []
         }
@@ -689,9 +697,9 @@ enum SyntaxHighlighter {
 
     private static func commentPattern(for ext: String) -> String? {
         switch ext {
-        case "swift", "ts", "tsx", "js", "jsx", "rs", "go", "c", "cpp", "h", "hpp", "cc", "cxx", "java", "kt", "kts", "dart", "scss":
+        case "swift", "ts", "tsx", "js", "jsx", "gs", "rs", "go", "c", "cpp", "h", "hpp", "cc", "cxx", "hxx", "java", "kt", "kts", "dart", "scss", "m", "mm", "cs", "jsonc":
             return #"//.*$|/\*[\s\S]*?\*/"#
-        case "py", "rb", "sh", "bash", "zsh", "yaml", "yml", "toml":
+        case "py", "rb", "sh", "bash", "zsh", "yaml", "yml", "toml", "robot", "resource", "feature":
             return "#.*$"
         case "lua":
             return #"--.*$|--\[\[[\s\S]*?\]\]"#

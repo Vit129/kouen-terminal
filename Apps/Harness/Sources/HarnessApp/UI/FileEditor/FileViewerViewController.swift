@@ -228,6 +228,7 @@ final class FileViewerViewController: NSViewController {
         return [
             "png", "jpg", "jpeg", "gif", "webp", "svg", "ico", "bmp", "tiff", "heic",
             "pdf", "rtf", "rtfd", "doc", "docx", "pages", "key", "keynote", "numbers",
+            "csv", "xls", "xlsx",
         ]
     }
 }
