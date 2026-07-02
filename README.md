@@ -1,6 +1,6 @@
 # Harness
 
-> Forked from [robzilla1738/harness-terminal](https://github.com/robzilla1738/harness-terminal). Current release: **v3.12.0**.
+> Forked from [robzilla1738/harness-terminal](https://github.com/robzilla1738/harness-terminal).
 
 Harness is a native macOS terminal built for AI agent workflows. A first-party Swift terminal engine, a background session daemon, a scriptable CLI, embedded browser with MCP control, and multi-agent awareness — all in one app.
 
