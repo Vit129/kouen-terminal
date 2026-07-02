@@ -1,8 +1,21 @@
 # Context — harness-terminal
 
 ## Now
-- **Task:** P32 + P34 backlog items both shipped (`1723136` right-click refactor, `965f7b3e` setPaneLabel) — archived to completed-archive.md; idle
+- **Task:** P32 + P34 backlog items shipped (`1723136` right-click refactor, `965f7b3e` setPaneLabel, `c9ee32ce` atomic label-on-create) — archived to completed-archive.md; idle
 - **Branch:** `main`
+
+### 2026-07-02 — spawnSession/splitPane set a pane label atomically ✅ DONE, committed (`c9ee32ce`)
+User asked to make pane labeling "auto" and whether other terminals do this. No terminal tool
+(tmux included) does true semantic auto-labeling — tmux's `automatic-rename` only shows the literal
+foreground command. Landed on: the agent creating a pane labels it in the same call. Added optional
+`label` param to `spawnSession`/`splitPane` (both previously returned only `sessionId`/`paneId`, so
+labeling required a 3rd `harnessList` round-trip to resolve `surfaceId` first) — new
+`labelPrimarySurface`/`labelPaneSurface` helpers in `HarnessDaemonTools.swift` do one internal
+snapshot lookup + `setPaneLabel` call, best-effort. No live-daemon test harness exists for
+`HarnessDaemonTools`, so verified via a real headless daemon + real MCP stdio round-trip instead of
+building new test infra. Careless moment: cleanup used `pkill -f "HarnessDaemon"` which could have
+matched the production `/Applications/Harness.app` daemon — verified after the fact it was untouched
+(unchanged start time), but should have killed only the smoke-test PID.
 
 ### 2026-07-02 — P32 `setPaneLabel` MCP tool + P34 right-click block menu ✅ DONE, committed (`1723136`, `965f7b3e`)
 User said "ทำ p32,34 ต่อ" to implement two backlog items logged earlier this session.
