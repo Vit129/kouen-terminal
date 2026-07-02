@@ -192,6 +192,40 @@ pre-existing unrelated failures only)/`Tests/robot/run.sh` all clean.
   "Move Sidebar to Right," a different code path from the user's plain `⌘\` repro, confirmed
   inert via `settings.json` inspection before being reverted.
 
+### Post-commit review (Opus, high effort, workflow-backed) — 4 findings, all fixed
+
+User asked for a second-opinion structural review of the whole branch. 12-agent workflow (finder
+angles + independent verifier per finding) returned 9 raw candidates, collapsed to 4 distinct
+defects after dedup — all 4 confirmed via source trace (debug-mantra: fail-path traced through
+actual code, not guessed) and fixed:
+
+1. **Crash risk (most severe)** — `GitPanelView.previewCommitDetail` (new in this branch)
+   captures the commit-card `NSView` before `await runGit(["show", ...])`, then anchors an
+   `NSPopover` to it. Confirmed via trace: `applyState()` (called from the FSEventStream-driven
+   `refresh()`) does `historyStack.arrangedSubviews.forEach { $0.removeFromSuperview() }` on
+   every git-history refresh — if that fires while the `await` is in flight, the captured card
+   is detached, and presenting a popover anchored to it is invalid. Fix: guard `card.window !=
+   nil` after the await, bail if detached. See `RL-063`.
+2. **`waitingNotificationText` only checked `activeTab ?? tabs.first`**, unlike its sibling
+   `sessionBoardStatus` which scans all `session.tabs` — a background tab's notification could
+   never surface, directly contradicting this same phase's stated goal ("regardless of which
+   tab/split is focused"). Fix: scan all tabs, matching `sessionBoardStatus`'s pattern.
+3. **`gh` path-resolution mismatch** — `SidebarListModel.cachedGhPath` (the availability guard
+   for `fetchGitMetadata`) has a `which gh` fallback beyond the 3 hardcoded paths;
+   `GitHubCLIClient.runGH` (the actual fetch, swapped in during Phase 1) didn't — so a user with
+   `gh` at a non-standard location (MacPorts, asdf/mise shim) could pass the guard but still get
+   a silently-failing fetch, breaking the PR badge with no error. Fix: added the same `which gh`
+   fallback to `GitHubCLIClient`'s path resolution (cached statically) — fixes it for every
+   consumer of `GitHubCLIClient`, not just this call site.
+4. **Minor cleanup** — `previewCommitDetail` and `showCommitDetail` duplicated the identical
+   `git show --stat --patch` invocation verbatim. Extracted to a shared `fetchCommitDiff` helper
+   while fixing #1 anyway.
+
+No new regression tests added for these — the touched code (AppKit view lifecycle timing, a
+SwiftUI computed property, `Process`-based shell-out path resolution) has no existing test
+scaffolding in this codebase to extend consistently with, and building fixture-based tests for
+an inherently timing-dependent race (#1) would need scaffolding beyond this pass's scope.
+
 ---
 
 ## Testing and Verification

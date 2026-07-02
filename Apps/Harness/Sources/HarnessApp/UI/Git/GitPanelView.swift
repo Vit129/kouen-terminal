@@ -643,6 +643,12 @@ final class GitPanelView: NSView {
         }
     }
 
+    /// Shared by `previewCommitDetail` and `showCommitDetail` so the two diff views (popover
+    /// vs full tab) can never drift apart on the underlying `git show` invocation.
+    private func fetchCommitDiff(hash: String, path: String) async -> String {
+        await runGit(["show", "--stat", "--patch", hash], in: path)
+    }
+
     /// Quick-look popover — file-nav bar + colored diff, anchored to the commit card, no tab
     /// opened. This is the default click action; `showCommitDetail` (full tab) stays reachable
     /// via the "Open Full Diff in Tab" context-menu item for the copy/search/keep-open case.
@@ -651,8 +657,13 @@ final class GitPanelView: NSView {
               let path = currentPath,
               let hash = card.identifier?.rawValue else { return }
         Task {
-            let detail = await runGit(["show", "--stat", "--patch", hash], in: path)
+            let detail = await fetchCommitDiff(hash: hash, path: path)
             guard !detail.isEmpty else { return }
+            // `refresh()` (FSEventStream-driven, debounced) rebuilds the commit-history list —
+            // `applyState` detaches every existing card via `removeFromSuperview()` — and can
+            // fire while the git-show above was in flight. Presenting a popover anchored to a
+            // now-detached view is invalid; bail rather than anchor to stale/removed geometry.
+            guard card.window != nil else { return }
             self.presentCommitDetail(detail, anchor: card)
         }
     }
@@ -668,7 +679,7 @@ final class GitPanelView: NSView {
               let card,
               let hash = card.identifier?.rawValue else { return }
         Task {
-            let detail = await runGit(["show", "--stat", "--patch", hash], in: path)
+            let detail = await fetchCommitDiff(hash: hash, path: path)
             let shortHash = String(hash.prefix(7))
             let tmpDir = NSTemporaryDirectory() + "harness-diff/"
             try? FileManager.default.createDirectory(atPath: tmpDir, withIntermediateDirectories: true)
