@@ -55,7 +55,15 @@ final class MainSplitViewController: NSViewController {
         // strip even though both regions request the same theme color.
         let sidebarContainer = NSView()
         HarnessDesign.makeClear(sidebarContainer)
-        sidebarContainer.translatesAutoresizingMaskIntoConstraints = false
+        // Deliberately NOT translatesAutoresizingMaskIntoConstraints = false here (unlike
+        // `sidebar.view` below): `sidebarContainer` is an NSSplitView arranged subview —
+        // NSSplitView positions/sizes it via direct frame assignment (setPosition/adjustSubviews),
+        // the same autoresizing-mask-based mechanism `content.view` already relies on (never
+        // opted out). Opting `sidebarContainer` itself into pure Auto Layout with no constraint
+        // defining its own width/position left it ambiguous — any layoutSubtreeIfNeeded()/layout()
+        // pass could resolve it to 0 width, wiping out whatever frame NSSplitView had just set via
+        // setPosition. `sidebar.view`'s constraints (below) are relative to sidebarContainer's
+        // bounds, which stay well-defined as long as sidebarContainer itself stays frame-managed.
         sidebar.view.translatesAutoresizingMaskIntoConstraints = false
         sidebarContainer.addSubview(sidebar.view)
         NSLayoutConstraint.activate([

@@ -643,6 +643,20 @@ final class GitPanelView: NSView {
         }
     }
 
+    /// Quick-look popover — file-nav bar + colored diff, anchored to the commit card, no tab
+    /// opened. This is the default click action; `showCommitDetail` (full tab) stays reachable
+    /// via the "Open Full Diff in Tab" context-menu item for the copy/search/keep-open case.
+    @objc private func previewCommitDetail(_ sender: NSClickGestureRecognizer) {
+        guard let card = sender.view,
+              let path = currentPath,
+              let hash = card.identifier?.rawValue else { return }
+        Task {
+            let detail = await runGit(["show", "--stat", "--patch", hash], in: path)
+            guard !detail.isEmpty else { return }
+            self.presentCommitDetail(detail, anchor: card)
+        }
+    }
+
     @objc private func showCommitDetail(_ sender: Any) {
         let card: NSView?
         if let gesture = sender as? NSClickGestureRecognizer {
@@ -1170,7 +1184,7 @@ final class GitPanelView: NSView {
         card.wantsLayer = true
         card.translatesAutoresizingMaskIntoConstraints = false
         card.identifier = NSUserInterfaceItemIdentifier(fullHash)
-        card.addGestureRecognizer(NSClickGestureRecognizer(target: self, action: #selector(showCommitDetail(_:))))
+        card.addGestureRecognizer(NSClickGestureRecognizer(target: self, action: #selector(previewCommitDetail(_:))))
 
         // Right-click context menu
         let menu = NSMenu()
@@ -1179,7 +1193,7 @@ final class GitPanelView: NSView {
         menu.addItem(NSMenuItem.separator())
         menu.addItem(withTitle: "Copy \(hash) — \(subject)", action: #selector(copyCommitSummary(_:)), keyEquivalent: "").representedObject = "\(hash) \(subject)"
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(withTitle: "Show Diff", action: #selector(showCommitDetail(_:)), keyEquivalent: "").representedObject = card
+        menu.addItem(withTitle: "Open Full Diff in Tab", action: #selector(showCommitDetail(_:)), keyEquivalent: "").representedObject = card
         menu.items.forEach { $0.target = self }
         // Fix: showCommitDetail needs the card view via representedObject for menu path
         menu.items.last?.representedObject = card
