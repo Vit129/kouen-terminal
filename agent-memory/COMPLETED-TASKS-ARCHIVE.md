@@ -60,3 +60,11 @@ Archived from agent-memory/MEMORY.md. Active tasks in [MEMORY.md](MEMORY.md).
 | 53 | Fix tab bar wrong branch display when agent uses worktree (probe worktreePath instead of cwd) | ✅ Done |
 | 54 | Fix split pane inherits worktree path (not repo root) for new shell CWD | ✅ Done |
 | 55 | Wire missing command prompt verbs: :z, :view, :edit, :e, :split, :vsplit, :agent, :fzf, :zi, :rg, :fd, :bat, :eza, :jq (RL-044, CASE-042) | ✅ Done |
+| 56 | Claude Code statusLine/advisor/remote-control "broke after migrate" — NOT Harness, `~/.claude/settings.json` had invalid `skillOverrides.deep-research:"disabled"`, CC 2.1.195 skips whole file on one bad value (CASE-057) | ✅ Done |
+| 57 | Live perf profile of running Harness 3.11.7/183 — CPU 42% from SwiftUI `.repeatForever` re-rendering whole ViewGraph; moved `workingDot`/`NotchStatusDot` pulses to CALayer `CABasicAnimation` | ✅ Done |
+| 58 | Cmd+\ sidebar toggle gone after collapse — dead CADisplayLink token guard + zero-delta early exit race; move invalidate() before early-return paths (CASE-058) | ✅ Done |
+| 59 | P23 SSH socket auto-detect (PBI-SSH-008) — `harness-cli socket-path` + `SSHTunnelManager.detectSocketPath`, wired into Settings UI + CLI `--detect` | ✅ Done |
+| 60 | P32 Phase 1 — New Agent Task command palette flow: command palette clipped fix (`setContentSize`), silent `addAgentTask` failures now surface via NSAlert, `.harness-worktrees/` gitignored | ✅ Done |
+| 61 | P32 Phase 2 — worktree tabs invisible to git UI: `gitRoot(for:)` walked past worktree's own `.git` to main repo root for directory inputs; swapped to `WorktreeManager().repoRoot(for:)` at 3 call sites; Git panel paint-before-autostage for instant Changes display | ✅ Done |
+| 62 | Sidebar default width 264→220, always-open on launch, divider color unified with pane-split divider; root cause of "still huge after resize" was NSSplitView proportional redistribution on window resize — fixed via `shouldAdjustSizeOfSubview` (holdingPriority has no effect with a classic constrain-coordinate delegate) | ✅ Done |
+| 63 | ACP-removal test cleanup — `ACPTransportTests.swift` deleted (no live equivalent), `StdioTransportTests.swift` repaired to use `JSONRPCMessage`; stale robot assertion for deleted `aiChatControllers` removed | ✅ Done |

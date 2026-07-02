@@ -91,6 +91,7 @@ final class SyntaxTextView: NSView {
         diagnostics = []
         gutterView.diagnostics = []
         gutterView.needsDisplay = true
+        setDiffLines([:])
     }
 
     func setDiagnostics(_ diagnostics: [LSPDiagnostic]) {
@@ -111,6 +112,7 @@ final class SyntaxTextView: NSView {
     func setDiffLines(_ diffLines: [Int: DiffLineType]) {
         gutterView.diffLines = diffLines
         gutterView.needsDisplay = true
+        textView.diffLineTypes = diffLines
     }
 
     /// Vi engine — handles all normal/visual/operator-pending key dispatch.
@@ -705,7 +707,10 @@ enum SyntaxHighlighter {
 @MainActor
 final class SyntaxTextViewInner: NSTextView {
     weak var parentView: SyntaxTextView?
-    
+    var diffLineTypes: [Int: SyntaxTextView.DiffLineType] = [:] {
+        didSet { needsDisplay = true }
+    }
+
     override func keyDown(with event: NSEvent) {
         if let parent = parentView, parent.handleTextViewKeyDown(event) {
             return
@@ -716,6 +721,45 @@ final class SyntaxTextViewInner: NSTextView {
     override func mouseDown(with event: NSEvent) {
         parentView?.dismissCompletionPopup()
         super.mouseDown(with: event)
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        drawDiffLineBackgrounds(dirtyRect)
+        super.draw(dirtyRect)
+    }
+
+    private func drawDiffLineBackgrounds(_ dirtyRect: NSRect) {
+        guard !diffLineTypes.isEmpty, let layoutManager, let textContainer else { return }
+        let glyphRange = layoutManager.glyphRange(forBoundingRect: dirtyRect, in: textContainer)
+        let charRange = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
+        let text = string as NSString
+
+        var lineNumber = 1
+        text.enumerateSubstrings(in: NSRange(location: 0, length: charRange.location), options: [.byLines, .substringNotRequired]) { _, _, _, _ in
+            lineNumber += 1
+        }
+
+        let inset = textContainerInset.height
+        let width = max(bounds.width, dirtyRect.maxX)
+        text.enumerateSubstrings(in: charRange, options: [.byLines, .substringNotRequired]) { [weak self] _, range, _, _ in
+            guard let self else { return }
+            defer { lineNumber += 1 }
+            guard let type = self.diffLineTypes[lineNumber] else { return }
+            let glyphIndex = layoutManager.glyphIndexForCharacter(at: range.location)
+            var lineRect = layoutManager.lineFragmentRect(forGlyphAt: glyphIndex, effectiveRange: nil)
+            lineRect.origin.x = 0
+            lineRect.size.width = width
+            lineRect.origin.y += inset
+
+            let color: NSColor
+            switch type {
+            case .added: color = .systemGreen
+            case .modified: color = .systemYellow
+            case .deleted: color = .systemRed
+            }
+            color.withAlphaComponent(0.13).setFill()
+            lineRect.fill()
+        }
     }
 }
 
