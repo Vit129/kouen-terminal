@@ -108,6 +108,41 @@ final class WorktreeIsolationDaemonTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: wtPath))
     }
 
+    // MARK: - P32 F3: archiveScript runs before worktree removal
+
+    func testCloseSessionRunsArchiveScriptBeforeRemoval() throws {
+        let registry = SurfaceRegistry()
+        let wsID = try workspaceID(registry)
+
+        let mgr = WorktreeManager()
+        let wtPath = try XCTUnwrap(mgr.create(repoPath: repoPath, sessionID: "arch1", branch: "archive-close"))
+
+        // A harness.json with archiveScript that writes a marker file OUTSIDE the worktree
+        // (so we can still see it after the worktree dir is removed) and reads an injected env var.
+        let markerPath = root.appendingPathComponent("marker.txt").path
+        let config = """
+        {"archiveScript": "echo done-$MARKER_TOKEN > \(markerPath)", "env": {"MARKER_TOKEN": "abc123"}}
+        """
+        try config.write(toFile: wtPath + "/harness.json", atomically: true, encoding: .utf8)
+        shell("git add harness.json && git commit -m cfg", in: wtPath)
+
+        let response = registry.handle(.newSession(
+            workspaceID: wsID, cwd: wtPath, name: "archive-session",
+            worktreePath: wtPath, parentRepoPath: repoPath
+        ))
+        guard case let .sessionID(sessionID) = response else {
+            return XCTFail("Expected sessionID")
+        }
+
+        _ = registry.handle(.closeSession(sessionID: sessionID))
+
+        // Worktree removed (clean after commit)...
+        XCTAssertFalse(FileManager.default.fileExists(atPath: wtPath))
+        // ...but the archiveScript ran first, with cwd inside the worktree and env injected.
+        let markerContents = try String(contentsOfFile: markerPath, encoding: .utf8)
+        XCTAssertEqual(markerContents.trimmingCharacters(in: .whitespacesAndNewlines), "done-abc123")
+    }
+
     func testCloseSessionKeepsDirtyWorktree() throws {
         let registry = SurfaceRegistry()
         let wsID = try workspaceID(registry)

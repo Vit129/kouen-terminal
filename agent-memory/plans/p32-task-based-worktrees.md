@@ -1,6 +1,6 @@
 # P32 — Task-Based Agent Worktrees
 
-Status: **Planning**
+Status: **All 4 phases complete**
 Priority: **P1** — closes the biggest gap vs Superset/cmux/Supacode found in 2026-07-01 competitor review
 Owner surface: `WorktreeManager`, `WorktreeAutoIsolateService`, `SessionCoordinator`, `ProjectConfig`, new UI entry point (sidebar/command palette)
 Created: 2026-07-01
@@ -121,19 +121,40 @@ Exit criteria: task-created tabs are visually distinguishable from branch-auto-i
 
 ### Phase 3 — Setup/teardown hooks (P1)
 
-- [ ] `ProjectConfig` gains `taskSetup`/`taskTeardown`
-- [ ] Run setup synchronously (with timeout) after worktree create, before first prompt
-- [ ] Run teardown before worktree removal on explicit task close
-- [ ] Unit tests for hook invocation with correct cwd/env vars
+- [x] ~~`ProjectConfig` gains `taskSetup`/`taskTeardown`~~ — superseded by the F3 correction:
+      no new fields, reuse existing `setupScript`/`archiveScript`.
+- [x] Setup: already covered for free — `setupScript` auto-runs on every `addSession` call
+      (P24, `SessionLifecycleService.swift:71-78`), and `addAgentTask` routes through
+      `addSession`, so task-worktree sessions get it with zero new code.
+- [x] Teardown: `archiveScript` was dead code (schema-only, zero call sites) — wired it into
+      `SurfaceRegistry.handle(.closeSession)` (`Packages/HarnessDaemon/Sources/HarnessDaemon/
+      SurfaceRegistry.swift`), right before `WorktreeManager.remove`, gated on the worktree
+      being clean (same branch the existing removal check already takes). Added
+      `WorktreeManager.runArchiveScript(_:cwd:env:timeout:)` — runs via `/bin/sh -c`, injects
+      `config.env`, hard-killed via `DispatchSourceTimer` after 30s so a hanging project script
+      can't freeze the daemon's synchronous IPC handler for other clients.
+      `HarnessDaemonCore` gained a new dependency on `HarnessSettings` for `ProjectConfig`.
+- [x] Unit test: `WorktreeIsolationDaemonTests.testCloseSessionRunsArchiveScriptBeforeRemoval`
+      — archiveScript writes a marker file outside the worktree (so it's checkable after the
+      worktree dir is gone) using an injected env var, asserts it ran with worktree cwd and
+      completed before removal.
 
-Exit criteria: a project with `taskSetup: ["npm install"]` runs it automatically for every new task.
+Exit criteria: a project with `archiveScript` in `harness.json` runs it automatically on
+explicit task close, before the worktree is deleted. ✅ `swift build` clean; `swift test
+--filter WorktreeIsolationDaemonTests` 10/10 pass; full `swift test` shows only the 2
+pre-existing unrelated failures noted in CONTEXT.md; `Tests/robot/run.sh` 10/10 pass.
 
 ### Phase 4 — Task switcher (P2)
 
-- [ ] ⌘1-9 binding scoped to active task worktrees in the current workspace
-- [ ] Falls back gracefully when fewer than 9 tasks exist
+- [x] Already delivered by the existing `⌘1-9` binding (`MainMenuBuilder.swift:71-80`,
+      `MenuTarget.selectWorkspaceNumber`) — it switches to the Nth entry of
+      `workspace.sessions` by index, and `addAgentTask` creates task-worktree sessions as
+      regular entries in that same list, so they're already reachable by number.
+      Considered adding a task-only-filtered `⌘1-9`, but that would collide with (and break)
+      the existing all-session binding for no net gain — confirmed with user, closing as-is
+      rather than duplicating a working shortcut.
 
-Exit criteria: matches Superset's workspace-switch ergonomics.
+Exit criteria: matches Superset's workspace-switch ergonomics. ✅ via existing binding.
 
 ---
 

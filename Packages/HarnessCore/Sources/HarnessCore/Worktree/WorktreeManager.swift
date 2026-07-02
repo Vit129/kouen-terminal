@@ -59,6 +59,41 @@ public struct WorktreeManager: Sendable {
         return runGit(args, in: repoPath)
     }
 
+    // MARK: - Archive hook (P32 F3)
+
+    /// Runs a project's `archiveScript` (from `harness.json`) in `cwd`, blocking the caller
+    /// until it exits or `timeout` elapses (whichever first — the caller is the daemon's
+    /// synchronous IPC handler, so an unbounded arbitrary script would hang all other clients).
+    /// Returns false on spawn failure, non-zero exit, or timeout.
+    @discardableResult
+    public func runArchiveScript(_ script: String, cwd: String, env: [String: String]? = nil, timeout: TimeInterval = 30) -> Bool {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = ["-c", script]
+        process.currentDirectoryURL = URL(fileURLWithPath: cwd)
+        if let env {
+            var environment = ProcessInfo.processInfo.environment
+            for (key, value) in env { environment[key] = value }
+            process.environment = environment
+        }
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        do {
+            try process.run()
+        } catch {
+            return false
+        }
+        let timer = DispatchSource.makeTimerSource(queue: .global())
+        timer.schedule(deadline: .now() + timeout)
+        timer.setEventHandler { [process] in
+            if process.isRunning { process.terminate() }
+        }
+        timer.resume()
+        process.waitUntilExit()
+        timer.cancel()
+        return process.terminationStatus == 0
+    }
+
     // MARK: - List
 
     /// Lists all worktrees for a repository.
