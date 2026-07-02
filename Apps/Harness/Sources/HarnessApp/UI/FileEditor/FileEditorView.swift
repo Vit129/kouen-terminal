@@ -172,7 +172,7 @@ final class FileEditorView: NSView {
         let file = (path as NSString).lastPathComponent
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-        process.arguments = ["diff", "--unified=0", "--", file]
+        process.arguments = ["diff", "HEAD", "--unified=0", "--", file]
         process.currentDirectoryURL = URL(fileURLWithPath: dir)
         let pipe = Pipe()
         process.standardOutput = pipe
@@ -182,30 +182,27 @@ final class FileEditorView: NSView {
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         guard let output = String(data: data, encoding: .utf8) else { return [:] }
 
+        // "-start[,count]" or "+start[,count]" — count defaults to 1 when omitted.
+        func parseRange(_ spec: Substring) -> (start: Int, count: Int)? {
+            let body = spec.dropFirst()
+            let comps = body.split(separator: ",")
+            guard let start = Int(comps.first ?? "") else { return nil }
+            let count = comps.count > 1 ? (Int(comps[1]) ?? 1) : 1
+            return (start, count)
+        }
+
         var result: [Int: SyntaxTextView.DiffLineType] = [:]
-        // Parse @@ -a,b +c,d @@ hunks
+        // Parse "@@ -oldStart,oldCount +newStart,newCount @@" hunks
         for line in output.components(separatedBy: "\n") {
             guard line.hasPrefix("@@") else { continue }
-            // Extract +start,count
-            guard let plusRange = line.range(of: "+") else { continue }
-            let afterPlus = line[plusRange.upperBound...]
-            guard let spaceOrComma = afterPlus.firstIndex(where: { $0 == "," || $0 == " " }) else { continue }
-            let startStr = String(afterPlus[..<spaceOrComma])
-            guard let start = Int(startStr) else { continue }
-            var count = 1
-            if afterPlus[spaceOrComma] == "," {
-                let afterComma = afterPlus[afterPlus.index(after: spaceOrComma)...]
-                if let end = afterComma.firstIndex(of: " ") {
-                    count = Int(afterComma[..<end]) ?? 1
-                }
-            }
-            // Check if it's add or modify by looking at the - side
-            let hasRemoved = line.contains("-") && !line.hasPrefix("---")
-            let type: SyntaxTextView.DiffLineType = count == 0 ? .deleted : (hasRemoved ? .modified : .added)
-            if count == 0 {
-                result[start] = .deleted
+            let parts = line.split(separator: " ")
+            guard parts.count >= 3, parts[1].hasPrefix("-"), parts[2].hasPrefix("+"),
+                  let old = parseRange(parts[1]), let new = parseRange(parts[2]) else { continue }
+            if new.count == 0 {
+                result[new.start] = .deleted
             } else {
-                for i in start..<(start + count) {
+                let type: SyntaxTextView.DiffLineType = old.count == 0 ? .added : .modified
+                for i in new.start..<(new.start + new.count) {
                     result[i] = type
                 }
             }
