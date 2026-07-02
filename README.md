@@ -61,47 +61,24 @@ See [USAGE.md](USAGE.md) for the full install, run, CLI, and remote/headless gui
 - Multi-agent workflows — run Claude Code, Codex, and Gemini CLI in parallel panes with per-agent statusline showing model, context usage, and rate limits.
 - Optional tmux-style controls: prefix key, status line, copy mode, paste buffers, hooks, command prompt, and many tmux-compatible commands.
 - IDE-like navigation — double-click folders to cd, ⌘P fuzzy jump to any directory via zoxide frecency, ⌘⇧J frecency dir picker (↩ cd · ⌘↩ open new tab), ⌘⇧R saved command recipes, ⌘-click file paths, `:cd` from the command prompt, and **Open With Harness** from Finder on any source file.
-- Sidebar tools for sessions, file navigation, real-time Git workflows (one-step Commit & Push), command palette, and editor/LSP flows.
+- Sidebar tools for sessions, file navigation, real-time Git workflows (one-step Commit & Push), command palette, and editor/LSP flows across 21 languages — see [Editor & LSP](#editor--lsp).
 - Stable under long sessions — per-pane controller trees and browser network buffers are bounded and released on pane close; memory stays flat across hours of use.
 
 ## Keyboard Shortcuts
 
-### Terminal editing
+The most-used ones. Full reference (Vi modal editing, prompt tools, navigation, session/layout files, agent protocol) is in [docs/KEYBINDINGS.md](docs/KEYBINDINGS.md).
 
 | Shortcut | Action |
 |----------|--------|
 | ⌘⌃V | Toggle Vi modal editing (normal / insert mode) |
-| Esc (Vi normal) | Enter normal mode — `hjkl` move, `wb` word, `0`/`$` line, `x` delete, `i`/`a`/`A` insert |
-| ⌘-click output block | Select OSC 133 command block — Copy or Re-run from the action bar |
-| ⌃C (with selection) | Copy selection first, then send interrupt |
-| ⌘⇧U | Hint mode — keyboard-driven link/path opening |
-
-### Prompt tools
-
-| Shortcut | Action |
-|----------|--------|
-| ⌘⇧↩ | Prompt queue — batch shell commands, sends the next one as soon as the previous shell prompt reappears |
-| ⌥Space | Inline AI command suggestion overlay — sends recent pane output to Claude, suggests a next command |
-
-### Navigation & layout
-
-| Shortcut | Action |
-|----------|--------|
 | ⌘⇧J | Frecency directory picker (zoxide-powered) |
 | ⌘⇧R | Recipes — saved command picker |
 | ⌘⇧E | Composer panel — multi-line command editor |
 | ⌘⌥F | Floating terminal pane (NSPanel, persisted frame) |
 | ⌘⇧\ | Tab overview — thumbnail grid, click to switch |
-| ⌘F | Scrollback search |
-| ⌘⇧F | Find in files |
-
-### Session & layout files
-
-| Shortcut / command | Action |
-|-------------------|--------|
-| ⌘⇧S (export) | Export current layout to `.harness-layout` JSON |
-| ⌘⇧O (import) | Restore a saved `.harness-layout` |
-| OSC 26 | Agent protocol — Fork Tab, approval bar, agent activity |
+| ⌘F / ⌘⇧F | Scrollback search / find in files |
+| ⌥Space | Inline AI command suggestion overlay — sends recent pane output to Claude, suggests a next command |
+| ⌘⇧U | Hint mode — keyboard-driven link/path opening |
 
 ## How It Feels
 
@@ -171,6 +148,40 @@ AI agents (Claude Code, Codex, Kiro) can see and interact with the embedded brow
 ```
 
 **Token efficiency:** snapshot returns structured data (~200–500 tokens), not screenshots or raw HTML — significantly cheaper than vision-based browser automation.
+
+## Editor & LSP
+
+Opening a file in the sidebar file editor auto-detects a language server from the file extension or a project marker (e.g. `package.json`, `Package.swift`) in an ancestor directory, and starts it if the binary is on `PATH`. Vi ex commands work against the live session: `gd` (go to definition, falls back to `gf` path resolution), `K` (hover), `:errors` (diagnostics). See [docs/COMMANDS.md](docs/COMMANDS.md#errors-and-lsp).
+
+Nothing ships bundled — install the server binary you need yourself. Auto-start is off by default; turn it on and override any default binary path via `settings.json`:
+
+```json
+{ "lspAutoStart": true, "lspServers": { "python": "/opt/homebrew/bin/pyright-langserver" } }
+```
+
+| Group | Extensions | Server |
+| --- | --- | --- |
+| iOS native | `.swift` `.m` `.mm` | `sourcekit-lsp` |
+| Android native | `.kt` `.kts` | `kotlin-language-server` |
+| Android native | `.java` | `jdtls` |
+| Flutter | `.dart` | `dart language-server` |
+| Web / React / Next.js / Apps Script | `.ts` `.tsx` `.js` `.jsx` `.gs` | `typescript-language-server` |
+| PHP | `.php` | `intelephense` |
+| Ruby | `.rb` | `ruby-lsp` |
+| Go | `.go` | `gopls` |
+| Rust | `.rs` | `rust-analyzer` |
+| Python | `.py` | `pyright-langserver` |
+| C / C++ | `.c` `.cpp` `.cc` `.cxx` `.h` `.hpp` `.hxx` | `clangd` |
+| C# / .NET | `.cs` | `csharp-ls` |
+| SQL | `.sql` | `sql-language-server` |
+| JSON | `.json` `.jsonc` | `vscode-json-language-server` |
+| YAML | `.yml` `.yaml` | `yaml-language-server` |
+| CSS | `.css` `.scss` `.sass` | `vscode-css-language-server` |
+| HTML | `.html` `.htm` | `vscode-html-language-server` |
+| Robot Framework | `.robot` `.resource` | `robotcode` |
+| Gherkin / Cucumber | `.feature` | `cucumber-language-server` |
+| Shell | `.sh` `.bash` `.zsh` | `bash-language-server` |
+| Markdown | `.md` | `marksman` |
 
 ## Remote And Headless
 
