@@ -35,6 +35,13 @@ struct ToolRegistry: Sendable {
                 param("escapeSequences", "boolean", "Return raw output including escape sequences (optional)"),
                 param("joinWrapped", "boolean", "Join soft-wrapped lines into their logical line (optional)"),
             ]),
+            toolDef("harnessGetLastBlock", "Get the most recently finished command block on a pane (exact command, output, exit code) — precise, unlike readPaneOutput's line-count tail. Requires the pane's shell to emit OSC 133 C (zsh/fish; not bash yet)", [
+                param("surfaceId", "string", "Surface id from harnessList"),
+            ]),
+            toolDef("harnessGetBlock", "Get a specific command block by id (from a prior harnessGetLastBlock/harnessGetBlock response) on a pane", [
+                param("surfaceId", "string", "Surface id from harnessList"),
+                param("blockId", "number", "Block id to fetch"),
+            ]),
             toolDef("sendPaneText", "Send text to a Harness pane (requires MCP policy allowlist or HARNESS_MCP_ALLOW_CONTROL=1)", [
                 param("surfaceId", "string", "Surface id from harnessList"),
                 param("text", "string", "Text to send"),
@@ -175,6 +182,8 @@ struct ToolRegistry: Sendable {
         case "harnessBoard": return await daemonTools.harnessBoard()
         case "openDiffReview": return await daemonTools.openDiffReview(args)
         case "readPaneOutput": return await readPaneOutput(args)
+        case "harnessGetLastBlock": return await harnessGetBlock(args, requireBlockId: false)
+        case "harnessGetBlock": return await harnessGetBlock(args, requireBlockId: true)
         case "sendPaneText": return await sendPaneText(args)
         case "sendPaneKeys": return await sendPaneKeys(args)
         case "spawnSession": return await spawnSession(args)
@@ -274,6 +283,18 @@ struct ToolRegistry: Sendable {
             escapeSequences: escapeSequences,
             joinWrapped: joinWrapped
         )
+    }
+
+    private func harnessGetBlock(_ args: [String: AnyCodable], requireBlockId: Bool) async -> (AnyCodable?, JSONRPCError?) {
+        guard case let .string(surfaceId)? = args["surfaceId"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'surfaceId' parameter"))
+        }
+        var blockId: Int?
+        if case let .int(n)? = args["blockId"] { blockId = n }
+        if requireBlockId, blockId == nil {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'blockId' parameter"))
+        }
+        return await daemonTools.getBlock(surfaceId: surfaceId, blockId: blockId)
     }
 
     private func sendPaneText(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {

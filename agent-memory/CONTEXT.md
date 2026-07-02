@@ -1,10 +1,53 @@
 # Context — harness-terminal
 
 ## Now
-- **Task:** P34 F1 slice 1 (OSC 133 command-boundary + block command-text capture) done, built+tested, **not yet committed**
+- **Task:** P34 F2 (block actions) + F3 (MCP block access) done, built+tested, **not yet committed**
 - **Branch:** `main`
 
-### 2026-07-02 — P34 F1 slice 1: OSC 133 command-boundary + block command-text capture ✅ DONE, not committed
+### 2026-07-02 — P34 F2 (block actions) + F3 (MCP block access) ✅ DONE, not committed
+Continuation of F1 slice 1 (`2ca7fbb`) — user said "phase 2,3" to proceed.
+
+**F2:** Promoted `TerminalBlock` back to `public` (needed cross-module now) and replaced the F1
+`commandText(atPromptLine:)` accessor with a fuller `block(atPromptLine:) -> TerminalBlock?`
+(command, output line range, exit code) plus `lastBlock`/`block(id:)` and a ranged
+`captureLines(fromLine:toLine:)` on `TerminalEmulator`/`HarnessGridTerminal`/
+`HarnessTerminalSurfaceView`. `BlockActionBar` (`BlockTintOverlay.swift`) grew two buttons —
+Copy Output Only, Copy Command Only — shown only when the pane's shell actually emitted a block
+(`hasBlock` check in `showActionBar`); bash panes still get the original 2-button Copy/Re-run
+bar instead of two buttons with nothing precise to act on. Re-run's fallback regex-strip is
+unchanged for that same bash case.
+
+**F3:** Found via code read (not the plan doc's assumption) that OSC-133 parsing only happens
+client-side (GUI's `HarnessTerminalSurfaceView` / `harness attach`'s `HarnessGridTerminal`) — the
+daemon itself is a dumb byte-relay + raw scrollback store, confirmed by `RealPty.captureGrid`
+already replaying retained scrollback bytes through a **fresh** `HarnessGridTerminal` on every
+call (not a live/always-on parser). This meant `harnessGetLastBlock`/`harnessGetBlock` didn't
+need a new daemon-side OSC-133 subsystem — just a sibling method next to `captureGrid` that does
+the same replay, then reads the replayed instance's block store. Not "retroactive backfill"
+(explicitly rejected in F1's interview) since the replayed bytes contain the SAME live OSC 133
+`C`/`D` sequences originally parsed — deterministic recomputation, not guessing.
+New: `IPCRequest.getBlock(surfaceID:blockID:)` / `IPCResponse.blockInfo(BlockSummary?)`
+(`HarnessIPC`), `RealPty.block(id:)` (daemon), `SurfaceRegistry.handle(.getBlock)`,
+`HarnessDaemonTools.getBlock` + `harnessGetLastBlock`/`harnessGetBlock` MCP tool registration
+(`ToolRegistry.swift`). Nil `blockID` = most recent *finished* block; a still-running block (no
+`D` yet) returns nil even by exact id since there's no output range to read yet.
+Tests: extended `TerminalBlockStoreTests` (full block shape, exit code, output range,
+lastFinishedBlock-only), new `HarnessGridTerminalTests` cases for the wrapper forwarding
+(`lastBlock`/`block(id:)`) that `RealPty.block(id:)` calls into — no daemon-level PTY-spawning
+test added, matching the existing precedent that `captureGrid`/`captureRange` (same replay
+shape) have never had one either.
+`swift build --product Harness` clean; `swift test` (2 full runs) only the 2 pre-existing
+unrelated failures; `Tests/robot/run.sh` 10/10. One transient signal-11 crash in an unrelated
+Metal/GPU test (`GridCompositorCopyModeTests`) during a single full-suite run — reproduced
+against the clean pre-F2/F3 baseline commit via `git stash`/re-run to rule out a regression;
+did not recur across 2 more full runs with these changes present, so treated as a pre-existing
+flake, not caused by this work.
+**Lesson:** before assuming a daemon-side MCP tool needs new live state tracking, check whether
+the daemon already has an on-demand "replay stored bytes through a fresh headless instance"
+pattern for a sibling feature (`captureGrid` here) — it may already be the source of truth you
+need, with no new subsystem required.
+
+### 2026-07-02 — P34 F1 slice 1: OSC 133 command-boundary + block command-text capture ✅ DONE, committed (`2ca7fbb`)
 `interview` skill (doc.md, codebase-aware) before implementing, since research found the plan
 doc's own premise partly wrong: `SemanticMark` (`TerminalScreen.swift`) tracks only `exit: Int?`
 per row — no command text, no persistent block model — and none of zsh/bash/fish

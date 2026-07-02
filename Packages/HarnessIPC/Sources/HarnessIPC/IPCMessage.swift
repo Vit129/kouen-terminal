@@ -75,6 +75,14 @@ public enum IPCRequest: Codable, Sendable {
     /// otherwise the lines are grid-reconstructed plain text. `joinWrapped` (`-J`) joins
     /// soft-wrapped rows into their logical line (grid path only). Returns `.text`.
     case capturePaneRange(surfaceID: String, start: Int?, end: Int?, escapeSequences: Bool, joinWrapped: Bool)
+    /// P34 F3 (`harnessGetLastBlock`/`harnessGetBlock`): a command + its output + exit code,
+    /// delimited by OSC 133 `C`/`D`. Nil `blockID` = the most recently *finished* block.
+    /// Reconstructed on demand from retained scrollback bytes (the same replay-through-a-fresh-
+    /// emulator path `capturePaneRange`'s grid reconstruction already uses) — not a live
+    /// subscription, so it also works for a pane no GUI window currently has open. Returns
+    /// `.blockInfo`; an old daemon that doesn't know this case replies `.error("unrecognized
+    /// request")`.
+    case getBlock(surfaceID: String, blockID: Int?)
     /// `pipe-pane`: tee the pane's live output to a spawned shell command's stdin.
     /// `shellCommand == nil` stops an active pipe (toggle off).
     case pipePane(surfaceID: String, shellCommand: String?)
@@ -317,6 +325,9 @@ public enum IPCResponse: Codable, Sendable {
     /// match `ipcProtocolVersion`. The daemon closes the connection immediately after.
     case protocolRejected(reason: String)
     case gitResult(output: String, stderr: String, success: Bool)
+    /// Reply to `getBlock`. Nil when no matching block exists (never started, wrong id, or
+    /// the pane's shell doesn't emit OSC 133 `C` yet).
+    case blockInfo(BlockSummary?)
 
     // Browser tool integration (P14)
     case browserRequest(id: UUID, paneID: UUID?, req: BrowserRequestPayload)

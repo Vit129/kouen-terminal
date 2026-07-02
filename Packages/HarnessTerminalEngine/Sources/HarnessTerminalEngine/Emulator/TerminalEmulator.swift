@@ -210,14 +210,30 @@ public final class TerminalEmulator: VTParserHandler {
     /// The OSC 133 semantic mark on a copy-mode-space line, or nil.
     public func mark(atBufferLine index: Int) -> SemanticMark? { current.mark(atBufferLine: index) }
 
-    /// Exact command text (from OSC 133 `C`'s payload — the shell's own preexec hook, not a
-    /// screen-scrape guess) for the block whose prompt is at buffer line `line`. Nil if that
-    /// prompt's shell doesn't emit `C` yet (e.g. bash panes) or the block hasn't started.
-    public func commandText(atPromptLine line: Int) -> String? { blockStore.commandText(atPromptLine: line) }
+    /// The block (command text, output line range, exit code) whose prompt is at buffer line
+    /// `line`, or nil if that prompt's shell doesn't emit OSC 133 `C` yet (e.g. bash panes) or
+    /// the block hasn't started. `command` is exact (the shell's own preexec hook), never a
+    /// screen-scrape guess.
+    public func block(atPromptLine line: Int) -> TerminalBlock? { blockStore.block(atPromptLine: line) }
+
+    /// The most recently *finished* block, if any — what `harnessGetLastBlock` (F3) reads.
+    public var lastBlock: TerminalBlock? { blockStore.lastFinishedBlock }
+
+    /// A specific block by id (`TerminalBlock.id`, stable for the pane's lifetime).
+    public func block(id: Int) -> TerminalBlock? { blockStore.block(id: id) }
 
     /// The full buffer as plain-text lines for `capture-pane`. `joinWrapped` (tmux `-J`)
     /// joins soft-wrapped physical rows into their logical line.
     public func captureLines(joinWrapped: Bool) -> [String] { current.captureLines(joinWrapped: joinWrapped) }
+
+    /// Plain-text lines for a `[history ++ viewport]` physical-row range (inclusive), e.g. a
+    /// `TerminalBlock`'s `outputStartLine...outputEndLine` — always unwrapped rows, since a
+    /// block's stored indices are physical and joining would desync them.
+    public func captureLines(fromLine start: Int, toLine end: Int) -> [String] {
+        let all = current.captureLines(joinWrapped: false)
+        guard start >= 0, end >= start, end < all.count else { return [] }
+        return Array(all[start ... end])
+    }
 
     // MARK: - VTParserHandler
 

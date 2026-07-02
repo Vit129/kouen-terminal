@@ -1,15 +1,29 @@
 import AppKit
+import HarnessTerminalEngine
 
 extension HarnessTerminalSurfaceView {
     /// Buffer line indices where OSC 133 prompts start — used by block overlay for tinting.
     public var promptRows: [Int] { emulatorSync { $0.promptRows } }
-    /// Exact command text (OSC 133 `C`'s payload) for the block whose prompt is at `line`, or
-    /// nil if that shell doesn't emit `C` yet (e.g. bash) or the block hasn't started.
-    public func commandText(atPromptLine line: Int) -> String? { emulatorSync { $0.commandText(atPromptLine: line) } }
+    /// The block (exact command, output line range, exit code) whose prompt is at `line`, or
+    /// nil if that shell doesn't emit OSC 133 `C` yet (e.g. bash) or the block hasn't started.
+    public func block(atPromptLine line: Int) -> TerminalBlock? { emulatorSync { $0.block(atPromptLine: line) } }
+    /// Plain-text lines for a physical-row range (inclusive) — a `TerminalBlock`'s
+    /// `outputStartLine...outputEndLine`, for Copy Output Only.
+    public func text(fromLine start: Int, toLine end: Int) -> String {
+        emulatorSync { $0.captureLines(fromLine: start, toLine: end) }.joined(separator: "\n")
+    }
     /// Text content of the current selection, or nil if nothing is selected.
     public var selectionString: String? { selectionTextIfAny() }
     /// Copy the current selection to the system clipboard (no-op if nothing selected).
     public func copyBlock() { copySelection() }
+    /// Copy arbitrary text to the system clipboard (block actions that don't copy the live
+    /// selection — Copy Output Only / Copy Command Only).
+    public func copyText(_ text: String) {
+        guard !text.isEmpty else { return }
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(text, forType: .string)
+    }
     /// Send raw text bytes to the PTY (equivalent to the user typing the string).
     public func sendText(_ text: String) { emit(Array(text.utf8)) }
 

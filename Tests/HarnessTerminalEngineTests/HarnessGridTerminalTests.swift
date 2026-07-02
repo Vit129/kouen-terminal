@@ -143,4 +143,28 @@ final class HarnessGridTerminalTests: XCTestCase {
         term.feed("loading...\rdone")
         XCTAssertEqual(term.captureLines(joinWrapped: false).first, "doneing...")
     }
+
+    // MARK: - Block forwarding (P34 F3 — what RealPty.block(id:) calls into after replaying
+    // retained scrollback through a fresh HarnessGridTerminal, the same way captureGrid does)
+
+    func testLastBlockForwardsFromEmulator() {
+        guard let term = HarnessGridTerminal(cols: 40, rows: 10) else { return XCTFail() }
+        let cmd = Data("swift build".utf8).base64EncodedString()
+        term.feed("\u{1b}]133;A\u{07}$ ")
+        term.feed("\u{1b}]133;C;\(cmd)\u{07}\r\nBuild complete!\r\n")
+        term.feed("\u{1b}]133;D;0\u{07}")
+        XCTAssertEqual(term.lastBlock?.command, "swift build")
+        XCTAssertEqual(term.lastBlock?.exitCode, 0)
+    }
+
+    func testBlockByIDForwardsFromEmulator() {
+        guard let term = HarnessGridTerminal(cols: 40, rows: 10) else { return XCTFail() }
+        let cmd = Data("echo hi".utf8).base64EncodedString()
+        term.feed("\u{1b}]133;A\u{07}$ ")
+        term.feed("\u{1b}]133;C;\(cmd)\u{07}\r\n")
+        term.feed("\u{1b}]133;D;0\u{07}")
+        guard let id = term.lastBlock?.id else { return XCTFail("expected a block") }
+        XCTAssertEqual(term.block(id: id)?.command, "echo hi")
+        XCTAssertNil(term.block(id: id + 1), "no block with that id")
+    }
 }

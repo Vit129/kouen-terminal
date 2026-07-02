@@ -6,7 +6,6 @@
 |------|-------|--------|
 | [p25-ios-ipados-support.md](p25-ios-ipados-support.md) | P25 — iOS/iPadOS Support | Planning |
 | [p8-macos27-adoption.md](p8-macos27-adoption.md) | P8 — macOS 27 Golden Gate Adoption | Active |
-| [p34-block-based-terminal.md](p34-block-based-terminal.md) | P34 — Block-Based Terminal (Command Grouping) | F1 slice 1 done, F2/F3 not started |
 
 ## Completed
 
@@ -16,6 +15,7 @@
 
 | Plan | Version | Notes |
 |------|---------|-------|
+| P34 — Block-Based Terminal | Unreleased | F1 command-boundary capture (zsh/fish `133;C`), F2 Copy Output/Command Only, F3 `harnessGetLastBlock`/`harnessGetBlock` MCP tools; bookmark deferred (2026-07-02) — see completed-archive.md |
 | P33 — Visibility Gaps | Unreleased | PR checks-status dot, sidebar notification text, commit-diff popover rewire, sidebar first-reveal blank-panel fix, 4-finding Opus review pass (2026-07-02) — see completed-archive.md |
 | P32 — Task-Based Agent Worktrees | Unreleased | Explicit "New Agent Task" palette action, `taskName` metadata, `archiveScript` teardown wired, task switcher via existing ⌘1-9 (2026-07-01–02) — see completed-archive.md |
 | P23 — SSH Remote Host Manager | v3.9.x | Settings → Remote tab, toolbar badge, `harness-cli remote add/list/remove`, socket auto-detect via new `harness-cli socket-path` command (2026-07-01) — see completed-archive.md |
