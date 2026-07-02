@@ -47,6 +47,31 @@ public enum PaneNode: Codable, Sendable, Equatable {
         }
     }
 
+    /// Sets `label` on the `PaneSurface` matching `surfaceID`, wherever it is in the tree.
+    /// Returns false if no surface with that id exists (nothing to update).
+    @discardableResult
+    public mutating func setSurfaceLabel(_ surfaceID: SurfaceID, label: String?) -> Bool {
+        switch self {
+        case var .leaf(leaf):
+            guard let index = leaf.surfaces.firstIndex(where: { $0.id == surfaceID }) else { return false }
+            leaf.surfaces[index].label = label
+            self = .leaf(leaf)
+            return true
+        case .branch(let direction, let ratio, var first, var second):
+            if first.setSurfaceLabel(surfaceID, label: label) {
+                self = .branch(direction: direction, ratio: ratio, first: first, second: second)
+                return true
+            }
+            if second.setSurfaceLabel(surfaceID, label: label) {
+                self = .branch(direction: direction, ratio: ratio, first: first, second: second)
+                return true
+            }
+            return false
+        case .browser:
+            return false
+        }
+    }
+
     public func allSurfaceIDs() -> [SurfaceID] {
         switch self {
         case let .leaf(leaf):
@@ -100,17 +125,23 @@ public struct PaneSurface: Codable, Sendable, Identifiable, Equatable {
     public var daemonSurfaceID: DaemonSurfaceID?
     public var title: String
     public var cwd: String?
+    /// Agent/human-set purpose annotation (e.g. "build pane", "claude"), distinct from `title`.
+    /// Never touched by OSC/shell title updates — only `setPaneLabel` writes it, so it survives
+    /// whatever the shell prints next. Nil = unset.
+    public var label: String?
 
     public init(
         id: SurfaceID = UUID(),
         daemonSurfaceID: DaemonSurfaceID? = nil,
         title: String = "Shell",
-        cwd: String? = nil
+        cwd: String? = nil,
+        label: String? = nil
     ) {
         self.id = id
         self.daemonSurfaceID = daemonSurfaceID
         self.title = title
         self.cwd = cwd
+        self.label = label
     }
 }
 

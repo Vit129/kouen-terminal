@@ -15,6 +15,7 @@ struct ToolPolicy: Sendable {
         "runCommand",
         "sendPaneText",
         "sendPaneKeys",
+        "setPaneLabel",
         "spawnSession",
         "splitPane",
         "closePane",

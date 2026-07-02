@@ -91,6 +91,7 @@ struct HarnessDaemonTools: Sendable {
             "title": .string(activeSurface?.title ?? tab.title),
             "cwd": .string(activeSurface?.cwd ?? tab.cwd),
             "active": .bool(tab.activePaneID == leaf.id),
+            "label": activeSurface?.label.map(AnyCodable.string) ?? .null,
         ]
         if includeAgents {
             obj["agent"] = tab.agent.map(agentJSON) ?? .null
@@ -211,6 +212,16 @@ struct HarnessDaemonTools: Sendable {
         guard isToolAllowed("sendPaneKeys") else { return (nil, disabledError("sendPaneKeys")) }
         let result = await okResponse(for: .sendKeys(surfaceID: surfaceId, keys: keys), expected: "sendKeys")
         if result.1 == nil { await notifyMCPActivity(surfaceId: surfaceId, tool: "sendPaneKeys") }
+        return result
+    }
+
+    /// Sets/clears a pane's durable purpose label — see `IPCRequest.setPaneLabel`.
+    /// `label: nil` (or empty string) clears it.
+    func setPaneLabel(surfaceId: String, label: String?) async -> (AnyCodable?, JSONRPCError?) {
+        guard isToolAllowed("setPaneLabel") else { return (nil, disabledError("setPaneLabel")) }
+        let cleaned = label?.isEmpty == true ? nil : label
+        let result = await okResponse(for: .setPaneLabel(surfaceID: surfaceId, label: cleaned), expected: "setPaneLabel")
+        if result.1 == nil { await notifyMCPActivity(surfaceId: surfaceId, tool: "setPaneLabel") }
         return result
     }
 
