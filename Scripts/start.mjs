@@ -161,8 +161,21 @@ async function main() {
         { display: '3) major  — breaking changes', value: 'major' },
         { display: '4) skip   — keep current version', value: '--no-bump' },
       ];
-      console.log('\nVersion bump?');
-      const bump = await selectWithArrows(bumpOptions);
+      let bump;
+      const bumpArg = process.argv[3];
+      if (bumpArg) {
+        const byNumber = { '1': 'patch', '2': 'minor', '3': 'major', '4': '--no-bump' };
+        const byName = { 'patch': 'patch', 'minor': 'minor', 'major': 'major', 'skip': '--no-bump', '--no-bump': '--no-bump' };
+        bump = byNumber[bumpArg] || byName[bumpArg];
+        if (!bump) {
+          console.error(`❌ Unknown bump option: ${bumpArg}`);
+          process.exit(1);
+        }
+        console.log(`\n✅ Selected bump: ${bumpOptions.find(o => o.value === bump)?.display || bump}\n`);
+      } else {
+        console.log('\nVersion bump?');
+        bump = await selectWithArrows(bumpOptions);
+      }
       const bumpArgs = bump === '--no-bump' ? ['--no-bump'] : [bump];
       await runCommand('Scripts/full-cycle.sh', bumpArgs);
     }
