@@ -10,7 +10,12 @@ final class FilePreviewCoordinator {
     private unowned let terminalHost: NSView
     private unowned let tabBarDivider: NSView
 
-    private let fileTabManager = FileTabManager()
+    // One FileTabManager per terminal tab (mirrors PaneLifecycleManager.containerCache),
+    // so file previews opened in one tab never appear in another. `fileTabManager` always
+    // points at the entry for the currently-active tab; switchToTab(tabID:) swaps it.
+    private var fileTabManager = FileTabManager()
+    private var fileTabManagers: [String: FileTabManager] = [:] // tabID → its own FileTabManager
+    private var currentTabID: String?
     private var fileEditorPanel: NSView?
     private var fileEditorTabBar: FileEditorTabBarView?
     private var fileEditorView: FileEditorView?
@@ -69,6 +74,40 @@ final class FilePreviewCoordinator {
 
     func activateTerminalTab() {
         // no-op — terminal is always visible in split mode
+    }
+
+    // MARK: - Per-Tab Scoping
+
+    /// Called whenever the active terminal tab changes. Swaps in that tab's own
+    /// FileTabManager and shows/hides the split to match — a tab with no open
+    /// previews of its own never shows another tab's file.
+    func switchToTab(tabID: String?) {
+        guard tabID != currentTabID else { return }
+        currentTabID = tabID
+        guard let tabID else {
+            fileTabManager = FileTabManager()
+            hideFileEditorSplit()
+            return
+        }
+        let manager = fileTabManagers[tabID] ?? {
+            let created = FileTabManager()
+            fileTabManagers[tabID] = created
+            return created
+        }()
+        fileTabManager = manager
+        if manager.hasOpenTabs {
+            showFileEditorSplit()
+            loadActiveFileTab()
+        } else {
+            hideFileEditorSplit()
+        }
+    }
+
+    /// Drop FileTabManagers for tabs that no longer exist, mirroring
+    /// PaneLifecycleManager.pruneCache — otherwise every tab ever visited leaks forever.
+    func pruneFileTabManagers(keepingTabIDs liveTabIDs: Set<String>) {
+        let staleKeys = fileTabManagers.keys.filter { !liveTabIDs.contains($0) }
+        for key in staleKeys { fileTabManagers.removeValue(forKey: key) }
     }
 
     private func loadActiveFileTab() {

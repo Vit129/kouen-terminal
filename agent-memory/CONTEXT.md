@@ -1,8 +1,32 @@
 # Context — harness-terminal
 
 ## Now
-- **Task:** idle — last work (Git panel FSEvent filter fix) applied, built+tested, **not yet committed**
+- **Task:** idle — last work (per-Tab file preview scoping) applied, built+tested, **not yet committed**
 - **Branch:** `main`
+
+### 2026-07-02 — File preview tabs leaked across terminal Tabs (global singleton) ✅ FIXED, not committed
+Feature request via `interview` skill (per-Tab scope confirmed with user, not per-Session/per-Pane —
+split panes were just an example of already-correct isolation, not an additional requirement).
+Double-clicking a file (from Git panel Changes list or file tree) opened it into a single
+app-wide `FileTabManager` singleton owned by `FilePreviewCoordinator` — any Tab showed the
+same file-preview state, deduped only by path, no session/tab awareness at all.
+
+**Fix:** promoted `FileTabManager` from one `let` instance to a `var` swapped via
+`switchToTab(tabID:)`, backed by `fileTabManagers: [String: FileTabManager]` keyed by tabID —
+mirrors `PaneLifecycleManager.containerCache`'s exact pattern (already proven for terminal
+panes) rather than inventing a new one. Wired into `ContentAreaViewController.snapshotChanged`
+(switch on every snapshot tick, cheap tabID-equality guard) and `viewDidLoad` (seed initial tab
+before `restoreEditorState()`, so restored paths land in the correctly-keyed manager, not an
+orphaned throwaway instance). `pruneFileTabManagers(keepingTabIDs:)` added alongside
+`paneLifecycle.pruneCache` on structural changes, same leak-prevention shape.
+Persistence across app restart intentionally deferred (user: ship in-session scoping first,
+improve to cross-restart persistence later) — `UserDefaults` keys stay flat/global for now,
+so restored state on next launch reflects whichever tab last touched it, not true per-tab.
+Test: `Tests/HarnessAppTests/FilePreviewCoordinatorTabScopeTests.swift` (3 cases: leak-hidden
+on switch-away, correct-file-restored on switch-back, pruned-tab starts fresh).
+**Lesson:** when a new per-X-scoped state need comes up, check for an existing per-tabID/
+per-sessionID dictionary-cache pattern already proven elsewhere (`PaneLifecycleManager`) before
+designing a new one — same shape, same pruning discipline, smaller diff.
 
 ### 2026-07-02 — Git sidebar panel didn't refresh after external `git commit`/`push` ✅ FIXED, not committed
 User report: after `git commit`+`push` from a terminal pane, the sidebar Git tab kept showing stale
