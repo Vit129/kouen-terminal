@@ -152,10 +152,45 @@ existing ring + dock badge before this phase; this phase adds *why* (the message
 in the sidebar without needing the Notch panel enabled. `swift build`/`swift test` (2
 pre-existing unrelated failures only)/`Tests/robot/run.sh` all clean.
 
-### Phase 3 — Diff viewer polish (F3, P2, optional)
+### Phase 3 — Diff viewer polish (F3, P2, optional) — ✅ done, scoped narrower than F3's original text
 
-- [ ] Deferred — confirm scope/direction with user before starting (design surface, not a
-      wiring fix like Phase 1/2)
+- User asked to see the tradeoffs before picking a redesign direction (a dedicated file-list+diff
+  sidebar panel vs improving the existing tab-open flow) — while checking, found
+  `GitPanelView.presentCommitDetail` was a **fully complete, already-working popover** (file-nav
+  bar + colored diff via `NSPopover`, anchored to the commit card) with **zero call sites** — the
+  same dead-code-next-to-live-path shape as Phase 1/2. Since the popover floats over the content
+  area via `.show(relativeTo:of:preferredEdge:.maxX)`, the 220pt-pinned-sidebar-width concern
+  that motivated the "which direction" question didn't actually apply.
+- [x] Rewired the commit-card click gesture from `showCommitDetail` (opens a full editor tab) to
+      a new `previewCommitDetail` handler that calls the existing `presentCommitDetail` popover
+      instead — zero new UI code, just pointing the click at code that already existed.
+- [x] Kept the old full-tab-open behavior reachable via the context menu, renamed "Show Diff" →
+      "Open Full Diff in Tab", for the copy/search/keep-open case.
+- Not visually verified by the agent — this session has no display access (background job,
+  `screencapture` fails with "could not create image from display"); build/tests were the only
+  verification until the user confirmed manually.
+
+### Sidebar bug found + fixed during Phase 1-3 manual QA (not a P33 feature, but same branch)
+
+- User found: sidebar renders as an empty/blurred material panel with no visible content on the
+  *first* `⌘\` reveal after every launch (confirmed present in production too — predates this
+  session's work entirely, not caused by F1/F2/F3).
+- Root cause: `MainSplitViewController.viewDidLoad` sets
+  `sidebarContainer.translatesAutoresizingMaskIntoConstraints = false` with no constraint of its
+  own (only its child `sidebar.view` is pinned to its edges) — but `sidebarContainer` is an
+  `NSSplitView` arranged subview, which NSSplitView positions via direct frame assignment
+  (`setPosition`), not Auto Layout. `content.view` (the unaffected sibling) never had this flag
+  touched. An existing fix (CASE-042 — `panel.layoutSubtreeIfNeeded()` at animation end, to flush
+  blank SwiftUI content after first reveal) triggers Auto Layout to resolve `sidebarContainer`'s
+  now-ambiguous geometry, collapsing it to 0-width and wiping out the frame `setPosition` had
+  just set moments earlier.
+- Confirmed via targeted `fputs` instrumentation (no display access to verify visually) — added,
+  used to capture real frame values from the user's terminal, then fully removed before the fix
+  landed. Fix: removed the `= false`. See `RL-062`/`CASE-061`.
+- An earlier attempted fix (wrapping `updateSidebarPlacement()`'s `adjustSubviews()` call in
+  `setPresentsWithTransaction`) was reverted — that function is only reachable via
+  "Move Sidebar to Right," a different code path from the user's plain `⌘\` repro, confirmed
+  inert via `settings.json` inspection before being reverted.
 
 ---
 
