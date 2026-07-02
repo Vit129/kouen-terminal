@@ -1,6 +1,6 @@
 # Terminal AI Chat (⌘I inline overlay)
 
-## Status: SHIPPED (P26 Path B, 2026-06-21)
+## Status: ❌ REMOVED (`c4e1e15`, 2026-06-29) — "erase as if never built." Kept for historical record only; do not treat any content below as current.
 
 ## What It Is
 
