@@ -287,11 +287,29 @@ extension HarnessTerminalSurfaceView {
         scheduleRender()
     }
 
-    /// Right-click context menu (Copy / Paste / Select All). Suppressed while the program is
-    /// capturing the mouse (unless Shift forces local handling), matching the selection rules.
+    /// Right-click context menu (Copy / Paste / Select All, plus block actions when the click
+    /// landed on an OSC 133 command block). Suppressed while the program is capturing the mouse
+    /// (unless Shift forces local handling), matching the selection rules.
     public override func menu(for event: NSEvent) -> NSMenu? {
         guard !isMouseReporting(event) else { return nil }
         let menu = NSMenu()
+
+        if let pos = cell(at: event.locationInWindow) {
+            let clickedLine = selectionTopLine + pos.row
+            let prompts = emulatorSync { $0.promptRows }
+            if !prompts.isEmpty, let blockStart = prompts.last(where: { $0 <= clickedLine }) {
+                let blockEnd = prompts.first(where: { $0 > clickedLine }).map { $0 - 1 } ?? (clickedLine + 512)
+                // Select the block so the "Copy" item below copies the whole command+output.
+                selectionGranularity = .character
+                selectionRectangular = false
+                selectionAnchor = (line: blockStart, column: 0)
+                selectionHead = (line: blockEnd, column: Int.max)
+                scheduleRender()
+                appendBlockMenuItems(to: menu, promptLine: blockStart)
+                menu.addItem(.separator())
+            }
+        }
+
         let copyItem = NSMenuItem(title: "Copy", action: #selector(copy(_:)), keyEquivalent: "")
         copyItem.target = self
         menu.addItem(copyItem)
@@ -303,6 +321,66 @@ extension HarnessTerminalSurfaceView {
         selectAllItem.target = self
         menu.addItem(selectAllItem)
         return menu
+    }
+
+    // MARK: - Block actions (right-click on an OSC 133 command block)
+
+    /// Output/Command-only copy need real block data (OSC 133 `C`, zsh/fish) — degrade to just
+    /// Re-run for shells that don't emit it yet (bash), rather than offering an action with
+    /// nothing precise to act on. `promptLine` rides each item's `representedObject` since the
+    /// handler fires later, after the user picks from the menu.
+    /// Internal (not `private`) — `@testable import` needs this without going through
+    /// `menu(for:)`'s mouse-coordinate → grid-cell mapping, which needs a live renderer/window.
+    func appendBlockMenuItems(to menu: NSMenu, promptLine: Int) {
+        let hasBlock = block(atPromptLine: promptLine) != nil
+        if hasBlock {
+            let outputItem = NSMenuItem(title: "Copy Output Only", action: #selector(copyBlockOutputOnly(_:)), keyEquivalent: "")
+            outputItem.target = self
+            outputItem.representedObject = promptLine
+            menu.addItem(outputItem)
+            let commandItem = NSMenuItem(title: "Copy Command Only", action: #selector(copyBlockCommandOnly(_:)), keyEquivalent: "")
+            commandItem.target = self
+            commandItem.representedObject = promptLine
+            menu.addItem(commandItem)
+        }
+        let rerunItem = NSMenuItem(title: "Re-run", action: #selector(rerunBlock(_:)), keyEquivalent: "")
+        rerunItem.target = self
+        rerunItem.representedObject = promptLine
+        menu.addItem(rerunItem)
+    }
+
+    @objc private func copyBlockOutputOnly(_ sender: NSMenuItem) {
+        guard let promptLine = sender.representedObject as? Int,
+              let block = block(atPromptLine: promptLine), let end = block.outputEndLine
+        else { return }
+        copyText(text(fromLine: block.outputStartLine, toLine: end))
+    }
+
+    @objc private func copyBlockCommandOnly(_ sender: NSMenuItem) {
+        guard let promptLine = sender.representedObject as? Int,
+              let block = block(atPromptLine: promptLine)
+        else { return }
+        copyText(block.command)
+    }
+
+    @objc private func rerunBlock(_ sender: NSMenuItem) {
+        guard let promptLine = sender.representedObject as? Int else { return }
+        // Exact command text from OSC 133 `C` when the pane's shell emits it (zsh/fish); falls
+        // back to a prompt-prefix-strip guess for shells that don't yet (bash).
+        if let exact = block(atPromptLine: promptLine)?.command {
+            sendText(exact + "\r")
+            return
+        }
+        guard let selection = selectionTextIfAny(),
+              let firstLine = selection.components(separatedBy: "\n").first(where: { !$0.isEmpty })
+        else { return }
+        // ponytail: naive prompt-prefix strip — covers ❯/$/%/#/>/▶ + space. Only reached when
+        // the pane's shell doesn't emit 133;C yet (bash).
+        let stripped = firstLine.replacingOccurrences(
+            of: #"^.*?[❯$%#>▶]\s+"#, with: "", options: [.regularExpression]
+        )
+        let cmd = stripped.isEmpty ? firstLine : stripped
+        sendText(cmd + "\r")
     }
 
     func copySelection() {
