@@ -1,9 +1,56 @@
 # Context — harness-terminal
 
 ## Now
-- **Task:** Sidebar width/visibility polish pass done, user-confirmed live in preview — committed
+- **Task:** Sidebar status unification + Board tab visual bug — committed, pushed
 - **Branch:** `main`
-- **Committed (4 commits ahead of origin/main)**: d9c1ad1, 36cf813, 80b82db (+ prior 5641273) — not pushed, awaiting explicit go-ahead
+
+### 2026-07-02 — Near-miss: `git revert --abort` wiped uncommitted session work
+Found an unexpected in-progress `git revert eb0c89b` (REVERT_HEAD set, conflicts pre-resolved and
+staged) while preparing to commit — not something this session started. User confirmed intent was
+to keep the current (later) state, not actually revert. `git revert --abort` was the wrong recovery
+step here: it does `git reset --merge` back to the pre-revert HEAD, which discarded **all**
+working-tree edits to every file that had been part of the revert's index — not just the revert's
+own changes — including hand-written fixes made *after* the revert began. Files reset: `CONTEXT.md`,
+`HarnessSidebarPanelViewController.swift`, `SidebarSessionListView.swift`, `TerminalTabBarView.swift`.
+Recovered by reconstructing each diff from conversation history (`CONTEXT.md`/`MEMORY.md` had scratch
+backups; the 3 Swift files were retyped from diffs already read earlier in the session) — full
+recovery confirmed via `git diff` matching pre-abort content exactly, build+test green.
+**Lesson:** `git revert --abort` / `git merge --abort` mid-operation is NOT safe to run casually
+when working-tree files were edited after the operation started — it discards those edits too, not
+just the operation's own changes. Back up (or `git stash`) any files touched since the operation
+began before aborting. See RL-060 in `knowledge/rl-lessons.md`.
+
+### 2026-07-02 — Sidebar status classification/color unification + Board tab flip bug ✅ FIXED (build+test green, live confirm pending)
+
+Chain of fixes across one session, each surfaced by the user spotting a visual mismatch:
+
+1. **Classification duplication regression** — staged (uncommitted) edits to `SidebarListModel.swift`
+   had grown a local `columnKind(for:)` copy that dropped the `agent.activity == .working` check
+   `BoardModel.columnKind` (the single classifier `eb0c89b` introduced) relies on. Restored: doc
+   comment + `.working` check back in `BoardModel.swift`; `SidebarListModel` now calls
+   `BoardModel.columnKind(for:)` directly, no local copy.
+2. **Sidebar row visual regression** — same staged diff had also dropped the real agent icon
+   (`AgentIconRenderer.templateOrMonogramImage`) from `SidebarSessionItemRow`, replacing it with a
+   static branch glyph + ad-hoc dot color. Restored icon to match `TabPillView`'s pattern; dot
+   color bugs fixed twice — first wrong-mapped (`.running`→green instead of blue), fixed to use
+   canonical `BoardColumnKind.color`; then per user's actual ask, replaced the dot entirely with a
+   colored status **text** label (`sessionBoardStatus.displayName` at `sessionBoardStatus.color`)
+   for all non-idle states, mirroring the existing "Needs Attention" text pattern. Also collapsed
+   `SidebarGroupHeaderRow.statusColor` (a 2nd hardcoded copy of the same palette, values happened to
+   already match) to `Color(nsColor: status.color)` — one color source of truth now.
+3. **Board tab visual bug (CASE-059 / RL-059)** — switching Sessions→Board showed the first column
+   header ("Needs Attention (0)") squashed to a sliver, later reduced to "shifted down slightly"
+   after several timing nudges (`reload(force:)`, `layoutSubtreeIfNeeded()`, `displayIfNeeded()`,
+   `scrollToTop()` in that order). None of these were the real fix — root cause was
+   `BoardViewController`'s scroll `documentView` being a plain non-flipped `NSView()`, so content
+   anchors bottom-left and `scroll(to: .zero)` scrolled to the bottom, not the top. Fixed with a
+   flipped `documentView` subclass (same pattern as `GitPanelView.swift`'s existing `FlippedView`).
+   **Lesson:** when several small timing nudges only partially converge on a layout bug, stop
+   nudging and check `isFlipped` before adding a 6th nudge.
+
+Files touched: `BoardModel.swift`, `SidebarListModel.swift`, `SidebarSessionListView.swift`,
+`BoardViewController.swift`, `HarnessSidebarPanelViewController.swift`. All still uncommitted
+(staged/working tree) — user has not yet given commit go-ahead.
 
 ### 2026-07-01 — Sidebar default width/visibility + resize-proportional-growth bug ✅ FIXED (user-confirmed)
 User: sidebar too big → reduce default width `HarnessDesign.sidebarWidth` 264→220

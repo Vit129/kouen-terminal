@@ -1,6 +1,14 @@
 import AppKit
 import HarnessCore
 
+/// Top-left-origin document view. Plain `NSView` is bottom-left-origin, which anchors
+/// scroll-view content to the bottom — with `columnsStack` pinned to `documentView`'s
+/// top and bottom, that showed the column headers rendered shifted down from the top
+/// (and made `scrollToTop()`'s `scroll(to: .zero)` scroll to the bottom instead).
+private final class FlippedView: NSView {
+    nonisolated override var isFlipped: Bool { true }
+}
+
 /// P16 PBI-BOARD-002: "Board" sidebar tab — a horizontal Kanban view over
 /// `BoardModel.classify(snapshot:)`. Each column (Needs Attention, Running,
 /// Idle, Done, Error) is a vertically-scrolling stack of cards; each card
@@ -34,7 +42,7 @@ final class BoardViewController: NSViewController {
         columnsStack.translatesAutoresizingMaskIntoConstraints = false
         columnsStack.edgeInsets = NSEdgeInsets(top: 8, left: 10, bottom: 8, right: 10)
 
-        let documentView = NSView()
+        let documentView = FlippedView()
         documentView.translatesAutoresizingMaskIntoConstraints = false
         documentView.addSubview(columnsStack)
         NSLayoutConstraint.activate([
@@ -83,7 +91,15 @@ final class BoardViewController: NSViewController {
     }
 
     /// Recomputes columns from the live snapshot and rebuilds the card stacks.
-    @objc func reload() {
+    ///
+    /// - Parameter force: rebuild the column subviews even if the classified data
+    ///   is unchanged. Needed when becoming visible after being hidden: AutoLayout
+    ///   skips a hidden view's subtree, so the existing NSTextField column headers
+    ///   can hold a stale cached `intrinsicContentSize` from before they were
+    ///   hidden. Skipping the rebuild in that case leaves the header laid out with
+    ///   the stale size, which is what squashed the first column header into a
+    ///   sliver on the Sessions → Board switch.
+    @objc func reload(force: Bool = false) {
         let newColumns = BoardModel.classify(snapshot: SessionCoordinator.shared.snapshot)
             .map { col in
                 // Filter dismissed cards from Needs Attention column only.
@@ -93,7 +109,7 @@ final class BoardViewController: NSViewController {
                 }
                 return c
             }
-        guard newColumns != columns else { return }
+        guard force || newColumns != columns else { return }
         columns = newColumns
 
         columnsStack.subviews.forEach { $0.removeFromSuperview() }
@@ -105,6 +121,14 @@ final class BoardViewController: NSViewController {
     func dismissCard(_ tabID: TabID) {
         dismissedCardIDs.insert(tabID)
         reload()
+    }
+
+    /// Resets scroll position to the top-left. The board stays mounted (and its
+    /// scroll offset persists) while hidden behind other sidebar tabs, so without
+    /// this a stale vertical/horizontal scroll from a previous visit shows on return.
+    func scrollToTop() {
+        scrollView.contentView.scroll(to: .zero)
+        scrollView.reflectScrolledClipView(scrollView.contentView)
     }
 
     private func makeColumnView(_ column: BoardColumn) -> NSView {
