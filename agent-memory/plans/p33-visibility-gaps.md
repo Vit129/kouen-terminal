@@ -64,17 +64,48 @@ so a badge existed but never showed pass/fail/pending. Implemented:
 - Deleted `PRStatusPoller.swift` and its dead `AppDelegate.swift:62` call site — duplicate
   polling of the same data the sidebar already fetches on its own 60s cache cycle.
 
-### F2 — Cross-pane notification visibility — P0
+### F2 — Cross-pane notification visibility — P0 — **premise corrected mid-implementation (again)**
 
-- Backend (`AgentNotification`, `OSCNotificationParser`) is correct and reusable as-is —
-  scope is presentation only.
-- Add a small per-session "last notification" surface in the sidebar row (mirrors cmux's
-  "latest notification text" in the vertical-tab sidebar) — reuse the same row-insertion pattern
-  as F1/P32-Phase2's task name.
-- Add a visual cue on the pane/tab itself when a notification lands on a *background* pane —
-  today `notificationPosted` only updates the status dot of the tab that received it; extend so
-  a pane in an inactive split also gets a visible marker (cmux's "ring"), not just the tab bar.
-- Keep scope to presentation — do not touch the OSC parsing or `NotificationBus` transport.
+Same shape as F1: the original plan assumed `AgentNotification`/`OSCNotificationParser` (OSC
+9/99/777 terminal-sequence parsing) was the live notification path with only a single-tab-dot
+consumer. Deeper trace before writing code found `OSCNotificationParser` is **actually dead** —
+zero call sites anywhere — and the real, live path is a completely different one: the IPC
+`.notify(surfaceID, title, body)` request (fired by agent hooks, e.g. Claude Code's
+Notification/Stop hooks via `AgentHookInstaller`) → `SurfaceRegistry.markWaiting` →
+`Tab.status = .waiting` + `Tab.notificationText`. That path already drives, all shipped and
+working:
+- **Per-pane glowing ring** — `TerminalHostView.drawTerminalOverlay` draws a `.systemBlue`
+  4pt border on ANY pane whose tab is waiting (`NotificationCoordinator.syncWaitingRings()`
+  sets `host.isWaiting` for every host, not just the active one) — this **is** cmux's "ring,"
+  already built, already cross-pane.
+- **Dock badge** — waiting-tab count (`NotificationCoordinator.updateDockBadge`).
+- **Native macOS notification banner + sound** (`DesktopNotifier`, gated on app-not-active /
+  tab-not-focused, deduped by `pushedNotificationKeys`).
+- **Notch panel** (`AgentNotchRootView`) — cross-session waiting list with `notificationText`,
+  jump-to-agent — opt-in via `notchVisibilityMode`/`experienceMode`, not always visible.
+
+The one thing genuinely missing: `Tab.notificationText` is **not surfaced in the sidebar** —
+the one UI element that's always visible regardless of Notch settings or which tab/split is
+focused. `sessionBoardStatus` (already shown in the sidebar row) is a *different* signal
+(`BoardModel.columnKind`, driven by `agent.activity`) — a coarse category label, not the actual
+hook-fired message, and doesn't necessarily correlate with `tab.status == .waiting`.
+
+Scoped down to just that gap:
+- `SidebarSessionItemRow` gains `waitingNotificationText` — shows `tab.notificationText` (in
+  the ring's `.systemBlue`) in place of the generic `sessionBoardStatus` label when the tab is
+  actually `.waiting`, falling back to the existing label otherwise.
+- Zero new backend/polling/parsing — reuses data already flowing through the existing synced
+  `SessionSnapshot` → `SidebarListModel.update(from:)` path, which already runs unconditionally
+  on every metadata tick ("SwiftUI model sync — always update so badges/agent status stay
+  fresh", `HarnessSidebarPanelViewController.swift:741`) specifically so fields like this stay
+  current — confirmed this call is NOT gated behind `Tab.isStableEqual` (which itself does NOT
+  compare `notificationText`, only `status` — a second notification's text while already
+  `.waiting` wouldn't flip `status`, but since the sidebar update path is unconditional this
+  doesn't matter here; noted as a latent gap for any *future* consumer that gates on
+  `isStableEqual` instead).
+- `rebuildRows()` (what `.update(from:)` calls) verified to be pure in-memory grouping/sorting,
+  no shell-out, safe to run on every tick — same pathway already used for git-branch/status
+  badges today, not a new performance surface.
 
 ### F3 — Diff viewer polish — P2 (optional, defer unless requested)
 
@@ -104,17 +135,22 @@ Exit criteria: a session on a branch with an open PR shows the PR number (alread
 check-status dot in the sidebar. ✅ `swift build`/`swift test` (only the 2 pre-existing unrelated
 failures)/`Tests/robot/run.sh` all clean.
 
-### Phase 2 — Cross-pane notification visibility (F2, P0)
+### Phase 2 — Sidebar notification text (F2, P0) — ✅ done
 
-- [ ] Sidebar row shows the session's most recent `AgentNotification.title`/`.body` (truncated),
-      keyed the same way `prBySession` is keyed
-- [ ] Background pane (not the active one in its split) gets a visible marker when it receives
-      a notification, cleared on becoming active/focused
-- [ ] Unit test: notification landing on a non-active pane sets the marker; switching to that
-      pane clears it
+- [x] Discovered the "ring"/"marker" part of this phase already ships (`TerminalHostView`
+      waiting-ring, cross-pane, since before this session) — did NOT rebuild it
+- [x] `SidebarSessionItemRow.waitingNotificationText` added — shows `tab.notificationText` in
+      `.systemBlue` (matching the ring color) when `tab.status == .waiting`, replacing the
+      generic `sessionBoardStatus` label for that row only
+- [x] No new tests needed — pure view-layer read of existing synced state, no new state
+      machine/async path to regress-test (unlike Phase 1's `archiveScript`, there's no new
+      execution path here, just a new render branch on already-tested data)
 
-Exit criteria: with 2+ panes open and an agent notification firing on a background one, the user
-can tell which pane needs attention without switching to it first.
+Exit criteria: with 2+ panes open and an agent notification firing on a background one, the
+user can tell which pane needs attention without switching to it — ✅ already true via the
+existing ring + dock badge before this phase; this phase adds *why* (the message text) visible
+in the sidebar without needing the Notch panel enabled. `swift build`/`swift test` (2
+pre-existing unrelated failures only)/`Tests/robot/run.sh` all clean.
 
 ### Phase 3 — Diff viewer polish (F3, P2, optional)
 

@@ -252,7 +252,16 @@ private struct SidebarSessionItemRow: View {
                             .foregroundStyle(Color(nsColor: c.textSecondary).opacity(0.6))
                             .lineLimit(1)
                             .truncationMode(.tail)
-                        if sessionBoardStatus != .idle {
+                        if let notification = waitingNotificationText {
+                            Text("·")
+                                .font(.system(size: 10))
+                                .foregroundStyle(Color(nsColor: c.textSecondary).opacity(0.4))
+                            Text(notification)
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(Color(nsColor: .systemBlue))
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                        } else if sessionBoardStatus != .idle {
                             Text("·")
                                 .font(.system(size: 10))
                                 .foregroundStyle(Color(nsColor: c.textSecondary).opacity(0.4))
@@ -419,6 +428,19 @@ private struct SidebarSessionItemRow: View {
             if kinds.contains(k) { return k }
         }
         return .idle
+    }
+
+    /// The most specific attention signal for this row: an agent-hook-fired notification
+    /// (`tab.status == .waiting`, e.g. Claude Code's Notification/Stop hooks) carries an
+    /// actual message, unlike `sessionBoardStatus`'s coarse category label — surfaced here so
+    /// the always-visible sidebar (not just the terminal pane's glow ring or the opt-in Notch
+    /// panel) shows which session needs attention and why, without leaving the current tab.
+    private var waitingNotificationText: String? {
+        guard let tab = session.activeTab ?? session.tabs.first,
+              tab.status == .waiting,
+              let text = tab.notificationText, !text.isEmpty
+        else { return nil }
+        return text
     }
 
     private func agentColor(for kind: AgentKind) -> Color {
