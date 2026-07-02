@@ -25,6 +25,20 @@ final class ShellIntegrationTests: XCTestCase {
         }
     }
 
+    func testZshAndFishEmitCommandBoundary() {
+        // zsh and fish have a native preexec hook, so both emit 133;C with the exact typed
+        // command (base64) for block detection / accurate Re-run. bash's only preexec
+        // mechanism is the DEBUG trap (reentrancy footgun sourced into every user's rc) —
+        // deferred, see the ponytail comment above `bashScript`.
+        for shell: ShellIntegration.Shell in [.zsh, .fish] {
+            let s = ShellIntegration.script(for: shell)
+            XCTAssertTrue(s.contains("133;C"), "\(shell) script must emit the command-boundary mark")
+            XCTAssertTrue(s.contains("base64"), "\(shell) script must base64-encode the command payload")
+        }
+        XCTAssertFalse(ShellIntegration.script(for: .bash).contains("133;C"),
+                        "bash intentionally does not emit 133;C yet — no DEBUG-trap guard exists")
+    }
+
     func testInstallWritesScriptAndWiresRCIdempotently() throws {
         let home = tempHome()
         defer { try? FileManager.default.removeItem(at: home) }

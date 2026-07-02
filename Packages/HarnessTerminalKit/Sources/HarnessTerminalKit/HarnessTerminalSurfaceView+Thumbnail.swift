@@ -3,6 +3,9 @@ import AppKit
 extension HarnessTerminalSurfaceView {
     /// Buffer line indices where OSC 133 prompts start — used by block overlay for tinting.
     public var promptRows: [Int] { emulatorSync { $0.promptRows } }
+    /// Exact command text (OSC 133 `C`'s payload) for the block whose prompt is at `line`, or
+    /// nil if that shell doesn't emit `C` yet (e.g. bash) or the block hasn't started.
+    public func commandText(atPromptLine line: Int) -> String? { emulatorSync { $0.commandText(atPromptLine: line) } }
     /// Text content of the current selection, or nil if nothing is selected.
     public var selectionString: String? { selectionTextIfAny() }
     /// Copy the current selection to the system clipboard (no-op if nothing selected).

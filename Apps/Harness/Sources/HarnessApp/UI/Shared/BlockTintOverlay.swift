@@ -187,7 +187,7 @@ final class BlockTintOverlay: NSView {
         let barX = bounds.width - barW - 8
         let barY = CGFloat(blockEndRow + 1) * rowH - barH - 4
         let bar = BlockActionBar(frame: NSRect(x: barX, y: barY, width: barW, height: barH),
-                                 surfaceView: surfaceView)
+                                 surfaceView: surfaceView, promptLine: startLine)
         addSubview(bar)
         actionBar = bar
     }
@@ -203,9 +203,11 @@ final class BlockTintOverlay: NSView {
 @MainActor
 private final class BlockActionBar: NSView {
     private weak var surfaceView: HarnessTerminalSurfaceView?
+    private let promptLine: Int
 
-    init(frame: NSRect, surfaceView: HarnessTerminalSurfaceView?) {
+    init(frame: NSRect, surfaceView: HarnessTerminalSurfaceView?, promptLine: Int) {
         self.surfaceView = surfaceView
+        self.promptLine = promptLine
         super.init(frame: frame)
         wantsLayer = true
         layer?.backgroundColor = NSColor(white: 0.10, alpha: 0.92).cgColor
@@ -253,12 +255,19 @@ private final class BlockActionBar: NSView {
 
 
     @objc private func rerunBlock() {
-        guard let sv = surfaceView,
-              let selection = sv.selectionString,
+        guard let sv = surfaceView else { removeFromSuperview(); return }
+        // Exact command text from OSC 133 `C` when the pane's shell emits it (zsh/fish); falls
+        // back to a prompt-prefix-strip guess for shells that don't yet (bash).
+        if let exact = sv.commandText(atPromptLine: promptLine) {
+            sv.sendText(exact + "\r")
+            removeFromSuperview()
+            return
+        }
+        guard let selection = sv.selectionString,
               let firstLine = selection.components(separatedBy: "\n").first(where: { !$0.isEmpty })
         else { removeFromSuperview(); return }
-        // ponytail: naive prompt-prefix strip — covers ❯/$/%/#/>/▶ + space. Ceiling: use OSC 133 B/C
-        // markers to extract the exact command string without guessing the prompt format.
+        // ponytail: naive prompt-prefix strip — covers ❯/$/%/#/>/▶ + space. Only reached when
+        // the pane's shell doesn't emit 133;C yet (bash).
         let stripped = firstLine.replacingOccurrences(
             of: #"^.*?[❯$%#>▶]\s+"#, with: "", options: [.regularExpression]
         )

@@ -1,8 +1,56 @@
 # Context — harness-terminal
 
 ## Now
-- **Task:** idle — last work (per-Tab file preview scoping) applied, built+tested, **not yet committed**
+- **Task:** P34 F1 slice 1 (OSC 133 command-boundary + block command-text capture) done, built+tested, **not yet committed**
 - **Branch:** `main`
+
+### 2026-07-02 — P34 F1 slice 1: OSC 133 command-boundary + block command-text capture ✅ DONE, not committed
+`interview` skill (doc.md, codebase-aware) before implementing, since research found the plan
+doc's own premise partly wrong: `SemanticMark` (`TerminalScreen.swift`) tracks only `exit: Int?`
+per row — no command text, no persistent block model — and none of zsh/bash/fish
+shell-integration scripts actually emit OSC `133;B`/`133;C` (only `A`/`D`), so the existing
+"command duration" feature (`onCommandFinished`) never fires against a real shell, only
+hand-fed tests. `BlockTintOverlay`'s Re-run already existed (Warp-style ⌘-click overlay,
+Copy/Re-run buttons) but used a regex prompt-prefix strip to guess the command — an
+already-flagged `ponytail:` ceiling comment pointed at exactly this fix.
+
+User confirmed via interview: F1 only this pass (no F2 UI-actions/F3 MCP tools yet, same
+"ทำ 1 ก่อนแล้วค่อย improve" pattern as file-preview), shell-script changes requiring re-install
+on other machines acceptable, no retroactive scrollback backfill, and fix Re-run's regex-strip
+now since the real data would be available. Consulted `advisor` before touching 3 shell
+scripts (every pane sources them) — confirmed direction, added two corrections: (1) skip
+emitting `133;B` entirely — engine code already treats it as fallback-only ("C deliberately
+overwrites B"), so embedding a marker in `$PROMPT`/`PS1` (fragile against starship/p10k
+dynamic-prompt themes) is unnecessary; (2) bash's only preexec mechanism is the `DEBUG` trap
+(fires per pipeline-stage, needs a `PROMPT_COMMAND`/reentrancy guard) — too much of a footgun
+to hand-roll into every bash user's rc without dedicated test coverage, so deferred (bash
+stays A+D only, `ponytail:` comment names the ceiling and upgrade path).
+
+**Fix:** zsh (`add-zsh-hook preexec`) and fish (`--on-event fish_preexec`) now also emit
+`133;C;<base64 command>` — the shell's own preexec hook already knows the exact typed command,
+so this carries real data instead of reconstructing it from rendered terminal columns. Base64
+avoids the payload colliding with the OSC-133 `;`-field-separator the parser already splits on.
+`TerminalEmulator.handleSemanticPrompt` decodes it and opens a `TerminalBlock` (new file,
+`Emulator/TerminalBlock.swift`) in a new per-pane `TerminalBlockStore` — deliberately decoupled
+from `HistoryLine`/scrollback (own last-N cap) so a block survives `dropHistoryHead` eviction,
+matching F1's "forward-only, no retroactive rescan" scope. `133;D` closes the block (exit code
++ end line). New `TerminalEmulator.commandText(atPromptLine:)` is the only new public surface
+crossing into `HarnessTerminalKit` (mirrored via `HarnessTerminalSurfaceView.commandText`);
+`BlockActionBar.rerunBlock()` now uses it when available, falling back to the old regex-strip
+only for panes whose shell doesn't emit `C` yet (bash).
+Bonus: emitting `C` also fixes the latent bug where `onCommandFinished`'s duration/"long
+command finished in background" notification never fired against a real shell (`C→D` timing
+now actually happens).
+Tests: `Tests/HarnessTerminalEngineTests/TerminalBlockStoreTests.swift` (4 cases — capture,
+no-C-no-text, unknown-prompt-line nil, two-blocks-don't-bleed), extended
+`ShellIntegrationTests.testZshAndFishEmitCommandBoundary` (+ explicit bash-must-not assertion).
+`swift build --product Harness` clean; `swift test` only the 2 pre-existing unrelated failures
+(`ExperienceModeTests`, `Phase6KeysTests`); `Tests/robot/run.sh` 10/10.
+**Lesson:** when a plan doc's "extend the shell script" step turns out to need a *payload*
+(not just a boundary marker), check whether the shell's own hook already carries the data
+(zsh/fish preexec receive the literal command as an argument) before reaching for
+screen-scrape/regex — it's both more accurate and avoids touching fragile territory like
+`$PROMPT`/`PS1` that prompt-theme frameworks reset on every render.
 
 ### 2026-07-02 — File preview tabs leaked across terminal Tabs (global singleton) ✅ FIXED, not committed
 Feature request via `interview` skill (per-Tab scope confirmed with user, not per-Session/per-Pane —

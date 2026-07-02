@@ -6,13 +6,7 @@
 |------|-------|--------|
 | [p25-ios-ipados-support.md](p25-ios-ipados-support.md) | P25 — iOS/iPadOS Support | Planning |
 | [p8-macos27-adoption.md](p8-macos27-adoption.md) | P8 — macOS 27 Golden Gate Adoption | Active |
-| [p34-block-based-terminal.md](p34-block-based-terminal.md) | P34 — Block-Based Terminal (Command Grouping) | Planning |
-
-## Pending
-
-| File | Title | Status |
-|------|-------|--------|
-| [kiro-rules-restructure.md](kiro-rules-restructure.md) | Kiro Rules Restructure | Pending |
+| [p34-block-based-terminal.md](p34-block-based-terminal.md) | P34 — Block-Based Terminal (Command Grouping) | F1 slice 1 done, F2/F3 not started |
 
 ## Completed
 
