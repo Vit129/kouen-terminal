@@ -1,5 +1,6 @@
 import Foundation
 import HarnessCore
+import HarnessSettings
 
 /// Single source of truth for Harness session layout and notifications.
 /// @unchecked Sendable: all access to `sessions` and `editor` is serialized by `lock`.
@@ -516,6 +517,13 @@ public final class SurfaceRegistry: @unchecked Sendable {
                 let mgr = WorktreeManager()
                 let repoPath = wt.parent ?? mgr.repoRoot(for: wt.path) ?? wt.path
                 if !mgr.isDirty(worktreePath: wt.path) {
+                    // P32 F3: run the project's archiveScript (if any) before the worktree
+                    // dir disappears — this is the only point in the lifecycle where the
+                    // worktree still exists but the task is definitely ending.
+                    if let config = ProjectConfig.load(from: wt.path),
+                       let archive = config.archiveScript, !archive.isEmpty {
+                        mgr.runArchiveScript(archive, cwd: wt.path, env: config.env)
+                    }
                     mgr.remove(repoPath: repoPath, worktreePath: wt.path)
                 }
             }

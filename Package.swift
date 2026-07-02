@@ -250,7 +250,8 @@ let package = Package(
             name: "HarnessDaemonCore",
             // Depends on the engine so `capture-pane` reconstructs the on-screen grid
             // (faithful overwrites/clears + soft-wrap join), exactly like tmux.
-            dependencies: ["HarnessCore", "HarnessTerminalEngine", "CHarnessSys"],
+            // HarnessSettings for ProjectConfig (P32 F3: archiveScript on worktree close).
+            dependencies: ["HarnessCore", "HarnessTerminalEngine", "CHarnessSys", "HarnessSettings"],
             path: "Packages/HarnessDaemon/Sources/HarnessDaemon"
         ),
         .executableTarget(
