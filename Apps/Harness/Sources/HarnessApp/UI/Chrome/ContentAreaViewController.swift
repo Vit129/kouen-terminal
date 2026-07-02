@@ -132,6 +132,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         NotificationCenter.default.addObserver(self, selector: #selector(viNextBufferCommand(_:)), name: .viNextBufferCommand, object: nil)
         installCopySelectionToast()
         reloadTabBar()
+        filePreview.switchToTab(tabID: SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.id.uuidString)
         filePreview.restoreEditorState()
     }
 
@@ -205,6 +206,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         let payload = note.snapshotPayload
         let structureChanged = payload.structureChanged
         let metadataOnly = payload.metadataOnly
+        filePreview.switchToTab(tabID: SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.id.uuidString)
         if metadataOnly && !structureChanged {
             refreshTabBarMetadata()
             return
@@ -216,6 +218,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
                 ws.sessions.flatMap { $0.tabs.map { $0.id.uuidString } }
             })
             paneLifecycle.pruneCache(keepingTabIDs: liveTabIDs)
+            filePreview.pruneFileTabManagers(keepingTabIDs: liveTabIDs)
         }
         paneLifecycle.reloadIfNeeded(force: structureChanged)
     }
