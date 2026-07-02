@@ -1,14 +1,16 @@
 import AppKit
 import HarnessTerminalKit
 
-/// Warp-style block output overlay: per-command tint, rounded border, collapse/expand, Copy/AI/Re-run action bar.
+/// Warp-style block output overlay: per-command tint, rounded border, collapse/expand.
 /// Added as a subview of TerminalHostView filling it entirely — rendered above the Metal surface via CA compositor.
+/// Block *actions* (Copy Output/Command Only, Re-run) live on the right-click context menu
+/// (`HarnessTerminalSurfaceView.menu(for:)`) — not here; a ⌘-click-triggered floating action bar
+/// was tried first and dropped for poor discoverability (no on-screen hint).
 @MainActor
 final class BlockTintOverlay: NSView {
     private weak var surfaceView: HarnessTerminalSurfaceView?
     private var topLine = 0
     private var visibleRows = 24
-    private var actionBar: BlockActionBar?
     private var collapsedBlocks = Set<Int>()  // buffer-line indices of collapsed prompt rows
     private var cachedPromptRows: [Int] = []  // refreshed on command-finish, not on every draw/hitTest
 
@@ -33,7 +35,6 @@ final class BlockTintOverlay: NSView {
             prevScroll?(topLine, totalLines, visibleRows)
             self?.topLine = topLine
             self?.visibleRows = visibleRows
-            self?.dismissActionBar()
             // Only redraw if there are visible blocks — avoids CPU draw on every scroll
             // tick when the terminal has no OSC 133-delimited prompt rows.
             if let self, !self.cachedPromptRows.isEmpty || !self.collapsedBlocks.isEmpty {
@@ -48,11 +49,6 @@ final class BlockTintOverlay: NSView {
             prevFinished?(duration, exitCode)
             self?.cachedPromptRows = surfaceView?.promptRows ?? []
             self?.needsDisplay = true
-        }
-
-        surfaceView.onBlockSelected = { [weak self] start, end in
-            self?.needsDisplay = true
-            self?.showActionBar(startLine: start, endLine: end)
         }
     }
 
@@ -175,126 +171,4 @@ final class BlockTintOverlay: NSView {
         }
     }
 
-    // MARK: - Action bar
-
-    private func showActionBar(startLine: Int, endLine: Int) {
-        dismissActionBar()
-        guard visibleRows > 0 else { return }
-        let rowH = bounds.height / CGFloat(visibleRows)
-        let blockEndRow = min(endLine - topLine, visibleRows - 1)
-        guard blockEndRow >= 0 else { return }
-        // Output/Command-only copy need real block data (OSC 133 `C`, zsh/fish) — degrade to the
-        // original Copy+Re-run pair for shells that don't emit it yet (bash), rather than
-        // offering an action with nothing precise to act on.
-        let hasBlock = surfaceView?.block(atPromptLine: startLine) != nil
-        let barW: CGFloat = hasBlock ? 320 : 192
-        let barH: CGFloat = 28
-        let barX = bounds.width - barW - 8
-        let barY = CGFloat(blockEndRow + 1) * rowH - barH - 4
-        let bar = BlockActionBar(frame: NSRect(x: barX, y: barY, width: barW, height: barH),
-                                 surfaceView: surfaceView, promptLine: startLine, showsBlockOnlyActions: hasBlock)
-        addSubview(bar)
-        actionBar = bar
-    }
-
-    private func dismissActionBar() {
-        actionBar?.removeFromSuperview()
-        actionBar = nil
-    }
-}
-
-// MARK: - Action bar
-
-@MainActor
-private final class BlockActionBar: NSView {
-    private weak var surfaceView: HarnessTerminalSurfaceView?
-    private let promptLine: Int
-
-    init(frame: NSRect, surfaceView: HarnessTerminalSurfaceView?, promptLine: Int, showsBlockOnlyActions: Bool) {
-        self.surfaceView = surfaceView
-        self.promptLine = promptLine
-        super.init(frame: frame)
-        wantsLayer = true
-        layer?.backgroundColor = NSColor(white: 0.10, alpha: 0.92).cgColor
-        layer?.cornerRadius = 7
-        layer?.cornerCurve = .continuous
-        layer?.borderWidth = 0.5
-        layer?.borderColor = NSColor.white.withAlphaComponent(0.14).cgColor
-
-        var buttons = [makeButton(symbol: "doc.on.doc", label: "Copy", action: #selector(copyBlock))]
-        if showsBlockOnlyActions {
-            buttons.append(makeButton(symbol: "text.alignleft", label: "Output", action: #selector(copyOutputOnly)))
-            buttons.append(makeButton(symbol: "terminal", label: "Command", action: #selector(copyCommandOnly)))
-        }
-        buttons.append(makeButton(symbol: "arrow.counterclockwise", label: "Re-run", action: #selector(rerunBlock)))
-        let stack = NSStackView(views: buttons)
-        stack.orientation  = .horizontal
-        stack.spacing      = 1
-        stack.distribution = .fillEqually
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(stack)
-        NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: topAnchor, constant: 2),
-            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 6),
-            stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -6),
-            stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -2),
-        ])
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError() }
-
-    private func makeButton(symbol: String, label: String, action: Selector) -> NSButton {
-        let btn = NSButton(title: label, target: self, action: action)
-        btn.bezelStyle  = .rounded
-        btn.font        = .systemFont(ofSize: 10.5, weight: .medium)
-        if let img = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)?
-            .withSymbolConfiguration(.init(pointSize: 10, weight: .medium)) {
-            btn.image         = img
-            btn.imagePosition = .imageLeading
-        }
-        btn.contentTintColor = NSColor.white.withAlphaComponent(0.85)
-        return btn
-    }
-
-    @objc private func copyBlock() {
-        surfaceView?.copyBlock()
-        removeFromSuperview()
-    }
-
-    @objc private func copyOutputOnly() {
-        defer { removeFromSuperview() }
-        guard let sv = surfaceView, let block = sv.block(atPromptLine: promptLine),
-              let end = block.outputEndLine
-        else { return }
-        sv.copyText(sv.text(fromLine: block.outputStartLine, toLine: end))
-    }
-
-    @objc private func copyCommandOnly() {
-        defer { removeFromSuperview() }
-        guard let sv = surfaceView, let block = sv.block(atPromptLine: promptLine) else { return }
-        sv.copyText(block.command)
-    }
-
-    @objc private func rerunBlock() {
-        guard let sv = surfaceView else { removeFromSuperview(); return }
-        // Exact command text from OSC 133 `C` when the pane's shell emits it (zsh/fish); falls
-        // back to a prompt-prefix-strip guess for shells that don't yet (bash).
-        if let exact = sv.block(atPromptLine: promptLine)?.command {
-            sv.sendText(exact + "\r")
-            removeFromSuperview()
-            return
-        }
-        guard let selection = sv.selectionString,
-              let firstLine = selection.components(separatedBy: "\n").first(where: { !$0.isEmpty })
-        else { removeFromSuperview(); return }
-        // ponytail: naive prompt-prefix strip — covers ❯/$/%/#/>/▶ + space. Only reached when
-        // the pane's shell doesn't emit 133;C yet (bash).
-        let stripped = firstLine.replacingOccurrences(
-            of: #"^.*?[❯$%#>▶]\s+"#, with: "", options: [.regularExpression]
-        )
-        let cmd = stripped.isEmpty ? firstLine : stripped
-        sv.sendText(cmd + "\r")
-        removeFromSuperview()
-    }
 }

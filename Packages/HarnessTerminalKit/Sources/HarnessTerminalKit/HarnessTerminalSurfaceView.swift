@@ -366,8 +366,6 @@ public final class HarnessTerminalSurfaceView: NSView {
     public var viModeState: ViInputMode = .insert
     /// Fired on every vi mode transition so the host can update a badge/indicator.
     public var onViModeChanged: ((ViInputMode) -> Void)?
-    /// Fired after a ⌘-click block selection; provides buffer-line boundaries of the selected block.
-    public var onBlockSelected: ((_ startLine: Int, _ endLine: Int) -> Void)?
     /// Whether a program may set the system clipboard via OSC 52 (tmux
     /// `set-clipboard`). The host sets this from the option; default on.
     public var allowProgramClipboardAccess = true

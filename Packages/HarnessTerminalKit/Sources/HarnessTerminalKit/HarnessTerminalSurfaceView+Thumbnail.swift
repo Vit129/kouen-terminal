@@ -12,10 +12,6 @@ extension HarnessTerminalSurfaceView {
     public func text(fromLine start: Int, toLine end: Int) -> String {
         emulatorSync { $0.captureLines(fromLine: start, toLine: end) }.joined(separator: "\n")
     }
-    /// Text content of the current selection, or nil if nothing is selected.
-    public var selectionString: String? { selectionTextIfAny() }
-    /// Copy the current selection to the system clipboard (no-op if nothing selected).
-    public func copyBlock() { copySelection() }
     /// Copy arbitrary text to the system clipboard (block actions that don't copy the live
     /// selection — Copy Output Only / Copy Command Only).
     public func copyText(_ text: String) {

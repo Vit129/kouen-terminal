@@ -3,8 +3,8 @@ import XCTest
 @testable import HarnessTerminalEngine
 
 /// OSC 133 `C`'s command-text payload (our own base64 extension), `TerminalEmulator.block(atPromptLine:)`
-/// — the exact-command/output-range source `BlockActionBar`'s Re-run/Copy Output/Copy Command
-/// actions read instead of screen-scraping — and `captureLines(fromLine:toLine:)`.
+/// — the exact-command/output-range source the right-click block menu's Re-run/Copy Output/Copy
+/// Command actions read instead of screen-scraping — and `captureLines(fromLine:toLine:)`.
 final class TerminalBlockStoreTests: XCTestCase {
     private func osc133(_ body: String) -> String { "\u{1b}]133;\(body)\u{07}" }
     private func b64(_ s: String) -> String { Data(s.utf8).base64EncodedString() }
