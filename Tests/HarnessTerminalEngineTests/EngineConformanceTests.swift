@@ -287,6 +287,15 @@ final class EngineConformanceTests: XCTestCase {
         XCTAssertNil(URLDetection.url(in: line, at: 0), "the leading 'see' is not a URL")
     }
 
+    func testDetectFilePathStripsToolCallParens() {
+        // Coding-agent CLIs (Claude Code, Codex) print tool calls like this with no space
+        // before the path, e.g. "⏺ Update(Apps/Harness/.../SyntaxTextView.swift)".
+        let line = "⏺ Update(Apps/Harness/Sources/HarnessApp/UI/FileEditor/SyntaxTextView.swift)"
+        let col = line.distance(from: line.startIndex, to: line.range(of: "SyntaxTextView")!.lowerBound)
+        let match = URLDetection.detectFilePath(in: line, at: col)
+        XCTAssertEqual(match?.url, "Apps/Harness/Sources/HarnessApp/UI/FileEditor/SyntaxTextView.swift")
+    }
+
     func testDetectLocalhostBarePortPrependsHTTPScheme() {
         let line = "Local:   http://localhost:3000"
         let col = line.distance(from: line.startIndex, to: line.range(of: "localhost")!.lowerBound)
