@@ -8,7 +8,13 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [3.13.1] - 2026-07-02
 
 ### Added
-- Release version bump to v3.13.1.
+- Support non-interactive option with patch version bump ([`5dbb64e`](https://github.com/Vit129/harness-terminal/commit/5dbb64eacb5f4d1c6fef7f22ae0fda6e558e26fd))
+
+### Documentation
+- Drop hardcoded release version from README ([`c7fb340`](https://github.com/Vit129/harness-terminal/commit/c7fb3403052e2a918c774c97515d800167e7a17a))
+
+### Fixed
+- Preserve selection on reload, fix clicking agent tool-call paths ([`587fa90`](https://github.com/Vit129/harness-terminal/commit/587fa906c3ae07eb4e9018861b6ab6220716ef3f))
 
 ## [3.13.0] - 2026-07-02
 
