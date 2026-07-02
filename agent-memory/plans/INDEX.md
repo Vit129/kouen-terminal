@@ -6,8 +6,6 @@
 |------|-------|--------|
 | [p25-ios-ipados-support.md](p25-ios-ipados-support.md) | P25 — iOS/iPadOS Support | Planning |
 | [p8-macos27-adoption.md](p8-macos27-adoption.md) | P8 — macOS 27 Golden Gate Adoption | Active |
-| [p32-task-based-worktrees.md](p32-task-based-worktrees.md) | P32 — Task-Based Agent Worktrees | Planning |
-| [p33-visibility-gaps.md](p33-visibility-gaps.md) | P33 — Visibility Gaps | Phase 1-2 done, Phase 3 deferred |
 | [p34-block-based-terminal.md](p34-block-based-terminal.md) | P34 — Block-Based Terminal (Command Grouping) | Planning |
 
 ## Pending
@@ -24,6 +22,8 @@
 
 | Plan | Version | Notes |
 |------|---------|-------|
+| P33 — Visibility Gaps | Unreleased | PR checks-status dot, sidebar notification text, commit-diff popover rewire, sidebar first-reveal blank-panel fix, 4-finding Opus review pass (2026-07-02) — see completed-archive.md |
+| P32 — Task-Based Agent Worktrees | Unreleased | Explicit "New Agent Task" palette action, `taskName` metadata, `archiveScript` teardown wired, task switcher via existing ⌘1-9 (2026-07-01–02) — see completed-archive.md |
 | P23 — SSH Remote Host Manager | v3.9.x | Settings → Remote tab, toolbar badge, `harness-cli remote add/list/remove`, socket auto-detect via new `harness-cli socket-path` command (2026-07-01) — see completed-archive.md |
 | SwiftUI Migration | v3.9.0–v3.11.x | Sidebar, Settings, Command palette, Notifications, Agent notch, Terminal tab bar all migrated; Browser tab bar deliberately skipped (2026-07-01, low value/high risk) — see completed-archive.md |
 | P30 — Otty Feature Parity | v3.11.x | Recipes, Floating Panes, Tab Thumbnails, Frecency, Session Resurrection audit — all done; Kitty Graphics + WASM plugins deferred (see completed-archive.md) |
