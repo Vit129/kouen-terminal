@@ -1,10 +1,10 @@
 # Context — harness-terminal
 
 ## Now
-- **Task:** P34 F2 (block actions) + F3 (MCP block access) done, built+tested, **not yet committed**
+- **Task:** P34 done (F1 `2ca7fbb`, F2/F3 `8049605`) — archived to completed-archive.md; idle
 - **Branch:** `main`
 
-### 2026-07-02 — P34 F2 (block actions) + F3 (MCP block access) ✅ DONE, not committed
+### 2026-07-02 — P34 F2 (block actions) + F3 (MCP block access) ✅ DONE, committed (`8049605`)
 Continuation of F1 slice 1 (`2ca7fbb`) — user said "phase 2,3" to proceed.
 
 **F2:** Promoted `TerminalBlock` back to `public` (needed cross-module now) and replaced the F1
