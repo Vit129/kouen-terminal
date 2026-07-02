@@ -2,6 +2,156 @@
 
 Older releases. See [CHANGELOG.md](../CHANGELOG.md) for recent versions.
 
+## [3.11.7] - 2026-06-29
+
+### Changed
+- Skip Phase-1 revision pings in all UI snapshot observers ([`5cbbe82`](https://github.com/Vit129/harness-terminal/commit/5cbbe828007342f2594014065a573f063fe6f509))
+- Coalesce burst pings in SessionCoordinator; cap FrecencyDirectoryStore at 500 ([`ffb059a`](https://github.com/Vit129/harness-terminal/commit/ffb059a9d4f2a521ac51a6e4b56f9a18449cdf1e))
+
+## [3.11.6] - 2026-06-29
+
+### Added
+- Inline image paste & drag-drop via Kitty graphics; perf: remove SurfaceShellTracker full-process-table walk ([`7b5ff01`](https://github.com/Vit129/harness-terminal/commit/7b5ff018da4aee8946306227ba2fc3997197b834))
+- Image paste & drag-drop inserts file path instead of Kitty bytes ([`bc14a2c`](https://github.com/Vit129/harness-terminal/commit/bc14a2c07ab8d5e64ddf46e5f8a14090c6019785))
+
+### Documentation
+- Update README — agent workspace positioning, browser MCP, multi-agent statusline ([`eb5a4a7`](https://github.com/Vit129/harness-terminal/commit/eb5a4a795c8462638b80b342d345806016b7238e))
+- Update README to v3.11.5 + keyboard shortcuts; CHANGELOG otty features ([`f3efcd5`](https://github.com/Vit129/harness-terminal/commit/f3efcd527c72e254eaa913ba81df9c8fd9e1e4fa))
+- Remove [Unreleased] section; mark otty-features closed in CHANGELOG ([`3505fa3`](https://github.com/Vit129/harness-terminal/commit/3505fa3ade4a3c84051dc2147f905c2c187b9e64))
+- Remove otty-features comment from CHANGELOG ([`9eb0028`](https://github.com/Vit129/harness-terminal/commit/9eb0028b9476a9d85dfd9cc113e007c8ab4b7899))
+- Record tab-switch black-screen root cause analysis in knowledge base ([`cc67abd`](https://github.com/Vit129/harness-terminal/commit/cc67abdb3e41f274e99d9ecf453c3876a3c9dabe))
+
+### Fixed
+- Daemon stop command with built-in 2-second timeout ([`7e3793c`](https://github.com/Vit129/harness-terminal/commit/7e3793c4b371d092a4078668f4a578bb72bdeaed))
+- Black screen on tab switch — wake Metal renderer after isHidden restore ([`7310f42`](https://github.com/Vit129/harness-terminal/commit/7310f42482fc65db402bb353adff40e031efe1c5))
+- Tab-switch black screen — keep hosts in cached container ([`4b5be7b`](https://github.com/Vit129/harness-terminal/commit/4b5be7b262f67ede64b571664cb2951b754900e1))
+- Restore Metal rendering after display switch ([`c58621a`](https://github.com/Vit129/harness-terminal/commit/c58621a9696e35cf93f54cfc932a49b3186033e2))
+- Tab-switch black screen — keep hosts in cached container ([`7dd9000`](https://github.com/Vit129/harness-terminal/commit/7dd9000e21e9299059e9fdccd6e38ef764a59462))
+- Synchronous repaint on tab-switch fast-path reveal ([`da03968`](https://github.com/Vit129/harness-terminal/commit/da03968c564c9c5e36ec7d42b36177a6fd7de17f))
+- Evict cached container on force rebuild to prevent black-on-revisit ([`06daab6`](https://github.com/Vit129/harness-terminal/commit/06daab6254975f64e69f699c815cd6bde0bf59af))
+- Validate cached hosts before fast-path reveal; plug cache-overwrite leak ([`3d839a1`](https://github.com/Vit129/harness-terminal/commit/3d839a19299df0983f4b20328425fc24409ca3fa))
+- Performance and black screen when switch tab ([`9d49488`](https://github.com/Vit129/harness-terminal/commit/9d4948827230405e3c36713c1c59b03fefb8f402))
+
+## [3.11.4] - 2026-06-28
+
+### Added
+- Add Option 3 — Fix version to re-sync all 4 version files ([`e17e1b9`](https://github.com/Vit129/harness-terminal/commit/e17e1b9399347e29b7a72fb8e65305a8bb35dc00))
+- Add graceful install — preserve session layout across updates ([`9537a78`](https://github.com/Vit129/harness-terminal/commit/9537a78346c3be1d3ab79bd343f8d5c359d7996e))
+
+### Fixed
+- Critical bugs in action buttons and status line visibility ([`32f03d7`](https://github.com/Vit129/harness-terminal/commit/32f03d7a6f111fcbdabe26107bd0711f156d06fb))
+- BlockActionBar buttons unresponsive + skip redundant scroll redraws ([`bc69cd6`](https://github.com/Vit129/harness-terminal/commit/bc69cd6f28f334c8007640350f41671e274a70d1))
+- Shell injection in directory picker + floating panel guards ([`c13ece9`](https://github.com/Vit129/harness-terminal/commit/c13ece96e96c6fb2ac1326b23c90ce0d07743d2c))
+- Remove duplicate shellQuoted extension + Self in stored property initializer ([`33b0b93`](https://github.com/Vit129/harness-terminal/commit/33b0b933afdfae228cca319a14436257e85f4bda))
+- Store and remove NotificationCenter observers in FloatingPaneController ([`ff381cc`](https://github.com/Vit129/harness-terminal/commit/ff381cc102854ba6fd62db68b07973d9f321f93c))
+- Vi mode breaks Esc + 3 audit bugs from otty-features wave ([`d432fc9`](https://github.com/Vit129/harness-terminal/commit/d432fc99b8db39b4d44ed670637a22e0bb04a3d7))
+- Group header '...' button silent since June 22 SwiftUI migration ([`1b6adfe`](https://github.com/Vit129/harness-terminal/commit/1b6adfe1329be4ee5f8b1133f6d39edbb37b4238))
+- ShowStatusLine orphaned gate hides status line permanently ([`ebc2e17`](https://github.com/Vit129/harness-terminal/commit/ebc2e17d0875b0baee648cd53fe07a04ce590c1f))
+- 4 bugs from wave-2 SwiftUI migration + Open With + harness view ([`411ee6d`](https://github.com/Vit129/harness-terminal/commit/411ee6d79b6713652e19d2da60da8b9951413346))
+- CommandPalette cd silently fails for paths with spaces ([`f0d75fe`](https://github.com/Vit129/harness-terminal/commit/f0d75fe31ea2bb6587705b809cd44a04b3acda86))
+- 5 SwiftUI migration bugs + perf improvements ([`ce16dbb`](https://github.com/Vit129/harness-terminal/commit/ce16dbbdd0ec95a883a612c0b7e37ec166ab0752))
+- Add timeout to harness-cli daemon stop to prevent hang ([`3a12fad`](https://github.com/Vit129/harness-terminal/commit/3a12fad8ade55160bbfcbb4ad5c234e0c4274ef3))
+
+## [3.11.2] - 2026-06-28
+
+### Changed
+- Debounce status line refresh + skip redundant NSAttributedString rebuilds ([`a0a343b`](https://github.com/Vit129/harness-terminal/commit/a0a343b3292c02457ef93506cc46a8d8495d3924))
+- Hoist process-table build out of per-surface agent scan loop ([`8076204`](https://github.com/Vit129/harness-terminal/commit/8076204ce43d6760c35c6724b2296ec504f5b7a0))
+
+### Fixed
+- Remove NotificationCenter observer leaks on window/pane teardown ([`a3f437d`](https://github.com/Vit129/harness-terminal/commit/a3f437d45f74c6033bab019524aaea0019f3a113))
+- Browser routing, GUI-disconnect hang, stale runSurface Ctrl-C, per-chunk alloc ([`d2fa7f5`](https://github.com/Vit129/harness-terminal/commit/d2fa7f5f4c30aa1f47124adc12dbe120ca239148))
+- Shell-quote model/effort in spawnCommand + browser routing + invariant tests ([`1b2628c`](https://github.com/Vit129/harness-terminal/commit/1b2628cc11ecc7358294f125f4e92a478411dff1))
+- 5 Opus round-2 findings — snapshot reconnect, timer leak, progress, network capture, reconnect probe ([`c641239`](https://github.com/Vit129/harness-terminal/commit/c64123976b110d45afe2149a892c94235792b776))
+- PromptQueue surface-key leak + AppIdleThrottle double-install guard ([`2e6fdd0`](https://github.com/Vit129/harness-terminal/commit/2e6fdd039815292d8b927f3bc02908c2ebf55df7))
+- Status line Settings toggle bound to wrong field for non-full modes ([`2159a77`](https://github.com/Vit129/harness-terminal/commit/2159a774e85f202613afc45b9f2d3e2b5a79a4a9))
+
+## [3.11.0] - 2026-06-28
+
+### Added
+- Implement Phase 11 - Recipes command picker ([`87eeabb`](https://github.com/Vit129/harness-terminal/commit/87eeabbdc60765f8cfb06f219585d95684a13589))
+- Phase 10 — Quick Terminal ⌥Space (NSPanel + dedicated workspace) ([`a823fff`](https://github.com/Vit129/harness-terminal/commit/a823fff6b0126d76fec19c5d33b9986bd0d7f878))
+- Phase 2 — Vi modal editing (Esc/hjkl/wb/x/i/a/A) with ⌘⌃V toggle ([`5a7eb10`](https://github.com/Vit129/harness-terminal/commit/5a7eb10688303e19a699783e9dfb7398b9f6abf2))
+- Phase 12 — block output: prompt gutter on by default, ⌘-click selects OSC 133 block ([`196c362`](https://github.com/Vit129/harness-terminal/commit/196c362c6c23a0c429b8bc3ca73db33344f1d5be))
+- Phase 14 — Floating Terminal ⌘⌥F (NSPanel, persisted frame) + Phase 15 — Tab Overview ⌘⇧\ (thumbnail grid, click to switch) ([`68c4906`](https://github.com/Vit129/harness-terminal/commit/68c490655d93c82a3d3b87f2a42bf856e17c5e55))
+- ⌘↩ opens new tab in dir picker + zoxide as data source ([`e64bbc8`](https://github.com/Vit129/harness-terminal/commit/e64bbc8d9f1edbe90fcee936fbb63b170defbcb1))
+- Block output tint + AI explain action bar (Phase 12b) ([`0e608ce`](https://github.com/Vit129/harness-terminal/commit/0e608ce2472ce8bc5ba78752ea2a2e2dd506ac0d))
+- Block border, collapse/expand, re-run button (Phase 12c) ([`49d25b2`](https://github.com/Vit129/harness-terminal/commit/49d25b21d45031d24a1cfef5a73c3b44942c8dc9))
+- OSC 26 agent protocol + Fork Tab + approval bar ([`b6154c2`](https://github.com/Vit129/harness-terminal/commit/b6154c2ea3ba2d3c2c95608b2dbc1e7c4f674a74))
+
+### Changed
+- Defer tab thumbnail renders + add OSC 26 hook payloads ([`372886a`](https://github.com/Vit129/harness-terminal/commit/372886addfa4535758b571af75e17dd5bf3a7f37))
+
+### Documentation
+- Mark medium phases 10, 11, 18, 19 complete in PLAN + CONTEXT ([`584f31d`](https://github.com/Vit129/harness-terminal/commit/584f31dede22e2bce4321b661fdbe1201051a6b4))
+- Mark Phase 2 + 12 done in PLAN + CONTEXT ([`acf399b`](https://github.com/Vit129/harness-terminal/commit/acf399b244e2c531d422bfd97959304a3cf98219))
+- Mark Phase 14 + 15 done — otty-features complete ([`4d41ca3`](https://github.com/Vit129/harness-terminal/commit/4d41ca3cffd44dd350a414591ea0da5cc85282f9))
+- Add agent-terminal AIDLC planning + update otty-features PLAN ([`e41a344`](https://github.com/Vit129/harness-terminal/commit/e41a3445bf2cebf45855595ad3c625726721c961))
+
+### Fixed
+- Deinit in extension SyntaxTextView — move to class body ([`cac75c5`](https://github.com/Vit129/harness-terminal/commit/cac75c5aeb35bf100c39aee898a304e909b0eaeb))
+- Full-cycle uses make install (prod+install) before tag/release ([`710580b`](https://github.com/Vit129/harness-terminal/commit/710580bd8959614fb38ab53529aaeabbcac0c6c4))
+- Approval bar freeze + ProMotion render-rate cap ([`6083086`](https://github.com/Vit129/harness-terminal/commit/608308635fcbc20a945ce453909980c0a4b0c393))
+
+## [3.10.1] - 2026-06-27
+
+### Added
+- Full-cycle --no-bump flag + start.mjs asks version bump before full run ([`10346cb`](https://github.com/Vit129/harness-terminal/commit/10346cb36c4f607e32a17cea05611a3c83a0a432))
+- Send selection to AI chat via right-click context menu ([`b104eed`](https://github.com/Vit129/harness-terminal/commit/b104eed9b1e0875167370339d978e98acef7b84b))
+- Wire ⌘F scrollback search — find bar was implemented but unbound ([`5fac8a7`](https://github.com/Vit129/harness-terminal/commit/5fac8a7ae23b0c35fff61a4cb3946ba15683096d))
+- Click-to-move shell cursor on single click (Phase 5) ([`ee002b8`](https://github.com/Vit129/harness-terminal/commit/ee002b826f8cd399647bd04fbf1e214f3dcec096))
+- Auto secure input on password prompts (Phase 6) ([`99643bc`](https://github.com/Vit129/harness-terminal/commit/99643bcc7d0666d58122f36a17c0239908e4ec90))
+- Ctrl+C copies selection when text is selected (Phase 7) ([`844b9c2`](https://github.com/Vit129/harness-terminal/commit/844b9c220e28db7ae27fbeafd5d1bffdb66bee3f))
+- Show git branch in tab immediately on cd (Phase 17) ([`be60091`](https://github.com/Vit129/harness-terminal/commit/be60091588775b3c05442711f63c698ae43298fe))
+- Composer panel for multi-line PTY commands ⌘⇧E (Phase 8) ([`f753a14`](https://github.com/Vit129/harness-terminal/commit/f753a146b49773a255af54d1c19be0104b58596f))
+- Prompt queue — sequential command runner (Phase 9) ([`d9e74b9`](https://github.com/Vit129/harness-terminal/commit/d9e74b91591f6f5fb33ffb85a7249377c5e66016))
+
+### Changed
+- Prevent redundant UI rebuilds and memory leaks in GitPanelView ([`8841cc7`](https://github.com/Vit129/harness-terminal/commit/8841cc71c09a665ca330fda0cfa10808289fd42f))
+
+### Documentation
+- Release workflow + version sync rule in CLAUDE.md ([`7dcac54`](https://github.com/Vit129/harness-terminal/commit/7dcac543a81fa3d5732bae1ae45ae86033c0ad86))
+- Expand otty-features PLAN — 6 new features from CMUX/Zellij/iTerm2 research ([`3163e1c`](https://github.com/Vit129/harness-terminal/commit/3163e1ca46b2c007d1041897053a61af2b98c9f0))
+- Update CHANGELOG, PLAN, CONTEXT for otty-features phases 1/3-9/17/20 ([`9ebe9c4`](https://github.com/Vit129/harness-terminal/commit/9ebe9c4c4dcf5bdea5b0a75c1d262c130d2a4239))
+
+### Fixed
+- Full-cycle step 4 — build+sign only, no open (was dropping session) ([`9ae8d7c`](https://github.com/Vit129/harness-terminal/commit/9ae8d7c3f63faf79374b0149c64f66d6fc27be00))
+- Trim inactive session scrollback on macOS memory pressure ([`54f6a0b`](https://github.com/Vit129/harness-terminal/commit/54f6a0b819a7fbe7335f2e20cea3eed79fcb5be1))
+- AI chat streaming reads no output for batch-write agents (⌘I) ([`160d064`](https://github.com/Vit129/harness-terminal/commit/160d06474e6bf94c31d361542a724421583bea47))
+- Remove NSEvent monitors and NotificationCenter observers on deinit ([`6f9c155`](https://github.com/Vit129/harness-terminal/commit/6f9c15562044a96dd138176e570b7a7b846c50ec))
+
+## [3.10.0] - 2026-06-27
+
+### Added
+- SwiftUI settings foundation — SettingsModel + Terminal page ([`4435619`](https://github.com/Vit129/harness-terminal/commit/443561969f40a6a153afa21beb37eef2fa7179f7))
+- SwiftUI Settings — Appearance page (S2) ([`dd1ca45`](https://github.com/Vit129/harness-terminal/commit/dd1ca45b688e7694b664b1bee1bab18be14fe45b))
+- SwiftUI Settings S3–S5 — Colors, Keys, Agents pages ([`c572ed4`](https://github.com/Vit129/harness-terminal/commit/c572ed4cf723d5ce22fe57ec5fef5e773e2704cb))
+- SwiftUI Settings S6–S9 — Advanced, Remote, root wiring, AppKit deleted ([`94c9491`](https://github.com/Vit129/harness-terminal/commit/94c94913c260e4fbca555f575e0f215d4ce1c5c4))
+- Migrate WorkspacePillButton to SwiftUI ([`204dcf2`](https://github.com/Vit129/harness-terminal/commit/204dcf2d2ddd5e7c0299320117a1594540322c6d))
+- Migrate sidebar section label + footer to SwiftUI ([`a072edf`](https://github.com/Vit129/harness-terminal/commit/a072edf56bdd051951a6ae9e4a1a0e26c6e988b6))
+- Migrate sidebar tab bar from NSSegmentedControl to SwiftUI Picker ([`a6d59a9`](https://github.com/Vit129/harness-terminal/commit/a6d59a9ce4549c1a080584bb981a268af569ac46))
+- Open With Harness for source files + file preview routing ([`36fde38`](https://github.com/Vit129/harness-terminal/commit/36fde383ef6d6f6ab5ec19bff05800fbfa81e1b0))
+- Open With file → terminal at git root + tree reveals file ([`cabcb86`](https://github.com/Vit129/harness-terminal/commit/cabcb86707bdc001cc590c11986e9a2f206176b5))
+- File tree roots at git root, expands to CWD on cd ([`d3a700f`](https://github.com/Vit129/harness-terminal/commit/d3a700f3d4d9c1fd55e005079cd5aea2de2de130))
+- AppKit → SwiftUI wave 2 — 4 UI components migrated ([`760705a`](https://github.com/Vit129/harness-terminal/commit/760705a092f877d78eacb5419e3e777ae4f3bfee))
+
+### Changed
+- Migrate Toast+About to SwiftUI, delete dead NotificationBellButton + DragReorder stub ([`94f4d54`](https://github.com/Vit129/harness-terminal/commit/94f4d541b44ac728aeb58ade876edfbec84dd3b9))
+
+### Documentation
+- Update knowledge — CASE-042/043 + cwd-worktree-bleed companion fix + memory decisions ([`c67a980`](https://github.com/Vit129/harness-terminal/commit/c67a980f668cb32497eecd1db8103242d3c53d10))
+- Update CONTEXT — SwiftUI Settings S6–S9 complete ([`654fe82`](https://github.com/Vit129/harness-terminal/commit/654fe820b0d8676f657d20487c8c2acdcfc8c74f))
+- Update CONTEXT, knowledge, plans, graphify after sidebar SwiftUI wave 2 ([`95290db`](https://github.com/Vit129/harness-terminal/commit/95290dbc140413bcb42db54896d81dfae6dd836e))
+- Update CONTEXT — SwiftUI wave 2 complete (4 components, −424 lines) ([`139ab6a`](https://github.com/Vit129/harness-terminal/commit/139ab6a04662f976d791c78a550172d902d57547))
+
+### Fixed
+- Flush NSHostingView layout after sidebar animation completes ([`bef888a`](https://github.com/Vit129/harness-terminal/commit/bef888a9b06d0ef1a5cfd549c1a571a7a56b70da))
+- Sidebar animation frames drop on macOS 26 — Task {@MainActor} → assumeIsolated ([`d5833b0`](https://github.com/Vit129/harness-terminal/commit/d5833b0deed13b73942eec00e52f2fcc4e1b8541))
+- Sync Metal terminal frames with CA during sidebar animation ([`28d0233`](https://github.com/Vit129/harness-terminal/commit/28d02337fb1a55d0605cc352a021d9b337d6771b))
+- Point Bug 1 robot guard to BrowserIntegrationController where removeValue lives ([`ad792c9`](https://github.com/Vit129/harness-terminal/commit/ad792c9ca0753023088bd8f9b1e278c27a77e83d))
+- Remove presentsWithTransaction from animated sidebar — was blocking main thread every vsync ([`b9f94cd`](https://github.com/Vit129/harness-terminal/commit/b9f94cd7a49e0d767443a858c59d5e8f4332ec9e))
+- Panel to response slow and move pane to left/right corner ([`0f71782`](https://github.com/Vit129/harness-terminal/commit/0f7178285d13542c1f639f84cf3d0932cf25105c))
+
 ## [3.9.5] - 2026-06-26
 
 ### Added
