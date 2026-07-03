@@ -1,0 +1,52 @@
+# Graphify focused corpus for harness-terminal (Swift macOS app)
+#
+# Keep: Packages/*/Sources, Apps/*/Sources, Tools/*/Sources, Tests/, docs/, agent-memory knowledge
+# Skip: build artifacts, packaged binaries, worktrees (full repo copies), test run output, tool state
+
+# Build artifacts (huge, regenerated, not source)
+.build/
+.swiftpm/
+*.xcodeproj/project.xcworkspace/
+*.xcodeproj/xcuserdata/
+
+# Packaged app / installer output
+Harness.app/
+Harness.dmg
+.harness-preview/
+
+# Agent worktrees — each one is a full checkout of the repo; would duplicate
+# every source node once per worktree
+.claude/worktrees/
+.gemini/worktrees/
+.harness-worktrees/
+
+# Test run output (regenerated every run, not source)
+.robot-output/
+results/
+report.html
+log.html
+output.xml
+
+# Tool/assistant state
+.claude/
+.gemini/
+.githooks/
+.github/
+
+# Graphify's own output
+graphify-out/
+Tests/HarnessRobotTests/graphify-out/
+
+# Generated docs / large reference material not needed for code graph
+terminal-cheat-sheet.html
+docs/CHANGELOG-archive.md
+CHANGELOG.md
+
+# Repo/tool metadata
+*.DS_Store
+Package.resolved
+
+# Keep durable project knowledge in the graph — do not ignore:
+# - agent-memory/CONTEXT.md, MEMORY.md, PLAYBOOK.md
+# - agent-memory/knowledge/
+# - docs/ (architecture, commands, agent-hooks)

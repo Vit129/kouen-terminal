@@ -9,6 +9,7 @@ struct SettingsAgentsView: View {
 
     @State private var notifStatus: String = ""
     @State private var notifNeedsAllow: Bool = false
+    @State private var testResult: String = ""
     @State private var hookStates: [AgentKind: HookState] = [:]
 
     enum HookState { case idle, installing, installed, failed }
@@ -84,9 +85,17 @@ struct SettingsAgentsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            if !testResult.isEmpty {
+                Text(testResult)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             HStack(spacing: 10) {
                 Button("Send Test Notification") {
-                    DesktopNotifier.sendTest()
+                    testResult = "Sending…"
+                    DesktopNotifier.sendTest { success in
+                        testResult = success ? "Test notification sent." : "Failed to display notification — check Console for the AppleScript error."
+                    }
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { refreshNotifStatus() }
                 }
                 .buttonStyle(.bordered)

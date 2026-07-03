@@ -12,15 +12,19 @@ extension HarnessCLI {
         struct VersionReport: Encodable {
             var cliVersion: String
             var cliBuild: Int
+            var cliProtocolVersion: Int
             var daemonVersion: String?
             var daemonBuild: Int?
+            var daemonProtocolVersion: Int?
             var daemonRunning: Bool
         }
         var report = VersionReport(
             cliVersion: HarnessVersion.short,
             cliBuild: HarnessVersion.build,
+            cliProtocolVersion: ipcProtocolVersion,
             daemonVersion: nil,
             daemonBuild: nil,
+            daemonProtocolVersion: nil,
             daemonRunning: false
         )
         if let client = try? makeClient(args),
@@ -29,6 +33,7 @@ extension HarnessCLI {
             report.daemonRunning = true
             report.daemonVersion = stats.version
             report.daemonBuild = stats.build
+            report.daemonProtocolVersion = stats.protocolVersion
         }
         if args.contains("--json") {
             if let encoded = try? JSONOutputFormatter.encode(report, pretty: args.contains("--pretty")) {
@@ -201,6 +206,7 @@ extension HarnessCLI {
         Commands:
           doctor [--json]                             (diagnose daemon, socket, paths, integrations)
           version [--json]                            (print CLI and daemon versions; flags build mismatch)
+          protocol-version                             (print this binary's IPC wire-protocol version; no daemon needed)
           color-check                                  (print ANSI/256/truecolor diagnostic swatches)
           theme-preview [--theme <name>] [--all]       (print deterministic themed sample output)
           view <file>                                  (print a text file with preview size/binary guards)

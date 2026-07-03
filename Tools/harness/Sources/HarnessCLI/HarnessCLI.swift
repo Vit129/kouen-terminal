@@ -66,6 +66,12 @@ struct HarnessCLI {
             case "version", "--version", "-v":
                 printVersion(args) // best-effort daemon query; works with the daemon down
                 return
+            case "protocol-version":
+                // No daemon round-trip: `ipcProtocolVersion` is a compile-time constant baked
+                // into this binary, so an installer can compare an old and new harness-cli's
+                // output directly to decide whether a daemon restart is actually needed.
+                print(ipcProtocolVersion)
+                return
             case "mcp":
                 handleMCP(args)
                 return

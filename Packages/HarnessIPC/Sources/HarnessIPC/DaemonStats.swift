@@ -16,6 +16,11 @@ public struct DaemonStats: Codable, Sendable {
     /// Build number (`HarnessVersion.build`) of the running daemon — the handshake the app
     /// and CLI compare against their own build to detect a stale daemon (issue #60).
     public var build: Int?
+    /// `ipcProtocolVersion` the running daemon was built with. Unlike `build` (which changes
+    /// on every release, including UI-only ones), this only changes on a wire-format bump —
+    /// an installer can compare it against the new binary's own value to skip a daemon
+    /// restart (and the PTY/agent-killing that implies) when the wire protocol didn't move.
+    public var protocolVersion: Int?
 
     public init(
         pid: Int32,
@@ -26,7 +31,8 @@ public struct DaemonStats: Codable, Sendable {
         subscriberCount: Int,
         snapshotRevision: Int,
         version: String? = nil,
-        build: Int? = nil
+        build: Int? = nil,
+        protocolVersion: Int? = nil
     ) {
         self.pid = pid
         self.uptimeSeconds = uptimeSeconds
@@ -37,6 +43,7 @@ public struct DaemonStats: Codable, Sendable {
         self.snapshotRevision = snapshotRevision
         self.version = version
         self.build = build
+        self.protocolVersion = protocolVersion
     }
 }
 
