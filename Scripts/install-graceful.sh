@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Graceful install: preserve session layout across version updates.
-# Workspace structure and pane CWDs are restored after restart;
-# running shell processes are restarted fresh (daemon must restart for new binary).
+# Workspace structure and pane CWDs are restored after restart. The daemon (and every
+# PTY/agent task running under it) is only restarted when the IPC wire protocol actually
+# changed between the installed build and the new one — most releases are UI-only, so
+# running shells/agents survive the install untouched; only the GUI restarts.
 #
 # Crucially, this script can be run from *inside* a Harness pane:
 # the install work is handed off to a detached background process before
@@ -52,6 +54,47 @@ fi
 # Absolute paths for the detached helper (it runs in a different cwd)
 SRC_ABS=$(cd "$ROOT" && pwd)/Harness.app
 DEST_ABS="$DEST"
+UID_NUM=$(id -u)
+
+# --- Decide whether the daemon actually needs to restart ---
+# `ipcProtocolVersion` is a compile-time constant baked into harness-cli, shared by the
+# daemon it ships alongside. Comparing the CURRENTLY INSTALLED cli's value (a stand-in for
+# the running daemon's protocol, since they were built together) against the NEW build's
+# value tells us whether this release touched the wire format at all. Most releases don't —
+# they're UI-only — so the daemon (and every PTY/agent task running under it) can survive
+# the install untouched; only the GUI needs to restart.
+REUSE_DAEMON=0
+if pgrep -f "HarnessDaemon" > /dev/null 2>&1; then
+  INSTALLED_CLI=""
+  if [[ -x "$APP_SUPPORT_BIN/harness-cli" ]]; then
+    INSTALLED_CLI="$APP_SUPPORT_BIN/harness-cli"
+  elif [[ -x "$DEST/Contents/MacOS/harness-cli" ]]; then
+    INSTALLED_CLI="$DEST/Contents/MacOS/harness-cli"
+  fi
+  if [[ -n "$INSTALLED_CLI" ]]; then
+    OLD_PROTO=$("$INSTALLED_CLI" protocol-version 2>/dev/null || echo "")
+    NEW_PROTO=$("$SRC_ABS/Contents/MacOS/harness-cli" protocol-version 2>/dev/null || echo "")
+    if [[ -n "$OLD_PROTO" && "$OLD_PROTO" == "$NEW_PROTO" ]]; then
+      REUSE_DAEMON=1
+      echo "==> IPC protocol unchanged ($OLD_PROTO) — daemon (and running tasks) will keep running."
+    else
+      echo "==> IPC protocol changed ($OLD_PROTO -> $NEW_PROTO) — daemon must restart."
+    fi
+  fi
+fi
+
+# Lines that stop the daemon, blanked out entirely when it's safe to keep running.
+STOP_DAEMON_LINES="
+    echo '-- stopping daemon'
+    launchctl bootout 'gui/$UID_NUM' '$LAUNCH_AGENT' 2>/dev/null || true
+    launchctl bootout 'gui/$UID_NUM/com.robert.harness.daemon' 2>/dev/null || true
+    pkill -f '/Applications/Harness.app/Contents/MacOS/HarnessDaemon' 2>/dev/null || true
+    pkill -f '$APP_SUPPORT_BIN/HarnessDaemon' 2>/dev/null || true
+    sleep 0.5
+"
+if [[ $REUSE_DAEMON -eq 1 ]]; then
+  STOP_DAEMON_LINES="    echo '-- reusing running daemon (protocol unchanged); not stopping it'"
+fi
 
 if pgrep -x Harness > /dev/null 2>&1; then
   echo "==> Flushing session state (waiting for layout debounce)..."
@@ -65,12 +108,7 @@ if pgrep -x Harness > /dev/null 2>&1; then
       pgrep -x Harness > /dev/null 2>&1 || break
       sleep 0.1
     done
-    echo '-- stopping daemon'
-    launchctl bootout 'gui/\$(id -u)' '$LAUNCH_AGENT' 2>/dev/null || true
-    launchctl bootout 'gui/\$(id -u)/com.robert.harness.daemon' 2>/dev/null || true
-    pkill -f '/Applications/Harness.app/Contents/MacOS/HarnessDaemon' 2>/dev/null || true
-    pkill -f '$APP_SUPPORT_BIN/HarnessDaemon' 2>/dev/null || true
-    sleep 0.5
+$STOP_DAEMON_LINES
     echo '-- installing $SRC_ABS -> $DEST_ABS'
     rm -rf '$DEST_ABS'
     ditto '$SRC_ABS' '$DEST_ABS'
@@ -91,13 +129,18 @@ if pgrep -x Harness > /dev/null 2>&1; then
     pkill -TERM Harness 2>/dev/null || true
 
 else
-  # Not running — install directly (same as install-app.sh minus the state wipe)
-  echo "==> Stopping any stale daemon..."
-  launchctl bootout "gui/$(id -u)" "$LAUNCH_AGENT" 2>/dev/null || true
-  launchctl bootout "gui/$(id -u)/com.robert.harness.daemon" 2>/dev/null || true
-  pkill -f "/Applications/Harness.app/Contents/MacOS/HarnessDaemon" 2>/dev/null || true
-  pkill -f "$APP_SUPPORT_BIN/HarnessDaemon" 2>/dev/null || true
-  sleep 0.5
+  # GUI not running — but a detached daemon (e.g. background agent tasks attached only via
+  # `harness attach`/MCP) may still be alive, so the same reuse check applies.
+  if [[ $REUSE_DAEMON -eq 1 ]]; then
+    echo "==> Reusing running daemon (protocol unchanged); not stopping it."
+  else
+    echo "==> Stopping any stale daemon..."
+    launchctl bootout "gui/$UID_NUM" "$LAUNCH_AGENT" 2>/dev/null || true
+    launchctl bootout "gui/$UID_NUM/com.robert.harness.daemon" 2>/dev/null || true
+    pkill -f "/Applications/Harness.app/Contents/MacOS/HarnessDaemon" 2>/dev/null || true
+    pkill -f "$APP_SUPPORT_BIN/HarnessDaemon" 2>/dev/null || true
+    sleep 0.5
+  fi
 
   echo "==> Installing to $DEST..."
   rm -rf "$DEST"

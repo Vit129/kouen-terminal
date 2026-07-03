@@ -516,7 +516,8 @@ public final class DaemonServer: @unchecked Sendable {
                 subscriberCount: totalSubs,
                 snapshotRevision: registry.revision,
                 version: HarnessVersion.short,
-                build: HarnessVersion.build
+                build: HarnessVersion.build,
+                protocolVersion: ipcProtocolVersion
             )
             return .daemonStats(stats)
         default:

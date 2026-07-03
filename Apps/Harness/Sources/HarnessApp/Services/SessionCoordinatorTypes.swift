@@ -20,14 +20,25 @@ enum DesktopNotifier {
     // attributes `display notification` to the process that executes it, so running inside
     // Harness attributes the notification to Harness rather than to the frontmost app.
     static func requestAuthorizationIfNeeded() {}
-    static func show(title: String, body: String, withSound: Bool = true) {
+    /// - Parameter completion: reports whether the AppleScript actually ran without error.
+    ///   `NSAppleScript` is main-thread-only, so this always dispatches there — running it on a
+    ///   background queue (the previous behavior) could fail silently depending on caller context.
+    static func show(
+        title: String, body: String, withSound: Bool = true,
+        completion: (@MainActor @Sendable (Bool) -> Void)? = nil
+    ) {
         let soundClause = withSound ? " sound name \"Glass\"" : ""
         let script = """
             display notification "\(Self.escape(body))" with title "\(Self.escape(title))"\(soundClause)
             """
-        DispatchQueue.global(qos: .utility).async {
+        DispatchQueue.main.async {
             var error: NSDictionary?
             NSAppleScript(source: script)?.executeAndReturnError(&error)
+            if let error {
+                NSLog("DesktopNotifier: display notification failed: %@", error)
+            }
+            let succeeded = error == nil
+            Task { @MainActor in completion?(succeeded) }
         }
     }
     static func authorizationStatus(_ completion: @escaping @MainActor (UNAuthorizationStatus) -> Void) {
@@ -38,8 +49,8 @@ enum DesktopNotifier {
         guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.notifications") else { return }
         NSWorkspace.shared.open(url)
     }
-    static func sendTest() {
-        show(title: "Harness", body: "Notifications are working!")
+    static func sendTest(completion: (@MainActor @Sendable (Bool) -> Void)? = nil) {
+        show(title: "Harness", body: "Notifications are working!", completion: completion)
     }
     private static func escape(_ s: String) -> String {
         s.replacingOccurrences(of: "\\", with: "\\\\")

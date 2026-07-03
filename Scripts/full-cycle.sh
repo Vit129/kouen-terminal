@@ -20,7 +20,9 @@ Runs:
   3. Build production app.
   4. If prod build fails → rollback version bump.
   5. Commit, push, CHANGELOG, tag, GitHub release.
-  6. Install to /Applications (no rebuild — reuses step 4 binary).
+  6. Install to /Applications via install-graceful — preserves session state, and
+     skips the daemon restart (keeping running tasks alive) when the IPC protocol
+     didn't change.
 USAGE
 }
 
@@ -79,9 +81,15 @@ fi
 
 # Step 4: Build production app + install to /Applications.
 # Build BEFORE tagging/releasing so a broken build never creates a public tag.
+# Uses install-graceful (not `make install`): it builds before touching the running
+# app/daemon, preserves workspace/session state instead of wiping it, and — when the
+# IPC wire protocol didn't change (the common case) — skips restarting the daemon
+# entirely, so PTYs and agent tasks running under it survive this release. It also
+# safely hands off to a detached process when run from inside a Harness pane, unlike
+# `make install`'s unconditional `pkill -x Harness` which would kill this very session.
 echo ""
-echo "▶ Step 4: Building production app and installing..."
-if ! make install; then
+echo "▶ Step 4: Building production app and installing (graceful)..."
+if ! Scripts/install-graceful.sh; then
   echo ""
   echo "❌ Production build failed — rolling back version bump..."
   git checkout -- \

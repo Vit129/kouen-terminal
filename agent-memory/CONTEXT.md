@@ -1,10 +1,29 @@
 # Context — harness-terminal
 
 ## Now
-- **Task:** Two file-preview bugs fixed via `debug-mantra` — selection-drop-on-reload + AI-tool-call-path click — FIXED, not committed
+- **Task:** idle — review's harness-terminal action items implemented: H5, H6, notification Step 1, S1 daemon-reuse + wired into the real `make start` Full cycle path. All uncommitted on `main`.
 - **Branch:** `main`
+- **Pending:** review action checklist in REVIEW-graphify-harness-2026-07-03.md — remaining: notification Step 2/3 (system-level, needs user), graphify G1/G3/G4 (different repo)
 
-### 2026-07-02 — File preview: selection dropped on background reload + clicking agent tool-call paths failed ✅ FIXED, not committed
+### 2026-07-03 (cont'd) — Wired S1 into the actual daily release flow
+User asked "what happens if I run `make start` full cycle now" — traced the real call chain (`start.mjs` → `full-cycle.sh` Step 4 → was `make install` → `install-app.sh`) and found S1 had ZERO effect on it: `install-app.sh` kills daemon+GUI unconditionally before build, no protocol check, plus wipes session state via `clear-runtime-state.sh` (incompatible with graceful's preserve-state goal — never call both). Fixed: `full-cycle.sh` Step 4 now calls `Scripts/install-graceful.sh` directly instead of `make install`.
+
+### 2026-07-03 — Implemented review fixes: H5, H6, notification Step 1, S1 daemon-reuse ✅ DONE, not committed
+- **H5:** `Scripts/install-graceful.sh` — `UID_NUM=$(id -u)` computed in parent, interpolated as literal into the detached child script (old `\$(id -u)` never expanded, `launchctl bootout` silently no-op'd).
+- **H6:** `.gitignore` + `git rm --cached graphify-out/graph.json` (file stays on disk).
+- **Notification Step 1:** `DesktopNotifier.show` (`SessionCoordinatorTypes.swift`) moved from background queue to `DispatchQueue.main.async` (NSAppleScript is main-thread-only), logs the error instead of discarding, `sendTest`/Settings UI (`SettingsAgentsView.swift`) show real success/failure via a `@MainActor @Sendable` completion.
+- **S1 (the big one — install/build no longer kills running agent tasks for UI-only releases):** Added `DaemonStats.protocolVersion` + `harness-cli protocol-version` (no-daemon-required, prints the compile-time `ipcProtocolVersion` constant). `install-graceful.sh` compares installed-CLI vs new-build-CLI protocol version; daemon restart (and the `launchctl bootout`/`pkill` sequence) is skipped entirely when they match — only the GUI restarts, PTYs/agents under the daemon survive. Applies to both the "GUI running" (detached nohup) and "GUI closed, daemon detached" branches.
+- Verified: full `swift build` clean, `swift test --filter DaemonStatsTests` 6/6, isolated bash dry-run of match/mismatch detection logic, `Tests/robot/run.sh` 10/10. Not yet committed — user hasn't asked to commit.
+
+### 2026-07-03 — Review: graphify + harness-terminal ✅ DONE (Sonnet-5 verified)
+Deliverable: `REVIEW-graphify-harness-2026-07-03.md` (repo root). Key findings:
+- **Notifications not showing:** `DesktopNotifier.show` runs `NSAppleScript` on a background queue (main-thread-only API), swallows the error dict, and `authorizationStatus` hard-codes `.authorized` — failures are invisible by design. Underlying: UNUserNotificationCenter disabled due to corrupted notification DB on macOS 26. Fix plan: main-thread/osascript + surfaced errors → reset notification DB → probe-guarded return to UNUserNotificationCenter.
+- **Install kills running tasks:** only because daemon restarts; `identifyClient` handshake requires exact `ipcProtocolVersion` equality (`IPCMessage.swift:129`). Solution S1: install-graceful compares old-daemon vs new-binary protocol version, skips daemon restart when equal → agents survive. Also found `launchctl bootout 'gui/\$(id -u)'` quoting bug in install-graceful.sh (never expands, always falls through to pkill) — Sonnet confirmed `KeepAlive` IS set on the LaunchAgent, so the respawn race this causes is real, not hypothetical.
+- **graphify:** algorithms sound (deterministic Leiden + churn-hardening, well-guarded MinHash/JW dedup); structural debt = extract.py 16k lines (correction: an active `extractors/MIGRATION.md` batch plan already covers this, not a neglected split), __main__.py 5.2k; installed pkg 0.10.0 vs repo 0.14.0 skew; god nodes include both `Int` (927 edges, builtin) and module names (`HarnessCore`/`Foundation` — a builtin-only filter wouldn't catch these).
+- **Repo hygiene:** 20MB graph.json tracked in git (recommend .gitignore).
+- **Retracted finding:** original draft claimed the 2026-07-02 file-preview fixes were uncommitted — false, they shipped in `587fa906` before this review ran. Caught by Sonnet's independent git-log check; report corrected. **Lesson: verify "uncommitted work" claims against `git log`, not against CONTEXT.md, which can go stale.**
+
+### 2026-07-02 — File preview: selection dropped on background reload + clicking agent tool-call paths failed ✅ FIXED and committed (`587fa906`)
 User report (Thai) was two bugs conflated in one message, split via `AskUserQuestion`: (1) drag-selecting
 text in the file preview then scrolling to reach Cmd+C — the gray highlight "disappears too fast to
 register"; (2) clicking a file path inside an AI agent's own tool-call summary line printed in the
