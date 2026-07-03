@@ -3,13 +3,13 @@ _Auto-generated from GRAPH_REPORT.md · do not edit manually_
 _Regen: `graphify update .`_
 
 ## Summary
-- 14577 nodes · 31198 edges · 3732 communities (1230 shown, 2502 thin omitted)
+- 14591 nodes · 31234 edges · 3721 communities (1230 shown, 2491 thin omitted)
 - Extraction: 89% EXTRACTED · 11% INFERRED · 0% AMBIGUOUS · INFERRED: 3427 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 
 ## Graph Freshness
-- Built from commit: `39c0c02b`
+- Built from commit: `3ee42f82`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -27,6 +27,21 @@ _Regen: `graphify update .`_
 10. `TerminalHostView` - 99 edges
 
 
+## Cross-Cutting Nodes (span the most distinct areas of the codebase)
+A high-degree node isn't always architecturally central - a widely-used
+utility/config file can rack up more edges than a real coupler while only
+ever touching one area. This ranks by how many DIFFERENT communities a
+node's neighbors span, not by raw edge count.
+1. `IPCRequest` - bridges 137 areas (151 edges)
+2. `Command` - bridges 100 areas (107 edges)
+3. `SessionCoordinator` - bridges 54 areas (124 edges)
+4. `IPCResponse` - bridges 53 areas (69 edges)
+5. `MenuTarget` - bridges 53 areas (60 edges)
+6. `SpecialKey` - bridges 52 areas (56 edges)
+7. `EngineConformanceTests` - bridges 50 areas (76 edges)
+8. `AgentKind` - bridges 47 areas (92 edges)
+9. `HarnessPaths` - bridges 43 areas (95 edges)
+
 ## Surprising Connections (you probably didn't know these)
 - `SUI` --calls--> `Color`  [INFERRED]
   Packages/HarnessOnboarding/Sources/HarnessOnboarding/Design/ImmersivePalette.swift → Apps/Harness/Sources/HarnessApp/Settings/SwiftUI/SettingsColorsView.swift
@@ -36,8 +51,8 @@ _Regen: `graphify update .`_
   Apps/Harness/Sources/HarnessApp/Services/RemoteHostsService.swift → Packages/HarnessCore/Sources/HarnessCore/Remote/RemoteHostStore.swift
 - `ThemeImportController` --calls--> `ThemeFileService`  [INFERRED]
   Apps/Harness/Sources/HarnessApp/Services/ThemeImportController.swift → Packages/HarnessTheme/Sources/HarnessTheme/ThemeFileService.swift
-- `GitHubCLIClient` --calls--> `Process`  [INFERRED]
-  Packages/HarnessCore/Sources/HarnessCore/GitHub/GitHubCLIClient.swift → Apps/Harness/Sources/HarnessApp/UI/CommandPalette/CommandPaletteController.swift
+- `WorktreeAutoIsolateService` --calls--> `WorktreeManager`  [INFERRED]
+  Apps/Harness/Sources/HarnessApp/Services/WorktreeAutoIsolateService.swift → Packages/HarnessCore/Sources/HarnessCore/Worktree/WorktreeManager.swift
 
 
 _Full map → GRAPH_REPORT.md · query: `graphify query "..."`_

@@ -14,19 +14,63 @@ struct NotificationEntry: Identifiable, Equatable {
     var id: TabID { tabID }
 }
 
+/// Presents notifications even while Harness is the frontmost app — without a delegate,
+/// UNUserNotificationCenter suppresses foreground notifications by default (Step 3 of
+/// REVIEW-graphify-harness-2026-07-03.md Part 3's fix plan). Stateless, so @unchecked Sendable
+/// is safe here (no mutable state to race on), matching this codebase's existing pattern for
+/// simple singleton delegates.
+final class NotificationPresenter: NSObject, UNUserNotificationCenterDelegate, @unchecked Sendable {
+    static let shared = NotificationPresenter()
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        completionHandler([.banner, .sound])
+    }
+}
+
 enum DesktopNotifier {
-    // UNUserNotificationCenter.current() crashes on macOS 26 due to a corrupted NSCalendarDate
-    // in the notification database. Use NSAppleScript in-process instead: Standard Additions
-    // attributes `display notification` to the process that executes it, so running inside
-    // Harness attributes the notification to Harness rather than to the frontmost app.
-    static func requestAuthorizationIfNeeded() {}
-    /// - Parameter completion: reports whether the AppleScript actually ran without error.
-    ///   `NSAppleScript` is main-thread-only, so this always dispatches there — running it on a
-    ///   background queue (the previous behavior) could fail silently depending on caller context.
+    // UNUserNotificationCenter.current() crashes on some macOS 26 installs due to a corrupted
+    // NSCalendarDate in the notification database (NotificationCenterProbe guards against this —
+    // see its doc comment). When the probe hasn't run yet or has marked the center bad, every
+    // method below falls back to NSAppleScript in-process: Standard Additions attributes
+    // `display notification` to the process that executes it, so running inside Harness
+    // attributes the notification to Harness rather than to the frontmost app.
+    static func requestAuthorizationIfNeeded() {
+        NotificationCenterProbe.runAtLaunch()
+        guard !NotificationCenterProbe.isKnownBad else { return }
+        UNUserNotificationCenter.current().delegate = NotificationPresenter.shared
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, error in
+            if let error {
+                NSLog("DesktopNotifier: requestAuthorization failed: %@", error.localizedDescription)
+            }
+        }
+    }
+    /// - Parameter completion: reports whether the notification was actually delivered — via the
+    ///   real API when safe, or via AppleScript's error result as a fallback.
+    ///   `NSAppleScript` is main-thread-only, so the fallback path always dispatches there —
+    ///   running it on a background queue (a previous version's behavior) could fail silently
+    ///   depending on caller context.
     static func show(
         title: String, body: String, withSound: Bool = true,
         completion: (@MainActor @Sendable (Bool) -> Void)? = nil
     ) {
+        guard NotificationCenterProbe.isKnownBad else {
+            let content = UNMutableNotificationContent()
+            content.title = title
+            content.body = body
+            if withSound { content.sound = .default }
+            let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+            UNUserNotificationCenter.current().add(request) { error in
+                if let error {
+                    NSLog("DesktopNotifier: add(request:) failed: %@", error.localizedDescription)
+                }
+                let succeeded = error == nil
+                Task { @MainActor in completion?(succeeded) }
+            }
+            return
+        }
         let soundClause = withSound ? " sound name \"Glass\"" : ""
         let script = """
             display notification "\(Self.escape(body))" with title "\(Self.escape(title))"\(soundClause)
@@ -42,7 +86,14 @@ enum DesktopNotifier {
         }
     }
     static func authorizationStatus(_ completion: @escaping @MainActor (UNAuthorizationStatus) -> Void) {
-        Task { @MainActor in completion(.authorized) }
+        guard !NotificationCenterProbe.isKnownBad else {
+            Task { @MainActor in completion(.notDetermined) }
+            return
+        }
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            let status = settings.authorizationStatus
+            Task { @MainActor in completion(status) }
+        }
     }
     static func requestOrOpenSettings() { openSystemNotificationSettings() }
     static func openSystemNotificationSettings() {

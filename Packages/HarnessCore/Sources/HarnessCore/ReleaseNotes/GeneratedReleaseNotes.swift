@@ -1,15 +1,15 @@
-// Generated from the CHANGELOG.md [3.13.1] block by Scripts/generate-release-notes.swift.
+// Generated from the CHANGELOG.md [3.13.2] block by Scripts/generate-release-notes.swift.
 // DO NOT EDIT BY HAND — regenerate in release prep after updating CHANGELOG.md:
 //   swift Scripts/generate-release-notes.swift
 // Drift guards: ReleaseNotesGuardTests (version + changelog digest), package-app.sh.
 
 extension ReleaseNotes {
     public static let current = ReleaseNotes(
-        version: "3.13.1",
-        changelogDigest: "7fe1acc2bc4abd1f",
+        version: "3.13.2",
+        changelogDigest: "015d538ff68699ea",
         sections: [
             Section(title: "Added", items: [
-                "Release version bump to v3.13.1",
+                "Release version bump to v3.13.2",
             ]),
         ]
     )
