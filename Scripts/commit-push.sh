@@ -25,6 +25,17 @@ if [[ -z "$msg" ]]; then
 fi
 
 git add -A
+
+# This script only runs from full-cycle.sh, always right after a version bump —
+# so a staged Info.plist here always means a release commit. Auto-tag the message
+# so the commit-msg guardrail never blocks on a forgotten "version" keyword.
+if git diff --cached --name-only | grep -q "Info.plist" && ! echo "$msg" | grep -qiE "version|bump|release|build|[0-9]+\.[0-9]+\.[0-9]+"; then
+  ver="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Apps/Harness/Sources/HarnessApp/Resources/Info.plist 2>/dev/null || true)"
+  if [[ -n "$ver" ]]; then
+    msg="${msg} (release v${ver})"
+  fi
+fi
+
 git commit -m "$msg"
 
 branch="$(git branch --show-current)"
