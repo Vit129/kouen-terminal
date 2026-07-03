@@ -8,7 +8,11 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [3.13.2] - 2026-07-03
 
 ### Added
-- Release version bump to v3.13.2.
+- Wire auto-rebuild hook + gitignore wiki/log bloat ([`3ee42f8`](https://github.com/Vit129/harness-terminal/commit/3ee42f822bc15fc3bf4ed6aad54f5597c9027bcb))
+
+### Fixed
+- Notification Step 1, S1 daemon-reuse install, H5 bootout quoting bug ([`85354d2`](https://github.com/Vit129/harness-terminal/commit/85354d23e192f1ba5d7ae70bef39c751cac29b80))
+- Notification Step 1, S1 daemon-reuse install, H5 bootout quoting bug (v3.13.2) ([`8a9fcf7`](https://github.com/Vit129/harness-terminal/commit/8a9fcf7d3a9529faf3b02804acbab077dee656af))
 
 ## [3.13.1] - 2026-07-02
 
