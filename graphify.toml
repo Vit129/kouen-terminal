@@ -1,0 +1,7 @@
+# graphify project defaults — applied by `graphify update .` (the code-only,
+# no-LLM-key path used by the post-commit hook) and by ad-hoc CLI runs.
+# Mirrors the flags Scripts/graphify-refresh.sh passes for full/manual refreshes,
+# so an incremental post-commit update and a manual full refresh stay consistent.
+no_viz = true
+wiki = true
+exclude_hubs = 99
