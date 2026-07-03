@@ -1,0 +1,16 @@
+#!/bin/bash
+# Auto-rebuild the graphify knowledge graph after each commit.
+# Uses `graphify update .` (the code-only AST path) instead of Scripts/graphify-refresh.sh's
+# full extraction — the latter also re-processes docs/images and errors out without an LLM
+# API key set, which would make this hook silently no-op on every commit.
+# Backgrounded + logged so a slow rebuild never blocks the commit or a chained `git commit && ...`.
+
+GIT_DIR=$(git rev-parse --git-dir 2>/dev/null)
+[ -d "$GIT_DIR/rebase-merge" ] && exit 0
+[ -d "$GIT_DIR/rebase-apply" ] && exit 0
+[ -f "$GIT_DIR/MERGE_HEAD" ] && exit 0
+[ -f "$GIT_DIR/CHERRY_PICK_HEAD" ] && exit 0
+
+REPO_ROOT=$(git rev-parse --show-toplevel)
+( cd "$REPO_ROOT" && graphify update . > graphify-out/.last-refresh.log 2>&1 & )
+exit 0
