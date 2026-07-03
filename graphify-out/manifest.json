@@ -210,8 +210,8 @@
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/Services/SessionCoordinatorTypes.swift": {
-    "mtime": 1783043754.3743641,
-    "ast_hash": "a318c85ab09fd0cddc067fd9c7e7c689",
+    "mtime": 1783072215.2794018,
+    "ast_hash": "397d1e671f5cfa34e0d7c89e929d07ef",
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/Services/SessionLifecycleService.swift": {
@@ -1355,8 +1355,8 @@
     "semantic_hash": ""
   },
   "Packages/HarnessOnboarding/Sources/HarnessOnboarding/Install/NotificationPermission.swift": {
-    "mtime": 1780729194.6566834,
-    "ast_hash": "938e470e6fb5ea1a4e5fd2dd436da036",
+    "mtime": 1783072199.059666,
+    "ast_hash": "b2b03623d22c395e035a4f4556732ac3",
     "semantic_hash": ""
   },
   "Packages/HarnessOnboarding/Sources/HarnessOnboarding/Install/ShellProfileInstaller.swift": {
@@ -3652,6 +3652,16 @@
   "Apps/Harness/Resources/icon-source/harnesscli-newicon.jpg": {
     "mtime": 1780537743.6441495,
     "ast_hash": "e44b299c74fa852fd99dc35d2500d382",
+    "semantic_hash": ""
+  },
+  "Packages/HarnessCore/Sources/HarnessCore/Platform/NotificationCenterProbe.swift": {
+    "mtime": 1783072177.6237943,
+    "ast_hash": "d0ce455b8f440bb9866e0d42912ca47e",
+    "semantic_hash": ""
+  },
+  "Tests/HarnessCoreTests/NotificationCenterProbeTests.swift": {
+    "mtime": 1783072286.2261274,
+    "ast_hash": "8fec190f6d8a3c3522a34a314eb419a0",
     "semantic_hash": ""
   }
 }

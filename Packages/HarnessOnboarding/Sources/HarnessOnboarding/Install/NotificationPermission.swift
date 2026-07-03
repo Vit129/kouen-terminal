@@ -1,4 +1,5 @@
 import AppKit
+import HarnessCore
 import UserNotifications
 
 /// Lets the first-run wizard ask macOS for notification permission with context, so a freshly
@@ -18,17 +19,34 @@ enum NotificationPermission {
         }
     }
 
-    /// Current permission, delivered on the main queue.
-    /// Disabled: UNUserNotificationCenter.current() crashes on macOS 26 beta.
+    /// Current permission, delivered on the main queue. Falls back to `.undetermined` when
+    /// `UNUserNotificationCenter` is known-bad on this machine (see `NotificationCenterProbe` in
+    /// HarnessApp — corrupted-database crash on some macOS 26 installs).
     static func current(_ completion: @escaping @MainActor @Sendable (State) -> Void) {
-        deliver(.undetermined, to: completion)
+        guard !NotificationCenterProbe.isKnownBad else {
+            deliver(.undetermined, to: completion)
+            return
+        }
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            let status = settings.authorizationStatus
+            Task { @MainActor in completion(map(status)) }
+        }
     }
 
-    /// Prompt when undecided; open System Settings ▸ Notifications when already denied.
-    /// Disabled: UNUserNotificationCenter.current() crashes on macOS 26 beta.
+    /// Prompt when undecided; open System Settings ▸ Notifications when already denied. Falls
+    /// back to opening Settings + `.undetermined` when `UNUserNotificationCenter` is known-bad.
     static func request(_ completion: @escaping @MainActor @Sendable (State) -> Void) {
-        openSystemSettings()
-        deliver(.undetermined, to: completion)
+        guard !NotificationCenterProbe.isKnownBad else {
+            openSystemSettings()
+            deliver(.undetermined, to: completion)
+            return
+        }
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
+            if let error {
+                NSLog("NotificationPermission: requestAuthorization failed: %@", error.localizedDescription)
+            }
+            Task { @MainActor in completion(granted ? .granted : .denied) }
+        }
     }
 
     private static func deliver(_ state: State, to completion: @escaping @MainActor @Sendable (State) -> Void) {
