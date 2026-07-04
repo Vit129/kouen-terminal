@@ -175,8 +175,8 @@
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/Services/NotificationCoordinator.swift": {
-    "mtime": 1781597102.6482646,
-    "ast_hash": "6695cd60da2f12dc04872c3872813854",
+    "mtime": 1783149025.910886,
+    "ast_hash": "3f7d4852f4ba6bf03b38584181043a08",
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/Services/ProjectTaskDetector.swift": {
@@ -200,8 +200,8 @@
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/Services/SessionCoordinator+HostDelegate.swift": {
-    "mtime": 1782653507.7639368,
-    "ast_hash": "647222af528070868b8a8a497bbbe04f",
+    "mtime": 1783149102.0915685,
+    "ast_hash": "c96f0cb3c43b01db6d98f758fff82de2",
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/Services/SessionCoordinator.swift": {
@@ -210,8 +210,8 @@
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/Services/SessionCoordinatorTypes.swift": {
-    "mtime": 1783072215.2794018,
-    "ast_hash": "397d1e671f5cfa34e0d7c89e929d07ef",
+    "mtime": 1783149044.4994738,
+    "ast_hash": "44948e8127682f2d5ba95294497fd13e",
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/Services/SessionLifecycleService.swift": {
@@ -3255,8 +3255,8 @@
     "semantic_hash": ""
   },
   "agent-memory/knowledge/INDEX.md": {
-    "mtime": 1782973050.7386055,
-    "ast_hash": "a4e82aca31d99de9eaf2f5d58c465a7a",
+    "mtime": 1783149539.3876991,
+    "ast_hash": "5e98b61176ffc83dc25755246faabf54",
     "semantic_hash": ""
   },
   "agent-memory/knowledge/ai/terminal-chat.md": {
@@ -3420,8 +3420,8 @@
     "semantic_hash": ""
   },
   "agent-memory/knowledge/rl-lessons.md": {
-    "mtime": 1782973050.740942,
-    "ast_hash": "ce0b4d5581591f219d6d87a34a332a9c",
+    "mtime": 1783149562.284744,
+    "ast_hash": "149bab2c1afce4f80c3e778cf32a2d6d",
     "semantic_hash": ""
   },
   "agent-memory/knowledge/sidebar-swiftui-migration.md": {
@@ -3662,6 +3662,11 @@
   "Tests/HarnessCoreTests/NotificationCenterProbeTests.swift": {
     "mtime": 1783072286.2261274,
     "ast_hash": "8fec190f6d8a3c3522a34a314eb419a0",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/bugs/notification-sound-and-click-routing.md": {
+    "mtime": 1783149508.9586134,
+    "ast_hash": "4bb228593a6387589521b344ec93b6aa",
     "semantic_hash": ""
   }
 }
