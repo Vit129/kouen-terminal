@@ -31,7 +31,7 @@ final class NotificationCoordinator {
                     pushedNotificationKeys.insert(key)
                     let agentLabel = effectiveAgentKind(for: tab)?.displayName ?? "Harness"
                     let title = "\(agentLabel) · \(tab.title.isEmpty ? "Terminal" : tab.title)"
-                    deliverAgentAlert(event: .agentWaiting, title: title, body: text)
+                    deliverAgentAlert(event: .agentWaiting, title: title, body: text, surfaceID: surfaceID)
                 }
             }
         }
@@ -79,7 +79,7 @@ final class NotificationCoordinator {
 
                     let folder = HarnessDesign.pathDisplayName(tab.cwd)
                     let title = "\(agent.kind.displayName) · \(folder)"
-                    deliverAgentAlert(event: .agentFinished, title: title, body: "Finished — waiting for you")
+                    deliverAgentAlert(event: .agentFinished, title: title, body: "Finished — waiting for you", surfaceID: surfaceID)
                 }
             }
         }
@@ -87,13 +87,13 @@ final class NotificationCoordinator {
         lastStopNotifyAt = lastStopNotifyAt.filter { live.contains($0.key) }
     }
 
-    func deliverAgentAlert(event: NotificationEvent, title: String, body: String) {
+    func deliverAgentAlert(event: NotificationEvent, title: String, body: String, surfaceID: SurfaceID? = nil) {
         guard coord.settings.isEventEnabled(event) else { return }
         let wantBanner = coord.settings.systemNotificationsEnabled
         let wantChime = coord.settings.notificationSoundEnabled
         guard wantBanner || wantChime else { return }
         if wantBanner {
-            DesktopNotifier.show(title: title, body: body, withSound: wantChime)
+            DesktopNotifier.show(title: title, body: body, withSound: wantChime, surfaceID: surfaceID?.uuidString)
         } else if wantChime {
             NSSound(named: "Glass")?.play()
         }
@@ -208,9 +208,23 @@ final class NotificationCoordinator {
         ))
         pushedNotificationKeys.insert(key)
         if NSApp.isActive == false {
-            deliverAgentAlert(event: event, title: title, body: body)
+            deliverAgentAlert(event: event, title: title, body: body, surfaceID: surfaceID)
         }
         coord.syncFromDaemon()
+    }
+
+    /// Routes a clicked macOS notification to the same place as clicking its notch/inbox entry:
+    /// select the owning workspace + tab, focus the pane, clear the waiting state.
+    func openSurface(_ surfaceID: SurfaceID) {
+        guard let tabID = coord.activePaneService.tabID(forSurface: surfaceID) else { return }
+        guard let workspace = coord.snapshot.workspaces.first(where: { ws in
+            ws.sessions.contains { session in session.tabs.contains { $0.id == tabID } }
+        }) else { return }
+        coord.selectWorkspace(workspace.id)
+        coord.selectTab(workspaceID: workspace.id, tabID: tabID)
+        coord.setActiveSurface(surfaceID)
+        coord.terminalHosts.host(for: surfaceID)?.focusTerminal()
+        clearNotification(surfaceID: surfaceID)
     }
 
     // MARK: - Private helpers

@@ -20,8 +20,8 @@
     "semantic_hash": ""
   },
   "agent-memory/MEMORY.md": {
-    "mtime": 1783047531.0979898,
-    "ast_hash": "7ddec0ceed16f7f5dc2bfb12334ec65e",
+    "mtime": 1783145861.8759391,
+    "ast_hash": "628bd971c4d5f371238e834e642fdec2",
     "semantic_hash": ""
   },
   "agent-memory/PLAYBOOK.md": {
@@ -350,13 +350,13 @@
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/UI/Chrome/BrowserIntegrationController.swift": {
-    "mtime": 1782097937.0111337,
-    "ast_hash": "73a1ee10d6e7c6bd6949716e3d487cc3",
+    "mtime": 1783147401.1498868,
+    "ast_hash": "c221caeee8b47fabdaeaea49a574a886",
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/UI/Chrome/BrowserPaneView.swift": {
-    "mtime": 1782632180.0951283,
-    "ast_hash": "a2ed45a1fa112148c5d6f1236be35899",
+    "mtime": 1783147396.6559799,
+    "ast_hash": "c7d797dcf7d7686783f2aee033318640",
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/UI/Chrome/ContentAreaViewController.swift": {
@@ -510,8 +510,8 @@
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/UI/FileTree/FileTreeSwiftUIView.swift": {
-    "mtime": 1782124685.6030502,
-    "ast_hash": "a9e7766111dd82acc3b247acd54c056c",
+    "mtime": 1783147407.1235435,
+    "ast_hash": "261d4c74e82a5395e9844dbbba812918",
     "semantic_hash": ""
   },
   "Apps/Harness/Sources/HarnessApp/UI/FileTree/WorkspaceFileTreeView.swift": {
@@ -955,8 +955,8 @@
     "semantic_hash": ""
   },
   "Packages/HarnessCore/Sources/HarnessCore/HarnessVersion.swift": {
-    "mtime": 1783073947.28825,
-    "ast_hash": "a06bb06e0ff3b6543a54f602c3efde32",
+    "mtime": 1783147892.26123,
+    "ast_hash": "f5ac4de68c34befdec1d460f793da96f",
     "semantic_hash": ""
   },
   "Packages/HarnessCore/Sources/HarnessCore/IPC/DaemonClient.swift": {
@@ -1080,8 +1080,8 @@
     "semantic_hash": ""
   },
   "Packages/HarnessCore/Sources/HarnessCore/ReleaseNotes/GeneratedReleaseNotes.swift": {
-    "mtime": 1783073948.1868963,
-    "ast_hash": "ab076bccbe686f48df9d6d83c896e2ad",
+    "mtime": 1783147892.899016,
+    "ast_hash": "4881751b3114cb40a03fc110f81f0c4d",
     "semantic_hash": ""
   },
   "Packages/HarnessCore/Sources/HarnessCore/ReleaseNotes/ReleaseNotes.swift": {
@@ -2025,8 +2025,8 @@
     "semantic_hash": ""
   },
   "Tests/HarnessAppTests/BrowserPaneViewTests.swift": {
-    "mtime": 1781507864.0407782,
-    "ast_hash": "94fa106b5bea4db6b70406421f595979",
+    "mtime": 1783147416.9125915,
+    "ast_hash": "be4b2c2208a28f7904e9f30ab8539169",
     "semantic_hash": ""
   },
   "Tests/HarnessAppTests/ExternalOpenKindTests.swift": {
@@ -3250,8 +3250,8 @@
     "semantic_hash": ""
   },
   "agent-memory/COMPLETED-TASKS-ARCHIVE.md": {
-    "mtime": 1783037830.9402325,
-    "ast_hash": "27bb6f72721ea6b8f40a4c7a510b86fd",
+    "mtime": 1783145861.8763974,
+    "ast_hash": "05eda6857f31f01608733a6ad5eac54d",
     "semantic_hash": ""
   },
   "agent-memory/knowledge/INDEX.md": {
@@ -3440,8 +3440,8 @@
     "semantic_hash": ""
   },
   "agent-memory/knowledge/ui/browser-pane.md": {
-    "mtime": 1782035945.2080264,
-    "ast_hash": "10505fb32a8ed8d7cf79ada3dc71fcbd",
+    "mtime": 1783147479.28883,
+    "ast_hash": "1c7a4170090a9125d6a5e915a81d0e79",
     "semantic_hash": ""
   },
   "agent-memory/knowledge/ui/git-panel.md": {

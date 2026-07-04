@@ -41,7 +41,7 @@ extension SessionCoordinator: TerminalHostDelegate {
         if NSApp.isActive, surfaceID == activeSurfaceID { return }
         let code = exitCode ?? 0
         let status = code == 0 ? "succeeded" : "failed (exit \(code))"
-        notificationCoordinator.deliverAgentAlert(event: .commandFinished, title: "Command \(status)", body: "Ran for \(formatDuration(duration)).")
+        notificationCoordinator.deliverAgentAlert(event: .commandFinished, title: "Command \(status)", body: "Ran for \(formatDuration(duration)).", surfaceID: surfaceID)
     }
 
     func terminalHostDidRequestDesktopNotification(title: String, body: String, surfaceID: SurfaceID) {

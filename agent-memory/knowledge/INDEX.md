@@ -34,6 +34,7 @@
 | patterns/fsevents-pattern.md | Swift/FSEvents | FSEventStreamCreate, recursive, DispatchSource, WatcherContext, Unmanaged, CASE-016, CASE-021 | 1/0 | Reusable FSEvents recursive watcher pattern for Swift actors — replaces non-recursive DispatchSource for nested directory watching. |
 | architecture/command-prompt.md | Commands/Parser | CommandParser, CommandPrompt, knownVerbs, aliases, sendKeys, zoxide, passthrough | 1/0 | Command prompt 2-layer architecture: CommandParser (text→Command) + MainExecutor (Command→effect). Every documented verb needs both layers or throws unknownCommand. |
 | rl-lessons.md | AppKit/Swift6 | RL, zombie, NSSplitView, NSPanel, NSAlert, WKWebView, Task.detached, Observable, nonisolated, assumeIsolated | 0/0 | All RL-xxx lesson entries — grep target for bug pattern lookup |
+| bugs/notification-sound-and-click-routing.md | AppKit/UN | UNUserNotificationCenter, NotificationPresenter, willPresent, didReceive, sound, userInfo, surfaceID, notch, CASE-063 | 0/0 | Compound report split into 2: (a) foreground `willPresent` ignored the sound toggle — now gates `.sound` on `content.sound != nil`; (b) banner click never navigated like the notch/inbox does — no `didReceive` and no identity on the request at all. Added `surfaceID` through `content.userInfo`, `NotificationCoordinator.openSurface(_:)`, and the `didReceive` delegate method. |
 | architecture/decisions.md | Architecture | ACP, harness-mcp, keybindings, sidebar, worktree, browser, tab, config, IPC | 0/0 | Stable architecture decisions moved from MEMORY.md |
 
 ## Source Map
@@ -61,6 +62,7 @@
 | bugs/notch-cpu-animation.md | `HarnessApp/UI/Notch/NotchPanelController.swift`, `HarnessApp/UI/Notch/AgentNotchViewModel.swift`, `HarnessApp/UI/Notch/NotchMaskAnimator.swift`, `HarnessApp/UI/Notch/NotchShape.swift`, `HarnessApp/Services/SnapshotCoalescer.swift`, `HarnessDaemon/AgentScanner.swift` |
 | patterns/gpu-animation-ca.md | `HarnessApp/UI/Notch/NotchMaskAnimator.swift`, `HarnessApp/UI/Notch/NotchPanelController.swift`, `HarnessApp/UI/Notch/NotchPanel.swift`, `HarnessApp/Services/SnapshotCoalescer.swift` |
 | bugs/zombie-crash-macos26.md | `HarnessApp/Services/TerminalPaneRegistry.swift`, `HarnessApp/UI/Chrome/ContentAreaViewController.swift`, `HarnessApp/UI/FileTree/WorkspaceFileTreeView.swift`, `HarnessApp/Services/ActivePaneService.swift`, `HarnessTerminalKit/HarnessTerminalSurfaceView+Scrollback.swift`, `HarnessTerminalKit/TerminalScrollbarView.swift`, `HarnessTerminalKit/ResizeHUDView.swift` |
+| bugs/notification-sound-and-click-routing.md | `HarnessApp/Services/SessionCoordinatorTypes.swift`, `HarnessApp/Services/NotificationCoordinator.swift`, `HarnessApp/Services/SessionCoordinator+HostDelegate.swift` |
 
 ## Edges
 
@@ -82,6 +84,8 @@
 | architecture/session-tab-hierarchy.md | ui/appkit-metal.md | ContentAreaViewController, top bar |
 | ui/agent-session-board.md | architecture/session-tab-hierarchy.md | SessionSnapshot, Tab, PaneLeaf, status classification |
 | ui/browser-pane.md | ui/split-panes.md | PaneNode, PaneContainerView, SplitPaneCoordinator |
+| bugs/notification-sound-and-click-routing.md | bugs/zombie-crash-macos26.md | NotificationCenterProbe.isKnownBad forks AppleScript vs UNUserNotificationCenter delivery path |
+| bugs/notification-sound-and-click-routing.md | bugs/nstextfield-leak-board.md | both touch NotificationCoordinator.swift |
 | ui/browser-pane.md | architecture/ipc-architecture.md | DaemonSyncService, snapshot, applySnapshot |
 | ui/tab-bar.md | architecture/session-tab-hierarchy.md | reloadTabBar, TabPillView, SessionGroup, pill-per-session |
 | ui/tab-bar.md | ui/agent-session-board.md | statusDot, BoardColumnKind, tab status classification |

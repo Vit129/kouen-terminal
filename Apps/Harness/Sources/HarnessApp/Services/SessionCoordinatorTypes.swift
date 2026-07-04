@@ -26,7 +26,24 @@ final class NotificationPresenter: NSObject, UNUserNotificationCenterDelegate, @
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
-        completionHandler([.banner, .sound])
+        var options: UNNotificationPresentationOptions = [.banner]
+        if notification.request.content.sound != nil { options.insert(.sound) }
+        completionHandler(options)
+    }
+
+    /// Clicking the banner routes to the same place as clicking its notch/inbox entry.
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        if let idString = response.notification.request.content.userInfo["surfaceID"] as? String,
+           let surfaceID = UUID(uuidString: idString) {
+            Task { @MainActor in
+                SessionCoordinator.shared.notificationCoordinator.openSurface(surfaceID)
+            }
+        }
+        completionHandler()
     }
 }
 
@@ -53,7 +70,7 @@ enum DesktopNotifier {
     ///   running it on a background queue (a previous version's behavior) could fail silently
     ///   depending on caller context.
     static func show(
-        title: String, body: String, withSound: Bool = true,
+        title: String, body: String, withSound: Bool = true, surfaceID: String? = nil,
         completion: (@MainActor @Sendable (Bool) -> Void)? = nil
     ) {
         guard NotificationCenterProbe.isKnownBad else {
@@ -61,6 +78,7 @@ enum DesktopNotifier {
             content.title = title
             content.body = body
             if withSound { content.sound = .default }
+            if let surfaceID { content.userInfo = ["surfaceID": surfaceID] }
             let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
             UNUserNotificationCenter.current().add(request) { error in
                 if let error {
