@@ -143,8 +143,8 @@ final class MainSplitViewController: NSViewController {
         )
         NotificationCenter.default.addObserver(
             self,
-            selector: #selector(openLocalhostURLFromTerminal(_:)),
-            name: Notification.Name("HarnessOpenLocalhostURL"),
+            selector: #selector(openURLInBrowserPaneFromTerminal(_:)),
+            name: Notification.Name("HarnessOpenInBrowserPaneURL"),
             object: nil
         )
     }
@@ -181,7 +181,7 @@ final class MainSplitViewController: NSViewController {
         sidebar.selectFilesTab(revealPath: path)
     }
 
-    @objc private func openLocalhostURLFromTerminal(_ notification: Notification) {
+    @objc private func openURLInBrowserPaneFromTerminal(_ notification: Notification) {
         guard let url = notification.userInfo?["url"] as? URL else { return }
         SessionCoordinator.shared.splitPaneCoordinator.openBrowserPane(url: url, direction: .horizontal)
     }
