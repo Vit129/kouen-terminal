@@ -338,15 +338,23 @@ public final class BrowserPaneView: NSView {
     }
 
     func createTab(url: URL, configuration: WKWebViewConfiguration? = nil) {
+        let isFreshConfiguration = configuration == nil
         let config = configuration ?? WKWebViewConfiguration()
-        if configuration == nil { config.limitsNavigationsToAppBoundDomains = false }
+        if isFreshConfiguration { config.limitsNavigationsToAppBoundDomains = false }
         let newWeb = WKWebView(frame: webView.frame, configuration: config)
         newWeb.navigationDelegate = self
         newWeb.uiDelegate = self
         newWeb.translatesAutoresizingMaskIntoConstraints = false
 
-        setupConsoleLogRedirection(for: newWeb)
-        setupNetworkCapture(for: newWeb)
+        // A reused configuration (popup/window.open via createWebViewWith) shares its
+        // WKUserContentController with the opener tab, which already has these handlers
+        // registered — adding "harnessConsoleLog" a second time throws and crashes the app.
+        // The injected scripts stay active for the new tab either way since they live on
+        // the shared controller, so skipping re-setup here loses nothing.
+        if isFreshConfiguration {
+            setupConsoleLogRedirection(for: newWeb)
+            setupNetworkCapture(for: newWeb)
+        }
 
         let tab = BrowserTab(id: UUID(), webView: newWeb, title: "New Tab")
         tabs.append(tab)
