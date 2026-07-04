@@ -25,6 +25,21 @@ final class BrowserPaneViewTests: XCTestCase {
         XCTAssertEqual(paneView.urlTextField.stringValue, "https://example.com/finish")
     }
 
+    func testViewSourceButtonVisibleOnlyForLocalHTML() {
+        let mockWebView = MockWebView(frame: .zero, configuration: WKWebViewConfiguration())
+        let testURL = URL(string: "https://example.com/test")!
+        mockWebView.mockURL = testURL
+
+        let paneView = BrowserPaneView(url: testURL, paneID: UUID(), webView: mockWebView)
+        paneView.webView(mockWebView, didCommit: nil)
+        XCTAssertTrue(paneView.viewSourceButton.isHidden, "remote URL should not show View Source")
+
+        let fileURL = URL(fileURLWithPath: "/tmp/report.html")
+        mockWebView.mockURL = fileURL
+        paneView.webView(mockWebView, didCommit: nil)
+        XCTAssertFalse(paneView.viewSourceButton.isHidden, "local .html file:// URL should show View Source")
+    }
+
     func testRemovePaneNodeCollapsesBranch() {
         let coordinator = SessionCoordinator.shared.splitPaneCoordinator
         let firstBrowserID = UUID()

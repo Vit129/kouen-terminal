@@ -179,3 +179,26 @@ override func mouseUp(with event: NSEvent) {
 **Lesson (RL-043 update):** NSClickGestureRecognizer on a view consumes ALL mouse events
 even with `delaysPrimaryMouseButtonEvents = false`. If you need both "select area" and
 "close button" in one view, use `mouseUp` override — never gesture recognizer.
+
+## Local HTML Rendering (2026-07-04)
+
+Double-clicking a `.html`/`.htm` file in the file tree (`FileTreeSwiftUIView.openFile()`)
+now routes into the Browser Pane via `openBrowserPane(url: URL(fileURLWithPath:))` instead
+of opening as syntax-highlighted source (single-click preview is unchanged — still text).
+Motivated by wanting the same rendered view for local static HTML (e.g. a course/report
+site with sibling `.js`/`.css`) that ⌘B already gives for remote/localhost URLs.
+
+- `BrowserPaneView.navigate(to:)` and `createTab(url:)` branch on `url.isFileURL` →
+  `webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())`.
+  Plain `webView.load(URLRequest(url:))` (the http(s) path) silently fails for `file://`
+  — WKWebView requires the dedicated API plus an explicit sandbox read-access grant on the
+  *directory*, not just the file, so relative `<script src="course.js">`/`<link
+  href="style.css">` references next to the HTML resolve too.
+- **Toggle back to source:** new toolbar button `viewSourceButton` (only visible when the
+  active tab's URL is a local `.html`/`.htm` file — gated via
+  `updateViewSourceButtonVisibility(for:)`, called at all 4 existing `urlTextField`
+  sync points: `navigate(to:)`, `selectTab`, `didCommit`, `didFinish`). Clicking it posts
+  the existing `HarnessOpenFilePreview` notification (same one `BrowserIntegrationController`
+  already used for close-pane symmetry) — `MainSplitViewController.openFilePreviewFromTerminal`
+  picks it up and opens the file as source in a normal file tab. No new notification needed.
+- Test: `BrowserPaneViewTests.testViewSourceButtonVisibleOnlyForLocalHTML`.

@@ -24,6 +24,9 @@ final class BrowserIntegrationController {
         bv.onClosePaneRequested = {
             SessionCoordinator.shared.splitPaneCoordinator.closeBrowserPane(paneID: paneIDCopy)
         }
+        bv.onViewSourceRequested = { url in
+            NotificationCenter.default.post(name: Notification.Name("HarnessOpenFilePreview"), object: nil, userInfo: ["path": url.path])
+        }
         bv.translatesAutoresizingMaskIntoConstraints = false
         parent.addSubview(bv)
         NSLayoutConstraint.activate([

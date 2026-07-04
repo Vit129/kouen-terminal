@@ -32,8 +32,11 @@ public final class BrowserPaneView: NSView {
     internal let reloadStopButton = SoftIconButton(frame: NSRect(x: 0, y: 0, width: 20, height: 20))
     internal let urlTextField = NSTextField()
     internal let closePaneButton = SoftIconButton(frame: NSRect(x: 0, y: 0, width: 20, height: 20))
+    internal let viewSourceButton = SoftIconButton(frame: NSRect(x: 0, y: 0, width: 20, height: 20))
     /// Called when user taps the close (×) button in the toolbar.
     public var onClosePaneRequested: (() -> Void)?
+    /// Called when user taps "View Source" while showing a local .html/.htm file:// URL.
+    public var onViewSourceRequested: ((URL) -> Void)?
 
     internal let errorBanner = NSView()
     internal let errorLabel = NSTextField(labelWithString: "")
@@ -185,6 +188,11 @@ public final class BrowserPaneView: NSView {
         closePaneButton.setContentHuggingPriority(.required, for: .horizontal)
         closePaneButton.setContentCompressionResistancePriority(.required, for: .horizontal)
 
+        configureNavigationButton(viewSourceButton, symbolName: "chevron.left.slash.chevron.right", action: #selector(viewSourceClicked))
+        viewSourceButton.setAccessibilityIdentifier("browser-view-source-button")
+        viewSourceButton.toolTip = "View Source"
+        viewSourceButton.isHidden = true
+
         // URL Text Field container & configuration
         let urlContainer = NSView()
         urlContainer.translatesAutoresizingMaskIntoConstraints = false
@@ -217,7 +225,7 @@ public final class BrowserPaneView: NSView {
             urlTextField.centerYAnchor.constraint(equalTo: urlContainer.centerYAnchor),
         ])
 
-        let toolbarStack = NSStackView(views: [backButton, forwardButton, reloadStopButton, urlContainer, closePaneButton])
+        let toolbarStack = NSStackView(views: [backButton, forwardButton, reloadStopButton, urlContainer, viewSourceButton, closePaneButton])
         toolbarStack.orientation = .horizontal
         toolbarStack.spacing = 6
         toolbarStack.edgeInsets = NSEdgeInsets(top: 2, left: 8, bottom: 2, right: 8)
@@ -343,7 +351,11 @@ public final class BrowserPaneView: NSView {
         let tab = BrowserTab(id: UUID(), webView: newWeb, title: "New Tab")
         tabs.append(tab)
         selectTab(at: tabs.count - 1)
-        newWeb.load(URLRequest(url: url))
+        if url.isFileURL {
+            newWeb.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
+        } else {
+            newWeb.load(URLRequest(url: url))
+        }
     }
 
     private var mainStack: NSStackView!
@@ -366,6 +378,7 @@ public final class BrowserPaneView: NSView {
             setupProgressObservation()
         }
         urlTextField.stringValue = newWeb.url?.absoluteString ?? ""
+        updateViewSourceButtonVisibility(for: newWeb.url)
         refreshTabBar()
     }
 
@@ -562,6 +575,18 @@ public final class BrowserPaneView: NSView {
         }
     }
 
+    @objc private func viewSourceClicked() {
+        guard let url = webView.url, url.isFileURL else { return }
+        onViewSourceRequested?(url)
+    }
+
+    /// Local .html/.htm files can round-trip to the file editor via `onViewSourceRequested`;
+    /// every other URL (http/https, about:blank) has no source file to show.
+    private func updateViewSourceButtonVisibility(for url: URL?) {
+        let ext = url?.pathExtension.lowercased() ?? ""
+        viewSourceButton.isHidden = !(url?.isFileURL == true && (ext == "html" || ext == "htm"))
+    }
+
     @objc private func backClicked() {
         if webView.canGoBack {
             webView.goBack()
@@ -665,9 +690,15 @@ public final class BrowserPaneView: NSView {
     // MARK: - Public API
 
     public func navigate(to url: URL) {
-        let request = URLRequest(url: url)
-        webView.load(request)
+        if url.isFileURL {
+            // WKWebView refuses plain file:// loads; the directory grant lets
+            // sibling assets (course.js, style.css) load alongside the HTML.
+            webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
+        } else {
+            webView.load(URLRequest(url: url))
+        }
         urlTextField.stringValue = url.absoluteString
+        updateViewSourceButtonVisibility(for: url)
         dismissErrorBanner()
     }
 
@@ -785,6 +816,7 @@ extension BrowserPaneView: WKNavigationDelegate {
     public func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         if let url = webView.url {
             urlTextField.stringValue = url.absoluteString
+            updateViewSourceButtonVisibility(for: url)
         }
     }
 
@@ -798,6 +830,7 @@ extension BrowserPaneView: WKNavigationDelegate {
         cancelRetry()
         if let url = webView.url {
             urlTextField.stringValue = url.absoluteString
+            updateViewSourceButtonVisibility(for: url)
             UserDefaults.standard.set(url.absoluteString, forKey: "browserPane.\(paneID.uuidString).url")
         }
         // Update tab title

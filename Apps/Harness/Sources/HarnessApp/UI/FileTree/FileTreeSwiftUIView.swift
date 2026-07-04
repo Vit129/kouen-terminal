@@ -786,6 +786,14 @@ private struct NodeRow: View {
     }
 
     private func openFile() {
+        let ext = (node.node.path as NSString).pathExtension.lowercased()
+        if ext == "html" || ext == "htm" {
+            SessionCoordinator.shared.splitPaneCoordinator.openBrowserPane(
+                url: URL(fileURLWithPath: node.node.path),
+                direction: .horizontal
+            )
+            return
+        }
         let coordinator = SessionCoordinator.shared
         let action = coordinator.settings.fileClickAction
         if action == "editor" || action == "preview" {

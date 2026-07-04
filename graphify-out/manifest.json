@@ -955,8 +955,8 @@
     "semantic_hash": ""
   },
   "Packages/HarnessCore/Sources/HarnessCore/HarnessVersion.swift": {
-    "mtime": 1783006246.5389323,
-    "ast_hash": "e6fb41f08353a363998f18f85795eec3",
+    "mtime": 1783073947.28825,
+    "ast_hash": "a06bb06e0ff3b6543a54f602c3efde32",
     "semantic_hash": ""
   },
   "Packages/HarnessCore/Sources/HarnessCore/IPC/DaemonClient.swift": {
@@ -1080,8 +1080,8 @@
     "semantic_hash": ""
   },
   "Packages/HarnessCore/Sources/HarnessCore/ReleaseNotes/GeneratedReleaseNotes.swift": {
-    "mtime": 1783006247.2336965,
-    "ast_hash": "ad09c625f3e2c9cf9deac33404f7a2fb",
+    "mtime": 1783073948.1868963,
+    "ast_hash": "ab076bccbe686f48df9d6d83c896e2ad",
     "semantic_hash": ""
   },
   "Packages/HarnessCore/Sources/HarnessCore/ReleaseNotes/ReleaseNotes.swift": {
@@ -1865,8 +1865,8 @@
     "semantic_hash": ""
   },
   "Scripts/commit-push.sh": {
-    "mtime": 1781276095.8163264,
-    "ast_hash": "824f7a15ff73e602bea6c4ea8371d9db",
+    "mtime": 1783075425.1724823,
+    "ast_hash": "2a6b30e9a4db0623ede31d2a9928b482",
     "semantic_hash": ""
   },
   "Scripts/completions/harness-cli.fish": {
