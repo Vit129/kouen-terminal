@@ -8,7 +8,12 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [3.14.0] - 2026-07-04
 
 ### Added
-- Release version bump to v3.14.0.
+- Open every http/https link in the in-app Browser Pane ([`36ea9b6`](https://github.com/Vit129/harness-terminal/commit/36ea9b6a546741a7661ba32002ff66c6478e97b3))
+- Route web links to the in-app browser pane, fix popup crash (release v3.14.0) ([`2c98e9e`](https://github.com/Vit129/harness-terminal/commit/2c98e9ec6dc2b700faeb97c0de81dfc6f8d4277f))
+
+### Fixed
+- Respect sound toggle in foreground and route banner clicks to their pane ([`2202305`](https://github.com/Vit129/harness-terminal/commit/2202305e8c5f296450ef2fd599d0e70861c01612))
+- Prevent crash when a browser popup reuses the opener's WKWebViewConfiguration ([`149d28b`](https://github.com/Vit129/harness-terminal/commit/149d28ba8c639bbaa8d7f63633157077e65baf10))
 
 ## [3.13.3] - 2026-07-04
 
