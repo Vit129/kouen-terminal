@@ -8,7 +8,10 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [3.13.3] - 2026-07-04
 
 ### Added
-- Release version bump to v3.13.3.
+- Render local .html files in the embedded browser pane on double-click (release v3.13.3) ([`70ba89c`](https://github.com/Vit129/harness-terminal/commit/70ba89ce0a9954d0cab6c11561d58cf577caaf78))
+
+### Fixed
+- Auto-tag commit message when Info.plist is staged ([`e4d8d51`](https://github.com/Vit129/harness-terminal/commit/e4d8d51693ab8b863ebdb50777300db022c893eb))
 
 ## [3.13.2] - 2026-07-03
 
