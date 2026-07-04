@@ -221,7 +221,7 @@ extension HarnessTerminalSurfaceView {
             // HTML files open in the browser pane, not file preview
             if path.hasSuffix(".html") || path.hasSuffix(".htm") {
                 NotificationCenter.default.post(
-                    name: Notification.Name("HarnessOpenLocalhostURL"),
+                    name: Notification.Name("HarnessOpenInBrowserPaneURL"),
                     object: nil,
                     userInfo: ["url": URL(fileURLWithPath: path)]
                 )
@@ -237,24 +237,12 @@ extension HarnessTerminalSurfaceView {
         guard let url = URL(string: string), let scheme = url.scheme?.lowercased(),
               ["http", "https", "mailto", "ftp", "ftps"].contains(scheme) else { return }
 
-        // Dev-server URLs open in the in-app Browser Pane instead of the system browser.
-        if ["http", "https"].contains(scheme),
-           let host = url.host,
-           URLDetection.isLocalDevHost(host) {
+        // Every http/https link opens in the in-app Browser Pane instead of switching to
+        // the system browser. mailto/ftp/ftps still hand off — there's no in-app handler
+        // for those schemes.
+        if ["http", "https"].contains(scheme) {
             NotificationCenter.default.post(
-                name: Notification.Name("HarnessOpenLocalhostURL"),
-                object: nil,
-                userInfo: ["url": url]
-            )
-            return
-        }
-
-        // GitHub PR/issue URLs open in the in-app Browser Pane.
-        if ["http", "https"].contains(scheme),
-           let host = url.host,
-           host.contains("github.com") {
-            NotificationCenter.default.post(
-                name: Notification.Name("HarnessOpenLocalhostURL"),
+                name: Notification.Name("HarnessOpenInBrowserPaneURL"),
                 object: nil,
                 userInfo: ["url": url]
             )
