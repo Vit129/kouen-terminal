@@ -2,6 +2,30 @@
 
 Older releases. See [CHANGELOG.md](../CHANGELOG.md) for recent versions.
 
+## [3.12.0] - 2026-06-30
+
+### Added
+- Board + Spaces tabs + openDiffReview MCP tool ([`78af4a4`](https://github.com/Vit129/harness-terminal/commit/78af4a49e1c559e1d223d5a0d73a91659d1a0602))
+- Show Needs Attention text inline in session rows ([`73258c5`](https://github.com/Vit129/harness-terminal/commit/73258c531532e9e6db1ca383a99a694f377aed0e))
+- Board toggle, inline agent status, openDiffReview; bump version 3.12.0 ([`0277c32`](https://github.com/Vit129/harness-terminal/commit/0277c3268f53e5e19ada91281e233b10a91e0e20))
+
+### Changed
+- Merge Board into Sessions tab with list/board toggle ([`fd7a294`](https://github.com/Vit129/harness-terminal/commit/fd7a29417114999b1fd37ac2600a7e12d0b8aff8))
+- Inline board status in session rows, drop Spaces tab ([`08014e8`](https://github.com/Vit129/harness-terminal/commit/08014e87676974ab74de6a3e7f0ac01076cd1284))
+
+### Documentation
+- Record CASE-057 — CC 2.1.195 rejects whole settings.json on one invalid value ([`793b9ae`](https://github.com/Vit129/harness-terminal/commit/793b9ae6c556d1a00641339aa66f08c129e0aea0))
+- Record live perf profile — CPU = SwiftUI .repeatForever ViewGraph storm, memory clean ([`b188a4b`](https://github.com/Vit129/harness-terminal/commit/b188a4b0902ad72f460d1da9f0cb0afbb4e9bf0e))
+- Mark .repeatForever CPU fix done (dd7a78c) in knowledge ([`1905af0`](https://github.com/Vit129/harness-terminal/commit/1905af041107d779ff34d9a10d39f9d75684445c))
+
+### Fixed
+- Status line hidden on plain mode after SwiftUI settings migration ([`71e3c05`](https://github.com/Vit129/harness-terminal/commit/71e3c05bf3e33153b858ca594fba68c1de7e30ca))
+- Contain Metal layer islands so status bar stays on top ([`2a5b3f0`](https://github.com/Vit129/harness-terminal/commit/2a5b3f053c86a129f0df361a6a80896c6ec9139e))
+- Eliminate CPU spikes from FSEvent storm during agent writes ([`f6ffb0a`](https://github.com/Vit129/harness-terminal/commit/f6ffb0a3c9a24ca39f8171025bdafbe289d66a65))
+- Move working/notch pulse off SwiftUI .repeatForever to CALayer (CPU) ([`dd7a78c`](https://github.com/Vit129/harness-terminal/commit/dd7a78c37e74215800d1ca391f2d530f71a465be))
+- Add openGitPanel stub to SurfaceRegistry exhaustive switch ([`4596a86`](https://github.com/Vit129/harness-terminal/commit/4596a8695effb73f59560ab74dac95138b78c1ed))
+- Kill in-flight CADisplayLink before reading frame width ([`ac77280`](https://github.com/Vit129/harness-terminal/commit/ac772801d68a6fb95bef3bae690128df761ddf23))
+
 ## [3.11.7] - 2026-06-29
 
 ### Changed
