@@ -1,8 +1,17 @@
 import Foundation
 
 public enum HarnessPaths {
+    /// `KOUEN_HOME` takes precedence; `HARNESS_HOME` (the pre-rename name) is read as a fallback
+    /// so a shell profile or CI config already setting it keeps working unmodified.
+    private static var overrideRootRaw: String? {
+        let env = ProcessInfo.processInfo.environment
+        if let kouen = env["KOUEN_HOME"], !kouen.isEmpty { return kouen }
+        if let harness = env["HARNESS_HOME"], !harness.isEmpty { return harness }
+        return nil
+    }
+
     private static var overrideRoot: URL? {
-        guard let raw = ProcessInfo.processInfo.environment["HARNESS_HOME"], !raw.isEmpty else {
+        guard let raw = overrideRootRaw, !raw.isEmpty else {
             let fm = FileManager.default
             if Bundle.main.bundleIdentifier == "com.vit129.kouen.preview" {
                 return Bundle.main.bundleURL.deletingLastPathComponent()
