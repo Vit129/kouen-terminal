@@ -7,7 +7,7 @@ import os
 /// disabled every `mark` is a single branch, so the call sites are safe to leave on
 /// the launch path. Enable with `HARNESS_STARTUP_METRICS=1`; the timeline is logged
 /// live to the unified log (Console.app / `log stream`) under
-/// `subsystem == "com.vit129.harness", category == "startup"`.
+/// `subsystem == "com.vit129.kouen", category == "startup"`.
 ///
 /// Mirrors `DaemonMetrics`: a process-wide `shared` instance, env-gated, with
 /// monotonic timestamps. Marks are **idempotent** (only the first occurrence of a
@@ -36,7 +36,7 @@ public final class StartupMetrics: @unchecked Sendable {
     #if canImport(os)
     // Apple's unified log (Console.app / `log stream`). Linux has no equivalent; the file log
     // under `logs/startup.log` is the durable sink there.
-    private let logger = Logger(subsystem: "com.vit129.harness", category: "startup")
+    private let logger = Logger(subsystem: "com.vit129.kouen", category: "startup")
     #endif
     /// Whether to also append marks to `logs/startup.log`. True only for the
     /// env-constructed `shared` instance — test-constructed instances never touch

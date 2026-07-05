@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Clear production runtime state that can make a freshly built Harness.app
+# Clear production runtime state that can make a freshly built Kouen.app
 # reconnect to stale panes, scrollback, sockets, or daemon buffers.
 #
 # Intentionally preserves user configuration: settings, keybindings, themes,
 # options, hooks, environment, and installed agent metadata.
 set -euo pipefail
 
-APP_SUPPORT="$HOME/Library/Application Support/Harness"
+APP_SUPPORT="$HOME/Library/Application Support/Kouen"
 CACHE_ROOT="$HOME/Library/Caches/Harness"
 
 echo "==> Clearing production runtime state..."

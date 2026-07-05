@@ -4,7 +4,7 @@ public enum HarnessPaths {
     private static var overrideRoot: URL? {
         guard let raw = ProcessInfo.processInfo.environment["HARNESS_HOME"], !raw.isEmpty else {
             let fm = FileManager.default
-            if Bundle.main.bundleIdentifier == "com.vit129.harness.preview" {
+            if Bundle.main.bundleIdentifier == "com.vit129.kouen.preview" {
                 return Bundle.main.bundleURL.deletingLastPathComponent()
             }
             if let bundled = Bundle.main.object(forInfoDictionaryKey: "HarnessPreviewHome") as? String,
@@ -15,10 +15,10 @@ public enum HarnessPaths {
             
             // Auto-detect if running inside a directory (e.g. repo) that contains a `.harness-preview` folder.
             // This automatically points harness-cli or debug daemon to the preview state when run from the repo.
-            // Skip this auto-detection for the main GUI app (com.vit129.harness) so it doesn't share sessions
+            // Skip this auto-detection for the main GUI app (com.vit129.kouen) so it doesn't share sessions
             // with the preview environment when launched from within the repo directory.
             if NSClassFromString("XCTestCase") == nil {
-                if Bundle.main.bundleIdentifier != "com.vit129.harness" {
+                if Bundle.main.bundleIdentifier != "com.vit129.kouen" {
                     var dir = URL(fileURLWithPath: fm.currentDirectoryPath)
                     while dir.path != "/" {
                         let previewDir = dir.appendingPathComponent(".harness-preview", isDirectory: true)
@@ -233,7 +233,7 @@ public enum HarnessPaths {
 
     /// launchd label for the user-domain LaunchAgent that supervises HarnessDaemon.
     /// Stable so `launchctl print gui/$UID/<label>` works for support diagnostics.
-    public static let launchAgentLabel = "com.vit129.harness.daemon"
+    public static let launchAgentLabel = "com.vit129.kouen.daemon"
 
     public static var launchAgentURL: URL {
         FileManager.default.homeDirectoryForCurrentUser

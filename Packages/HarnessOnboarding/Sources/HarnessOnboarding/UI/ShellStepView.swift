@@ -54,7 +54,7 @@ struct ShellStepView: View {
             // Non-blocking heads-up if the user leaves this step with no profile updated: harness-cli
             // won't be on PATH until shell integration is applied, and the wizard reopens any time.
             if noneConfigured && !success {
-                Text("Skip and harness-cli won't be on your PATH until you apply shell integration. Reopen this anytime from Help → Welcome to Harness.")
+                Text("Skip and kouen-cli won't be on your PATH until you apply shell integration. Reopen this anytime from Help → Welcome to Kouen.")
                     .font(.system(size: 11))
                     .foregroundStyle(Color.white.opacity(0.5))
                     .multilineTextAlignment(.center)

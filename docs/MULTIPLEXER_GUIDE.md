@@ -1,6 +1,6 @@
-# Harness as a terminal multiplexer
+# Kouen as a terminal multiplexer
 
-Harness is a native terminal multiplexer: a prefix key, splits, tabs, sessions, copy mode,
+Kouen is a native terminal multiplexer: a prefix key, splits, tabs, sessions, copy mode,
 detach/attach, and a `:` command line — all driven by one shared verb vocabulary
 (`split-window`, `new-window`, `kill-pane`, `copy-mode`…). It is **self-contained**: the daemon,
 the session model, the compositor, and the VT engine are all first-party Swift, with no external
@@ -32,7 +32,7 @@ The terms "tab" and "window" are used interchangeably in the verbs (`new-window`
 `next-window`/`previous-window` verbs move between tabs).
 
 **Who owns what:** a background **daemon** (`HarnessDaemon`, kept alive by launchd) owns all
-session truth and every PTY. The app and `harness-cli` are just clients — so your shells keep
+session truth and every PTY. The app and `kouen-cli` are just clients — so your shells keep
 running when the app quits, across crashes, and you can reattach from another window or over ssh.
 
 ---
@@ -46,8 +46,8 @@ Most multiplexer commands start with a **prefix** keystroke, then a second key.
   entirely (then drive everything from the `:` prompt, the `Cmd-K` palette, and macOS shortcuts).
 - Press **`prefix ?`** any time for a live cheatsheet generated from your current bindings.
 
-> The prefix layer only appears in modes that show Harness controls (Full/Agent modes, or when
-> Harness controls are set to On). In Plain mode you lean on the macOS `Cmd` shortcuts instead.
+> The prefix layer only appears in modes that show Kouen controls (Full/Agent modes, or when
+> Kouen controls are set to On). In Plain mode you lean on the macOS `Cmd` shortcuts instead.
 
 Everything below that says "`prefix X`" means: tap the prefix, release, then tap `X`.
 
@@ -71,7 +71,7 @@ Everything below that says "`prefix X`" means: tap the prefix, release, then tap
 **Layouts:** `even-horizontal` / `even-vertical` — cycle with `prefix Space`, or pick one with `:select-layout`. Also `rotate-window`, `break-pane` (pop a pane into its own tab), and `join-pane`.
 
 **Move a pane between tabs:** `prefix m` marks the active pane, then `prefix j` joins that marked
-pane into the current one (Harness's `move-pane`/`join-pane`).
+pane into the current one (Kouen's `move-pane`/`join-pane`).
 
 **Type to several panes at once:** `prefix S` toggles `synchronize-panes` for the tab.
 
@@ -102,14 +102,14 @@ readable without manual renaming.
 Sessions are the sidebar rows; each has its own tab strip. **Sessions are always visible** in the
 sidebar rather than something you "attach" to one at a time.
 
-- New session / workspace from the sidebar `+`, the palette, or `harness-cli new-session` /
+- New session / workspace from the sidebar `+`, the palette, or `kouen-cli new-session` /
   `new-workspace`.
 - **Persistence** (see [MODES.md](MODES.md)): a session survives a *clean* quit if the global
   "keep sessions on quit" is on **or** the session is pinned. Pin/unpin from the sidebar context
-  menu or `harness-cli promote-session` / `demote-session`. A crash leaves everything running.
+  menu or `kouen-cli promote-session` / `demote-session`. A crash leaves everything running.
 - `Cmd-Shift-N` makes a new workspace.
 
-**Grouped sessions:** `harness-cli new-session --group-with <session>` creates an independent session
+**Grouped sessions:** `kouen-cli new-session --group-with <session>` creates an independent session
 sharing the target session's window list (linked windows with shared surfaces). Every member sees the
 same tab bar; opening or closing a tab propagates to all members. Members may have divergent split
 layouts within each shared tab. See [TMUX_PARITY.md](TMUX_PARITY.md#at-parity) for full details.
@@ -134,7 +134,7 @@ Enter with **`prefix [`**. Copy mode is modal and vim-flavored (`mode-keys vi`):
 | `p` | Paste the most recent buffer into the pane |
 | `q` / `Escape` | Leave copy mode |
 
-Yanks land in named **paste buffers** (`harness-cli set-buffer` / `list-buffers` /
+Yanks land in named **paste buffers** (`kouen-cli set-buffer` / `list-buffers` /
 `paste-buffer`) as well as the system clipboard. Prefer emacs motions? Set `mode-keys emacs`
 (then `C-b/C-f/C-n/C-p`, `M-[`/`M-]` for prompt jumps). Copy mode is fully rebindable via
 `bind-key -T copy-mode <key> <command>`.
@@ -163,19 +163,19 @@ Anything you can bind, you can type.
   (`split-window -v`, `select-layout tiled`, `bind-key -T prefix S new-session`), with `↑`/`↓`
   history.
 - **`Cmd-K`** opens the command palette (fuzzy actions + themes).
-- From a shell, **`harness-cli <verb>`** runs the same vocabulary (and a lot more — buffers,
-  hooks, options, layout ops). Run `harness-cli` with no args for the full list.
-- Rebind anything: `harness-cli bind-key C-x x kill-pane`, multi-step with `;`
+- From a shell, **`kouen-cli <verb>`** runs the same vocabulary (and a lot more — buffers,
+  hooks, options, layout ops). Run `kouen-cli` with no args for the full list.
+- Rebind anything: `kouen-cli bind-key C-x x kill-pane`, multi-step with `;`
   (`bind-key C-x s "split-window -h ; copy-mode"`). Bindings persist in
-  `~/Library/Application Support/Harness/keybindings.json` (merged under the defaults, so deleting
+  `~/Library/Application Support/Kouen/keybindings.json` (merged under the defaults, so deleting
   one restores the default). Full details in [KEYBINDINGS.md](KEYBINDINGS.md).
 - **Hooks** fire commands on events (`after-new-tab`, `pane-exited`, `agent-state-changed`, …):
-  `harness-cli bind-hook after-split-pane 'display-message "split!"'`. Use `set-hook --if` with
+  `kouen-cli bind-hook after-split-pane 'display-message "split!"'`. Use `set-hook --if` with
   a format condition to make a hook conditional: `set-hook pane-exited --if "#{?pane_dead,1,0}"
   'display-message pane exited'`. Lifecycle events include `session-created/renamed/closed`,
   `window-linked/unlinked/layout-changed`, and alert events (`alert-activity`, `alert-silence`,
   `alert-bell`). See [TMUX_PARITY.md](TMUX_PARITY.md#at-parity) for the full list.
-- **Paste buffers** store text in named slots: `harness-cli set-buffer -b myname 'text'`,
+- **Paste buffers** store text in named slots: `kouen-cli set-buffer -b myname 'text'`,
   `paste-buffer -b myname` (into the active pane), `list-buffers`, `show-buffer -b myname`,
   `delete-buffer -b myname`. All bindable so copy-mode `y` yanks to both the clipboard and a
   paste buffer.
@@ -184,7 +184,7 @@ Anything you can bind, you can type.
 
 ## 9. Options and configuration
 
-Harness uses a scoped option store with a fallback chain: `pane → tab → session → workspace → global`.
+Kouen uses a scoped option store with a fallback chain: `pane → tab → session → workspace → global`.
 This means you can set a global default and override it per-session, tab, or pane.
 
 - **`set-option -g key value`** (or `set`) sets a global option.
@@ -206,20 +206,20 @@ for scope details.
 
 ## 10. Attach over ssh — the compositor
 
-`harness-cli attach-window` renders a tab's **entire split layout** — every pane, borders,
+`kouen-cli attach-window` renders a tab's **entire split layout** — every pane, borders,
 the status line, the active cursor — into any plain terminal, including over ssh. It's
-Harness-native and fully client-side:
+Kouen-native and fully client-side:
 
 ```bash
-harness-cli attach-window                       # the active tab
-harness-cli attach-window --session work          # a named session
-harness-cli attach --surface <uuid>               # a single pane only
+kouen-cli attach-window                       # the active tab
+kouen-cli attach-window --session work          # a named session
+kouen-cli attach --surface <uuid>               # a single pane only
 ```
 
 Inside the compositor the prefix (`Ctrl-A`) drives: `%` / `"` split, `x` kill, `z` zoom,
 **`hjkl`** select pane (note: `hjkl`, not arrows), `o` / `;` cycle, `c` new tab, `n` / `p` tab,
 `d` detach. Copy-mode and SGR mouse work too. Detach keys default to `Ctrl-A d`; override with
-`--detach-keys`. There's also a programmatic **control mode** (`harness-cli control-mode` / `-CC`).
+`--detach-keys`. There's also a programmatic **control mode** (`kouen-cli control-mode` / `-CC`).
 
 ### Driving a headless or remote daemon
 
@@ -228,18 +228,18 @@ running on **another machine** — headless, or on Linux — and control it remo
 remote once, then add `--host <name>` to any command:
 
 ```bash
-# On the remote box, the daemon listens on a Unix socket (harness-cli doctor prints its path).
-harness-cli remote add --name devbox --ssh me@devbox --socket "/home/me/.config/harness/harness.sock"
-harness-cli new-session --host devbox --cwd ~/Code
-harness-cli send-keys  --host devbox --surface <id> --keys "make test Enter"
-harness-cli capture-pane --host devbox --surface <id>
-harness-cli doctor       --host devbox          # health-check the remote daemon
+# On the remote box, the daemon listens on a Unix socket (kouen-cli doctor prints its path).
+kouen-cli remote add --name devbox --ssh me@devbox --socket "/home/me/.config/harness/harness.sock"
+kouen-cli new-session --host devbox --cwd ~/Code
+kouen-cli send-keys  --host devbox --surface <id> --keys "make test Enter"
+kouen-cli capture-pane --host devbox --surface <id>
+kouen-cli doctor       --host devbox          # health-check the remote daemon
 ```
 
 (`--host` works on the client commands above; `attach-window` always renders the
 *local* daemon, so run it on the machine whose daemon you want to see.)
 
-Harness forwards the remote socket over `ssh -N -L`, reusing your existing SSH trust — no new
+Kouen forwards the remote socket over `ssh -N -L`, reusing your existing SSH trust — no new
 credentials. Because the daemon owns scrollback and persists it to disk, a remote session's
 history survives the daemon restarting on that box. See
 [COMMANDS.md → Remote daemons](COMMANDS.md#remote-daemons-over-ssh) for `remote list` / `remote
@@ -249,10 +249,10 @@ remove` and `--ssh-arg`.
 
 Two commands manage the daemon lifecycle:
 
-- **`harness-cli kill-server`** sends `SIGTERM` to the local daemon, stopping it gracefully.
+- **`kouen-cli kill-server`** sends `SIGTERM` to the local daemon, stopping it gracefully.
   launchd's `KeepAlive` respawns it, restoring all sessions from disk — so shells and scrollback
-  survive. For a permanent shutdown, use `launchctl bootout` (see `harness-cli doctor`).
-- **`harness-cli start-server`** ensures the daemon is running (a no-op if it already is).
+  survive. For a permanent shutdown, use `launchctl bootout` (see `kouen-cli doctor`).
+- **`kouen-cli start-server`** ensures the daemon is running (a no-op if it already is).
 
 Both are local-only; with `--host`, they error loudly instead of targeting the wrong daemon.
 
@@ -287,7 +287,7 @@ would be useful, use `choose-window` instead.
 
 ## 12. Shell integration (prompt marks + the success/failure gutter)
 
-Harness understands **OSC 133** semantic prompts. Once installed, each shell prompt is marked and
+Kouen understands **OSC 133** semantic prompts. Once installed, each shell prompt is marked and
 each command's exit status is recorded, which powers:
 
 - A **left-margin gutter stripe** per prompt: **green** = exit 0, **red** = non-zero, neutral =
@@ -295,15 +295,15 @@ each command's exit status is recorded, which powers:
 - **Jump-to-prompt** navigation: `[` / `]` in copy mode, and the live-view `jump-previous-prompt`
   / `jump-next-prompt` commands (bind them or run from the `:` prompt).
 
-Turn it on with one command (it writes the script under the Harness home and wires a guarded,
+Turn it on with one command (it writes the script under the Kouen home and wires a guarded,
 idempotent, backed-up `source` line into your rc):
 
 ```bash
-harness-cli install-shell-integration            # auto-detects $SHELL
-harness-cli install-shell-integration all          # bash + zsh + fish
+kouen-cli install-shell-integration            # auto-detects $SHELL
+kouen-cli install-shell-integration all          # bash + zsh + fish
 ```
 
-Restart your shell (or open a new pane). The snippet is a no-op outside a Harness pane — it gates
+Restart your shell (or open a new pane). The snippet is a no-op outside a Kouen pane — it gates
 on `$HARNESS` (exported by the daemon into every pane). Details:
 [shell-integration/README.md](shell-integration/README.md).
 
@@ -311,17 +311,17 @@ on `$HARNESS` (exported by the daemon into every pane). Details:
 
 ## 13. Agent hooks (notifications)
 
-Harness detects coding agents (Claude Code, Codex, Cursor, Pi, Hermes, OpenClaw, and more) and
+Kouen detects coding agents (Claude Code, Codex, Cursor, Pi, Hermes, OpenClaw, and more) and
 can notify you when one stops or needs input. For the agents with a hook mechanism, wire it up
 once:
 
 ```bash
-harness-cli install-hooks claude-code      # or codex | cursor | pi | hermes | openclaw
+kouen-cli install-hooks claude-code      # or codex | cursor | pi | hermes | openclaw
 ```
 
 It deep-merges into the agent's own config (e.g. `~/.claude/settings.json`), backing it up first
 — never clobbering. Agents without a hook mechanism (aider, gemini, goose, opencode) are detected
-automatically and notify via Harness's activity path, so there's nothing to install for them.
+automatically and notify via Kouen's activity path, so there's nothing to install for them.
 
 ---
 
@@ -362,11 +362,11 @@ COPY MODE    prefix [  enter        hjkl move   v/V/C-v select   y yank
              / ? search  n/N next   [ ] jump prompt           q/Esc exit
 
 SESSION      prefix d  detach       View ▸ Detach/Reattach Pane
-             attach over ssh:  harness-cli attach-window [--session NAME]
+             attach over ssh:  kouen-cli attach-window [--session NAME]
 
-COMMAND      prefix :  or Cmd-;     Cmd-K palette     harness-cli <verb>
+COMMAND      prefix :  or Cmd-;     Cmd-K palette     kouen-cli <verb>
 
-SETUP        harness-cli install                      (CLI + daemon + completion)
-             harness-cli install-shell-integration    (OSC 133 prompt gutter)
-             harness-cli install-hooks <agent>        (agent notifications)
+SETUP        kouen-cli install                      (CLI + daemon + completion)
+             kouen-cli install-shell-integration    (OSC 133 prompt gutter)
+             kouen-cli install-hooks <agent>        (agent notifications)
 ```

@@ -18,7 +18,7 @@ public enum TerminalBanner {
     public static func welcome(version: String, columns: Int) -> Data {
         let inner = innerWidth(columns: columns)
         var lines: [[Run]] = []
-        lines.append([Run("⌁ ", sgr: accent), Run("Welcome to Harness \(version)", sgr: bold)])
+        lines.append([Run("⌁ ", sgr: accent), Run("Welcome to Kouen \(version)", sgr: bold)])
         lines += wrappedText("The native terminal with a multiplexer built in.", sgr: dim, inner: inner)
         lines.append([])
         lines.append([Run("Why it's different", sgr: bold)])
@@ -46,7 +46,7 @@ public enum TerminalBanner {
 
     public static func whatsNew(_ notes: ReleaseNotes, columns: Int) -> Data {
         var lines: [[Run]] = []
-        lines.append([Run("⌁ ", sgr: accent), Run("Harness updated · \(notes.version)", sgr: bold)])
+        lines.append([Run("⌁ ", sgr: accent), Run("Kouen updated · \(notes.version)", sgr: bold)])
         for section in orderedSections(notes.sections) where !section.items.isEmpty {
             lines.append([])
             lines.append([Run(section.title, sgr: bold)])
@@ -253,7 +253,7 @@ public enum TerminalBanner {
         bullets: [
             "GPU-native renderer — instant, pixel-smooth output and 490 built-in themes",
             "Your shells outlive the window — a background daemon keeps every session running across closes and restarts",
-            "tmux workflows, no tmux — tabs, splits, prefix keys, copy mode, scriptable from harness-cli",
+            "tmux workflows, no tmux — tabs, splits, prefix keys, copy mode, scriptable from kouen-cli",
             "Agent-aware — Claude Code, Codex & friends show live working / needs-attention status on their tab",
             "Remote-ready — run the daemon on a Linux box or server and attach from here over SSH",
         ],

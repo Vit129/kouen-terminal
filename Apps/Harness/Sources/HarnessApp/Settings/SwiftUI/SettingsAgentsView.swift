@@ -136,7 +136,7 @@ struct SettingsAgentsView: View {
 
     private var detectionSection: some View {
         Section("Detection & hooks") {
-            Text("Harness identifies agents by walking each pane's process tree and matching the executables shown below — it works for any shell, no setup. Install hooks so an agent can ping you the moment it stops or needs input.")
+            Text("Kouen identifies agents by walking each pane's process tree and matching the executables shown below — it works for any shell, no setup. Install hooks so an agent can ping you the moment it stops or needs input.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             HStack(spacing: 8) {

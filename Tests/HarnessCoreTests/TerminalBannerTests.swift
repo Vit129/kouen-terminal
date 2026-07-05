@@ -28,10 +28,10 @@ final class TerminalBannerTests: XCTestCase {
 
     func testWelcomeIsAGuidedTour() {
         let banner = text(TerminalBanner.welcome(version: "1.2.3", columns: 80))
-        XCTAssertTrue(banner.contains("Welcome to Harness 1.2.3"))
+        XCTAssertTrue(banner.contains("Welcome to Kouen 1.2.3"))
         XCTAssertTrue(banner.contains("Why it's different"))
         XCTAssertTrue(banner.contains("Shortcuts"))
-        XCTAssertTrue(banner.contains("harness-cli"))
+        XCTAssertTrue(banner.contains("kouen-cli"))
         XCTAssertTrue(banner.contains("Docs: GitHub"))
         XCTAssertTrue(banner.contains("⌘D / ⌘⇧D"))
     }

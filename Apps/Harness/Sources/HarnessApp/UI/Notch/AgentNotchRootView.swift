@@ -198,7 +198,7 @@ struct AgentNotchRootView: View {
     private var header: some View {
         HStack {
             VStack(alignment: .leading, spacing: 1) {
-                Text("Harness Agents")
+                Text("Kouen Agents")
                     .font(.system(size: 12.5, weight: .semibold))
                 Text(model.headerSummary)
                     .font(.system(size: 10, weight: .medium))

@@ -36,7 +36,7 @@ struct CompleteStepView: View {
             .frame(maxWidth: 420)
 
             Button(action: onOpenDemo) {
-                Text("Open Harness")
+                Text("Open Kouen")
                     .frame(width: 200)
             }
             .buttonStyle(GlassPrimaryButtonStyle())

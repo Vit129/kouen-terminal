@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# Regenerate Harness.icns from Apps/Harness/Resources/Assets.xcassets/AppIcon.appiconset
+# Regenerate Kouen.icns from Apps/Harness/Resources/Assets.xcassets/AppIcon.appiconset
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-OUT="$ROOT/Apps/Harness/Resources/Harness.icns"
+OUT="$ROOT/Apps/Harness/Resources/Kouen.icns"
 # Master 1024×1024 source lives OUTSIDE the .appiconset so it isn't an unassigned
 # child of the icon set (the set's largest assigned slot is 512x512@2x = 1024px).
 SRC="$ROOT/Apps/Harness/Resources/AppIcon-1024.png"
