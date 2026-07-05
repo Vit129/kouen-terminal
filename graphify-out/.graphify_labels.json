@@ -1351,5 +1351,8 @@
   "1349": "NerdFontFallbackTests",
   "1350": "P33 — Visibility Gaps: PR status, cross-pane notifications, diff popover (2026-07-02)",
   "1351": "P34 — Block-Based Terminal / Command Grouping (2026-07-02)",
-  "1352": "P3 — N-ary Split Panes (v1.5.0)"
+  "1352": "P3 — N-ary Split Panes (v1.5.0)",
+  "1353": "TabAlertTests",
+  "1354": "ViInputMode",
+  "1355": "ColorKind"
 }
