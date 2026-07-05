@@ -6,6 +6,7 @@
 |------|-------|--------|
 | [p25-ios-ipados-support.md](p25-ios-ipados-support.md) | P25 — iOS/iPadOS Support | Planning |
 | [p8-macos27-adoption.md](p8-macos27-adoption.md) | P8 — macOS 27 Golden Gate Adoption | Active |
+| [p35-oauth-login-embedded-browser.md](p35-oauth-login-embedded-browser.md) | P35 — Fix Google/OAuth login inside embedded browser | Not started |
 
 ## Completed
 
