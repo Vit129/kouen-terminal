@@ -13,7 +13,7 @@ public final class AgentScanner: @unchecked Sendable {
     private var agentScanTimer: DispatchSourceTimer?
     private var cwdTimer: DispatchSourceTimer?
     private weak var registry: SurfaceRegistry?
-    private let queue = DispatchQueue(label: "com.robert.harness.agent-scanner")
+    private let queue = DispatchQueue(label: "com.vit129.harness.agent-scanner")
 
     public func start(registry: SurfaceRegistry) {
         self.registry = registry

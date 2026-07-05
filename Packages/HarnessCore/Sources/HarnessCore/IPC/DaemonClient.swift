@@ -8,7 +8,7 @@ import Foundation
 /// Synchronous IPC client. @unchecked Sendable: stateless between calls (each request
 /// opens and closes its own socket) and all calls funnel through the serial `queue`.
 public final class DaemonClient: @unchecked Sendable {
-    private let queue = DispatchQueue(label: "com.robert.harness.daemon-client")
+    private let queue = DispatchQueue(label: "com.vit129.harness.daemon-client")
     /// Where this client connects. Defaults to the local daemon's control socket, so every existing
     /// `DaemonClient()` call is unchanged; a remote client passes the local end of an SSH tunnel.
     private let endpoint: Endpoint
@@ -220,7 +220,7 @@ public final class DaemonClient: @unchecked Sendable {
 /// @unchecked Sendable: `fd` is immutable; `cancelled`/`finished` are guarded by `lock`.
 public final class DaemonSubscription: @unchecked Sendable {
     private let fd: Int32
-    private let queue = DispatchQueue(label: "com.robert.harness.daemon-subscription")
+    private let queue = DispatchQueue(label: "com.vit129.harness.daemon-subscription")
     private let lock = NSLock()
     /// Serializes writes to the single full-duplex `fd` so concurrent writers (keystroke `sendInput`
     /// + `detachSurface`) can never interleave bytes mid-frame. Distinct from `lock` (which guards

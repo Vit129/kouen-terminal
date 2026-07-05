@@ -36,7 +36,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
     /// Hooks fire fire-and-forget here, never under `lock`, so a hook-bound command
     /// can re-enter `handle` (which locks) without deadlocking. Serial so hook
     /// reactions run in the order their events occurred.
-    private let hookQueue = DispatchQueue(label: "com.robert.harness.hooks")
+    private let hookQueue = DispatchQueue(label: "com.vit129.harness.hooks")
     private var hookExecutor: DaemonCommandExecutor?
     private let hookExecutionHelper: HookExecutor
     /// Invoked after every layout commit with the new revision. `DaemonServer` uses
@@ -1703,7 +1703,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
         var token: UUID?
         /// Tee writes run here so a stalled consumer (full pipe buffer ⇒ blocking write) can't
         /// stall the surface's shared `deliveryQueue` and starve the GUI/attach subscribers.
-        private let writerQueue = DispatchQueue(label: "com.robert.harness.pipe-pane.write")
+        private let writerQueue = DispatchQueue(label: "com.vit129.harness.pipe-pane.write")
         private let backlogLock = NSLock()
         private var backlog = 0
         private let maxBacklog = 4 * 1024 * 1024

@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# Generate / refresh the Sparkle appcast for harnesscli.dev.
+# Generate / refresh a Sparkle appcast — inherited from upstream, where it's hosted at
+# harnesscli.dev. This fork has no appcast host or EdDSA signing key of its own yet:
+# SUFeedURL/SUPublicEDKey were removed from Info.plist and SparkleUpdater starts with
+# startingUpdater: false, so nothing in this fork currently checks or serves an appcast.
+# Kept as reference for what standing up a real feed would need.
 #
 # Sparkle's `generate_appcast` scans a directory of release archives (.dmg / .zip), EdDSA-signs
-# each with the private key that matches SUPublicEDKey in Info.plist (public:
-# 3LBPx8Uv5L5ptqRqdCWovmUIPLxcDEPnivy8cOpIlH8=), and writes appcast.xml into that same
-# directory, embedding the signature + version of each build.
+# each with a private key matching whatever SUPublicEDKey this fork eventually configures, and
+# writes appcast.xml into that same directory, embedding the signature + version of each build.
 #
 # Usage:  ./Scripts/generate-appcast.sh [archives-dir]
 #   archives-dir defaults to ./dist  (drop the signed, notarized Harness.dmg there first).

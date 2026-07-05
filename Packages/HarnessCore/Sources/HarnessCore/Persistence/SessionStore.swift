@@ -2,7 +2,7 @@ import Foundation
 
 /// @unchecked Sendable: all disk reads/writes and the debounce timer are confined to `queue`.
 public final class SessionStore: @unchecked Sendable {
-    private let queue = DispatchQueue(label: "com.robert.harness.session-store")
+    private let queue = DispatchQueue(label: "com.vit129.harness.session-store")
     private var pendingSave: DispatchWorkItem?
     private let debounceInterval: TimeInterval = 0.5
 

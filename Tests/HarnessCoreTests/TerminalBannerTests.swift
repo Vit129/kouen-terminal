@@ -32,7 +32,7 @@ final class TerminalBannerTests: XCTestCase {
         XCTAssertTrue(banner.contains("Why it's different"))
         XCTAssertTrue(banner.contains("Shortcuts"))
         XCTAssertTrue(banner.contains("harness-cli"))
-        XCTAssertTrue(banner.contains("harnesscli.dev"))
+        XCTAssertTrue(banner.contains("Docs: GitHub"))
         XCTAssertTrue(banner.contains("⌘D / ⌘⇧D"))
     }
 

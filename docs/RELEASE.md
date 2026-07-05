@@ -1,5 +1,14 @@
 # Release runbook
 
+> **Fork notice:** this describes the upstream project's own release pipeline —
+> Developer ID signing, notarization, and a Sparkle appcast hosted at
+> `harnesscli.dev` — none of which this fork has (no Developer ID cert, no
+> appcast host, no website repo). This fork's releases are plain
+> `git tag` + `gh release create`; Sparkle auto-update is disabled
+> (`SparkleUpdater.swift`, `startingUpdater: false`). Keep this doc as
+> reference for what a real release pipeline would need if this fork ever
+> stands up its own signing/hosting.
+
 Harness can be released from GitHub Actions on a hosted macOS runner. The
 `Release Harness` workflow builds the app, signs it with Developer ID, notarizes
 the app and DMG, uploads the DMG to GitHub Releases, generates a Sparkle appcast,

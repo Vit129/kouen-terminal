@@ -28,7 +28,7 @@ final class ScrollbackFile: @unchecked Sendable {
     /// is amortized rather than firing on nearly every flush under a sustained output flood.
     private var highWater: Int { max(retentionCap * 2, retentionCap + 64 * 1024) }
 
-    private let queue = DispatchQueue(label: "com.robert.harness.scrollback-file")
+    private let queue = DispatchQueue(label: "com.vit129.harness.scrollback-file")
     private let debounceInterval: TimeInterval = 0.5
     /// Hard cap on the in-RAM `pending` buffer. A gapless output flood (`yes`, `cat bigfile`)
     /// re-arms the debounce faster than the 0.5s timer can ever fire, so without this `pending`
