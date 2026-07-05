@@ -1,10 +1,26 @@
 # Harness
 
-> Forked from [robzilla1738/harness-terminal](https://github.com/robzilla1738/harness-terminal).
+> This is a personal fork of [robzilla1738/harness-terminal](https://github.com/robzilla1738/harness-terminal), maintained independently by [Vit129](https://github.com/Vit129). It's a hard fork, not a PR queue back upstream — see [What's different from upstream](#whats-different-from-upstream).
 
 Harness is a native macOS terminal built for AI agent workflows. A first-party Swift terminal engine, a background session daemon, a scriptable CLI, embedded browser with MCP control, and multi-agent awareness — all in one app.
 
 Run Claude Code, Codex, Gemini CLI, or any agent side-by-side. Sessions persist across app restarts, agents notify you when done, the embedded browser responds to MCP tool calls, and panes render on Metal.
+
+---
+
+## What's different from upstream
+
+This fork started from [robzilla1738/harness-terminal](https://github.com/robzilla1738/harness-terminal) (currently v1.12.1) and has since diverged substantially — 47 releases of its own versus upstream's 23, five new first-party Swift packages, and features with no upstream equivalent. Checked directly against upstream's current source, not assumed:
+
+- **In-app AI-agent tooling via MCP.** `harness-mcp` (`Tools/harness-mcp/`) is a bundled Model Context Protocol server that lets agents drive the embedded browser pane directly — open URLs, read DOM snapshots, click/fill elements, take screenshots, and inspect network/storage — without a separate Playwright process. Upstream has no browser pane and no MCP server at all.
+- **An IDE sidebar: file tree, Git, and a built-in code editor with LSP.** Two new packages, `HarnessLSP` (language-server client) and `HarnessSyntaxResources` (tree-sitter grammars), back a sidebar file editor with syntax highlighting across 21 languages, Vi ex commands (`gd`, `K`, `:errors`), and one-step Git commit-and-push. Upstream's sidebar is session/tab lists only — no file tree, no editor, no Git integration.
+- **Inline AI command suggestions.** `⌥Space` sends the focused pane's recent output to Claude and suggests the next command inline. No equivalent exists upstream.
+- **A denser navigation/workflow layer**: a saved-command picker (Recipes, `⌘⇧R`), a multi-line command composer (`⌘⇧E`), a zoxide-powered frecency directory picker (`⌘⇧J`) and fuzzy directory jump (`⌘P`), a tab-overview thumbnail grid (`⌘⇧\`), and a keyboard-driven hint mode for opening links/paths (`⌘⇧U`) — none of these keybindings exist upstream.
+- **A larger package surface.** New first-party Swift packages — `HarnessCommands`, `HarnessIPC`, `HarnessLSP`, `HarnessSettings`, `HarnessSyntaxResources` — sit alongside the packages this fork started from (`HarnessCore`, `HarnessDaemon`, `HarnessTerminalEngine`, `HarnessTerminalKit`, `HarnessCopyMode`, `HarnessOnboarding`, `HarnessTheme`).
+
+None of this is a knock on the original — it's a different, more actively-maintained branch, kept for personal use rather than as a distributed product.
+
+---
 
 ## Install
 
