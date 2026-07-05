@@ -13,7 +13,7 @@ import HarnessDaemonCore
 /// four signal `DispatchSource`s on the `.global()` *concurrent* queue, so without this
 /// gate parallel handlers could double-rotate or clobber each other's non-`O_APPEND`
 /// writes. No reentrancy: `daemonLog` never calls itself, so `.sync` can't deadlock.
-private let daemonLogQueue = DispatchQueue(label: "com.vit129.harness.daemonLog")
+private let daemonLogQueue = DispatchQueue(label: "com.vit129.kouen.daemonLog")
 
 /// Append a line to `~/Library/Application Support/Harness/logs/daemon.log` and
 /// (best-effort) duplicate to stderr so `launchctl print` shows recent output.

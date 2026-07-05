@@ -1,13 +1,13 @@
-# Claude Code → Harness
+# Claude Code → Kouen
 
-Make Claude Code surface its `Notification` and `Stop` events as Harness pane
+Make Claude Code surface its `Notification` and `Stop` events as Kouen pane
 notifications (tab-pill working dot, sidebar bell, and macOS notification banner), so you
 can leave a long edit running and pop back when it's actually waiting on you.
 
 ## One-line install
 
 ```bash
-harness-cli install-hooks claude-code
+kouen-cli install-hooks claude-code
 ```
 
 This writes `~/.claude/settings.json` (backing up any existing file as
@@ -24,7 +24,7 @@ This writes `~/.claude/settings.json` (backing up any existing file as
         "hooks": [
           {
             "type": "command",
-            "command": "PATH=\"$HOME/Library/Application Support/Harness/bin:$PATH\" harness-cli notify --surface \"$HARNESS_SURFACE\" --title \"Claude Code\" --from-hook"
+            "command": "PATH=\"$HOME/Library/Application Support/Kouen/bin:$PATH\" kouen-cli notify --surface \"$HARNESS_SURFACE\" --title \"Claude Code\" --from-hook"
           }
         ]
       }
@@ -35,7 +35,7 @@ This writes `~/.claude/settings.json` (backing up any existing file as
         "hooks": [
           {
             "type": "command",
-            "command": "PATH=\"$HOME/Library/Application Support/Harness/bin:$PATH\" harness-cli notify --surface \"$HARNESS_SURFACE\" --title \"Claude Code\" --body \"Done\""
+            "command": "PATH=\"$HOME/Library/Application Support/Kouen/bin:$PATH\" kouen-cli notify --surface \"$HARNESS_SURFACE\" --title \"Claude Code\" --body \"Done\""
           }
         ]
       }
@@ -44,16 +44,16 @@ This writes `~/.claude/settings.json` (backing up any existing file as
 }
 ```
 
-`$HARNESS_SURFACE` is exported by Harness for every pane, so the hook always
+`$HARNESS_SURFACE` is exported by Kouen for every pane, so the hook always
 notifies the right tab. Claude Code passes the `Notification` message as JSON on
 the hook's **stdin** (not an env var), so `--from-hook` reads that stdin and uses
 its `message` field for the notification body.
 
 ## Verifying
 
-1. Open a new Harness pane, run `claude` and start a long task.
+1. Open a new Kouen pane, run `claude` and start a long task.
 2. While it's working, the tab pill's status dot turns Anthropic violet
-   (Harness detected `claude` in the process tree).
+   (Kouen detected `claude` in the process tree).
 3. When Claude Code emits a permission request or finishes, you see:
    - macOS notification banner.
    - The tab pill's working dot lights up (waiting state).
@@ -64,7 +64,7 @@ its `message` field for the notification body.
 
 Edit `~/.claude/settings.json` directly — you can match specific tools or
 pre/post events by following the standard Claude Code hook schema. `install-hooks`
-is idempotent and self-healing: re-running it replaces Harness's own
+is idempotent and self-healing: re-running it replaces Kouen's own
 `Notification`/`Stop` entries with the current versions (handy for picking up
 fixes) while leaving the rest of your config — model, permissions, MCP, and any
-non-Harness hooks — untouched.
+non-Kouen hooks — untouched.

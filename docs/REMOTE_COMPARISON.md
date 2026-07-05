@@ -1,12 +1,12 @@
 # Remote SSH — Market Comparison
 
-## Harness vs Competitors (Remote Development over SSH)
+## Kouen vs Competitors (Remote Development over SSH)
 
-| Feature | Harness | VS Code Remote SSH | JetBrains Gateway | Warp | iTerm2 | Ghostty |
+| Feature | Kouen | VS Code Remote SSH | JetBrains Gateway | Warp | iTerm2 | Ghostty |
 |---------|---------|-------------------|-------------------|------|--------|---------|
 | **Architecture** | Daemon + SSH tunnel | Extension + remote server | Thin client + IDE backend | Cloud SSH profiles | Basic SSH sessions | No remote support |
 | **Session persistence** | ✅ Daemon survives app quit | ❌ Dies with window | ✅ Backend persists | ❌ No persistence | ❌ No persistence | — |
-| **CLI-driven remote** | ✅ `harness-cli --host` | ❌ GUI only | ❌ GUI only | ❌ GUI only | ❌ Manual SSH | — |
+| **CLI-driven remote** | ✅ `kouen-cli --host` | ❌ GUI only | ❌ GUI only | ❌ GUI only | ❌ Manual SSH | — |
 | **Zero remote install** | ✅ Just needs running daemon | ❌ Installs vscode-server | ❌ Installs IDE backend | ✅ Nothing extra | ✅ Nothing extra | — |
 | **Multi-host management** | ✅ Settings UI + CLI | ✅ SSH config integration | ✅ Connection manager | ✅ SSH profiles | ❌ Manual | — |
 | **Jump host support** | ✅ `-J` proxy jump | ✅ ProxyJump config | ✅ Gateway UI | ❌ Not exposed | Manual config | — |
@@ -21,19 +21,19 @@
 
 ## Our Strengths
 
-1. **Lightest remote footprint** — Only needs the Harness daemon (~5MB) running on the remote. No 200MB VS Code server or 500MB JetBrains backend to install.
+1. **Lightest remote footprint** — Only needs the Kouen daemon (~5MB) running on the remote. No 200MB VS Code server or 500MB JetBrains backend to install.
 
-2. **CLI-first remote** — `harness-cli --host devbox list-sessions` / `capture-pane` / `send-keys` works headless. No competitor offers full scriptable remote terminal control.
+2. **CLI-first remote** — `kouen-cli --host devbox list-sessions` / `capture-pane` / `send-keys` works headless. No competitor offers full scriptable remote terminal control.
 
 3. **Daemon persistence** — Remote sessions survive app quit AND network drops. Reconnect picks up where you left off. Only JetBrains Gateway matches this.
 
-4. **Agent-aware remote** — Detect Claude Code, Codex, Goose etc. running remotely and surface notifications locally. Unique to Harness.
+4. **Agent-aware remote** — Detect Claude Code, Codex, Goose etc. running remotely and surface notifications locally. Unique to Kouen.
 
 5. **Unix socket IPC** — More secure than TCP tunnels (no port to scan). Socket is `chmod 0600`.
 
 ## Our Gaps (vs leaders)
 
-1. **No Windows/Linux GUI** — VS Code and JetBrains work everywhere. Harness GUI is macOS only.
+1. **No Windows/Linux GUI** — VS Code and JetBrains work everywhere. Kouen GUI is macOS only.
 
 2. **No SSH config file integration** — VS Code reads `~/.ssh/config` hosts automatically. We require manual entry.
 

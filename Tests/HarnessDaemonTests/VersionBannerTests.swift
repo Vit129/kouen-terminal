@@ -155,7 +155,7 @@ final class VersionBannerTests: XCTestCase {
         guard let restored = surfaceIDs(registry).first else { return XCTFail("expected a restored surface") }
         usleep(500_000)
         XCTAssertFalse(
-            capture(registry, restored).contains("Harness updated"),
+            capture(registry, restored).contains("Kouen updated"),
             "boot restore must never banner existing panes"
         )
 
@@ -166,7 +166,7 @@ final class VersionBannerTests: XCTestCase {
             return XCTFail("newTab spawned no surface")
         }
         XCTAssertTrue(
-            waitForCapture(registry, surfaceID: fresh, contains: "Harness updated"),
+            waitForCapture(registry, surfaceID: fresh, contains: "Kouen updated"),
             "what's-new banner missing from the first fresh surface after an update"
         )
         XCTAssertTrue(capture(registry, fresh).contains(ReleaseNotes.current.version))
@@ -187,7 +187,7 @@ final class VersionBannerTests: XCTestCase {
             return XCTFail("newTab spawned no surface")
         }
         usleep(500_000)
-        XCTAssertFalse(capture(registry, fresh).contains("Harness updated"))
+        XCTAssertFalse(capture(registry, fresh).contains("Kouen updated"))
         // Still recorded: turning the option back on must not resurrect an old banner.
         XCTAssertEqual(VersionBannerStore().loadLastSeenBuild(), HarnessVersion.build)
     }
@@ -211,7 +211,7 @@ final class VersionBannerTests: XCTestCase {
             return XCTFail("newTab spawned no surface")
         }
         usleep(500_000)
-        XCTAssertFalse(capture(registry, fresh).contains("Harness updated"), "downgrade shows nothing")
+        XCTAssertFalse(capture(registry, fresh).contains("Kouen updated"), "downgrade shows nothing")
     }
 
     func testFailedAckRetriesWithoutReplayingBanner() throws {

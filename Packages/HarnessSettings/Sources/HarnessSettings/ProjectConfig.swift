@@ -40,22 +40,32 @@ public struct ProjectConfig: Codable, Sendable, Equatable {
         self.isolateAgents = isolateAgents
     }
 
-    /// Reads `harness.json` from the given directory, returning nil if not found or unparseable.
-    /// Personal override: `~/.config/harness/projects/<repo-folder-name>.json` takes precedence.
+    /// Reads `kouen.json` (or the pre-rename `harness.json`) from the given directory,
+    /// returning nil if not found or unparseable.
+    /// Personal override: `~/.config/kouen/projects/<repo-folder-name>.json` takes precedence,
+    /// falling back to the pre-rename `~/.config/harness/projects/...` if the new one isn't there.
     public static func load(from directory: String) -> ProjectConfig? {
-        // Check personal override first
+        // Check personal override first: new path, then the pre-rename path.
         let repoName = (directory as NSString).lastPathComponent
-        let overridePath = NSHomeDirectory() + "/.config/harness/projects/\(repoName).json"
-        if FileManager.default.fileExists(atPath: overridePath),
-           let data = FileManager.default.contents(atPath: overridePath),
-           let config = try? JSONDecoder().decode(ProjectConfig.self, from: data) {
-            return config
+        let overridePath = NSHomeDirectory() + "/.config/kouen/projects/\(repoName).json"
+        let legacyOverridePath = NSHomeDirectory() + "/.config/harness/projects/\(repoName).json"
+        for candidate in [overridePath, legacyOverridePath] {
+            if FileManager.default.fileExists(atPath: candidate),
+               let data = FileManager.default.contents(atPath: candidate),
+               let config = try? JSONDecoder().decode(ProjectConfig.self, from: data) {
+                return config
+            }
         }
-        // Fall back to repo-local harness.json
-        let path = (directory as NSString).appendingPathComponent("harness.json")
-        guard FileManager.default.fileExists(atPath: path),
-              let data = FileManager.default.contents(atPath: path)
-        else { return nil }
-        return try? JSONDecoder().decode(ProjectConfig.self, from: data)
+        // Fall back to repo-local kouen.json, then the pre-rename harness.json — teams may
+        // already have the latter committed, so it keeps working unmoved.
+        let path = (directory as NSString).appendingPathComponent("kouen.json")
+        let legacyPath = (directory as NSString).appendingPathComponent("harness.json")
+        for candidate in [path, legacyPath] {
+            if FileManager.default.fileExists(atPath: candidate),
+               let data = FileManager.default.contents(atPath: candidate) {
+                return try? JSONDecoder().decode(ProjectConfig.self, from: data)
+            }
+        }
+        return nil
     }
 }

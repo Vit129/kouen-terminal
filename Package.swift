@@ -31,7 +31,7 @@ let platformProducts: [Product] = [
     // Immersive first-run onboarding wizard (SwiftUI). Self-contained, no deps; embedded
     // into Harness.app and shown on first launch.
     .library(name: "HarnessOnboarding", targets: ["HarnessOnboarding"]),
-    .executable(name: "Harness", targets: ["HarnessApp"]),
+    .executable(name: "Kouen", targets: ["HarnessApp"]),
 ]
 // `harness-cli`'s `attach-window` compositor renders through the Metal/AppKit terminal kit, so the
 // kit dependency (and the one source file that uses it) is macOS-only; the rest of the CLI — incl.
@@ -171,9 +171,9 @@ let package = Package(
         // C portability shim exposed as a product so the generated Xcode project can import the
         // same first-party module that SwiftPM targets use internally.
         .library(name: "CHarnessSys", targets: ["CHarnessSys"]),
-        .executable(name: "HarnessDaemon", targets: ["HarnessDaemon"]),
-        .executable(name: "harness-cli", targets: ["HarnessCLI"]),
-        .executable(name: "harness-mcp", targets: ["HarnessMCP"]),
+        .executable(name: "KouenDaemon", targets: ["HarnessDaemon"]),
+        .executable(name: "kouen-cli", targets: ["HarnessCLI"]),
+        .executable(name: "kouen-mcp", targets: ["HarnessMCP"]),
     ] + platformProducts,
     dependencies: platformDependencies,
     targets: [

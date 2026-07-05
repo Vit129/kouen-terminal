@@ -39,13 +39,13 @@ preview:
 	./Scripts/preview.sh
 
 preview-stop:
-	-pkill -f '$(CURDIR)/.harness-preview/HarnessPreview.app/Contents/MacOS/Harness' 2>/dev/null
-	-pkill -f '$(CURDIR)/.harness-preview/HarnessPreview.app/Contents/MacOS/HarnessDaemon' 2>/dev/null
+	-pkill -f '$(CURDIR)/.harness-preview/KouenPreview.app/Contents/MacOS/Kouen' 2>/dev/null
+	-pkill -f '$(CURDIR)/.harness-preview/KouenPreview.app/Contents/MacOS/KouenDaemon' 2>/dev/null
 
 preview-clean:
 	rm -rf .harness-preview
 	rm -rf "/tmp/harness-preview-$$(printf '%s' "$(CURDIR)" | md5 | cut -c1-10)"
-	-tccutil reset All com.vit129.harness.preview 2>/dev/null || true
+	-tccutil reset All com.vit129.kouen.preview 2>/dev/null || true
 
 icon:
 	./Scripts/generate-app-icon.sh
@@ -61,10 +61,10 @@ release: icon
 package: release
 
 # Release order: make release -> make sign -> make dmg -> make finalize.
-# dmg/sign/finalize operate on the EXISTING Harness.app so a prior signature is never
+# dmg/sign/finalize operate on the EXISTING Kouen.app so a prior signature is never
 # rebuilt away. (When dmg/sign depended on `release`, running `make dmg` after `make sign`
-# re-created an UNSIGNED Harness.app and shipped an unsigned DMG.) Each script fails clearly
-# if Harness.app is missing, so run `make release` first.
+# re-created an UNSIGNED Kouen.app and shipped an unsigned DMG.) Each script fails clearly
+# if Kouen.app is missing, so run `make release` first.
 dmg:
 	./Scripts/create-dmg.sh
 
@@ -89,8 +89,8 @@ hotfix-release:
 
 clean:
 	swift package clean
-	rm -rf Harness.app Harness.dmg Harness-notarize.zip dist .dmg-staging .icon-staging.iconset
-	-tccutil reset All com.vit129.harness.preview 2>/dev/null || true
+	rm -rf Kouen.app Kouen.dmg Kouen-notarize.zip dist .dmg-staging .icon-staging.iconset
+	-tccutil reset All com.vit129.kouen.preview 2>/dev/null || true
 
 # HyperFrames marketing video (marketing/video — see marketing/README.md)
 video-skills:

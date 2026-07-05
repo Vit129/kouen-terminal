@@ -15,7 +15,7 @@ extension HarnessCLI {
         } else if args.contains("--stdin") {
             data = FileHandle.standardInput.readDataToEndOfFile()
         } else {
-            fputs("Usage: harness-cli set-buffer (--data <text> | --stdin) [--name <name>]\n", harnessStderr)
+            fputs("Usage: kouen-cli set-buffer (--data <text> | --stdin) [--name <name>]\n", harnessStderr)
             exit(1)
         }
         let response = try checkedRequest(client, .setBuffer(name: name, data: data))
@@ -43,7 +43,7 @@ extension HarnessCLI {
 
     static func handleDeleteBuffer(_ args: [String], client: DaemonClient) throws {
         guard let name = flagValue(args, flag: "--name") else {
-            fputs("Usage: harness-cli delete-buffer --name <name>\n", harnessStderr)
+            fputs("Usage: kouen-cli delete-buffer --name <name>\n", harnessStderr)
             exit(1)
         }
         _ = try checkedRequest(client, .deleteBuffer(name: name))
@@ -51,7 +51,7 @@ extension HarnessCLI {
 
     static func handlePasteBuffer(_ args: [String], client: DaemonClient) throws {
         guard let surface = flagValue(args, flag: "--surface") else {
-            fputs("Usage: harness-cli paste-buffer --surface <id> [--name <name>] [-p|--bracketed]\n", harnessStderr)
+            fputs("Usage: kouen-cli paste-buffer --surface <id> [--name <name>] [-p|--bracketed]\n", harnessStderr)
             exit(1)
         }
         let name = flagValue(args, flag: "--name")
@@ -64,7 +64,7 @@ extension HarnessCLI {
     static func handleSaveBuffer(_ args: [String], client: DaemonClient) throws {
         let name = flagValue(args, flag: "--name")
         guard let path = flagValue(args, flag: "--file") ?? positionalArgs(args, skippingValuesFor: ["--name", "--file"]).first else {
-            fputs("Usage: harness-cli save-buffer [--name <name>] <path>\n", harnessStderr)
+            fputs("Usage: kouen-cli save-buffer [--name <name>] <path>\n", harnessStderr)
             exit(1)
         }
         let response = try checkedRequest(client, .getBuffer(name: name))
@@ -79,7 +79,7 @@ extension HarnessCLI {
     static func handleLoadBuffer(_ args: [String], client: DaemonClient) throws {
         let name = flagValue(args, flag: "--name")
         guard let path = flagValue(args, flag: "--file") ?? positionalArgs(args, skippingValuesFor: ["--name", "--file"]).first else {
-            fputs("Usage: harness-cli load-buffer [--name <name>] <path>\n", harnessStderr)
+            fputs("Usage: kouen-cli load-buffer [--name <name>] <path>\n", harnessStderr)
             exit(1)
         }
         let expanded = (path as NSString).expandingTildeInPath

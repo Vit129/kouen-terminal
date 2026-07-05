@@ -6,7 +6,7 @@ import Glibc
 import Foundation
 import HarnessCore
 
-/// `harness-cli replay` — plays a recording (see ``RecordingEvent``) back to the
+/// `kouen-cli replay` — plays a recording (see ``RecordingEvent``) back to the
 /// local terminal by writing the recorded `output` bytes to stdout.
 ///
 /// Playback honors the recorded inter-event timing on a monotonic, anti-drift
@@ -21,13 +21,13 @@ public enum ReplayClient {
             let data = try Data(contentsOf: URL(fileURLWithPath: path))
             text = String(decoding: data, as: UTF8.self)
         } catch {
-            fputs("harness-cli replay: cannot read \(path): \(error)\n", harnessStderr)
+            fputs("kouen-cli replay: cannot read \(path): \(error)\n", harnessStderr)
             return 66 // EX_NOINPUT
         }
 
         let (events, skipped) = TerminalRecordingCodec.decode(text)
         if skipped > 0 {
-            fputs("harness-cli replay: skipped \(skipped) malformed line(s)\n", harnessStderr)
+            fputs("kouen-cli replay: skipped \(skipped) malformed line(s)\n", harnessStderr)
         }
         let steps = TerminalReplay.steps(from: events, honorTiming: honorTiming, speed: speed)
 

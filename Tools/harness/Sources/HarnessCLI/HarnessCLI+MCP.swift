@@ -3,7 +3,7 @@ import HarnessCore
 
 extension HarnessCLI {
 
-    /// harness-cli mcp <subcommand>
+    /// kouen-cli mcp <subcommand>
     ///
     ///   setup   — write mcpServers.harness to every detected agent config file
     ///   status  — print which agents are configured and where harness-mcp lives
@@ -16,7 +16,7 @@ extension HarnessCLI {
         case "remove":  mcpRemove()
         default:
             fputs("""
-            Usage: harness-cli mcp <subcommand>
+            Usage: kouen-cli mcp <subcommand>
               setup   Write harness-mcp into each agent's MCP config
               status  Show which agents have harness configured
               remove  Remove harness-mcp from all agent configs
@@ -31,7 +31,7 @@ extension HarnessCLI {
         let binaryPath = resolveMCPBinaryPath()
         guard let binaryPath else {
             fputs(
-                "harness-cli mcp setup: harness-mcp binary not found.\n" +
+                "kouen-cli mcp setup: harness-mcp binary not found.\n" +
                 "Run `make build` or install Harness.app first.\n",
                 harnessStderr
             )
@@ -105,7 +105,7 @@ extension HarnessCLI {
 
     /// Resolve `harness-mcp` binary path with priority:
     /// 1. Installed app-support bin/ directory (survives app moves)
-    /// 2. Same directory as the running harness-cli executable (bundle or dev build)
+    /// 2. Same directory as the running kouen-cli executable (bundle or dev build)
     /// 3. Debug build directory (for `swift run` / direct dev usage)
     private static func resolveMCPBinaryPath() -> String? {
         let candidates: [URL] = [

@@ -119,7 +119,7 @@ enum DesktopNotifier {
         NSWorkspace.shared.open(url)
     }
     static func sendTest(completion: (@MainActor @Sendable (Bool) -> Void)? = nil) {
-        show(title: "Harness", body: "Notifications are working!", completion: completion)
+        show(title: "Kouen", body: "Notifications are working!", completion: completion)
     }
     private static func escape(_ s: String) -> String {
         s.replacingOccurrences(of: "\\", with: "\\\\")

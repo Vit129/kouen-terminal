@@ -37,7 +37,7 @@ private struct LSPDiagnosticsPayload: Codable {
 extension HarnessCLI {
     static func handleLSP(_ args: [String]) -> Int {
         guard args.count >= 2 else {
-            fputs("Usage: harness-cli lsp <start|status|hover|definition|diagnostics> ...\n", harnessStderr)
+            fputs("Usage: kouen-cli lsp <start|status|hover|definition|diagnostics> ...\n", harnessStderr)
             return 64
         }
         return runAsyncCLI {
@@ -60,7 +60,7 @@ extension HarnessCLI {
         switch box.get() {
         case .success(let code): return code
         case .failure(let error):
-            fputs("harness-cli lsp: \(error)\n", harnessStderr)
+            fputs("kouen-cli lsp: \(error)\n", harnessStderr)
             return 1
         case nil:
             return 1
@@ -80,7 +80,7 @@ extension HarnessCLI {
         case "diagnostics":
             return try await handleLSPDiagnostics(args)
         default:
-            fputs("Usage: harness-cli lsp <start|status|hover|definition|diagnostics> ...\n", harnessStderr)
+            fputs("Usage: kouen-cli lsp <start|status|hover|definition|diagnostics> ...\n", harnessStderr)
             return 64
         }
     }
@@ -89,7 +89,7 @@ extension HarnessCLI {
         let path = positionalArgs(args, skippingValuesFor: ["--lang"]).dropFirst(1).first
             ?? FileManager.default.currentDirectoryPath
         guard let configuration = lspConfiguration(path: path, lang: flagValue(args, flag: "--lang")) else {
-            fputs("harness-cli lsp start: no language server configured for \(path)\n", harnessStderr)
+            fputs("kouen-cli lsp start: no language server configured for \(path)\n", harnessStderr)
             return 1
         }
         let client = LSPClient()
@@ -123,7 +123,7 @@ extension HarnessCLI {
 
     private static func handleLSPHover(_ args: [String]) async throws -> Int {
         guard let location = parseLocationArgument(args) else {
-            fputs("Usage: harness-cli lsp hover <file>:<line>:<col> [--json]\n", harnessStderr)
+            fputs("Usage: kouen-cli lsp hover <file>:<line>:<col> [--json]\n", harnessStderr)
             return 64
         }
         let (client, configuration, text) = try await openLSPDocument(location.fileURL)
@@ -143,7 +143,7 @@ extension HarnessCLI {
 
     private static func handleLSPDefinition(_ args: [String]) async throws -> Int {
         guard let location = parseLocationArgument(args) else {
-            fputs("Usage: harness-cli lsp definition <file>:<line>:<col> [--json]\n", harnessStderr)
+            fputs("Usage: kouen-cli lsp definition <file>:<line>:<col> [--json]\n", harnessStderr)
             return 64
         }
         let (client, _, _) = try await openLSPDocument(location.fileURL)
@@ -163,7 +163,7 @@ extension HarnessCLI {
     private static func handleLSPDiagnostics(_ args: [String]) async throws -> Int {
         let files = positionalArgs(args, skippingValuesFor: []).dropFirst(1)
         guard let path = files.first else {
-            fputs("Usage: harness-cli lsp diagnostics <file> [--json]\n", harnessStderr)
+            fputs("Usage: kouen-cli lsp diagnostics <file> [--json]\n", harnessStderr)
             return 64
         }
         let url = URL(fileURLWithPath: (path as NSString).expandingTildeInPath).standardizedFileURL

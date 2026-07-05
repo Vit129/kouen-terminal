@@ -68,7 +68,7 @@ struct HarnessCLI {
                 return
             case "protocol-version":
                 // No daemon round-trip: `ipcProtocolVersion` is a compile-time constant baked
-                // into this binary, so an installer can compare an old and new harness-cli's
+                // into this binary, so an installer can compare an old and new kouen-cli's
                 // output directly to decide whether a daemon restart is actually needed.
                 print(ipcProtocolVersion)
                 return
@@ -125,19 +125,19 @@ struct HarnessCLI {
                 try handleSelectSession(args, client: client)
             case "close-tab":
                 guard let tabID = UUID(uuidString: flagValue(args, flag: "--tab") ?? "") else {
-                    fputs("Usage: harness-cli close-tab --tab <uuid>\n", harnessStderr)
+                    fputs("Usage: kouen-cli close-tab --tab <uuid>\n", harnessStderr)
                     exit(1)
                 }
                 _ = try checkedRequest(client, .closeTab(tabID: tabID))
             case "close-session":
                 guard let sessionID = UUID(uuidString: flagValue(args, flag: "--session") ?? "") else {
-                    fputs("Usage: harness-cli close-session --session <uuid>\n", harnessStderr)
+                    fputs("Usage: kouen-cli close-session --session <uuid>\n", harnessStderr)
                     exit(1)
                 }
                 _ = try checkedRequest(client, .closeSession(sessionID: sessionID))
             case "promote-session", "demote-session":
                 guard let sessionID = UUID(uuidString: flagValue(args, flag: "--session") ?? "") else {
-                    fputs("Usage: harness-cli \(command) --session <uuid>\n", harnessStderr)
+                    fputs("Usage: kouen-cli \(command) --session <uuid>\n", harnessStderr)
                     exit(1)
                 }
                 // Promote pins a session to survive a clean quit even in Plain mode; demote
@@ -147,13 +147,13 @@ struct HarnessCLI {
                 guard let surface = flagValue(args, flag: "--surface"),
                       let text = flagValue(args, flag: "--text")
                 else {
-                    fputs("Usage: harness-cli send --surface <uuid> --text \"...\"\n", harnessStderr)
+                    fputs("Usage: kouen-cli send --surface <uuid> --text \"...\"\n", harnessStderr)
                     exit(1)
                 }
                 _ = try checkedRequest(client, .send(surfaceID: surface, text: text))
             case "notify":
                 guard let surface = flagValue(args, flag: "--surface") else {
-                    fputs("Usage: harness-cli notify --surface <uuid> [--title t] [--body b] [--from-hook]\n", harnessStderr)
+                    fputs("Usage: kouen-cli notify --surface <uuid> [--title t] [--body b] [--from-hook]\n", harnessStderr)
                     exit(1)
                 }
                 let title = flagValue(args, flag: "--title") ?? "Agent"
@@ -230,7 +230,7 @@ struct HarnessCLI {
                 #else
                 // The window compositor needs the Metal/AppKit terminal kit, which isn't built on
                 // headless/Linux. Single-pane `attach` still works there.
-                fputs("harness-cli attach-window: not supported on this platform; use `attach`\n", harnessStderr)
+                fputs("kouen-cli attach-window: not supported on this platform; use `attach`\n", harnessStderr)
                 exit(64)
                 #endif
             case "record":
@@ -310,7 +310,7 @@ struct HarnessCLI {
                 exit(1)
             }
         } catch {
-            fputs("harness-cli: \(error)\n", harnessStderr)
+            fputs("kouen-cli: \(error)\n", harnessStderr)
             exit(1)
         }
     }
@@ -369,14 +369,14 @@ struct HarnessCLI {
     static func resolveEndpoint(_ args: [String]) throws -> Endpoint {
         guard let hostName = flagValue(args, flag: "--host") else { return .localControlSocket }
         guard let host = RemoteHostStore().host(named: hostName) else {
-            fputs("harness-cli: unknown --host '\(hostName)'. Add it with `harness-cli remote add`.\n", harnessStderr)
+            fputs("kouen-cli: unknown --host '\(hostName)'. Add it with `kouen-cli remote add`.\n", harnessStderr)
             exit(64)
         }
         return try SSHTunnelManager.shared.endpoint(for: host)
     }
 
     static func resolvedCLIPath() -> String {
-        Bundle.main.executablePath ?? CommandLine.arguments.first ?? "harness-cli"
+        Bundle.main.executablePath ?? CommandLine.arguments.first ?? "kouen-cli"
     }
 
     static func parseDetachSequence(_ raw: String) -> [UInt8]? {
@@ -406,14 +406,14 @@ struct HarnessCLI {
             // A dangling `--detach-keys` (last token, no value) must not silently keep the default:
             // the user asked for a custom sequence and would otherwise get a different one.
             if flagIsDangling(args, flag: "--detach-keys") {
-                return .invalid("harness-cli: --detach-keys requires a value "
+                return .invalid("kouen-cli: --detach-keys requires a value "
                     + "('C-a d', '0x01 0x64', or comma-separated decimal bytes).\n")
             }
             return .absent
         }
         guard let parsed = parseDetachSequence(raw) else {
             return .invalid(
-                "harness-cli: invalid --detach-keys '\(raw)'. "
+                "kouen-cli: invalid --detach-keys '\(raw)'. "
                 + "Use 'C-a d', '0x01 0x64', or comma-separated decimal bytes.\n")
         }
         return .parsed(parsed)
@@ -422,9 +422,9 @@ struct HarnessCLI {
     static func installCLI() throws {
         let source = CLIInstallLocator.sourceBinary()
         guard FileManager.default.fileExists(atPath: source.path) else {
-            throw DaemonSessionError.daemonError("harness-cli binary not found at \(source.path)")
+            throw DaemonSessionError.daemonError("kouen-cli binary not found at \(source.path)")
         }
-        let dest = HarnessPaths.applicationSupport.appendingPathComponent("bin/harness-cli")
+        let dest = HarnessPaths.applicationSupport.appendingPathComponent("bin/kouen-cli")
         try HarnessPaths.ensureDirectories()
         try FileManager.default.createDirectory(at: dest.deletingLastPathComponent(), withIntermediateDirectories: true)
         try copyExecutable(source: source, destination: dest)
@@ -449,13 +449,13 @@ struct HarnessCLI {
         // Shell completions for the user's login shell, so they work out of the box: fish drops
         // into its auto-load dir; zsh/bash get a guarded, backed-up, idempotent `source` block
         // wired into the rc (the same mechanism as install-shell-integration). Any shell can also
-        // regenerate the script on demand with `harness-cli completions <shell>`.
+        // regenerate the script on demand with `kouen-cli completions <shell>`.
         do {
             for line in try ShellCompletionInstaller.installForLoginShell() { print(line) }
         } catch {
             fputs("warning: shell completion install failed: \(error)\n", harnessStderr)
         }
-        print("Tip: run 'harness-cli install-shell-integration' to enable OSC 133 prompt marks, "
+        print("Tip: run 'kouen-cli install-shell-integration' to enable OSC 133 prompt marks, "
             + "the success/failure gutter, and prompt jumping.")
     }
 

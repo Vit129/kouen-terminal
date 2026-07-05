@@ -30,8 +30,8 @@ public enum AttachClient {
         /// (never forwarded to the shell) only when the full sequence matches.
         public var detachSequence: [UInt8] = [0x01, 0x64]
         /// Human-readable label sent via `identifyClient`. Shows up in
-        /// `harness-cli list-clients`.
-        public var label: String = "harness-cli attach"
+        /// `kouen-cli list-clients`.
+        public var label: String = "kouen-cli attach"
         public init() {}
     }
 
@@ -41,7 +41,7 @@ public enum AttachClient {
         endpoint: Endpoint = .localControlSocket
     ) throws -> Int32 {
         guard isatty(STDIN_FILENO) != 0, isatty(STDOUT_FILENO) != 0 else {
-            fputs("harness-cli attach: stdin/stdout must be a TTY\n", harnessStderr)
+            fputs("kouen-cli attach: stdin/stdout must be a TTY\n", harnessStderr)
             return 64
         }
         let client = DaemonClient(endpoint: endpoint)
@@ -54,7 +54,7 @@ public enum AttachClient {
         do {
             try session.connect()
         } catch {
-            fputs("\nharness-cli attach: \(error)\n", harnessStderr)
+            fputs("\nkouen-cli attach: \(error)\n", harnessStderr)
             return 1
         }
 
@@ -64,7 +64,7 @@ public enum AttachClient {
         do {
             try session.run()
         } catch {
-            fputs("\nharness-cli attach: \(error)\n", harnessStderr)
+            fputs("\nkouen-cli attach: \(error)\n", harnessStderr)
             return 1
         }
         return 0

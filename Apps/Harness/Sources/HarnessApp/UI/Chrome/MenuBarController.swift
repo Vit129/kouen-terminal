@@ -72,7 +72,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         }
 
         menu.addItem(.separator())
-        let open = NSMenuItem(title: "Open Harness", action: #selector(openHarness), keyEquivalent: "")
+        let open = NSMenuItem(title: "Open Kouen", action: #selector(openHarness), keyEquivalent: "")
         open.target = self
         menu.addItem(open)
     }

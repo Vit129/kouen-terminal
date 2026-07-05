@@ -91,7 +91,7 @@ public final class RealPty: @unchecked Sendable {
     private static let maxReapedGenerationsTracked = 32
     private let lifecycleLock = NSLock()
 
-    private let readQueue = DispatchQueue(label: "com.vit129.harness.realpty.read")
+    private let readQueue = DispatchQueue(label: "com.vit129.kouen.realpty.read")
     private var readSource: DispatchSourceRead?
     /// Reused across read wakeups — `readQueue` is serial and every generation's read source runs on
     /// it, so this is single-owner and never raced. Allocating + zero-filling a fresh 64 KiB buffer
@@ -108,7 +108,7 @@ public final class RealPty: @unchecked Sendable {
     /// still sees chunks in order. Bounded in practice — the real subscriber (`DaemonServer`) hands
     /// each chunk to its own queue with a write-backlog cap and drops a stuck client — so this
     /// queue can't grow without bound.
-    private let deliveryQueue = DispatchQueue(label: "com.vit129.harness.realpty.deliver")
+    private let deliveryQueue = DispatchQueue(label: "com.vit129.kouen.realpty.deliver")
     /// Blocking PTY-master `write()`s run here, never on the caller's thread. `SurfaceRegistry`
     /// dispatches input (`sendData`) while holding the registry lock on the daemon's serial IPC
     /// queue; a blocking write to a flow-controlled (C-s) or full PTY buffer there would wedge the
@@ -116,11 +116,11 @@ public final class RealPty: @unchecked Sendable {
     /// keeps the blast radius to this one surface's input — which matches terminal flow-control
     /// semantics — while the daemon keeps serving everyone else. Serial ⇒ keystrokes stay ordered;
     /// no userspace buffering ⇒ no dropped input.
-    private let writeQueue = DispatchQueue(label: "com.vit129.harness.realpty.write")
+    private let writeQueue = DispatchQueue(label: "com.vit129.kouen.realpty.write")
     /// Delayed-SIGKILL escalation timers (`scheduleKillEscalation`) run here, off every
     /// hot path. A child that ignores SIGTERM+SIGHUP would otherwise leave the `watchForExit`
     /// `waitpid(pid, …, 0)` blocked forever, leaking that thread for the daemon's lifetime.
-    private let killQueue = DispatchQueue(label: "com.vit129.harness.realpty.kill")
+    private let killQueue = DispatchQueue(label: "com.vit129.kouen.realpty.kill")
     /// Grace period after SIGTERM before escalating to SIGKILL. Long enough for a well-behaved
     /// shell to drain and exit on its own (so we don't `SIGKILL` it mid-teardown), short enough
     /// that a TERM-ignoring child is reaped promptly.

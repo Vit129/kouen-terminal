@@ -72,7 +72,7 @@ struct SettingsAdvancedView: View {
             }
 
             Section("Terminal identity") {
-                Text("How Harness identifies itself to programs (TERM_PROGRAM + XTVERSION). Compatible reports a protocol-compatible identity so tools like Claude Code enable Shift+Enter immediately. Applies to newly-opened panes.")
+                Text("How Kouen identifies itself to programs (TERM_PROGRAM + XTVERSION). Compatible reports a protocol-compatible identity so tools like Claude Code enable Shift+Enter immediately. Applies to newly-opened panes.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 

@@ -21,7 +21,7 @@ final class ShellCompletionInstallerTests: XCTestCase {
         let result = try ShellCompletionInstaller.install(for: .fish, homeOverride: home)
         XCTAssertNil(result.rcPath, "fish auto-loads from its completions dir; no rc wiring")
         XCTAssertTrue(FileManager.default.fileExists(atPath: result.scriptPath.path))
-        XCTAssertTrue(read(result.scriptPath).contains("complete -c harness-cli"))
+        XCTAssertTrue(read(result.scriptPath).contains("complete -c kouen-cli"))
         // No shell rc files were created for fish.
         XCTAssertFalse(FileManager.default.fileExists(atPath: home.appendingPathComponent(".zshrc").path))
     }
@@ -72,7 +72,7 @@ final class ShellCompletionInstallerTests: XCTestCase {
         XCTAssertTrue(read(home.appendingPathComponent(".zshrc")).contains("Harness CLI completions"))
         // The fish drop-in exists and is inert without fish.
         XCTAssertTrue(FileManager.default.fileExists(
-            atPath: home.appendingPathComponent(".config/fish/completions/harness-cli.fish").path))
+            atPath: home.appendingPathComponent(".config/fish/completions/kouen-cli.fish").path))
     }
 
     func testInstallForLoginShellFishTouchesNoRc() throws {

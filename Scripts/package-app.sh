@@ -75,16 +75,16 @@ if [[ ! -d "$APP/Contents/Frameworks/Sparkle.framework" ]] \
   exit 1
 fi
 
-ICON="$ROOT/Apps/Harness/Resources/Harness.icns"
+ICON="$ROOT/Apps/Harness/Resources/Kouen.icns"
 if [[ ! -f "$ICON" ]]; then
   "$ROOT/Scripts/generate-app-icon.sh"
 fi
-cp "$ICON" "$APP/Contents/Resources/Harness.icns"
+cp "$ICON" "$APP/Contents/Resources/Kouen.icns"
 
 # Transparent brand logo for onboarding + settings (loaded via Bundle.main).
-LOGO="$ROOT/Apps/Harness/Resources/HarnessLogo.png"
+LOGO="$ROOT/Apps/Harness/Resources/KouenLogo.png"
 if [[ -f "$LOGO" ]]; then
-  cp "$LOGO" "$APP/Contents/Resources/HarnessLogo.png"
+  cp "$LOGO" "$APP/Contents/Resources/KouenLogo.png"
 fi
 
 # Bundled "Symbols Nerd Font Mono" (MIT) — auto-activated via Info.plist's

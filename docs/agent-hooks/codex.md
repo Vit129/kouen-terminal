@@ -1,11 +1,11 @@
-# Codex → Harness
+# Codex → Kouen
 
-Surface Codex CLI pause / done events as Harness pane notifications.
+Surface Codex CLI pause / done events as Kouen pane notifications.
 
 ## One-line install
 
 ```bash
-harness-cli install-hooks codex
+kouen-cli install-hooks codex
 ```
 
 Writes `~/.codex/hooks.json` (the event/matcher shape Codex uses — the same as Claude
@@ -15,20 +15,20 @@ Code, deep-merged into any existing hooks):
 {
   "hooks": {
     "PermissionRequest": [
-      { "matcher": "*", "hooks": [{ "type": "command", "command": "PATH=\"$HOME/Library/Application Support/Harness/bin:$PATH\" harness-cli notify --surface \"$HARNESS_SURFACE\" --title \"Codex\" --body \"Awaiting input\"" }] }
+      { "matcher": "*", "hooks": [{ "type": "command", "command": "PATH=\"$HOME/Library/Application Support/Kouen/bin:$PATH\" kouen-cli notify --surface \"$HARNESS_SURFACE\" --title \"Codex\" --body \"Awaiting input\"" }] }
     ],
     "Notification": [
-      { "matcher": "*", "hooks": [{ "type": "command", "command": "PATH=\"$HOME/Library/Application Support/Harness/bin:$PATH\" harness-cli notify --surface \"$HARNESS_SURFACE\" --title \"Codex\" --body \"Notification\"" }] }
+      { "matcher": "*", "hooks": [{ "type": "command", "command": "PATH=\"$HOME/Library/Application Support/Kouen/bin:$PATH\" kouen-cli notify --surface \"$HARNESS_SURFACE\" --title \"Codex\" --body \"Notification\"" }] }
     ],
     "Stop": [
-      { "matcher": "*", "hooks": [{ "type": "command", "command": "PATH=\"$HOME/Library/Application Support/Harness/bin:$PATH\" harness-cli notify --surface \"$HARNESS_SURFACE\" --title \"Codex\" --body \"Done\"" }] }
+      { "matcher": "*", "hooks": [{ "type": "command", "command": "PATH=\"$HOME/Library/Application Support/Kouen/bin:$PATH\" kouen-cli notify --surface \"$HARNESS_SURFACE\" --title \"Codex\" --body \"Done\"" }] }
     ]
   }
 }
 ```
 
 > **Codex hooks are enabled by default** in current releases — the old
-> `[features] hooks = true` flag only *disables* them, so Harness no longer
+> `[features] hooks = true` flag only *disables* them, so Kouen no longer
 > writes `~/.codex/config.toml`. On a very old Codex that ignores `hooks.json`,
 > upgrade Codex, or add `[features]` / `hooks = true` to `config.toml` yourself.
 

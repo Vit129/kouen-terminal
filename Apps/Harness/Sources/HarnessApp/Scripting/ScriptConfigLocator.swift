@@ -4,9 +4,13 @@ import Foundation
 struct ScriptConfigLocator {
     /// Discovers the script path using the following precedence:
     /// 1. `$HARNESS_CONFIG_FILE` (if set)
-    /// 2. `$XDG_CONFIG_HOME/harness/init.js` (if `XDG_CONFIG_HOME` is set and not empty)
-    /// 3. `$HOME/.config/harness/init.js` (if `HOME` is set)
-    /// 4. `$HOME/.harness.js` (if `HOME` is set)
+    /// 2. `$XDG_CONFIG_HOME/kouen/init.js` (if `XDG_CONFIG_HOME` is set and not empty)
+    /// 3. `$HOME/.config/kouen/init.js` (if `HOME` is set)
+    /// 4. `$HOME/.kouen.js` (if `HOME` is set)
+    ///
+    /// Each `kouen`-named path falls back to its pre-rename `harness`-named equivalent
+    /// (`harness/init.js`, `.harness.js`) if the new one doesn't exist, so a script in
+    /// place before the rename keeps loading unmoved.
     ///
     /// - Parameters:
     ///   - environment: The environment variables dictionary (defaults to the live process environment).
@@ -23,29 +27,41 @@ struct ScriptConfigLocator {
             }
         }
         
-        // 2. $XDG_CONFIG_HOME/harness/init.js
+        // 2. $XDG_CONFIG_HOME/kouen/init.js (falling back to the pre-rename harness/init.js)
         if let xdgConfigHome = environment["XDG_CONFIG_HOME"], !xdgConfigHome.isEmpty {
-            let path = (xdgConfigHome as NSString).appendingPathComponent("harness/init.js")
+            let path = (xdgConfigHome as NSString).appendingPathComponent("kouen/init.js")
             if fileExists(path) {
                 return path
             }
+            let legacyPath = (xdgConfigHome as NSString).appendingPathComponent("harness/init.js")
+            if fileExists(legacyPath) {
+                return legacyPath
+            }
         }
-        
-        // 3. $HOME/.config/harness/init.js
+
+        // 3. $HOME/.config/kouen/init.js (falling back to the pre-rename .config/harness/init.js)
         let homeDir = environment["HOME"] ?? NSHomeDirectory()
         if !homeDir.isEmpty {
-            let path1 = (homeDir as NSString).appendingPathComponent(".config/harness/init.js")
+            let path1 = (homeDir as NSString).appendingPathComponent(".config/kouen/init.js")
             if fileExists(path1) {
                 return path1
             }
-            
-            // 4. $HOME/.harness.js
-            let path2 = (homeDir as NSString).appendingPathComponent(".harness.js")
+            let legacyPath1 = (homeDir as NSString).appendingPathComponent(".config/harness/init.js")
+            if fileExists(legacyPath1) {
+                return legacyPath1
+            }
+
+            // 4. $HOME/.kouen.js (falling back to the pre-rename .harness.js)
+            let path2 = (homeDir as NSString).appendingPathComponent(".kouen.js")
             if fileExists(path2) {
                 return path2
             }
+            let legacyPath2 = (homeDir as NSString).appendingPathComponent(".harness.js")
+            if fileExists(legacyPath2) {
+                return legacyPath2
+            }
         }
-        
+
         return nil
     }
 }

@@ -5,7 +5,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 PREVIEW_HOME="$ROOT/.harness-preview"
-APP="$PREVIEW_HOME/HarnessPreview.app"
+APP="$PREVIEW_HOME/KouenPreview.app"
 mkdir -p "$PREVIEW_HOME"
 
 # HARNESS_HOME (and therefore the control socket path) must fit inside
@@ -47,8 +47,8 @@ HARNESS_BIN="$ROOT/.build/debug/Harness"
 if [[ ! -x "$HARNESS_BIN" ]] || [[ -n "$(find "$ROOT/Packages" "$ROOT/Apps" "$ROOT/Tools" -name '*.swift' -newer "$HARNESS_BIN" 2>/dev/null | head -n1)" ]]; then
   echo "Building debug..."
   swift build --product Harness
-  swift build --product HarnessDaemon
-  swift build --product harness-cli
+  swift build --product KouenDaemon
+  swift build --product kouen-cli
 else
   echo "Build up-to-date, skipping."
 fi
@@ -56,16 +56,16 @@ fi
 BUILD_DIR="$ROOT/.build/debug"
 
 # ─── Kill previous preview (ONLY preview, never prod) ─────────────────────────
-pkill -f "$APP/Contents/MacOS/Harness" 2>/dev/null || true
-pkill -f "$APP/Contents/MacOS/HarnessDaemon" 2>/dev/null || true
+pkill -f "$APP/Contents/MacOS/Kouen" 2>/dev/null || true
+pkill -f "$APP/Contents/MacOS/KouenDaemon" 2>/dev/null || true
 rm -f "$PREVIEW_HARNESS_HOME/harness.sock" "$PREVIEW_HARNESS_HOME/daemon.pid"
 
 # ─── Package preview app bundle ───────────────────────────────────────────────
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
-cp "$BUILD_DIR/Harness" "$APP/Contents/MacOS/Harness"
-cp "$BUILD_DIR/HarnessDaemon" "$APP/Contents/MacOS/HarnessDaemon"
-cp "$BUILD_DIR/harness-cli" "$APP/Contents/MacOS/harness-cli"
+cp "$BUILD_DIR/Harness" "$APP/Contents/MacOS/Kouen"
+cp "$BUILD_DIR/KouenDaemon" "$APP/Contents/MacOS/KouenDaemon"
+cp "$BUILD_DIR/kouen-cli" "$APP/Contents/MacOS/kouen-cli"
 chmod +x "$APP/Contents/MacOS/"*
 for bundle in "$BUILD_DIR"/*.bundle; do
   [[ -d "$bundle" ]] || continue
@@ -80,14 +80,14 @@ if [[ -z "$FRAMEWORK" || ! -d "$FRAMEWORK" ]]; then
   exit 1
 fi
 ditto "$FRAMEWORK" "$APP/Contents/Frameworks/Sparkle.framework"
-if ! otool -l "$APP/Contents/MacOS/Harness" | grep -q "@executable_path/../Frameworks"; then
-  install_name_tool -add_rpath "@executable_path/../Frameworks" "$APP/Contents/MacOS/Harness"
+if ! otool -l "$APP/Contents/MacOS/Kouen" | grep -q "@executable_path/../Frameworks"; then
+  install_name_tool -add_rpath "@executable_path/../Frameworks" "$APP/Contents/MacOS/Kouen"
 fi
-if [[ -f "$ROOT/Apps/Harness/Resources/Harness.icns" ]]; then
-  cp "$ROOT/Apps/Harness/Resources/Harness.icns" "$APP/Contents/Resources/Harness.icns"
+if [[ -f "$ROOT/Apps/Harness/Resources/Kouen.icns" ]]; then
+  cp "$ROOT/Apps/Harness/Resources/Kouen.icns" "$APP/Contents/Resources/Kouen.icns"
 fi
-if [[ -f "$ROOT/Apps/Harness/Resources/HarnessLogo.png" ]]; then
-  cp "$ROOT/Apps/Harness/Resources/HarnessLogo.png" "$APP/Contents/Resources/HarnessLogo.png"
+if [[ -f "$ROOT/Apps/Harness/Resources/KouenLogo.png" ]]; then
+  cp "$ROOT/Apps/Harness/Resources/KouenLogo.png" "$APP/Contents/Resources/KouenLogo.png"
 fi
 if [[ -d "$ROOT/Apps/Harness/Resources/Fonts" ]]; then
   ditto "$ROOT/Apps/Harness/Resources/Fonts" "$APP/Contents/Resources/Fonts"
@@ -104,7 +104,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleIconFile</key>
   <string>Harness</string>
   <key>CFBundleIdentifier</key>
-  <string>com.vit129.harness.preview</string>
+  <string>com.vit129.kouen.preview</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleName</key>
@@ -141,9 +141,9 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-codesign --force --sign - --entitlements "$ROOT/Harness.entitlements" "$APP/Contents/MacOS/Harness" >/dev/null
-codesign --force --sign - --entitlements "$ROOT/Harness.entitlements" "$APP/Contents/MacOS/HarnessDaemon" >/dev/null
-codesign --force --sign - --entitlements "$ROOT/Harness.entitlements" "$APP/Contents/MacOS/harness-cli" >/dev/null
+codesign --force --sign - --entitlements "$ROOT/Kouen.entitlements" "$APP/Contents/MacOS/Kouen" >/dev/null
+codesign --force --sign - --entitlements "$ROOT/Kouen.entitlements" "$APP/Contents/MacOS/KouenDaemon" >/dev/null
+codesign --force --sign - --entitlements "$ROOT/Kouen.entitlements" "$APP/Contents/MacOS/kouen-cli" >/dev/null
 codesign --force --sign - --deep "$APP" >/dev/null
 
 # ─── Launch ───────────────────────────────────────────────────────────────────
@@ -160,12 +160,12 @@ Build label:      $PREVIEW_BUILD_LABEL
 Production app is NOT affected.
 
 Preview CLI:
-  HARNESS_HOME="$PREVIEW_HARNESS_HOME" "$BUILD_DIR/harness-cli" ping
+  HARNESS_HOME="$PREVIEW_HARNESS_HOME" "$BUILD_DIR/kouen-cli" ping
 
 EOF
 
 if [[ "${PREVIEW_SIGNPOSTS:-0}" == "1" ]]; then
-  HARNESS_HOME="$PREVIEW_HARNESS_HOME" "$APP/Contents/MacOS/Harness" -HARNESS_FRAME_SIGNPOSTS 1 &
+  HARNESS_HOME="$PREVIEW_HARNESS_HOME" "$APP/Contents/MacOS/Kouen" -HARNESS_FRAME_SIGNPOSTS 1 &
 else
-  HARNESS_HOME="$PREVIEW_HARNESS_HOME" "$APP/Contents/MacOS/Harness" &
+  HARNESS_HOME="$PREVIEW_HARNESS_HOME" "$APP/Contents/MacOS/Kouen" &
 fi

@@ -15,8 +15,8 @@ enum MainMenuBuilder {
         let main = NSMenu()
 
         let app = NSMenuItem()
-        app.submenu = NSMenu(title: "Harness")
-        let aboutItem = NSMenuItem(title: "About Harness", action: #selector(MenuTarget.showAbout), keyEquivalent: "")
+        app.submenu = NSMenu(title: "Kouen")
+        let aboutItem = NSMenuItem(title: "About Kouen", action: #selector(MenuTarget.showAbout), keyEquivalent: "")
         aboutItem.target = MenuTarget.shared
         app.submenu?.addItem(aboutItem)
         app.submenu?.addItem(.separator())
@@ -32,14 +32,14 @@ enum MainMenuBuilder {
         prefs.target = MenuTarget.shared
         app.submenu?.addItem(prefs)
         app.submenu?.addItem(.separator())
-        let hide = NSMenuItem(title: "Hide Harness", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        let hide = NSMenuItem(title: "Hide Kouen", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         app.submenu?.addItem(hide)
         let hideOthers = NSMenuItem(title: "Hide Others", action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
         hideOthers.keyEquivalentModifierMask = [.command, .option]
         app.submenu?.addItem(hideOthers)
         app.submenu?.addItem(NSMenuItem(title: "Show All", action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: ""))
         app.submenu?.addItem(.separator())
-        app.submenu?.addItem(NSMenuItem(title: "Quit Harness", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        app.submenu?.addItem(NSMenuItem(title: "Quit Kouen", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         main.addItem(app)
 
         // Edit — standard responder-chain actions so Copy/Paste/Select All work in
@@ -250,7 +250,7 @@ let exportLayoutItem = NSMenuItem(title: "Export Layout…", action: #selector(M
         // Help
         let help = NSMenuItem()
         help.submenu = NSMenu(title: "Help")
-        let welcome = NSMenuItem(title: "Welcome to Harness", action: #selector(MenuTarget.showOnboarding), keyEquivalent: "")
+        let welcome = NSMenuItem(title: "Welcome to Kouen", action: #selector(MenuTarget.showOnboarding), keyEquivalent: "")
         welcome.target = MenuTarget.shared
         help.submenu?.addItem(welcome)
         let shortcuts = NSMenuItem(title: "Keyboard Shortcuts", action: #selector(MenuTarget.showShortcuts), keyEquivalent: "/")

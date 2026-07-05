@@ -15,7 +15,7 @@ extension HarnessCLI {
             return
         }
         guard let workspaceID = UUID(uuidString: flagValue(args, flag: "--workspace-id") ?? "") else {
-            fputs("Usage: harness-cli new-tab --workspace <name|uuid> [--cwd path]\n", harnessStderr)
+            fputs("Usage: kouen-cli new-tab --workspace <name|uuid> [--cwd path]\n", harnessStderr)
             exit(1)
         }
         let cwd = flagValue(args, flag: "--cwd")
@@ -40,7 +40,7 @@ extension HarnessCLI {
             return
         }
         guard let workspaceID = try resolveWorkspaceID(args, client: client) else {
-            fputs("Usage: harness-cli new-session --workspace <name|uuid> [--cwd path] [--name name] [--isolate [--branch <branch>]] [--worktree <branch>] [--repo <path>] [--group-with <session>]\n", harnessStderr)
+            fputs("Usage: kouen-cli new-session --workspace <name|uuid> [--cwd path] [--name name] [--isolate [--branch <branch>]] [--worktree <branch>] [--repo <path>] [--group-with <session>]\n", harnessStderr)
             exit(1)
         }
         // --isolate [--branch <branch>] [--base-ref <ref>]: create session in its own worktree
@@ -86,7 +86,7 @@ extension HarnessCLI {
               let directionRaw = flagValue(args, flag: "--direction"),
               let direction = SplitDirection(rawValue: directionRaw)
         else {
-            fputs("Usage: harness-cli new-split --tab <uuid> --direction horizontal|vertical\n", harnessStderr)
+            fputs("Usage: kouen-cli new-split --tab <uuid> --direction horizontal|vertical\n", harnessStderr)
             exit(1)
         }
         let paneID: UUID?
@@ -106,7 +106,7 @@ extension HarnessCLI {
 
     static func handleSelectWorkspace(_ args: [String], client: DaemonClient) throws {
         guard let target = flagValue(args, flag: "--workspace") ?? flagValue(args, flag: "--id") else {
-            fputs("Usage: harness-cli select-workspace --workspace <name|uuid>\n", harnessStderr)
+            fputs("Usage: kouen-cli select-workspace --workspace <name|uuid>\n", harnessStderr)
             exit(1)
         }
         if let uuid = UUID(uuidString: target) {
@@ -120,7 +120,7 @@ extension HarnessCLI {
         guard let workspaceID = UUID(uuidString: flagValue(args, flag: "--workspace") ?? ""),
               let tabID = UUID(uuidString: flagValue(args, flag: "--tab") ?? "")
         else {
-            fputs("Usage: harness-cli select-tab --workspace <uuid> --tab <uuid>\n", harnessStderr)
+            fputs("Usage: kouen-cli select-tab --workspace <uuid> --tab <uuid>\n", harnessStderr)
             exit(1)
         }
         _ = try checkedRequest(client, .selectTab(workspaceID: workspaceID, tabID: tabID))
@@ -130,7 +130,7 @@ extension HarnessCLI {
         guard let workspaceID = try resolveWorkspaceID(args, client: client),
               let sessionID = UUID(uuidString: flagValue(args, flag: "--session") ?? "")
         else {
-            fputs("Usage: harness-cli select-session --workspace <name|uuid> --session <uuid>\n", harnessStderr)
+            fputs("Usage: kouen-cli select-session --workspace <name|uuid> --session <uuid>\n", harnessStderr)
             exit(1)
         }
         _ = try checkedRequest(client, .selectSession(workspaceID: workspaceID, sessionID: sessionID))
@@ -281,7 +281,7 @@ extension HarnessCLI {
 
     static func handleHasSession(_ args: [String], client: DaemonClient) throws {
         guard let target = flagValue(args, flag: "--session") else {
-            fputs("Usage: harness-cli has-session --session <name|uuid>\n", harnessStderr)
+            fputs("Usage: kouen-cli has-session --session <name|uuid>\n", harnessStderr)
             exit(2)
         }
         let exists = SnapshotQueryFormatter.sessionExists(try snapshot(client), nameOrID: target)

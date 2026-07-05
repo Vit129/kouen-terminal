@@ -17,13 +17,13 @@ struct WelcomeStepView: View {
                 .accessibilityHidden(true)
 
             VStack(spacing: 10) {
-                Text("Harness CLI")
+                Text("Kouen CLI")
                     .font(.system(size: 34, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.white.opacity(0.94))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
 
-                Text("The command line for Harness — drive sessions, splits, and agents from anywhere.")
+                Text("The command line for Kouen — drive sessions, splits, and agents from anywhere.")
                     .font(.system(size: 14.5, weight: .regular))
                     .foregroundStyle(Color.white.opacity(0.60))
                     .multilineTextAlignment(.center)
@@ -53,7 +53,7 @@ struct WelcomeStepView: View {
     }
 
     static func logoImage(bundle: Bundle = .main) -> NSImage? {
-        if let url = bundle.url(forResource: "HarnessLogo", withExtension: "png"),
+        if let url = bundle.url(forResource: "KouenLogo", withExtension: "png"),
            let image = NSImage(contentsOf: url) {
             return image
         }

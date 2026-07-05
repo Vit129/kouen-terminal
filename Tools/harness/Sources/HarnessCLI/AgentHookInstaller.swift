@@ -6,7 +6,7 @@ import Glibc
 import Foundation
 import HarnessCore
 
-/// CLI presentation for `harness-cli install-hooks <agent>`. The actual file-writing /
+/// CLI presentation for `kouen-cli install-hooks <agent>`. The actual file-writing /
 /// merge / backup logic lives in `HarnessCore.AgentHookInstaller` (shared with the GUI's
 /// "Install hooks" button). This shim only resolves the agent name, calls core, and prints
 /// the same human-facing messages + exit codes the command always had.

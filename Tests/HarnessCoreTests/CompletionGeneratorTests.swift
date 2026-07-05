@@ -16,7 +16,7 @@ final class CompletionGeneratorTests: XCTestCase {
 
     func testFishUsesCompleteDirectiveAndJSONFlags() {
         let fish = CompletionGenerator.script(for: .fish)
-        XCTAssertTrue(fish.contains("complete -c harness-cli"))
+        XCTAssertTrue(fish.contains("complete -c kouen-cli"))
         XCTAssertTrue(fish.contains("-l json"), "JSON-capable commands get a --json completion")
         XCTAssertTrue(fish.contains("-l pretty"))
         XCTAssertTrue(fish.contains("-a \"zsh fish bash\""), "completions arg values")
@@ -25,20 +25,20 @@ final class CompletionGeneratorTests: XCTestCase {
 
     func testZshIsACompdefWithDescriptions() {
         let zsh = CompletionGenerator.script(for: .zsh)
-        XCTAssertTrue(zsh.hasPrefix("#compdef harness-cli"))
+        XCTAssertTrue(zsh.hasPrefix("#compdef kouen-cli"))
         XCTAssertTrue(zsh.contains("_describe"))
         // Summaries with apostrophes are escaped so the array stays valid.
         XCTAssertFalse(zsh.contains("session's:"), "apostrophes must be escaped, not raw")
         // Must register the function so it works when sourced from an rc (not just autoloaded
-        // from $fpath) — otherwise `source <(harness-cli completions zsh)` defines but never wires
+        // from $fpath) — otherwise `source <(kouen-cli completions zsh)` defines but never wires
         // the completion.
-        XCTAssertTrue(zsh.contains("compdef _harness_cli harness-cli"),
+        XCTAssertTrue(zsh.contains("compdef _kouen_cli kouen-cli"),
                       "sourced zsh completion must register via compdef")
     }
 
     func testBashRegistersACompletionFunction() {
         let bash = CompletionGenerator.script(for: .bash)
-        XCTAssertTrue(bash.contains("complete -F _harness_cli harness-cli"))
+        XCTAssertTrue(bash.contains("complete -F _kouen_cli kouen-cli"))
         XCTAssertTrue(bash.contains("compgen -W"))
     }
 

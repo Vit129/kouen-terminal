@@ -1,18 +1,22 @@
 import Foundation
 
-/// Installs `harness-cli` shell completions so they work out of the box after `install`:
-/// - **fish**: written to `~/.config/fish/completions/harness-cli.fish`, which fish auto-loads
+/// Installs `kouen-cli` shell completions so they work out of the box after `install`:
+/// - **fish**: written to `~/.config/fish/completions/kouen-cli.fish`, which fish auto-loads
 ///   (no rc edit needed).
 /// - **zsh/bash**: the script is written under the Harness home and a guarded, backed-up,
 ///   idempotent `source` block is wired into the user's rc (`.zshrc`/`.bashrc`) — the same
 ///   mechanism `ShellIntegration` uses for OSC 133.
 ///
 /// Scripts come from `CompletionGenerator` (one canonical command catalog), so the installed
-/// files, `harness-cli completions <shell>`, and `Scripts/completions/harness-cli.fish` never drift.
+/// files, `kouen-cli completions <shell>`, and `Scripts/completions/kouen-cli.fish` never drift.
 public enum ShellCompletionInstaller {
     /// The fish completion script — generated from the command catalog.
     public static var fishCompletionSource: String { CompletionGenerator.script(for: .fish) }
 
+    // Unchanged by the Harness->Kouen rename: this sentinel is already written into users' real
+    // .zshrc/.bashrc files, so changing it would strand existing installs with an unrecognized
+    // block (duplicate on reinstall) instead of replacing it in place. Cosmetic only — never
+    // shown to the user outside their own rc file.
     private static let markerBegin = "# >>> Harness CLI completions >>>"
     private static let markerEnd = "# <<< Harness CLI completions <<<"
 
@@ -35,7 +39,7 @@ public enum ShellCompletionInstaller {
         switch shell {
         case .fish:
             if let home = homeOverride {
-                return home.appendingPathComponent(".config/fish/completions/harness-cli.fish")
+                return home.appendingPathComponent(".config/fish/completions/kouen-cli.fish")
             }
             return HarnessPaths.fishCompletionURL
         case .zsh, .bash:
@@ -43,7 +47,7 @@ public enum ShellCompletionInstaller {
                 $0.appendingPathComponent("Library/Application Support/Harness", isDirectory: true)
             } ?? HarnessPaths.applicationSupport
             return appSupport.appendingPathComponent("completions", isDirectory: true)
-                .appendingPathComponent("harness-cli.\(shell.rawValue)")
+                .appendingPathComponent("kouen-cli.\(shell.rawValue)")
         }
     }
 
@@ -85,7 +89,7 @@ public enum ShellCompletionInstaller {
         case .bash:
             lines.append(try wireSummary(for: .bash, homeOverride: homeOverride))
         case .fish, nil:
-            break // fish handled above; an unknown shell can use `harness-cli completions <shell>`.
+            break // fish handled above; an unknown shell can use `kouen-cli completions <shell>`.
         }
         return lines
     }

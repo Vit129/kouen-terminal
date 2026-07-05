@@ -10,7 +10,7 @@ extension HarnessCLI {
     static func handleBindHook(_ args: [String], client: DaemonClient) throws {
         // Drop the subcommand (`bind-hook`) at index 0: `<event> <command...> [--if <format>]`.
         guard let parsed = parseBindHook(Array(args.dropFirst())) else {
-            fputs("Usage: harness-cli bind-hook <event> <command...> [--if <format>]\n", harnessStderr)
+            fputs("Usage: kouen-cli bind-hook <event> <command...> [--if <format>]\n", harnessStderr)
             exit(1)
         }
         let response = try checkedRequest(
@@ -38,7 +38,7 @@ extension HarnessCLI {
 
     static func handleUnbindHook(_ args: [String], client: DaemonClient) throws {
         guard let raw = flagValue(args, flag: "--id"), let id = UUID(uuidString: raw) else {
-            fputs("Usage: harness-cli unbind-hook --id <uuid>\n", harnessStderr)
+            fputs("Usage: kouen-cli unbind-hook --id <uuid>\n", harnessStderr)
             exit(1)
         }
         _ = try checkedRequest(client, .unbindHook(id: id))

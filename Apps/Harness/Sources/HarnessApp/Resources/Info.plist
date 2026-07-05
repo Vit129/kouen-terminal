@@ -80,20 +80,20 @@
 			<string>Owner</string>
 			<key>LSItemContentTypes</key>
 			<array>
-				<string>com.vit129.harness.theme</string>
+				<string>com.vit129.kouen.theme</string>
 			</array>
 		</dict>
 	</array>
 	<key>CFBundleExecutable</key>
-	<string>Harness</string>
+	<string>Kouen</string>
 	<key>CFBundleIconFile</key>
-	<string>Harness</string>
+	<string>Kouen</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.vit129.harness</string>
+	<string>com.vit129.kouen</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>Harness</string>
+	<string>Kouen</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -178,7 +178,7 @@
 			<key>UTTypeDescription</key>
 			<string>Harness theme</string>
 			<key>UTTypeIdentifier</key>
-			<string>com.vit129.harness.theme</string>
+			<string>com.vit129.kouen.theme</string>
 			<key>UTTypeTagSpecification</key>
 			<dict>
 				<key>public.filename-extension</key>

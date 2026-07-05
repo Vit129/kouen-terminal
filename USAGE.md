@@ -1,12 +1,12 @@
-# Harness Usage
+# Kouen Usage
 
 Getting started guide. For deep dives, follow the links at the bottom.
 
-## 1. Install Harness
+## 1. Install Kouen
 
 ### Option A: Download the app
 
-Check [releases](https://github.com/Vit129/harness-terminal/releases/latest) for a `Harness.dmg`. Requires Apple silicon + macOS 15+.
+Check [releases](https://github.com/Vit129/kouen-terminal/releases/latest) for a `Kouen.dmg`. Requires Apple silicon + macOS 15+.
 
 ### Option B: Preview build (dev/test)
 
@@ -35,22 +35,22 @@ Builds, signs, stops the old daemon, copies to `/Applications`, and opens the ap
 ## 2. Install The CLI On PATH
 
 ```bash
-/Applications/Harness.app/Contents/MacOS/harness-cli install
+/Applications/Kouen.app/Contents/MacOS/kouen-cli install
 # or from a local build:
-.build/release/harness-cli install
+.build/release/kouen-cli install
 ```
 
 Add to shell profile if prompted:
 
 ```bash
-export PATH="$HOME/Library/Application Support/Harness/bin:$PATH"
+export PATH="$HOME/Library/Application Support/Kouen/bin:$PATH"
 ```
 
 Verify:
 
 ```bash
-harness-cli doctor
-harness-cli ping
+kouen-cli doctor
+kouen-cli ping
 ```
 
 ## 3. Pick An Experience Mode
@@ -69,9 +69,9 @@ Open **Settings → Terminal → Experience**:
 ## 4. Agent Notifications
 
 ```bash
-harness-cli install-hooks claude-code
-harness-cli install-hooks codex
-harness-cli install-hooks cursor
+kouen-cli install-hooks claude-code
+kouen-cli install-hooks codex
+kouen-cli install-hooks cursor
 ```
 
 `⌘⇧I` opens the Agent Notch. `⌘⇧U` opens the notifications inbox.
@@ -91,7 +91,7 @@ eval "$(zoxide init zsh)"
 source <(fzf --zsh)
 ```
 
-| Tool | Harness integration |
+| Tool | Kouen integration |
 |------|---------------------|
 | `zoxide` | `⌘P` fuzzy jump · `⌘⇧J` visual picker (↩ cd · ⌘↩ new tab) |
 | `fzf` | `ctrl+r` history · `ctrl+t` file pick |
@@ -104,10 +104,10 @@ source <(fzf --zsh)
 
 | Problem | Try |
 |---|---|
-| CLI cannot find daemon | `harness-cli doctor`, relaunch Harness |
-| CLI version differs from daemon | `harness-cli install`, restart daemon |
+| CLI cannot find daemon | `kouen-cli doctor`, relaunch Kouen |
+| CLI version differs from daemon | `kouen-cli install`, restart daemon |
 | Preview app is stale | `make preview-stop && make preview-clean && make preview` |
-| Agent hook silent | Check `harness-cli doctor` + `HARNESS_SURFACE` + agent guide |
+| Agent hook silent | Check `kouen-cli doctor` + `HARNESS_SURFACE` + agent guide |
 
 ## More Docs
 

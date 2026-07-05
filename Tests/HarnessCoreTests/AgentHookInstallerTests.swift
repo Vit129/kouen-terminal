@@ -25,7 +25,7 @@ final class AgentHookInstallerTests: XCTestCase {
         XCTAssertFalse(result.replacedInvalidJSON)
         XCTAssertTrue(AgentHookInstaller.isInstalled(agent: .claudeCode, homeOverride: home))
         let text = try String(contentsOf: result.path, encoding: .utf8)
-        XCTAssertTrue(text.contains("harness-cli notify"))
+        XCTAssertTrue(text.contains("kouen-cli notify"))
     }
 
     func testInstallPreservesExistingUserConfig() throws {
@@ -60,12 +60,12 @@ final class AgentHookInstallerTests: XCTestCase {
         XCTAssertTrue(command.contains("--from-hook"), "Notification body must come from stdin")
         // The PATH prefix must point at the platform's real install location — a hardcoded
         // macOS path in Linux-installed hooks made every notification silently vanish
-        // (`harness-cli` was never on the hook's PATH).
+        // (`kouen-cli` was never on the hook's PATH).
         #if os(Linux)
         XCTAssertTrue(command.contains(
-            "PATH=\"${XDG_DATA_HOME:-$HOME/.local/share}/harness/bin:$PATH\" harness-cli notify"))
+            "PATH=\"${XDG_DATA_HOME:-$HOME/.local/share}/harness/bin:$PATH\" kouen-cli notify"))
         #else
-        XCTAssertTrue(command.contains("PATH=\"$HOME/Library/Application Support/Harness/bin:$PATH\" harness-cli notify"))
+        XCTAssertTrue(command.contains("PATH=\"$HOME/Library/Application Support/Harness/bin:$PATH\" kouen-cli notify"))
         #endif
         XCTAssertFalse(command.contains("HARNESS_NOTIFY_MESSAGE"), "the dangling env var must be gone")
     }
@@ -100,6 +100,7 @@ final class AgentHookInstallerTests: XCTestCase {
         let command = try claudeNotificationCommand(at: url)
         XCTAssertTrue(command.contains("--from-hook"))
         XCTAssertFalse(command.contains("HARNESS_NOTIFY_MESSAGE"))
+        XCTAssertTrue(command.contains("kouen-cli notify"), "converges to the current (post-rename) command")
         // Unrelated config + the user's own non-Harness hook survive untouched.
         XCTAssertEqual(json["model"] as? String, "claude-opus")
         XCTAssertNotNil((json["permissions"] as? [String: Any])?["allow"])
@@ -161,7 +162,7 @@ final class AgentHookInstallerTests: XCTestCase {
         let harness = notification.compactMap { entry -> String? in
             ((entry as? [String: Any])?["hooks"] as? [Any])?
                 .compactMap { ($0 as? [String: Any])?["command"] as? String }
-                .first { $0.contains("harness-cli notify") }
+                .first { $0.contains("kouen-cli notify") || $0.contains("harness-cli notify") }
         }
         return try XCTUnwrap(harness.first)
     }
@@ -221,25 +222,25 @@ final class AgentHookInstallerTests: XCTestCase {
         _ = try AgentHookInstaller.install(agent: .cursor, homeOverride: home)
         var commands = try stopCommands()
         XCTAssertTrue(commands.contains("echo mine"))
-        XCTAssertEqual(commands.filter { $0.contains("harness-cli notify") }.count, 1)
+        XCTAssertEqual(commands.filter { $0.contains("kouen-cli notify") }.count, 1)
 
         // Reinstall converges to exactly one Harness entry (prune works), user entry intact.
         _ = try AgentHookInstaller.install(agent: .cursor, homeOverride: home)
         commands = try stopCommands()
         XCTAssertTrue(commands.contains("echo mine"))
-        XCTAssertEqual(commands.filter { $0.contains("harness-cli notify") }.count, 1)
+        XCTAssertEqual(commands.filter { $0.contains("kouen-cli notify") }.count, 1)
     }
 
     func testGrokWritesOwnFlatFileAndLeavesSiblingsAlone() throws {
         let result = try AgentHookInstaller.install(agent: .grok, homeOverride: home)
-        XCTAssertTrue(result.path.path.hasSuffix(".grok/hooks/harness.json"))
+        XCTAssertTrue(result.path.path.hasSuffix(".grok/hooks/kouen.json"))
         // Grok merges every *.json in the dir — a sibling user file must be untouched.
         let sibling = result.path.deletingLastPathComponent().appendingPathComponent("user.json")
         try #"{"pre-edit":"echo hi"}"#.write(to: sibling, atomically: true, encoding: .utf8)
 
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: try Data(contentsOf: result.path)) as? [String: Any])
-        XCTAssertTrue((json["on-complete"] as? String)?.contains("harness-cli notify") ?? false)
-        XCTAssertTrue((json["on-error"] as? String)?.contains("harness-cli notify") ?? false)
+        XCTAssertTrue((json["on-complete"] as? String)?.contains("kouen-cli notify") ?? false)
+        XCTAssertTrue((json["on-error"] as? String)?.contains("kouen-cli notify") ?? false)
         XCTAssertTrue(AgentHookInstaller.isInstalled(agent: .grok, homeOverride: home))
 
         let again = try AgentHookInstaller.install(agent: .grok, homeOverride: home)
@@ -250,10 +251,10 @@ final class AgentHookInstallerTests: XCTestCase {
     func testOpenCodeInstallsPluginFile() throws {
         XCTAssertTrue(AgentHookInstaller.canInstall(.openCode))
         let result = try AgentHookInstaller.install(agent: .openCode, homeOverride: home)
-        XCTAssertTrue(result.path.path.hasSuffix(".config/opencode/plugins/harness.js"))
+        XCTAssertTrue(result.path.path.hasSuffix(".config/opencode/plugins/kouen.js"))
         let text = try String(contentsOf: result.path, encoding: .utf8)
         XCTAssertTrue(text.contains("session.idle"))
-        XCTAssertTrue(text.contains("harness-cli notify"))
+        XCTAssertTrue(text.contains("kouen-cli notify"))
         XCTAssertTrue(AgentHookInstaller.isInstalled(agent: .openCode, homeOverride: home))
         // Idempotent overwrite: reinstall backs up and reproduces the same plugin.
         let again = try AgentHookInstaller.install(agent: .openCode, homeOverride: home)
@@ -263,12 +264,42 @@ final class AgentHookInstallerTests: XCTestCase {
 
     func testPiInstallsTsExtension() throws {
         let result = try AgentHookInstaller.install(agent: .pi, homeOverride: home)
-        XCTAssertTrue(result.path.path.hasSuffix(".pi/agent/extensions/harness.ts"))
+        XCTAssertTrue(result.path.path.hasSuffix(".pi/agent/extensions/kouen.ts"))
         let text = try String(contentsOf: result.path, encoding: .utf8)
-        XCTAssertTrue(text.contains("harness-cli notify"))
+        XCTAssertTrue(text.contains("kouen-cli notify"))
         XCTAssertTrue(text.contains("session_end"))
         XCTAssertTrue(text.contains("HARNESS_SURFACE ?? \"\""))
         XCTAssertTrue(AgentHookInstaller.isInstalled(agent: .pi, homeOverride: home))
+    }
+
+    /// Post-rename: installing the new own-file must remove the pre-rename sibling so it stops
+    /// firing the (now-broken, `harness-cli`-calling) hook a second time alongside the new one.
+    func testGrokInstallRemovesPreRenameSiblingFile() throws {
+        let legacy = home.appendingPathComponent(".grok/hooks/harness.json")
+        try FileManager.default.createDirectory(at: legacy.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try #"{"on-complete":"harness-cli notify --title Grok"}"#.write(to: legacy, atomically: true, encoding: .utf8)
+
+        let result = try AgentHookInstaller.install(agent: .grok, homeOverride: home)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacy.path), "pre-rename own-file removed")
+        XCTAssertEqual(result.removedLegacy, [legacy])
+        XCTAssertTrue(result.path.path.hasSuffix(".grok/hooks/kouen.json"))
+    }
+
+    /// Same guarantee for OpenCode's plugin file and Pi's extension file.
+    func testOpenCodeAndPiInstallRemovePreRenameSiblingFile() throws {
+        let legacyOpenCode = home.appendingPathComponent(".config/opencode/plugins/harness.js")
+        try FileManager.default.createDirectory(at: legacyOpenCode.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try "// old plugin\nharness-cli notify".write(to: legacyOpenCode, atomically: true, encoding: .utf8)
+        let resultOpenCode = try AgentHookInstaller.install(agent: .openCode, homeOverride: home)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacyOpenCode.path))
+        XCTAssertEqual(resultOpenCode.removedLegacy, [legacyOpenCode])
+
+        let legacyPi = home.appendingPathComponent(".pi/agent/extensions/harness.ts")
+        try FileManager.default.createDirectory(at: legacyPi.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try "// old extension\nharness-cli notify".write(to: legacyPi, atomically: true, encoding: .utf8)
+        let resultPi = try AgentHookInstaller.install(agent: .pi, homeOverride: home)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacyPi.path))
+        XCTAssertEqual(resultPi.removedLegacy, [legacyPi])
     }
 
     func testHermesYamlEditPreservesContentAndIsIdempotent() throws {
@@ -280,14 +311,14 @@ final class AgentHookInstallerTests: XCTestCase {
         _ = try AgentHookInstaller.install(agent: .hermes, homeOverride: home)
         var text = try String(contentsOf: url, encoding: .utf8)
         XCTAssertTrue(text.contains("model: hermes-3"))   // user content preserved
-        XCTAssertTrue(text.contains("harness-cli notify"))
-        XCTAssertTrue(text.contains("harness-managed"))
+        XCTAssertTrue(text.contains("kouen-cli notify"))
+        XCTAssertTrue(text.contains("harness-managed")) // region sentinel — unchanged by the rename
         XCTAssertTrue(AgentHookInstaller.isInstalled(agent: .hermes, homeOverride: home))
 
         // Reinstall replaces the managed region in place — not a second copy.
         _ = try AgentHookInstaller.install(agent: .hermes, homeOverride: home)
         text = try String(contentsOf: url, encoding: .utf8)
-        XCTAssertEqual(text.components(separatedBy: "harness-cli notify").count - 1, 1)
+        XCTAssertEqual(text.components(separatedBy: "kouen-cli notify").count - 1, 1)
     }
 
     func testOpenClawJson5EditPreservesComments() throws {
@@ -306,13 +337,13 @@ final class AgentHookInstallerTests: XCTestCase {
         var text = try String(contentsOf: url, encoding: .utf8)
         XCTAssertTrue(text.contains("// user comment — must survive"), "JSON5 comments must not be destroyed")
         XCTAssertTrue(text.contains("gateway"))
-        XCTAssertTrue(text.contains("harness-cli notify"))
+        XCTAssertTrue(text.contains("kouen-cli notify"))
         XCTAssertTrue(AgentHookInstaller.isInstalled(agent: .openClaw, homeOverride: home))
 
         // Reinstall replaces the managed region in place — not a second copy.
         _ = try AgentHookInstaller.install(agent: .openClaw, homeOverride: home)
         text = try String(contentsOf: url, encoding: .utf8)
-        XCTAssertEqual(text.components(separatedBy: "harness-cli notify").count - 1, 1)
+        XCTAssertEqual(text.components(separatedBy: "kouen-cli notify").count - 1, 1)
     }
 
     func testHermesSkipsWhenConfigAlreadyDefinesHooks() throws {
@@ -360,7 +391,7 @@ final class AgentHookInstallerTests: XCTestCase {
         let text = try String(contentsOf: result.path, encoding: .utf8)
         XCTAssertTrue(text.hasPrefix("{"))
         XCTAssertTrue(text.contains("\"hooks\""))
-        XCTAssertTrue(text.contains("harness-cli notify"))
+        XCTAssertTrue(text.contains("kouen-cli notify"))
         XCTAssertTrue(AgentHookInstaller.isInstalled(agent: .openClaw, homeOverride: home))
     }
 
@@ -369,7 +400,7 @@ final class AgentHookInstallerTests: XCTestCase {
         XCTAssertNil(result.backedUp)
         let text = try String(contentsOf: result.path, encoding: .utf8)
         XCTAssertTrue(text.contains("hooks:"))
-        XCTAssertTrue(text.contains("harness-cli notify"))
+        XCTAssertTrue(text.contains("kouen-cli notify"))
         XCTAssertTrue(AgentHookInstaller.isInstalled(agent: .hermes, homeOverride: home))
     }
 
@@ -433,13 +464,13 @@ final class AgentHookInstallerTests: XCTestCase {
         let header = try XCTUnwrap(text.range(of: "see docs at"))
         let region = try XCTUnwrap(text.range(of: "harness-managed"))
         XCTAssertTrue(header.lowerBound < region.lowerBound, "region must come after the header comment")
-        XCTAssertTrue(text.contains("harness-cli notify"))
+        XCTAssertTrue(text.contains("kouen-cli notify"))
         XCTAssertTrue(text.contains("gateway"))
     }
 
     func testSetupPromptCoversEveryInstallableAgentAndItsRealPath() {
         let prompt = AgentHookInstaller.setupPrompt
-        XCTAssertTrue(prompt.contains("harness-cli notify"))
+        XCTAssertTrue(prompt.contains("kouen-cli notify"))
         XCTAssertTrue(prompt.contains("$HARNESS_SURFACE"))
         XCTAssertTrue(prompt.contains("install-hooks"))
         for kind in AgentHookInstaller.installableAgents {

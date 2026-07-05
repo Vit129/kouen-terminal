@@ -53,7 +53,7 @@ actor MCPServer {
                 "tools": .object([:]),
             ]),
             "serverInfo": .object([
-                "name": .string("harness-mcp"),
+                "name": .string("kouen-mcp"),
                 "version": .string(HarnessVersion.short),
             ]),
         ])

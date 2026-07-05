@@ -10,7 +10,7 @@ extension HarnessCLI {
     static func handleCat(_ args: [String]) -> Int {
         let paths = positionalArgs(args, skippingValuesFor: [])
         guard let path = paths.first else {
-            fputs("Usage: harness-cli cat <file>\n", harnessStderr)
+            fputs("Usage: kouen-cli cat <file>\n", harnessStderr)
             return 64
         }
         do {

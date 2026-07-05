@@ -72,12 +72,12 @@ public enum DoctorRunner {
                 let daemonDesc = daemonStats?.build.map { "\(daemonStats?.version ?? "?") (\($0))" }
                     ?? "pre-handshake (no version reported)"
                 checks.append(.init("Daemon version", .warn,
-                    "daemon \(daemonDesc) != CLI \(HarnessVersion.short) (\(HarnessVersion.build)) — restart Harness.app, or run: harness-cli install"))
+                    "daemon \(daemonDesc) != CLI \(HarnessVersion.short) (\(HarnessVersion.build)) — restart Kouen.app, or run: kouen-cli install"))
             }
         }
 
         // 2. Control socket: path must fit sun_path, and when present be owner-only (0o600).
-        let socketURL = home.appendingPathComponent("harness.sock")
+        let socketURL = home.appendingPathComponent("kouen.sock")
         if socketURL.path.utf8.count >= HarnessPaths.maxSocketPathLength {
             checks.append(.init("Control socket", .fail,
                 "path is \(socketURL.path.utf8.count) bytes (max \(HarnessPaths.maxSocketPathLength - 1)) — shorten HARNESS_HOME: \(socketURL.path)"))

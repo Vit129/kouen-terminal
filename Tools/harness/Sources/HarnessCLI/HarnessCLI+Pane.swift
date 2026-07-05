@@ -11,7 +11,7 @@ extension HarnessCLI {
         guard let surface = flagValue(args, flag: "--surface"),
               let keys = flagValue(args, flag: "--keys")
         else {
-            fputs("Usage: harness-cli send-keys --surface <id> [-l|-H] --keys \"C-c Up Enter ...\"\n", harnessStderr)
+            fputs("Usage: kouen-cli send-keys --surface <id> [-l|-H] --keys \"C-c Up Enter ...\"\n", harnessStderr)
             exit(1)
         }
         // `-l` (literal): send the keys text verbatim, no key-name interpretation.
@@ -30,7 +30,7 @@ extension HarnessCLI {
 
     static func handleCapturePane(_ args: [String], client: DaemonClient) throws {
         guard let surface = flagValue(args, flag: "--surface") else {
-            fputs("Usage: harness-cli capture-pane --surface <id> [--scrollback] [-S <start>] [-E <end>] [-e] [-J] [-p]\n", harnessStderr)
+            fputs("Usage: kouen-cli capture-pane --surface <id> [--scrollback] [-S <start>] [-E <end>] [-e] [-J] [-p]\n", harnessStderr)
             exit(1)
         }
         // -S/-E request a line range (tmux `-p` prints to stdout, the default here);
@@ -51,7 +51,7 @@ extension HarnessCLI {
 
     static func handlePipePane(_ args: [String], client: DaemonClient) throws {
         guard let surface = flagValue(args, flag: "--surface") else {
-            fputs("Usage: harness-cli pipe-pane --surface <id> [<shell-command>]   (omit command to stop)\n", harnessStderr)
+            fputs("Usage: kouen-cli pipe-pane --surface <id> [<shell-command>]   (omit command to stop)\n", harnessStderr)
             exit(1)
         }
         // Skip the subcommand at index 0; the first remaining non-flag, non-surface
@@ -69,7 +69,7 @@ extension HarnessCLI {
         else if args.contains("-U") { mode = "unlock" }
         else { mode = "wait" }
         guard let channel = positionalArgs(args, skippingValuesFor: []).first else {
-            fputs("Usage: harness-cli wait-for [-S|-L|-U] <channel>\n", harnessStderr)
+            fputs("Usage: kouen-cli wait-for [-S|-L|-U] <channel>\n", harnessStderr)
             exit(1)
         }
         // `wait`/`lock` block until signaled/granted — a generous (≈1 week) timeout, well
@@ -81,7 +81,7 @@ extension HarnessCLI {
     static func handleLinkWindow(_ args: [String], client: DaemonClient) throws {
         guard let tabRaw = flagValue(args, flag: "--tab"), let tabID = UUID(uuidString: tabRaw),
               let sessionRaw = flagValue(args, flag: "--target-session"), let sessionID = UUID(uuidString: sessionRaw) else {
-            fputs("Usage: harness-cli link-window --tab <uuid> --target-session <uuid>\n", harnessStderr)
+            fputs("Usage: kouen-cli link-window --tab <uuid> --target-session <uuid>\n", harnessStderr)
             exit(1)
         }
         let response = try checkedRequest(client, .linkWindow(tabID: tabID, targetSessionID: sessionID))
@@ -90,7 +90,7 @@ extension HarnessCLI {
 
     static func handleUnlinkWindow(_ args: [String], client: DaemonClient) throws {
         guard let tabRaw = flagValue(args, flag: "--tab"), let tabID = UUID(uuidString: tabRaw) else {
-            fputs("Usage: harness-cli unlink-window --tab <uuid>\n", harnessStderr)
+            fputs("Usage: kouen-cli unlink-window --tab <uuid>\n", harnessStderr)
             exit(1)
         }
         _ = try checkedRequest(client, .unlinkWindow(tabID: tabID))
@@ -108,7 +108,7 @@ extension HarnessCLI {
         guard let srcStr = flagValue(args, flag: "--src"), let src = UUID(uuidString: srcStr),
               let dstStr = flagValue(args, flag: "--dst"), let dst = UUID(uuidString: dstStr)
         else {
-            fputs("Usage: harness-cli swap-pane --src <uuid> --dst <uuid>\n", harnessStderr)
+            fputs("Usage: kouen-cli swap-pane --src <uuid> --dst <uuid>\n", harnessStderr)
             exit(1)
         }
         _ = try checkedRequest(client, .swapPanes(srcPaneID: src, dstPaneID: dst))
@@ -119,7 +119,7 @@ extension HarnessCLI {
               let dirStr = flagValue(args, flag: "--dir")?.lowercased(),
               let direction = parseDirection(dirStr)
         else {
-            fputs("Usage: harness-cli resize-pane --pane <uuid> --dir L|R|U|D [--amount N]\n", harnessStderr)
+            fputs("Usage: kouen-cli resize-pane --pane <uuid> --dir L|R|U|D [--amount N]\n", harnessStderr)
             exit(1)
         }
         let amount = Int(flagValue(args, flag: "--amount") ?? "1") ?? 1
@@ -138,7 +138,7 @@ extension HarnessCLI {
 
     static func handleCopyMode(_ args: [String], client: DaemonClient) throws {
         guard let surface = flagValue(args, flag: "--surface") else {
-            fputs("Usage: harness-cli copy-mode --surface <id> [--enter|--exit]\n", harnessStderr)
+            fputs("Usage: kouen-cli copy-mode --surface <id> [--enter|--exit]\n", harnessStderr)
             exit(1)
         }
         let enabled = !args.contains("--exit")
@@ -149,7 +149,7 @@ extension HarnessCLI {
         guard let tabStr = flagValue(args, flag: "--tab"), let tabID = UUID(uuidString: tabStr),
               let layout = flagValue(args, flag: "--layout")
         else {
-            fputs("Usage: harness-cli select-layout --tab <uuid> --layout <name> [--main <paneUUID>]\n", harnessStderr)
+            fputs("Usage: kouen-cli select-layout --tab <uuid> --layout <name> [--main <paneUUID>]\n", harnessStderr)
             exit(1)
         }
         let mainPaneID: UUID?
@@ -168,7 +168,7 @@ extension HarnessCLI {
 
     static func handleCycleLayout(_ args: [String], client: DaemonClient, forward: Bool) throws {
         guard let tabStr = flagValue(args, flag: "--tab"), let tabID = UUID(uuidString: tabStr) else {
-            fputs("Usage: harness-cli \(forward ? "next" : "previous")-layout --tab <uuid>\n", harnessStderr)
+            fputs("Usage: kouen-cli \(forward ? "next" : "previous")-layout --tab <uuid>\n", harnessStderr)
             exit(1)
         }
         _ = try checkedRequest(client, forward ? .nextLayout(tabID: tabID) : .previousLayout(tabID: tabID))
@@ -176,7 +176,7 @@ extension HarnessCLI {
 
     static func handleRotateWindow(_ args: [String], client: DaemonClient) throws {
         guard let tabStr = flagValue(args, flag: "--tab"), let tabID = UUID(uuidString: tabStr) else {
-            fputs("Usage: harness-cli rotate-window --tab <uuid> [--reverse]\n", harnessStderr)
+            fputs("Usage: kouen-cli rotate-window --tab <uuid> [--reverse]\n", harnessStderr)
             exit(1)
         }
         let forward = !args.contains("--reverse")
@@ -185,7 +185,7 @@ extension HarnessCLI {
 
     static func handleBreakPane(_ args: [String], client: DaemonClient) throws {
         guard let paneStr = flagValue(args, flag: "--pane"), let paneID = UUID(uuidString: paneStr) else {
-            fputs("Usage: harness-cli break-pane --pane <uuid>\n", harnessStderr)
+            fputs("Usage: kouen-cli break-pane --pane <uuid>\n", harnessStderr)
             exit(1)
         }
         let response = try checkedRequest(client, .breakPane(paneID: paneID))
@@ -198,7 +198,7 @@ extension HarnessCLI {
               let dirStr = flagValue(args, flag: "--direction"),
               let direction = SplitDirection(rawValue: dirStr)
         else {
-            fputs("Usage: harness-cli join-pane --src <uuid> --dst <uuid> --direction horizontal|vertical\n", harnessStderr)
+            fputs("Usage: kouen-cli join-pane --src <uuid> --dst <uuid> --direction horizontal|vertical\n", harnessStderr)
             exit(1)
         }
         let response = try checkedRequest(client, .joinPane(sourcePaneID: src, destPaneID: dst, direction: direction))
@@ -211,7 +211,7 @@ extension HarnessCLI {
         guard let srcStr = flagValue(args, flag: "--src"), let src = UUID(uuidString: srcStr),
               let dstStr = flagValue(args, flag: "--dst"), let dst = UUID(uuidString: dstStr)
         else {
-            fputs("Usage: harness-cli move-pane --src <uuid> --dst <uuid> [--direction horizontal|vertical]\n", harnessStderr)
+            fputs("Usage: kouen-cli move-pane --src <uuid> --dst <uuid> [--direction horizontal|vertical]\n", harnessStderr)
             exit(1)
         }
         // Absent --direction defaults to horizontal (tmux move-pane); a provided-but-invalid
@@ -233,7 +233,7 @@ extension HarnessCLI {
     /// `renumber-windows --session <uuid>` — renumber a session's tab indices.
     static func handleRenumberWindows(_ args: [String], client: DaemonClient) throws {
         guard let sessionStr = flagValue(args, flag: "--session"), let session = UUID(uuidString: sessionStr) else {
-            fputs("Usage: harness-cli renumber-windows --session <uuid>\n", harnessStderr)
+            fputs("Usage: kouen-cli renumber-windows --session <uuid>\n", harnessStderr)
             exit(1)
         }
         _ = try checkedRequest(client, .renumberWindows(sessionID: session))
@@ -241,7 +241,7 @@ extension HarnessCLI {
 
     static func handleRespawnPane(_ args: [String], client: DaemonClient) throws {
         guard let surface = flagValue(args, flag: "--surface") else {
-            fputs("Usage: harness-cli respawn-pane --surface <id> [--clear-history|-k]\n", harnessStderr)
+            fputs("Usage: kouen-cli respawn-pane --surface <id> [--clear-history|-k]\n", harnessStderr)
             exit(1)
         }
         let keepHistory = !(args.contains("--clear-history") || args.contains("-k"))
@@ -250,13 +250,13 @@ extension HarnessCLI {
 
     static func handleSelectPane(_ args: [String], client: DaemonClient) throws {
         guard let paneStr = flagValue(args, flag: "--pane"), let paneID = UUID(uuidString: paneStr) else {
-            fputs("Usage: harness-cli select-pane --pane <uuid> --dir L|R|U|D\n", harnessStderr)
+            fputs("Usage: kouen-cli select-pane --pane <uuid> --dir L|R|U|D\n", harnessStderr)
             exit(1)
         }
         guard let dirStr = flagValue(args, flag: "--dir")?.lowercased(),
               let axis = DirectionalAxis(short: dirStr)
         else {
-            fputs("Usage: harness-cli select-pane --pane <uuid> --dir L|R|U|D\n", harnessStderr)
+            fputs("Usage: kouen-cli select-pane --pane <uuid> --dir L|R|U|D\n", harnessStderr)
             exit(1)
         }
         let response = try checkedRequest(client, .selectPaneDirectional(currentPaneID: paneID, direction: axis))
