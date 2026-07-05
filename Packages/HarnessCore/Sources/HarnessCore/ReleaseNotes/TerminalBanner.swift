@@ -40,7 +40,7 @@ public enum TerminalBanner {
             }
         }
         lines.append([])
-        lines.append([Run("Docs: harnesscli.dev"), Run("  ·  ", sgr: dim), Run("Settings: ⌘,")])
+        lines.append([Run("Docs: GitHub"), Run("  ·  ", sgr: dim), Run("Settings: ⌘,")])
         return render(lines: lines, columns: columns)
     }
 
@@ -59,7 +59,7 @@ public enum TerminalBanner {
             }
         }
         lines.append([])
-        lines.append([Run("Full notes: harnesscli.dev/changelog", sgr: dim)])
+        lines.append([Run("Full notes: CHANGELOG.md", sgr: dim)])
         return render(lines: lines, columns: columns)
     }
 

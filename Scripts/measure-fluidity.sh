@@ -18,7 +18,7 @@ DUR="${1:-4}"
 # BSD mktemp requires the X run at the END of the template.
 LOG="$(mktemp /tmp/harness-fluidity.XXXXXX)"
 
-log stream --predicate 'subsystem == "com.robert.harness"' --style compact > "$LOG" &
+log stream --predicate 'subsystem == "com.vit129.harness"' --style compact > "$LOG" &
 LOG_PID=$!
 trap 'kill "$LOG_PID" 2>/dev/null || true' EXIT
 sleep 1

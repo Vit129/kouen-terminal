@@ -17,7 +17,9 @@ let strictFoundationSettings: [SwiftSetting] = [.unsafeFlags(["-warnings-as-erro
 #if os(macOS)
 let platformDependencies: [Package.Dependency] = [
     // Sparkle: macOS auto-update (the only external dependency, and only for the GUI app —
-    // the engine/daemon/CLI stay first-party). Appcast hosted at harnesscli.dev.
+    // the engine/daemon/CLI stay first-party). This fork has no appcast of its own yet —
+    // SUFeedURL is unset in Info.plist and startingUpdater is false (SparkleUpdater.swift),
+    // so the dependency is present but inert until this fork stands up its own feed.
     // Pinned to the audited 2.9.x line (`Package.resolved` locks 2.9.2): a fresh resolve can't
     // float onto an unaudited future major/minor, while patch-level security fixes still land.
     .package(url: "https://github.com/sparkle-project/Sparkle", .upToNextMinor(from: "2.9.2")),

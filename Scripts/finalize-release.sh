@@ -5,6 +5,11 @@ set -euo pipefail
 # the website. This is the one step that needs an Apple credential and a Sparkle signing key —
 # secrets that intentionally live with the human or a protected CI environment, not the repo.
 #
+# Fork notice: this describes upstream's pipeline (their Developer ID cert, their
+# harnesscli.dev appcast host). This fork has neither configured, so this script isn't
+# currently runnable end-to-end here — this fork's releases are plain `git tag` +
+# `gh release create`, no notarization/appcast step.
+#
 # Prereq: ./Scripts/build-release.sh && SIGNING_IDENTITY=… ./Scripts/sign-and-notarize.sh && \
 #         ./Scripts/create-dmg.sh   (or `make dmg` + `make sign`) so Harness.app + Harness.dmg exist.
 #

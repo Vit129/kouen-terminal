@@ -21,7 +21,7 @@ public struct SystemdUserInstaller: ServiceInstaller {
         """
         [Unit]
         Description=Harness terminal daemon
-        Documentation=https://github.com/robzilla1738/harness-terminal
+        Documentation=https://github.com/Vit129/harness-terminal
         After=default.target
 
         [Service]

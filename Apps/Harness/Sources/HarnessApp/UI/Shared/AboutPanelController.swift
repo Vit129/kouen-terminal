@@ -76,7 +76,7 @@ private struct AboutView: View {
                     }
                     .buttonStyle(MonoPillButtonStyle())
                     Button("Open on GitHub") {
-                        if let url = URL(string: "https://github.com/robzilla1738/harness-terminal") {
+                        if let url = URL(string: "https://github.com/Vit129/harness-terminal") {
                             NSWorkspace.shared.open(url)
                         }
                     }

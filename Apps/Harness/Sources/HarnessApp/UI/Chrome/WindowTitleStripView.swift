@@ -200,7 +200,7 @@ final class WindowTitleStripView: NSView {
     }
 
     private func configurePreviewBadge() {
-        guard Bundle.main.bundleIdentifier == "com.robert.harness.preview",
+        guard Bundle.main.bundleIdentifier == "com.vit129.harness.preview",
               let label = Bundle.main.object(forInfoDictionaryKey: "HarnessPreviewBuildLabel") as? String,
               !label.isEmpty
         else { return }

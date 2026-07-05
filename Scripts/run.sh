@@ -50,6 +50,7 @@ kill_stale_prod() {
 
   pkill -f "/Applications/Harness.app/Contents/MacOS/HarnessDaemon" 2>/dev/null || true
   pkill -f "/Applications/Harness.app/Contents/MacOS/Harness\$" 2>/dev/null || true
+  launchctl bootout "gui/$(id -u)/com.vit129.harness.daemon" 2>/dev/null || true
   launchctl bootout "gui/$(id -u)/com.robert.harness.daemon" 2>/dev/null || true
   pkill -f "$HOME/Library/Application Support/Harness/bin/HarnessDaemon" 2>/dev/null || true
   sleep 0.5

@@ -14,11 +14,11 @@ import os
 /// parse+build is ~16µs, so if typing feels laggy the `present` interval is where the time is, and
 /// that is what the vsync/drawable-pacing work targets.
 ///
-/// Subsystem `com.robert.harness`, category `frame`. Enable with `PREVIEW_SIGNPOSTS=1 make preview`
+/// Subsystem `com.vit129.harness`, category `frame`. Enable with `PREVIEW_SIGNPOSTS=1 make preview`
 /// (which launches `open … --args -HARNESS_FRAME_SIGNPOSTS 1`), by setting
 /// `HARNESS_FRAME_SIGNPOSTS=1` in the app's launch environment (direct binary launch /
 /// `xctrace record --template 'os_signpost' --launch …`), then read with
-/// `log stream --predicate 'subsystem == "com.robert.harness"'`.
+/// `log stream --predicate 'subsystem == "com.vit129.harness"'`.
 final class FrameSignposter: @unchecked Sendable {
     static let shared = FrameSignposter()
 
@@ -68,14 +68,14 @@ final class FrameSignposter: @unchecked Sendable {
         enabled = ProcessInfo.processInfo.environment["HARNESS_FRAME_SIGNPOSTS"] == "1"
             || UserDefaults.standard.bool(forKey: "HARNESS_FRAME_SIGNPOSTS")
         #if canImport(os)
-        signposter = OSSignposter(subsystem: "com.robert.harness", category: "frame")
-        logger = Logger(subsystem: "com.robert.harness", category: "frame")
+        signposter = OSSignposter(subsystem: "com.vit129.harness", category: "frame")
+        logger = Logger(subsystem: "com.vit129.harness", category: "frame")
         #endif
     }
 
     /// Record a `present` duration (ns) plus its breakdown and, every `presentLogEvery` frames,
     /// log p50/p95/max per component to the unified log — so the drawable/vsync stall is readable
-    /// with `log stream --predicate 'subsystem == "com.robert.harness"'` (no Instruments needed).
+    /// with `log stream --predicate 'subsystem == "com.vit129.harness"'` (no Instruments needed).
     /// Main-thread only; a no-op when disabled (so the hot path stays a single branch).
     func recordPresent(
         nanos: UInt64, drawableWait: UInt64 = 0, semaphoreWait: UInt64 = 0, schedule: UInt64 = 0,

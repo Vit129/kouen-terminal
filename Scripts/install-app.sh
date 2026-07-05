@@ -13,7 +13,7 @@ cd "$ROOT"
 DEST="/Applications/Harness.app"
 APP_SUPPORT="$HOME/Library/Application Support/Harness"
 APP_SUPPORT_BIN="$APP_SUPPORT/bin"
-LAUNCH_AGENT="$HOME/Library/LaunchAgents/com.robert.harness.daemon.plist"
+LAUNCH_AGENT="$HOME/Library/LaunchAgents/com.vit129.harness.daemon.plist"
 NO_BUILD=0
 
 for arg in "$@"; do
@@ -31,7 +31,10 @@ done
 # --- Stop production runtime FIRST (old binary can crash during build) ---
 echo "==> Stopping production runtime..."
 launchctl bootout "gui/$(id -u)" "$LAUNCH_AGENT" 2>/dev/null || true
+launchctl bootout "gui/$(id -u)/com.vit129.harness.daemon" 2>/dev/null || true
+# One-time migration off the pre-rename com.robert.* label/plist (harmless once nothing's left under it).
 launchctl bootout "gui/$(id -u)/com.robert.harness.daemon" 2>/dev/null || true
+rm -f "$HOME/Library/LaunchAgents/com.robert.harness.daemon.plist"
 "$ROOT/Harness.app/Contents/MacOS/harness-cli" daemon stop 2>/dev/null || true
 pkill -f "/Applications/Harness.app/Contents/MacOS/HarnessDaemon" 2>/dev/null || true
 pkill -f "$APP_SUPPORT_BIN/HarnessDaemon" 2>/dev/null || true

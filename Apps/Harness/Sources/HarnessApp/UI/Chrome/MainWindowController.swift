@@ -27,7 +27,7 @@ final class MainWindowController: NSWindowController {
             backing: .buffered,
             defer: false
         )
-        window.title = Bundle.main.bundleIdentifier == "com.robert.harness.preview"
+        window.title = Bundle.main.bundleIdentifier == "com.vit129.harness.preview"
             ? "Harness Preview"
             : "Harness"
         window.isRestorable = false
