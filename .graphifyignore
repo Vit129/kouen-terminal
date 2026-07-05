@@ -42,14 +42,6 @@ terminal-cheat-sheet.html
 docs/CHANGELOG-archive.md
 CHANGELOG.md
 
-# Images (non-essential for code graph, require LLM extraction)
-*.png
-*.jpg
-*.jpeg
-*.gif
-*.svg
-*.webp
-
 # Repo/tool metadata
 *.DS_Store
 Package.resolved
