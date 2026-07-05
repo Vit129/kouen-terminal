@@ -306,8 +306,14 @@ public enum AgentHookInstaller {
     private static func upsertRegion(
         at url: URL, commentToken: String, body: String, insertAtTop: Bool, conflictKey: String
     ) throws -> (backedUp: URL?, replacedInvalidJSON: Bool, needsManualMerge: Bool) {
-        let begin = "\(commentToken) >>> harness-managed (do not edit) >>>"
-        let end = "\(commentToken) <<< harness-managed <<<"
+        let begin = "\(commentToken) >>> kouen-managed (do not edit) >>>"
+        let end = "\(commentToken) <<< kouen-managed <<<"
+        // Pre-rename sentinel: a region written before Harness->Kouen still carries this pair.
+        // Recognized so re-installing finds and replaces it (converging to the current sentinel)
+        // instead of mistaking it for unrelated content the user wrote — same reasoning as
+        // `legacyHookMarker` above, just for the region-edit strategy's markers.
+        let legacyBegin = "\(commentToken) >>> harness-managed (do not edit) >>>"
+        let legacyEnd = "\(commentToken) <<< harness-managed <<<"
         let region = "\(begin)\n\(body)\n\(end)"
 
         let exists = FileManager.default.fileExists(atPath: url.path)
@@ -321,8 +327,17 @@ public enum AgentHookInstaller {
             }
         }
 
-        let beginRange = text.range(of: begin)
-        let endRange = text.range(of: end)
+        // Prefer the current sentinel pair; fall back to the pre-rename pair if that's what's
+        // actually on disk. Never mixes a begin from one pair with an end from the other.
+        let (beginRange, endRange): (Range<String.Index>?, Range<String.Index>?)
+        if let b = text.range(of: begin), let e = text.range(of: end) {
+            (beginRange, endRange) = (b, e)
+        } else if let b = text.range(of: legacyBegin), let e = text.range(of: legacyEnd) {
+            (beginRange, endRange) = (b, e)
+        } else {
+            (beginRange, endRange) = (text.range(of: begin) ?? text.range(of: legacyBegin),
+                                       text.range(of: end) ?? text.range(of: legacyEnd))
+        }
 
         var result = text
         if let b = beginRange, let e = endRange, b.lowerBound < e.lowerBound {
