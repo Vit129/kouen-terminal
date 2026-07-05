@@ -53,7 +53,7 @@ enum CommandPaletteController {
     }
     /// MRU stack of action IDs the user has just run. Persisted across launches so
     /// the palette feels like it learns from the user.
-    private static let recentDefaultsKey = "com.robert.harness.palette.recent"
+    private static let recentDefaultsKey = "com.vit129.harness.palette.recent"
     private static let recentLimit = 5
 
     // Zoxide cache — refreshed in background every 60s so buildActions() never blocks

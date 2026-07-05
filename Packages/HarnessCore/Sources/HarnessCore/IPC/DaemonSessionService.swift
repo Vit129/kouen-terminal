@@ -72,10 +72,10 @@ public final class DaemonSessionService: @unchecked Sendable {
 
     /// Minimal, throttled latency instrumentation for the (synchronous, main-thread-callable) IPC
     /// request path. The 2s sync round trip is otherwise invisible: a momentarily slow daemon stalls
-    /// the UI with no signal. This logs a `slow IPC` line (subsystem `com.robert.harness`, category
+    /// the UI with no signal. This logs a `slow IPC` line (subsystem `com.vit129.harness`, category
     /// `ipc`) when a request exceeds `slowThresholdNanos` (~250ms), at most once per `throttle`
     /// window so a struggling daemon can't flood the log. Read with
-    /// `log stream --predicate 'subsystem == "com.robert.harness" && category == "ipc"'`. No behavior
+    /// `log stream --predicate 'subsystem == "com.vit129.harness" && category == "ipc"'`. No behavior
     /// change — purely observational; the request itself is untouched (no async conversion).
     private static let latency = LatencyMonitor()
 
@@ -85,8 +85,8 @@ public final class DaemonSessionService: @unchecked Sendable {
         private let lock = NSLock()
         private var lastLogUptime: UInt64 = 0
         #if canImport(os)
-        private let logger = Logger(subsystem: "com.robert.harness", category: "ipc")
-        private let signposter = OSSignposter(subsystem: "com.robert.harness", category: "ipc")
+        private let logger = Logger(subsystem: "com.vit129.harness", category: "ipc")
+        private let signposter = OSSignposter(subsystem: "com.vit129.harness", category: "ipc")
         #endif
 
         func record(start: UInt64, request: IPCRequest) {

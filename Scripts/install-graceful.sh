@@ -20,7 +20,7 @@ cd "$ROOT"
 DEST="/Applications/Harness.app"
 APP_SUPPORT="$HOME/Library/Application Support/Harness"
 APP_SUPPORT_BIN="$APP_SUPPORT/bin"
-LAUNCH_AGENT="$HOME/Library/LaunchAgents/com.robert.harness.daemon.plist"
+LAUNCH_AGENT="$HOME/Library/LaunchAgents/com.vit129.harness.daemon.plist"
 LOG="$APP_SUPPORT/install-graceful.log"
 NO_BUILD=0
 
@@ -87,7 +87,9 @@ fi
 STOP_DAEMON_LINES="
     echo '-- stopping daemon'
     launchctl bootout 'gui/$UID_NUM' '$LAUNCH_AGENT' 2>/dev/null || true
+    launchctl bootout 'gui/$UID_NUM/com.vit129.harness.daemon' 2>/dev/null || true
     launchctl bootout 'gui/$UID_NUM/com.robert.harness.daemon' 2>/dev/null || true
+    rm -f '$HOME/Library/LaunchAgents/com.robert.harness.daemon.plist'
     pkill -f '/Applications/Harness.app/Contents/MacOS/HarnessDaemon' 2>/dev/null || true
     pkill -f '$APP_SUPPORT_BIN/HarnessDaemon' 2>/dev/null || true
     sleep 0.5
@@ -136,7 +138,9 @@ else
   else
     echo "==> Stopping any stale daemon..."
     launchctl bootout "gui/$UID_NUM" "$LAUNCH_AGENT" 2>/dev/null || true
+    launchctl bootout "gui/$UID_NUM/com.vit129.harness.daemon" 2>/dev/null || true
     launchctl bootout "gui/$UID_NUM/com.robert.harness.daemon" 2>/dev/null || true
+    rm -f "$HOME/Library/LaunchAgents/com.robert.harness.daemon.plist"
     pkill -f "/Applications/Harness.app/Contents/MacOS/HarnessDaemon" 2>/dev/null || true
     pkill -f "$APP_SUPPORT_BIN/HarnessDaemon" 2>/dev/null || true
     sleep 0.5

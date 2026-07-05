@@ -104,7 +104,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleIconFile</key>
   <string>Harness</string>
   <key>CFBundleIdentifier</key>
-  <string>com.robert.harness.preview</string>
+  <string>com.vit129.harness.preview</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleName</key>

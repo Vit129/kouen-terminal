@@ -80,7 +80,7 @@
 			<string>Owner</string>
 			<key>LSItemContentTypes</key>
 			<array>
-				<string>com.robert.harness.theme</string>
+				<string>com.vit129.harness.theme</string>
 			</array>
 		</dict>
 	</array>
@@ -89,7 +89,7 @@
 	<key>CFBundleIconFile</key>
 	<string>Harness</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.robert.harness</string>
+	<string>com.vit129.harness</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
@@ -167,13 +167,7 @@
 		</dict>
 	</array>
 	<key>SUEnableAutomaticChecks</key>
-	<true/>
-	<key>SUFeedURL</key>
-	<string>https://harnesscli.dev/appcast.xml</string>
-	<key>SUPublicEDKey</key>
-	<string>3LBPx8Uv5L5ptqRqdCWovmUIPLxcDEPnivy8cOpIlH8=</string>
-	<key>SUScheduledCheckInterval</key>
-	<integer>86400</integer>
+	<false/>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>
@@ -184,7 +178,7 @@
 			<key>UTTypeDescription</key>
 			<string>Harness theme</string>
 			<key>UTTypeIdentifier</key>
-			<string>com.robert.harness.theme</string>
+			<string>com.vit129.harness.theme</string>
 			<key>UTTypeTagSpecification</key>
 			<dict>
 				<key>public.filename-extension</key>
