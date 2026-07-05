@@ -98,7 +98,7 @@ public enum HarnessPaths {
     }
 
     public static var socketURL: URL {
-        runtimeDirectory.appendingPathComponent("harness.sock")
+        runtimeDirectory.appendingPathComponent("kouen.sock")
     }
 
     /// Max bytes for a Unix-domain `sockaddr_un.sun_path` (including the trailing NUL): 104 on
@@ -228,7 +228,7 @@ public enum HarnessPaths {
     }
 
     public static var fishCompletionURL: URL {
-        fishCompletionDirectory.appendingPathComponent("harness-cli.fish")
+        fishCompletionDirectory.appendingPathComponent("kouen-cli.fish")
     }
 
     /// launchd label for the user-domain LaunchAgent that supervises HarnessDaemon.

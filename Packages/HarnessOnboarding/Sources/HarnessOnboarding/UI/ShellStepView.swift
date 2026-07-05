@@ -137,7 +137,7 @@ struct ShellStepView: View {
     private func installFishCompletion() {
         // Single source of truth: the fish script comes from the host's catalog-driven generator
         // (`CompletionGenerator.script(for: .fish)`, injected via OnboardingEnvironment) — the same
-        // one `harness-cli completions fish` and the installer emit. When the host hasn't wired it
+        // one `kouen-cli completions fish` and the installer emit. When the host hasn't wired it
         // (preview/test isolation) we skip rather than embed a second, drift-prone command list.
         guard let fishScript = OnboardingEnvironment.fishCompletionScript() else { return }
         isWorking = true
@@ -147,7 +147,7 @@ struct ShellStepView: View {
             let dir = FileManager.default.homeDirectoryForCurrentUser
                 .appendingPathComponent(".config/fish/completions", isDirectory: true)
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-            let url = dir.appendingPathComponent("harness-cli.fish")
+            let url = dir.appendingPathComponent("kouen-cli.fish")
             try fishScript.write(to: url, atomically: true, encoding: .utf8)
             messages.append("Fish completion installed")
             success = true

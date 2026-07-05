@@ -3,7 +3,7 @@ import XCTest
 
 final class DoctorRunnerTests: XCTestCase {
     /// A fresh owner-only (0o700) temp home, auto-cleaned. Rooted under `/tmp` (not the long
-    /// `/var/folders/...` temp dir) so the `home/harness.sock` path stays under the 104-byte
+    /// `/var/folders/...` temp dir) so the `home/kouen.sock` path stays under the 104-byte
     /// `sun_path` limit — otherwise doctor's (correct) socket-path-too-long check would fire.
     private func makeHome(mode: Int = 0o700) throws -> URL {
         let url = URL(fileURLWithPath: "/tmp", isDirectory: true)
@@ -41,7 +41,7 @@ final class DoctorRunnerTests: XCTestCase {
 
     func testOwnerOnlySocketPasses() throws {
         let home = try makeHome()
-        let sock = home.appendingPathComponent("harness.sock")
+        let sock = home.appendingPathComponent("kouen.sock")
         XCTAssertTrue(FileManager.default.createFile(atPath: sock.path, contents: Data()))
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: sock.path)
         let report = DoctorRunner.run(home: home, daemonReachable: true, cliPath: "x",
@@ -52,7 +52,7 @@ final class DoctorRunnerTests: XCTestCase {
 
     func testWorldAccessibleSocketFails() throws {
         let home = try makeHome()
-        let sock = home.appendingPathComponent("harness.sock")
+        let sock = home.appendingPathComponent("kouen.sock")
         XCTAssertTrue(FileManager.default.createFile(atPath: sock.path, contents: Data()))
         try FileManager.default.setAttributes([.posixPermissions: 0o666], ofItemAtPath: sock.path)
         let report = DoctorRunner.run(home: home, daemonReachable: true, cliPath: "x",
@@ -85,7 +85,7 @@ final class DoctorRunnerTests: XCTestCase {
                                       installedAgentHooks: [])
         let row = check(report, "Daemon version")
         XCTAssertEqual(row?.status, .warn, "a stale daemon is recoverable — warn, don't fail")
-        XCTAssertTrue(row?.detail.contains("harness-cli install") == true,
+        XCTAssertTrue(row?.detail.contains("kouen-cli install") == true,
                       "the warning should tell the user how to heal")
         XCTAssertEqual(report.exitCode, 0)
     }

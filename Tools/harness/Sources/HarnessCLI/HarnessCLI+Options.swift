@@ -32,7 +32,7 @@ extension HarnessCLI {
         // lone scope flags), so `<key>` isn't mis-read as the subcommand name.
         let positional = positionalArgs(args, skippingValuesFor: ["-T"])
         guard positional.count >= 2 else {
-            fputs("Usage: harness-cli set-option [-g|-w|-s|-t|-p] [-T <target>] <key> <value>\n", harnessStderr)
+            fputs("Usage: kouen-cli set-option [-g|-w|-s|-t|-p] [-T <target>] <key> <value>\n", harnessStderr)
             exit(1)
         }
         let key = positional[0]
@@ -107,7 +107,7 @@ extension HarnessCLI {
         // flags like `-g`/`-u`), so `<key>` isn't mis-read as the subcommand name.
         let positional = positionalArgs(args, skippingValuesFor: ["-s"])
         guard let key = positional.first else {
-            fputs("Usage: harness-cli set-environment [-g] [-u] [-s <session name|uuid>] <key> [value]\n", harnessStderr)
+            fputs("Usage: kouen-cli set-environment [-g] [-u] [-s <session name|uuid>] <key> [value]\n", harnessStderr)
             exit(1)
         }
         let value = unset ? nil : positional.dropFirst().joined(separator: " ")

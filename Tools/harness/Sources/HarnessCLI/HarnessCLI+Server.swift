@@ -9,12 +9,12 @@ import HarnessCore
 extension HarnessCLI {
     static func handleKillServer(_ args: [String]) {
         if flagValue(args, flag: "--host") != nil {
-            fputs("kill-server: operates on the local daemon only — run it on the host (ssh <host> harness-cli kill-server)\n", harnessStderr)
+            fputs("kill-server: operates on the local daemon only — run it on the host (ssh <host> kouen-cli kill-server)\n", harnessStderr)
             exit(64)
         }
         let raw = (try? String(contentsOf: HarnessPaths.daemonPIDURL, encoding: .utf8)) ?? ""
         guard let pid = Int32(raw.trimmingCharacters(in: .whitespacesAndNewlines)), pid > 0 else {
-            fputs("kill-server: no daemon.pid — is the daemon running? (try: harness-cli ping)\n", harnessStderr)
+            fputs("kill-server: no daemon.pid — is the daemon running? (try: kouen-cli ping)\n", harnessStderr)
             exit(1)
         }
         // PID-reuse guard: after an unclean shutdown the recorded PID can belong to an
@@ -58,7 +58,7 @@ extension HarnessCLI {
             return
         }
         if flagValue(args, flag: "--host") != nil {
-            fputs("start-server: cannot start a remote daemon — start it on the host (systemd/launchctl or harness-cli install)\n", harnessStderr)
+            fputs("start-server: cannot start a remote daemon — start it on the host (systemd/launchctl or kouen-cli install)\n", harnessStderr)
             exit(1)
         }
         #if os(macOS)
@@ -71,7 +71,7 @@ extension HarnessCLI {
             print("daemon started")
             return
         }
-        fputs("start-server: could not start the daemon — run 'harness-cli install' (LaunchAgent) or open Harness.app\n", harnessStderr)
+        fputs("start-server: could not start the daemon — run 'kouen-cli install' (LaunchAgent) or open Harness.app\n", harnessStderr)
         exit(1)
         #else
         fputs("start-server: start HarnessDaemon directly (e.g. via systemd) on this platform\n", harnessStderr)
@@ -81,7 +81,7 @@ extension HarnessCLI {
 
     static func handleDetachClient(_ args: [String], client: DaemonClient) throws {
         guard let raw = flagValue(args, flag: "--client"), let id = UUID(uuidString: raw) else {
-            fputs("Usage: harness-cli detach-client --client <uuid>\n", harnessStderr)
+            fputs("Usage: kouen-cli detach-client --client <uuid>\n", harnessStderr)
             exit(1)
         }
         _ = try checkedRequest(client, .detachClient(clientID: id))
@@ -134,7 +134,7 @@ extension HarnessCLI {
         case "list":
             let hosts = store.load()
             if hosts.isEmpty {
-                print("No remote hosts. Add one with: harness-cli remote add --name <name> --ssh <user@host>")
+                print("No remote hosts. Add one with: kouen-cli remote add --name <name> --ssh <user@host>")
             }
             for h in hosts {
                 let live = SSHTunnelManager.shared.isConnected(h.name) ? " [connected]" : ""
@@ -143,7 +143,7 @@ extension HarnessCLI {
             return 0
         case "add":
             guard let name = flagValue(args, flag: "--name"), let ssh = flagValue(args, flag: "--ssh") else {
-                fputs("Usage: harness-cli remote add --name <name> --ssh <user@host> "
+                fputs("Usage: kouen-cli remote add --name <name> --ssh <user@host> "
                     + "--socket <remote-path> | --detect [--ssh-arg <arg> ...]\n", harnessStderr)
                 return 64
             }
@@ -152,7 +152,7 @@ extension HarnessCLI {
             while i < args.count {
                 if args[i] == "--ssh-arg" {
                     guard i + 1 < args.count else {
-                        fputs("harness-cli remote add: --ssh-arg requires a value "
+                        fputs("kouen-cli remote add: --ssh-arg requires a value "
                             + "(e.g. --ssh-arg -p --ssh-arg 2222).\n", harnessStderr)
                         return 64
                     }
@@ -166,18 +166,18 @@ extension HarnessCLI {
                 do {
                     socketPath = try SSHTunnelManager.detectSocketPath(sshTarget: ssh, sshArgs: sshArgs)
                 } catch {
-                    fputs("harness-cli remote add: socket auto-detect failed (\(error)); "
+                    fputs("kouen-cli remote add: socket auto-detect failed (\(error)); "
                         + "pass --socket <remote-path> instead.\n", harnessStderr)
                     return 1
                 }
             } else {
-                fputs("harness-cli remote add: pass --socket <remote-path>, or --detect to auto-detect it "
-                    + "via `harness-cli socket-path` on the remote.\n", harnessStderr)
+                fputs("kouen-cli remote add: pass --socket <remote-path>, or --detect to auto-detect it "
+                    + "via `kouen-cli socket-path` on the remote.\n", harnessStderr)
                 return 64
             }
             let result = store.upsert(RemoteHost(name: name, sshTarget: ssh, remoteSocketPath: socketPath, sshArgs: sshArgs))
             guard result.saved else {
-                fputs("harness-cli remote add: failed to write \(HarnessPaths.remoteHostsURL.path) "
+                fputs("kouen-cli remote add: failed to write \(HarnessPaths.remoteHostsURL.path) "
                     + "(check disk space and permissions).\n", harnessStderr)
                 return 1
             }
@@ -185,41 +185,41 @@ extension HarnessCLI {
             return 0
         case "remove":
             guard let name = flagValue(args, flag: "--name") else {
-                fputs("Usage: harness-cli remote remove --name <name>\n", harnessStderr)
+                fputs("Usage: kouen-cli remote remove --name <name>\n", harnessStderr)
                 return 64
             }
             let result = store.remove(name: name)
             SSHTunnelManager.shared.stop(host: name)
             guard result.saved else {
-                fputs("harness-cli remote remove: failed to write \(HarnessPaths.remoteHostsURL.path) "
+                fputs("kouen-cli remote remove: failed to write \(HarnessPaths.remoteHostsURL.path) "
                     + "(check disk space and permissions).\n", harnessStderr)
                 return 1
             }
             print("Removed remote '\(name)'")
             return 0
         default:
-            fputs("Usage: harness-cli remote <list|add|remove> ...\n", harnessStderr)
+            fputs("Usage: kouen-cli remote <list|add|remove> ...\n", harnessStderr)
             return 64
         }
     }
 
     static func runDaemonForeground() -> Never {
         guard let daemon = locateDaemonBinary() else {
-            fputs("harness-cli daemon: HarnessDaemon binary not found "
-                + "(set HARNESS_DAEMON_PATH or run `harness-cli install`).\n", harnessStderr)
+            fputs("kouen-cli daemon: HarnessDaemon binary not found "
+                + "(set HARNESS_DAEMON_PATH or run `kouen-cli install`).\n", harnessStderr)
             exit(1)
         }
         let path = daemon.path
         var argv: [UnsafeMutablePointer<CChar>?] = [strdup(path), nil]
         defer { argv.forEach { $0.map { free($0) } } } // unreachable on success (execv replaces us)
         execv(path, &argv)
-        fputs("harness-cli daemon: exec failed for \(path)\n", harnessStderr)
+        fputs("kouen-cli daemon: exec failed for \(path)\n", harnessStderr)
         exit(1)
     }
 
     static func handleAttach(_ args: [String]) throws -> Int32 {
         guard let surface = flagValue(args, flag: "--surface") else {
-            fputs("Usage: harness-cli attach --surface <id> [--detach-keys <bytes>] [--host <name>]\n", harnessStderr)
+            fputs("Usage: kouen-cli attach --surface <id> [--detach-keys <bytes>] [--host <name>]\n", harnessStderr)
             return 64
         }
         var configuration = AttachClient.Configuration()
@@ -261,7 +261,7 @@ extension HarnessCLI {
     static func handleRecord(_ args: [String], client: DaemonClient) -> Int32 {
         guard let surface = flagValue(args, flag: "--surface"),
               let output = flagValue(args, flag: "--output") else {
-            fputs("Usage: harness-cli record --surface <uuid> --output <file> [--display]\n", harnessStderr)
+            fputs("Usage: kouen-cli record --surface <uuid> --output <file> [--display]\n", harnessStderr)
             return 64
         }
         return RecordClient.run(
@@ -275,12 +275,12 @@ extension HarnessCLI {
     /// `--no-timing` dumps everything instantly. Ctrl-C stops cleanly.
     static func handleReplay(_ args: [String]) -> Int32 {
         guard let file = positionalArgs(args, skippingValuesFor: ["--speed"]).first else {
-            fputs("Usage: harness-cli replay <file> [--speed <n>] [--no-timing]\n", harnessStderr)
+            fputs("Usage: kouen-cli replay <file> [--speed <n>] [--no-timing]\n", harnessStderr)
             return 64
         }
         let speed = Double(flagValue(args, flag: "--speed") ?? "1") ?? .nan
         guard speed > 0 else {
-            fputs("harness-cli replay: --speed must be a positive number\n", harnessStderr)
+            fputs("kouen-cli replay: --speed must be a positive number\n", harnessStderr)
             return 64
         }
         return ReplayClient.run(path: file, speed: speed, honorTiming: !args.contains("--no-timing"))

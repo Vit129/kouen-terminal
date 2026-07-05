@@ -41,12 +41,12 @@ extension HarnessCLI {
             }
             return
         }
-        print("harness-cli \(report.cliVersion) (\(report.cliBuild))")
+        print("kouen-cli \(report.cliVersion) (\(report.cliBuild))")
         if !report.daemonRunning {
             print("daemon: not running")
         } else if let build = report.daemonBuild {
             var line = "daemon: \(report.daemonVersion ?? "?") (\(build))"
-            if build != HarnessVersion.build { line += "  [mismatch — restart Harness.app, or run: harness-cli install]" }
+            if build != HarnessVersion.build { line += "  [mismatch — restart Harness.app, or run: kouen-cli install]" }
             print(line)
         } else {
             print("daemon: running, pre-handshake build (no version reported)")
@@ -77,7 +77,7 @@ extension HarnessCLI {
     static func printCompletions(_ args: [String]) throws {
         let positional = Array(args.dropFirst()).first { !$0.hasPrefix("-") }
         guard let raw = positional, let shell = ShellIntegration.Shell(rawValue: raw) else {
-            fputs("Usage: harness-cli completions <zsh|fish|bash>\n", harnessStderr)
+            fputs("Usage: kouen-cli completions <zsh|fish|bash>\n", harnessStderr)
             exit(1)
         }
         print(CompletionGenerator.script(for: shell))
@@ -105,7 +105,7 @@ extension HarnessCLI {
 
     static func handleDetectAgent(_ args: [String], client: DaemonClient) throws {
         guard let surface = flagValue(args, flag: "--surface") else {
-            fputs("Usage: harness-cli detect-agent --surface <id>\n", harnessStderr)
+            fputs("Usage: kouen-cli detect-agent --surface <id>\n", harnessStderr)
             exit(1)
         }
         let response = try checkedRequest(client, .detectAgent(surfaceID: surface))
@@ -160,7 +160,7 @@ extension HarnessCLI {
         guard let tabStr = flagValue(args, flag: "--tab"), let tabID = UUID(uuidString: tabStr),
               let name = flagValue(args, flag: "--name")
         else {
-            fputs("Usage: harness-cli rename-tab --tab <uuid> --name \"...\"\n", harnessStderr)
+            fputs("Usage: kouen-cli rename-tab --tab <uuid> --name \"...\"\n", harnessStderr)
             exit(1)
         }
         _ = try checkedRequest(client, .renameTab(tabID: tabID, name: name))
@@ -170,7 +170,7 @@ extension HarnessCLI {
         guard let sessionStr = flagValue(args, flag: "--session"), let sessionID = UUID(uuidString: sessionStr),
               let name = flagValue(args, flag: "--name")
         else {
-            fputs("Usage: harness-cli rename-session --session <uuid> --name \"...\"\n", harnessStderr)
+            fputs("Usage: kouen-cli rename-session --session <uuid> --name \"...\"\n", harnessStderr)
             exit(1)
         }
         _ = try checkedRequest(client, .renameSession(sessionID: sessionID, name: name))
@@ -181,7 +181,7 @@ extension HarnessCLI {
               let id = UUID(uuidString: idStr),
               let name = flagValue(args, flag: "--name")
         else {
-            fputs("Usage: harness-cli rename-workspace --id <uuid> --name \"...\"\n", harnessStderr)
+            fputs("Usage: kouen-cli rename-workspace --id <uuid> --name \"...\"\n", harnessStderr)
             exit(1)
         }
         _ = try checkedRequest(client, .renameWorkspace(workspaceID: id, name: name))
@@ -191,7 +191,7 @@ extension HarnessCLI {
         // Drop the subcommand at index 0 so it doesn't leak into the format string.
         let format = args.dropFirst().joined(separator: " ")
         guard !format.isEmpty else {
-            fputs("Usage: harness-cli display-message <format>\n", harnessStderr)
+            fputs("Usage: kouen-cli display-message <format>\n", harnessStderr)
             exit(1)
         }
         _ = try checkedRequest(client, .displayMessage(format: format))
@@ -199,7 +199,7 @@ extension HarnessCLI {
 
     static func printUsage() {
         print("""
-        harness-cli — control Harness terminal sessions
+        kouen-cli — control Harness terminal sessions
 
         List/show commands accept [--json] [--pretty] (compact JSON by default; --pretty indents).
 

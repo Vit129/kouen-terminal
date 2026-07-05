@@ -3,7 +3,7 @@ import XCTest
 
 final class EndpointTests: XCTestCase {
     func testCodableRoundTripUnix() throws {
-        let endpoint = Endpoint.unix(path: "/tmp/harness.sock")
+        let endpoint = Endpoint.unix(path: "/tmp/kouen.sock")
         let data = try JSONEncoder().encode(endpoint)
         XCTAssertEqual(try JSONDecoder().decode(Endpoint.self, from: data), endpoint)
     }

@@ -29,7 +29,7 @@ extension HarnessCLI {
     static func handleView(_ args: [String]) -> Int {
         let paths = positionalArgs(args, skippingValuesFor: [])
         guard let path = paths.first else {
-            fputs("Usage: harness-cli view <file>\n", harnessStderr)
+            fputs("Usage: kouen-cli view <file>\n", harnessStderr)
             return 64
         }
 

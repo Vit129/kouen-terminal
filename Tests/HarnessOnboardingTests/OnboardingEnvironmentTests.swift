@@ -18,7 +18,7 @@ final class OnboardingEnvironmentTests: XCTestCase {
 
     func testFishCompletionScriptUsesTheInjectedGenerator() {
         defer { OnboardingEnvironment.fishCompletionScript = { nil } }
-        OnboardingEnvironment.fishCompletionScript = { "complete -c harness-cli ..." }
-        XCTAssertEqual(OnboardingEnvironment.fishCompletionScript(), "complete -c harness-cli ...")
+        OnboardingEnvironment.fishCompletionScript = { "complete -c kouen-cli ..." }
+        XCTAssertEqual(OnboardingEnvironment.fishCompletionScript(), "complete -c kouen-cli ...")
     }
 }

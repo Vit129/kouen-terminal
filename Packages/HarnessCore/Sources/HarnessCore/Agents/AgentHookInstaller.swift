@@ -1,7 +1,7 @@
 import Foundation
 
 /// Writes per-agent hook config files so each known agent CLI calls back into Harness via
-/// `harness-cli notify --surface "$HARNESS_SURFACE"`. Hook commands prepend Harness's
+/// `kouen-cli notify --surface "$HARNESS_SURFACE"`. Hook commands prepend Harness's
 /// app-support bin directory to PATH, so they keep working even when the user's agent
 /// process did not load the shell profile that onboarding edits. Shared by the CLI (`install-hooks`)
 /// and the Settings "Install hooks" button — UI-agnostic (no `print`/`exit`), so the GUI
@@ -70,7 +70,7 @@ public enum AgentHookInstaller {
               let data = try? Data(contentsOf: url),
               let text = String(data: data, encoding: .utf8)
         else { return false }
-        return text.contains(hookMarker)
+        return containsHookMarker(text)
     }
 
     /// Install the agent's Harness hook in its real config file (creating dirs as needed),
@@ -148,7 +148,7 @@ public enum AgentHookInstaller {
     public static var setupPrompt: String {
         let rows = installableAgents.map { kind -> String in
             let rel = strategy(for: kind)?.filename ?? ""
-            return "  • \(kind.displayName): `harness-cli install-hooks \(kind.rawValue)`  (config: ~/\(rel))"
+            return "  • \(kind.displayName): `kouen-cli install-hooks \(kind.rawValue)`  (config: ~/\(rel))"
         }.joined(separator: "\n")
 
         return """
@@ -156,7 +156,7 @@ public enum AgentHookInstaller {
         Goal: when you finish a turn or need my input, call Harness so it surfaces you in its \
         menu-bar notch.
 
-        Preferred — Harness ships a CLI at "$HOME/Library/Application Support/Harness/bin/harness-cli". \
+        Preferred — Harness ships a CLI at "$HOME/Library/Application Support/Harness/bin/kouen-cli". \
         If it exists, run its installer for whichever tool you are (it writes the correct hook \
         config for that tool and backs up any existing file first):
 
@@ -165,7 +165,7 @@ public enum AgentHookInstaller {
         If that CLI is NOT installed, create the hook config yourself at the path listed above for \
         your tool, and have it run this exact command (this is what notifies Harness):
 
-          PATH="$HOME/Library/Application Support/Harness/bin:$PATH" harness-cli notify --surface "$HARNESS_SURFACE" --title "<your tool name>" --body "Done"
+          PATH="$HOME/Library/Application Support/Harness/bin:$PATH" kouen-cli notify --surface "$HARNESS_SURFACE" --title "<your tool name>" --body "Done"
 
         $HARNESS_SURFACE is exported by Harness for every pane, so the notification reaches the right \
         tab. Always back up a file before editing it, then tell me which file you changed.
@@ -192,13 +192,13 @@ public enum AgentHookInstaller {
                                    payload: cursorPayload, managedEvents: ["stop"])
         case .grok:
             // Grok Build merges every `~/.grok/hooks/*.json`, so we own a dedicated file.
-            return .ownJSONFile(filename: ".grok/hooks/harness.json", payload: grokPayload)
+            return .ownJSONFile(filename: ".grok/hooks/kouen.json", payload: grokPayload)
         case .openCode:
             // OpenCode auto-loads JS/TS plugins from its global plugins dir.
-            return .ownTextFile(filename: ".config/opencode/plugins/harness.js", contents: openCodePlugin)
+            return .ownTextFile(filename: ".config/opencode/plugins/kouen.js", contents: openCodePlugin)
         case .pi:
             // Pi auto-discovers TS extensions from `~/.pi/agent/extensions/*.ts` (no config edit).
-            return .ownTextFile(filename: ".pi/agent/extensions/harness.ts", contents: piExtension)
+            return .ownTextFile(filename: ".pi/agent/extensions/kouen.ts", contents: piExtension)
         case .hermes:
             // Hermes declares shell hooks in `~/.hermes/config.yaml` (consent via `hermes hooks`).
             return .regionEdit(filename: ".hermes/config.yaml", body: hermesHookBody,
@@ -271,18 +271,18 @@ public enum AgentHookInstaller {
         guard let commands = entry["hooks"] as? [Any] else { return false }
         return commands.contains { command in
             guard let text = (command as? [String: Any])?["command"] as? String else { return false }
-            return text.contains(hookMarker)
+            return containsHookMarker(text)
         }
     }
 
     /// Flat shape (Cursor): Harness-owned if the entry's own `command` contains the marker.
     private static func isFlatEntryHarnessOwned(_ entry: [String: Any]) -> Bool {
-        (entry["command"] as? String)?.contains(hookMarker) ?? false
+        (entry["command"] as? String).map(containsHookMarker) ?? false
     }
 
     // MARK: - Own-file & text-region strategies
 
-    /// Overwrite a Harness-owned file (e.g. `harness.json`/`harness.js`/`harness.ts`) atomically,
+    /// Overwrite a Harness-owned file (e.g. `kouen.json`/`kouen.js`/`kouen.ts`) atomically,
     /// backing up any pre-existing copy first. Idempotent: we own the whole file.
     private static func writeOwnFile(at url: URL, data: Data) throws -> URL? {
         var backedUp: URL?
@@ -424,9 +424,13 @@ public enum AgentHookInstaller {
         let relative: [String]
         switch agent {
         case .cursor: relative = [".cursor/agent-hooks.json"]
-        case .pi: relative = [".pi/hooks.json"]
+        // ".pi/hooks.json" predates the current extensions-dir mechanism; "...harness.ts" is
+        // this same own-file at its pre-Kouen-rename name — both are orphans to clean up.
+        case .pi: relative = [".pi/hooks.json", ".pi/agent/extensions/harness.ts"]
         case .hermes: relative = [".hermes/hooks.json"]
         case .openClaw: relative = [".openclaw/hooks.json"]
+        case .grok: relative = [".grok/hooks/harness.json"] // pre-Kouen-rename name of this own-file
+        case .openCode: relative = [".config/opencode/plugins/harness.js"] // ditto
         default: relative = []
         }
         return relative.map { home.appendingPathComponent($0) }
@@ -437,7 +441,7 @@ public enum AgentHookInstaller {
         for url in legacyHookFiles(for: agent, home: home) {
             guard FileManager.default.fileExists(atPath: url.path),
                   let text = try? String(contentsOf: url, encoding: .utf8),
-                  text.contains(hookMarker)
+                  containsHookMarker(text)
             else { continue } // absent or a user file — leave it alone
             // Never delete without a recoverable backup. If the backup fails, keep the orphan.
             guard (try? backUp(url)) != nil else { continue }
@@ -463,17 +467,29 @@ public enum AgentHookInstaller {
 
     // MARK: - Hook commands
 
-    /// Substring present in every Harness hook command — the `isInstalled` marker.
-    private static let hookMarker = "harness-cli notify"
-    /// Shell-expandable PATH prefix so hooks find `harness-cli` even under an agent's minimal
-    /// PATH. Platform-specific: macOS installs under `~/Library/Application Support/Harness/bin`;
-    /// Linux follows the XDG base-dir spec (mirrors `HarnessPaths.applicationSupport`), expanded
-    /// at hook *runtime* so a changed `XDG_DATA_HOME` keeps working without reinstalling hooks.
+    /// Substring present in every hook command this build writes — the `isInstalled` marker.
+    private static let hookMarker = "kouen-cli notify"
+    /// The pre-rename equivalent of `hookMarker`. A hook installed before the Harness->Kouen
+    /// rename still calls the (no-longer-existing) `harness-cli` binary, so ownership checks
+    /// must recognize it too — otherwise re-installing wouldn't prune the stale, now-broken
+    /// entry, and it'd sit alongside the working one forever.
+    private static let legacyHookMarker = "harness-cli notify"
+    /// True if `text` was written by this build (`hookMarker`) or a pre-rename one
+    /// (`legacyHookMarker`) — i.e. it's ours to prune/overwrite either way.
+    private static func containsHookMarker(_ text: String) -> Bool {
+        text.contains(hookMarker) || text.contains(legacyHookMarker)
+    }
+    /// Shell-expandable PATH prefix so hooks find `kouen-cli` even under an agent's minimal
+    /// PATH. Platform-specific: macOS installs under `~/Library/Application Support/Harness/bin`
+    /// (that directory name predates, and is intentionally unchanged by, the Kouen rename — see
+    /// the rename PR notes); Linux follows the XDG base-dir spec (mirrors
+    /// `HarnessPaths.applicationSupport`), expanded at hook *runtime* so a changed
+    /// `XDG_DATA_HOME` keeps working without reinstalling hooks.
     #if os(Linux)
     private static let notifyPrefix =
-        "PATH=\"${XDG_DATA_HOME:-$HOME/.local/share}/harness/bin:$PATH\" harness-cli notify"
+        "PATH=\"${XDG_DATA_HOME:-$HOME/.local/share}/harness/bin:$PATH\" kouen-cli notify"
     #else
-    private static let notifyPrefix = "PATH=\"$HOME/Library/Application Support/Harness/bin:$PATH\" harness-cli notify"
+    private static let notifyPrefix = "PATH=\"$HOME/Library/Application Support/Harness/bin:$PATH\" kouen-cli notify"
     #endif
 
     private static func notifyCommand(title: String, body: String) -> String {
@@ -556,12 +572,12 @@ public enum AgentHookInstaller {
     }
 
     /// OpenCode plugin: surfaces session-idle / permission events in Harness via Bun's `$` shell.
-    /// Contains `harness-cli notify`, so `isInstalled` detects it.
+    /// Contains `kouen-cli notify`, so `isInstalled` detects it.
     private static var openCodePlugin: String {
         // Use process.stdout.write with hex escapes — octal (\033) is illegal in strict-mode
         // JS template literals, so the raw PTY bytes must go through stdout.write instead.
         """
-        // harness-managed — surfaces OpenCode session events in Harness. Safe to delete.
+        // kouen-managed — surfaces OpenCode session events in Harness. Safe to delete.
         export const HarnessNotify = async ({ $ }) => ({
           "session.idle": async () => {
             process.stdout.write('\\x1b]26;identity=opencode;status=idle\\x07')
@@ -576,10 +592,10 @@ public enum AgentHookInstaller {
     }
 
     /// Pi extension: runs the notify command when a session ends. Auto-discovered from
-    /// `~/.pi/agent/extensions/*.ts`. Contains `harness-cli notify`, so `isInstalled` detects it.
+    /// `~/.pi/agent/extensions/*.ts`. Contains `kouen-cli notify`, so `isInstalled` detects it.
     private static var piExtension: String {
         """
-        // harness-managed — surfaces Pi session events in Harness. Safe to delete.
+        // kouen-managed — surfaces Pi session events in Harness. Safe to delete.
         import { execSync } from "node:child_process"
 
         export function activate(api: any) {
