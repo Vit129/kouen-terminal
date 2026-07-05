@@ -17,7 +17,7 @@ final class HarnessPathsTests: XCTestCase {
     func testHarnessHomeOverrideRootsAllPaths() {
         setenv("HARNESS_HOME", "/tmp/harness-paths-test", 1)
         XCTAssertEqual(HarnessPaths.applicationSupport.path, "/tmp/harness-paths-test")
-        XCTAssertEqual(HarnessPaths.socketURL.path, "/tmp/harness-paths-test/harness.sock")
+        XCTAssertEqual(HarnessPaths.socketURL.path, "/tmp/harness-paths-test/kouen.sock")
         XCTAssertEqual(HarnessPaths.snapshotURL.path, "/tmp/harness-paths-test/sessions/layout.json")
         XCTAssertEqual(HarnessPaths.settingsURL.lastPathComponent, "settings.json")
     }
@@ -30,11 +30,11 @@ final class HarnessPathsTests: XCTestCase {
 
     func testValidatedSocketPathAcceptsShortHome() throws {
         setenv("HARNESS_HOME", "/tmp/harness-sock-test", 1)
-        XCTAssertEqual(try HarnessPaths.validatedSocketPath(), "/tmp/harness-sock-test/harness.sock")
+        XCTAssertEqual(try HarnessPaths.validatedSocketPath(), "/tmp/harness-sock-test/kouen.sock")
     }
 
     func testValidatedSocketPathRejectsOverlongHome() {
-        // A HARNESS_HOME deep enough to push harness.sock past sun_path (104) must fail clearly,
+        // A HARNESS_HOME deep enough to push kouen.sock past sun_path (104) must fail clearly,
         // not silently truncate and connect/bind to the wrong socket.
         let deep = "/tmp/" + String(repeating: "x", count: 120)
         setenv("HARNESS_HOME", deep, 1)

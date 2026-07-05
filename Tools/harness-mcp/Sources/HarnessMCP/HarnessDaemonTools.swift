@@ -417,7 +417,7 @@ struct HarnessDaemonTools: Sendable {
             // the two calls.
             subscription = try subscriptionClient.attachReplayingSurfaceOutput(
                 surfaceID: surfaceId,
-                label: "harness-mcp waitForPaneOutput",
+                label: "kouen-mcp waitForPaneOutput",
                 onReplay: { text in
                     guard !fromNow else { return }
                     waiter.append(text, sequence: nil)

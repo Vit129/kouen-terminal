@@ -21,7 +21,7 @@ public struct ThemeDocument: Codable, Equatable, Sendable {
     public static let currentVersion = 1
     /// File extension and Uniform Type Identifier (registered in the app's Info.plist).
     public static let fileExtension = "harnesstheme"
-    public static let uti = "com.vit129.harness.theme"
+    public static let uti = "com.vit129.kouen.theme"
 
     public var version: Int
     public var name: String

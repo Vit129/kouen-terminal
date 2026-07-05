@@ -9,7 +9,7 @@ final class AboutPanelController: NSObject {
         if window == nil {
             let controller = NSHostingController(rootView: AboutView())
             let win = NSWindow(contentViewController: controller)
-            win.title = "About Harness"
+            win.title = "About Kouen"
             win.titlebarAppearsTransparent = true
             win.titleVisibility = .hidden
             win.styleMask = [.titled, .closable, .fullSizeContentView]
@@ -48,13 +48,13 @@ private struct AboutView: View {
                         .resizable()
                         .frame(width: 96, height: 96)
                 }
-                Text("Harness")
+                Text("Kouen")
                     .font(.system(size: 24, weight: .bold))
                 Text("Version \(version) · build \(build)")
                     .font(.system(size: 11.5))
                     .foregroundStyle(.secondary)
                     .padding(.top, -6)
-                Text("A native macOS terminal for AI agents and dev sessions.\nGPU-rendered by Harness's own terminal engine.")
+                Text("A native macOS terminal for AI agents and dev sessions.\nGPU-rendered by Kouen's own terminal engine.")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)

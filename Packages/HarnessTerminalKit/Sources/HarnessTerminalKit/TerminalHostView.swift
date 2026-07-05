@@ -59,7 +59,7 @@ public final class TerminalHostView: NSView {
     /// Backoff counter for `scheduleDaemonReconnect`, reset to 0 on a successful (re)connect.
     private var reconnectAttempts = 0
     /// Off-main probe queue for reconnect so a still-restarting daemon never blocks the main thread.
-    private let reconnectQueue = DispatchQueue(label: "com.vit129.harness.reconnect")
+    private let reconnectQueue = DispatchQueue(label: "com.vit129.kouen.reconnect")
     /// Tripped in `deinit` so in-flight `reconnectQueue.asyncAfter` blocks bail before blocking RPCs.
     private let reconnectLatch = ReconnectLatch()
     /// Theme-derived indicator colors. This package can't reach the app's palette,
@@ -1049,7 +1049,7 @@ private final class DetachedPaneOverlay: NSView {
 /// @unchecked Sendable: `DaemonClient` is itself thread-safe and `surfaceID` is immutable.
 private final class SurfaceIO: @unchecked Sendable {
     private let client: DaemonClient
-    private let queue = DispatchQueue(label: "com.vit129.harness.terminal-io")
+    private let queue = DispatchQueue(label: "com.vit129.kouen.terminal-io")
     private let surfaceID: String
     private let lock = NSLock()
     /// The live full-duplex output subscription, once `startDaemonOutput` wires it. Input rides this
@@ -1227,7 +1227,7 @@ private final class SurfaceIO: @unchecked Sendable {
 private final class InputGate: @unchecked Sendable {
     private let io: SurfaceIO
     private let broadcastClient: DaemonClient
-    private let broadcastQueue = DispatchQueue(label: "com.vit129.harness.sync-input")
+    private let broadcastQueue = DispatchQueue(label: "com.vit129.kouen.sync-input")
     private let lock = NSLock()
     private var siblingsStorage: [String] = []
 

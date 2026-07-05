@@ -1,7 +1,7 @@
 import Foundation
 import HarnessCore
 
-/// Control mode (`harness-cli -CC` / `control-mode`): the tmux control protocol
+/// Control mode (`kouen-cli -CC` / `control-mode`): the tmux control protocol
 /// over stdin/stdout, so external tools (terminal emulators, scripts) can drive
 /// Harness programmatically. Commands arrive one-per-line on stdin; each runs
 /// through the shared `CommandIPCTranslator` and is wrapped in a `%begin/%end`
@@ -12,7 +12,7 @@ import HarnessCore
 /// just another front-end onto `Command` → IPC.
 enum ControlModeClient {
     static func run(client: DaemonClient) throws -> Int32 {
-        _ = try? client.request(.identifyClient(label: "harness-cli -CC", protocolVersion: ipcProtocolVersion), timeout: 1)
+        _ = try? client.request(.identifyClient(label: "kouen-cli -CC", protocolVersion: ipcProtocolVersion), timeout: 1)
         let writer = Writer()
         var commandNumber = 0
 

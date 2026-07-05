@@ -16,9 +16,10 @@ enum AgentHookStrategy {
     /// each event maps to a flat array of `{command}` objects (no nested `matcher`/`hooks`).
     case eventArrayJSON(filename: String, payload: [String: Any], managedEvents: [String])
 
-    /// Write a dedicated, Harness-owned JSON file verbatim — Grok's `~/.grok/hooks/harness.json`.
+    /// Write a dedicated, Harness-owned JSON file verbatim — Grok's `~/.grok/hooks/kouen.json`.
     /// We own the whole file (the agent merges every `*.json` in the dir), so install overwrites
-    /// idempotently; there's nothing to prune or preserve.
+    /// idempotently; there's nothing to prune or preserve. The pre-rename `harness.json` sibling
+    /// is cleaned up via `legacyHookFiles`, same as any other older-Harness orphan.
     case ownJSONFile(filename: String, payload: [String: Any])
 
     /// Write a dedicated, Harness-owned text file verbatim — a JS plugin (OpenCode) or TS

@@ -8,7 +8,7 @@ enum HarnessDesign {
     /// The transparent brand mark (`HarnessLogo.png`, bundled into the app) for hero tiles in
     /// onboarding + the About panel. Falls back to the (opaque) app icon if absent.
     static func brandLogo() -> NSImage? {
-        if let url = Bundle.main.url(forResource: "HarnessLogo", withExtension: "png"),
+        if let url = Bundle.main.url(forResource: "KouenLogo", withExtension: "png"),
            let image = NSImage(contentsOf: url) {
             return image
         }

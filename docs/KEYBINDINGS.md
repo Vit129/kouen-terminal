@@ -1,6 +1,6 @@
-# Harness keybindings
+# Kouen keybindings
 
-Harness keybindings are data. User overrides live in `~/Library/Application Support/Harness/keybindings.json`; removing an override restores the default binding.
+Kouen keybindings are data. User overrides live in `~/Library/Application Support/Kouen/keybindings.json`; removing an override restores the default binding.
 
 ## Key spec syntax
 
@@ -134,17 +134,17 @@ Press `:` in the file editor to open the ex command line. These commands replace
 
 ```bash
 # Bind C-x q to detach
-harness-cli bind-key C-x q detach-client
+kouen-cli bind-key C-x q detach-client
 
 # Move "kill pane" off `x` to `C-x x`
-harness-cli unbind-key x
-harness-cli bind-key C-x x kill-pane
+kouen-cli unbind-key x
+kouen-cli bind-key C-x x kill-pane
 
 # Multi-step: split + immediately enter copy mode
-harness-cli bind-key C-x s "split-window -h ; copy-mode"
+kouen-cli bind-key C-x s "split-window -h ; copy-mode"
 
 # Apply immediately in the running app
-harness-cli display-message "reload"  # (the app polls keybindings.json on `reload-keybindings`)
+kouen-cli display-message "reload"  # (the app polls keybindings.json on `reload-keybindings`)
 ```
 
 In the app, the `:` prompt accepts the same syntax:
@@ -156,7 +156,7 @@ In the app, the `:` prompt accepts the same syntax:
 
 ## Persistence
 
-- File: `~/Library/Application Support/Harness/keybindings.json`
+- File: `~/Library/Application Support/Kouen/keybindings.json`
 - Format: JSON; `tables` is an array of `{id, bindings: [{spec, command, note}]}` entries
 - Merge: on load, defaults fill in any missing slots; deleting a stored binding restores the default
-- Harness writes the file atomically whenever a binding changes.
+- Kouen writes the file atomically whenever a binding changes.

@@ -29,10 +29,10 @@ enum HarnessCLIPaths {
 
     static var launchAgentURL: URL {
         FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/LaunchAgents/com.vit129.harness.daemon.plist")
+            .appendingPathComponent("Library/LaunchAgents/com.vit129.kouen.daemon.plist")
     }
 
-    static let launchAgentLabel = "com.vit129.harness.daemon"
+    static let launchAgentLabel = "com.vit129.kouen.daemon"
 
     static func ensureDirectories() throws {
         let ownerOnly: [FileAttributeKey: Any] = [.posixPermissions: 0o700]

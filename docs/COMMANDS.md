@@ -1,6 +1,6 @@
-# Harness command reference
+# Kouen command reference
 
-These are the commands Harness accepts from the `:` prompt, key bindings, hooks, and `harness-cli`.
+These are the commands Kouen accepts from the `:` prompt, key bindings, hooks, and `kouen-cli`.
 
 The 2026-06 parity series added bindable forms of the config/buffer/hook verbs
 (`set-option`/`set`/`setw`, `show-options`, `set-environment`/`setenv`, `set-buffer`,
@@ -140,7 +140,7 @@ accepted forms; it is never silently routed to the next pane.
 
 ### Inspection (CLI / control mode)
 
-These query the current Harness state and do not change your layout.
+These query the current Kouen state and do not change your layout.
 
 | Command | Effect |
 |---|---|
@@ -158,8 +158,8 @@ These CLI commands are pure local output and do not require the daemon.
 
 | Command | Effect |
 |---|---|
-| `harness-cli color-check` | Print a deterministic SGR diagnostic page: ANSI 0-15, the 256-color cube, grayscale ramp, truecolor primaries, gradients, text attributes, and foreground/background combinations. |
-| `harness-cli theme-preview [--theme <name>] [--all]` | Print realistic prompt, git/build, diagnostic, agent-state, selection/search, and ANSI-swatch examples for one theme or every built-in theme. |
+| `kouen-cli color-check` | Print a deterministic SGR diagnostic page: ANSI 0-15, the 256-color cube, grayscale ramp, truecolor primaries, gradients, text attributes, and foreground/background combinations. |
+| `kouen-cli theme-preview [--theme <name>] [--all]` | Print realistic prompt, git/build, diagnostic, agent-state, selection/search, and ANSI-swatch examples for one theme or every built-in theme. |
 | `show-cheatsheet` | Toggle the live prefix-binding cheatsheet overlay (same as `prefix ?`). |
 
 ## Modes
@@ -177,8 +177,8 @@ These CLI commands are pure local output and do not require the daemon.
 
 ### Attaching from a plain terminal
 
-`harness-cli attach --surface <id>` connects a single pane (raw passthrough).
-`harness-cli attach-window [--tab <id>] [--detach-keys <bytes>]` renders a whole
+`kouen-cli attach --surface <id>` connects a single pane (raw passthrough).
+`kouen-cli attach-window [--tab <id>] [--detach-keys <bytes>]` renders a whole
 tab's **split layout** — every pane with borders, a status line, and the active
 pane's cursor — into any plain terminal (incl. over ssh). Without `--tab` it
 attaches the active tab. Inside: the prefix (`Ctrl-A`) then `o` / `;` cycles the
@@ -194,7 +194,7 @@ reuses your existing SSH trust (keys/agent/config); no new credentials or crypto
 
 | Command | Effect |
 |---|---|
-| `remote add --name <name> --ssh <user@host> --socket <remote-path> [--ssh-arg <arg> …]` | Register a remote daemon. `--socket` is the daemon's control-socket path on the remote (run `harness-cli doctor` there to print it). Repeat `--ssh-arg` to pass extra ssh options. |
+| `remote add --name <name> --ssh <user@host> --socket <remote-path> [--ssh-arg <arg> …]` | Register a remote daemon. `--socket` is the daemon's control-socket path on the remote (run `kouen-cli doctor` there to print it). Repeat `--ssh-arg` to pass extra ssh options. |
 | `remote list` | List registered remotes (`name  ssh-target  socket`). |
 | `remote remove --name <name>` | Forget a remote and tear down its tunnel. |
 | `<command> … --host <name>` | Run any client command against the named remote instead of the local daemon (`ping`, `new-session`, `send-keys`, `capture-pane`, `doctor`, …). Exception: `attach-window` always renders the **local** daemon — run it on the machine whose daemon you want to see (see the multiplexer guide). |

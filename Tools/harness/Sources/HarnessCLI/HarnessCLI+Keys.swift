@@ -8,10 +8,10 @@ import HarnessCore
 
 extension HarnessCLI {
     static func handleBindKey(_ args: [String]) throws {
-        // Usage: harness-cli bind-key [-T <table>] <spec> <command source>
+        // Usage: kouen-cli bind-key [-T <table>] <spec> <command source>
         let (table, positional) = parseKeyTableArgs(args)
         guard positional.count >= 2 else {
-            fputs("Usage: harness-cli bind-key [-T <table>] <spec> <command...>\n", harnessStderr)
+            fputs("Usage: kouen-cli bind-key [-T <table>] <spec> <command...>\n", harnessStderr)
             exit(1)
         }
         let spec = positional[0]
@@ -30,7 +30,7 @@ extension HarnessCLI {
     static func handleUnbindKey(_ args: [String]) throws {
         let (table, positional) = parseKeyTableArgs(args)
         guard let spec = positional.first, let parsedSpec = KeySpec.parse(spec) else {
-            fputs("Usage: harness-cli unbind-key [-T <table>] <spec>\n", harnessStderr)
+            fputs("Usage: kouen-cli unbind-key [-T <table>] <spec>\n", harnessStderr)
             exit(1)
         }
         var set = KeybindingsStore.load()

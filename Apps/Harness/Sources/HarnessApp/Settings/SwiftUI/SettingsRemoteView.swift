@@ -17,7 +17,7 @@ struct SettingsRemoteView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                Text("Saved SSH tunnels to remote Harness daemons. TCP remains disabled until it has a TLS layer.")
+                Text("Saved SSH tunnels to remote Kouen daemons. TCP remains disabled until it has a TLS layer.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
 

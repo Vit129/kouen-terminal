@@ -49,6 +49,26 @@ final class ScriptingTests: XCTestCase {
         XCTAssertNil(path5)
     }
 
+    /// Post-rename: the new `kouen`-named path is preferred when both it and the
+    /// pre-rename `harness`-named path exist — the fallback never shadows the new location.
+    func testConfigLocatorPrefersNewPathOverLegacyFallback() {
+        let env = ["HOME": "/home"]
+        let path = ScriptConfigLocator.locate(environment: env) { path in
+            return path == "/home/.config/kouen/init.js" || path == "/home/.config/harness/init.js"
+        }
+        XCTAssertEqual(path, "/home/.config/kouen/init.js")
+    }
+
+    /// Pre-migration: only the legacy `harness`-named path exists on disk — it must still
+    /// be found (not silently dropped) so an existing init.js keeps loading after the rename.
+    func testConfigLocatorFallsBackToLegacyHarnessPath() {
+        let env = ["HOME": "/home"]
+        let path = ScriptConfigLocator.locate(environment: env) { path in
+            return path == "/home/.config/harness/init.js"
+        }
+        XCTAssertEqual(path, "/home/.config/harness/init.js")
+    }
+
     @MainActor
     func testMissingFileIsNoOp() {
         // If config locator returns nil, no runtime should be initialized

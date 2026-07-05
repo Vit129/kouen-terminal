@@ -26,12 +26,12 @@ final class DaemonLauncher: @unchecked Sendable {
     static let shared = DaemonLauncher()
 
     private var fallbackProcess: Process?
-    private let queue = DispatchQueue(label: "com.vit129.harness.daemon-launcher")
+    private let queue = DispatchQueue(label: "com.vit129.kouen.daemon-launcher")
 
     /// True when running as a preview/SIT build or debug build.
     /// Preview/Debug must never interact with the production LaunchAgent.
     private let isPreview: Bool = {
-        if Bundle.main.bundleIdentifier == "com.vit129.harness.preview" {
+        if Bundle.main.bundleIdentifier == "com.vit129.kouen.preview" {
             return true
         }
         if let val = Bundle.main.object(forInfoDictionaryKey: "HarnessPreviewHome") as? String, !val.isEmpty {

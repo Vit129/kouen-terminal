@@ -5,13 +5,16 @@ import Foundation
 import AppKit
 import HarnessCore
 
-/// Loads JavaScript plugins from `~/.config/harness/plugins/*.js`.
+/// Loads JavaScript plugins from `~/.config/kouen/plugins/*.js`.
 ///
 /// Each plugin file is evaluated in the shared `ScriptRuntime` context, so plugins
 /// can call any `harness.*` API. Plugins are loaded after `init.js` so they can
 /// depend on custom globals defined there.
 ///
-/// Plugin directory: `~/.config/harness/plugins/` (XDG: `$XDG_CONFIG_HOME/harness/plugins/`).
+/// Plugin directory: `~/.config/kouen/plugins/` (XDG: `$XDG_CONFIG_HOME/kouen/plugins/`).
+/// Falls back to the pre-rename `~/.config/harness/plugins/` directory (whole-directory,
+/// not per-file) if the new one doesn't exist yet, so plugins already in place before
+/// the rename keep loading without the user having to move anything.
 @MainActor
 struct PluginLoader {
     /// Load all `.js` files from the plugins directory into `runtime`.
@@ -42,12 +45,23 @@ struct PluginLoader {
 
     private static func pluginsDirectory() -> String? {
         let env = ProcessInfo.processInfo.environment
+        let configBase: String
         if let xdg = env["XDG_CONFIG_HOME"], !xdg.isEmpty {
-            return (xdg as NSString).appendingPathComponent("harness/plugins")
+            configBase = xdg
+        } else {
+            let home = env["HOME"] ?? NSHomeDirectory()
+            guard !home.isEmpty else { return nil }
+            configBase = (home as NSString).appendingPathComponent(".config")
         }
-        let home = env["HOME"] ?? NSHomeDirectory()
-        guard !home.isEmpty else { return nil }
-        return (home as NSString).appendingPathComponent(".config/harness/plugins")
+        let newPath = (configBase as NSString).appendingPathComponent("kouen/plugins")
+        if FileManager.default.fileExists(atPath: newPath) {
+            return newPath
+        }
+        let oldPath = (configBase as NSString).appendingPathComponent("harness/plugins")
+        if FileManager.default.fileExists(atPath: oldPath) {
+            return oldPath
+        }
+        return newPath
     }
 
     private static func showToast(_ message: String) {

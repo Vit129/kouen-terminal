@@ -1,6 +1,6 @@
 import Foundation
 
-/// `harness-cli install-tools` — installs recommended shell tools via Homebrew.
+/// `kouen-cli install-tools` — installs recommended shell tools via Homebrew.
 func handleInstallTools() {
     let tools: [(formula: String, description: String)] = [
         ("zoxide", "smart cd — learns your frequent dirs"),

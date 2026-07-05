@@ -11,7 +11,7 @@ import HarnessCore
 public final class DaemonServer: @unchecked Sendable {
     public let registry: SurfaceRegistry
     private var listener: DispatchSourceRead?
-    private let queue = DispatchQueue(label: "com.vit129.harness.daemon")
+    private let queue = DispatchQueue(label: "com.vit129.kouen.daemon")
     private var clientBuffers: [Int32: Data] = [:]
     private var clientSources: [Int32: DispatchSourceRead] = [:]
     /// Unsent reply bytes per client, flushed by a writable `DispatchSource` when the socket

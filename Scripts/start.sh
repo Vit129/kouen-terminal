@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Interactive build & release menu for Harness.app (delegates to Node.js).
+# Interactive build & release menu for Kouen.app (delegates to Node.js).
 #
 # Usage:
 #   Scripts/start.sh        # interactive menu

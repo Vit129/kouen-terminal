@@ -230,7 +230,7 @@ final class SurfaceEmulatorState: @unchecked Sendable {
 
     init(columns: Int, rows: Int) {
         self.emulator = TerminalEmulator(cols: columns, rows: rows)
-        self.queue = DispatchQueue(label: "com.vit129.harness.terminal-surface.emulator", qos: .userInteractive)
+        self.queue = DispatchQueue(label: "com.vit129.kouen.terminal-surface.emulator", qos: .userInteractive)
         queue.setSpecific(key: specific, value: ())
     }
 

@@ -6,7 +6,7 @@ import Glibc
 import Foundation
 import HarnessCore
 
-/// `harness-cli record` — records a daemon-owned surface's output to a JSON Lines
+/// `kouen-cli record` — records a daemon-owned surface's output to a JSON Lines
 /// file (see ``RecordingEvent`` for the format).
 ///
 /// This is a **passive observer**: it subscribes to the surface's output stream
@@ -25,7 +25,7 @@ public enum RecordClient {
         do {
             writer = try RecordingWriter(path: outputPath)
         } catch {
-            fputs("harness-cli record: cannot open \(outputPath): \(error)\n", harnessStderr)
+            fputs("kouen-cli record: cannot open \(outputPath): \(error)\n", harnessStderr)
             return 1
         }
 
@@ -74,12 +74,12 @@ private final class RecordSession: @unchecked Sendable {
         }
         installInterruptHandler()
 
-        fputs("harness-cli record: recording surface \(surfaceID) → \(writer.path) (Ctrl-C to stop)\n", harnessStderr)
+        fputs("kouen-cli record: recording surface \(surfaceID) → \(writer.path) (Ctrl-C to stop)\n", harnessStderr)
 
         do {
             subscription = try client.subscribeSurfaceOutput(
                 surfaceID: surfaceID,
-                label: "harness-cli record",
+                label: "kouen-cli record",
                 onData: { [weak self] data, _ in
                     guard let self else { return }
                     self.writer.append(.output(timeMs: self.writer.nowMs(), data: data))
@@ -88,7 +88,7 @@ private final class RecordSession: @unchecked Sendable {
                 onEnd: { [weak self] in self?.stop() }
             )
         } catch {
-            fputs("harness-cli record: subscribe failed: \(error)\n", harnessStderr)
+            fputs("kouen-cli record: subscribe failed: \(error)\n", harnessStderr)
             _ = writer.close()
             return 1
         }
@@ -100,7 +100,7 @@ private final class RecordSession: @unchecked Sendable {
         sigwinchSource?.cancel()
         let summary = writer.close()
         let seconds = Double(summary.durationMs) / 1000
-        fputs(String(format: "harness-cli record: wrote %d events (%.1fs) → %@\n",
+        fputs(String(format: "kouen-cli record: wrote %d events (%.1fs) → %@\n",
                      summary.eventCount, seconds, writer.path), harnessStderr)
         return 0
     }
