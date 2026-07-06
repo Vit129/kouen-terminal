@@ -81,6 +81,15 @@ if [[ ! -f "$ICON" ]]; then
 fi
 cp "$ICON" "$APP/Contents/Resources/Kouen.icns"
 
+# Dark-appearance Dock icon, swapped at runtime via NSApp.applicationIconImage
+# (AppDelegate's effectiveAppearance observer) — macOS has no static asset-catalog
+# mechanism for "mac" idiom app icons to auto-swap with system appearance, so this
+# is app-level, not something actool/Info.plist can express.
+ICON_DARK="$ROOT/Apps/Kouen/Resources/AppIcon-1024-dark.png"
+if [[ -f "$ICON_DARK" ]]; then
+  cp "$ICON_DARK" "$APP/Contents/Resources/AppIcon-1024-dark.png"
+fi
+
 # Transparent brand logo for onboarding + settings (loaded via Bundle.main).
 LOGO="$ROOT/Apps/Kouen/Resources/KouenLogo.png"
 if [[ -f "$LOGO" ]]; then
