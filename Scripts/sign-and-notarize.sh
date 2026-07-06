@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# Sign and notarize Harness.app for distribution.
+# Sign and notarize Kouen.app for distribution.
 #
 # Required:
 #   SIGNING_IDENTITY  — e.g. "Developer ID Application: Your Name (TEAMID)"
@@ -18,7 +18,7 @@ set -euo pipefail
 #   --sign-only / SIGN_ONLY=1 : sign locally and skip notarization without failing.
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-APP="$ROOT/Harness.app"
+APP="$ROOT/Kouen.app"
 # Require an explicit identity so a release is never signed with the wrong or
 # ambiguous one. Use SIGNING_IDENTITY=- for an ad-hoc (unsigned) local build.
 IDENTITY="${SIGNING_IDENTITY:?Set SIGNING_IDENTITY to your Developer ID (or '-' for an ad-hoc local build).}"
@@ -64,15 +64,15 @@ fi
 
 if [[ "$IDENTITY" != "-" ]]; then
   codesign --force --options runtime --timestamp --sign "$IDENTITY" \
-    "$APP/Contents/MacOS/HarnessDaemon" \
-    "$APP/Contents/MacOS/harness-cli" \
-    "$APP/Contents/MacOS/Harness"
+    "$APP/Contents/MacOS/KouenDaemon" \
+    "$APP/Contents/MacOS/kouen-cli" \
+    "$APP/Contents/MacOS/Kouen"
   codesign --force --options runtime --timestamp --sign "$IDENTITY" "$APP"
 else
   codesign --force --sign "$IDENTITY" \
-    "$APP/Contents/MacOS/HarnessDaemon" \
-    "$APP/Contents/MacOS/harness-cli" \
-    "$APP/Contents/MacOS/Harness"
+    "$APP/Contents/MacOS/KouenDaemon" \
+    "$APP/Contents/MacOS/kouen-cli" \
+    "$APP/Contents/MacOS/Kouen"
   codesign --force --sign "$IDENTITY" "$APP"
 fi
 
@@ -108,7 +108,7 @@ MSG
   exit 1
 fi
 
-ZIP="$ROOT/Harness-notarize.zip"
+ZIP="$ROOT/Kouen-notarize.zip"
 ditto -c -k --keepParent "$APP" "$ZIP"
 xcrun notarytool submit "$ZIP" "${NOTARY_AUTH[@]}" --wait
 xcrun stapler staple "$APP"

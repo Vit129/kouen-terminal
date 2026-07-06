@@ -6,7 +6,7 @@
 # options, hooks, environment, and installed agent metadata.
 set -euo pipefail
 
-APP_SUPPORT="$HOME/Library/Application Support/Kouen"
+APP_SUPPORT="$HOME/Library/Application Support/Harness"
 CACHE_ROOT="$HOME/Library/Caches/Harness"
 
 echo "==> Clearing production runtime state..."

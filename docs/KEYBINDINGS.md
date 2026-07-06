@@ -1,6 +1,6 @@
 # Kouen keybindings
 
-Kouen keybindings are data. User overrides live in `~/Library/Application Support/Kouen/keybindings.json`; removing an override restores the default binding.
+Kouen keybindings are data. User overrides live in `~/Library/Application Support/Harness/keybindings.json`; removing an override restores the default binding.
 
 ## Key spec syntax
 
@@ -156,7 +156,7 @@ In the app, the `:` prompt accepts the same syntax:
 
 ## Persistence
 
-- File: `~/Library/Application Support/Kouen/keybindings.json`
+- File: `~/Library/Application Support/Harness/keybindings.json`
 - Format: JSON; `tables` is an array of `{id, bindings: [{spec, command, note}]}` entries
 - Merge: on load, defaults fill in any missing slots; deleting a stored binding restores the default
 - Kouen writes the file atomically whenever a binding changes.

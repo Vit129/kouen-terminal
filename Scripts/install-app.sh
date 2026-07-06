@@ -11,7 +11,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 DEST="/Applications/Kouen.app"
-APP_SUPPORT="$HOME/Library/Application Support/Kouen"
+APP_SUPPORT="$HOME/Library/Application Support/Harness"
 APP_SUPPORT_BIN="$APP_SUPPORT/bin"
 LAUNCH_AGENT="$HOME/Library/LaunchAgents/com.vit129.kouen.daemon.plist"
 NO_BUILD=0
@@ -41,6 +41,12 @@ rm -f "$HOME/Library/LaunchAgents/com.robert.harness.daemon.plist"
 pkill -f "/Applications/Kouen.app/Contents/MacOS/KouenDaemon" 2>/dev/null || true
 pkill -f "$APP_SUPPORT_BIN/KouenDaemon" 2>/dev/null || true
 pkill -x Kouen 2>/dev/null || true
+# One-time migration: the app bundle name changed too (Harness.app -> Kouen.app), so an old
+# install at the old path is a separate bundle this script never touches otherwise — quit it
+# and remove it so two copies aren't left running/installed side by side.
+pkill -f "/Applications/Harness.app/Contents/MacOS/Harness" 2>/dev/null || true
+pkill -f "/Applications/Harness.app/Contents/MacOS/harness-mcp" 2>/dev/null || true
+rm -rf "/Applications/Harness.app"
 sleep 1
 
 # --- Build ---

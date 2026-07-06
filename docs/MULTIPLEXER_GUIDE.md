@@ -167,7 +167,7 @@ Anything you can bind, you can type.
   hooks, options, layout ops). Run `kouen-cli` with no args for the full list.
 - Rebind anything: `kouen-cli bind-key C-x x kill-pane`, multi-step with `;`
   (`bind-key C-x s "split-window -h ; copy-mode"`). Bindings persist in
-  `~/Library/Application Support/Kouen/keybindings.json` (merged under the defaults, so deleting
+  `~/Library/Application Support/Harness/keybindings.json` (merged under the defaults, so deleting
   one restores the default). Full details in [KEYBINDINGS.md](KEYBINDINGS.md).
 - **Hooks** fire commands on events (`after-new-tab`, `pane-exited`, `agent-state-changed`, …):
   `kouen-cli bind-hook after-split-pane 'display-message "split!"'`. Use `set-hook --if` with

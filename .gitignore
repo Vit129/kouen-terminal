@@ -11,10 +11,10 @@ DerivedData/
 *.mode2v3
 *.perspectivev3
 xcuserdata/
-Harness.app/
-Harness.dmg
+Kouen.app/
+Kouen.dmg
 *.dmg
-Harness-notarize.zip
+Kouen-notarize.zip
 *.notarize.zip
 .harness-preview/
 .dmg-staging/

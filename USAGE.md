@@ -43,7 +43,7 @@ Builds, signs, stops the old daemon, copies to `/Applications`, and opens the ap
 Add to shell profile if prompted:
 
 ```bash
-export PATH="$HOME/Library/Application Support/Kouen/bin:$PATH"
+export PATH="$HOME/Library/Application Support/Harness/bin:$PATH"
 ```
 
 Verify:

@@ -17,7 +17,7 @@ into any existing hooks, so your own entries are preserved:
   "version": 1,
   "hooks": {
     "stop": [
-      { "command": "PATH=\"$HOME/Library/Application Support/Kouen/bin:$PATH\" kouen-cli notify --surface \"$HARNESS_SURFACE\" --title \"Cursor\" --body \"Done\"" }
+      { "command": "PATH=\"$HOME/Library/Application Support/Harness/bin:$PATH\" kouen-cli notify --surface \"$HARNESS_SURFACE\" --title \"Cursor\" --body \"Done\"" }
     ]
   }
 }
@@ -48,5 +48,5 @@ If your build doesn't fire the hook, drop this in your shell config and call it
 from inside Cursor's terminal session at the moments you care about:
 
 ```bash
-cursor_notify() { PATH="$HOME/Library/Application Support/Kouen/bin:$PATH" kouen-cli notify --surface "$HARNESS_SURFACE" --title "Cursor" --body "$1"; }
+cursor_notify() { PATH="$HOME/Library/Application Support/Harness/bin:$PATH" kouen-cli notify --surface "$HARNESS_SURFACE" --title "Cursor" --body "$1"; }
 ```

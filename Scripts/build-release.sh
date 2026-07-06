@@ -12,12 +12,12 @@ swift package resolve
 rm -rf "$ROOT/.build/release"/*.bundle
 
 echo "Building release binaries..."
-swift build -c release --product Harness
-swift build -c release --product HarnessDaemon
-swift build -c release --product harness-cli
-swift build -c release --product harness-mcp
+swift build -c release --product Kouen
+swift build -c release --product KouenDaemon
+swift build -c release --product kouen-cli
+swift build -c release --product kouen-mcp
 
-echo "Packaging Harness.app..."
+echo "Packaging Kouen.app..."
 "$ROOT/Scripts/package-app.sh" release
 
-echo "Done. App bundle: $ROOT/Harness.app"
+echo "Done. App bundle: $ROOT/Kouen.app"

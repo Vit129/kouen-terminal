@@ -66,7 +66,7 @@ Press `Cmd+Shift+I` in Kouen to open the Agent Notch and select the notifying ag
       "matcher": "",
       "hooks": [{
         "type": "command",
-        "command": "PATH=\"$HOME/Library/Application Support/Kouen/bin:$PATH\" kouen-cli notify --surface \"${HARNESS_SURFACE:-default}\" --body \"Agent finished — review output\""
+        "command": "PATH=\"$HOME/Library/Application Support/Harness/bin:$PATH\" kouen-cli notify --surface \"${HARNESS_SURFACE:-default}\" --body \"Agent finished — review output\""
       }]
     }]
   }

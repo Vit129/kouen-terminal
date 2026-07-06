@@ -3,16 +3,16 @@ set -euo pipefail
 CONFIG="${1:-release}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_DIR="$ROOT/.build/$CONFIG"
-APP="$ROOT/Harness.app"
+APP="$ROOT/Kouen.app"
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS"
 mkdir -p "$APP/Contents/Resources"
 
-cp "$BUILD_DIR/Harness" "$APP/Contents/MacOS/Harness"
-cp "$BUILD_DIR/HarnessDaemon" "$APP/Contents/MacOS/HarnessDaemon"
-cp "$BUILD_DIR/harness-cli" "$APP/Contents/MacOS/harness-cli"
-cp "$BUILD_DIR/harness-mcp" "$APP/Contents/MacOS/harness-mcp"
+cp "$BUILD_DIR/Kouen" "$APP/Contents/MacOS/Kouen"
+cp "$BUILD_DIR/KouenDaemon" "$APP/Contents/MacOS/KouenDaemon"
+cp "$BUILD_DIR/kouen-cli" "$APP/Contents/MacOS/kouen-cli"
+cp "$BUILD_DIR/kouen-mcp" "$APP/Contents/MacOS/kouen-mcp"
 cp "$ROOT/Apps/Harness/Sources/HarnessApp/Resources/Info.plist" "$APP/Contents/Info.plist"
 
 # Guard: HarnessVersion.swift is the daemon/CLI's view of the version (the app reads
@@ -60,17 +60,17 @@ if [[ ! -d "$FRAMEWORK" ]]; then
   FRAMEWORK="$(find "$ROOT/.build/artifacts" "$ROOT/.build" -name Sparkle.framework -type d 2>/dev/null | head -n1 || true)"
 fi
 if [[ -z "$FRAMEWORK" || ! -d "$FRAMEWORK" ]]; then
-  echo "error: Sparkle.framework not found under .build — build the Harness product first (the app would crash without it)." >&2
+  echo "error: Sparkle.framework not found under .build — build the Kouen product first (the app would crash without it)." >&2
   exit 1
 fi
 mkdir -p "$APP/Contents/Frameworks"
 ditto "$FRAMEWORK" "$APP/Contents/Frameworks/Sparkle.framework"
-if ! otool -l "$APP/Contents/MacOS/Harness" | grep -q "@executable_path/../Frameworks"; then
-  install_name_tool -add_rpath "@executable_path/../Frameworks" "$APP/Contents/MacOS/Harness"
+if ! otool -l "$APP/Contents/MacOS/Kouen" | grep -q "@executable_path/../Frameworks"; then
+  install_name_tool -add_rpath "@executable_path/../Frameworks" "$APP/Contents/MacOS/Kouen"
 fi
 # Verify the embed actually took (framework present + rpath wired), or fail before we ship.
 if [[ ! -d "$APP/Contents/Frameworks/Sparkle.framework" ]] \
-   || ! otool -l "$APP/Contents/MacOS/Harness" | grep -q "@executable_path/../Frameworks"; then
+   || ! otool -l "$APP/Contents/MacOS/Kouen" | grep -q "@executable_path/../Frameworks"; then
   echo "error: Sparkle embed verification failed (framework or @rpath missing)." >&2
   exit 1
 fi
