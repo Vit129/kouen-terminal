@@ -60,7 +60,7 @@ jobs:
             rm -rf .build/artifacts
           fi
 
-      # Compiles every target, including the AppKit `HarnessApp` executable target,
+      # Compiles every target, including the AppKit `KouenApp` executable target,
       # so a green build proves the GUI code compiles too.
       - name: Build (debug)
         run: swift build
@@ -86,7 +86,7 @@ jobs:
       - name: Toolchain versions
         run: swift --version
 
-      # On Linux the manifest drops the AppKit/Metal/SwiftUI targets (HarnessApp, renderer, kit,
+      # On Linux the manifest drops the AppKit/Metal/SwiftUI targets (KouenApp, renderer, kit,
       # onboarding, Sparkle). This builds the headless daemon + CLI + the pure libraries, proving the
       # daemon runs on a remote/headless box. A green build here is what makes issue #16 possible.
       - name: Build (debug)
@@ -102,7 +102,7 @@ jobs:
 
       - name: Live daemon tests
         env:
-          HARNESS_LIVE_DAEMON_TESTS: "1"
+          KOUEN_LIVE_DAEMON_TESTS: "1"
         run: swift test
 
   live-daemon-tests:
@@ -136,13 +136,13 @@ jobs:
           fi
 
       # The socket/PTY/security round-trip suites (DaemonRoundTrip, RealPtyLifecycle, contention,
-      # hook-firing) are gated behind HARNESS_LIVE_DAEMON_TESTS and therefore NEVER run in the default
+      # hook-firing) are gated behind KOUEN_LIVE_DAEMON_TESTS and therefore NEVER run in the default
       # `swift test`. Run the full suite with the gate ON here so those live tests — spawning a real
       # shell + Unix socket and checking the daemon's IPC, reconnect, and peer-credential paths — are
       # actually exercised in CI.
       - name: Live daemon tests
         env:
-          HARNESS_LIVE_DAEMON_TESTS: "1"
+          KOUEN_LIVE_DAEMON_TESTS: "1"
         run: swift test
 
   lint:
@@ -179,5 +179,5 @@ jobs:
 
       - name: Run benchmark suite
         env:
-          HARNESS_BENCHMARKS: "1"
-        run: swift test -c release --filter HarnessBenchmarks
+          KOUEN_BENCHMARKS: "1"
+        run: swift test -c release --filter KouenBenchmarks
