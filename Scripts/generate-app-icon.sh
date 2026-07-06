@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# Regenerate Kouen.icns from Apps/Harness/Resources/Assets.xcassets/AppIcon.appiconset
+# Regenerate Kouen.icns from Apps/Kouen/Resources/Assets.xcassets/AppIcon.appiconset
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-OUT="$ROOT/Apps/Harness/Resources/Kouen.icns"
+OUT="$ROOT/Apps/Kouen/Resources/Kouen.icns"
 # Master 1024×1024 source lives OUTSIDE the .appiconset so it isn't an unassigned
 # child of the icon set (the set's largest assigned slot is 512x512@2x = 1024px).
-SRC="$ROOT/Apps/Harness/Resources/AppIcon-1024.png"
+SRC="$ROOT/Apps/Kouen/Resources/AppIcon-1024.png"
 
 if [[ ! -f "$SRC" ]]; then
   echo "Missing $SRC — add a 1024×1024 master PNG first." >&2
   exit 1
 fi
-TMP_STAGE="$(mktemp -d "${TMPDIR:-/tmp}/harness-icon.XXXXXX")"
-STAGE="$TMP_STAGE/Harness.iconset"
+TMP_STAGE="$(mktemp -d "${TMPDIR:-/tmp}/kouen-icon.XXXXXX")"
+STAGE="$TMP_STAGE/Kouen.iconset"
 mkdir -p "$STAGE"
 trap 'rm -rf "$TMP_STAGE"' EXIT
 for spec in "16:icon_16x16.png" "32:icon_16x16@2x.png" "32:icon_32x32.png" "64:icon_32x32@2x.png" \

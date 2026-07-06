@@ -1,0 +1,234 @@
+import AppKit
+import KouenCore
+
+/// `:` command prompt. Pressing prefix `:` (or invoking via Command Palette →
+/// "Run command…") brings up a single-line field anchored under the active
+/// window. The text is parsed via `CommandParser` and dispatched through
+/// `MainExecutor`. History persists across launches; arrow keys cycle it.
+@MainActor
+final class CommandPromptController: NSObject, NSTextFieldDelegate {
+    static let shared = CommandPromptController()
+
+    private var window: NSPanel?
+    private let field = NSTextField()
+    private var history: [String] = []
+    var historyEntries: [String] { history }
+    private var historyCursor: Int = -1
+    /// In-progress text saved when history recall begins, restored on Down past the newest entry.
+    private var draft = ""
+
+    private static var historyURL: URL {
+        KouenPaths.applicationSupport.appendingPathComponent("command-history.json")
+    }
+
+    private override init() {
+        super.init()
+        if let data = try? Data(contentsOf: Self.historyURL),
+           let saved = try? JSONDecoder().decode([String].self, from: data) {
+            history = saved
+        }
+    }
+
+    private func saveHistory() {
+        try? KouenPaths.ensureDirectories()
+        if let data = try? JSONEncoder().encode(history) {
+            try? data.write(to: Self.historyURL, options: .atomic)
+        }
+    }
+
+    func present() {
+        let panel = window ?? build()
+        window = panel
+        // NSPanel doesn't take main-window status, so mainWindow is always the terminal
+        // window — even when the prompt panel holds key focus on the 2nd+ invocation.
+        // Using keyWindow here caused the panel to drift upward on each re-open because
+        // it positioned 64pt above its own frame instead of the parent window.
+        let anchor = NSApp.mainWindow
+            ?? NSApp.windows.first(where: { $0 !== panel && $0.isVisible && !($0 is NSPanel) })
+        guard let anchor else { return }
+        let frame = anchor.frame
+        let size = NSSize(width: 520, height: 36)
+        panel.setFrame(
+            NSRect(
+                x: frame.midX - size.width / 2,
+                y: frame.minY + 64,
+                width: size.width,
+                height: size.height
+            ),
+            display: false
+        )
+        field.stringValue = ""
+        historyCursor = -1
+        panel.alphaValue = 0
+        panel.orderFront(nil)
+        panel.makeKey()
+        panel.makeFirstResponder(field)
+        KouenMotion.animate(KouenDesign.Motion.fast, timing: KouenDesign.Motion.entrance) { _ in
+            panel.animator().alphaValue = 1
+        }
+    }
+
+    /// `command-prompt -p … "<template>"`: open the prompt seeded with the
+    /// template so the user fills in any `%%`/`%1…` placeholders before running.
+    func presentTemplate(prompts: [String], template: String) {
+        present()
+        field.stringValue = template
+        // Select the first placeholder if present, else place the caret at the end.
+        if let editor = field.currentEditor() {
+            let ns = template as NSString
+            let placeholder = ns.range(of: "%%").location != NSNotFound
+                ? ns.range(of: "%%")
+                : ns.range(of: "%1")
+            if placeholder.location != NSNotFound {
+                editor.selectedRange = placeholder
+            } else {
+                editor.selectedRange = NSRange(location: ns.length, length: 0)
+            }
+        }
+    }
+
+    func presentSeeded(text: String) {
+        present()
+        field.stringValue = text
+        moveInsertionPointToEnd()
+    }
+
+    @objc func dismiss() {
+        guard let window else { return }
+        KouenMotion.animate(KouenDesign.Motion.fast, timing: KouenDesign.Motion.exit) { _ in
+            window.animator().alphaValue = 0
+        } completion: {
+            window.orderOut(nil)
+        }
+    }
+
+    // MARK: NSTextFieldDelegate
+
+    func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+        switch selector {
+        case #selector(NSResponder.cancelOperation(_:)):
+            dismiss()
+            return true
+        case #selector(NSResponder.insertNewline(_:)):
+            commit()
+            return true
+        case #selector(NSResponder.moveUp(_:)):
+            recallHistory(direction: -1)
+            return true
+        case #selector(NSResponder.moveDown(_:)):
+            recallHistory(direction: 1)
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func commit() {
+        let raw = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !raw.isEmpty else { dismiss(); return }
+        if history.last != raw { history.append(raw) }
+        if history.count > 100 { history.removeFirst(history.count - 100) }
+        historyCursor = -1
+        saveHistory()
+        let source = raw
+        // Dismiss first so the executed command sees no overlay (some commands
+        // like `display-message` would otherwise stack on top of us).
+        dismiss()
+        do {
+            try MainExecutor.shared.executeSource(source)
+        } catch {
+            DisplayMessage.show("command failed: \(error)")
+        }
+    }
+
+    private func recallHistory(direction: Int) {
+        guard !history.isEmpty else { return }
+        if historyCursor == -1 {
+            // Down from the blank/draft state is a no-op — there is nothing newer.
+            guard direction < 0 else { return }
+            draft = field.stringValue
+            historyCursor = history.count - 1
+        } else if direction > 0, historyCursor == history.count - 1 {
+            // Down past the newest entry returns to the in-progress draft (readline behavior).
+            historyCursor = -1
+            field.stringValue = draft
+            moveInsertionPointToEnd()
+            return
+        } else {
+            historyCursor = max(0, min(history.count - 1, historyCursor + direction))
+        }
+        field.stringValue = history[historyCursor]
+        moveInsertionPointToEnd()
+    }
+
+    private func moveInsertionPointToEnd() {
+        if let editor = field.currentEditor() {
+            editor.selectedRange = NSRange(location: field.stringValue.count, length: 0)
+        }
+    }
+
+    private func build() -> NSPanel {
+        let panel = KeyablePanel(
+            contentRect: NSRect(x: 0, y: 0, width: 520, height: 36),
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        panel.isFloatingPanel = true
+        panel.level = .floating
+        panel.backgroundColor = .clear
+        panel.isOpaque = false
+        panel.hasShadow = true
+        panel.becomesKeyOnlyIfNeeded = false
+
+        let overlay = KouenOverlayBackground()
+        overlay.frame = NSRect(x: 0, y: 0, width: 520, height: 36)
+
+        let prompt = NSTextField(labelWithString: ":")
+        prompt.font = KouenDesign.Typography.kbd
+        prompt.textColor = KouenChrome.current.accent
+
+        field.placeholderString = "command (e.g. find, grep, cd, rename-window)"
+        field.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
+        field.textColor = KouenChrome.current.textPrimary
+        field.bezelStyle = .roundedBezel
+        field.isBordered = false
+        field.drawsBackground = false
+        field.focusRingType = .none
+        field.delegate = self
+
+        let closeButton = NSButton()
+        closeButton.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: "Close")?
+            .withSymbolConfiguration(.init(pointSize: 10, weight: .semibold))
+        closeButton.isBordered = false
+        closeButton.contentTintColor = KouenChrome.current.textTertiary
+        closeButton.target = self
+        closeButton.action = #selector(dismiss)
+        closeButton.translatesAutoresizingMaskIntoConstraints = false
+
+        let stack = NSStackView(views: [prompt, field])
+        stack.orientation = .horizontal
+        stack.spacing = 8
+        stack.alignment = .centerY
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        overlay.contentView.addSubview(stack)
+        overlay.contentView.addSubview(closeButton)
+        NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(equalTo: overlay.contentView.leadingAnchor, constant: 12),
+            stack.trailingAnchor.constraint(equalTo: closeButton.leadingAnchor, constant: -8),
+            stack.centerYAnchor.constraint(equalTo: overlay.contentView.centerYAnchor),
+
+            closeButton.trailingAnchor.constraint(equalTo: overlay.contentView.trailingAnchor, constant: -10),
+            closeButton.centerYAnchor.constraint(equalTo: overlay.contentView.centerYAnchor),
+            closeButton.widthAnchor.constraint(equalToConstant: 16),
+            closeButton.heightAnchor.constraint(equalToConstant: 16),
+        ])
+
+        panel.contentView = overlay
+        return panel
+    }
+}
+
+private final class KeyablePanel: NSPanel {
+    override var canBecomeKey: Bool { true }
+}

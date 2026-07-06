@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Bump Harness's version (Info.plist) — patch/minor/major — and commit the
+# Bump Kouen's version (Info.plist) — patch/minor/major — and commit the
 # bump on the current branch. Used before install/prod/full-cycle builds.
 #
 # Usage: Scripts/bump-version.sh
@@ -8,7 +8,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-INFO_PLIST="Apps/Harness/Sources/HarnessApp/Resources/Info.plist"
+INFO_PLIST="Apps/Kouen/Sources/KouenApp/Resources/Info.plist"
 
 current_version="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$INFO_PLIST")"
 current_build="$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$INFO_PLIST")"

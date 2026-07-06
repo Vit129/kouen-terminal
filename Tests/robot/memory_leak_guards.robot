@@ -16,10 +16,10 @@ Library          Process
 
 *** Variables ***
 ${ROOT}              ${CURDIR}/../..
-${PANE_REGISTRY}     ${ROOT}/Apps/Harness/Sources/HarnessApp/Services/TerminalPaneRegistry.swift
-${COORDINATOR}       ${ROOT}/Apps/Harness/Sources/HarnessApp/Services/SessionCoordinator.swift
-${NOTIFICATION_COORD}    ${ROOT}/Apps/Harness/Sources/HarnessApp/Services/NotificationCoordinator.swift
-${BROWSER_PANE}      ${ROOT}/Apps/Harness/Sources/HarnessApp/UI/Chrome/BrowserPaneView.swift
+${PANE_REGISTRY}     ${ROOT}/Apps/Kouen/Sources/KouenApp/Services/TerminalPaneRegistry.swift
+${COORDINATOR}       ${ROOT}/Apps/Kouen/Sources/KouenApp/Services/SessionCoordinator.swift
+${NOTIFICATION_COORD}    ${ROOT}/Apps/Kouen/Sources/KouenApp/Services/NotificationCoordinator.swift
+${BROWSER_PANE}      ${ROOT}/Apps/Kouen/Sources/KouenApp/UI/Chrome/BrowserPaneView.swift
 ${RETIRE_CHECKER}    ${CURDIR}/helpers/check_retire_coverage.py
 
 *** Test Cases ***
@@ -39,7 +39,7 @@ Leak B - Browser Network Capture Is Bounded
     ${content}=    Get File    ${BROWSER_PANE}
     Should Contain    ${content}    __cap()
     ...    msg=Network capture pushes must call __cap() to trim the ring
-    Should Not Contain    ${content}    window.__harnessNetwork.length + 1
+    Should Not Contain    ${content}    window.__kouenNetwork.length + 1
     ...    msg=Use a monotonic seq for ids, not array length (collides after trim)
 
 Leak C - Every Per-Surface Dict In Coordinator Has Retire Cleanup

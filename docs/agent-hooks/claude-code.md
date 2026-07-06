@@ -11,7 +11,7 @@ kouen-cli install-hooks claude-code
 ```
 
 This writes `~/.claude/settings.json` (backing up any existing file as
-`settings.json.harness-bak-<timestamp>`).
+`settings.json.kouen-bak-<timestamp>`).
 
 ## What gets written
 
@@ -24,7 +24,7 @@ This writes `~/.claude/settings.json` (backing up any existing file as
         "hooks": [
           {
             "type": "command",
-            "command": "PATH=\"$HOME/Library/Application Support/Harness/bin:$PATH\" kouen-cli notify --surface \"$HARNESS_SURFACE\" --title \"Claude Code\" --from-hook"
+            "command": "PATH=\"$HOME/Library/Application Support/Kouen/bin:$PATH\" kouen-cli notify --surface \"$KOUEN_SURFACE\" --title \"Claude Code\" --from-hook"
           }
         ]
       }
@@ -35,7 +35,7 @@ This writes `~/.claude/settings.json` (backing up any existing file as
         "hooks": [
           {
             "type": "command",
-            "command": "PATH=\"$HOME/Library/Application Support/Harness/bin:$PATH\" kouen-cli notify --surface \"$HARNESS_SURFACE\" --title \"Claude Code\" --body \"Done\""
+            "command": "PATH=\"$HOME/Library/Application Support/Kouen/bin:$PATH\" kouen-cli notify --surface \"$KOUEN_SURFACE\" --title \"Claude Code\" --body \"Done\""
           }
         ]
       }
@@ -44,7 +44,7 @@ This writes `~/.claude/settings.json` (backing up any existing file as
 }
 ```
 
-`$HARNESS_SURFACE` is exported by Kouen for every pane, so the hook always
+`$KOUEN_SURFACE` is exported by Kouen for every pane, so the hook always
 notifies the right tab. Claude Code passes the `Notification` message as JSON on
 the hook's **stdin** (not an env var), so `--from-hook` reads that stdin and uses
 its `message` field for the notification body.

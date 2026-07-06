@@ -18,17 +18,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 DEST="/Applications/Kouen.app"
-# Mirrors HarnessPaths.resolveDataRootName: prefer Kouen if it already exists (already
-# migrated, or a fresh install); fall back to reading Harness if that's what's actually on
-# disk (an upgrade nothing has migrated yet). Never a physical move — see that function's
-# doc comment for why.
-if [[ -d "$HOME/Library/Application Support/Kouen" ]]; then
-  APP_SUPPORT="$HOME/Library/Application Support/Kouen"
-elif [[ -d "$HOME/Library/Application Support/Harness" ]]; then
-  APP_SUPPORT="$HOME/Library/Application Support/Harness"
-else
-  APP_SUPPORT="$HOME/Library/Application Support/Kouen"
-fi
+APP_SUPPORT="$HOME/Library/Application Support/Kouen"
 APP_SUPPORT_BIN="$APP_SUPPORT/bin"
 LAUNCH_AGENT="$HOME/Library/LaunchAgents/com.vit129.kouen.daemon.plist"
 LOG="$APP_SUPPORT/install-graceful.log"
@@ -45,13 +35,6 @@ for arg in "$@"; do
     *) echo "Unknown option: $arg" >&2; exit 2 ;;
   esac
 done
-
-# One-time migration: the app bundle name changed too (Harness.app -> Kouen.app), so an old
-# install at the old path is a separate bundle this script never touches otherwise — quit it
-# and remove it so two copies aren't left running/installed side by side.
-pkill -f "/Applications/Harness.app/Contents/MacOS/Harness" 2>/dev/null || true
-pkill -f "/Applications/Harness.app/Contents/MacOS/harness-mcp" 2>/dev/null || true
-rm -rf "/Applications/Harness.app"
 
 # --- Build ---
 if [[ $NO_BUILD -eq 0 ]]; then
@@ -105,10 +88,6 @@ STOP_DAEMON_LINES="
     echo '-- stopping daemon'
     launchctl bootout 'gui/$UID_NUM' '$LAUNCH_AGENT' 2>/dev/null || true
     launchctl bootout 'gui/$UID_NUM/com.vit129.kouen.daemon' 2>/dev/null || true
-    launchctl bootout 'gui/$UID_NUM/com.vit129.harness.daemon' 2>/dev/null || true
-    rm -f '$HOME/Library/LaunchAgents/com.vit129.harness.daemon.plist'
-    launchctl bootout 'gui/$UID_NUM/com.robert.harness.daemon' 2>/dev/null || true
-    rm -f '$HOME/Library/LaunchAgents/com.robert.harness.daemon.plist'
     pkill -f '/Applications/Kouen.app/Contents/MacOS/KouenDaemon' 2>/dev/null || true
     pkill -f '$APP_SUPPORT_BIN/KouenDaemon' 2>/dev/null || true
     sleep 0.5
@@ -151,17 +130,13 @@ $STOP_DAEMON_LINES
 
 else
   # GUI not running — but a detached daemon (e.g. background agent tasks attached only via
-  # `harness attach`/MCP) may still be alive, so the same reuse check applies.
+  # `kouen attach`/MCP) may still be alive, so the same reuse check applies.
   if [[ $REUSE_DAEMON -eq 1 ]]; then
     echo "==> Reusing running daemon (protocol unchanged); not stopping it."
   else
     echo "==> Stopping any stale daemon..."
     launchctl bootout "gui/$UID_NUM" "$LAUNCH_AGENT" 2>/dev/null || true
     launchctl bootout "gui/$UID_NUM/com.vit129.kouen.daemon" 2>/dev/null || true
-    launchctl bootout "gui/$UID_NUM/com.vit129.harness.daemon" 2>/dev/null || true
-    rm -f "$HOME/Library/LaunchAgents/com.vit129.harness.daemon.plist"
-    launchctl bootout "gui/$UID_NUM/com.robert.harness.daemon" 2>/dev/null || true
-    rm -f "$HOME/Library/LaunchAgents/com.robert.harness.daemon.plist"
     pkill -f "/Applications/Kouen.app/Contents/MacOS/KouenDaemon" 2>/dev/null || true
     pkill -f "$APP_SUPPORT_BIN/KouenDaemon" 2>/dev/null || true
     sleep 0.5

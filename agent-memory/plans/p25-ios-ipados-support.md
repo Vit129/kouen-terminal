@@ -2,7 +2,7 @@
 
 Status: **Planning**
 Priority: **P1** — strategic platform expansion, not a current macOS release blocker
-Owner surface: Package.swift, HarnessCore, HarnessTerminalEngine, HarnessCopyMode, HarnessTheme, HarnessTerminalRenderer, new HarnessTerminalUIKit, new HarnessMobileApp
+Owner surface: Package.swift, KouenCore, KouenTerminalEngine, KouenCopyMode, KouenTheme, KouenTerminalRenderer, new KouenTerminalUIKit, new KouenMobileApp
 Created: 2026-06-19
 Depends on: stable daemon IPC, remote host model, terminal renderer isolation
 
@@ -10,9 +10,9 @@ Depends on: stable daemon IPC, remote host model, terminal renderer isolation
 
 ## Product Intent
 
-Harness on iPad should be a **remote-first terminal workstation**:
+Kouen on iPad should be a **remote-first terminal workstation**:
 
-- attach to Harness daemons running on a Mac, Linux box, or server
+- attach to Kouen daemons running on a Mac, Linux box, or server
 - render live sessions with the same terminal engine, themes, copy mode, panes, tabs, scrollback, and agent notifications
 - provide iPad-native input: hardware keyboard, touch selection, pointer, command menus, Split View, Stage Manager, and Files integration
 - preserve daemon-owned persistence; closing the iPad app must not kill sessions
@@ -22,7 +22,7 @@ The first iPad milestone is **not** a standalone local macOS-equivalent terminal
 Core mental model:
 
 ```text
-iPad Harness app -> network transport -> HarnessDaemon on Mac/Linux/server -> PTY sessions
+iPad Kouen app -> network transport -> KouenDaemon on Mac/Linux/server -> PTY sessions
 ```
 
 ---
@@ -33,20 +33,20 @@ iPad Harness app -> network transport -> HarnessDaemon on Mac/Linux/server -> PT
 
 | Layer | Current role | iPadOS use |
 |-------|--------------|------------|
-| `HarnessCore` | IPC schema, commands, settings, models, keybindings, agents, remote host store | Reuse models/codecs; add network endpoint support |
-| `HarnessTerminalEngine` | Pure Swift VT parser and grid model | Reuse directly |
-| `HarnessCopyMode` | UI-agnostic copy-mode reducer | Reuse directly |
-| `HarnessTheme` | Theme catalog and theme document format | Reuse directly |
-| `HarnessDaemonCore` | PTY/session authority | Stays off-device; remote target |
-| `harness-cli` | Automation and daemon management | Stays Mac/Linux-first; may provide pairing/bootstrap helper |
+| `KouenCore` | IPC schema, commands, settings, models, keybindings, agents, remote host store | Reuse models/codecs; add network endpoint support |
+| `KouenTerminalEngine` | Pure Swift VT parser and grid model | Reuse directly |
+| `KouenCopyMode` | UI-agnostic copy-mode reducer | Reuse directly |
+| `KouenTheme` | Theme catalog and theme document format | Reuse directly |
+| `KouenDaemonCore` | PTY/session authority | Stays off-device; remote target |
+| `kouen-cli` | Automation and daemon management | Stays Mac/Linux-first; may provide pairing/bootstrap helper |
 
 ### macOS-specific today
 
 | Layer | Constraint | iPadOS path |
 |-------|------------|-------------|
-| `HarnessApp` | AppKit, NSWindow, NSView, menus, Sparkle, service provider, launchd helper install | Do not port directly; create new mobile app shell |
-| `HarnessTerminalKit` | AppKit host views and `NSEvent` mapping | Create UIKit sibling: `HarnessTerminalUIKit` |
-| `HarnessTerminalRenderer` | Metal/CoreText renderer, likely salvageable but currently macOS-hosted | Extract platform-neutral renderer core; add UIKit/CAMetalLayer or MTKView host |
+| `KouenApp` | AppKit, NSWindow, NSView, menus, Sparkle, service provider, launchd helper install | Do not port directly; create new mobile app shell |
+| `KouenTerminalKit` | AppKit host views and `NSEvent` mapping | Create UIKit sibling: `KouenTerminalUIKit` |
+| `KouenTerminalRenderer` | Metal/CoreText renderer, likely salvageable but currently macOS-hosted | Extract platform-neutral renderer core; add UIKit/CAMetalLayer or MTKView host |
 | `RemoteHostsService` / `SSHTunnelManager` | Uses local SSH process and Unix socket forwarding | Replace for mobile with network endpoint, gateway, or embedded SSH strategy |
 | `CLIInstaller`, `SparkleUpdater`, `LaunchAgentInstaller` | macOS install/update lifecycle | Exclude from mobile |
 | File editor / Quick Look / LSP | AppKit text views, local filesystem/process assumptions | Defer; remote read-only browser later |
@@ -79,10 +79,10 @@ Decision target: choose one for MVP, document threat model, and avoid supporting
 Do not duplicate VT rendering logic. The goal is:
 
 ```text
-HarnessTerminalEngine -> TerminalFrame model -> shared Metal renderer core -> AppKit host or UIKit host
+KouenTerminalEngine -> TerminalFrame model -> shared Metal renderer core -> AppKit host or UIKit host
 ```
 
-If `HarnessTerminalRenderer` has AppKit-only color/font assumptions, introduce a small platform adapter rather than forking the renderer.
+If `KouenTerminalRenderer` has AppKit-only color/font assumptions, introduce a small platform adapter rather than forking the renderer.
 
 ### D3: Local terminal support (explicitly deferred)
 
@@ -96,11 +96,11 @@ Local iPad shell sessions are out of MVP unless proven viable without private AP
 
 Add platform-gated targets:
 
-- `HarnessTerminalUIKit`
+- `KouenTerminalUIKit`
   - UIKit terminal host view
   - touch selection, scroll gestures, pointer hover, hardware keyboard mapping
-  - consumes `HarnessTerminalEngine`, `HarnessCopyMode`, `HarnessTheme`, `HarnessTerminalRenderer`
-- `HarnessMobileApp`
+  - consumes `KouenTerminalEngine`, `KouenCopyMode`, `KouenTheme`, `KouenTerminalRenderer`
+- `KouenMobileApp`
   - iOS/iPadOS SwiftUI/UIKit app shell
   - remote host list, session browser, terminal workspace
   - no Sparkle, no launchd install, no AppKit services
@@ -109,7 +109,7 @@ Package direction:
 
 ```swift
 #if os(iOS)
-// HarnessTerminalUIKit + HarnessMobileApp
+// KouenTerminalUIKit + KouenMobileApp
 #endif
 ```
 
@@ -146,18 +146,18 @@ The iPad app needs a non-fragile trust flow:
 Minimum daemon commands:
 
 ```bash
-harness-cli mobile pair
-harness-cli mobile list-clients
-harness-cli mobile revoke <client-id>
+kouen-cli mobile pair
+kouen-cli mobile list-clients
+kouen-cli mobile revoke <client-id>
 ```
 
 ### F4: UIKit Terminal Surface — P0
 
-Create a UIKit sibling of `TerminalHostView` and `HarnessTerminalSurfaceView`:
+Create a UIKit sibling of `TerminalHostView` and `KouenTerminalSurfaceView`:
 
 - `UIView` / `MTKView` or `CAMetalLayer` backed rendering
 - hardware keyboard input through `UIPress`, `UIKeyCommand`, and text input traits
-- touch selection mapped into `HarnessCopyMode`
+- touch selection mapped into `KouenCopyMode`
 - two-finger scrollback and inertial scrolling
 - clipboard through `UIPasteboard`
 - pointer interactions for iPad trackpad/mouse
@@ -205,7 +205,7 @@ The iPad app must assume the daemon owns truth. Local cached state is presentati
 
 Once remote attach is stable:
 
-- import/export `.harnesstheme`
+- import/export `.kouentheme`
 - import SSH keys or pairing bundles if the selected transport needs them
 - share copied terminal text/images
 - optional remote file preview through daemon-mediated read-only APIs
@@ -218,8 +218,8 @@ Do not expose arbitrary remote file browsing until the permission model is defin
 
 ### Phase 0 — Feasibility Spike (P0)
 
-- [ ] Build a small iPadOS SwiftPM/Xcode target importing `HarnessCore`, `HarnessTerminalEngine`, `HarnessCopyMode`, and `HarnessTheme`
-- [ ] Compile `HarnessTerminalRenderer` for iOS or list exact AppKit/CoreText blockers
+- [ ] Build a small iPadOS SwiftPM/Xcode target importing `KouenCore`, `KouenTerminalEngine`, `KouenCopyMode`, and `KouenTheme`
+- [ ] Compile `KouenTerminalRenderer` for iOS or list exact AppKit/CoreText blockers
 - [ ] Prototype one terminal grid rendered in a UIKit/Metal view
 - [ ] Choose D1 transport model and write the security model
 - [ ] Confirm App Store constraints for background networking, local network permission, key storage, and remote shell access
@@ -249,7 +249,7 @@ Exit criteria: iPad test client can request `list-sessions` from a paired daemon
 
 ### Phase 3 — UIKit Terminal MVP (P0)
 
-- [ ] Create `HarnessTerminalUIKit`
+- [ ] Create `KouenTerminalUIKit`
 - [ ] Implement live PTY output subscription
 - [ ] Implement keyboard text, arrows, modifiers, paste, resize, and detach
 - [ ] Implement touch scrollback and basic selection/copy
@@ -260,7 +260,7 @@ Exit criteria: iPad app attaches to one remote session, displays live output, ac
 
 ### Phase 4 — iPad App Shell (P1)
 
-- [ ] Create `HarnessMobileApp`
+- [ ] Create `KouenMobileApp`
 - [ ] Remote host setup and pairing UI
 - [ ] Session list and attach flow
 - [ ] Terminal workspace with tab/pane controls
@@ -301,14 +301,14 @@ Exit criteria: iPad app feels native under touch, keyboard, and pointer usage.
 
 - [ ] `swift build` on macOS still passes
 - [ ] `swift build` on Linux still excludes GUI/mobile surfaces and passes headless targets
-- [ ] iOS simulator build passes for `HarnessTerminalUIKit`
-- [ ] iPadOS app archive or Xcode build passes for `HarnessMobileApp`
+- [ ] iOS simulator build passes for `KouenTerminalUIKit`
+- [ ] iPadOS app archive or Xcode build passes for `KouenMobileApp`
 
 ### Unit tests
 
-- [ ] `HarnessCoreTests`: endpoint parsing, auth models, pairing persistence, network framing
-- [ ] `HarnessTerminalEngineTests`: unchanged
-- [ ] `HarnessCopyModeTests`: reused for touch selection paths
+- [ ] `KouenCoreTests`: endpoint parsing, auth models, pairing persistence, network framing
+- [ ] `KouenTerminalEngineTests`: unchanged
+- [ ] `KouenCopyModeTests`: reused for touch selection paths
 - [ ] Renderer parity tests: frame model / damage / color conversion where testable without AppKit
 
 ### Integration tests
@@ -345,8 +345,8 @@ Exit criteria: iPad app feels native under touch, keyboard, and pointer usage.
 
 ## Non-goals
 
-- Running `HarnessDaemon` locally on iPad in MVP
-- Porting `HarnessApp` AppKit views through compatibility shims
+- Running `KouenDaemon` locally on iPad in MVP
+- Porting `KouenApp` AppKit views through compatibility shims
 - Sparkle/update flow on iOS/iPadOS
 - Full file editor/LSP parity in the first release
 - Git panel/browser pane parity in the first release
@@ -382,5 +382,5 @@ Exit criteria: iPad app feels native under touch, keyboard, and pointer usage.
 1. Create a throwaway iPadOS spike target that imports pure shared packages.
 2. Render one static `TerminalFrame` through a UIKit-hosted Metal surface.
 3. Add a tiny paired network proof-of-concept that calls `daemon-stats`.
-4. Decide transport based on the spike, then replace the throwaway target with real `HarnessTerminalUIKit` and `HarnessMobileApp` targets.
+4. Decide transport based on the spike, then replace the throwaway target with real `KouenTerminalUIKit` and `KouenMobileApp` targets.
 

@@ -1,11 +1,11 @@
-// PORT side of the GridCompositor drift canary. Imports ONLY HarnessOnboarding so every
+// PORT side of the GridCompositor drift canary. Imports ONLY KouenOnboarding so every
 // unqualified type name resolves to the onboarding-preview port's inlined models / compositor
 // — no collision with the live stack (built in LiveCompositorFixture.swift). Builds the SAME
 // documented fixture (CompositorFixtureSpec); the test compares the two emitted ANSI strings.
 //
 // Twin: LiveCompositorFixture.swift — keep both fixtures in lockstep.
 import Foundation
-import HarnessOnboarding
+import KouenOnboarding
 
 enum PortCompositorFixture {
     private static func grid(_ first: String, cols: Int, rows: Int, cursorVisible: Bool) -> TerminalGridSnapshot {

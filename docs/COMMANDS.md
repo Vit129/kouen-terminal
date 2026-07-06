@@ -201,7 +201,7 @@ reuses your existing SSH trust (keys/agent/config); no new credentials or crypto
 
 Allowed `--ssh-arg` options are validated: `-p` (port), `-i` (identity file), `-J` (jump
 host), `-l` (login user), and the flag-only `-4 -6 -A -T -q -v`. Example:
-`remote add --name devbox --ssh me@devbox --socket /home/me/.config/harness/harness.sock --ssh-arg -p --ssh-arg 2222`.
+`remote add --name devbox --ssh me@devbox --socket /home/me/.config/kouen/kouen.sock --ssh-arg -p --ssh-arg 2222`.
 
 ## Buffers (paste store)
 
@@ -230,7 +230,7 @@ a table is named — parser, CLI, `switch-client -T`), `copy-mode-emacs`, `comma
 
 | Command | Effect |
 |---|---|
-| `set-option [-g\|-w\|-s\|-t\|-p] [-T <target>] <key> <value>` | Set a typed option in the chosen scope. Coerces `on`/`off`/`true`/`false`/integers. Bindable as `set`; a scoped set without `-T` resolves against the caller's focus (CLI: the calling pane via `$HARNESS_SURFACE`). |
+| `set-option [-g\|-w\|-s\|-t\|-p] [-T <target>] <key> <value>` | Set a typed option in the chosen scope. Coerces `on`/`off`/`true`/`false`/integers. Bindable as `set`; a scoped set without `-T` resolves against the caller's focus (CLI: the calling pane via `$KOUEN_SURFACE`). |
 | `setw <key> <value>` (alias `set-window-option`) | Window (tab) option for the focused/calling tab — same scope in the CLI, the `:` prompt, and a sourced `.tmux.conf`. |
 | `show-options [-g\|-w\|-s\|-t\|-p]` (alias `show`) | Dump options for the chosen scope (or all). |
 | `show-window-options` (alias `showw`) | Dump options at the tab (window) scope. |
@@ -305,4 +305,4 @@ Events: `after-new-tab`, `after-new-session`, `after-kill-tab`, `after-split-pan
 | `a ; b ; c` | Sequence. Commits each in order; later steps see the post-state of earlier ones. |
 | `"literal text"` / `'literal text'` | Quoted arguments preserve whitespace and `;`. An unterminated quote is a parse error (it is **not** silently swallowed to end of line). |
 
-See `docs/KEYBINDINGS.md` for the default key tables and `Packages/HarnessCore/Sources/HarnessCore/Format/FormatString.swift` for the `FormatString` token list and operators.
+See `docs/KEYBINDINGS.md` for the default key tables and `Packages/KouenCore/Sources/KouenCore/Format/FormatString.swift` for the `FormatString` token list and operators.

@@ -43,7 +43,7 @@ Builds, signs, stops the old daemon, copies to `/Applications`, and opens the ap
 Add to shell profile if prompted:
 
 ```bash
-export PATH="$HOME/Library/Application Support/Harness/bin:$PATH"
+export PATH="$HOME/Library/Application Support/Kouen/bin:$PATH"
 ```
 
 Verify:
@@ -107,7 +107,7 @@ source <(fzf --zsh)
 | CLI cannot find daemon | `kouen-cli doctor`, relaunch Kouen |
 | CLI version differs from daemon | `kouen-cli install`, restart daemon |
 | Preview app is stale | `make preview-stop && make preview-clean && make preview` |
-| Agent hook silent | Check `kouen-cli doctor` + `HARNESS_SURFACE` + agent guide |
+| Agent hook silent | Check `kouen-cli doctor` + `KOUEN_SURFACE` + agent guide |
 
 ## More Docs
 

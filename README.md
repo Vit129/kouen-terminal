@@ -12,7 +12,7 @@ Run Claude Code, Codex, Gemini CLI, or any agent side-by-side. Sessions persist 
 
 This fork started from upstream (currently v1.12.1) and has since diverged substantially — 47 releases of its own versus upstream's 23, and five new first-party Swift packages backing the features below. Checked directly against upstream's current source, not assumed:
 
-- **AI browser control via MCP** — `kouen-mcp` exposes tools like `harnessBrowserOpen` and `harnessBrowserSnapshot` (full list under [AI Browser Control](#ai-browser-control-kouen-mcp)) so agents can drive the embedded browser pane directly. Upstream has no browser pane and no MCP server.
+- **AI browser control via MCP** — `kouen-mcp` exposes tools like `kouenBrowserOpen` and `kouenBrowserSnapshot` (full list under [AI Browser Control](#ai-browser-control-kouen-mcp)) so agents can drive the embedded browser pane directly. Upstream has no browser pane and no MCP server.
 - **A built-in code editor with LSP** across 21 languages, with vi ex commands `gd` / `K` / `:errors` working against the live session (see [Editor & LSP](#editor--lsp)). Upstream's sidebar is session/tab lists only — no file editor, no LSP.
 - **Inline AI command suggestions** (`⌥Space`, see [Keyboard Shortcuts](#keyboard-shortcuts)) — sends the pane's recent output to Claude and suggests the next command inline. No equivalent upstream.
 - **A denser navigation layer** — Recipes (`⌘⇧R`), Composer (`⌘⇧E`), the zoxide frecency picker (`⌘⇧J`), tab overview (`⌘⇧\`), and hint mode (`⌘⇧U`) — none of these shortcuts exist upstream.
@@ -38,7 +38,7 @@ Use this for a normal local install:
 
 ```bash
 git clone https://github.com/Vit129/kouen-terminal.git
-cd harness-terminal
+cd kouen-terminal
 make install
 ```
 
@@ -115,7 +115,7 @@ After installation, `kouen-cli` is available from the app bundle or app-support 
 
 ```bash
 /Applications/Kouen.app/Contents/MacOS/kouen-cli install
-export PATH="$HOME/Library/Application Support/Harness/bin:$PATH"
+export PATH="$HOME/Library/Application Support/Kouen/bin:$PATH"
 ```
 
 Common commands:
@@ -142,14 +142,14 @@ AI agents (Claude Code, Codex, Kiro) can see and interact with the embedded brow
 
 | Capability | Tool | Returns |
 | --- | --- | --- |
-| Open / navigate URL | `harnessBrowserOpen`, `harnessBrowserNavigate` | pane ID |
-| Read DOM + elements | `harnessBrowserSnapshot` | accessibility tree with stable refs (e1, e2…) |
-| Click / fill / scroll | `harnessBrowserInteract` | ok / error |
-| Screenshot | `harnessBrowserScreenshot` | base64 PNG |
+| Open / navigate URL | `kouenBrowserOpen`, `kouenBrowserNavigate` | pane ID |
+| Read DOM + elements | `kouenBrowserSnapshot` | accessibility tree with stable refs (e1, e2…) |
+| Click / fill / scroll | `kouenBrowserInteract` | ok / error |
+| Screenshot | `kouenBrowserScreenshot` | base64 PNG |
 | Read console logs | included in snapshot | array of log strings |
-| Network requests | `harnessBrowserNetwork` | url, method, status, req/res body |
-| Cookies | `harnessBrowserCookies` | name, value, domain, expires, secure |
-| localStorage / sessionStorage | `harnessBrowserStorage` | key/value pairs |
+| Network requests | `kouenBrowserNetwork` | url, method, status, req/res body |
+| Cookies | `kouenBrowserCookies` | name, value, domain, expires, secure |
+| localStorage / sessionStorage | `kouenBrowserStorage` | key/value pairs |
 
 **Snapshot element format** — stable refs let agents interact without writing selectors:
 
@@ -204,7 +204,7 @@ Nothing ships bundled — install the server binary you need yourself. Auto-star
 The daemon and CLI can run without the GUI, including on Linux. Register a remote daemon over SSH and use `--host` with normal CLI commands:
 
 ```bash
-kouen-cli remote add --name devbox --ssh me@devbox --socket "/home/me/.config/harness/harness.sock"
+kouen-cli remote add --name devbox --ssh me@devbox --socket "/home/me/.config/kouen/kouen.sock"
 kouen-cli ping --host devbox
 kouen-cli new-session --host devbox --cwd ~/Code
 kouen-cli capture-pane --host devbox --surface <id>

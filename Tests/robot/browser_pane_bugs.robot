@@ -8,10 +8,10 @@ Library          Process
 
 *** Variables ***
 ${ROOT}                  ${CURDIR}/../..
-${CONTENT_AREA}          ${ROOT}/Apps/Harness/Sources/HarnessApp/UI/Chrome/ContentAreaViewController.swift
-${BROWSER_PANE}          ${ROOT}/Apps/Harness/Sources/HarnessApp/UI/Chrome/BrowserPaneView.swift
-${BROWSER_INTEGRATION}   ${ROOT}/Apps/Harness/Sources/HarnessApp/UI/Chrome/BrowserIntegrationController.swift
-${MAIN_MENU}             ${ROOT}/Apps/Harness/Sources/HarnessApp/UI/Chrome/MainMenuBuilder.swift
+${CONTENT_AREA}          ${ROOT}/Apps/Kouen/Sources/KouenApp/UI/Chrome/ContentAreaViewController.swift
+${BROWSER_PANE}          ${ROOT}/Apps/Kouen/Sources/KouenApp/UI/Chrome/BrowserPaneView.swift
+${BROWSER_INTEGRATION}   ${ROOT}/Apps/Kouen/Sources/KouenApp/UI/Chrome/BrowserIntegrationController.swift
+${MAIN_MENU}             ${ROOT}/Apps/Kouen/Sources/KouenApp/UI/Chrome/MainMenuBuilder.swift
 
 *** Test Cases ***
 Bug 1 - Browser Pane Reuse On Rebuild

@@ -13,27 +13,27 @@ cp "$BUILD_DIR/Kouen" "$APP/Contents/MacOS/Kouen"
 cp "$BUILD_DIR/KouenDaemon" "$APP/Contents/MacOS/KouenDaemon"
 cp "$BUILD_DIR/kouen-cli" "$APP/Contents/MacOS/kouen-cli"
 cp "$BUILD_DIR/kouen-mcp" "$APP/Contents/MacOS/kouen-mcp"
-cp "$ROOT/Apps/Harness/Sources/HarnessApp/Resources/Info.plist" "$APP/Contents/Info.plist"
+cp "$ROOT/Apps/Kouen/Sources/KouenApp/Resources/Info.plist" "$APP/Contents/Info.plist"
 
-# Guard: HarnessVersion.swift is the daemon/CLI's view of the version (the app reads
+# Guard: KouenVersion.swift is the daemon/CLI's view of the version (the app reads
 # Bundle.main, but the launchd daemon can't). It is bumped by hand alongside Info.plist;
 # v1.3.0/v1.3.1 missed it, shipping daemons that reported 1.2.0 — and the daemon↔app build
 # handshake depends on it. Fail the package step if the two disagree.
 PLIST_SHORT="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")"
 PLIST_BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Contents/Info.plist")"
-VERSION_SWIFT="$ROOT/Packages/HarnessCore/Sources/HarnessCore/HarnessVersion.swift"
+VERSION_SWIFT="$ROOT/Packages/KouenCore/Sources/KouenCore/KouenVersion.swift"
 CODE_SHORT="$(sed -n 's/.*static let short = "\([^"]*\)".*/\1/p' "$VERSION_SWIFT")"
 CODE_BUILD="$(sed -n 's/.*static let build = \([0-9]*\).*/\1/p' "$VERSION_SWIFT")"
 if [[ "$PLIST_SHORT" != "$CODE_SHORT" || "$PLIST_BUILD" != "$CODE_BUILD" ]]; then
-  echo "error: HarnessVersion.swift ($CODE_SHORT/$CODE_BUILD) does not match Info.plist ($PLIST_SHORT/$PLIST_BUILD)." >&2
-  echo "       Bump HarnessVersion.short/build to match Info.plist before packaging." >&2
+  echo "error: KouenVersion.swift ($CODE_SHORT/$CODE_BUILD) does not match Info.plist ($PLIST_SHORT/$PLIST_BUILD)." >&2
+  echo "       Bump KouenVersion.short/build to match Info.plist before packaging." >&2
   exit 1
 fi
 
 # Guard: the post-update "what's new" banner ships the generated CHANGELOG notes
 # (GeneratedReleaseNotes.swift). Stale notes would banner the PREVIOUS release's changes
 # after every update — fail the package step instead.
-NOTES_SWIFT="$ROOT/Packages/HarnessCore/Sources/HarnessCore/ReleaseNotes/GeneratedReleaseNotes.swift"
+NOTES_SWIFT="$ROOT/Packages/KouenCore/Sources/KouenCore/ReleaseNotes/GeneratedReleaseNotes.swift"
 NOTES_VERSION="$(sed -n 's/.*version: "\([^"]*\)".*/\1/p' "$NOTES_SWIFT" | head -1)"
 if [[ "$NOTES_VERSION" != "$PLIST_SHORT" ]]; then
   echo "error: GeneratedReleaseNotes.swift ($NOTES_VERSION) does not match Info.plist ($PLIST_SHORT)." >&2
@@ -41,7 +41,7 @@ if [[ "$NOTES_VERSION" != "$PLIST_SHORT" ]]; then
   exit 1
 fi
 
-# SwiftPM resource bundles (for example HarnessTheme's bundled themes.json) are
+# SwiftPM resource bundles (for example KouenTheme's bundled themes.json) are
 # emitted next to the built products. The app is assembled by this script rather
 # than by Xcode, so copy those bundles into Contents/Resources explicitly.
 for bundle in "$BUILD_DIR"/*.bundle; do
@@ -75,14 +75,14 @@ if [[ ! -d "$APP/Contents/Frameworks/Sparkle.framework" ]] \
   exit 1
 fi
 
-ICON="$ROOT/Apps/Harness/Resources/Kouen.icns"
+ICON="$ROOT/Apps/Kouen/Resources/Kouen.icns"
 if [[ ! -f "$ICON" ]]; then
   "$ROOT/Scripts/generate-app-icon.sh"
 fi
 cp "$ICON" "$APP/Contents/Resources/Kouen.icns"
 
 # Transparent brand logo for onboarding + settings (loaded via Bundle.main).
-LOGO="$ROOT/Apps/Harness/Resources/KouenLogo.png"
+LOGO="$ROOT/Apps/Kouen/Resources/KouenLogo.png"
 if [[ -f "$LOGO" ]]; then
   cp "$LOGO" "$APP/Contents/Resources/KouenLogo.png"
 fi
@@ -90,7 +90,7 @@ fi
 # Bundled "Symbols Nerd Font Mono" (MIT) — auto-activated via Info.plist's
 # ATSApplicationFontsPath = Fonts so Nerd Font / Powerline glyphs always have a coverage font
 # even when the user's primary font isn't a Nerd Font. Copied verbatim (incl. its LICENSE).
-FONTS="$ROOT/Apps/Harness/Resources/Fonts"
+FONTS="$ROOT/Apps/Kouen/Resources/Fonts"
 if [[ -d "$FONTS" ]]; then
   ditto "$FONTS" "$APP/Contents/Resources/Fonts"
 fi

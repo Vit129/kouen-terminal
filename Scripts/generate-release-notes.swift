@@ -1,10 +1,10 @@
 #!/usr/bin/env swift
-// Regenerates Packages/HarnessCore/Sources/HarnessCore/ReleaseNotes/GeneratedReleaseNotes.swift
+// Regenerates Packages/KouenCore/Sources/KouenCore/ReleaseNotes/GeneratedReleaseNotes.swift
 // from the top release block of CHANGELOG.md.
 //
 //   swift Scripts/generate-release-notes.swift     (or: make release-notes)
 //
-// Run in release prep AFTER updating CHANGELOG.md, alongside the HarnessVersion.swift bump.
+// Run in release prep AFTER updating CHANGELOG.md, alongside the KouenVersion.swift bump.
 // Two guards catch a forgotten run: ReleaseNotesGuardTests (version + changelog digest) and
 // the package-app.sh version check.
 //
@@ -20,7 +20,7 @@ let scriptURL = URL(fileURLWithPath: #filePath)
 let root = scriptURL.deletingLastPathComponent().deletingLastPathComponent()
 let changelogURL = root.appendingPathComponent("CHANGELOG.md")
 let outputURL = root.appendingPathComponent(
-    "Packages/HarnessCore/Sources/HarnessCore/ReleaseNotes/GeneratedReleaseNotes.swift")
+    "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/GeneratedReleaseNotes.swift")
 
 guard let changelog = try? String(contentsOf: changelogURL, encoding: .utf8) else {
     FileHandle.standardError.write(Data("error: cannot read \(changelogURL.path)\n".utf8))
@@ -57,7 +57,7 @@ guard let header = firstMatch(#"## \[([^\]]+)\] - (\S+)"#, in: block), header.co
 let version = header[1]
 
 // MARK: - FNV-1a 64 (must stay byte-identical to ReleaseNotes.digest — the guard test
-// compares this script's output against HarnessCore's implementation on every run)
+// compares this script's output against KouenCore's implementation on every run)
 
 func digest(of text: String) -> String {
     var hash: UInt64 = 0xcbf2_9ce4_8422_2325

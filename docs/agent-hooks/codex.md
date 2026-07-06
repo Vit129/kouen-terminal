@@ -15,13 +15,13 @@ Code, deep-merged into any existing hooks):
 {
   "hooks": {
     "PermissionRequest": [
-      { "matcher": "*", "hooks": [{ "type": "command", "command": "PATH=\"$HOME/Library/Application Support/Harness/bin:$PATH\" kouen-cli notify --surface \"$HARNESS_SURFACE\" --title \"Codex\" --body \"Awaiting input\"" }] }
+      { "matcher": "*", "hooks": [{ "type": "command", "command": "PATH=\"$HOME/Library/Application Support/Kouen/bin:$PATH\" kouen-cli notify --surface \"$KOUEN_SURFACE\" --title \"Codex\" --body \"Awaiting input\"" }] }
     ],
     "Notification": [
-      { "matcher": "*", "hooks": [{ "type": "command", "command": "PATH=\"$HOME/Library/Application Support/Harness/bin:$PATH\" kouen-cli notify --surface \"$HARNESS_SURFACE\" --title \"Codex\" --body \"Notification\"" }] }
+      { "matcher": "*", "hooks": [{ "type": "command", "command": "PATH=\"$HOME/Library/Application Support/Kouen/bin:$PATH\" kouen-cli notify --surface \"$KOUEN_SURFACE\" --title \"Codex\" --body \"Notification\"" }] }
     ],
     "Stop": [
-      { "matcher": "*", "hooks": [{ "type": "command", "command": "PATH=\"$HOME/Library/Application Support/Harness/bin:$PATH\" kouen-cli notify --surface \"$HARNESS_SURFACE\" --title \"Codex\" --body \"Done\"" }] }
+      { "matcher": "*", "hooks": [{ "type": "command", "command": "PATH=\"$HOME/Library/Application Support/Kouen/bin:$PATH\" kouen-cli notify --surface \"$KOUEN_SURFACE\" --title \"Codex\" --body \"Done\"" }] }
     ]
   }
 }

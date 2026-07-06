@@ -1,0 +1,77 @@
+import Foundation
+import KouenCore
+
+/// App-side facade over `RemoteHostStore` + `SSHTunnelManager`: lists/edits saved remote daemons
+/// and brings up the SSH tunnel that lets the GUI drive one. Connecting blocks (it spawns ssh and
+/// waits for the remote daemon to answer), so callers run `connect` off the main thread.
+/// @unchecked Sendable: the store/tunnel manager are thread-safe; `_activeHostName` is lock-guarded.
+final class RemoteHostsService: @unchecked Sendable {
+    static let shared = RemoteHostsService()
+    static let activeHostDidChange = Notification.Name("KouenRemoteActiveHostDidChange")
+    static let connectionDidFail = Notification.Name("KouenRemoteConnectionDidFail")
+
+    private let store = RemoteHostStore()
+    private let lock = NSLock()
+    private var _activeHostName: String?
+
+    /// The host the GUI is currently pointed at, or nil when on the local daemon.
+    var activeHostName: String? {
+        lock.lock(); defer { lock.unlock() }; return _activeHostName
+    }
+
+    func hosts() -> [RemoteHost] { store.load() }
+
+    func addHost(_ host: RemoteHost) { store.upsert(host) }
+
+    /// Runs `kouen-cli socket-path` on the remote over ssh and returns the path it prints, so the
+    /// GUI can auto-fill the Socket path field instead of asking the user to SSH in and run
+    /// `kouen-cli doctor` by hand. Blocking — call off the main thread.
+    func detectSocketPath(sshTarget: String, sshArgs: [String]) throws -> String {
+        try SSHTunnelManager.detectSocketPath(sshTarget: sshTarget, sshArgs: sshArgs)
+    }
+
+    func removeHost(named name: String) {
+        store.remove(name: name)
+        SSHTunnelManager.shared.stop(host: name)
+        var didChange = false
+        lock.lock()
+        if _activeHostName == name {
+            _activeHostName = nil
+            didChange = true
+        }
+        lock.unlock()
+        if didChange {
+            // Switch the GUI back to the local daemon — the tunnel is gone.
+            DispatchQueue.main.async {
+                SessionCoordinator.shared.applyEndpointSwitch(.localControlSocket)
+            }
+            Self.postActiveHostDidChange()
+        }
+    }
+
+    /// Bring up (or reuse) the tunnel to `name` and return the local endpoint that reaches it.
+    /// Blocking — call off the main thread.
+    func connect(named name: String) throws -> Endpoint {
+        guard let host = store.host(named: name) else {
+            throw DaemonSessionError.daemonError("unknown remote host '\(name)'")
+        }
+        let endpoint = try SSHTunnelManager.shared.endpoint(for: host)
+        lock.lock(); _activeHostName = name; lock.unlock()
+        Self.postActiveHostDidChange()
+        return endpoint
+    }
+
+    /// Tear down the active tunnel and forget it (the caller switches back to the local daemon).
+    func disconnect() {
+        lock.lock(); let name = _activeHostName; _activeHostName = nil; lock.unlock()
+        guard let name else { return }
+        SSHTunnelManager.shared.stop(host: name)
+        Self.postActiveHostDidChange()
+    }
+
+    private static func postActiveHostDidChange() {
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: activeHostDidChange, object: nil)
+        }
+    }
+}

@@ -6,7 +6,7 @@ set -euo pipefail
 # secrets that intentionally live with the human or a protected CI environment, not the repo.
 #
 # Fork notice: this describes upstream's pipeline (their Developer ID cert, their
-# harnesscli.dev appcast host). This fork has neither configured, so this script isn't
+# kouencli.dev appcast host). This fork has neither configured, so this script isn't
 # currently runnable end-to-end here — this fork's releases are plain `git tag` +
 # `gh release create`, no notarization/appcast step.
 #
@@ -29,7 +29,7 @@ set -euo pipefail
 #                                             # appcast enclosure URL prefix
 #   SPARKLE_EDDSA_PRIVATE_KEY_FILE=/path/to/private-key
 #                                             # use Sparkle's --ed-key-file mode instead of keychain
-#   DEPLOY_WEBSITE=1 WEBSITE_DIR=~/Code/harness-website   # copy appcast.xml into public/ and `vercel --prod`
+#   DEPLOY_WEBSITE=1 WEBSITE_DIR=~/Code/kouen-website   # copy appcast.xml into public/ and `vercel --prod`
 #
 # Usage:  ASC_ISSUER_ID=<uuid> ASC_KEY_ID=<key-id> ./Scripts/finalize-release.sh
 
@@ -113,20 +113,20 @@ cp "$DMG" "$ROOT/dist/Kouen.dmg"
 "$ROOT/Scripts/generate-appcast.sh" "$ROOT/dist"
 
 if [[ "${DEPLOY_WEBSITE:-0}" == "1" ]]; then
-  WEBSITE_DIR="${WEBSITE_DIR:-$HOME/Code/harness-website}"
+  WEBSITE_DIR="${WEBSITE_DIR:-$HOME/Code/kouen-website}"
   if [[ -d "$WEBSITE_DIR" && -f "$ROOT/dist/appcast.xml" ]]; then
     echo "==> Deploying appcast.xml to the website ($WEBSITE_DIR)…"
     mkdir -p "$WEBSITE_DIR/public"
     cp "$ROOT/dist/appcast.xml" "$WEBSITE_DIR/public/appcast.xml"
     ( cd "$WEBSITE_DIR" && vercel --prod --yes )
-    echo "    appcast live at https://harnesscli.dev/appcast.xml — Sparkle auto-update is now wired."
+    echo "    appcast live at https://kouencli.dev/appcast.xml — Sparkle auto-update is now wired."
   else
     echo "    Skipped website deploy (set WEBSITE_DIR and ensure dist/appcast.xml exists)." >&2
   fi
 else
   echo "==> appcast at dist/appcast.xml. Deploy it: copy to the website's public/appcast.xml and \`vercel --prod\`,"
-  echo "    or re-run with DEPLOY_WEBSITE=1. SUFeedURL (https://harnesscli.dev/appcast.xml) then resolves."
-  echo "    Ensure DOWNLOAD_URL_PREFIX (${DOWNLOAD_URL_PREFIX:-https://harnesscli.dev/}) points at the live DMG."
+  echo "    or re-run with DEPLOY_WEBSITE=1. SUFeedURL (https://kouencli.dev/appcast.xml) then resolves."
+  echo "    Ensure DOWNLOAD_URL_PREFIX (${DOWNLOAD_URL_PREFIX:-https://kouencli.dev/}) points at the live DMG."
 fi
 
 echo "Done. Notarized DMG on release $TAG; appcast generated."

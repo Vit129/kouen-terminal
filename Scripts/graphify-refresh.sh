@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Refresh the graphify knowledge graph for harness-terminal.
+# Refresh the graphify knowledge graph for kouen-terminal.
 #
 # Uses --update (changed files only) once a graph already exists, otherwise
 # does a full extraction. Standard flags: --no-viz (skip graph.html, agents

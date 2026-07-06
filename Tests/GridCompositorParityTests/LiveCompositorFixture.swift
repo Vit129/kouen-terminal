@@ -1,5 +1,5 @@
 // LIVE side of the GridCompositor drift canary. Imports only the live stack
-// (HarnessTerminalKit + the real HarnessCore/HarnessTerminalEngine models) so every
+// (KouenTerminalKit + the real KouenCore/KouenTerminalEngine models) so every
 // unqualified type name resolves to the production compositor — no module/type-name
 // collisions with the onboarding port (built in PortCompositorFixture.swift). The two
 // files build the SAME documented fixture (see CompositorFixtureSpec) and the test in
@@ -7,9 +7,9 @@
 //
 // Twin: PortCompositorFixture.swift — keep both fixtures in lockstep.
 import Foundation
-import HarnessCore
-import HarnessTerminalEngine
-import HarnessTerminalKit
+import KouenCore
+import KouenTerminalEngine
+import KouenTerminalKit
 
 enum LiveCompositorFixture {
     private static func grid(_ first: String, cols: Int, rows: Int, cursorVisible: Bool) -> TerminalGridSnapshot {

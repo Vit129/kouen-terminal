@@ -16,13 +16,13 @@ your comments and trailing commas survive — never reserialized):
 
 ```json5
 {
-  // >>> harness-managed (do not edit) >>>
+  // >>> kouen-managed (do not edit) >>>
   "hooks": {
-    "harness-notify": {
-      "command": "PATH=\"$HOME/Library/Application Support/Harness/bin:$PATH\" kouen-cli notify --surface \"$HARNESS_SURFACE\" --title \"OpenClaw\" --body \"Done\"",
+    "kouen-notify": {
+      "command": "PATH=\"$HOME/Library/Application Support/Kouen/bin:$PATH\" kouen-cli notify --surface \"$KOUEN_SURFACE\" --title \"OpenClaw\" --body \"Done\"",
     },
   },
-  // <<< harness-managed <<<
+  // <<< kouen-managed <<<
   // …your existing config…
 }
 ```
@@ -30,9 +30,9 @@ your comments and trailing commas survive — never reserialized):
 Re-running `install-hooks openclaw` replaces the managed region in place.
 
 > If your `openclaw.json` already defines a top-level `hooks` object, merge the
-> `harness-notify` entry into it by hand — a JSON5 object can't have two `hooks`
+> `kouen-notify` entry into it by hand — a JSON5 object can't have two `hooks`
 > keys. OpenClaw's hook system is gateway/guardrail-oriented; depending on your
 > build, you may prefer wiring `kouen-cli notify` into a gateway mapping
-> instead. The command itself (and `$HARNESS_SURFACE`) is the same either way.
+> instead. The command itself (and `$KOUEN_SURFACE`) is the same either way.
 
 The dot color for OpenClaw panes is `#f5a623`.

@@ -2,9 +2,9 @@
 set -euo pipefail
 
 # On-hardware fluidity measurement: drives a real resize drag and a scroll fling over the running
-# Harness preview window with CGEvents while tailing the FrameSignposter percentile lines from the
+# Kouen preview window with CGEvents while tailing the FrameSignposter percentile lines from the
 # unified log. The headless analogue (no real window/GPU contention) is
-# `HARNESS_BENCHMARKS=1 swift test --filter FluidityBenchmarks`.
+# `KOUEN_BENCHMARKS=1 swift test --filter FluidityBenchmarks`.
 #
 # Usage:
 #   PREVIEW_SIGNPOSTS=1 make preview        # launch the preview with signposts on
@@ -16,7 +16,7 @@ set -euo pipefail
 
 DUR="${1:-4}"
 # BSD mktemp requires the X run at the END of the template.
-LOG="$(mktemp /tmp/harness-fluidity.XXXXXX)"
+LOG="$(mktemp /tmp/kouen-fluidity.XXXXXX)"
 
 log stream --predicate 'subsystem == "com.vit129.kouen"' --style compact > "$LOG" &
 LOG_PID=$!
@@ -29,16 +29,16 @@ import CoreGraphics
 
 let dur = Double(CommandLine.arguments.dropFirst().first ?? "4") ?? 4
 
-// Find the frontmost Harness window (preview or release) via the window list.
+// Find the frontmost Kouen window (preview or release) via the window list.
 guard let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]],
       let win = info.first(where: { dict in
-          (dict[kCGWindowOwnerName as String] as? String)?.contains("Harness") == true
+          (dict[kCGWindowOwnerName as String] as? String)?.contains("Kouen") == true
               && (dict[kCGWindowLayer as String] as? Int) == 0
       }),
       let boundsDict = win[kCGWindowBounds as String] as? [String: CGFloat],
       let pid = win[kCGWindowOwnerPID as String] as? pid_t
 else {
-    FileHandle.standardError.write(Data("error: no on-screen Harness window found — launch the preview first.\n".utf8))
+    FileHandle.standardError.write(Data("error: no on-screen Kouen window found — launch the preview first.\n".utf8))
     exit(1)
 }
 let bounds = CGRect(

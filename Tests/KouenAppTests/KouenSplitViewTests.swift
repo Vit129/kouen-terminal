@@ -1,0 +1,70 @@
+import AppKit
+import XCTest
+@testable import KouenApp
+
+@MainActor
+final class KouenSplitViewTests: XCTestCase {
+    func testFirstLayoutRelaysPostDividerFramesToChildren() {
+        let split = KouenSplitView(frame: NSRect(x: 0, y: 0, width: 600, height: 300))
+        split.isVertical = true
+        split.direction = .horizontal
+        split.ratio = nil
+
+        let first = LayoutProbeView()
+        let second = LayoutProbeView()
+        split.addSubview(first)
+        split.addSubview(second)
+
+        split.needsLayout = true
+        split.layoutSubtreeIfNeeded()
+
+        XCTAssertEqual(first.lastLayoutWidth, first.frame.width, accuracy: 0.001)
+        XCTAssertEqual(second.lastLayoutWidth, second.frame.width, accuracy: 0.001)
+        XCTAssertLessThan(first.frame.width, split.bounds.width)
+        XCTAssertLessThan(second.frame.width, split.bounds.width)
+    }
+
+    func testHorizontalSplitRatioPersistence() {
+        let split = KouenSplitView(frame: NSRect(x: 0, y: 0, width: 600, height: 300))
+        split.isVertical = true
+        split.direction = .horizontal
+        split.ratio = 0.4
+
+        let first = LayoutProbeView()
+        let second = LayoutProbeView()
+        split.addSubview(first)
+        split.addSubview(second)
+
+        split.needsLayout = true
+        split.layoutSubtreeIfNeeded()
+
+        XCTAssertEqual(first.frame.width, 240, accuracy: 5.0)
+    }
+
+    func testVerticalSplitRatioPersistence() {
+        let split = KouenSplitView(frame: NSRect(x: 0, y: 0, width: 600, height: 300))
+        split.isVertical = false
+        split.direction = .vertical
+        split.ratio = 0.6
+
+        let first = LayoutProbeView()
+        let second = LayoutProbeView()
+        split.addSubview(first)
+        split.addSubview(second)
+
+        split.needsLayout = true
+        split.layoutSubtreeIfNeeded()
+
+        XCTAssertEqual(first.frame.height, 180, accuracy: 5.0)
+    }
+}
+
+@MainActor
+private final class LayoutProbeView: NSView {
+    private(set) var lastLayoutWidth: CGFloat = -1
+
+    override func layout() {
+        super.layout()
+        lastLayoutWidth = frame.width
+    }
+}

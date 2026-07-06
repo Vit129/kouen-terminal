@@ -9,7 +9,7 @@ usage() {
 Usage: Scripts/run.sh [command]
 
 Commands:
-  preview   Build and launch isolated preview app (.harness-preview) [default]
+  preview   Build and launch isolated preview app (.kouen-preview) [default]
   debug     Alias for preview (kept for old muscle memory)
   prod      Build (release), package, sign, and open Kouen.app (no /Applications copy)
   run       Re-open the existing Kouen.app without rebuilding
@@ -35,10 +35,10 @@ kill_stale() {
 }
 
 # prod/run builds at the repo root share the production KOUEN_HOME
-# (~/Library/Application Support/Kouen, or /Harness if not yet migrated) with
-# /Applications/Kouen.app and the launchd-managed daemon (`make install`). Without stopping
-# those too, the fresh repo-root app reconnects to the old launchd daemon/socket and looks
-# unchanged. `preview` uses an isolated KOUEN_HOME and never goes through this path.
+# (~/Library/Application Support/Kouen) with /Applications/Kouen.app and the
+# launchd-managed daemon (`make install`). Without stopping those too, the fresh
+# repo-root app reconnects to the old launchd daemon/socket and looks unchanged.
+# `preview` uses an isolated KOUEN_HOME and never goes through this path.
 kill_stale_prod() {
   kill_stale
 
@@ -51,10 +51,7 @@ kill_stale_prod() {
   pkill -f "/Applications/Kouen.app/Contents/MacOS/KouenDaemon" 2>/dev/null || true
   pkill -f "/Applications/Kouen.app/Contents/MacOS/Kouen\$" 2>/dev/null || true
   launchctl bootout "gui/$(id -u)/com.vit129.kouen.daemon" 2>/dev/null || true
-  launchctl bootout "gui/$(id -u)/com.vit129.harness.daemon" 2>/dev/null || true
-  launchctl bootout "gui/$(id -u)/com.robert.harness.daemon" 2>/dev/null || true
   pkill -f "$HOME/Library/Application Support/Kouen/bin/KouenDaemon" 2>/dev/null || true
-  pkill -f "$HOME/Library/Application Support/Harness/bin/KouenDaemon" 2>/dev/null || true
   sleep 0.5
 }
 

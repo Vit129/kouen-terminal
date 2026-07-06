@@ -8,7 +8,7 @@ runtime under the hood.
 
 This guide is the narrative "how it works + shortcuts" tour. For exhaustive references see:
 
-- [HARNESS_TMUX_CAPABILITIES.pdf](HARNESS_TMUX_CAPABILITIES.pdf) — printable setup and shortcuts guide.
+- [KOUEN_TMUX_CAPABILITIES.pdf](KOUEN_TMUX_CAPABILITIES.pdf) — printable setup and shortcuts guide.
 - [KEYBINDINGS.md](KEYBINDINGS.md) — every default binding + the key-spec syntax.
 - [COMMANDS.md](COMMANDS.md) — the full command grammar.
 - [MIGRATION.md](MIGRATION.md) — moving an existing terminal/multiplexer setup over.
@@ -26,12 +26,12 @@ The hierarchy, top to bottom:
 | **Session** | A sidebar entry with its own tab bar. Survives quit if pinned/kept. |
 | **Tab** | One tab in a session: title, cwd, git branch, agent, and a split tree. |
 | **Pane** | A single terminal (a leaf in the tab's split tree). |
-| **Surface** | The daemon-owned PTY behind a pane (`$HARNESS_SURFACE`). |
+| **Surface** | The daemon-owned PTY behind a pane (`$KOUEN_SURFACE`). |
 
 The terms "tab" and "window" are used interchangeably in the verbs (`new-window` makes a tab; the
 `next-window`/`previous-window` verbs move between tabs).
 
-**Who owns what:** a background **daemon** (`HarnessDaemon`, kept alive by launchd) owns all
+**Who owns what:** a background **daemon** (`KouenDaemon`, kept alive by launchd) owns all
 session truth and every PTY. The app and `kouen-cli` are just clients — so your shells keep
 running when the app quits, across crashes, and you can reattach from another window or over ssh.
 
@@ -167,7 +167,7 @@ Anything you can bind, you can type.
   hooks, options, layout ops). Run `kouen-cli` with no args for the full list.
 - Rebind anything: `kouen-cli bind-key C-x x kill-pane`, multi-step with `;`
   (`bind-key C-x s "split-window -h ; copy-mode"`). Bindings persist in
-  `~/Library/Application Support/Harness/keybindings.json` (merged under the defaults, so deleting
+  `~/Library/Application Support/Kouen/keybindings.json` (merged under the defaults, so deleting
   one restores the default). Full details in [KEYBINDINGS.md](KEYBINDINGS.md).
 - **Hooks** fire commands on events (`after-new-tab`, `pane-exited`, `agent-state-changed`, …):
   `kouen-cli bind-hook after-split-pane 'display-message "split!"'`. Use `set-hook --if` with
@@ -190,7 +190,7 @@ This means you can set a global default and override it per-session, tab, or pan
 - **`set-option -g key value`** (or `set`) sets a global option.
 - **`-s`** / **`-w`** / **`-t`** / **`-p`** select the session / workspace / tab / pane SCOPE;
   without `-T <target>` the write resolves against your focus (the CLI uses the calling pane
-  via `$HARNESS_SURFACE`), and `-T <target>` pins an explicit one.
+  via `$KOUEN_SURFACE`), and `-T <target>` pins an explicit one.
 
 Common options include `status` (show/hide status bar), `mode-keys` (vi/emacs in copy mode),
 `allow-rename` (let programs change tab title), `history-limit`, `base-index` (start window
@@ -229,7 +229,7 @@ remote once, then add `--host <name>` to any command:
 
 ```bash
 # On the remote box, the daemon listens on a Unix socket (kouen-cli doctor prints its path).
-kouen-cli remote add --name devbox --ssh me@devbox --socket "/home/me/.config/harness/harness.sock"
+kouen-cli remote add --name devbox --ssh me@devbox --socket "/home/me/.config/kouen/kouen.sock"
 kouen-cli new-session --host devbox --cwd ~/Code
 kouen-cli send-keys  --host devbox --surface <id> --keys "make test Enter"
 kouen-cli capture-pane --host devbox --surface <id>
@@ -304,7 +304,7 @@ kouen-cli install-shell-integration all          # bash + zsh + fish
 ```
 
 Restart your shell (or open a new pane). The snippet is a no-op outside a Kouen pane — it gates
-on `$HARNESS` (exported by the daemon into every pane). Details:
+on `$KOUEN` (exported by the daemon into every pane). Details:
 [shell-integration/README.md](shell-integration/README.md).
 
 ---

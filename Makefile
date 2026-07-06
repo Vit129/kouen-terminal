@@ -12,7 +12,7 @@ prod:
 start:
 	./Scripts/start.sh $(filter-out $@,$(MAKECMDGOALS))
 
-# Clear persisted session/scrollback state for debug builds (HarnessDebug home only —
+# Clear persisted session/scrollback state for debug builds (KouenDebug home only —
 # never touches the production app's real session state).
 clean-state:
 	./Scripts/clean-state.sh
@@ -33,18 +33,18 @@ build:
 	swift build
 
 bench:
-	HARNESS_BENCHMARKS=1 swift test -c release --filter HarnessBenchmarks
+	KOUEN_BENCHMARKS=1 swift test -c release --filter KouenBenchmarks
 
 preview:
 	./Scripts/preview.sh
 
 preview-stop:
-	-pkill -f '$(CURDIR)/.harness-preview/KouenPreview.app/Contents/MacOS/Kouen' 2>/dev/null
-	-pkill -f '$(CURDIR)/.harness-preview/KouenPreview.app/Contents/MacOS/KouenDaemon' 2>/dev/null
+	-pkill -f '$(CURDIR)/.kouen-preview/KouenPreview.app/Contents/MacOS/Kouen' 2>/dev/null
+	-pkill -f '$(CURDIR)/.kouen-preview/KouenPreview.app/Contents/MacOS/KouenDaemon' 2>/dev/null
 
 preview-clean:
-	rm -rf .harness-preview
-	rm -rf "/tmp/harness-preview-$$(printf '%s' "$(CURDIR)" | md5 | cut -c1-10)"
+	rm -rf .kouen-preview
+	rm -rf "/tmp/kouen-preview-$$(printf '%s' "$(CURDIR)" | md5 | cut -c1-10)"
 	-tccutil reset All com.vit129.kouen.preview 2>/dev/null || true
 
 icon:

@@ -1,0 +1,81 @@
+import XCTest
+@testable import KouenCore
+
+/// Drift guards for the generated what's-new banner content. These are what make
+/// `GeneratedReleaseNotes.swift` safe to check in: a release prep that bumps
+/// CHANGELOG.md/KouenVersion.swift without rerunning `make release-notes` fails here
+/// (and again in `package-app.sh`) instead of shipping a banner for the wrong release.
+final class ReleaseNotesGuardTests: XCTestCase {
+    private var changelog: String {
+        get throws {
+            let url = URL(fileURLWithPath: #filePath) // Tests/KouenCoreTests/<this file>
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("CHANGELOG.md")
+            return try String(contentsOf: url, encoding: .utf8)
+        }
+    }
+
+    /// Same extraction as Scripts/generate-release-notes.swift: the top release block,
+    /// heading included, up to the next release heading, trailing whitespace trimmed.
+    private func topBlock(of changelog: String) throws -> String {
+        guard let headerRange = changelog.range(
+            of: #"(?m)^## \[[^\]]+\] - .*$"#, options: [.regularExpression]
+        ) else {
+            throw XCTSkip("CHANGELOG.md has no release heading")
+        }
+        let afterHeader = changelog[headerRange.upperBound...]
+        let blockEnd = afterHeader.range(of: "\n## [", options: [.literal])?.lowerBound
+            ?? afterHeader.endIndex
+        return String(changelog[headerRange.lowerBound ..< blockEnd])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    func testGeneratedNotesMatchKouenVersion() {
+        XCTAssertEqual(
+            ReleaseNotes.current.version, KouenVersion.short,
+            "GeneratedReleaseNotes.swift is for \(ReleaseNotes.current.version) but " +
+                "KouenVersion.short is \(KouenVersion.short) — run `make release-notes`."
+        )
+    }
+
+    func testGeneratedNotesMatchChangelogBlock() throws {
+        let block = try topBlock(of: try changelog)
+        XCTAssertEqual(
+            ReleaseNotes.digest(of: block), ReleaseNotes.current.changelogDigest,
+            "CHANGELOG.md's top release block changed after GeneratedReleaseNotes.swift " +
+                "was generated — run `make release-notes`."
+        )
+    }
+
+    func testGeneratedNotesAreRenderable() {
+        XCTAssertFalse(ReleaseNotes.current.sections.isEmpty)
+        for section in ReleaseNotes.current.sections {
+            XCTAssertFalse(section.items.isEmpty, "empty section \(section.title)")
+            for item in section.items {
+                XCTAssertFalse(item.isEmpty)
+                // No markdown survives generation — the banner renders text verbatim.
+                XCTAssertFalse(item.contains("**"), "markdown leaked into: \(item)")
+                XCTAssertFalse(item.contains("`"), "markdown leaked into: \(item)")
+                // The notes are injected verbatim into a live PTY, so a stray ESC/BEL/other
+                // control character would emit an escape sequence (title change, color, …) into
+                // the user's terminal. Fail at generation time instead — printable scalars only
+                // (tab allowed); the generator never emits multi-line items.
+                for scalar in item.unicodeScalars {
+                    XCTAssertTrue(
+                        scalar.value >= 0x20 || scalar.value == 0x09,
+                        "control character U+\(String(format: "%04X", scalar.value)) in: \(item)"
+                    )
+                }
+            }
+        }
+    }
+
+    /// Pins the FNV-1a implementation both the generator script and the guard rely on.
+    func testDigestIsStableFNV1a() {
+        XCTAssertEqual(ReleaseNotes.digest(of: ""), "cbf29ce484222325")
+        XCTAssertEqual(ReleaseNotes.digest(of: "a"), "af63dc4c8601ec8c")
+        XCTAssertNotEqual(ReleaseNotes.digest(of: "kouen"), ReleaseNotes.digest(of: "kouen "))
+    }
+}

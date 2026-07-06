@@ -10,7 +10,7 @@ if [[ ! -f "$DMG" ]]; then
   exit 2
 fi
 
-workdir="$(mktemp -d "${TMPDIR:-/tmp}/harness-dmg-smoke.XXXXXX")"
+workdir="$(mktemp -d "${TMPDIR:-/tmp}/kouen-dmg-smoke.XXXXXX")"
 mountpoint="$workdir/mount"
 install_dir="$workdir/install"
 home_dir="$workdir/home"
@@ -75,10 +75,10 @@ echo "==> Verifying code signature..."
 codesign --verify --deep --strict --verbose=2 "$app"
 
 echo "==> Exercising bundled theme catalog through shipped CLI..."
-HARNESS_HOME="$home_dir" "$app/Contents/MacOS/kouen-cli" theme-preview --all >/dev/null
+KOUEN_HOME="$home_dir" "$app/Contents/MacOS/kouen-cli" theme-preview --all >/dev/null
 
 echo "==> Launching Kouen.app from temp install location..."
-HARNESS_HOME="$home_dir" "$app/Contents/MacOS/Kouen" >"$app_log" 2>&1 &
+KOUEN_HOME="$home_dir" "$app/Contents/MacOS/Kouen" >"$app_log" 2>&1 &
 app_pid=$!
 
 for attempt in {1..40}; do
@@ -91,7 +91,7 @@ for attempt in {1..40}; do
     exit 1
   fi
 
-  if HARNESS_HOME="$home_dir" "$app/Contents/MacOS/kouen-cli" ping >/dev/null 2>&1; then
+  if KOUEN_HOME="$home_dir" "$app/Contents/MacOS/kouen-cli" ping >/dev/null 2>&1; then
     echo "==> Smoke launch passed."
     exit 0
   fi

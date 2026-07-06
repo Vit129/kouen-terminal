@@ -1,0 +1,851 @@
+import AppKit
+import KouenCore
+import KouenLSP
+
+struct SyntaxDefinitionTarget {
+    let url: URL
+    let line: Int
+    let column: Int
+}
+
+@MainActor
+final class SyntaxTextView: NSView {
+    enum DiffLineType: Equatable { case added, modified, deleted }
+
+    override var isFlipped: Bool { true }
+
+    private let scrollView = NSScrollView()
+    private let textView = SyntaxTextViewInner()
+    private let gutterView = SyntaxLineNumberGutterView()
+    private var fileExtension = ""
+    private var diagnostics: [LSPDiagnostic] = []
+    private var hoverPopover: NSPopover?
+    private var completionPopup: CompletionPopupView?
+    private var currentPrefix: String = ""
+
+    var symbolIndex: WorkspaceSymbolIndex?
+    var activeDiagnostics: [LSPDiagnostic] { diagnostics }
+
+    var onHover: ((LSPPosition) async -> String?)?
+    var onDefinition: ((LSPPosition) async -> SyntaxDefinitionTarget?)?
+
+    var onCurrentFile: (() -> String?)? {
+        get { vi.onCurrentFile }
+        set { vi.onCurrentFile = newValue }
+    }
+    var onCurrentCWD: (() -> String?)? {
+        get { vi.onCurrentCWD }
+        set { vi.onCurrentCWD = newValue }
+    }
+    var onNavigateToDefinition: ((SyntaxDefinitionTarget) -> Void)?
+
+    /// Highlight all occurrences of a pattern inline (vi * / # search).
+    func highlightSearchPattern(_ pattern: String) {
+        guard let storage = textView.textStorage else { return }
+        // Clear previous highlights
+        let full = NSRange(location: 0, length: storage.length)
+        storage.removeAttribute(.backgroundColor, range: full)
+        guard !pattern.isEmpty else { return }
+        let text = storage.string as NSString
+        let highlightColor = NSColor.systemYellow.withAlphaComponent(0.35)
+        var searchRange = NSRange(location: 0, length: text.length)
+        while searchRange.length > 0 {
+            let found = text.range(of: pattern, options: .caseInsensitive, range: searchRange)
+            if found.location == NSNotFound { break }
+            storage.addAttribute(.backgroundColor, value: highlightColor, range: found)
+            let next = found.location + found.length
+            searchRange = NSRange(location: next, length: text.length - next)
+        }
+    }
+
+    func clearSearchHighlight() {
+        guard let storage = textView.textStorage else { return }
+        storage.removeAttribute(.backgroundColor, range: NSRange(location: 0, length: storage.length))
+    }
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        setup()
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError() }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+
+    var string: String { textView.string }
+
+    func load(text: String, fileExtension ext: String, resetScroll: Bool = true) {
+        let previousOrigin = scrollView.contentView.bounds.origin
+        fileExtension = ext.lowercased()
+        if resetScroll {
+            textView.textStorage?.setAttributedString(SyntaxHighlighter.highlight(text, fileExtension: fileExtension))
+            textView.scrollToBeginningOfDocument(nil)
+        } else {
+            // Same-file reload (FSEvent touch) — replacing textStorage wholesale collapses
+            // NSTextView's selectedRange to the document end, silently dropping any text
+            // the user was mid-selecting/copying. Preserve it across the swap.
+            preservingSelection {
+                textView.textStorage?.setAttributedString(SyntaxHighlighter.highlight(text, fileExtension: fileExtension))
+            }
+            textView.layoutSubtreeIfNeeded()
+            scrollView.contentView.scroll(to: previousOrigin)
+            scrollView.reflectScrolledClipView(scrollView.contentView)
+        }
+        diagnostics = []
+        gutterView.diagnostics = []
+        gutterView.needsDisplay = true
+        // Only clear on a genuine file switch — a same-file reload (FSEvent-triggered,
+        // e.g. a bare mtime touch) would otherwise blink the highlight off while the
+        // async git-diff refetch is in flight.
+        if resetScroll {
+            setDiffLines([:])
+        }
+    }
+
+    func setDiagnostics(_ diagnostics: [LSPDiagnostic]) {
+        self.diagnostics = diagnostics
+        gutterView.diagnostics = diagnostics
+        applyDiagnosticAttributes()
+        gutterView.needsDisplay = true
+    }
+
+    func navigateTo(line: Int, column: Int) {
+        let ns = textView.string as NSString
+        let target = offset(line: max(0, line - 1), character: max(0, column - 1), in: ns)
+        guard target != NSNotFound else { return }
+        textView.setSelectedRange(NSRange(location: target, length: 0))
+        textView.scrollRangeToVisible(NSRange(location: target, length: 0))
+    }
+
+    func setDiffLines(_ diffLines: [Int: DiffLineType]) {
+        gutterView.diffLines = diffLines
+        gutterView.needsDisplay = true
+        textView.diffLineTypes = diffLines
+    }
+
+    /// Vi engine — handles all normal/visual/operator-pending key dispatch.
+    private let vi = ViEngine()
+    /// Exposed mode for status bar display.
+    var viMode: ViMode { vi.mode }
+    /// Callback when vi mode changes (for status display).
+    var onEditModeChange: ((Bool) -> Void)?  // kept for compatibility: true = insert
+
+    /// Vi-like mode: read-only by default, press `i` to edit, `Esc` to return.
+    var isEditMode: Bool { if case .insert = vi.mode { return true }; return false }
+    /// Callback to save the current text content to disk.
+    var onSave: ((String) -> Void)?
+
+    func showFindBar() {
+        textView.performFindPanelAction(NSTextFinder.Action.showFindInterface)
+    }
+
+    override var acceptsFirstResponder: Bool { true }
+
+    override func keyDown(with event: NSEvent) {
+        let cmd = event.modifierFlags.contains(.command)
+        let key = event.charactersIgnoringModifiers ?? ""
+        // ⌘S: save (any mode)
+        if cmd && key == "s" {
+            if case .insert = vi.mode {
+                onSave?(textView.string)
+                vi.enter(mode: .normal)
+            }
+            return
+        }
+        // ⌘F: find
+        if cmd && key == "f" { showFindBar(); return }
+        // Let vi engine handle everything else
+        if vi.handle(event) { return }
+        super.keyDown(with: event)
+    }
+
+    func handleTextViewKeyDown(_ event: NSEvent) -> Bool {
+        guard let popup = completionPopup else { return false }
+        switch event.keyCode {
+        case 53: // Esc
+            dismissCompletionPopup()
+            return true
+        case 48: // Tab
+            popup.confirmSelection()
+            return true
+        case 36, 76: // Return / Enter
+            popup.confirmSelection()
+            return true
+        case 126: // Up Arrow
+            return popup.moveSelection(down: false)
+        case 125: // Down Arrow
+            return popup.moveSelection(down: true)
+        default:
+            return false
+        }
+    }
+
+    private func showCompletionPopup(candidates: [String], prefix: String) {
+        currentPrefix = prefix
+        if completionPopup == nil {
+            let popup = CompletionPopupView(frame: .zero)
+            popup.onConfirm = { [weak self] completion in
+                self?.insertCompletion(completion, prefix: prefix)
+                self?.dismissCompletionPopup()
+            }
+            popup.onDismiss = { [weak self] in
+                self?.dismissCompletionPopup()
+            }
+            addSubview(popup)
+            completionPopup = popup
+        }
+        guard let popup = completionPopup else { return }
+        popup.update(candidates: candidates)
+
+        let selectedRange = textView.selectedRange()
+        guard selectedRange.location != NSNotFound else { return }
+        let charRange = NSRange(location: selectedRange.location, length: 0)
+        let screenRect = textView.firstRect(forCharacterRange: charRange, actualRange: nil)
+        if screenRect.origin.x != CGFloat.infinity {
+            let windowRect = textView.window?.convertFromScreen(screenRect) ?? screenRect
+            let localPoint = convert(windowRect.origin, from: nil)
+            let width: CGFloat = 200
+            let height: CGFloat = min(200, CGFloat(candidates.count) * 24 + 10)
+            let x = localPoint.x
+            let y = localPoint.y + screenRect.height + 4
+            popup.frame = CGRect(x: x, y: y, width: width, height: height)
+        }
+    }
+
+    func dismissCompletionPopup() {
+        completionPopup?.removeFromSuperview()
+        completionPopup = nil
+        currentPrefix = ""
+    }
+
+    private func insertCompletion(_ completion: String, prefix: String) {
+        let selectedRange = textView.selectedRange()
+        guard selectedRange.location != NSNotFound else { return }
+        let start = selectedRange.location - prefix.count
+        let rangeToReplace = NSRange(location: start, length: prefix.count)
+        if textView.shouldChangeText(in: rangeToReplace, replacementString: completion) {
+            let ext = fileExtension
+            let highlighted = SyntaxHighlighter.highlight(completion, fileExtension: ext)
+            textView.textStorage?.replaceCharacters(in: rangeToReplace, with: highlighted)
+            textView.didChangeText()
+            textView.setSelectedRange(NSRange(location: start + completion.count, length: 0))
+        }
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        guard let position = lspPosition(for: event), let onHover else { return }
+        Task {
+            guard let text = await onHover(position), !text.isEmpty else { return }
+            await MainActor.run { [weak self] in
+                self?.showHover(text, for: event)
+            }
+        }
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        if event.modifierFlags.contains(.command), let position = lspPosition(for: event), let onDefinition {
+            Task {
+                guard let target = await onDefinition(position) else { return }
+                await MainActor.run { [weak self] in
+                    // Push current position to jump list before navigating
+                    if let pos = self?.textView.selectedRange().location {
+                        self?.vi.pushJumpPublic(pos)
+                    }
+                    self?.onNavigateToDefinition?(target)
+                }
+            }
+            return
+        }
+        textView.mouseDown(with: event)
+    }
+
+    // mouseDragged/mouseUp not forwarded: NSTextView's mouseDown installs a tracking
+    // loop that captures drag and up events internally. Forwarding mouseUp from here
+    // causes infinite recursion via the responder chain (stack overflow crash).
+
+    private func setup() {
+        wantsLayer = true
+        addTrackingArea(NSTrackingArea(
+            rect: bounds,
+            options: [.activeInKeyWindow, .mouseMoved, .inVisibleRect],
+            owner: self
+        ))
+
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = false
+        scrollView.drawsBackground = false
+        scrollView.autohidesScrollers = true
+        addSubview(scrollView)
+
+        textView.parentView = self
+        textView.delegate = self
+        textView.isEditable = false
+        textView.isSelectable = true
+        textView.drawsBackground = false
+        textView.textContainerInset = NSSize(width: 8, height: 12)
+        textView.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+        textView.textColor = NSColor(white: 0.9, alpha: 1)
+        textView.textContainer?.widthTracksTextView = true
+        textView.isHorizontallyResizable = false
+        textView.autoresizingMask = [.width]
+        textView.isAutomaticQuoteSubstitutionEnabled = false
+        textView.isAutomaticDashSubstitutionEnabled = false
+        textView.isAutomaticTextReplacementEnabled = false
+        textView.usesFindBar = true
+        textView.isIncrementalSearchingEnabled = true
+        scrollView.documentView = textView
+
+        gutterView.translatesAutoresizingMaskIntoConstraints = false
+        gutterView.textView = textView
+        addSubview(gutterView)
+
+        NSLayoutConstraint.activate([
+            gutterView.topAnchor.constraint(equalTo: topAnchor),
+            gutterView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            gutterView.bottomAnchor.constraint(equalTo: bottomAnchor),
+            gutterView.widthAnchor.constraint(equalToConstant: 44),
+
+            scrollView.topAnchor.constraint(equalTo: topAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: gutterView.trailingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
+        ])
+
+        scrollView.contentView.postsBoundsChangedNotifications = true
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(textDidScroll),
+            name: NSView.boundsDidChangeNotification,
+            object: scrollView.contentView
+        )
+
+        // Vi engine setup
+        vi.textView = textView
+        textView.isEditable = false
+        vi.onModeChange = { [weak self] newMode in
+            guard let self else { return }
+            let isInsert: Bool
+            if case .insert = newMode { isInsert = true } else { isInsert = false }
+            self.onEditModeChange?(isInsert)
+        }
+        vi.onSave = { [weak self] in
+            guard let self else { return }
+            self.onSave?(self.textView.string)
+        }
+        vi.onQuit = { [weak self] in
+            // bubble up — ContentAreaViewController listens for this notification
+            NotificationCenter.default.post(name: .viQuitCommand, object: self)
+        }
+        vi.onOpenFile = { [weak self] path in
+            NotificationCenter.default.post(name: .viOpenFileCommand, object: self, userInfo: ["path": path])
+        }
+        vi.onSetOption = { [weak self] key, value in
+            guard let self else { return }
+            switch key {
+            case "number":
+                self.gutterView.isHidden = value == "false"
+                self.gutterView.needsDisplay = true
+            case "relativenumber":
+                self.gutterView.relativeNumbers = value == "true"
+                self.gutterView.needsDisplay = true
+            default: break
+            }
+        }
+        vi.onNextBuffer = { delta in
+            NotificationCenter.default.post(name: .viNextBufferCommand, object: nil, userInfo: ["delta": delta])
+        }
+        vi.onListBuffers = { [weak self] in
+            guard let self else { return [] }
+            let result: [String] = []
+            NotificationCenter.default.post(name: .viListBuffersCommand, object: self)
+            return result  // async result comes back via notification; simplified to immediate
+        }
+        vi.onSearchHighlight = { [weak self] pattern in
+            guard let self else { return }
+            if pattern.isEmpty { self.clearSearchHighlight() } else { self.highlightSearchPattern(pattern) }
+        }
+        vi.onHover = { [weak self] position in await self?.onHover?(position) }
+        vi.onDefinition = { [weak self] position in await self?.onDefinition?(position) }
+        vi.onNavigateToDefinition = { [weak self] target in
+            self?.onNavigateToDefinition?(target)
+        }
+        vi.onDiagnostics = { [weak self] in
+            self?.diagnostics ?? []
+        }
+    }
+
+    @objc private func textDidScroll() {
+        gutterView.needsDisplay = true
+    }
+
+    /// Runs `body` (expected to replace `textView.textStorage` wholesale) while preserving
+    /// the user's active selection, which NSTextView otherwise collapses to the document end
+    /// on a full textStorage swap even when the text content itself is unchanged.
+    private func preservingSelection(_ body: () -> Void) {
+        let previousSelection = textView.selectedRange()
+        body()
+        let length = (textView.string as NSString).length
+        let location = min(previousSelection.location, length)
+        let selectionLength = min(previousSelection.length, length - location)
+        textView.setSelectedRange(NSRange(location: location, length: selectionLength))
+    }
+
+    private func applyDiagnosticAttributes() {
+        let highlighted = SyntaxHighlighter.highlight(textView.string, fileExtension: fileExtension)
+        let mutable = NSMutableAttributedString(attributedString: highlighted)
+        for diagnostic in diagnostics {
+            let range = nsRange(for: diagnostic.range)
+            guard range.location != NSNotFound, range.length > 0, NSMaxRange(range) <= mutable.length else { continue }
+            let color: NSColor = diagnostic.severity == .warning ? .systemYellow : .systemRed
+            mutable.addAttributes([
+                .underlineStyle: NSUnderlineStyle.single.rawValue,
+                .underlineColor: color,
+                .toolTip: diagnostic.message,
+            ], range: range)
+        }
+        preservingSelection {
+            textView.textStorage?.setAttributedString(mutable)
+        }
+    }
+
+    private func nsRange(for range: LSPRange) -> NSRange {
+        let ns = textView.string as NSString
+        let start = offset(line: range.start.line, character: range.start.character, in: ns)
+        let end = offset(line: range.end.line, character: range.end.character, in: ns)
+        guard start != NSNotFound, end != NSNotFound, end >= start else {
+            return NSRange(location: NSNotFound, length: 0)
+        }
+        return NSRange(location: start, length: max(1, end - start))
+    }
+
+    private func lspPosition(for event: NSEvent) -> LSPPosition? {
+        guard let layoutManager = textView.layoutManager, let textContainer = textView.textContainer else { return nil }
+        let pointInText = textView.convert(event.locationInWindow, from: nil)
+        let containerPoint = NSPoint(
+            x: pointInText.x - textView.textContainerOrigin.x,
+            y: pointInText.y - textView.textContainerOrigin.y
+        )
+        let glyphIndex = layoutManager.glyphIndex(for: containerPoint, in: textContainer)
+        let charIndex = layoutManager.characterIndexForGlyph(at: glyphIndex)
+        return lspPosition(characterOffset: charIndex)
+    }
+
+    private func lspPosition(characterOffset: Int) -> LSPPosition {
+        let ns = textView.string as NSString
+        var line = 0
+        var lineStart = 0
+        ns.enumerateSubstrings(in: NSRange(location: 0, length: min(characterOffset, ns.length)), options: [.byLines, .substringNotRequired]) { _, range, _, _ in
+            line += 1
+            lineStart = NSMaxRange(range)
+        }
+        return LSPPosition(line: max(0, line), character: max(0, characterOffset - lineStart))
+    }
+
+    private func offset(line: Int, character: Int, in text: NSString) -> Int {
+        var currentLine = 0
+        var result = NSNotFound
+        text.enumerateSubstrings(in: NSRange(location: 0, length: text.length), options: [.byLines, .substringNotRequired]) { _, range, _, stop in
+            if currentLine == line {
+                result = min(range.location + character, NSMaxRange(range))
+                stop.pointee = true
+            }
+            currentLine += 1
+        }
+        if result == NSNotFound, line == currentLine {
+            result = min(text.length, text.length + character)
+        }
+        return result
+    }
+
+    private func showHover(_ text: String, for event: NSEvent) {
+        hoverPopover?.close()
+        let controller = NSViewController()
+        let label = NSTextField(wrappingLabelWithString: text)
+        label.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
+        label.textColor = KouenDesign.chrome.textPrimary
+        label.backgroundColor = .clear
+        label.translatesAutoresizingMaskIntoConstraints = false
+        let container = NSView()
+        container.wantsLayer = true
+        container.layer?.backgroundColor = KouenDesign.chrome.sidebarBackground.cgColor
+        container.addSubview(label)
+        NSLayoutConstraint.activate([
+            label.topAnchor.constraint(equalTo: container.topAnchor, constant: 10),
+            label.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 12),
+            label.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -12),
+            label.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -10),
+            container.widthAnchor.constraint(lessThanOrEqualToConstant: 420),
+        ])
+        controller.view = container
+        let popover = NSPopover()
+        popover.contentViewController = controller
+        popover.behavior = .transient
+        hoverPopover = popover
+        let point = convert(event.locationInWindow, from: nil)
+        popover.show(relativeTo: NSRect(origin: point, size: .zero), of: self, preferredEdge: .maxY)
+    }
+}
+
+@MainActor
+private final class SyntaxLineNumberGutterView: NSView {
+    weak var textView: NSTextView?
+    var diffLines: [Int: SyntaxTextView.DiffLineType] = [:]
+    var diagnostics: [LSPDiagnostic] = []
+    var relativeNumbers: Bool = false
+
+    override var isFlipped: Bool { true }
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard let textView, let layoutManager = textView.layoutManager, let textContainer = textView.textContainer else { return }
+        let c = KouenDesign.chrome
+        // Don't draw opaque gutter background — let window vibrancy through
+        NSColor.clear.setFill()
+        dirtyRect.fill()
+
+        let visibleRect = textView.enclosingScrollView?.contentView.bounds ?? textView.visibleRect
+        let glyphRange = layoutManager.glyphRange(forBoundingRect: visibleRect, in: textContainer)
+        let charRange = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
+        let text = textView.string as NSString
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.monospacedSystemFont(ofSize: 10, weight: .regular),
+            .foregroundColor: c.textSecondary,
+        ]
+
+        var lineNumber = 1
+        text.enumerateSubstrings(in: NSRange(location: 0, length: charRange.location), options: [.byLines, .substringNotRequired]) { _, _, _, _ in
+            lineNumber += 1
+        }
+
+        let diagnosticLines = Set(diagnostics.map { $0.range.start.line + 1 })
+        let inset = textView.textContainerInset.height
+
+        // Compute cursor line once — doing it inside the per-visible-line loop is O(N×M)
+        // where N = visible lines and M = file length to cursor.
+        let cursorLine: Int
+        if relativeNumbers {
+            let cursorPos = textView.selectedRange().location
+            var ln = 1
+            text.enumerateSubstrings(in: NSRange(location: 0, length: cursorPos),
+                                     options: [.byLines, .substringNotRequired]) { _, _, _, _ in ln += 1 }
+            cursorLine = ln
+        } else {
+            cursorLine = 0
+        }
+
+        text.enumerateSubstrings(in: charRange, options: [.byLines, .substringNotRequired]) { [weak self] _, range, _, _ in
+            guard let self else { return }
+            let glyphIndex = layoutManager.glyphIndexForCharacter(at: range.location)
+            var lineRect = layoutManager.lineFragmentRect(forGlyphAt: glyphIndex, effectiveRange: nil)
+            lineRect.origin.y += inset - visibleRect.origin.y
+
+            if let diffType = self.diffLines[lineNumber] {
+                let color: NSColor
+                switch diffType {
+                case .added: color = .systemGreen
+                case .modified: color = .systemYellow
+                case .deleted: color = .systemRed
+                }
+                color.setFill()
+                NSRect(x: 0, y: lineRect.origin.y, width: 3, height: lineRect.height).fill()
+            }
+
+            if diagnosticLines.contains(lineNumber) {
+                NSColor.systemRed.setFill()
+                NSBezierPath(ovalIn: NSRect(x: 6, y: lineRect.midY - 3, width: 6, height: 6)).fill()
+            }
+
+            let displayNumber = relativeNumbers ? abs(lineNumber - cursorLine) : lineNumber
+            let value = (relativeNumbers && displayNumber == 0 ? "\(lineNumber)" : "\(displayNumber)") as NSString
+            let size = value.size(withAttributes: attrs)
+            value.draw(at: NSPoint(x: bounds.width - size.width - 8, y: lineRect.origin.y + (lineRect.height - size.height) / 2), withAttributes: attrs)
+            lineNumber += 1
+        }
+    }
+}
+
+@MainActor
+enum SyntaxHighlighter {
+    static func highlight(_ text: String, fileExtension ext: String) -> NSAttributedString {
+        let font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
+        let attributed = NSMutableAttributedString(string: text, attributes: [
+            .font: font,
+            .foregroundColor: NSColor(white: 0.9, alpha: 1),
+        ])
+        let fullRange = NSRange(location: 0, length: attributed.length)
+        let comments = commentPattern(for: ext)
+        let strings = stringPattern(for: ext)
+
+        if let comments, let regex = try? NSRegularExpression(pattern: comments, options: .anchorsMatchLines) {
+            regex.matches(in: text, range: fullRange).forEach {
+                attributed.addAttribute(.foregroundColor, value: NSColor.systemGreen.withAlphaComponent(0.8), range: $0.range)
+            }
+        }
+        if let regex = try? NSRegularExpression(pattern: strings, options: [.anchorsMatchLines]) {
+            regex.matches(in: text, range: fullRange).forEach {
+                attributed.addAttribute(.foregroundColor, value: NSColor.systemOrange, range: $0.range)
+            }
+        }
+        let keywords = keywords(for: ext)
+        if !keywords.isEmpty {
+            let pattern = "\\b(" + keywords.map(NSRegularExpression.escapedPattern(for:)).joined(separator: "|") + ")\\b"
+            if let regex = try? NSRegularExpression(pattern: pattern) {
+                regex.matches(in: text, range: fullRange).forEach {
+                    attributed.addAttribute(.foregroundColor, value: NSColor.systemBlue, range: $0.range)
+                }
+            }
+        }
+        if let regex = try? NSRegularExpression(pattern: #"\b\d+(?:\.\d+)?\b"#) {
+            regex.matches(in: text, range: fullRange).forEach {
+                attributed.addAttribute(.foregroundColor, value: NSColor.systemCyan, range: $0.range)
+            }
+        }
+        if ["md", "markdown"].contains(ext), let regex = try? NSRegularExpression(pattern: #"^#{1,6}\s+.*$|`[^`]+`|\*\*[^*]+\*\*"#, options: .anchorsMatchLines) {
+            regex.matches(in: text, range: fullRange).forEach {
+                attributed.addAttribute(.foregroundColor, value: KouenDesign.chrome.accent, range: $0.range)
+            }
+        }
+        // Diff/patch: color +lines green, -lines red, @@hunk headers cyan, diff headers bold
+        if ["diff", "patch"].contains(ext) {
+            if let regex = try? NSRegularExpression(pattern: #"^\+(?!\+\+).*$"#, options: .anchorsMatchLines) {
+                regex.matches(in: text, range: fullRange).forEach {
+                    attributed.addAttribute(.foregroundColor, value: NSColor.systemGreen, range: $0.range)
+                }
+            }
+            if let regex = try? NSRegularExpression(pattern: #"^-(?!--).*$"#, options: .anchorsMatchLines) {
+                regex.matches(in: text, range: fullRange).forEach {
+                    attributed.addAttribute(.foregroundColor, value: NSColor.systemRed, range: $0.range)
+                }
+            }
+            if let regex = try? NSRegularExpression(pattern: #"^@@.*@@.*$"#, options: .anchorsMatchLines) {
+                regex.matches(in: text, range: fullRange).forEach {
+                    attributed.addAttribute(.foregroundColor, value: NSColor.systemCyan, range: $0.range)
+                }
+            }
+            if let regex = try? NSRegularExpression(pattern: #"^(diff --git|---|\+\+\+|index ).*$"#, options: .anchorsMatchLines) {
+                regex.matches(in: text, range: fullRange).forEach {
+                    attributed.addAttributes([.foregroundColor: NSColor.white, .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .bold)], range: $0.range)
+                }
+            }
+        }
+        return attributed
+    }
+
+    private static func stringPattern(for ext: String) -> String {
+        if ["yaml", "yml"].contains(ext) {
+            return #""[^"\\]*(?:\\.[^"\\]*)*"|'[^'\\]*(?:\\.[^'\\]*)*'"#
+        }
+        return #""[^"\\]*(?:\\.[^"\\]*)*"|'[^'\\]*(?:\\.[^'\\]*)*'|`[^`\\]*(?:\\.[^`\\]*)*`"#
+    }
+
+    private static func keywords(for ext: String) -> [String] {
+        if let custom = loadSyntaxKeywords(), let kw = custom[ext] { return kw }
+        return defaultKeywords(for: ext)
+    }
+
+    private static func loadSyntaxKeywords() -> [String: [String]]? {
+        let file = KouenPaths.applicationSupport.appendingPathComponent("syntax-keywords.json")
+        guard let data = try? Data(contentsOf: file),
+              let dict = try? JSONDecoder().decode([String: [String]].self, from: data),
+              !dict.isEmpty else { return nil }
+        return dict
+    }
+
+    private static func defaultKeywords(for ext: String) -> [String] {
+        switch ext {
+        case "swift":
+            return ["import", "func", "var", "let", "class", "struct", "enum", "protocol", "extension", "if", "else", "guard", "return", "switch", "case", "for", "while", "in", "where", "self", "Self", "nil", "true", "false", "private", "public", "internal", "final", "static", "override", "init", "deinit", "throw", "throws", "try", "catch", "await", "async", "actor", "some", "any", "weak", "unowned", "mutating", "typealias"]
+        case "ts", "tsx", "js", "jsx", "gs":
+            return ["import", "export", "from", "function", "const", "let", "var", "class", "interface", "type", "if", "else", "return", "switch", "case", "for", "while", "of", "in", "this", "null", "undefined", "true", "false", "new", "async", "await", "try", "catch", "throw", "extends", "implements", "default", "break", "continue"]
+        case "py":
+            return ["import", "from", "def", "class", "if", "elif", "else", "return", "for", "while", "in", "is", "not", "and", "or", "True", "False", "None", "self", "with", "as", "try", "except", "finally", "raise", "yield", "async", "await", "pass", "lambda"]
+        case "rs":
+            return ["fn", "let", "mut", "const", "struct", "enum", "impl", "trait", "pub", "use", "mod", "if", "else", "match", "for", "while", "loop", "return", "self", "Self", "true", "false", "async", "await", "move", "where", "type", "unsafe"]
+        case "go":
+            return ["package", "import", "func", "var", "const", "type", "struct", "interface", "if", "else", "for", "range", "switch", "case", "return", "go", "defer", "chan", "map", "nil", "true", "false", "select", "break", "continue"]
+        case "kt", "kts":
+            return ["fun", "val", "var", "class", "object", "interface", "import", "package", "if", "else", "when", "for", "while", "do", "return", "throw", "try", "catch", "finally", "is", "as", "in", "null", "true", "false", "this", "super", "override", "open", "abstract", "sealed", "data", "companion", "suspend", "lateinit", "by", "lazy"]
+        case "java":
+            return ["import", "package", "class", "interface", "extends", "implements", "public", "private", "protected", "static", "final", "abstract", "void", "new", "return", "if", "else", "for", "while", "do", "switch", "case", "break", "continue", "try", "catch", "finally", "throw", "throws", "this", "super", "null", "true", "false", "synchronized", "volatile"]
+        case "c", "h":
+            return ["include", "define", "ifdef", "ifndef", "endif", "if", "else", "for", "while", "do", "switch", "case", "break", "continue", "return", "void", "int", "char", "float", "double", "long", "short", "unsigned", "signed", "const", "static", "extern", "struct", "enum", "typedef", "sizeof", "NULL"]
+        case "cpp", "hpp", "cc", "cxx", "hxx":
+            return ["include", "define", "ifdef", "ifndef", "endif", "if", "else", "for", "while", "do", "switch", "case", "break", "continue", "return", "void", "int", "char", "float", "double", "long", "short", "unsigned", "signed", "const", "static", "extern", "struct", "enum", "typedef", "sizeof", "NULL", "class", "public", "private", "protected", "virtual", "override", "new", "delete", "namespace", "using", "template", "typename", "auto", "nullptr", "true", "false", "throw", "try", "catch", "constexpr", "noexcept"]
+        case "sh", "bash", "zsh":
+            return ["if", "then", "else", "elif", "fi", "for", "while", "do", "done", "case", "esac", "in", "function", "return", "local", "export", "source", "echo", "exit", "true", "false", "set", "unset", "readonly"]
+        case "rb":
+            return ["def", "class", "module", "if", "elsif", "else", "unless", "end", "do", "while", "for", "in", "return", "yield", "begin", "rescue", "ensure", "raise", "nil", "true", "false", "self", "require", "include", "attr_accessor", "attr_reader", "puts", "lambda", "proc"]
+        case "toml":
+            return ["true", "false"]
+        case "json", "jsonc", "yaml", "yml":
+            return ["true", "false", "null", "yes", "no"]
+        case "html", "htm":
+            return ["html", "head", "body", "div", "span", "p", "a", "img", "script", "style", "link", "meta", "title", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "table", "tr", "td", "th", "form", "input", "button", "select", "option", "textarea"]
+        case "css", "scss", "sass":
+            return ["import", "media", "keyframes", "font-face", "supports", "inherit", "initial", "unset", "none", "auto", "block", "inline", "flex", "grid", "absolute", "relative", "fixed", "sticky", "hidden", "visible", "solid", "dashed", "dotted"]
+        case "sql":
+            return ["SELECT", "FROM", "WHERE", "INSERT", "INTO", "VALUES", "UPDATE", "SET", "DELETE", "CREATE", "TABLE", "ALTER", "DROP", "INDEX", "JOIN", "LEFT", "RIGHT", "INNER", "OUTER", "ON", "AND", "OR", "NOT", "NULL", "IS", "IN", "LIKE", "ORDER", "BY", "GROUP", "HAVING", "LIMIT", "OFFSET", "AS", "DISTINCT", "COUNT", "SUM", "AVG", "MAX", "MIN", "TRUE", "FALSE"]
+        case "dart":
+            return ["import", "class", "extends", "implements", "mixin", "abstract", "final", "const", "var", "void", "if", "else", "for", "while", "do", "switch", "case", "break", "continue", "return", "async", "await", "Future", "Stream", "null", "true", "false", "this", "super", "new", "throw", "try", "catch", "finally", "late", "required"]
+        case "lua":
+            return ["local", "function", "end", "if", "then", "else", "elseif", "for", "while", "do", "repeat", "until", "return", "nil", "true", "false", "and", "or", "not", "in", "require"]
+        case "php":
+            return ["function", "class", "interface", "extends", "implements", "public", "private", "protected", "static", "final", "abstract", "new", "return", "if", "else", "elseif", "for", "foreach", "while", "do", "switch", "case", "break", "continue", "try", "catch", "finally", "throw", "null", "true", "false", "echo", "require", "include", "namespace", "use", "as"]
+        case "m", "mm":
+            return ["interface", "implementation", "protocol", "property", "synthesize", "dynamic", "end", "selector", "encode", "synchronized", "autoreleasepool", "import", "include", "if", "else", "for", "while", "do", "switch", "case", "break", "continue", "return", "void", "int", "char", "float", "double", "long", "short", "unsigned", "signed", "const", "static", "extern", "struct", "enum", "typedef", "sizeof", "NULL", "self", "super", "nil", "YES", "NO", "id", "instancetype", "IBAction", "IBOutlet", "strong", "weak", "nonatomic", "retain", "copy", "assign", "readonly", "readwrite", "try", "catch", "finally", "throw"]
+        case "cs":
+            return ["using", "namespace", "class", "interface", "struct", "enum", "public", "private", "protected", "internal", "static", "readonly", "const", "virtual", "override", "abstract", "sealed", "async", "await", "void", "var", "new", "return", "if", "else", "for", "foreach", "while", "do", "switch", "case", "break", "continue", "try", "catch", "finally", "throw", "this", "base", "null", "true", "false", "get", "set", "in", "is", "as", "typeof"]
+        case "robot", "resource":
+            return ["Settings", "Variables", "Test Cases", "Keywords", "Library", "Resource", "Documentation", "Suite Setup", "Suite Teardown", "Test Setup", "Test Teardown", "Force Tags", "Default Tags", "Log", "Should Be Equal", "Should Contain", "FOR", "END", "IF", "ELSE", "ELSE IF", "WHILE", "RETURN", "Run Keyword", "Run Keyword If"]
+        case "feature":
+            return ["Feature", "Background", "Scenario", "Scenario Outline", "Examples", "Rule", "Given", "When", "Then", "And", "But"]
+        default:
+            return []
+        }
+    }
+
+    private static func commentPattern(for ext: String) -> String? {
+        switch ext {
+        case "swift", "ts", "tsx", "js", "jsx", "gs", "rs", "go", "c", "cpp", "h", "hpp", "cc", "cxx", "hxx", "java", "kt", "kts", "dart", "scss", "m", "mm", "cs", "jsonc":
+            return #"//.*$|/\*[\s\S]*?\*/"#
+        case "py", "rb", "sh", "bash", "zsh", "yaml", "yml", "toml", "robot", "resource", "feature":
+            return "#.*$"
+        case "lua":
+            return #"--.*$|--\[\[[\s\S]*?\]\]"#
+        case "php":
+            return #"//.*$|/\*[\s\S]*?\*/|#.*$"#
+        case "sql":
+            return #"--.*$|/\*[\s\S]*?\*/"#
+        case "html", "htm":
+            return #"<!--[\s\S]*?-->"#
+        case "css", "sass":
+            return #"/\*[\s\S]*?\*/"#
+        default:
+            return nil
+        }
+    }
+}
+
+@MainActor
+final class SyntaxTextViewInner: NSTextView {
+    weak var parentView: SyntaxTextView?
+    var diffLineTypes: [Int: SyntaxTextView.DiffLineType] = [:] {
+        didSet { needsDisplay = true }
+    }
+
+    override func keyDown(with event: NSEvent) {
+        if let parent = parentView, parent.handleTextViewKeyDown(event) {
+            return
+        }
+        super.keyDown(with: event)
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        parentView?.dismissCompletionPopup()
+        super.mouseDown(with: event)
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        drawDiffLineBackgrounds(dirtyRect)
+        super.draw(dirtyRect)
+    }
+
+    private func drawDiffLineBackgrounds(_ dirtyRect: NSRect) {
+        guard !diffLineTypes.isEmpty, let layoutManager, let textContainer else { return }
+        let glyphRange = layoutManager.glyphRange(forBoundingRect: dirtyRect, in: textContainer)
+        let charRange = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
+        let text = string as NSString
+
+        var lineNumber = 1
+        text.enumerateSubstrings(in: NSRange(location: 0, length: charRange.location), options: [.byLines, .substringNotRequired]) { _, _, _, _ in
+            lineNumber += 1
+        }
+
+        let inset = textContainerInset.height
+        let width = max(bounds.width, dirtyRect.maxX)
+        text.enumerateSubstrings(in: charRange, options: [.byLines, .substringNotRequired]) { [weak self] _, range, _, _ in
+            guard let self else { return }
+            defer { lineNumber += 1 }
+            // .deleted has no corresponding line in this (current) file content to tint —
+            // the gutter bar already marks it. A full-row red band here would land on an
+            // unrelated, unchanged line.
+            guard let type = self.diffLineTypes[lineNumber], type != .deleted else { return }
+            let glyphIndex = layoutManager.glyphIndexForCharacter(at: range.location)
+            var lineRect = layoutManager.lineFragmentRect(forGlyphAt: glyphIndex, effectiveRange: nil)
+            lineRect.origin.x = 0
+            lineRect.size.width = width
+            lineRect.origin.y += inset
+
+            let color: NSColor = type == .added ? .systemGreen : .systemYellow
+            color.withAlphaComponent(0.13).setFill()
+            lineRect.fill()
+        }
+    }
+}
+
+extension SyntaxTextView: NSTextViewDelegate {
+    func textDidChange(_ notification: Notification) {
+        guard isEditMode, let index = symbolIndex else {
+            dismissCompletionPopup()
+            return
+        }
+        index.updateCurrentFileSymbols(text: textView.string)
+        
+        let selectedRange = textView.selectedRange()
+        guard selectedRange.location != NSNotFound, selectedRange.length == 0 else {
+            dismissCompletionPopup()
+            return
+        }
+        
+        let text = textView.string
+        let nsText = text as NSString
+        let cursor = selectedRange.location
+        
+        var start = cursor
+        while start > 0 {
+            let char = nsText.substring(with: NSRange(location: start - 1, length: 1))
+            let isIdentifierChar = char.rangeOfCharacter(from: CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_")) != nil
+            if !isIdentifierChar {
+                break
+            }
+            start -= 1
+        }
+        
+        let prefixRange = NSRange(location: start, length: cursor - start)
+        let prefix = nsText.substring(with: prefixRange)
+        
+        if prefix.count >= 2 {
+            let candidates = index.completions(prefix: prefix)
+            if !candidates.isEmpty {
+                showCompletionPopup(candidates: candidates, prefix: prefix)
+            } else {
+                dismissCompletionPopup()
+            }
+        } else {
+            dismissCompletionPopup()
+        }
+    }
+}
+
+extension Notification.Name {
+    static let viQuitCommand = Notification.Name("KouenViQuitCommand")
+    static let viOpenFileCommand = Notification.Name("KouenViOpenFileCommand")
+    static let viViewFileCommand = Notification.Name("KouenViViewFileCommand")
+    static let viSplitFileCommand = Notification.Name("KouenViSplitFileCommand")
+    static let viFindFileCommand = Notification.Name("KouenViFindFileCommand")
+    static let viWorkbenchCommand = Notification.Name("KouenViWorkbenchCommand")
+    static let viBoardAckCommand = Notification.Name("KouenViBoardAckCommand")
+    static let viNextBufferCommand = Notification.Name("KouenViNextBufferCommand")
+    static let viListBuffersCommand = Notification.Name("KouenViListBuffersCommand")
+}
