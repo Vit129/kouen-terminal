@@ -63,6 +63,13 @@ dist/
 # Per-run hook log, overwritten every commit — not useful in history.
 **/graphify-out/.last-refresh.log
 .robot-output/
+# Robot Framework's own default output location/names (run from the repo root or Tests/)
+/log.html
+/output.xml
+/report.html
+/results/
+__pycache__/
+*.pyc
 
 # Shared agent protocol (symlinked)
 .ai/

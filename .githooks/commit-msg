@@ -10,7 +10,7 @@ if echo "$STAGED" | grep -q "Info.plist"; then
         echo "🛑  Info.plist is staged but this looks like a non-version commit."
         echo "    Message: \"$MSG\""
         echo ""
-        echo "    Unstage it:  git restore --staged Apps/Harness/Sources/HarnessApp/Resources/Info.plist"
+        echo "    Unstage it:  git restore --staged Apps/Kouen/Sources/KouenApp/Resources/Info.plist"
         echo "    Or add 'version' / 'bump' / build number to the message if intentional."
         echo ""
         exit 1

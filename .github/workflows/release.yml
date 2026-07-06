@@ -1,4 +1,4 @@
-name: Release Harness
+name: Release Kouen
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       release_name:
-        description: "GitHub release title (defaults to Harness <version>)"
+        description: "GitHub release title (defaults to Kouen <version>)"
         required: false
         type: string
       deploy_appcast:
@@ -18,7 +18,7 @@ on:
         default: false
 
 concurrency:
-  group: harness-release
+  group: kouen-release
   cancel-in-progress: false
 
 env:
@@ -54,8 +54,8 @@ jobs:
             exit 1
           fi
 
-          VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Apps/Harness/Sources/HarnessApp/Resources/Info.plist)"
-          BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' Apps/Harness/Sources/HarnessApp/Resources/Info.plist)"
+          VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Apps/Kouen/Sources/KouenApp/Resources/Info.plist)"
+          BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' Apps/Kouen/Sources/KouenApp/Resources/Info.plist)"
           EXPECTED_VERSION="${RELEASE_TAG#v}"
           if [[ "$VERSION" != "$EXPECTED_VERSION" ]]; then
             echo "Info.plist version ($VERSION) does not match release tag ($RELEASE_TAG)." >&2
@@ -63,15 +63,15 @@ jobs:
             exit 1
           fi
 
-          # HarnessVersion.swift is what the daemon/CLI report (TERM_PROGRAM_VERSION, the
+          # KouenVersion.swift is what the daemon/CLI report (TERM_PROGRAM_VERSION, the
           # daemon↔app build handshake). It must move in lockstep with Info.plist — v1.3.0
           # and v1.3.1 shipped with it stale at 1.2.0.
-          VERSION_SWIFT="Packages/HarnessCore/Sources/HarnessCore/HarnessVersion.swift"
+          VERSION_SWIFT="Packages/KouenCore/Sources/KouenCore/KouenVersion.swift"
           CODE_SHORT="$(sed -n 's/.*static let short = "\([^"]*\)".*/\1/p' "$VERSION_SWIFT")"
           CODE_BUILD="$(sed -n 's/.*static let build = \([0-9]*\).*/\1/p' "$VERSION_SWIFT")"
           if [[ "$VERSION" != "$CODE_SHORT" || "$BUILD" != "$CODE_BUILD" ]]; then
-            echo "HarnessVersion.swift ($CODE_SHORT/$CODE_BUILD) does not match Info.plist ($VERSION/$BUILD)." >&2
-            echo "Bump HarnessVersion.short/build before running this workflow." >&2
+            echo "KouenVersion.swift ($CODE_SHORT/$CODE_BUILD) does not match Info.plist ($VERSION/$BUILD)." >&2
+            echo "Bump KouenVersion.short/build before running this workflow." >&2
             exit 1
           fi
 
@@ -151,7 +151,7 @@ jobs:
           set -euo pipefail
 
           CERT_PATH="$RUNNER_TEMP/developer-id.p12"
-          KEYCHAIN_PATH="$RUNNER_TEMP/harness-release.keychain-db"
+          KEYCHAIN_PATH="$RUNNER_TEMP/kouen-release.keychain-db"
           KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
 
           if ! printf '%s' "$SIGNING_CERTIFICATE_BASE64" | base64 --decode > "$CERT_PATH" 2>/dev/null; then
@@ -190,20 +190,20 @@ jobs:
           echo "ASC_KEY_PATH=$ASC_KEY_PATH" >> "$GITHUB_ENV"
           echo "SPARKLE_KEY_PATH=$SPARKLE_KEY_PATH" >> "$GITHUB_ENV"
 
-      - name: Build Harness.app
+      - name: Build Kouen.app
         run: make release
 
       - name: Verify release package contents
         run: |
           set -euo pipefail
-          stale_bundles="$(find Harness.app/Contents/Resources -maxdepth 1 -name '*.bundle' -print)"
+          stale_bundles="$(find Kouen.app/Contents/Resources -maxdepth 1 -name '*.bundle' -print)"
           if [[ -n "$stale_bundles" ]]; then
-            echo "Unexpected resource bundle(s) in Harness.app:" >&2
+            echo "Unexpected resource bundle(s) in Kouen.app:" >&2
             echo "$stale_bundles" >&2
             exit 1
           fi
 
-      - name: Sign and notarize Harness.app
+      - name: Sign and notarize Kouen.app
         env:
           SIGNING_IDENTITY: ${{ secrets.SIGNING_IDENTITY }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
@@ -227,14 +227,14 @@ jobs:
 
           RELEASE_NAME="$INPUT_RELEASE_NAME"
           if [[ -z "$RELEASE_NAME" ]]; then
-            RELEASE_NAME="Harness $APP_VERSION ($APP_BUILD)"
+            RELEASE_NAME="Kouen $APP_VERSION ($APP_BUILD)"
           fi
 
           gh release create "$RELEASE_TAG" \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "$RELEASE_NAME" \
-            --notes "Signed and notarized Harness $APP_VERSION ($APP_BUILD)." \
+            --notes "Signed and notarized Kouen $APP_VERSION ($APP_BUILD)." \
             --draft
 
       - name: Finalize release and generate appcast
@@ -252,7 +252,7 @@ jobs:
           make finalize
 
       - name: Smoke test final DMG
-        run: Scripts/smoke-dmg.sh Harness.dmg
+        run: Scripts/smoke-dmg.sh Kouen.dmg
 
       - name: Upload appcast to GitHub release
         env:
@@ -284,7 +284,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add public/appcast.xml
-          git commit -m "Update Harness appcast for $RELEASE_TAG"
+          git commit -m "Update Kouen appcast for $RELEASE_TAG"
           git push
 
       - name: Verify live appcast
@@ -297,12 +297,12 @@ jobs:
           trap 'rm -f "$live"' EXIT
 
           for attempt in {1..30}; do
-            if curl -fsSL -H 'Cache-Control: no-cache' https://harnesscli.dev/appcast.xml -o "$live"; then
+            if curl -fsSL -H 'Cache-Control: no-cache' https://kouencli.dev/appcast.xml -o "$live"; then
               actual="$(shasum -a 256 "$live" | awk '{print $1}')"
               if [[ "$actual" == "$expected" ]] && diff -u dist/appcast.xml "$live"; then
                 grep -q "<sparkle:version>$APP_BUILD</sparkle:version>" "$live"
                 grep -q "<sparkle:shortVersionString>$APP_VERSION</sparkle:shortVersionString>" "$live"
-                grep -q "https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG/Harness.dmg" "$live"
+                grep -q "https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG/Kouen.dmg" "$live"
                 grep -q "sparkle:edSignature=" "$live"
                 echo "Live appcast matches dist/appcast.xml."
                 exit 0
@@ -313,7 +313,7 @@ jobs:
             sleep 10
           done
 
-          echo "https://harnesscli.dev/appcast.xml did not match dist/appcast.xml." >&2
+          echo "https://kouencli.dev/appcast.xml did not match dist/appcast.xml." >&2
           echo "Expected SHA-256: $expected" >&2
           echo "Last live SHA-256: ${actual:-unavailable}" >&2
           exit 1
@@ -327,14 +327,14 @@ jobs:
 
           RELEASE_NAME="$INPUT_RELEASE_NAME"
           if [[ -z "$RELEASE_NAME" ]]; then
-            RELEASE_NAME="Harness $APP_VERSION ($APP_BUILD)"
+            RELEASE_NAME="Kouen $APP_VERSION ($APP_BUILD)"
           fi
 
           gh release edit "$RELEASE_TAG" \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "$RELEASE_NAME" \
-            --notes "Signed and notarized Harness $APP_VERSION ($APP_BUILD)." \
+            --notes "Signed and notarized Kouen $APP_VERSION ($APP_BUILD)." \
             --draft=false \
             --latest
 
@@ -342,9 +342,9 @@ jobs:
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: harness-release-${{ inputs.tag }}
+          name: kouen-release-${{ inputs.tag }}
           path: |
-            Harness.dmg
+            Kouen.dmg
             dist/appcast.xml
           if-no-files-found: ignore
 
