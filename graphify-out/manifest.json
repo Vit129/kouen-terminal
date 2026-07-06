@@ -10,8 +10,8 @@
     "semantic_hash": ""
   },
   "agent-memory/CONTEXT.md": {
-    "mtime": 1783044751.5768487,
-    "ast_hash": "d9d074854e459c7188ed4146c1e295bc",
+    "mtime": 1783334311.6709468,
+    "ast_hash": "b7e62e873e471b09ad099a83de289bf1",
     "semantic_hash": ""
   },
   "agent-memory/INDEX.md": {
@@ -20,8 +20,8 @@
     "semantic_hash": ""
   },
   "agent-memory/MEMORY.md": {
-    "mtime": 1783311312.3585455,
-    "ast_hash": "b9de65dec27ae6aa220ac115db42608a",
+    "mtime": 1783334423.5215833,
+    "ast_hash": "232bb4ec09b644698241836274171d1a",
     "semantic_hash": ""
   },
   "agent-memory/PLAYBOOK.md": {
@@ -150,8 +150,8 @@
     "semantic_hash": ""
   },
   "Scripts/package-app.sh": {
-    "mtime": 1783306380.8713043,
-    "ast_hash": "64509b033f6211c5f705f6f6d280e71b",
+    "mtime": 1783324188.5238974,
+    "ast_hash": "bccc20cd501f5a7548af3fc749aa56db",
     "semantic_hash": ""
   },
   "Scripts/prepare-release.sh": {
@@ -280,8 +280,8 @@
     "semantic_hash": ""
   },
   "AGENTS.md": {
-    "mtime": 1783306380.6885848,
-    "ast_hash": "1ba9918ceeaf0f5be8e392e9146268f5",
+    "mtime": 1783318925.5414371,
+    "ast_hash": "f0fced4c8c6a9abf475b1a8322e3faca",
     "semantic_hash": ""
   },
   "GEMINI.md": {
@@ -505,8 +505,8 @@
     "semantic_hash": ""
   },
   "agent-memory/knowledge/ui/browser-pane.md": {
-    "mtime": 1783147479.28883,
-    "ast_hash": "1c7a4170090a9125d6a5e915a81d0e79",
+    "mtime": 1783334437.0573442,
+    "ast_hash": "b2f71c25b7257c929f6eee984ecfa267",
     "semantic_hash": ""
   },
   "agent-memory/knowledge/ui/git-panel.md": {
@@ -650,7 +650,7 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Resources/Assets.xcassets/AppIcon.appiconset/Contents.json": {
-    "mtime": 1783306380.6893642,
+    "mtime": 1783323819.1100945,
     "ast_hash": "cb25d8883ad1378004ad7385c2ca267d",
     "semantic_hash": ""
   },
@@ -665,8 +665,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/AppDelegate.swift": {
-    "mtime": 1783313321.8324368,
-    "ast_hash": "4bdcfe759ba84c2b521e14519a9d19e3",
+    "mtime": 1783326904.3632703,
+    "ast_hash": "67c48ca10b782d67f7133ee7fbf3a380",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/Scripting/PluginLoader.swift": {
@@ -965,8 +965,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Chrome/BrowserPaneView.swift": {
-    "mtime": 1783306380.7431335,
-    "ast_hash": "a502af2ec2750df942fde0bc9fe922ba",
+    "mtime": 1783332979.6879618,
+    "ast_hash": "67a972d1ab0f8b44796b08b7878989da",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Chrome/ContentAreaViewController.swift": {
@@ -1605,8 +1605,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/KouenVersion.swift": {
-    "mtime": 1783306380.7972364,
-    "ast_hash": "1935c4e394b28111ad118d6172a5c77c",
+    "mtime": 1783314268.713155,
+    "ast_hash": "4cabdcb9ae35ea1659d69fda03ca02a6",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Layouts/LayoutTemplate.swift": {
@@ -1695,8 +1695,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/GeneratedReleaseNotes.swift": {
-    "mtime": 1783306380.8017719,
-    "ast_hash": "11c068f40c0b92690ace92df3d32eaa3",
+    "mtime": 1783314270.0029144,
+    "ast_hash": "41bf45ba1db9e17f5faf6629a1a69f36",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/ReleaseNotes.swift": {
@@ -3610,68 +3610,68 @@
     "semantic_hash": ""
   },
   "agent-memory/plans/p35-oauth-login-embedded-browser.md": {
-    "mtime": 1783306913.9982371,
-    "ast_hash": "085b9b3f77dc5c7a9642e38b0a82de47",
+    "mtime": 1783323855.9247634,
+    "ast_hash": "265f19b09d3f3c78af01d1061f3b62a4",
     "semantic_hash": ""
   },
   "agent-memory/plans/p36-app-use-white-dark-auto-mode.md": {
-    "mtime": 1783306914.0168307,
-    "ast_hash": "b2c187f900ccc0943c6b4d853b319238",
+    "mtime": 1783331909.36374,
+    "ast_hash": "8b20bc51cff02826bcff94cbe5c58048",
     "semantic_hash": ""
   },
   "Apps/Kouen/Resources/AppIcon-1024.png": {
-    "mtime": 1783306380.6891358,
-    "ast_hash": "2e9be7b98fb386b66659770a6ba03441",
+    "mtime": 1783323160.5504725,
+    "ast_hash": "63a00344d4536c21d7ea0a43498d9551",
     "semantic_hash": ""
   },
   "Apps/Kouen/Resources/Assets.xcassets/AppIcon.appiconset/icon_128x128.png": {
-    "mtime": 1783306380.6894906,
-    "ast_hash": "06b9a846ff3ffb0459085a70e1be6e2b",
+    "mtime": 1783323672.508915,
+    "ast_hash": "dd03bf8df393a65b64131396ffae9d8f",
     "semantic_hash": ""
   },
   "Apps/Kouen/Resources/Assets.xcassets/AppIcon.appiconset/icon_128x128@2x.png": {
-    "mtime": 1783306380.689732,
-    "ast_hash": "dab0eb549860c1053df40edec548c42b",
+    "mtime": 1783323672.5194438,
+    "ast_hash": "641894fa2d53307d29815976bf0ac728",
     "semantic_hash": ""
   },
   "Apps/Kouen/Resources/Assets.xcassets/AppIcon.appiconset/icon_16x16.png": {
-    "mtime": 1783306380.6898334,
-    "ast_hash": "230499ebeedebce88dfc3868a2d33ffd",
+    "mtime": 1783323672.4574046,
+    "ast_hash": "6601f4f5065d3f11b924acade04be73f",
     "semantic_hash": ""
   },
   "Apps/Kouen/Resources/Assets.xcassets/AppIcon.appiconset/icon_16x16@2x.png": {
-    "mtime": 1783306380.6899104,
-    "ast_hash": "e2c69965036cabe3015ef905ff5ce107",
+    "mtime": 1783323672.472675,
+    "ast_hash": "803383ef8d023c7585a94e2d3a319f09",
     "semantic_hash": ""
   },
   "Apps/Kouen/Resources/Assets.xcassets/AppIcon.appiconset/icon_256x256.png": {
-    "mtime": 1783306380.6901011,
-    "ast_hash": "dab0eb549860c1053df40edec548c42b",
+    "mtime": 1783323672.5289092,
+    "ast_hash": "641894fa2d53307d29815976bf0ac728",
     "semantic_hash": ""
   },
   "Apps/Kouen/Resources/Assets.xcassets/AppIcon.appiconset/icon_256x256@2x.png": {
-    "mtime": 1783306380.6907446,
-    "ast_hash": "2a2b600251fadd26e2cfc23c5ee94976",
+    "mtime": 1783323672.5428488,
+    "ast_hash": "242e1df199a577134514dded523262a1",
     "semantic_hash": ""
   },
   "Apps/Kouen/Resources/Assets.xcassets/AppIcon.appiconset/icon_32x32.png": {
-    "mtime": 1783306380.6908424,
-    "ast_hash": "e2c69965036cabe3015ef905ff5ce107",
+    "mtime": 1783323672.4868486,
+    "ast_hash": "803383ef8d023c7585a94e2d3a319f09",
     "semantic_hash": ""
   },
   "Apps/Kouen/Resources/Assets.xcassets/AppIcon.appiconset/icon_32x32@2x.png": {
-    "mtime": 1783306380.690921,
-    "ast_hash": "2cab0ba2d43888f29db45e4070636012",
+    "mtime": 1783323672.4987824,
+    "ast_hash": "b758f093b60f31c867713870e4b1ad00",
     "semantic_hash": ""
   },
   "Apps/Kouen/Resources/Assets.xcassets/AppIcon.appiconset/icon_512x512.png": {
-    "mtime": 1783306380.6914532,
-    "ast_hash": "2a2b600251fadd26e2cfc23c5ee94976",
+    "mtime": 1783323672.5533614,
+    "ast_hash": "242e1df199a577134514dded523262a1",
     "semantic_hash": ""
   },
   "Apps/Kouen/Resources/Assets.xcassets/AppIcon.appiconset/icon_512x512@2x.png": {
-    "mtime": 1783306380.6964405,
-    "ast_hash": "2fa93760da58cc8752b8b29912ad58e7",
+    "mtime": 1783323672.5641055,
+    "ast_hash": "63a00344d4536c21d7ea0a43498d9551",
     "semantic_hash": ""
   },
   "Apps/Kouen/Resources/Assets.xcassets/KouenLogo.imageset/kouen-logo.png": {
@@ -3680,8 +3680,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Resources/KouenLogo.png": {
-    "mtime": 1783306380.72663,
-    "ast_hash": "6a1561b1b79218d53a3cfa3e14c66a1e",
+    "mtime": 1783323160.5592878,
+    "ast_hash": "17c39a58ae9786579f15d62359b1f9bd",
     "semantic_hash": ""
   },
   "Apps/Kouen/Resources/icon-source/kouencli-newicon-copy.jpg": {
@@ -3692,6 +3692,11 @@
   "Apps/Kouen/Resources/icon-source/kouencli-newicon.jpg": {
     "mtime": 1783306380.7290983,
     "ast_hash": "e44b299c74fa852fd99dc35d2500d382",
+    "semantic_hash": ""
+  },
+  "Apps/Kouen/Resources/AppIcon-1024-dark.png": {
+    "mtime": 1783331533.8478093,
+    "ast_hash": "13b0cd78539bb7f370eeda0717d26c45",
     "semantic_hash": ""
   }
 }
