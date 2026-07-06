@@ -115,7 +115,7 @@ After installation, `kouen-cli` is available from the app bundle or app-support 
 
 ```bash
 /Applications/Kouen.app/Contents/MacOS/kouen-cli install
-export PATH="$HOME/Library/Application Support/Kouen/bin:$PATH"
+export PATH="$HOME/Library/Application Support/Harness/bin:$PATH"
 ```
 
 Common commands:

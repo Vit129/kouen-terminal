@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# Finalize a Harness release: notarize the (already Developer-ID-signed) DMG, staple it,
+# Finalize a Kouen release: notarize the (already Developer-ID-signed) DMG, staple it,
 # re-upload to the GitHub release, generate the Sparkle appcast, and (optionally) deploy it to
 # the website. This is the one step that needs an Apple credential and a Sparkle signing key —
 # secrets that intentionally live with the human or a protected CI environment, not the repo.
@@ -11,7 +11,7 @@ set -euo pipefail
 # `gh release create`, no notarization/appcast step.
 #
 # Prereq: ./Scripts/build-release.sh && SIGNING_IDENTITY=… ./Scripts/sign-and-notarize.sh && \
-#         ./Scripts/create-dmg.sh   (or `make dmg` + `make sign`) so Harness.app + Harness.dmg exist.
+#         ./Scripts/create-dmg.sh   (or `make dmg` + `make sign`) so Kouen.app + Kouen.dmg exist.
 #
 # Auth — provide ONE of:
 #   App Store Connect API key (recommended):
@@ -24,7 +24,7 @@ set -euo pipefail
 # Optional (all default sensibly — no personal values are hardcoded):
 #   TAG=vX.Y.Z                               # release tag; defaults to v<CFBundleShortVersionString>
 #   REPO=<owner/name>                        # GitHub repo; defaults to the checkout's `gh` context
-#   SIGNING_IDENTITY="Developer ID Application: …"  # defaults to the identity that signed Harness.app
+#   SIGNING_IDENTITY="Developer ID Application: …"  # defaults to the identity that signed Kouen.app
 #   DOWNLOAD_URL_PREFIX=https://github.com/<owner>/<repo>/releases/download/<tag>/
 #                                             # appcast enclosure URL prefix
 #   SPARKLE_EDDSA_PRIVATE_KEY_FILE=/path/to/private-key
@@ -35,11 +35,11 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
-APP="$ROOT/Harness.app"
-DMG="$ROOT/Harness.dmg"
+APP="$ROOT/Kouen.app"
+DMG="$ROOT/Kouen.dmg"
 
-[[ -d "$APP" ]] || { echo "Harness.app missing — run build-release.sh + sign-and-notarize.sh + create-dmg.sh first." >&2; exit 1; }
-[[ -f "$DMG" ]] || { echo "Harness.dmg missing — run create-dmg.sh first." >&2; exit 1; }
+[[ -d "$APP" ]] || { echo "Kouen.app missing — run build-release.sh + sign-and-notarize.sh + create-dmg.sh first." >&2; exit 1; }
+[[ -f "$DMG" ]] || { echo "Kouen.dmg missing — run create-dmg.sh first." >&2; exit 1; }
 
 # Single-source the version: derive it (and the default release TAG) from the *built* app's
 # Info.plist — the one thing that's authoritative about what's actually being shipped — instead of
@@ -109,7 +109,7 @@ else
   echo "==> Generating the Sparkle appcast (a keychain 'Allow' prompt may appear — approve it)…"
 fi
 mkdir -p "$ROOT/dist"
-cp "$DMG" "$ROOT/dist/Harness.dmg"
+cp "$DMG" "$ROOT/dist/Kouen.dmg"
 "$ROOT/Scripts/generate-appcast.sh" "$ROOT/dist"
 
 if [[ "${DEPLOY_WEBSITE:-0}" == "1" ]]; then

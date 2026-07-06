@@ -19,7 +19,7 @@ your comments and trailing commas survive — never reserialized):
   // >>> harness-managed (do not edit) >>>
   "hooks": {
     "harness-notify": {
-      "command": "PATH=\"$HOME/Library/Application Support/Kouen/bin:$PATH\" kouen-cli notify --surface \"$HARNESS_SURFACE\" --title \"OpenClaw\" --body \"Done\"",
+      "command": "PATH=\"$HOME/Library/Application Support/Harness/bin:$PATH\" kouen-cli notify --surface \"$HARNESS_SURFACE\" --title \"OpenClaw\" --body \"Done\"",
     },
   },
   // <<< harness-managed <<<

@@ -17,7 +17,7 @@ first; the region is replaced in place on re-install, never duplicated):
 # >>> harness-managed (do not edit) >>>
 hooks:
   - event: stop
-    command: 'PATH="$HOME/Library/Application Support/Kouen/bin:$PATH" kouen-cli notify --surface "$HARNESS_SURFACE" --title "Hermes" --body "Done"'
+    command: 'PATH="$HOME/Library/Application Support/Harness/bin:$PATH" kouen-cli notify --surface "$HARNESS_SURFACE" --title "Hermes" --body "Done"'
 # <<< harness-managed <<<
 ```
 

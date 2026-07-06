@@ -321,7 +321,7 @@ editor.setTabStatus(workspaceID: match.workspaceID, tabID: match.tabID, ...)
 
 ## kouen-cli
 
-Binary: `.build/{debug,release}/kouen-cli`, `Kouen.app/Contents/MacOS/kouen-cli`, or `~/Library/Application Support/Kouen/bin/kouen-cli` after `install`.
+Binary: `.build/{debug,release}/kouen-cli`, `Kouen.app/Contents/MacOS/kouen-cli`, or `~/Library/Application Support/Harness/bin/kouen-cli` after `install`.
 
 Requires daemon running (app or launchd). Full flags: `kouen-cli` (no args) or [docs/COMMANDS.md](docs/COMMANDS.md).
 
@@ -468,7 +468,7 @@ Per-agent guides: [docs/agent-hooks/](docs/agent-hooks/). Daemon hooks (`hooks.j
 
 **Brand icons:** `AgentChipView`, `TabPillView`, the `MenuBarController` menu, and Settings ▸ Agents render each agent's mark from **`AgentIconArt`** via **`SVGPathParser`** → `CGPath` and **`AgentIconRenderer`** (`templateImage` tintable by `contentTintColor`; `coloredImage` baked for `NSMenuItem`; `monogramTemplate` for the text-only fallback). Sources (attribution in [docs/THIRD-PARTY-NOTICES.md](docs/THIRD-PARTY-NOTICES.md)): **lobe-icons** `@lobehub/icons-static-svg` (MIT) for `codex`, `claude`, `cursor`, `openclaw`, `opencode`, `gemini`, `goose`; a **vendor brand mark** (matching the Skillz app) for `pi` (Inflection). No bundled raster assets — vector, crisp at any size, the same procedural approach as the box-drawing. Agents with no mark (Hermes, Aider) fall back to a tinted two-letter monogram (`AgentIconRenderer.monogramTemplate`); the per-agent color override tints it. **Hermes** uses the monogram deliberately: its official mark is a detailed portrait that is illegible at the 14–18px sizes the icon is shown at.
 
-**MCP (Model Context Protocol):** `kouen-mcp` is a JSON-RPC 2.0 MCP server (stdin/stdout transport) that lets AI agents call Kouen as a tool provider — direction is **agent → Kouen**, opposite of the shelved ACP sidebar. 27 tools across 6 categories: session/pane control, file I/O, git, workbench, browser pane, and agent orchestration. The binary ships at `Kouen.app/Contents/MacOS/kouen-mcp` in production builds (alongside `kouen-cli` and `HarnessDaemon`). Tool policy gating: dangerous tools (control, shell) are blocked by default; enable via `~/Library/Application Support/Kouen/mcp-policy.json` → `"allowControl": true` or `HARNESS_MCP_ALLOW_CONTROL=1` env var.
+**MCP (Model Context Protocol):** `kouen-mcp` is a JSON-RPC 2.0 MCP server (stdin/stdout transport) that lets AI agents call Kouen as a tool provider — direction is **agent → Kouen**, opposite of the shelved ACP sidebar. 27 tools across 6 categories: session/pane control, file I/O, git, workbench, browser pane, and agent orchestration. The binary ships at `Kouen.app/Contents/MacOS/kouen-mcp` in production builds (alongside `kouen-cli` and `HarnessDaemon`). Tool policy gating: dangerous tools (control, shell) are blocked by default; enable via `~/Library/Application Support/Harness/mcp-policy.json` → `"allowControl": true` or `HARNESS_MCP_ALLOW_CONTROL=1` env var.
 
 MCP setup (one command):
 ```bash

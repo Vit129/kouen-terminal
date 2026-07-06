@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-APP="$ROOT/Harness.app"
-DMG="$ROOT/Harness.dmg"
-VOLUME="Harness"
+APP="$ROOT/Kouen.app"
+DMG="$ROOT/Kouen.dmg"
+VOLUME="Kouen"
 
 if [[ ! -d "$APP" ]]; then
   echo "Run Scripts/build-release.sh first." >&2
@@ -13,7 +13,7 @@ fi
 STAGING="$ROOT/.dmg-staging"
 rm -rf "$STAGING" "$DMG"
 mkdir -p "$STAGING"
-ditto "$APP" "$STAGING/Harness.app"
+ditto "$APP" "$STAGING/Kouen.app"
 
 # Optional background: place Scripts/dmg-background.png (600×400) for create-dmg
 BG="$ROOT/Scripts/dmg-background.png"
@@ -25,7 +25,7 @@ if command -v create-dmg &>/dev/null; then
     --window-size 600 400
     --icon-size 100
     --app-drop-link 450 185
-    --hide-extension "Harness.app"
+    --hide-extension "Kouen.app"
   )
   if [[ -f "$BG" ]]; then
     DMG_ARGS+=(--background "$BG")
