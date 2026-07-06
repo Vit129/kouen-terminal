@@ -10,7 +10,7 @@ mkdir -p "$PREVIEW_HOME"
 
 # HARNESS_HOME (and therefore the control socket path) must fit inside
 # sockaddr_un.sun_path (103 bytes on Darwin). A worktree checkout under
-# .claude/worktrees/<random-name> can push "$PREVIEW_HOME/harness.sock" over
+# .claude/worktrees/<random-name> can push "$PREVIEW_HOME/kouen.sock" over
 # that limit, so keep the actual runtime state in a short, stable path under
 # /tmp keyed off $ROOT instead of inside the repo.
 PREVIEW_HARNESS_HOME="/tmp/harness-preview-$(printf '%s' "$ROOT" | md5 | cut -c1-10)"
@@ -58,7 +58,7 @@ BUILD_DIR="$ROOT/.build/debug"
 # ─── Kill previous preview (ONLY preview, never prod) ─────────────────────────
 pkill -f "$APP/Contents/MacOS/Kouen" 2>/dev/null || true
 pkill -f "$APP/Contents/MacOS/KouenDaemon" 2>/dev/null || true
-rm -f "$PREVIEW_HARNESS_HOME/harness.sock" "$PREVIEW_HARNESS_HOME/daemon.pid"
+rm -f "$PREVIEW_HARNESS_HOME/kouen.sock" "$PREVIEW_HARNESS_HOME/daemon.pid"
 
 # ─── Package preview app bundle ───────────────────────────────────────────────
 rm -rf "$APP"
@@ -154,7 +154,7 @@ cat <<EOF
 Launching Harness Preview (isolated SIT environment).
 App bundle:       $APP
 State directory:  $PREVIEW_HARNESS_HOME
-Socket:           $PREVIEW_HARNESS_HOME/harness.sock
+Socket:           $PREVIEW_HARNESS_HOME/kouen.sock
 Build label:      $PREVIEW_BUILD_LABEL
 
 Production app is NOT affected.

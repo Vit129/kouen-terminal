@@ -45,7 +45,7 @@ public enum HarnessPaths {
             #if DEBUG
             if NSClassFromString("XCTestCase") == nil {
                 return fm.homeDirectoryForCurrentUser
-                    .appendingPathComponent("Library/Application Support/HarnessDebug", isDirectory: true)
+                    .appendingPathComponent("Library/Application Support/KouenDebug", isDirectory: true)
             }
             #endif
             
@@ -54,23 +54,48 @@ public enum HarnessPaths {
         return URL(fileURLWithPath: (raw as NSString).expandingTildeInPath, isDirectory: true)
     }
 
+    /// Picks the data-root directory name under `base`: the current name (`newName`) if it
+    /// already exists there, else the pre-rename name (`legacyName`) if *that* exists (an
+    /// upgrade that hasn't been migrated), else the current name (a fresh install — nothing
+    /// exists yet, so there's nothing to preserve). Pure and independent of `fileExists` I/O
+    /// details, so it's testable without touching the real filesystem.
+    ///
+    /// Deliberately a **read fallback**, not a move: renaming `base/legacyName` to
+    /// `base/newName` would touch a live daemon's session/socket state on disk and can't be
+    /// made concurrency-safe against the daemon/CLI/app all calling this at once without a
+    /// lock — not worth it for a directory name nobody ever sees. Whichever name is already
+    /// on disk keeps being used, forever if need be; only a brand-new install gets the new name.
+    static func resolveDataRootName(
+        base: String, newName: String, legacyName: String,
+        fileExistsAtPath: (String) -> Bool = { FileManager.default.fileExists(atPath: $0) }
+    ) -> String {
+        let newPath = (base as NSString).appendingPathComponent(newName)
+        if fileExistsAtPath(newPath) { return newName }
+        let legacyPath = (base as NSString).appendingPathComponent(legacyName)
+        if fileExistsAtPath(legacyPath) { return legacyName }
+        return newName
+    }
+
     public static var applicationSupport: URL {
         if let overrideRoot { return overrideRoot }
         #if os(Linux)
         // Headless/Linux daemon: follow the XDG base-dir spec rather than ~/Library.
         let env = ProcessInfo.processInfo.environment
+        let xdgBase: String
         if let xdg = env["XDG_DATA_HOME"], !xdg.isEmpty {
-            return URL(fileURLWithPath: (xdg as NSString).expandingTildeInPath, isDirectory: true)
-                .appendingPathComponent("harness", isDirectory: true)
+            xdgBase = (xdg as NSString).expandingTildeInPath
+        } else {
+            xdgBase = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".local/share").path
         }
-        return FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".local/share/harness", isDirectory: true)
+        let name = resolveDataRootName(base: xdgBase, newName: "kouen", legacyName: "harness")
+        return URL(fileURLWithPath: xdgBase, isDirectory: true).appendingPathComponent(name, isDirectory: true)
         #else
         // Fall back to ~/Library/Application Support if the lookup ever returns empty
         // (it shouldn't on macOS) rather than force-unwrapping and crashing at launch.
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support", isDirectory: true)
-        return base.appendingPathComponent("Harness", isDirectory: true)
+        let name = resolveDataRootName(base: base.path, newName: "Kouen", legacyName: "Harness")
+        return base.appendingPathComponent(name, isDirectory: true)
         #endif
     }
 
@@ -165,14 +190,14 @@ public enum HarnessPaths {
         let env = ProcessInfo.processInfo.environment
         if let xdg = env["XDG_CACHE_HOME"], !xdg.isEmpty {
             return URL(fileURLWithPath: (xdg as NSString).expandingTildeInPath, isDirectory: true)
-                .appendingPathComponent("harness/pasted-images", isDirectory: true)
+                .appendingPathComponent("kouen/pasted-images", isDirectory: true)
         }
         return FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".cache/harness/pasted-images", isDirectory: true)
+            .appendingPathComponent(".cache/kouen/pasted-images", isDirectory: true)
         #else
         let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
             ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Caches", isDirectory: true)
-        return base.appendingPathComponent("Harness/pasted-images", isDirectory: true)
+        return base.appendingPathComponent("Kouen/pasted-images", isDirectory: true)
         #endif
     }
 
