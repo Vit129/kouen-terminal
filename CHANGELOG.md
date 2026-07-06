@@ -1,10 +1,25 @@
 # Changelog
 
-All notable changes to Harness are documented here. The format is based on
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and Harness follows
+All notable changes to Kouen are documented here. The format is based on
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and Kouen follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
-[GitHub Releases](https://github.com/Vit129/harness-terminal/releases).
+[GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
+## [4.0.0] - 2026-07-06
+
+### Changed
+- Renamed the product from Harness to Kouen (公園, "public park") — "Harness" collided with Harness.io, a real CI/CD platform whose CLI is literally named `harness`
+- New app icon and in-app brand mark, traced from the approved reference design
+- Renamed the executables and CLI surface: `Harness` → `Kouen`, `HarnessDaemon` → `KouenDaemon`, `harness-cli` → `kouen-cli`, `harness-mcp` → `kouen-mcp`
+- Renamed the bundle identifier namespace (`com.vit129.harness.*` → `com.vit129.kouen.*`)
+- Renamed the GitHub repository (`harness-terminal` → `kouen-terminal`)
+- Added a `KOUEN_HOME` environment variable (falls back to the pre-rename `HARNESS_HOME` so existing shell profiles keep working)
+- Migrated the personal script/plugin/project-config directory (`~/.config/harness/` → `~/.config/kouen/`, with a fallback to the old location so existing scripts and plugins keep loading unmoved)
+- Renamed the control socket (`harness.sock` → `kouen.sock`) and shell-completion files (`harness-cli.fish` → `kouen-cli.fish`, etc.)
+
+### Fixed
+- Agent hook notify commands (Claude Code, Codex, Cursor, Grok, OpenCode, Pi, Hermes, OpenClaw) and shell completions (fish/zsh/bash) still referenced the pre-rename `harness-cli` binary name after the executable rename — corrected, with old installs converging to the corrected command on reinstall instead of silently failing
+
 ## [3.14.0] - 2026-07-04
 
 ### Added

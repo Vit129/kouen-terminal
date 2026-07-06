@@ -3,15 +3,33 @@ import XCTest
 
 final class HarnessPathsTests: XCTestCase {
     private var previousHome: String?
+    private var previousKouenHome: String?
 
     override func setUp() {
         super.setUp()
         previousHome = getenv("HARNESS_HOME").map { String(cString: $0) }
+        previousKouenHome = getenv("KOUEN_HOME").map { String(cString: $0) }
+        unsetenv("KOUEN_HOME") // tests opt in explicitly; don't inherit the live shell's value
     }
 
     override func tearDown() {
         if let previousHome { setenv("HARNESS_HOME", previousHome, 1) } else { unsetenv("HARNESS_HOME") }
+        if let previousKouenHome { setenv("KOUEN_HOME", previousKouenHome, 1) } else { unsetenv("KOUEN_HOME") }
         super.tearDown()
+    }
+
+    /// `KOUEN_HOME` is the current name; `HARNESS_HOME` is read as a fallback so an existing
+    /// shell profile or CI config keeps working unmodified after the rename.
+    func testKouenHomeTakesPrecedenceOverHarnessHome() {
+        setenv("HARNESS_HOME", "/tmp/harness-home-should-be-ignored", 1)
+        setenv("KOUEN_HOME", "/tmp/kouen-home-test", 1)
+        XCTAssertEqual(HarnessPaths.applicationSupport.path, "/tmp/kouen-home-test")
+    }
+
+    func testHarnessHomeStillWorksWhenKouenHomeIsUnset() {
+        unsetenv("KOUEN_HOME")
+        setenv("HARNESS_HOME", "/tmp/harness-home-fallback-test", 1)
+        XCTAssertEqual(HarnessPaths.applicationSupport.path, "/tmp/harness-home-fallback-test")
     }
 
     func testHarnessHomeOverrideRootsAllPaths() {
