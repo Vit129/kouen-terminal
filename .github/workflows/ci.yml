@@ -14,12 +14,16 @@ concurrency:
 env:
   # Pin the toolchain to a known major so a `latest-stable` jump (e.g. to a new Xcode with
   # source-breaking changes) can't turn a green main red without a deliberate bump here.
-  XCODE_VERSION: "16"
+  # Bumped 16 -> 26.5 to match the toolchain development actually happens on: KouenWindow.swift's
+  # RL-040 zombie-view workaround uses a `nonisolated` override pattern that Xcode 16's older,
+  # stricter actor-isolation checker rejects outright — CI had been failing on that mismatch
+  # since before this bump, unrelated to any of the changes that shipped alongside it.
+  XCODE_VERSION: "26.5"
 
 jobs:
   build-test:
     name: Build & test (macOS)
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
 
@@ -107,7 +111,7 @@ jobs:
 
   live-daemon-tests:
     name: Live daemon tests (socket / PTY / security)
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
 
@@ -147,7 +151,7 @@ jobs:
 
   lint:
     name: Format lint (advisory)
-    runs-on: macos-15
+    runs-on: macos-26
     # Style only — never block a merge on formatting. Surfaces drift for a human to clean up.
     continue-on-error: true
     steps:
@@ -166,7 +170,7 @@ jobs:
 
   benchmarks:
     name: Benchmarks (non-blocking)
-    runs-on: macos-15
+    runs-on: macos-26
     # Perf baselines are informational here; never block a merge on runner variance.
     continue-on-error: true
     steps:
