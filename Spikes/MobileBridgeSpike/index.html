@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MobileBridgeSpike</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
+<script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+<style>
+  body { font-family: -apple-system, sans-serif; margin: 1rem; background: #111; color: #eee; }
+  input, button { font-size: 1rem; padding: 0.5rem; }
+  #log { white-space: pre-wrap; margin-top: 0.5rem; padding: 0.5rem; background: #000; color: #888; font-size: 0.8rem; border-radius: 6px; min-height: 3rem; max-height: 6rem; overflow-y: auto; }
+  #term { margin-top: 1rem; padding: 0.25rem; background: #000; border-radius: 6px; }
+</style>
+</head>
+<body>
+  <h3>P25 bridge spike — real terminal</h3>
+  <div>
+    <input id="host" placeholder="Tailscale IP, e.g. 100.x.x.x" size="20" /><br/><br/>
+    <input id="token" placeholder="pairing token from the Mac's console" size="20" />
+    <button id="connect">Connect &amp; attach</button>
+  </div>
+  <div id="log"></div>
+  <div id="term"></div>
+
+<script>
+  const log = (msg) => {
+    const el = document.getElementById('log');
+    el.textContent += msg + "\n";
+    el.scrollTop = el.scrollHeight;
+  };
+
+  // Real ANSI/VT rendering — the raw <pre> text dump this spike started with was
+  // unreadable (escape codes shown as literal garbage). xterm.js parses the same
+  // control sequences a real terminal does; a full renderer is still real product
+  // work (P25's own KouenTerminalRenderer, not this), but this makes the spike's
+  // output actually legible.
+  const term = new Terminal({
+    convertEol: true,
+    fontSize: 13,
+    theme: { background: '#000000' },
+  });
+  term.open(document.getElementById('term'));
+  term.resize(80, 30); // matches nothing in particular yet — real resize sync is future work
+
+  // iOS Safari only shows the on-screen keyboard when .focus() runs *inside* a
+  // real user gesture (tap/click) — calling it from the WS "attached" handler
+  // (async, not a gesture) silently no-ops. Tapping the terminal itself is a
+  // genuine gesture, so focus there instead.
+  document.getElementById('term').addEventListener('click', () => term.focus());
+  document.getElementById('term').addEventListener('touchend', () => term.focus());
+
+  let ws = null;
+  let attached = false;
+
+  document.getElementById('connect').addEventListener('click', () => {
+    const host = document.getElementById('host').value.trim();
+    const token = document.getElementById('token').value.trim();
+    if (!host) { log('enter the Mac\'s Tailscale/LAN IP first'); return; }
+    if (!token) { log('enter the pairing token printed on the Mac\'s console first'); return; }
+    attached = false;
+    term.reset();
+    const url = `ws://${host}:7777`;
+    log(`connecting to ${url} ...`);
+    ws = new WebSocket(url);
+    ws.onopen = () => { log('connected, sending pairing token...'); ws.send(token); };
+    ws.onmessage = async (event) => {
+      if (typeof event.data === 'string') {
+        log(`received: ${event.data}`);
+        if (!attached && event.data.includes('"ok":"attached"')) {
+          attached = true;
+          term.focus();
+          log('attached! tap the terminal and type — real keystrokes now, not a line box.');
+        }
+      } else {
+        // binary frame = raw terminal output (replay on attach, then live).
+        const buf = await event.data.arrayBuffer();
+        term.write(new Uint8Array(buf));
+      }
+    };
+    ws.onerror = () => log('connection error (see close reason below)');
+    ws.onclose = (event) => {
+      const wasAttached = attached;
+      attached = false;
+      if (event.wasClean) {
+        log(`closed (code ${event.code}${event.reason ? `: ${event.reason}` : ''})`);
+      } else if (wasAttached) {
+        log(`connection dropped unexpectedly (code ${event.code}) — likely the tab went to background or the network changed. Tap Connect & attach to retry.`);
+      } else {
+        log(`connection dropped before attaching (code ${event.code}). Check the host/token and try again.`);
+      }
+    };
+  });
+
+  // xterm.js already turns keys (incl. arrows, backspace, ctrl combos) into the
+  // right escape sequences — send its raw output straight through as keystrokes.
+  term.onData((data) => {
+    if (!ws || ws.readyState !== WebSocket.OPEN || !attached) return;
+    ws.send(data);
+  });
+
+  // QR pairing lands here via the iPhone's native Camera app opening this exact
+  // URL (?token=...), not an in-page camera scan — no HTTPS requirement. The
+  // host defaults to whatever address this page was actually loaded from, so no
+  // manual IP entry either.
+  document.getElementById('host').value = location.hostname || '';
+  const tokenFromQR = new URLSearchParams(location.search).get('token');
+  if (tokenFromQR) {
+    document.getElementById('token').value = tokenFromQR;
+    document.getElementById('connect').click();
+  }
+</script>
+</body>
+</html>

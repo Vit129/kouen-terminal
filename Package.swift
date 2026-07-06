@@ -32,6 +32,10 @@ let platformProducts: [Product] = [
     // into Kouen.app and shown on first launch.
     .library(name: "KouenOnboarding", targets: ["KouenOnboarding"]),
     .executable(name: "Kouen", targets: ["KouenApp"]),
+    // P25 throwaway spike: proves a phone browser can reach the Mac over WebSocket
+    // (Network.framework, no new dependency) before any real daemon/IPC wiring.
+    // Delete this target once the real bridge lands in KouenDaemonCore.
+    .executable(name: "MobileBridgeSpike", targets: ["MobileBridgeSpike"]),
 ]
 // `kouen-cli`'s `attach-window` compositor renders through the Metal/AppKit terminal kit, so the
 // kit dependency (and the one source file that uses it) is macOS-only; the rest of the CLI — incl.
@@ -82,6 +86,11 @@ let platformTargets: [Target] = [
         ],
         path: "Apps/Kouen/Sources/KouenApp",
         exclude: ["Resources"]
+    ),
+    .executableTarget(
+        name: "MobileBridgeSpike",
+        dependencies: ["KouenCore"],
+        path: "Spikes/MobileBridgeSpike/Sources/MobileBridgeSpike"
     ),
 ]
 let platformTestTargets: [Target] = [
