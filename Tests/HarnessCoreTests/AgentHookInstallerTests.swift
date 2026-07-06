@@ -312,7 +312,7 @@ final class AgentHookInstallerTests: XCTestCase {
         var text = try String(contentsOf: url, encoding: .utf8)
         XCTAssertTrue(text.contains("model: hermes-3"))   // user content preserved
         XCTAssertTrue(text.contains("kouen-cli notify"))
-        XCTAssertTrue(text.contains("harness-managed")) // region sentinel — unchanged by the rename
+        XCTAssertTrue(text.contains("kouen-managed"))
         XCTAssertTrue(AgentHookInstaller.isInstalled(agent: .hermes, homeOverride: home))
 
         // Reinstall replaces the managed region in place — not a second copy.
@@ -374,6 +374,9 @@ final class AgentHookInstallerTests: XCTestCase {
 
     func testRegionEditSkipsTornSentinel() throws {
         // Only the begin marker survives (e.g. a manual edit) — refuse to guess; leave it alone.
+        // Uses the pre-rename sentinel text deliberately — also covers that a torn *legacy*
+        // region is recognized as torn, not mistaken for absent (which would let a second
+        // region get appended alongside it).
         let url = try XCTUnwrap(AgentHookInstaller.hookConfigURL(for: .hermes, homeOverride: home))
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let original = "model: hermes-3\n# >>> harness-managed (do not edit) >>>\nhooks:\n  - event: stop\n"
@@ -382,6 +385,34 @@ final class AgentHookInstallerTests: XCTestCase {
         let result = try AgentHookInstaller.install(agent: .hermes, homeOverride: home)
         XCTAssertTrue(result.needsManualMerge)
         XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), original)
+    }
+
+    /// The migration this exists for: an install from before the Harness->Kouen rename has a
+    /// region wrapped in the old "harness-managed" sentinel. Re-installing must find it via the
+    /// legacy sentinel and replace it in place — converging to the current sentinel — not treat
+    /// the file as region-free (which, combined with the region's own `hooks:` key, would have
+    /// made `definesKey` see a conflict and wrongly report `needsManualMerge`).
+    func testHermesReinstallUpgradesLegacySentinelInPlace() throws {
+        let url = try XCTUnwrap(AgentHookInstaller.hookConfigURL(for: .hermes, homeOverride: home))
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let legacyRegion = """
+        model: hermes-3
+        # >>> harness-managed (do not edit) >>>
+        hooks:
+          - event: stop
+            command: 'harness-cli notify --surface "$HARNESS_SURFACE" --title "Hermes" --body "Done"'
+        # <<< harness-managed <<<
+        """
+        try legacyRegion.write(to: url, atomically: true, encoding: .utf8)
+
+        let result = try AgentHookInstaller.install(agent: .hermes, homeOverride: home)
+        XCTAssertFalse(result.needsManualMerge, "a legacy-sentinel region must upgrade, not be mistaken for a conflict")
+        let text = try String(contentsOf: url, encoding: .utf8)
+        XCTAssertTrue(text.contains("model: hermes-3")) // unrelated content preserved
+        XCTAssertTrue(text.contains("kouen-managed"))
+        XCTAssertTrue(text.contains("kouen-cli notify"))
+        XCTAssertFalse(text.contains("harness-managed"), "converged to a single, current region")
+        XCTAssertEqual(text.components(separatedBy: "hooks:").count - 1, 1, "not a second, duplicate region")
     }
 
     func testFreshOpenClawInstallProducesWrappedObject() throws {
@@ -462,7 +493,7 @@ final class AgentHookInstallerTests: XCTestCase {
         let text = try String(contentsOf: url, encoding: .utf8)
         // The managed region landed inside the real root object, after the header comment.
         let header = try XCTUnwrap(text.range(of: "see docs at"))
-        let region = try XCTUnwrap(text.range(of: "harness-managed"))
+        let region = try XCTUnwrap(text.range(of: "kouen-managed"))
         XCTAssertTrue(header.lowerBound < region.lowerBound, "region must come after the header comment")
         XCTAssertTrue(text.contains("kouen-cli notify"))
         XCTAssertTrue(text.contains("gateway"))
