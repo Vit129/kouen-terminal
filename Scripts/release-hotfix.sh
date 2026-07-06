@@ -150,8 +150,8 @@ update_readme_download() {
   tmp="$(mktemp)"
 
   awk -v tag="$tag" -v version="$version" -v build="$build" -v checksum="$checksum" '
-    /^\*\*\[Download Harness / {
-      print "**[Download Harness " version " (" build ") for macOS ->](https://github.com/Vit129/harness-terminal/releases/download/" tag "/Harness.dmg)**"
+    /^\*\*\[Download Kouen / {
+      print "**[Download Kouen " version " (" build ") for macOS ->](https://github.com/Vit129/kouen-terminal/releases/download/" tag "/Kouen.dmg)**"
       next
     }
     /^SHA-256: `/ {
@@ -231,7 +231,7 @@ run git push origin "refs/tags/$tag" --force
 
 head_sha="$(git rev-parse HEAD)"
 run gh workflow run release.yml \
-  --repo Vit129/harness-terminal \
+  --repo Vit129/kouen-terminal \
   -f "tag=$tag" \
   -f "release_name=$release_name" \
   -f "deploy_appcast=$deploy_appcast_input"
@@ -247,19 +247,19 @@ run_id="$(workflow_run_id_for_head "$head_sha")" || {
 }
 
 echo "Watching workflow run $run_id..."
-gh run watch "$run_id" --repo Vit129/harness-terminal --exit-status
+gh run watch "$run_id" --repo Vit129/kouen-terminal --exit-status
 
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT
 
 gh release download "$tag" \
-  --repo Vit129/harness-terminal \
+  --repo Vit129/kouen-terminal \
   --pattern appcast.xml \
   --dir "$tmpdir"
 
 grep -q "<sparkle:version>$build</sparkle:version>" "$tmpdir/appcast.xml"
 grep -q "<sparkle:shortVersionString>$version</sparkle:shortVersionString>" "$tmpdir/appcast.xml"
-grep -q "https://github.com/Vit129/harness-terminal/releases/download/$tag/Harness.dmg" "$tmpdir/appcast.xml"
+grep -q "https://github.com/Vit129/kouen-terminal/releases/download/$tag/Kouen.dmg" "$tmpdir/appcast.xml"
 grep -q "sparkle:edSignature=" "$tmpdir/appcast.xml"
 
 if [[ "$deploy_appcast" == "1" ]]; then
@@ -268,11 +268,11 @@ if [[ "$deploy_appcast" == "1" ]]; then
 fi
 
 gh release download "$tag" \
-  --repo Vit129/harness-terminal \
-  --pattern Harness.dmg \
+  --repo Vit129/kouen-terminal \
+  --pattern Kouen.dmg \
   --dir "$tmpdir"
 
-checksum="$(shasum -a 256 "$tmpdir/Harness.dmg" | awk '{print $1}')"
+checksum="$(shasum -a 256 "$tmpdir/Kouen.dmg" | awk '{print $1}')"
 update_readme_download "$checksum"
 
 if ! git diff --quiet -- README.md; then
@@ -286,7 +286,7 @@ fi
 notes="$tmpdir/release-notes.md"
 write_release_notes "$checksum" "$notes"
 run gh release edit "$tag" \
-  --repo Vit129/harness-terminal \
+  --repo Vit129/kouen-terminal \
   --target "$(git rev-parse HEAD)" \
   --title "$release_name" \
   --notes-file "$notes" \
@@ -296,4 +296,4 @@ echo
 echo "Release complete:"
 echo "  $release_name"
 echo "  DMG SHA-256: $checksum"
-echo "  https://github.com/Vit129/harness-terminal/releases/tag/$tag"
+echo "  https://github.com/Vit129/kouen-terminal/releases/tag/$tag"

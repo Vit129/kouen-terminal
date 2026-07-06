@@ -20,8 +20,8 @@ public struct SystemdUserInstaller: ServiceInstaller {
     public static func unitContents(daemonPath: URL, harnessHome: URL, logPath: URL) -> String {
         """
         [Unit]
-        Description=Harness terminal daemon
-        Documentation=https://github.com/Vit129/harness-terminal
+        Description=Kouen terminal daemon
+        Documentation=https://github.com/Vit129/kouen-terminal
         After=default.target
 
         [Service]
