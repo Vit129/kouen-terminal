@@ -21,6 +21,7 @@ public final class BrowserPaneView: NSView {
     private var consoleLogs: [String] = []
     private var pendingLogLines: [String] = []
     private var logWriteScheduled = false
+    private var compositorKickInFlight = false
 
     private let tabBar = NSView()
     private let tabBarStack = NSStackView()
@@ -337,7 +338,8 @@ public final class BrowserPaneView: NSView {
         createTab(url: URL(string: home) ?? URL(string: "https://www.google.com")!)
     }
 
-    func createTab(url: URL, configuration: WKWebViewConfiguration? = nil) {
+    @discardableResult
+    func createTab(url: URL, configuration: WKWebViewConfiguration? = nil, skipLoad: Bool = false) -> WKWebView {
         let isFreshConfiguration = configuration == nil
         let config = configuration ?? WKWebViewConfiguration()
         if isFreshConfiguration { config.limitsNavigationsToAppBoundDomains = false }
@@ -359,11 +361,18 @@ public final class BrowserPaneView: NSView {
         let tab = BrowserTab(id: UUID(), webView: newWeb, title: "New Tab")
         tabs.append(tab)
         selectTab(at: tabs.count - 1)
-        if url.isFileURL {
-            newWeb.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
-        } else {
-            newWeb.load(URLRequest(url: url))
+        // skipLoad: true for the createWebViewWith (window.open) path — WKWebView
+        // auto-loads navigationAction.request into the view once we return it from that
+        // delegate method. Calling .load() ourselves here starts a second, disconnected
+        // navigation that severs window.opener (breaks postMessage-based OAuth handoffs).
+        if !skipLoad {
+            if url.isFileURL {
+                newWeb.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
+            } else {
+                newWeb.load(URLRequest(url: url))
+            }
         }
+        return newWeb
     }
 
     private var mainStack: NSStackView!
@@ -468,9 +477,84 @@ public final class BrowserPaneView: NSView {
         })();
         """
         let userScript = WKUserScript(source: js, injectionTime: .atDocumentStart, forMainFrameOnly: false)
-        let controller = webView.configuration.userContentController
-        controller.addUserScript(userScript)
-        controller.add(WeakScriptMessageHandler(self), name: "kouenConsoleLog")
+        let controller0 = webView.configuration.userContentController
+        controller0.addUserScript(userScript)
+        controller0.add(WeakScriptMessageHandler(self), name: "kouenConsoleLog")
+
+        // Nested cross-origin iframe (e.g. a claude.ai artifact embed) doesn't get a
+        // scrolling-tree node built at initial layout, so wheel scroll silently does
+        // nothing until a relayout forces a commit (see kickCompositorRelayout). This
+        // in-frame script fires that native relayout on the user's first pointer move
+        // over the frame — before they scroll — so the node is committed by the time the
+        // first wheel arrives. JS only *signals*; the native side does the fix.
+        var kickJS = """
+        (function() {
+            if (window.self === window.top) return;   // nested frames only
+            if (window.__kouenKickBound) return;
+            window.__kouenKickBound = true;
+            function kick() {
+                try { window.webkit.messageHandlers.kouenCompositorKick.postMessage(1); } catch (e) {}
+            }
+            // Preemptive: fire as the pointer first crosses the frame, before the scroll.
+            // Backstop: the first real wheel gets its own guaranteed shot, so a pre-scroll
+            // hover can't consume the one chance that matters. Two one-shots — bounded, no
+            // perpetual flicker on continued hovering.
+            window.addEventListener('pointermove', kick, { capture: true, passive: true, once: true });
+            window.addEventListener('wheel', kick, { capture: true, passive: true, once: true });
+        })();
+        """
+        #if DEBUG
+        // Proves from the log file alone whether the kick worked: for each wheel in a
+        // nested frame it records the nearest scrollable ancestor's scrollTop before and
+        // after the native scroll. moved=false before the kick lands, moved=true after.
+        kickJS += """
+        (function() {
+            if (window.self === window.top || window.__kouenScrollProbe) return;
+            window.__kouenScrollProbe = true;
+            window.addEventListener('wheel', function(e) {
+                var el = e.target;
+                while (el && el.nodeType === 1) {
+                    var oy = getComputedStyle(el).overflowY;
+                    if ((oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight + 1) break;
+                    el = el.parentElement;
+                }
+                var sc = el || document.scrollingElement || document.documentElement;
+                var before = sc.scrollTop;
+                requestAnimationFrame(function() {
+                    console.log('kouen.scrollprobe dy=' + Math.round(e.deltaY) +
+                        ' before=' + before + ' after=' + sc.scrollTop +
+                        ' moved=' + (sc.scrollTop !== before));
+                });
+            }, { capture: true, passive: true });
+        })();
+        """
+        #endif
+        controller0.addUserScript(WKUserScript(source: kickJS, injectionTime: .atDocumentStart, forMainFrameOnly: false))
+        controller0.add(WeakScriptMessageHandler(self), name: "kouenCompositorKick")
+    }
+
+    // WebKit's async scrolling thread doesn't build a scrolling-tree node for a nested
+    // cross-origin iframe's scrollable content at initial layout, so wheel scrolling (which
+    // runs through the scrolling thread) does nothing — while dragging the scrollbar works,
+    // since that path runs in the web process where the RenderLayer *is* scrollable. A scale
+    // change forces a scrolling-tree commit that builds the node; that's why a manual pinch
+    // fixes it. Real Safari and the top-level document don't need this — only nested frames.
+    // We replicate the pinch at the AppKit level: nudge magnification, then revert once the
+    // commit has run so the zoom is imperceptible. Triggered by the in-frame script above on
+    // the user's first pointer move over the frame (see setupConsoleLogRedirection), so it
+    // fires only when a nested frame exists and its content is laid out — not on a blind
+    // timer. P35 investigation, 2026-07-06, see agent-memory/knowledge/ui/browser-pane.md.
+    private func kickCompositorRelayout(for webView: WKWebView) {
+        guard webView.allowsMagnification, !compositorKickInFlight else { return }
+        compositorKickInFlight = true
+        let current = webView.magnification
+        // Delta must clear WebKit's internal rounding so the scale change is actually
+        // applied (a sub-pixel nudge can be coalesced into a no-op that never commits).
+        webView.setMagnification(current + 0.01, centeredAt: .zero)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self, weak webView] in
+            webView?.setMagnification(current, centeredAt: .zero)
+            self?.compositorKickInFlight = false
+        }
     }
 
     private func setupNetworkCapture(for webView: WKWebView) {
@@ -847,6 +931,9 @@ extension BrowserPaneView: WKNavigationDelegate {
             tabs[idx].title = String(title.prefix(20))
             refreshTabBar()
         }
+        // The nested-iframe scroll fix (kickCompositorRelayout) is driven by the in-frame
+        // pointer-move signal, not from here — a blind post-load timer raced the iframe's
+        // async mount and mis-fired before its scrollable content existed.
         completeLoading()
     }
 
@@ -872,11 +959,21 @@ extension BrowserPaneView: WKNavigationDelegate {
 
 extension BrowserPaneView: WKUIDelegate {
     public func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
-        if navigationAction.targetFrame == nil {
-            let url = navigationAction.request.url ?? URL(string: "about:blank")!
-            createTab(url: url, configuration: configuration)
+        guard navigationAction.targetFrame == nil else { return nil }
+        let url = navigationAction.request.url ?? URL(string: "about:blank")!
+        // Must return the created view (not nil) — returning nil cancels window.open() at the
+        // JS level, leaving window.opener unset in the new tab. OAuth popups (Google GSI's
+        // gsi_transform relay page, and similar) rely on window.opener.postMessage(...) followed
+        // by window.close() to hand the session back and dismiss themselves.
+        // skipLoad: true — WKWebView loads navigationAction.request into the returned view
+        // automatically; loading it again ourselves would sever the window.opener link.
+        return createTab(url: url, configuration: configuration, skipLoad: true)
+    }
+
+    public func webViewDidClose(_ webView: WKWebView) {
+        if let idx = tabs.firstIndex(where: { $0.webView === webView }) {
+            closeTab(at: idx)
         }
-        return nil
     }
 }
 
@@ -1072,6 +1169,10 @@ private final class BrowserProgressLine: NSView {
 
 extension BrowserPaneView: WKScriptMessageHandler {
     public func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        if message.name == "kouenCompositorKick" {
+            if let wv = message.webView { kickCompositorRelayout(for: wv) }
+            return
+        }
         guard let body = message.body as? [String: Any],
               let level = body["level"] as? String,
               let text = body["message"] as? String else {

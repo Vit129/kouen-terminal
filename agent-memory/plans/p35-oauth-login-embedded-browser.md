@@ -61,4 +61,20 @@ working without notice. Apple's own sanctioned path for in-app OAuth is
   is this "I tried to log into $site inside the browser pane and it failed"
   encountered ad hoc?
 
-## Status: Not started — captured for future work, needs the above answered before picking an approach.
+## Status: Fixed (2026-07-06)
+
+Original hypothesis above (Google's anti-phishing embedded-webview block) was wrong —
+live repro reached the Google consent screen fine, which that block would have prevented.
+Real root cause: `BrowserPaneView.createTab` called `.load()` on the popup webview after
+WebKit had already created it via `createWebViewWith`, severing `window.opener` (WKWebView
+auto-loads `navigationAction.request` into the returned view — loading it again yourself
+breaks the opener link). Also missing: `webViewDidClose` (JS `window.close()` was a no-op).
+
+Fix: `createTab(url:configuration:skipLoad:)` skips the redundant load on the popup path;
+`createWebViewWith` returns the created view (was `nil`); added `webViewDidClose`.
+Verified end-to-end: Google login → Allow → popup auto-closes → claude.ai loads
+authenticated. Full case + diagnostic technique: `knowledge/ui/browser-pane.md` → "CASE:
+OAuth login (Google) never completes — P35".
+
+Other providers (GitHub, Microsoft, etc.) not separately tested, but same code path —
+expected to work now for any provider using the standard `window.open()` popup pattern.
