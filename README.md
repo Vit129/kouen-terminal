@@ -10,7 +10,7 @@ Run Claude Code, Codex, Gemini CLI, or any agent side-by-side. Sessions persist 
 
 ## What's different from upstream
 
-This fork started from [robzilla1738/harness-terminal](https://github.com/robzilla1738/harness-terminal) (currently v1.12.1) and has since diverged substantially — 47 releases of its own versus upstream's 23, and five new first-party Swift packages backing the features below. Checked directly against upstream's current source, not assumed:
+This fork started from upstream (currently v1.12.1) and has since diverged substantially — 47 releases of its own versus upstream's 23, and five new first-party Swift packages backing the features below. Checked directly against upstream's current source, not assumed:
 
 - **AI browser control via MCP** — `kouen-mcp` exposes tools like `harnessBrowserOpen` and `harnessBrowserSnapshot` (full list under [AI Browser Control](#ai-browser-control-kouen-mcp)) so agents can drive the embedded browser pane directly. Upstream has no browser pane and no MCP server.
 - **A built-in code editor with LSP** across 21 languages, with vi ex commands `gd` / `K` / `:errors` working against the live session (see [Editor & LSP](#editor--lsp)). Upstream's sidebar is session/tab lists only — no file editor, no LSP.
