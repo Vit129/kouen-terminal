@@ -68,8 +68,10 @@ FloatingPaneController.shared.install()
             Task { @MainActor in
                 SessionCoordinator.shared.applyAutoThemeForCurrentAppearance()
                 self?.mainWindowController?.applyChrome()
+                Self.updateDockIconForCurrentAppearance()
             }
         }
+        Self.updateDockIconForCurrentAppearance()
         // Request notification authorization once at launch instead of on every
         // notification post. macOS only shows the system prompt the first time
         // and silently denies after; doing it eagerly means notifications can
@@ -120,6 +122,23 @@ FloatingPaneController.shared.install()
     /// override — or a per-session / per-tab pin — is never clobbered on relaunch. (The old V1 flag
     /// was a permanent one-shot, so a later mode switch silently failed to re-sync persistence.)
     /// A fresh Plain install becomes ephemeral; an upgraded Full install keeps sessions.
+    /// macOS has no static asset-catalog mechanism for a "mac" idiom app icon to auto-swap with
+    /// system appearance (that's iOS/iPadOS-only, or Xcode 26's GUI-only Icon Composer `.icon`
+    /// format) — so the Dock tile is swapped here instead, at runtime, the same way many
+    /// third-party Mac apps fake it. Only affects the running app's Dock icon; Finder/Launchpad/
+    /// Get Info keep the static Info.plist icon since those are read before the process exists.
+    private static func updateDockIconForCurrentAppearance() {
+        let isDark = NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+        guard isDark else {
+            NSApp.applicationIconImage = nil // falls back to the bundle's default (light) icon
+            return
+        }
+        guard let path = Bundle.main.path(forResource: "AppIcon-1024-dark", ofType: "png"),
+              let image = NSImage(contentsOfFile: path) else { return }
+        NSApp.applicationIconImage = image
+        NSApp.dockTile.display()
+    }
+
     private static func reconcileSessionPersistenceWithMode() {
         let defaults = UserDefaults.standard
         let mode = SessionCoordinator.shared.settings.experienceMode
