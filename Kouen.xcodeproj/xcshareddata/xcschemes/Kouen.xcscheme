@@ -16,9 +16,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "9CAE8F41437D5C28E2B50B85"
-               BuildableName = "Harness.app"
-               BlueprintName = "Harness"
-               ReferencedContainer = "container:Harness.xcodeproj">
+               BuildableName = "Kouen.app"
+               BlueprintName = "Kouen"
+               ReferencedContainer = "container:Kouen.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
          <BuildActionEntry
@@ -30,9 +30,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "FDA3CC3703D3BAB2A5CB6F48"
-               BuildableName = "HarnessCopyModeTests.xctest"
-               BlueprintName = "HarnessCopyModeTests"
-               ReferencedContainer = "container:Harness.xcodeproj">
+               BuildableName = "KouenCopyModeTests.xctest"
+               BlueprintName = "KouenCopyModeTests"
+               ReferencedContainer = "container:Kouen.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
          <BuildActionEntry
@@ -44,9 +44,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "9515B8E3BA6F25B8EF9E7918"
-               BuildableName = "HarnessCoreTests.xctest"
-               BlueprintName = "HarnessCoreTests"
-               ReferencedContainer = "container:Harness.xcodeproj">
+               BuildableName = "KouenCoreTests.xctest"
+               BlueprintName = "KouenCoreTests"
+               ReferencedContainer = "container:Kouen.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
          <BuildActionEntry
@@ -58,9 +58,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "A4D21E44C70DD15E3B8B4194"
-               BuildableName = "HarnessDaemon"
-               BlueprintName = "HarnessDaemon"
-               ReferencedContainer = "container:Harness.xcodeproj">
+               BuildableName = "KouenDaemon"
+               BlueprintName = "KouenDaemon"
+               ReferencedContainer = "container:Kouen.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
          <BuildActionEntry
@@ -72,9 +72,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "5066DE38A62071AAD8BA8A9A"
-               BuildableName = "HarnessDaemonTests.xctest"
-               BlueprintName = "HarnessDaemonTests"
-               ReferencedContainer = "container:Harness.xcodeproj">
+               BuildableName = "KouenDaemonTests.xctest"
+               BlueprintName = "KouenDaemonTests"
+               ReferencedContainer = "container:Kouen.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
          <BuildActionEntry
@@ -86,9 +86,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "352C8E0B8D989854A1ABDC85"
-               BuildableName = "HarnessTerminalKitTests.xctest"
-               BlueprintName = "HarnessTerminalKitTests"
-               ReferencedContainer = "container:Harness.xcodeproj">
+               BuildableName = "KouenTerminalKitTests.xctest"
+               BlueprintName = "KouenTerminalKitTests"
+               ReferencedContainer = "container:Kouen.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
          <BuildActionEntry
@@ -100,9 +100,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "E313A7ED2B31E72C3B248DB0"
-               BuildableName = "harness-cli"
-               BlueprintName = "harness-cli"
-               ReferencedContainer = "container:Harness.xcodeproj">
+               BuildableName = "kouen-cli"
+               BlueprintName = "kouen-cli"
+               ReferencedContainer = "container:Kouen.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -117,9 +117,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "9CAE8F41437D5C28E2B50B85"
-            BuildableName = "Harness.app"
-            BlueprintName = "Harness"
-            ReferencedContainer = "container:Harness.xcodeproj">
+            BuildableName = "Kouen.app"
+            BlueprintName = "Kouen"
+            ReferencedContainer = "container:Kouen.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
       <Testables>
@@ -129,9 +129,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "9515B8E3BA6F25B8EF9E7918"
-               BuildableName = "HarnessCoreTests.xctest"
-               BlueprintName = "HarnessCoreTests"
-               ReferencedContainer = "container:Harness.xcodeproj">
+               BuildableName = "KouenCoreTests.xctest"
+               BlueprintName = "KouenCoreTests"
+               ReferencedContainer = "container:Kouen.xcodeproj">
             </BuildableReference>
          </TestableReference>
          <TestableReference
@@ -140,9 +140,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "5066DE38A62071AAD8BA8A9A"
-               BuildableName = "HarnessDaemonTests.xctest"
-               BlueprintName = "HarnessDaemonTests"
-               ReferencedContainer = "container:Harness.xcodeproj">
+               BuildableName = "KouenDaemonTests.xctest"
+               BlueprintName = "KouenDaemonTests"
+               ReferencedContainer = "container:Kouen.xcodeproj">
             </BuildableReference>
          </TestableReference>
          <TestableReference
@@ -151,9 +151,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "352C8E0B8D989854A1ABDC85"
-               BuildableName = "HarnessTerminalKitTests.xctest"
-               BlueprintName = "HarnessTerminalKitTests"
-               ReferencedContainer = "container:Harness.xcodeproj">
+               BuildableName = "KouenTerminalKitTests.xctest"
+               BlueprintName = "KouenTerminalKitTests"
+               ReferencedContainer = "container:Kouen.xcodeproj">
             </BuildableReference>
          </TestableReference>
          <TestableReference
@@ -162,9 +162,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "FDA3CC3703D3BAB2A5CB6F48"
-               BuildableName = "HarnessCopyModeTests.xctest"
-               BlueprintName = "HarnessCopyModeTests"
-               ReferencedContainer = "container:Harness.xcodeproj">
+               BuildableName = "KouenCopyModeTests.xctest"
+               BlueprintName = "KouenCopyModeTests"
+               ReferencedContainer = "container:Kouen.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -186,9 +186,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "9CAE8F41437D5C28E2B50B85"
-            BuildableName = "Harness.app"
-            BlueprintName = "Harness"
-            ReferencedContainer = "container:Harness.xcodeproj">
+            BuildableName = "Kouen.app"
+            BlueprintName = "Kouen"
+            ReferencedContainer = "container:Kouen.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
       <CommandLineArguments>
@@ -205,9 +205,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "9CAE8F41437D5C28E2B50B85"
-            BuildableName = "Harness.app"
-            BlueprintName = "Harness"
-            ReferencedContainer = "container:Harness.xcodeproj">
+            BuildableName = "Kouen.app"
+            BlueprintName = "Kouen"
+            ReferencedContainer = "container:Kouen.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>
