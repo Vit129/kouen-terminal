@@ -34,15 +34,15 @@ kill_stale() {
   sleep 0.5
 }
 
-# prod/run builds at the repo root share the production HARNESS_HOME
-# (~/Library/Application Support/Harness) with /Applications/Kouen.app and the
-# launchd-managed daemon (`make install`). Without stopping those too, the fresh
-# repo-root app reconnects to the old launchd daemon/socket and looks unchanged.
-# `preview` uses an isolated HARNESS_HOME and never goes through this path.
+# prod/run builds at the repo root share the production KOUEN_HOME
+# (~/Library/Application Support/Kouen, or /Harness if not yet migrated) with
+# /Applications/Kouen.app and the launchd-managed daemon (`make install`). Without stopping
+# those too, the fresh repo-root app reconnects to the old launchd daemon/socket and looks
+# unchanged. `preview` uses an isolated KOUEN_HOME and never goes through this path.
 kill_stale_prod() {
   kill_stale
 
-  # When running inside Harness, skip killing /Applications instance + its daemon —
+  # When running inside Kouen, skip killing /Applications instance + its daemon —
   # that would destroy our own terminal session mid-script.
   if [[ "${TERM_PROGRAM:-}" == "Kouen" ]]; then
     return
@@ -53,6 +53,7 @@ kill_stale_prod() {
   launchctl bootout "gui/$(id -u)/com.vit129.kouen.daemon" 2>/dev/null || true
   launchctl bootout "gui/$(id -u)/com.vit129.harness.daemon" 2>/dev/null || true
   launchctl bootout "gui/$(id -u)/com.robert.harness.daemon" 2>/dev/null || true
+  pkill -f "$HOME/Library/Application Support/Kouen/bin/KouenDaemon" 2>/dev/null || true
   pkill -f "$HOME/Library/Application Support/Harness/bin/KouenDaemon" 2>/dev/null || true
   sleep 0.5
 }

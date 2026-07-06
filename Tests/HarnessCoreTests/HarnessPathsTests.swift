@@ -32,6 +32,56 @@ final class HarnessPathsTests: XCTestCase {
         XCTAssertEqual(HarnessPaths.applicationSupport.path, "/tmp/harness-home-fallback-test")
     }
 
+    // MARK: - Data root name resolution (Harness -> Kouen, read-fallback)
+    //
+    // Deliberately a read fallback, not a physical move — see resolveDataRootName's doc comment.
+    // Testing the pure function directly (rather than `applicationSupport` end-to-end) sidesteps
+    // `overrideRoot`, which every other test in this file sets — that's how the previous version
+    // of this logic shipped a migration branch the suite could never actually exercise.
+
+    func testDataRootUsesNewNameWhenOnlyNewExists() {
+        let name = HarnessPaths.resolveDataRootName(
+            base: "/unused", newName: "Kouen", legacyName: "Harness",
+            fileExistsAtPath: { $0 == "/unused/Kouen" })
+        XCTAssertEqual(name, "Kouen")
+    }
+
+    func testDataRootFallsBackToLegacyNameWhenOnlyLegacyExists() {
+        let name = HarnessPaths.resolveDataRootName(
+            base: "/unused", newName: "Kouen", legacyName: "Harness",
+            fileExistsAtPath: { $0 == "/unused/Harness" })
+        XCTAssertEqual(name, "Harness", "an un-migrated upgrade keeps reading its existing directory")
+    }
+
+    func testDataRootPrefersNewNameWhenBothExist() {
+        let name = HarnessPaths.resolveDataRootName(
+            base: "/unused", newName: "Kouen", legacyName: "Harness",
+            fileExistsAtPath: { $0 == "/unused/Kouen" || $0 == "/unused/Harness" })
+        XCTAssertEqual(name, "Kouen")
+    }
+
+    func testDataRootUsesNewNameWhenNeitherExists() {
+        let name = HarnessPaths.resolveDataRootName(
+            base: "/unused", newName: "Kouen", legacyName: "Harness",
+            fileExistsAtPath: { _ in false })
+        XCTAssertEqual(name, "Kouen", "a fresh install has nothing to preserve")
+    }
+
+    /// Same logic against the real filesystem (default `fileExistsAtPath`, not a stub) — proves
+    /// the actual `FileManager.fileExists` wiring behaves the same as the stubbed unit tests above.
+    func testDataRootResolutionAgainstRealDiskFallsBackToLegacyDirectory() throws {
+        let tempBase = FileManager.default.temporaryDirectory
+            .appendingPathComponent("kouen-approot-test-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempBase, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempBase) }
+        let legacyDir = tempBase.appendingPathComponent("Harness", isDirectory: true)
+        try FileManager.default.createDirectory(at: legacyDir, withIntermediateDirectories: true)
+
+        let resolved = HarnessPaths.resolveDataRootName(
+            base: tempBase.path, newName: "Kouen", legacyName: "Harness")
+        XCTAssertEqual(resolved, "Harness")
+    }
+
     func testHarnessHomeOverrideRootsAllPaths() {
         setenv("HARNESS_HOME", "/tmp/harness-paths-test", 1)
         XCTAssertEqual(HarnessPaths.applicationSupport.path, "/tmp/harness-paths-test")
@@ -64,14 +114,21 @@ final class HarnessPathsTests: XCTestCase {
         }
     }
 
-    func testWithoutOverrideFallsBackToPlatformDefaultHarnessHome() {
+    /// Without an override, the real machine's own state decides Kouen vs. the pre-rename
+    /// Harness (see `resolveDataRootName`) — a fresh machine gets Kouen, an unmigrated upgrade
+    /// keeps Harness. Either is correct; only a third answer (or an unrelated path) is a bug.
+    func testWithoutOverrideFallsBackToPlatformDefaultDataHome() {
         unsetenv("HARNESS_HOME")
         let path = HarnessPaths.applicationSupport.path
         XCTAssertFalse(path.isEmpty)
         #if canImport(Glibc)
-        XCTAssertTrue(path.hasSuffix("/.local/share/harness"), "expected an XDG harness data path, got \(path)")
+        XCTAssertTrue(
+            path.hasSuffix("/.local/share/kouen") || path.hasSuffix("/.local/share/harness"),
+            "expected an XDG kouen or harness data path, got \(path)")
         #else
-        XCTAssertTrue(path.hasSuffix("/Harness"), "expected an Application Support/Harness path, got \(path)")
+        XCTAssertTrue(
+            path.hasSuffix("/Kouen") || path.hasSuffix("/Harness"),
+            "expected an Application Support/Kouen or /Harness path, got \(path)")
         #endif
     }
 

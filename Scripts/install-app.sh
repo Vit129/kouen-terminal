@@ -11,7 +11,17 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 DEST="/Applications/Kouen.app"
-APP_SUPPORT="$HOME/Library/Application Support/Harness"
+# Mirrors HarnessPaths.resolveDataRootName: prefer Kouen if it already exists (already
+# migrated, or a fresh install); fall back to reading Harness if that's what's actually on
+# disk (an upgrade nothing has migrated yet). Never a physical move — see that function's
+# doc comment for why.
+if [[ -d "$HOME/Library/Application Support/Kouen" ]]; then
+  APP_SUPPORT="$HOME/Library/Application Support/Kouen"
+elif [[ -d "$HOME/Library/Application Support/Harness" ]]; then
+  APP_SUPPORT="$HOME/Library/Application Support/Harness"
+else
+  APP_SUPPORT="$HOME/Library/Application Support/Kouen"
+fi
 APP_SUPPORT_BIN="$APP_SUPPORT/bin"
 LAUNCH_AGENT="$HOME/Library/LaunchAgents/com.vit129.kouen.daemon.plist"
 NO_BUILD=0
