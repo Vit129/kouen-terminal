@@ -15,5 +15,5 @@ public enum KouenVersion {
     public static let short = "4.0.0"
     /// Build number, matches `CFBundleVersion`. Used as the secondary-DA firmware field
     /// and as the daemon↔app/CLI staleness handshake in `daemonStats`.
-    public static let build = 191
+    public static let build = 192
 }
