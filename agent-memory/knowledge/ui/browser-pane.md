@@ -180,6 +180,120 @@ override func mouseUp(with event: NSEvent) {
 even with `delaysPrimaryMouseButtonEvents = false`. If you need both "select area" and
 "close button" in one view, use `mouseUp` override — never gesture recognizer.
 
+## CASE: OAuth login (Google) never completes — P35 (2026-07-06)
+
+**Symptom:** Sign in with Google inside the browser pane reaches the Google consent
+screen fine, user clicks Allow, popup shows a blank `accounts.google.com/gsi/transform`
+page and never closes; opener tab (claude.ai) stays on `/login`.
+
+**Root cause:** `createWebViewWith` (WKUIDelegate, target=_blank / `window.open()`) called
+`createTab(url:configuration:)`, which — like the "+ new tab" path — always did
+`newWeb.load(URLRequest(url:))`. Per Apple's documented contract, once you return the
+`WKWebView` from `createWebViewWith`, **WebKit itself loads `navigationAction.request`
+into it** — calling `.load()` yourself starts a second, disconnected navigation that
+severs `window.opener` for that browsing context. Confirmed via injected diagnostic JS
+(`console.log('opener=' + (window.opener ? 'set' : 'null'))` + a `message` event listener,
+piped through the existing `kouenConsoleLog` → `/tmp/kouen-browser-<paneID>.log` file —
+NOT app stdout/NSLog, that's a separate pipe): `window.opener` was `null` on *every*
+navigation inside the Google popup, from the very first one. Ruled out Google's
+anti-phishing embedded-webview block (P35's original hypothesis) since the repro reached
+the consent screen — that block fires *before* login, not after. Ruled out
+Cross-Origin-Opener-Policy since that would also break the same flow in real Safari.
+
+Also found: `webViewDidClose(_:)` was never implemented, so the popup's JS
+`window.close()` (part of Google GSI's postMessage-then-close handoff) was a silent no-op
+— even after fixing `window.opener`, the tab would've stayed open.
+
+**Fix (`BrowserPaneView.swift`):**
+1. `createTab(url:configuration:skipLoad:)` — new `skipLoad` param, `true` only when
+   called from `createWebViewWith`.
+2. `createWebViewWith` returns the created `WKWebView` (was `nil` — also wrong: returning
+   `nil` cancels `window.open()` at the JS level).
+3. Added `webViewDidClose(_:)` → finds the tab by `webView` identity, calls `closeTab`.
+
+**Lesson:** `WKUIDelegate.createWebViewWith` has a hard invariant — return the view you
+created, never call `.load()`/`.loadFileURL()` on it yourself. Any future popup-handling
+code in this file must respect that. Diagnostic technique worth reusing: page-side
+`console.log` already routes to a per-pane `/tmp/kouen-browser-<paneID>.log` file (find
+the newest one; `$TMPDIR` for a GUI app launched outside a shell is `/var/folders/.../T/`,
+not `/tmp`) — cheaper than attaching Safari Web Inspector for this kind of opener/postMessage
+question.
+
+## CASE: Nested cross-origin iframe won't wheel-scroll — FIXED, confirmed (2026-07-06)
+
+**Symptom:** A claude.ai "artifact" URL (`claude.ai/code/artifact/<id>`, content rendered in
+a nested cross-origin iframe at `<uuid>.frame.claudeusercontent.com`) doesn't respond to
+mouse-wheel/trackpad scroll over the embedded content in the browser pane. Scrollbar-thumb
+drag works fine. Ordinary pages (wikipedia, a google search) wheel-scroll fine in the same
+pane. The identical artifact URL opened in real Safari.app (same WebKit engine) scrolls
+fine — this is Kouen-specific, not upstream/WebKit-wide.
+
+**Root cause (researched via Opus subagent, not guessed):** WebKit's async scrolling
+*thread* never builds a scrolling-tree node for this nested iframe's scrollable content at
+initial layout in this app's WKWebView embedding — wheel scroll runs through that thread,
+so with no node it silently no-ops (matches WebKit bugzilla 124139, "wheel events dropped
+from iframe on first load"). Scrollbar drag works because that path runs in the *web
+process*, where the `RenderLayer` genuinely is scrollable — a completely different code
+path from wheel delivery. A pinch-to-zoom (magnification change) forces a scrolling-tree
+*commit*, which is why the user's manual pinch made scroll start working — that observation
+was the key clue that cracked this (see ledger below).
+
+**Diagnostic ledger (each ruled a candidate in or out — don't re-run these):**
+1. `allowsMagnification` / `allowsBackForwardNavigationGestures` disabled, rebuilt,
+   retested → no change. Not the cause.
+2. `customUserAgent` spoofed to real desktop Safari UA, rebuilt, retested → no change. Not
+   UA-sniffed server-side content variance.
+3. Injected `wheel` listener at bubble phase (not capture — capture-phase logging gave a
+   false "not prevented" reading earlier since it fires *before* the page's own bubble
+   handlers) confirmed: event dispatches with correct `deltaY`/`deltaX`,
+   `defaultPrevented=false` on every event, in both the nested iframe and the outer
+   claude.ai document. Not the artifact's own JS eating the event.
+4. Grepped/graphed the whole codebase for anything in Kouen's own AppKit layer that could
+   intercept wheel before WKWebView sees it: no `scrollWheel(_:)` override near the browser
+   pane (the only two exist in `KouenTerminalKit`, used only by `.terminal` leaves), no
+   custom `NSGestureRecognizer` on any ancestor, no ancestor `NSScrollView`, no global/local
+   `NSEvent` monitor anywhere in the app. Ruled out the native-interception family entirely.
+
+**Fix attempts:**
+- v1 (abandoned): JS polyfill — detect via `requestAnimationFrame` whether native scroll
+  moved `scrollTop`, manually drive it if not. First version re-probed every wheel event,
+  racing the burst of events one trackpad gesture fires (an earlier event's manual nudge
+  made a later event's own check falsely read "native works"). Fixed to decide once and
+  commit — user reported "scrolled a little then stopped" anyway. Removed entirely once the
+  magnification clue arrived; don't resurrect this pattern without a new reason.
+- v2 (in code now, **confirmed** via repeated-scroll manual retest — multiple gestures over
+  several seconds, `moved=true` persisted, the revert-to-original step did not re-drop the
+  scroll-tree node):
+  `kickCompositorRelayout(for:)` nudges `webView.magnification` by `+0.01` (delta has to
+  clear WebKit's internal rounding — `0.0001` in an earlier attempt was likely coalesced
+  into a no-op) then reverts 50ms later, guarded by `compositorKickInFlight`. Triggered by
+  an in-frame injected script (`forMainFrameOnly:false`, so it runs inside the nested
+  iframe) that posts a `kouenCompositorKick` message on the **first `pointermove` over the
+  frame** (pre-emptive, before the user scrolls) with the first `wheel` as an independent
+  one-shot backstop — replaces an earlier blind `didFinish + 1.2s` timer that fired before
+  the nested iframe had even mounted (confirmed via console-log timing: the iframe's own
+  connection handshake lands ~2-3s after the outer page's `didFinish`).
+- **Known risk, called out by the investigation itself:** the kick commits the scroll-tree
+  build at `+0.01`, then the revert *re-runs* the tree build at the original scale. If the
+  node is fragile, the revert could re-drop it — reproducing the v1 "scrolled a little then
+  stopped" symptom by a different mechanism. A `#if DEBUG`-gated probe
+  (`console.log('kouen.scrollprobe … moved=true/false')`, reusing the existing
+  `kouenConsoleLog` pipe) logs whether the nearest scrollable ancestor's `scrollTop` actually
+  changed after each wheel event in a nested frame — **the definitive test is `moved=true`
+  persisting across several repeated scroll gestures over multiple seconds, not a single
+  scroll.** If it flips back to `moved=false` on a later gesture, the fallback is to hold the
+  magnification at the nudged value instead of reverting (must toggle against a captured
+  baseline per-navigation, not `current + 0.01` repeatedly, or it accumulates).
+
+**Lesson:** when a wheel-scroll bug reproduces only for a *nested* frame and not the
+top-level document in the same WKWebView, and the DOM event fires correctly with
+`defaultPrevented=false`, suspect the async scrolling-tree/compositor layer, not JS event
+handling or AppKit-level event interception — a scale/geometry change that forces a
+scrolling-tree commit (magnification, or potentially a genuine frame-size nudge) is the
+right category of fix, not a JS `scrollTop` polyfill. Log `deltaPrevented` in the
+**bubble** phase, not capture — a capture-phase listener fires before the page's own bubble
+handlers and gives a false "nothing prevented this" reading.
+
 ## Local HTML Rendering (2026-07-04)
 
 Double-clicking a `.html`/`.htm` file in the file tree (`FileTreeSwiftUIView.openFile()`)
