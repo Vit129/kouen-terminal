@@ -1,6 +1,6 @@
 # Experience modes
 
-Harness presents four **experience modes**. A mode changes which controls are visible, the
+Kouen presents four **experience modes**. A mode changes which controls are visible, the
 default session-persistence policy, and how prominent agent workflows are.
 
 Switch modes any time in **Settings → Terminal → Experience**. New installs start in
@@ -23,7 +23,7 @@ shells. Splits and tabs are still available via the menu shortcuts (`⌘D/⌘⇧
 ## 2. Persistent Terminal
 
 Visually identical to Plain, but sessions **survive** a clean quit and can be attached and
-driven from the CLI (`harness-cli attach`, `attach-window`). Promote/demote individual
+driven from the CLI (`kouen-cli attach`, `attach-window`). Promote/demote individual
 sessions (see *Persistence*, below).
 
 ## 3. Full Terminal
@@ -58,7 +58,7 @@ keepSessionsOnQuit (global)  ||  session.persistent (per-session pin)
   off (Plain mode). Promote/demote:
   - GUI: right-click a session in the sidebar → **Keep running after quit** (shown only when the
     global switch is off, so the checkmark can't lie).
-  - CLI: `harness-cli promote-session --session <uuid>` / `demote-session --session <uuid>`.
+  - CLI: `kouen-cli promote-session --session <uuid>` / `demote-session --session <uuid>`.
 
 ## Opting into the prefix + status line without switching modes
 

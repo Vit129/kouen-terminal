@@ -14,12 +14,12 @@ Writes `~/.grok/hooks/kouen.json`:
 
 ```json
 {
-  "on-complete": "PATH=\"$HOME/Library/Application Support/Harness/bin:$PATH\" kouen-cli notify --surface \"$HARNESS_SURFACE\" --title \"Grok\" --body \"Done\"",
-  "on-error": "PATH=\"$HOME/Library/Application Support/Harness/bin:$PATH\" kouen-cli notify --surface \"$HARNESS_SURFACE\" --title \"Grok\" --body \"Error\""
+  "on-complete": "PATH=\"$HOME/Library/Application Support/Kouen/bin:$PATH\" kouen-cli notify --surface \"$KOUEN_SURFACE\" --title \"Grok\" --body \"Done\"",
+  "on-error": "PATH=\"$HOME/Library/Application Support/Kouen/bin:$PATH\" kouen-cli notify --surface \"$KOUEN_SURFACE\" --title \"Grok\" --body \"Error\""
 }
 ```
 
-`$HARNESS_SURFACE` is exported by Kouen for every pane, so the hook always
+`$KOUEN_SURFACE` is exported by Kouen for every pane, so the hook always
 notifies the right tab. Because this is a dedicated Kouen file, re-running
 `install-hooks grok` simply overwrites it — your other `~/.grok/hooks/*.json`
 files are left alone.

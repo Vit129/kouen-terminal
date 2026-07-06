@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """Cross-terminal PTY output-stress runner (implementation-independent).
 
-Runs inside ANY terminal (Harness, Ghostty, Terminal.app, …): it writes first-party byte
+Runs inside ANY terminal (Kouen, Ghostty, Terminal.app, …): it writes first-party byte
 payloads to stdout (the PTY slave) and times how long each `write` loop takes to drain — i.e.
 how fast the host terminal consumes/draws the stream end to end. Higher MB/s = faster.
 
 This script is deliberately self-contained and never imported, linked, or shelled-out from
-Harness product code — it is a measurement tool only. Run the same payloads in each terminal,
+Kouen product code — it is a measurement tool only. Run the same payloads in each terminal,
 five runs each, and compare medians.
 
-    # in a Harness pane, then in a Ghostty window (matched: Menlo 14, black bg, opacity 1,
+    # in a Kouen pane, then in a Ghostty window (matched: Menlo 14, black bg, opacity 1,
     # blur 0, padding 0, 160x48):
-    python3 Scripts/benchmarks/terminal_stress_runner.py harness out.jsonl out.done
+    python3 Scripts/benchmarks/terminal_stress_runner.py kouen out.jsonl out.done
 
 Results append one JSON line per workload to <result.jsonl>. See README.md.
 """

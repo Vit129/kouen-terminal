@@ -12,9 +12,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-INFO_PLIST="Apps/Harness/Sources/HarnessApp/Resources/Info.plist"
-HARNESS_VERSION_SWIFT="Packages/HarnessCore/Sources/HarnessCore/HarnessVersion.swift"
-RELEASE_NOTES_SWIFT="Packages/HarnessCore/Sources/HarnessCore/ReleaseNotes/GeneratedReleaseNotes.swift"
+INFO_PLIST="Apps/Kouen/Sources/KouenApp/Resources/Info.plist"
+KOUEN_VERSION_SWIFT="Packages/KouenCore/Sources/KouenCore/KouenVersion.swift"
+RELEASE_NOTES_SWIFT="Packages/KouenCore/Sources/KouenCore/ReleaseNotes/GeneratedReleaseNotes.swift"
 
 plist_version="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$INFO_PLIST")"
 plist_build="$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$INFO_PLIST")"
@@ -181,10 +181,10 @@ if [[ "$dry_run" == "0" ]]; then
   sed -E \
     -e "s/public static let short = \"[^\"]+\"/public static let short = \"$version\"/" \
     -e "s/public static let build = [0-9]+/public static let build = $build/" \
-    "$HARNESS_VERSION_SWIFT" > "$tmp"
-  mv "$tmp" "$HARNESS_VERSION_SWIFT"
+    "$KOUEN_VERSION_SWIFT" > "$tmp"
+  mv "$tmp" "$KOUEN_VERSION_SWIFT"
 else
-  echo "+ update $HARNESS_VERSION_SWIFT short=$version build=$build"
+  echo "+ update $KOUEN_VERSION_SWIFT short=$version build=$build"
 fi
 
 if [[ "$cl_version" != "$version" ]]; then
@@ -227,7 +227,7 @@ run make release-notes
 
 echo ""
 echo "Changed release files:"
-git --no-pager diff -- "$INFO_PLIST" "$HARNESS_VERSION_SWIFT" "$RELEASE_NOTES_SWIFT" CHANGELOG.md || true
+git --no-pager diff -- "$INFO_PLIST" "$KOUEN_VERSION_SWIFT" "$RELEASE_NOTES_SWIFT" CHANGELOG.md || true
 
 echo ""
 echo "Release metadata prepared. Next:"

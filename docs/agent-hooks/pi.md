@@ -19,7 +19,7 @@ import { execSync } from "node:child_process"
 export function activate(api: any) {
   const notify = (body: string) =>
     execSync(
-      `PATH="$HOME/Library/Application Support/Harness/bin:$PATH" kouen-cli notify --surface "${process.env.HARNESS_SURFACE ?? ""}" --title "Pi" --body "${body}"`,
+      `PATH="$HOME/Library/Application Support/Kouen/bin:$PATH" kouen-cli notify --surface "${process.env.KOUEN_SURFACE ?? ""}" --title "Pi" --body "${body}"`,
       { stdio: "ignore" }
     )
   api.on?.("session_end", () => notify("Done"))
@@ -27,7 +27,7 @@ export function activate(api: any) {
 }
 ```
 
-The extension reads `$HARNESS_SURFACE` (exported by Kouen for every pane) so
+The extension reads `$KOUEN_SURFACE` (exported by Kouen for every pane) so
 the notification lands on the right tab. Re-running `install-hooks pi`
 overwrites this file in place (backing up the previous copy).
 

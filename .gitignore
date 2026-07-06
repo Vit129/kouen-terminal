@@ -16,7 +16,7 @@ Kouen.dmg
 *.dmg
 Kouen-notarize.zip
 *.notarize.zip
-.harness-preview/
+.kouen-preview/
 .dmg-staging/
 .icon-staging*/
 .env
@@ -48,7 +48,7 @@ marketing/video/*.webm
 dist/
 # `**/` needed since these patterns have a slash in the middle — without it git anchors
 # them to the repo root only (per gitignore's own rule), missing nested copies like
-# Tests/HarnessRobotTests/graphify-out/cache/.
+# Tests/KouenRobotTests/graphify-out/cache/.
 **/graphify-out/cache/
 **/graphify-out/GRAPH_TREE.html
 # Dated graphify snapshot dirs (e.g. graphify-out/2026-06-10/) — duplicates of graph.json
@@ -68,4 +68,4 @@ dist/
 .ai/
 
 # Agent-task worktrees (P32) — sandboxes, not source
-.harness-worktrees/
+.kouen-worktrees/

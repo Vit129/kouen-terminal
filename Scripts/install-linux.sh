@@ -2,7 +2,7 @@
 # Build and install the headless Kouen daemon + CLI on a Linux (or other non-macOS) host.
 #
 # Requires a Swift 6 toolchain (https://www.swift.org/install/linux/). Builds the daemon and CLI in
-# release mode, then runs `kouen-cli install`, which copies the binaries under the Harness home and
+# release mode, then runs `kouen-cli install`, which copies the binaries under the Kouen home and
 # registers a systemd --user service so the daemon survives logout (with lingering) and restarts on
 # failure.
 #
@@ -26,9 +26,9 @@ echo "==> Installing via $CLI install"
 
 cat <<'EOF'
 
-Done. The daemon is registered as a systemd --user service (harness-daemon.service).
+Done. The daemon is registered as a systemd --user service (kouen-daemon.service).
 
-  systemctl --user status harness-daemon      # check it
+  systemctl --user status kouen-daemon      # check it
   loginctl enable-linger "$USER"              # keep it running after you log out (headless hosts)
 
 From your Mac, add this host and attach:

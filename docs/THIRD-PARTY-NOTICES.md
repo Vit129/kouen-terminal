@@ -2,7 +2,7 @@
 
 ## Agent platform icons
 
-Harness renders agent brand marks from vector geometry and tints them at draw time.
+Kouen renders agent brand marks from vector geometry and tints them at draw time.
 
 - **[Lobe Icons](https://github.com/lobehub/lobe-icons)** (MIT, see below), the
   `@lobehub/icons-static-svg` monochrome (`currentColor`) variants: `codex`, `claude`

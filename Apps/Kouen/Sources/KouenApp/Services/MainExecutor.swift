@@ -1,0 +1,879 @@
+import AppKit
+import KouenCore
+
+/// `CommandExecutor` implementation for the GUI app. Translates every
+/// high-level `Command` into the appropriate `SessionCoordinator` call (or
+/// for not-yet-implemented commands, raises `unsupportedInThisContext` so the
+/// user sees a clear error in the `:` prompt instead of a silent no-op).
+///
+/// Phases 3-6 add cases for copy-mode, options, hooks, buffers, layouts, etc.;
+/// the executor grows alongside those phases.
+@MainActor
+final class MainExecutor: CommandExecutor {
+    static let shared = MainExecutor()
+    private var lastMakeCommand: String?
+
+    private init() {}
+
+    nonisolated func execute(_ command: Command) throws {
+        // Funnel onto the main actor — IPC and AppKit calls all want it.
+        if Thread.isMainThread {
+            try MainActor.assumeIsolated { try self.dispatch(command) }
+        } else {
+            // Off-main callers must NOT be holding the main thread when they call this (it would
+            // deadlock on `main.sync`). In practice every caller — prefix keymap, command prompt,
+            // menus, hook-branch completions — runs on a background queue that is not blocking
+            // main, or is already on main (the branch above). Keep this invariant if adding callers.
+            var resultError: Error?
+            DispatchQueue.main.sync {
+                do { try MainActor.assumeIsolated { try self.dispatch(command) } }
+                catch { resultError = error }
+            }
+            if let resultError { throw resultError }
+        }
+    }
+
+    /// Run a command for the fire-and-forget paths (hook branches, confirm-before, menu items,
+    /// sourced config) that previously swallowed the throw with `try?`. Surfaces any failure as a
+    /// transient toast so a mistyped binding/command isn't a silent no-op. `nonisolated` so it's
+    /// callable from any closure context; the toast hops to the main actor.
+    nonisolated func executeSurfacingErrors(_ command: Command) {
+        do {
+            try execute(command)
+        } catch {
+            let message = "error: \(error)"
+            Task { @MainActor in DisplayMessage.show(message) }
+        }
+    }
+
+    @MainActor
+    private func dispatch(_ command: Command) throws {
+        let coordinator = SessionCoordinator.shared
+        switch command {
+        case let .openBrowser(url, direction):
+            let layoutDir = CommandIPCTranslator.layoutDirection(for: direction)
+            coordinator.splitPaneCoordinator.openBrowserPane(url: url, direction: layoutDir)
+        case .splitWindow(let direction, let before):
+            // `Command.SplitDirection` is divider-orientation (`.vertical` =
+            // side-by-side, the CommandParser convention); `splitActivePane`
+            // wants the layout direction. Invert through the one shared rule so
+            // prefix-`%` splits side-by-side, matching the compositor and tmux.
+            coordinator.splitActivePane(direction: CommandIPCTranslator.layoutDirection(for: direction), before: before)
+        case .killPane:
+            coordinator.killActivePane()
+        case .zoomPane:
+            coordinator.zoomActivePane()
+        case .selectPane(let target):
+            try selectPane(target: target, coordinator: coordinator)
+        case .swapPane:
+            // Route through the shared translator so next/previous/last and `-s`
+            // resolve identically to the CLI, compositor, and control mode (the
+            // old inline handler always swapped with the next pane).
+            try runViaTranslator(command, coordinator: coordinator)
+        case .resizePane(let direction, let amount):
+            try resizeActivePane(direction: direction, amount: amount, coordinator: coordinator)
+        case .markPane(let set):
+            coordinator.setMarkedPane(set)
+        case .joinPane(let direction):
+            coordinator.joinMarkedPane(direction: direction)
+        case .synchronizePanes(let set):
+            coordinator.setSynchronizePanes(set)
+        case .displayPanes:
+            coordinator.showDisplayPanes()
+        case .newWindow:
+            coordinator.openTabInActiveWorkspace()
+        case .killWindow:
+            if let tabID = coordinator.snapshot.activeWorkspace?.activeTab?.id {
+                coordinator.requestDaemon(.closeTab(tabID: tabID))
+                coordinator.syncFromDaemon()
+            }
+        case .renameWindow(let newName):
+            if let newName, let tabID = coordinator.snapshot.activeWorkspace?.activeTab?.id {
+                coordinator.requestDaemon(.renameTab(tabID: tabID, name: newName))
+                coordinator.syncFromDaemon()
+            } else {
+                coordinator.beginRenameActiveTab()
+            }
+        case .nextWindow:
+            cycleActiveTab(coordinator: coordinator, forward: true)
+        case .previousWindow:
+            cycleActiveTab(coordinator: coordinator, forward: false)
+        case .selectWindow(let index):
+            selectTab(coordinator: coordinator, atIndex: index)
+        case .moveWindow, .swapWindow:
+            // Route through the shared translator so the `-t :N` window NUMBER is mapped to an
+            // array position with base-index applied — identical to the CLI, compositor, and hook
+            // executor. The old inline handlers passed the raw number straight to reorderTab/swapTab,
+            // landing one slot off select-window under a non-zero `base-index`.
+            try runViaTranslator(command, coordinator: coordinator)
+        case .newSession(let name):
+            if let workspaceID = coordinator.snapshot.activeWorkspaceID {
+                // tmux `new-session` starts in the default directory (not the active
+                // tab's), so pass it explicitly rather than inheriting the cwd.
+                coordinator.addSession(to: workspaceID, cwd: coordinator.settings.defaultCWD, name: name)
+            }
+        case .killSession:
+            if let sessionID = coordinator.snapshot.activeWorkspace?.activeSessionID {
+                coordinator.requestDaemon(.closeSession(sessionID: sessionID))
+                coordinator.syncFromDaemon()
+            }
+        case .renameSession(let newName):
+            if let newName, let sessionID = coordinator.snapshot.activeWorkspace?.activeSessionID {
+                coordinator.requestDaemon(.renameSession(sessionID: sessionID, name: newName))
+                coordinator.syncFromDaemon()
+            }
+        case .selectWorkspace(let index):
+            coordinator.selectWorkspace(byIndex: index)
+        case .nextWorkspace, .previousWorkspace:
+            cycleActiveWorkspace(coordinator: coordinator, forward: command == .nextWorkspace)
+        case .copyMode:
+            coordinator.toggleCopyMode()
+        case let .copyModeCommand(action):
+            coordinator.performCopyModeAction(action)
+        case .detachClient:
+            coordinator.detachActiveSurface()
+        case .reattachSurface:
+            coordinator.reattachActiveSurface()
+        case .jumpToPreviousPrompt:
+            coordinator.jumpToPreviousPrompt()
+        case .jumpToNextPrompt:
+            coordinator.jumpToNextPrompt()
+        case .sendKeys(let keys):
+            guard let surfaceID = coordinator.activeSurfaceID else {
+                throw CommandExecutionError.noActiveSurface
+            }
+            coordinator.requestDaemon(.sendKeys(surfaceID: surfaceID.uuidString, keys: keys))
+        case .displayMessage(let format):
+            DisplayMessage.show(format)
+        case .runShell(let shellCommand, let captureToBuffer):
+            RunShell.run(shellCommand, captureToBuffer: captureToBuffer)
+        case .ifShell(let condition, let then, let otherwise):
+            RunShell.runConditional(condition) { success in
+                let branch = success ? then : otherwise
+                guard let branch else { return }
+                MainExecutor.shared.executeSurfacingErrors(branch)
+            }
+        case .bindKey(let table, let spec, let inner, let repeatable):
+            try KeybindingsService.shared.bind(table: KeyTableID(rawValue: table), specRaw: spec, command: inner, repeatable: repeatable)
+            PrefixKeymap.shared.rebuildFromSettings()
+        case .unbindKey(let table, let spec):
+            try KeybindingsService.shared.unbind(table: KeyTableID(rawValue: table), specRaw: spec)
+            PrefixKeymap.shared.rebuildFromSettings()
+        case .listKeys(let table):
+            DisplayMessage.show(KeybindingsService.shared.summary(table: table.map { KeyTableID(rawValue: $0) }))
+        case .sourceConfig:
+            coordinator.reimportTerminalConfig()
+        // Config / buffer / hook write verbs: resolve scope/session/pane against the GUI's
+        // focus through the shared translator (same path as the compositor and hooks).
+        case .setOption, .setEnvironment, .setBuffer, .pasteBuffer, .deleteBuffer,
+             .setHook, .unbindHook:
+            try runViaTranslator(command, coordinator: coordinator)
+        // Show verbs: query the daemon and render through the message overlay (the same
+        // surface list-keys uses).
+        case let .showOptions(scope):
+            if case let .options(items)? = coordinator.requestDaemon(.showOptions(scope: scope)) {
+                let lines = items.map { entry in
+                    "\(entry.scope)\(entry.target.map { "(\($0.prefix(8)))" } ?? "") \(entry.key) = \(entry.value)"
+                }
+                DisplayMessage.show(lines.isEmpty ? "no options set" : lines.joined(separator: "\n"))
+            }
+        case let .showEnvironment(global):
+            let sessionID = global ? nil : coordinator.snapshot.activeWorkspace?.activeSession?.id
+            if case let .options(items)? = coordinator.requestDaemon(.showEnvironment(sessionID: sessionID)) {
+                let lines = items.map { "\($0.key)=\($0.value)" }
+                DisplayMessage.show(lines.isEmpty ? "no environment entries" : lines.joined(separator: "\n"))
+            }
+        case .listBuffers:
+            if case let .buffers(buffers)? = coordinator.requestDaemon(.listBuffers) {
+                let lines = buffers.map { "\($0.name): \($0.byteCount) bytes: \"\($0.preview)\"" }
+                DisplayMessage.show(lines.isEmpty ? "no buffers" : lines.joined(separator: "\n"))
+            }
+        case let .showBuffer(name):
+            if case let .buffer(buffer)? = coordinator.requestDaemon(.getBuffer(name: name)) {
+                let text = buffer.data.map { String(decoding: $0, as: UTF8.self) } ?? buffer.preview
+                DisplayMessage.show(text.isEmpty ? "buffer is empty" : text)
+            } else {
+                DisplayMessage.show("no such buffer")
+            }
+        case let .showHooks(event):
+            if case let .hooks(hooks)? = coordinator.requestDaemon(.listHooks(event: event)) {
+                let lines = hooks.map { "\($0.event) → \($0.commandSource)  [\($0.id.uuidString.prefix(8))]" }
+                DisplayMessage.show(lines.isEmpty ? "no hooks bound" : lines.joined(separator: "\n"))
+            }
+        case .refreshClient:
+            coordinator.syncFromDaemon()
+        case .respawnWindow:
+            try runViaTranslator(command, coordinator: coordinator)
+        case .showMessages:
+            if case let .text(log)? = coordinator.requestDaemon(.showMessages) {
+                DisplayMessage.show(log.isEmpty ? "no messages" : log)
+            }
+        case .showPromptHistory:
+            let entries = CommandPromptController.shared.historyEntries
+            DisplayMessage.show(entries.isEmpty ? "no history" : entries.reversed().joined(separator: "\n"))
+
+        case let .listSessions(fmt, json):
+            let snap = coordinator.snapshot
+            let format = fmt ?? "#{session_name}: #{session_windows} windows"
+            var rows: [[String: String]] = []
+            var lines: [String] = []
+            for ws in snap.workspaces {
+                for (si, session) in ws.sessions.enumerated() {
+                    var ctx = FormatContext()
+                    ctx.sessionName = session.name
+                    ctx.sessionID = session.id.uuidString
+                    ctx.sessionWindows = session.tabs.count
+                    ctx.windowActive = session.id == ws.activeSessionID
+                    ctx.sessionAttached = 1
+                    ctx.tabIndex = si
+                    if json { rows.append(["session_name": ctx.sessionName ?? "", "session_id": ctx.sessionID ?? "", "session_windows": "\(ctx.sessionWindows ?? 0)"]) }
+                    else { lines.append(FormatString.evaluate(format, context: ctx)) }
+                }
+            }
+            DisplayMessage.show(json ? jsonArray(rows) : (lines.isEmpty ? "no sessions" : lines.joined(separator: "\n")))
+
+        case let .listWindows(fmt, json):
+            let snap = coordinator.snapshot
+            let format = fmt ?? "#{window_index}: #{window_name}#{window_flags}"
+            var rows: [[String: String]] = []
+            var lines: [String] = []
+            let sessions = snap.activeWorkspace?.sessions ?? []
+            for session in sessions {
+                for (ti, tab) in session.tabs.enumerated() {
+                    var ctx = FormatContext()
+                    ctx.tabName = tab.title; ctx.tabIndex = ti
+                    ctx.windowID = tab.id.uuidString
+                    ctx.windowPanes = tab.rootPane.allSurfaceIDs().count
+                    ctx.windowActive = tab.id == session.activeTabID
+                    ctx.windowFlags = tab.id == session.activeTabID ? "*" : ""
+                    if json { rows.append(["window_index": "\(ti)", "window_name": tab.title, "window_id": tab.id.uuidString, "window_active": ctx.windowActive == true ? "1" : "0"]) }
+                    else { lines.append(FormatString.evaluate(format, context: ctx)) }
+                }
+            }
+            DisplayMessage.show(json ? jsonArray(rows) : (lines.isEmpty ? "no windows" : lines.joined(separator: "\n")))
+
+        case let .listPanes(fmt, json):
+            let snap = coordinator.snapshot
+            let format = fmt ?? "#{pane_index}: [#{pane_width}x#{pane_height}]"
+            var rows: [[String: String]] = []
+            var lines: [String] = []
+            if let tab = snap.activeWorkspace?.activeTab {
+                for (pi, pid) in tab.rootPane.allPaneIDs().enumerated() {
+                    var ctx = FormatContext()
+                    ctx.paneIndex = pi; ctx.paneID = pid.uuidString
+                    ctx.paneActive = pid == tab.activePaneID
+                    if json { rows.append(["pane_index": "\(pi)", "pane_id": pid.uuidString, "pane_active": ctx.paneActive ? "1" : "0"]) }
+                    else { lines.append(FormatString.evaluate(format, context: ctx)) }
+                }
+            }
+            DisplayMessage.show(json ? jsonArray(rows) : (lines.isEmpty ? "no panes" : lines.joined(separator: "\n")))
+
+        case let .listClients(fmt, json):
+            let format = fmt ?? "#{client_name}: #{session_name}"
+            var ctx = FormatContext()
+            ctx.clientName = "gui"
+            ctx.sessionName = coordinator.snapshot.activeWorkspace?.activeSession?.name
+                ?? coordinator.snapshot.activeWorkspace?.name ?? ""
+            if json {
+                DisplayMessage.show(jsonArray([["client_name": "gui", "session_name": ctx.sessionName ?? ""]]))
+            } else {
+                DisplayMessage.show(FormatString.evaluate(format, context: ctx))
+            }
+        case let .findWindow(pattern, name, content, title, scopeTarget):
+            // Non-content searches translate to a selectTab request; -C needs live
+            // captures, done inline (re-dispatching the clientLocal result would loop).
+            guard content else { return try runViaTranslator(command, coordinator: coordinator) }
+            let match = FindWindowMatcher.firstMatch(
+                coordinator.snapshot, pattern: pattern, name: name, title: title,
+                target: scopeTarget, current: coordinator.snapshot.activeWorkspace?.activeSession
+            ) { surfaceID in
+                guard case let .text(text)? = coordinator.requestDaemon(
+                    .capturePane(surfaceID: surfaceID, includeScrollback: false)) else { return nil }
+                return text
+            }
+            guard let match else {
+                DisplayMessage.show("find-window: no matches for '\(pattern)'")
+                return
+            }
+            _ = coordinator.requestDaemon(.selectTab(workspaceID: match.workspaceID, tabID: match.tabID))
+            coordinator.activeSurfaceID = nil
+            coordinator.syncFromDaemon()
+        case .reloadKeybindings:
+            KeybindingsService.shared.reload()
+            PrefixKeymap.shared.rebuildFromSettings()
+        case .showCheatsheet:
+            PrefixCheatsheetWindow.shared.toggle()
+        case .sequence(let commands):
+            for command in commands { try execute(command) }
+        case .selectLayout(let name):
+            try applyLayout(name: name, coordinator: coordinator)
+        case .nextLayout:
+            try cycleLayout(forward: true, coordinator: coordinator)
+        case .previousLayout:
+            try cycleLayout(forward: false, coordinator: coordinator)
+        case .rotateWindow(let forward):
+            guard let tabID = coordinator.snapshot.activeWorkspace?.activeTab?.id else {
+                throw CommandExecutionError.noActiveSurface
+            }
+            coordinator.requestDaemon(.rotatePanes(tabID: tabID, forward: forward))
+            coordinator.syncFromDaemon()
+        case .breakPane:
+            try breakActivePane(coordinator: coordinator)
+        case .respawnPane(let keepHistory):
+            guard let sid = coordinator.activeSurfaceID else { throw CommandExecutionError.noActiveSurface }
+            coordinator.requestDaemon(.respawnPane(surfaceID: sid.uuidString, keepHistory: keepHistory))
+        case .clearHistory:
+            guard let sid = coordinator.activeSurfaceID else { throw CommandExecutionError.noActiveSurface }
+            coordinator.requestDaemon(.clearHistory(surfaceID: sid.uuidString))
+        case .resizeWindow:
+            try runViaTranslator(command, coordinator: coordinator)
+        case let .movePane(direction, source):
+            try runViaTranslator(.movePane(direction: direction, source: source), coordinator: coordinator)
+        case .renumberWindows:
+            try runViaTranslator(.renumberWindows, coordinator: coordinator)
+
+        // MARK: Phase 6/7
+        case .lastWindow:
+            guard let workspace = coordinator.snapshot.activeWorkspace,
+                  let session = workspace.activeSession,
+                  let last = session.lastActiveTabID,
+                  session.tabs.contains(where: { $0.id == last })
+            else { return }
+            coordinator.selectTab(workspaceID: workspace.id, tabID: last)
+        case .sendPrefix:
+            sendPrefix(coordinator: coordinator)
+        case .sourceFile(let path):
+            try sourceFile(path: path)
+        case .commandPrompt(let prompts, let template):
+            CommandPromptController.shared.presentTemplate(prompts: prompts, template: template)
+        case .confirmBefore(let prompt, let inner):
+            Phase67UI.confirmBefore(prompt: prompt) { MainExecutor.shared.executeSurfacingErrors(inner) }
+        case .choose(let scope):
+            Phase67UI.presentChoose(scope: scope, coordinator: coordinator)
+        case .pipePane(let shellCommand):
+            guard let sid = coordinator.activeSurfaceID else { throw CommandExecutionError.noActiveSurface }
+            coordinator.requestDaemon(.pipePane(surfaceID: sid.uuidString, shellCommand: shellCommand))
+        case .lockClient:
+            Phase67UI.lock()
+        case .clockMode:
+            Phase67UI.toggleClock()
+        case .switchClientTable(let table):
+            PrefixKeymap.shared.switchClientTable(KeyTableID(rawValue: table))
+        case .linkWindow(let targetSessionName):
+            linkWindow(targetSessionName: targetSessionName, coordinator: coordinator)
+        case .unlinkWindow:
+            if let tabID = coordinator.snapshot.activeWorkspace?.activeTab?.id {
+                coordinator.requestDaemon(.unlinkWindow(tabID: tabID))
+                coordinator.syncFromDaemon()
+            }
+        case .displayPopup(let command):
+            Phase67UI.presentPopup(command: command, coordinator: coordinator)
+        case .displayMenu(let items):
+            Phase67UI.presentMenu(items: items)
+        case let .targeted(spec, inner):
+            try runViaTranslator(.targeted(spec, inner), coordinator: coordinator)
+        case .workbench(let wbCmd):
+            try executeWorkbenchCommand(wbCmd, coordinator: coordinator)
+        }
+    }
+
+    @MainActor
+    private func activeContentVC() -> ContentAreaViewController? {
+        let split = NSApp.keyWindow?.contentViewController as? MainSplitViewController
+            ?? NSApp.mainWindow?.contentViewController as? MainSplitViewController
+        return split?.contentVC
+    }
+
+    @MainActor
+    private func executeWorkbenchCommand(_ wbCmd: WorkbenchCommand, coordinator: SessionCoordinator) throws {
+        let context = workbenchContext(coordinator: coordinator)
+        switch wbCmd {
+        case let .find(query):
+            if query.isEmpty {
+                CommandPaletteController.present(relativeTo: NSApp.keyWindow)
+            } else {
+                guard let contentVC = activeContentVC() else { return }
+                let root = context?.cwd ?? FileManager.default.currentDirectoryPath
+                switch FuzzyPathResolver.resolve(query: query, root: root, limit: 5) {
+                case .none:
+                    DisplayMessage.show("find: no match")
+                case .unique(let path):
+                    contentVC.openFileTab(path: path)
+                case .ambiguous(let matches):
+                    DisplayMessage.show(matches.enumerated().map { "\($0.offset + 1): \($0.element)" }.joined(separator: "\n"))
+                }
+            }
+        case let .grep(query):
+            CommandPaletteController.present(relativeTo: NSApp.keyWindow, mode: .grep(query: query))
+        case .recent:
+            let list = WorkbenchMRU.shared.entries
+            if list.isEmpty {
+                DisplayMessage.show("recent: no recently opened files")
+            } else {
+                let text = list.prefix(10).enumerated().map { "\($0.offset + 1): \($0.element)" }.joined(separator: "\n")
+                DisplayMessage.show(text)
+            }
+        case .errors:
+            guard let contentVC = activeContentVC() else { return }
+            let diags = contentVC.activeDiagnostics
+            if diags.isEmpty {
+                DisplayMessage.show("no diagnostics")
+            } else {
+                let text = diags.prefix(20).map { d in
+                    ":\(d.range.start.line + 1):\(d.range.start.character + 1): \(d.message)"
+                }.joined(separator: "\n")
+                DisplayMessage.show(text)
+            }
+        case let .make(target):
+            let cwd = context?.cwd ?? "."
+            let task = ProjectTaskDetector.detect(at: cwd)
+            let projectRunScript = ProjectConfig.load(from: cwd)?.runScript
+            let runCmd: String
+            switch target {
+            case "build": runCmd = task?.buildCmd ?? "swift build"
+            case "test": runCmd = task?.testCmd ?? "swift test"
+            case "last": runCmd = lastMakeCommand ?? projectRunScript ?? task?.defaultCmd ?? "swift build"
+            default: runCmd = projectRunScript ?? task?.defaultCmd ?? task?.buildCmd ?? "swift build"
+            }
+            lastMakeCommand = runCmd
+            coordinator.splitActivePaneAndRun(direction: .horizontal, command: runCmd)
+        case .board:
+            NotificationCenter.default.post(name: .viWorkbenchCommand, object: self, userInfo: ["command": "board"])
+        case .attention:
+            let snapshot = coordinator.snapshot
+            let card = BoardModel.classify(snapshot: snapshot)
+                .first { $0.kind == .needsAttention }?.cards.first
+            if let card {
+                coordinator.selectTab(workspaceID: card.workspaceID, tabID: card.tabID)
+            } else {
+                DisplayMessage.show("attention: no items need attention")
+            }
+        case .ack:
+            if let tabID = coordinator.snapshot.activeWorkspace?.activeTab?.id {
+                NotificationCenter.default.post(name: .viBoardAckCommand, object: self, userInfo: ["tabID": tabID.uuidString])
+                DisplayMessage.show("acknowledged")
+            }
+        case let .copyPath(relative):
+            if let file = context?.currentFilePath {
+                let path: String
+                if relative, let cwd = context?.cwd, file.hasPrefix(cwd + "/") {
+                    path = String(file.dropFirst(cwd.count + 1))
+                } else {
+                    path = file
+                }
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(path, forType: .string)
+                DisplayMessage.show("copied: \(path)")
+            } else {
+                DisplayMessage.show("copy-path: no current file")
+            }
+        case let .cd(path):
+            guard let surfaceID = coordinator.activeSurfaceID else {
+                DisplayMessage.show("cd: no active terminal")
+                return
+            }
+            let cwd = context?.cwd ?? FileManager.default.currentDirectoryPath
+            let expanded = (path as NSString).expandingTildeInPath
+            let resolved = expanded.hasPrefix("/") ? expanded : (cwd + "/" + expanded)
+            let url = URL(fileURLWithPath: resolved, isDirectory: true)
+            let canonical = url.standardized.path
+            // If the path exists on disk, cd directly. Otherwise ask zoxide.
+            let target: String
+            if FileManager.default.fileExists(atPath: canonical) {
+                target = canonical
+            } else if let zResult = Self.zoxideQuery(path) {
+                target = zResult
+            } else {
+                target = canonical
+            }
+            coordinator.requestDaemon(.sendKeys(surfaceID: surfaceID.uuidString, keys: ["cd \(target)", "Enter"]))
+        case let .mark(name, path):
+            throw CommandExecutionError.unsupportedInThisContext("mark '\(name)' '\(path)' not supported in GUI context yet")
+        case let .view(path):
+            guard let contentVC = activeContentVC() else { return }
+            let root = context?.cwd ?? FileManager.default.currentDirectoryPath
+            switch FuzzyPathResolver.resolve(query: path, root: root, limit: 5) {
+            case .none:
+                DisplayMessage.show("view: no match for '\(path)'")
+            case .unique(let resolved):
+                contentVC.openFileTab(path: resolved)
+            case .ambiguous(let matches):
+                DisplayMessage.show(matches.enumerated().map { "\($0.offset + 1): \($0.element)" }.joined(separator: "\n"))
+            }
+        case let .agent(waiting):
+            let agents = coordinator.agentsList()
+            let list = waiting ? agents.filter { $0.waiting } : agents
+            if list.isEmpty {
+                DisplayMessage.show(waiting ? "agent: no agents waiting" : "agent: no running agents")
+            } else if list.count == 1, let first = list.first {
+                coordinator.openAgent(first)
+            } else {
+                let text = list.enumerated().map { i, a in
+                    "\(i + 1): \(a.agentName) — \(a.tabTitle)\(a.waiting ? " [waiting]" : "")"
+                }.joined(separator: "\n")
+                DisplayMessage.show(text)
+            }
+        }
+    }
+
+    @MainActor
+    private func workbenchContext(coordinator: SessionCoordinator) -> WorkbenchContext? {
+        WorkbenchContextResolver.resolve(
+            snapshot: coordinator.snapshot,
+            focusedSurfaceID: coordinator.activeSurfaceID,
+            currentFilePath: activeContentVC()?.currentFilePath
+        )
+    }
+
+    /// Ask zoxide for the best match for `query`. Returns nil if zoxide isn't installed or has no match.
+    private static func zoxideQuery(_ query: String) -> String? {
+        let candidates = ["/opt/homebrew/bin/zoxide", "/usr/local/bin/zoxide", "/usr/bin/zoxide"]
+        let binary = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) ?? "zoxide"
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: binary)
+        proc.arguments = ["query", "--", query]
+        let pipe = Pipe()
+        proc.standardOutput = pipe
+        proc.standardError = Pipe()
+        guard (try? proc.run()) != nil else { return nil }
+        proc.waitUntilExit()
+        guard proc.terminationStatus == 0 else { return nil }
+        let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return output?.isEmpty == false ? output : nil
+    }
+
+    // MARK: Targeting
+
+    /// Run a command through the shared `CommandIPCTranslator` against the GUI's
+    /// active focus — the same resolution the CLI, compositor, and hook executor
+    /// use. Structural results go straight to the daemon; client-local inner verbs
+    /// (UI overlays) fall back to normal dispatch. Used for `-t`-targeted commands
+    /// and for verbs (move-pane, renumber-windows) whose resolution already lives
+    /// in the translator.
+    @MainActor
+    private func jsonArray(_ rows: [[String: String]]) -> String {
+        let items = rows.map { dict in
+            let pairs = dict.sorted(by: { $0.key < $1.key })
+                .map { "  \"\($0.key)\": \"\($0.value.replacingOccurrences(of: "\"", with: "\\\""))\"" }
+                .joined(separator: ",\n")
+            return "{\n\(pairs)\n}"
+        }
+        return "[\n" + items.joined(separator: ",\n") + "\n]"
+    }
+
+    private func runViaTranslator(_ command: Command, coordinator: SessionCoordinator) throws {
+        let baseIndex = optionInt("base-index", default: 0, coordinator: coordinator)
+        let paneBaseIndex = optionInt("pane-base-index", default: 0, coordinator: coordinator)
+        let activeTab = coordinator.snapshot.activeWorkspace?.activeTab
+        let activePane = coordinator.activeSurfaceID.flatMap { sid in
+            activeTab.flatMap { panePathLookup(surfaceID: sid, in: $0.rootPane) }
+        }
+        let markedPane = coordinator.markedSurfaceID.flatMap { sid in
+            activeTab.flatMap { panePathLookup(surfaceID: sid, in: $0.rootPane) }
+        }
+        let focus = CommandTarget(
+            snapshot: coordinator.snapshot,
+            focusedWorkspaceID: coordinator.snapshot.activeWorkspaceID,
+            focusedTabID: activeTab?.id,
+            focusedPaneID: activePane,
+            markedPaneID: markedPane
+        )
+        switch CommandIPCTranslator.translate(command, target: focus, baseIndex: baseIndex, paneBaseIndex: paneBaseIndex) {
+        case let .requests(requests):
+            // Daemon validation errors (unknown hook event, bad option scope, …) must
+            // reach the user — a silently-dropped .error reads as success (fail-loud
+            // policy). First error aborts the remainder.
+            for request in requests {
+                if case let .error(message)? = coordinator.requestDaemon(request) {
+                    coordinator.syncFromDaemon()
+                    throw CommandExecutionError.daemonError(message)
+                }
+            }
+            coordinator.syncFromDaemon()
+        case let .clientLocal(local):
+            try dispatch(local)
+        case .unresolved:
+            // find-window's no-match is a search result, not a focus problem — say so
+            // (matches the -C path and the compositor/control-mode wording).
+            if case let .findWindow(pattern, _, _, _, _) = command {
+                DisplayMessage.show("find-window: no matches for '\(pattern)'")
+                return
+            }
+            // Distinguish "you named something that doesn't exist" (strict `-t`/`-s`
+            // resolution) from "there is nothing focused to act on".
+            if case let .targeted(spec, _) = command {
+                throw CommandExecutionError.targetNotFound(spec.raw)
+            }
+            throw CommandExecutionError.noActiveSurface
+        }
+    }
+
+    @MainActor
+    private func optionInt(_ key: String, default fallback: Int, coordinator: SessionCoordinator) -> Int {
+        guard case let .options(entries)? = coordinator.requestDaemon(.showOptions(scope: nil)) else { return fallback }
+        return entries.first { $0.key == key }.flatMap { Int($0.value) } ?? fallback
+    }
+
+    // MARK: Phase 6/7 helpers
+
+    @MainActor
+    private func sendPrefix(coordinator: SessionCoordinator) {
+        guard let sid = coordinator.activeSurfaceID else { return }
+        // Send the configured prefix as a raw byte (C-<letter> → control code).
+        guard let spec = KeySpec.parse(coordinator.settings.prefixKey),
+              spec.modifiers.contains(.control),
+              let letter = spec.key.lowercased().unicodeScalars.first,
+              letter.value >= 0x61, letter.value <= 0x7a
+        else { return }
+        let byte = UInt8(letter.value - 0x60)
+        coordinator.requestDaemon(.sendData(surfaceID: sid.uuidString, data: Data([byte])))
+    }
+
+    @MainActor
+    private func sourceFile(path: String) throws {
+        let expanded = (path as NSString).expandingTildeInPath
+        let contents = try String(contentsOfFile: expanded, encoding: .utf8)
+        for rawLine in contents.split(separator: "\n", omittingEmptySubsequences: true) {
+            let line = rawLine.trimmingCharacters(in: .whitespaces)
+            if line.isEmpty || line.hasPrefix("#") { continue }
+            // Surface a bad line instead of silently skipping it, but keep sourcing the rest.
+            do { try executeSource(line) }
+            catch { DisplayMessage.show("source: \(line): \(error)") }
+        }
+    }
+
+    @MainActor
+    private func linkWindow(targetSessionName: String, coordinator: SessionCoordinator) {
+        guard let tabID = coordinator.snapshot.activeWorkspace?.activeTab?.id else { return }
+        let match = coordinator.snapshot.workspaces.flatMap { $0.sessions }.first {
+            $0.name == targetSessionName || $0.id.uuidString == targetSessionName
+        }
+        guard let session = match else { return }
+        coordinator.requestDaemon(.linkWindow(tabID: tabID, targetSessionID: session.id))
+        coordinator.syncFromDaemon()
+    }
+
+    @MainActor
+    private func applyLayout(name: String, coordinator: SessionCoordinator) throws {
+        guard let tabID = coordinator.snapshot.activeWorkspace?.activeTab?.id else {
+            throw CommandExecutionError.noActiveSurface
+        }
+        let activePaneID = coordinator.activeSurfaceID.flatMap { sid in
+            coordinator.snapshot.activeWorkspace?.activeTab.flatMap { panePathLookup(surfaceID: sid, in: $0.rootPane) }
+        }
+        coordinator.requestDaemon(.applyLayout(tabID: tabID, layout: name, mainPaneID: activePaneID))
+        coordinator.syncFromDaemon()
+    }
+
+    @MainActor
+    private func cycleLayout(forward: Bool, coordinator: SessionCoordinator) throws {
+        guard let tabID = coordinator.snapshot.activeWorkspace?.activeTab?.id else {
+            throw CommandExecutionError.noActiveSurface
+        }
+        coordinator.requestDaemon(forward ? .nextLayout(tabID: tabID) : .previousLayout(tabID: tabID))
+        coordinator.syncFromDaemon()
+    }
+
+    @MainActor
+    private func breakActivePane(coordinator: SessionCoordinator) throws {
+        guard let tab = coordinator.snapshot.activeWorkspace?.activeTab,
+              let sid = coordinator.activeSurfaceID,
+              let paneID = panePathLookup(surfaceID: sid, in: tab.rootPane)
+        else { throw CommandExecutionError.noActiveSurface }
+        coordinator.requestDaemon(.breakPane(paneID: paneID))
+        coordinator.syncFromDaemon()
+    }
+
+    @MainActor
+    private func selectPane(target: Command.PaneTarget, coordinator: SessionCoordinator) throws {
+        switch target {
+        case .next: coordinator.cycleActivePane(forward: true)
+        case .previous: coordinator.cycleActivePane(forward: false)
+        case .last: coordinator.selectLastPane()
+        case .current: break // already focused — explicit no-op
+        case .left, .right, .up, .down:
+            guard let tab = coordinator.snapshot.activeWorkspace?.activeTab,
+                  let sid = coordinator.activeSurfaceID,
+                  let paneID = panePathLookup(surfaceID: sid, in: tab.rootPane)
+            else { return }
+            let axis: DirectionalAxis
+            switch target {
+            case .left: axis = .left
+            case .right: axis = .right
+            case .up: axis = .up
+            case .down: axis = .down
+            default: return
+            }
+            let response = coordinator.requestDaemon(.selectPaneDirectional(currentPaneID: paneID, direction: axis))
+            if case let .paneID(neighbor) = response,
+               let neighborSurface = neighborSurface(paneID: neighbor, in: tab.rootPane) {
+                coordinator.setActiveSurface(neighborSurface)
+            }
+        }
+    }
+
+    @MainActor
+    private func neighborSurface(paneID: PaneID, in node: PaneNode) -> SurfaceID? {
+        switch node {
+        case let .leaf(leaf): return leaf.id == paneID ? (leaf.activeSurfaceID ?? leaf.surfaceID) : nil
+        case .browser: return nil
+        case let .branch(_, _, first, second):
+            return neighborSurface(paneID: paneID, in: first) ?? neighborSurface(paneID: paneID, in: second)
+        }
+    }
+
+    @MainActor
+    private func resizeActivePane(direction: ResizeDirection, amount: Int, coordinator: SessionCoordinator) throws {
+        guard let workspace = coordinator.snapshot.activeWorkspace,
+              let tab = workspace.activeTab,
+              let surfaceID = coordinator.activeSurfaceID,
+              let paneID = panePathLookup(surfaceID: surfaceID, in: tab.rootPane)
+        else { throw CommandExecutionError.noActiveSurface }
+        coordinator.requestDaemon(.resizePane(paneID: paneID, direction: direction, amount: amount))
+        coordinator.syncFromDaemon(metadataOnly: true)
+    }
+
+    @MainActor
+    private func cycleActiveTab(coordinator: SessionCoordinator, forward: Bool) {
+        guard let workspace = coordinator.snapshot.activeWorkspace,
+              let session = workspace.activeSession,
+              !session.tabs.isEmpty,
+              let activeTab = workspace.activeTab,
+              let currentIdx = session.tabs.firstIndex(where: { $0.id == activeTab.id })
+        else { return }
+        let nextIdx = (currentIdx + (forward ? 1 : -1) + session.tabs.count) % session.tabs.count
+        coordinator.requestDaemon(.selectTab(workspaceID: workspace.id, tabID: session.tabs[nextIdx].id))
+        coordinator.activeSurfaceID = nil
+        coordinator.syncFromDaemon()
+    }
+
+    @MainActor
+    private func selectTab(coordinator: SessionCoordinator, atIndex index: Int) {
+        guard let workspace = coordinator.snapshot.activeWorkspace,
+              let session = workspace.activeSession,
+              index >= 0, index < session.tabs.count
+        else { return }
+        coordinator.requestDaemon(.selectTab(workspaceID: workspace.id, tabID: session.tabs[index].id))
+        coordinator.activeSurfaceID = nil
+        coordinator.syncFromDaemon()
+    }
+
+    @MainActor
+    private func cycleActiveWorkspace(coordinator: SessionCoordinator, forward: Bool) {
+        let workspaces = coordinator.snapshot.workspaces
+        guard !workspaces.isEmpty,
+              let currentID = coordinator.snapshot.activeWorkspaceID,
+              let idx = workspaces.firstIndex(where: { $0.id == currentID })
+        else { return }
+        let nextIdx = (idx + (forward ? 1 : -1) + workspaces.count) % workspaces.count
+        coordinator.selectWorkspace(workspaces[nextIdx].id)
+    }
+
+    @MainActor
+    private func panePathLookup(surfaceID: SurfaceID, in node: PaneNode) -> PaneID? {
+        switch node {
+        case let .leaf(leaf): return leaf.surfaceIDs.contains(surfaceID) ? leaf.id : nil
+        case .browser: return nil
+        case let .branch(_, _, first, second):
+            return panePathLookup(surfaceID: surfaceID, in: first)
+                ?? panePathLookup(surfaceID: surfaceID, in: second)
+        }
+    }
+}
+
+// MARK: - Side-effect helpers
+
+@MainActor
+enum DisplayMessage {
+    /// `display-time` cache: a synchronous show-options IPC round-trip per toast
+    /// blocked the main actor (hook bursts fire many). The value changes rarely —
+    /// re-read at most every few seconds, like the compositor's applyOptions cache.
+    private static var cachedDisplayTimeMS = 750
+    private static var displayTimeFetchedAt = Date.distantPast
+
+    /// Non-blocking transient toast anchored to the active window, with the
+    /// message run through the `FormatString` evaluator so tokens like
+    /// `#{pane_title}` / `#{session_name}` resolve (matching the status line).
+    static func show(_ format: String) {
+        let rendered = FormatString.evaluate(format, context: SessionCoordinator.shared.currentFormatContext())
+        guard let host = (NSApp.keyWindow ?? NSApp.mainWindow ?? NSApp.windows.first(where: { $0.contentView != nil }))?.contentView else { return }
+        // `display-time` (ms, tmux) bounds the toast hold, same as the compositor's flash.
+        if Date().timeIntervalSince(displayTimeFetchedAt) > 5 {
+            displayTimeFetchedAt = Date()
+            cachedDisplayTimeMS = SessionCoordinator.shared.requestDaemon(.showOptions(scope: nil)).flatMap { response -> Int? in
+                guard case let .options(entries) = response else { return nil }
+                return entries.first { $0.key == "display-time" }.flatMap { Int($0.value) }
+            } ?? 750
+        }
+        Toast.show(rendered, in: host, hold: max(Double(cachedDisplayTimeMS) / 1000, 0.1))
+    }
+}
+
+@MainActor
+enum RunShell {
+    private static var loginShell: String {
+        let s = SessionCoordinator.shared.settings.defaultShell
+        return s.isEmpty ? (ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh") : s
+    }
+
+    /// Run a shell command off the main thread. With `captureToBuffer`, stdout is
+    /// stored in a paste buffer (`run-shell -b`); otherwise output is dropped.
+    static func run(_ command: String, captureToBuffer: Bool) {
+        let shell = loginShell
+        DispatchQueue.global(qos: .utility).async {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: shell)
+            process.arguments = ["-lc", command]
+            // Only stdout is captured, and only with -b; stderr is never used. Route every UNUSED
+            // stream to /dev/null instead of an undrained Pipe: an unread pipe that fills (~64 KiB)
+            // blocks the child on write() so it never exits, deadlocking readDataToEndOfFile()/
+            // waitUntilExit() and permanently leaking this GCD worker thread.
+            let out: Pipe? = captureToBuffer ? Pipe() : nil
+            if let out {
+                process.standardOutput = out
+            } else {
+                process.standardOutput = FileHandle.nullDevice
+            }
+            process.standardError = FileHandle.nullDevice
+            do {
+                try process.run()
+            } catch {
+                // A launch failure (bad shell path) is rare but otherwise invisible — surface it.
+                Task { @MainActor in DisplayMessage.show("run-shell failed: \(error.localizedDescription)") }
+                return
+            }
+            let data = out?.fileHandleForReading.readDataToEndOfFile() ?? Data()
+            process.waitUntilExit()
+            if captureToBuffer, !data.isEmpty {
+                DispatchQueue.main.async {
+                    _ = SessionCoordinator.shared.requestDaemon(.setBuffer(name: nil, data: data))
+                }
+            }
+        }
+    }
+
+    /// Run a shell command and call `completion(success)` on the main thread with
+    /// `success == (exit code 0)`, for `if-shell` branching.
+    static func runConditional(_ command: String, completion: @escaping @MainActor (Bool) -> Void) {
+        let shell = loginShell
+        DispatchQueue.global(qos: .utility).async {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: shell)
+            process.arguments = ["-lc", command]
+            // if-shell only needs the exit status — discard output to /dev/null. Undrained Pipes
+            // would deadlock waitUntilExit() once the child writes >64 KiB to either stream (the
+            // child blocks on a full pipe and never exits), hanging the branch and leaking a thread.
+            process.standardOutput = FileHandle.nullDevice
+            process.standardError = FileHandle.nullDevice
+            let success: Bool
+            if (try? process.run()) != nil {
+                process.waitUntilExit()
+                success = process.terminationStatus == 0
+            } else {
+                success = false
+            }
+            Task { @MainActor in completion(success) }
+        }
+    }
+}

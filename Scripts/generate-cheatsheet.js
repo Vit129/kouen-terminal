@@ -175,7 +175,7 @@ kbd { background: #3b4261; padding: 0.15rem 0.4rem; border-radius: 3px; font-siz
 <div class="tab active" data-tab="shell">Shell (fzf/zoxide/rg)</div>
 <div class="tab" data-tab="unix">Unix Essentials</div>
 <div class="tab" data-tab="vim">Vim / Copy Mode</div>
-<div class="tab" data-tab="harness">Harness Shortcuts</div>
+<div class="tab" data-tab="kouen">Kouen Shortcuts</div>
 <div class="tab" data-tab="practice">🎯 Practice</div>
 </div>
 
@@ -188,13 +188,13 @@ ${UNIX_REFERENCE}
 </div>
 
 <div class="section" id="vim">
-<h2>Copy Mode (vi-style, in Harness)</h2>
+<h2>Copy Mode (vi-style, in Kouen)</h2>
 ${renderTable(copyMode, ['Key', 'Action'])}
 <h2>Vi Ex Commands (file editor)</h2>
 ${renderTable(viCommands, ['Command', 'IDE equivalent'])}
 </div>
 
-<div class="section" id="harness">
+<div class="section" id="kouen">
 <h2>Global Menu Shortcuts</h2>
 ${renderTable(globalShortcuts, ['Action', 'Shortcut'])}
 <h2>Prefix Table (after ctrl+a)</h2>
@@ -212,8 +212,8 @@ ${renderTable(prefixTable, ['Key', 'Command'])}
 <div class="quiz-box" data-answer="alt+c"><h3>Fuzzy pick a subdirectory and cd into it</h3><input class="quiz-input" placeholder="Type shortcut..."><p class="hint">Hint: alt + ?</p></div>
 <div class="quiz-box" data-answer="!!"><h3>(Unix) Repeat the last command</h3><input class="quiz-input" placeholder="Type..."><p class="hint">Hint: commonly used with sudo</p></div>
 <div class="quiz-box" data-answer="rg -l"><h3>Search for a pattern but only show filenames</h3><input class="quiz-input" placeholder="Type command + flag..."><p class="hint">Hint: rg + flag for "list"</p></div>
-<div class="quiz-box" data-answer="⌘P"><h3>(Harness) Fuzzy jump to file or directory</h3><input class="quiz-input" placeholder="Type shortcut..."><p class="hint">Hint: like VS Code</p></div>
-<div class="quiz-box" data-answer="⌘W"><h3>(Harness) Close the active pane or tab</h3><input class="quiz-input" placeholder="Type shortcut..."><p class="hint">Hint: universal close</p></div>
+<div class="quiz-box" data-answer="⌘P"><h3>(Kouen) Fuzzy jump to file or directory</h3><input class="quiz-input" placeholder="Type shortcut..."><p class="hint">Hint: like VS Code</p></div>
+<div class="quiz-box" data-answer="⌘W"><h3>(Kouen) Close the active pane or tab</h3><input class="quiz-input" placeholder="Type shortcut..."><p class="hint">Hint: universal close</p></div>
 <div class="quiz-box" data-answer="v"><h3>(Copy mode) Start character selection</h3><input class="quiz-input" placeholder="Type key..."><p class="hint">Hint: same as vim visual</p></div>
 <div class="quiz-box" data-answer=":grep"><h3>(Vi ex) Search across the project</h3><input class="quiz-input" placeholder="Type ex command..."><p class="hint">Hint: colon + search tool name</p></div>
 <div class="quiz-box" data-answer="gd"><h3>(Vi ex) Go to definition</h3><input class="quiz-input" placeholder="Type keys..."><p class="hint">Hint: g + d</p></div>

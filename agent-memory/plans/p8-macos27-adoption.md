@@ -1,7 +1,7 @@
 # P8: macOS 27 Golden Gate Adoption
 
 ## Context
-WWDC26 announced macOS 27 Golden Gate (ships ~Sep 2026). Harness Terminal
+WWDC26 announced macOS 27 Golden Gate (ships ~Sep 2026). Kouen Terminal
 currently targets macOS 26 Tahoe. This plan covers compatibility testing,
 new API adoption, and visual alignment with the refined Liquid Glass system.
 
@@ -27,7 +27,7 @@ These MUST be maintained on any macOS 27 SDK upgrade.
      `swift_task_isCurrentExecutorWithFlagsImpl` — this dereferences metadata and crashes
      when the view is a zombie (freed but still receiving events)
    - `nonisolated` **bypasses** that executor check, making the thunk safe on zombie views
-   - Real examples: `HarnessWindow.sendEvent/close`, `WindowBorderOverlayView.layout/hitTest` (RL-040)
+   - Real examples: `KouenWindow.sendEvent/close`, `WindowBorderOverlayView.layout/hitTest` (RL-040)
    - Do NOT add `nonisolated` to every override — only to those reachable after dealloc begins
 
 2. **Never use `MainActor.assumeIsolated`** in Timer/NotificationCenter/completion callbacks
@@ -55,7 +55,7 @@ These MUST be maintained on any macOS 27 SDK upgrade.
 ### Verification checklist for macOS 27 beta
 
 - [ ] Run `grep -rn "nonisolated override" Apps/ Packages/` — allowed only in RL-040 sites
-      (HarnessWindow: sendEvent/close, WindowBorderOverlayView: layout/hitTest); any new site needs a RL-040 comment
+      (KouenWindow: sendEvent/close, WindowBorderOverlayView: layout/hitTest); any new site needs a RL-040 comment
 - [ ] Run `grep -rn "MainActor.assumeIsolated" Apps/` — allowed only in MainExecutor.execute()
       (synchronous bridge with Thread.isMainThread guard) and TerminalHostView hot path ([weak self]+guard)
 - [ ] Run app for 2+ hours without crash
@@ -68,10 +68,10 @@ See: `agent-memory/knowledge/bugs/zombie-crash-macos26.md` for full details.
 
 ## Phase 1 — Compatibility (P0)
 
-Ensure Harness builds and runs correctly on macOS 27 beta without regressions.
+Ensure Kouen builds and runs correctly on macOS 27 beta without regressions.
 
 - [ ] Build with Xcode 27 beta, fix any deprecation warnings-as-errors
-- [ ] Verify Liquid Glass doesn't break custom sidebar chrome (`HarnessDesign`,
+- [ ] Verify Liquid Glass doesn't break custom sidebar chrome (`KouenDesign`,
       `ChromeBackdrop`, `WindowBlur.apply()`)
 - [ ] Verify window corner radius change doesn't clip terminal content or overlays
 - [ ] Test NSStatusItem (`MenuBarController`) with new expanded interface session API
@@ -111,11 +111,11 @@ Not urgent but aligns with Apple's direction.
 Priority targets (most complex mouseDown logic):
 - [ ] `TerminalTabBarView` — drag reorder + context menu
 - [ ] `SessionCardRowView` — click + hover + context menu
-- [ ] `HarnessControls` (slider, toggle, select) — tracking loops
+- [ ] `KouenControls` (slider, toggle, select) — tracking loops
 - [ ] `ContentAreaViewController` split divider drag
 
 Lower priority (simpler or less frequent):
-- [ ] `SoftIconButton`, `HarnessPillButton`, `NotificationBellButton`
+- [ ] `SoftIconButton`, `KouenPillButton`, `NotificationBellButton`
 - [ ] `WorkspacePillButton`, `WorkspaceSwitcherRow`
 
 ## Phase 5 — State Restoration (P2)

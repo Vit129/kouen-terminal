@@ -2,7 +2,7 @@ import { spawn, execSync } from 'child_process';
 import readline from 'readline';
 
 // Get current version and build
-const infoPlistPath = "Apps/Harness/Sources/HarnessApp/Resources/Info.plist";
+const infoPlistPath = "Apps/Kouen/Sources/KouenApp/Resources/Info.plist";
 let currentVersion = "";
 let currentBuild = "";
 try {
@@ -48,7 +48,7 @@ async function selectWithArrows(options) {
 
   const displayMenu = () => {
     console.clear?.() || console.log('\x1Bc');
-    console.log('\n🚀 Harness Build & Release');
+    console.log('\n🚀 Kouen Build & Release');
     console.log(`\x1b[2mCurrent Version:\x1b[0m \x1b[1;33mv${currentVersion}\x1b[0m \x1b[2m(build ${currentBuild})\x1b[0m\n`);
     options.forEach((opt, i) => {
       const prefix = i === selected ? '❯ ' : '  ';
@@ -96,7 +96,7 @@ async function selectWithArrows(options) {
 }
 
 async function selectWithReadline(options) {
-  console.log('\n🚀 Harness Build & Release');
+  console.log('\n🚀 Kouen Build & Release');
   console.log(`\x1b[2mCurrent Version:\x1b[0m \x1b[1;33mv${currentVersion}\x1b[0m \x1b[2m(build ${currentBuild})\x1b[0m\n`);
   options.forEach((opt) => {
     console.log(`  ${opt.display}`);

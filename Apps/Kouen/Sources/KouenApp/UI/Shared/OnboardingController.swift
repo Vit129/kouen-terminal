@@ -1,0 +1,47 @@
+import AppKit
+import KouenCore
+import KouenOnboarding
+
+/// First-run onboarding entry point. Delegates to the immersive `KouenOnboarding` wizard
+/// (a borderless glass takeover embedded in the app) — shown once on first launch and
+/// re-openable any time from **Help → Welcome to Kouen**.
+///
+/// The wizard owns its own window lifetime and first-run flag; this enum is the thin,
+/// stable surface the rest of the app (`AppDelegate`, `MainMenuBuilder`) calls.
+@MainActor
+enum OnboardingController {
+    /// Present on first run only.
+    static func presentIfNeeded() {
+        configureEnvironment()
+        KouenOnboarding.presentIfNeeded()
+    }
+
+    /// Always present (Help menu).
+    static func present() {
+        configureEnvironment()
+        KouenOnboarding.present()
+    }
+
+    /// Bridge the isolated onboarding module to the core agent-hook installer, so the Setup
+    /// step can detect installed agents and wire up notification hooks in one click.
+    private static func configureEnvironment() {
+        OnboardingEnvironment.detectAgents = {
+            AgentHookInstaller.detectInstalledAgents().filter(AgentHookInstaller.canInstall).map { kind in
+                OnboardingEnvironment.Agent(
+                    id: kind.rawValue,
+                    displayName: kind.displayName,
+                    hooksInstalled: AgentHookInstaller.isInstalled(agent: kind)
+                )
+            }
+        }
+        OnboardingEnvironment.installHooks = { agentID in
+            guard let kind = AgentKind(rawValue: agentID) else { return false }
+            return (try? AgentHookInstaller.install(agent: kind)) != nil
+        }
+        // Single source of truth: the wizard writes the same catalog-generated fish completion the
+        // `kouen-cli completions fish` / installer path emits — never a hand-maintained list.
+        OnboardingEnvironment.fishCompletionScript = {
+            CompletionGenerator.script(for: .fish)
+        }
+    }
+}

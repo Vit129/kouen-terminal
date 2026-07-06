@@ -3,7 +3,7 @@ import PackageDescription
 
 // The whole package builds in the Swift 6 language mode (tools-version 6.0), so *complete* strict
 // concurrency checking is already on everywhere. For the two pure, foundational, dependency-free
-// libraries — HarnessCore (models/IPC/commands) and HarnessTerminalEngine (VT engine) — we also
+// libraries — KouenCore (models/IPC/commands) and KouenTerminalEngine (VT engine) — we also
 // treat warnings as errors so a data-race / Sendable / deprecation warning in the layer everything
 // else builds on can never be ignored and rot. Kept off the AppKit/Metal targets for now (they
 // surface framework-deprecation churn we don't want to hard-fail CI on).
@@ -13,7 +13,7 @@ let strictFoundationSettings: [SwiftSetting] = [.unsafeFlags(["-warnings-as-erro
 // AppKit renderer + terminal kit, the SwiftUI onboarding wizard, the GUI app, and Sparkle
 // auto-update) are dropped from products/dependencies/targets. The daemon, CLI, terminal engine,
 // copy-mode model, theme catalog and core library are all first-party Foundation/POSIX and build
-// headless on Linux — which is what lets `HarnessDaemon` run on a remote/headless box.
+// headless on Linux — which is what lets `KouenDaemon` run on a remote/headless box.
 #if os(macOS)
 let platformDependencies: [Package.Dependency] = [
     // Sparkle: macOS auto-update (the only external dependency, and only for the GUI app —
@@ -26,85 +26,85 @@ let platformDependencies: [Package.Dependency] = [
 ]
 let platformProducts: [Product] = [
     // Native terminal renderer: pure-Swift color resolution + a Metal glyph/draw layer.
-    .library(name: "HarnessTerminalRenderer", targets: ["HarnessTerminalRenderer"]),
-    .library(name: "HarnessTerminalKit", targets: ["HarnessTerminalKit"]),
+    .library(name: "KouenTerminalRenderer", targets: ["KouenTerminalRenderer"]),
+    .library(name: "KouenTerminalKit", targets: ["KouenTerminalKit"]),
     // Immersive first-run onboarding wizard (SwiftUI). Self-contained, no deps; embedded
-    // into Harness.app and shown on first launch.
-    .library(name: "HarnessOnboarding", targets: ["HarnessOnboarding"]),
-    .executable(name: "Kouen", targets: ["HarnessApp"]),
+    // into Kouen.app and shown on first launch.
+    .library(name: "KouenOnboarding", targets: ["KouenOnboarding"]),
+    .executable(name: "Kouen", targets: ["KouenApp"]),
 ]
-// `harness-cli`'s `attach-window` compositor renders through the Metal/AppKit terminal kit, so the
+// `kouen-cli`'s `attach-window` compositor renders through the Metal/AppKit terminal kit, so the
 // kit dependency (and the one source file that uses it) is macOS-only; the rest of the CLI — incl.
 // single-pane `attach` — is headless.
 let cliDependencies: [Target.Dependency] = [
-    "HarnessCore", "HarnessTerminalEngine", "HarnessCopyMode", "HarnessTerminalKit", "HarnessTheme",
-    "HarnessLSP", "CHarnessSys",
+    "KouenCore", "KouenTerminalEngine", "KouenCopyMode", "KouenTerminalKit", "KouenTheme",
+    "KouenLSP", "CKouenSys",
 ]
 let cliExclude: [String] = []
 let platformTargets: [Target] = [
     // Native renderer — first-party frame building, CoreText glyph atlas, and Metal drawing.
     .target(
-        name: "HarnessTerminalRenderer",
-        dependencies: ["HarnessCore", "HarnessTerminalEngine", "HarnessTheme"],
-        path: "Packages/HarnessTerminalRenderer/Sources/HarnessTerminalRenderer"
+        name: "KouenTerminalRenderer",
+        dependencies: ["KouenCore", "KouenTerminalEngine", "KouenTheme"],
+        path: "Packages/KouenTerminalRenderer/Sources/KouenTerminalRenderer"
     ),
     .target(
-        name: "HarnessTerminalKit",
+        name: "KouenTerminalKit",
         dependencies: [
-            "HarnessCore",
-            "HarnessTerminalEngine",
-            "HarnessCopyMode",
-            "HarnessTerminalRenderer",
-            "HarnessTheme",
+            "KouenCore",
+            "KouenTerminalEngine",
+            "KouenCopyMode",
+            "KouenTerminalRenderer",
+            "KouenTheme",
         ],
-        path: "Packages/HarnessTerminalKit/Sources/HarnessTerminalKit"
+        path: "Packages/KouenTerminalKit/Sources/KouenTerminalKit"
     ),
     // Immersive onboarding wizard — pure SwiftUI/AppKit, no external or first-party
     // dependencies (deliberately isolated, mirrors install paths via its own helpers).
     .target(
-        name: "HarnessOnboarding",
-        dependencies: ["HarnessCore", "HarnessIPC", "HarnessSettings", "HarnessCommands"],
-        path: "Packages/HarnessOnboarding/Sources/HarnessOnboarding"
+        name: "KouenOnboarding",
+        dependencies: ["KouenCore", "KouenIPC", "KouenSettings", "KouenCommands"],
+        path: "Packages/KouenOnboarding/Sources/KouenOnboarding"
     ),
     .executableTarget(
-        name: "HarnessApp",
+        name: "KouenApp",
         dependencies: [
-            "HarnessCore",
-            // Engine types (e.g. TerminalProgressReport) surface through HarnessTerminalKit's
+            "KouenCore",
+            // Engine types (e.g. TerminalProgressReport) surface through KouenTerminalKit's
             // public delegate API, so the app consumes the engine module directly.
-            "HarnessTerminalEngine",
-            "HarnessTerminalKit",
-            "HarnessTheme",
-            "HarnessLSP",
-            "HarnessSyntaxResources",
-            "HarnessOnboarding",
+            "KouenTerminalEngine",
+            "KouenTerminalKit",
+            "KouenTheme",
+            "KouenLSP",
+            "KouenSyntaxResources",
+            "KouenOnboarding",
             .product(name: "Sparkle", package: "Sparkle"),
         ],
-        path: "Apps/Harness/Sources/HarnessApp",
+        path: "Apps/Kouen/Sources/KouenApp",
         exclude: ["Resources"]
     ),
 ]
 let platformTestTargets: [Target] = [
     .testTarget(
-        name: "HarnessTerminalRendererTests",
-        dependencies: ["HarnessCore", "HarnessTerminalRenderer", "HarnessTerminalEngine", "HarnessTheme"],
-        path: "Tests/HarnessTerminalRendererTests"
+        name: "KouenTerminalRendererTests",
+        dependencies: ["KouenCore", "KouenTerminalRenderer", "KouenTerminalEngine", "KouenTheme"],
+        path: "Tests/KouenTerminalRendererTests"
     ),
     .testTarget(
-        name: "HarnessTerminalKitTests",
+        name: "KouenTerminalKitTests",
         dependencies: [
-            "HarnessCore",
-            "HarnessTerminalEngine",
-            "HarnessCopyMode",
-            "HarnessTerminalKit",
-            "HarnessTheme",
+            "KouenCore",
+            "KouenTerminalEngine",
+            "KouenCopyMode",
+            "KouenTerminalKit",
+            "KouenTheme",
         ],
-        path: "Tests/HarnessTerminalKitTests"
+        path: "Tests/KouenTerminalKitTests"
     ),
     .testTarget(
-        name: "HarnessOnboardingTests",
-        dependencies: ["HarnessOnboarding"],
-        path: "Tests/HarnessOnboardingTests"
+        name: "KouenOnboardingTests",
+        dependencies: ["KouenOnboarding"],
+        path: "Tests/KouenOnboardingTests"
     ),
     // Drift canary: the onboarding-preview port of GridCompositor must keep composing the
     // shared subset (layout, borders, junctions, status line) identically to the live one.
@@ -112,38 +112,38 @@ let platformTestTargets: [Target] = [
     .testTarget(
         name: "GridCompositorParityTests",
         dependencies: [
-            "HarnessTerminalKit",
-            "HarnessOnboarding",
-            "HarnessCore",
-            "HarnessTerminalEngine",
+            "KouenTerminalKit",
+            "KouenOnboarding",
+            "KouenCore",
+            "KouenTerminalEngine",
         ],
         path: "Tests/GridCompositorParityTests"
     ),
     .testTarget(
-        name: "HarnessAppTests",
-        dependencies: ["HarnessApp"],
-        path: "Tests/HarnessAppTests"
+        name: "KouenAppTests",
+        dependencies: ["KouenApp"],
+        path: "Tests/KouenAppTests"
     ),
     // Performance baselines for the hot paths (VT parse, IPC codec, scrollback,
-    // compositor, renderer stats). Gated behind HARNESS_BENCHMARKS=1 so a normal
+    // compositor, renderer stats). Gated behind KOUEN_BENCHMARKS=1 so a normal
     // `swift test` stays fast; run with `make bench`.
     .testTarget(
-        name: "HarnessBenchmarks",
+        name: "KouenBenchmarks",
         dependencies: [
-            "HarnessCore",
-            "HarnessTerminalEngine",
-            "HarnessTerminalKit",
-            "HarnessTerminalRenderer",
-            "HarnessTheme",
+            "KouenCore",
+            "KouenTerminalEngine",
+            "KouenTerminalKit",
+            "KouenTerminalRenderer",
+            "KouenTheme",
         ],
-        path: "Tests/HarnessBenchmarks"
+        path: "Tests/KouenBenchmarks"
     ),
 ]
 #else
 let platformDependencies: [Package.Dependency] = []
 let platformProducts: [Product] = []
 let cliDependencies: [Target.Dependency] = [
-    "HarnessCore", "HarnessTerminalEngine", "HarnessCopyMode", "HarnessTheme", "HarnessLSP", "CHarnessSys",
+    "KouenCore", "KouenTerminalEngine", "KouenCopyMode", "KouenTheme", "KouenLSP", "CKouenSys",
 ]
 let cliExclude: [String] = ["WindowAttachClient.swift"]
 let platformTargets: [Target] = []
@@ -151,78 +151,78 @@ let platformTestTargets: [Target] = []
 #endif
 
 let package = Package(
-    name: "Harness",
+    name: "Kouen",
     platforms: [.macOS(.v15)],
     products: [
-        .library(name: "HarnessIPC", targets: ["HarnessIPC"]),
-        .library(name: "HarnessSettings", targets: ["HarnessSettings"]),
-        .library(name: "HarnessCommands", targets: ["HarnessCommands"]),
-        .library(name: "HarnessCore", targets: ["HarnessCore"]),
+        .library(name: "KouenIPC", targets: ["KouenIPC"]),
+        .library(name: "KouenSettings", targets: ["KouenSettings"]),
+        .library(name: "KouenCommands", targets: ["KouenCommands"]),
+        .library(name: "KouenCore", targets: ["KouenCore"]),
         // Self-contained native terminal engine (VT parser + screen/grid model). Pure
         // Swift, no Metal/AppKit.
-        .library(name: "HarnessTerminalEngine", targets: ["HarnessTerminalEngine"]),
+        .library(name: "KouenTerminalEngine", targets: ["KouenTerminalEngine"]),
         // Shared, UI-agnostic copy-mode model (state + pure reducer over the engine grid),
         // driving copy mode in both the GUI overlay and the ssh compositor. Pure Swift.
-        .library(name: "HarnessCopyMode", targets: ["HarnessCopyMode"]),
-        // Native theme catalog + the shareable `.harnesstheme` document format. Pure Swift.
-        .library(name: "HarnessTheme", targets: ["HarnessTheme"]),
-        .library(name: "HarnessLSP", targets: ["HarnessLSP"]),
-        .library(name: "HarnessSyntaxResources", targets: ["HarnessSyntaxResources"]),
+        .library(name: "KouenCopyMode", targets: ["KouenCopyMode"]),
+        // Native theme catalog + the shareable `.kouentheme` document format. Pure Swift.
+        .library(name: "KouenTheme", targets: ["KouenTheme"]),
+        .library(name: "KouenLSP", targets: ["KouenLSP"]),
+        .library(name: "KouenSyntaxResources", targets: ["KouenSyntaxResources"]),
         // C portability shim exposed as a product so the generated Xcode project can import the
         // same first-party module that SwiftPM targets use internally.
-        .library(name: "CHarnessSys", targets: ["CHarnessSys"]),
-        .executable(name: "KouenDaemon", targets: ["HarnessDaemon"]),
-        .executable(name: "kouen-cli", targets: ["HarnessCLI"]),
-        .executable(name: "kouen-mcp", targets: ["HarnessMCP"]),
+        .library(name: "CKouenSys", targets: ["CKouenSys"]),
+        .executable(name: "KouenDaemon", targets: ["KouenDaemon"]),
+        .executable(name: "kouen-cli", targets: ["KouenCLI"]),
+        .executable(name: "kouen-mcp", targets: ["KouenMCP"]),
     ] + platformProducts,
     dependencies: platformDependencies,
     targets: [
         // IPC wire types, session/tab/workspace models, notification bus.
         // Leaf package: depends only on Foundation/Darwin — nothing else from this repo.
         .target(
-            name: "HarnessIPC",
-            path: "Packages/HarnessIPC/Sources/HarnessIPC",
+            name: "KouenIPC",
+            path: "Packages/KouenIPC/Sources/KouenIPC",
             swiftSettings: strictFoundationSettings
         ),
-        // App settings, keybindings, shell integration. Depends on HarnessIPC for AgentKind.
+        // App settings, keybindings, shell integration. Depends on KouenIPC for AgentKind.
         .target(
-            name: "HarnessSettings",
-            dependencies: ["HarnessIPC"],
-            path: "Packages/HarnessSettings/Sources/HarnessSettings",
+            name: "KouenSettings",
+            dependencies: ["KouenIPC"],
+            path: "Packages/KouenSettings/Sources/KouenSettings",
             swiftSettings: strictFoundationSettings
         ),
         // Command vocabulary, key tables, format, session editor, options, board model.
-        // Depends on HarnessIPC for Tab/SessionSnapshot/SplitDirection/IPCRequest.
+        // Depends on KouenIPC for Tab/SessionSnapshot/SplitDirection/IPCRequest.
         .target(
-            name: "HarnessCommands",
-            dependencies: ["HarnessIPC"],
-            path: "Packages/HarnessCommands/Sources/HarnessCommands",
+            name: "KouenCommands",
+            dependencies: ["KouenIPC"],
+            path: "Packages/KouenCommands/Sources/KouenCommands",
             swiftSettings: strictFoundationSettings
         ),
         .target(
-            name: "HarnessCore",
-            dependencies: ["HarnessIPC", "HarnessSettings", "HarnessCommands"],
-            path: "Packages/HarnessCore/Sources/HarnessCore",
+            name: "KouenCore",
+            dependencies: ["KouenIPC", "KouenSettings", "KouenCommands"],
+            path: "Packages/KouenCore/Sources/KouenCore",
             swiftSettings: strictFoundationSettings
         ),
         // Native terminal engine — pure Swift, no external dependencies. Foundation only
         // so it links for headless CLI use and unit tests without a GPU.
         .target(
-            name: "HarnessTerminalEngine",
-            path: "Packages/HarnessTerminalEngine/Sources/HarnessTerminalEngine",
+            name: "KouenTerminalEngine",
+            path: "Packages/KouenTerminalEngine/Sources/KouenTerminalEngine",
             swiftSettings: strictFoundationSettings
         ),
         // Shared copy-mode model — pure Swift over Core (action vocabulary) + the engine
         // (grid types). Both the GUI surface and the compositor drive this one reducer.
         .target(
-            name: "HarnessCopyMode",
-            dependencies: ["HarnessCore", "HarnessTerminalEngine"],
-            path: "Packages/HarnessCopyMode/Sources/HarnessCopyMode"
+            name: "KouenCopyMode",
+            dependencies: ["KouenCore", "KouenTerminalEngine"],
+            path: "Packages/KouenCopyMode/Sources/KouenCopyMode"
         ),
         // Native theme system — pure Swift, no external dependencies.
         .target(
-            name: "HarnessTheme",
-            path: "Packages/HarnessTheme/Sources/HarnessTheme",
+            name: "KouenTheme",
+            path: "Packages/KouenTheme/Sources/KouenTheme",
             // The community catalog is embedded as base64 in BundledThemesData.swift (compiled
             // into the binary), NOT shipped as a SwiftPM resource bundle: a missing/misplaced
             // `Bundle.module` bundle crashed the app at launch for users on a non-builtin theme.
@@ -231,85 +231,85 @@ let package = Package(
             exclude: ["Resources/themes.json"]
         ),
         .target(
-            name: "HarnessLSP",
-            dependencies: ["HarnessCore", "HarnessIPC", "HarnessSettings", "HarnessCommands"],
-            path: "Packages/HarnessLSP/Sources/HarnessLSP"
+            name: "KouenLSP",
+            dependencies: ["KouenCore", "KouenIPC", "KouenSettings", "KouenCommands"],
+            path: "Packages/KouenLSP/Sources/KouenLSP"
         ),
         .target(
-            name: "HarnessSyntaxResources",
-            path: "Packages/HarnessSyntaxResources",
+            name: "KouenSyntaxResources",
+            path: "Packages/KouenSyntaxResources",
             resources: [.copy("Resources/TreeSitterGrammars")]
         ),
         // Tiny C shim wrapping the variadic `ioctl` (unavailable to Swift on Linux) into
         // non-variadic terminal helpers used by the PTY layer and the CLI attach client.
         .target(
-            name: "CHarnessSys",
-            path: "Packages/CHarnessSys"
+            name: "CKouenSys",
+            path: "Packages/CKouenSys"
         ),
         // Daemon logic as a library so it is unit-testable; the executable below is a
         // thin `main.swift` wrapper over it.
         .target(
-            name: "HarnessDaemonCore",
+            name: "KouenDaemonCore",
             // Depends on the engine so `capture-pane` reconstructs the on-screen grid
             // (faithful overwrites/clears + soft-wrap join), exactly like tmux.
-            // HarnessSettings for ProjectConfig (P32 F3: archiveScript on worktree close).
-            dependencies: ["HarnessCore", "HarnessTerminalEngine", "CHarnessSys", "HarnessSettings"],
-            path: "Packages/HarnessDaemon/Sources/HarnessDaemon"
+            // KouenSettings for ProjectConfig (P32 F3: archiveScript on worktree close).
+            dependencies: ["KouenCore", "KouenTerminalEngine", "CKouenSys", "KouenSettings"],
+            path: "Packages/KouenDaemon/Sources/KouenDaemon"
         ),
         .executableTarget(
-            name: "HarnessDaemon",
-            dependencies: ["HarnessDaemonCore"],
-            path: "Packages/HarnessDaemon/Sources/HarnessDaemonMain"
+            name: "KouenDaemon",
+            dependencies: ["KouenDaemonCore"],
+            path: "Packages/KouenDaemon/Sources/KouenDaemonMain"
         ),
         .executableTarget(
-            name: "HarnessCLI",
+            name: "KouenCLI",
             dependencies: cliDependencies,
-            path: "Tools/harness/Sources/HarnessCLI",
+            path: "Tools/kouen/Sources/KouenCLI",
             exclude: cliExclude
         ),
         .executableTarget(
-            name: "HarnessMCP",
-            dependencies: ["HarnessCore", "HarnessIPC", "HarnessSettings", "HarnessCommands"],
-            path: "Tools/harness-mcp/Sources/HarnessMCP"
+            name: "KouenMCP",
+            dependencies: ["KouenCore", "KouenIPC", "KouenSettings", "KouenCommands"],
+            path: "Tools/kouen-mcp/Sources/KouenMCP"
         ),
         .testTarget(
-            name: "HarnessCoreTests",
-            dependencies: ["HarnessCore", "HarnessIPC", "HarnessSettings", "HarnessCommands"],
-            path: "Tests/HarnessCoreTests"
+            name: "KouenCoreTests",
+            dependencies: ["KouenCore", "KouenIPC", "KouenSettings", "KouenCommands"],
+            path: "Tests/KouenCoreTests"
         ),
         .testTarget(
-            name: "HarnessTerminalEngineTests",
-            dependencies: ["HarnessTerminalEngine"],
-            path: "Tests/HarnessTerminalEngineTests",
+            name: "KouenTerminalEngineTests",
+            dependencies: ["KouenTerminalEngine"],
+            path: "Tests/KouenTerminalEngineTests",
             resources: [.copy("ReflowGolden")]
         ),
         .testTarget(
-            name: "HarnessCopyModeTests",
-            dependencies: ["HarnessCopyMode", "HarnessCore", "HarnessTerminalEngine"],
-            path: "Tests/HarnessCopyModeTests"
+            name: "KouenCopyModeTests",
+            dependencies: ["KouenCopyMode", "KouenCore", "KouenTerminalEngine"],
+            path: "Tests/KouenCopyModeTests"
         ),
         .testTarget(
-            name: "HarnessThemeTests",
-            dependencies: ["HarnessTheme"],
-            path: "Tests/HarnessThemeTests"
+            name: "KouenThemeTests",
+            dependencies: ["KouenTheme"],
+            path: "Tests/KouenThemeTests"
         ),
         // Unit coverage for the CLI's pure argument-parsing helpers. The CLI is an executable
-        // target (`@main struct HarnessCLI`); `@testable import` reaches its internal statics
+        // target (`@main struct KouenCLI`); `@testable import` reaches its internal statics
         // without splitting out a library, so daemon-free helpers like `flagValue` are covered.
         .testTarget(
-            name: "HarnessCLITests",
-            dependencies: ["HarnessCLI", "HarnessLSP"],
-            path: "Tests/HarnessCLITests"
+            name: "KouenCLITests",
+            dependencies: ["KouenCLI", "KouenLSP"],
+            path: "Tests/KouenCLITests"
         ),
         .testTarget(
-            name: "HarnessMCPTests",
-            dependencies: ["HarnessMCP"],
-            path: "Tests/HarnessMCPTests"
+            name: "KouenMCPTests",
+            dependencies: ["KouenMCP"],
+            path: "Tests/KouenMCPTests"
         ),
         .testTarget(
-            name: "HarnessDaemonTests",
-            dependencies: ["HarnessDaemonCore", "HarnessCore", "HarnessTerminalEngine"],
-            path: "Tests/HarnessDaemonTests"
+            name: "KouenDaemonTests",
+            dependencies: ["KouenDaemonCore", "KouenCore", "KouenTerminalEngine"],
+            path: "Tests/KouenDaemonTests"
         ),
     ] + platformTargets + platformTestTargets
 )
