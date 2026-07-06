@@ -1,4 +1,5 @@
 import Foundation
+import KouenCore
 
 /// `kouen-cli install-tools` — installs recommended shell tools via Homebrew.
 func handleInstallTools() {
@@ -17,18 +18,18 @@ func handleInstallTools() {
     let brewPath = ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"]
         .first { FileManager.default.fileExists(atPath: $0) }
     guard let brew = brewPath else {
-        fputs("install-tools: Homebrew not found. Install from https://brew.sh first.\n", stderr)
+        fputs("install-tools: Homebrew not found. Install from https://brew.sh first.\n", kouenStderr)
         return
     }
 
-    fputs("Installing recommended shell tools via Homebrew...\n\n", stdout)
+    fputs("Installing recommended shell tools via Homebrew...\n\n", kouenStdout)
 
     var installed: [String] = []
     var skipped: [String] = []
     var failed: [String] = []
 
     for tool in tools {
-        fputs("  \(tool.formula) — \(tool.description)\n", stdout)
+        fputs("  \(tool.formula) — \(tool.description)\n", kouenStdout)
 
         // Check if already installed
         let whichProcess = Process()
@@ -39,7 +40,7 @@ func handleInstallTools() {
         try? whichProcess.run()
         whichProcess.waitUntilExit()
         if whichProcess.terminationStatus == 0 {
-            fputs("    ✓ already installed\n", stdout)
+            fputs("    ✓ already installed\n", kouenStdout)
             skipped.append(tool.formula)
             continue
         }
@@ -54,31 +55,31 @@ func handleInstallTools() {
             try process.run()
             process.waitUntilExit()
             if process.terminationStatus == 0 {
-                fputs("    ✓ installed\n", stdout)
+                fputs("    ✓ installed\n", kouenStdout)
                 installed.append(tool.formula)
             } else {
-                fputs("    ✗ failed\n", stderr)
+                fputs("    ✗ failed\n", kouenStderr)
                 failed.append(tool.formula)
             }
         } catch {
-            fputs("    ✗ error: \(error.localizedDescription)\n", stderr)
+            fputs("    ✗ error: \(error.localizedDescription)\n", kouenStderr)
             failed.append(tool.formula)
         }
     }
 
     // Shell integration hints
-    fputs("\n", stdout)
+    fputs("\n", kouenStdout)
     if !installed.isEmpty || !skipped.isEmpty {
-        fputs("Shell integration (add to ~/.zshrc):\n", stdout)
-        fputs("  eval \"$(zoxide init zsh)\"\n", stdout)
-        fputs("  source <(fzf --zsh)\n", stdout)
-        fputs("\n", stdout)
+        fputs("Shell integration (add to ~/.zshrc):\n", kouenStdout)
+        fputs("  eval \"$(zoxide init zsh)\"\n", kouenStdout)
+        fputs("  source <(fzf --zsh)\n", kouenStdout)
+        fputs("\n", kouenStdout)
     }
 
     // Summary
     let total = installed.count + skipped.count
-    fputs("Done: \(total)/\(tools.count) ready", stdout)
-    if !installed.isEmpty { fputs(" (\(installed.count) new)", stdout) }
-    if !failed.isEmpty { fputs(", \(failed.count) failed: \(failed.joined(separator: ", "))", stderr) }
-    fputs("\n", stdout)
+    fputs("Done: \(total)/\(tools.count) ready", kouenStdout)
+    if !installed.isEmpty { fputs(" (\(installed.count) new)", kouenStdout) }
+    if !failed.isEmpty { fputs(", \(failed.count) failed: \(failed.joined(separator: ", "))", kouenStderr) }
+    fputs("\n", kouenStdout)
 }

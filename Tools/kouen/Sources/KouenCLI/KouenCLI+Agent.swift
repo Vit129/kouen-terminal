@@ -13,7 +13,7 @@ extension KouenCLI {
 
         guard let data = FileManager.default.contents(atPath: file),
               let content = String(data: data, encoding: .utf8) else {
-            fputs("agent: cannot read '\(file)'\n", stderr)
+            fputs("agent: cannot read '\(file)'\n", kouenStderr)
             return
         }
 
@@ -33,7 +33,7 @@ extension KouenCLI {
         }
 
         guard let surfaceID = agentSurface else {
-            fputs("agent: no agent pane found\n", stderr)
+            fputs("agent: no agent pane found\n", kouenStderr)
             return
         }
 
