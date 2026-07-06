@@ -1,15 +1,15 @@
-# Graph Summary — harness-terminal
+# Graph Summary — kouen-terminal
 _Auto-generated from GRAPH_REPORT.md · do not edit manually_
 _Regen: `graphify update .`_
 
 ## Summary
-- 14596 nodes · 31269 edges · 3722 communities (1240 shown, 2482 thin omitted)
-- Extraction: 89% EXTRACTED · 11% INFERRED · 0% AMBIGUOUS · INFERRED: 3430 edges (avg confidence: 0.8)
+- 14296 nodes · 31376 edges · 3372 communities (908 shown, 2464 thin omitted)
+- Extraction: 89% EXTRACTED · 11% INFERRED · 0% AMBIGUOUS · INFERRED: 3436 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 
 ## Graph Freshness
-- Built from commit: `149d28ba`
+- Built from commit: `56e5c350`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -18,9 +18,9 @@ _Regen: `graphify update .`_
 1. `SessionEditor` - 170 edges
 2. `SurfaceRegistry` - 154 edges
 3. `IPCRequest` - 151 edges
-4. `DaemonClient` - 142 edges
+4. `DaemonClient` - 144 edges
 5. `SessionCoordinator` - 124 edges
-6. `HarnessTerminalSurfaceView` - 124 edges
+6. `KouenTerminalSurfaceView` - 124 edges
 7. `AnyCodable` - 109 edges
 8. `Command` - 107 edges
 9. `TerminalScreen` - 100 edges
@@ -32,27 +32,27 @@ A high-degree node isn't always architecturally central - a widely-used
 utility/config file can rack up more edges than a real coupler while only
 ever touching one area. This ranks by how many DIFFERENT communities a
 node's neighbors span, not by raw edge count.
-1. `IPCRequest` - bridges 136 areas (151 edges)
-2. `Command` - bridges 101 areas (107 edges)
-3. `SessionCoordinator` - bridges 56 areas (124 edges)
+1. `IPCRequest` - bridges 135 areas (151 edges)
+2. `Command` - bridges 100 areas (107 edges)
+3. `SessionCoordinator` - bridges 55 areas (124 edges)
 4. `MenuTarget` - bridges 54 areas (60 edges)
-5. `IPCResponse` - bridges 52 areas (69 edges)
-6. `SpecialKey` - bridges 52 areas (56 edges)
+5. `SpecialKey` - bridges 52 areas (56 edges)
+6. `IPCResponse` - bridges 51 areas (69 edges)
 7. `EngineConformanceTests` - bridges 50 areas (76 edges)
-8. `AgentKind` - bridges 46 areas (92 edges)
-9. `SurfaceRegistry` - bridges 43 areas (154 edges)
+8. `AgentKind` - bridges 44 areas (92 edges)
+9. `CommandParserTests` - bridges 42 areas (43 edges)
 
 ## Surprising Connections (you probably didn't know these)
 - `SUI` --calls--> `Color`  [INFERRED]
-  Packages/HarnessOnboarding/Sources/HarnessOnboarding/Design/ImmersivePalette.swift → Apps/Harness/Sources/HarnessApp/Settings/SwiftUI/SettingsColorsView.swift
+  Packages/KouenOnboarding/Sources/KouenOnboarding/Design/ImmersivePalette.swift → Apps/Kouen/Sources/KouenApp/Settings/SwiftUI/SettingsColorsView.swift
 - `DaemonSyncService` --calls--> `DaemonSessionService`  [INFERRED]
-  Apps/Harness/Sources/HarnessApp/Services/DaemonSyncService.swift → Packages/HarnessCore/Sources/HarnessCore/IPC/DaemonSessionService.swift
+  Apps/Kouen/Sources/KouenApp/Services/DaemonSyncService.swift → Packages/KouenCore/Sources/KouenCore/IPC/DaemonSessionService.swift
 - `RemoteHostsService` --calls--> `RemoteHostStore`  [INFERRED]
-  Apps/Harness/Sources/HarnessApp/Services/RemoteHostsService.swift → Packages/HarnessCore/Sources/HarnessCore/Remote/RemoteHostStore.swift
+  Apps/Kouen/Sources/KouenApp/Services/RemoteHostsService.swift → Packages/KouenCore/Sources/KouenCore/Remote/RemoteHostStore.swift
 - `ThemeImportController` --calls--> `ThemeFileService`  [INFERRED]
-  Apps/Harness/Sources/HarnessApp/Services/ThemeImportController.swift → Packages/HarnessTheme/Sources/HarnessTheme/ThemeFileService.swift
+  Apps/Kouen/Sources/KouenApp/Services/ThemeImportController.swift → Packages/KouenTheme/Sources/KouenTheme/ThemeFileService.swift
 - `WorktreeAutoIsolateService` --calls--> `WorktreeManager`  [INFERRED]
-  Apps/Harness/Sources/HarnessApp/Services/WorktreeAutoIsolateService.swift → Packages/HarnessCore/Sources/HarnessCore/Worktree/WorktreeManager.swift
+  Apps/Kouen/Sources/KouenApp/Services/WorktreeAutoIsolateService.swift → Packages/KouenCore/Sources/KouenCore/Worktree/WorktreeManager.swift
 
 
 _Full map → GRAPH_REPORT.md · query: `graphify query "..."`_
