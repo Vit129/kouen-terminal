@@ -5,9 +5,9 @@
 # changed between the installed build and the new one — most releases are UI-only, so
 # running shells/agents survive the install untouched; only the GUI restarts.
 #
-# Crucially, this script can be run from *inside* a Harness pane:
+# Crucially, this script can be run from *inside* a Kouen pane:
 # the install work is handed off to a detached background process before
-# Harness is asked to quit, so the pane dying doesn't abort the install.
+# Kouen is asked to quit, so the pane dying doesn't abort the install.
 #
 # Usage:
 #   Scripts/install-graceful.sh           # build release + graceful install
@@ -18,7 +18,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 DEST="/Applications/Kouen.app"
-APP_SUPPORT="$HOME/Library/Application Support/Kouen"
+APP_SUPPORT="$HOME/Library/Application Support/Harness"
 APP_SUPPORT_BIN="$APP_SUPPORT/bin"
 LAUNCH_AGENT="$HOME/Library/LaunchAgents/com.vit129.kouen.daemon.plist"
 LOG="$APP_SUPPORT/install-graceful.log"
@@ -35,6 +35,13 @@ for arg in "$@"; do
     *) echo "Unknown option: $arg" >&2; exit 2 ;;
   esac
 done
+
+# One-time migration: the app bundle name changed too (Harness.app -> Kouen.app), so an old
+# install at the old path is a separate bundle this script never touches otherwise — quit it
+# and remove it so two copies aren't left running/installed side by side.
+pkill -f "/Applications/Harness.app/Contents/MacOS/Harness" 2>/dev/null || true
+pkill -f "/Applications/Harness.app/Contents/MacOS/harness-mcp" 2>/dev/null || true
+rm -rf "/Applications/Harness.app"
 
 # --- Build ---
 if [[ $NO_BUILD -eq 0 ]]; then
@@ -100,16 +107,16 @@ if [[ $REUSE_DAEMON -eq 1 ]]; then
   STOP_DAEMON_LINES="    echo '-- reusing running daemon (protocol unchanged); not stopping it'"
 fi
 
-if pgrep -x Harness > /dev/null 2>&1; then
+if pgrep -x Kouen > /dev/null 2>&1; then
   echo "==> Flushing session state (waiting for layout debounce)..."
   sleep 1
 
   echo "==> Scheduling background installer..."
-  # Hand install + relaunch off to a process that survives Harness dying.
+  # Hand install + relaunch off to a process that survives Kouen dying.
   nohup bash -c "
-    echo '-- waiting for Harness GUI to exit'
+    echo '-- waiting for Kouen GUI to exit'
     for i in \$(seq 1 100); do
-      pgrep -x Harness > /dev/null 2>&1 || break
+      pgrep -x Kouen > /dev/null 2>&1 || break
       sleep 0.1
     done
 $STOP_DAEMON_LINES
@@ -127,10 +134,10 @@ $STOP_DAEMON_LINES
     echo '-- done'
   " >> "$LOG" 2>&1 &
 
-  echo "==> Quitting Harness — will restart with new build momentarily..."
+  echo "==> Quitting Kouen — will restart with new build momentarily..."
   echo "    (log: $LOG)"
   osascript -e 'tell application "Kouen" to quit' 2>/dev/null || \
-    pkill -TERM Harness 2>/dev/null || true
+    pkill -TERM Kouen 2>/dev/null || true
 
 else
   # GUI not running — but a detached daemon (e.g. background agent tasks attached only via

@@ -14,8 +14,8 @@ Writes `~/.grok/hooks/kouen.json`:
 
 ```json
 {
-  "on-complete": "PATH=\"$HOME/Library/Application Support/Kouen/bin:$PATH\" kouen-cli notify --surface \"$HARNESS_SURFACE\" --title \"Grok\" --body \"Done\"",
-  "on-error": "PATH=\"$HOME/Library/Application Support/Kouen/bin:$PATH\" kouen-cli notify --surface \"$HARNESS_SURFACE\" --title \"Grok\" --body \"Error\""
+  "on-complete": "PATH=\"$HOME/Library/Application Support/Harness/bin:$PATH\" kouen-cli notify --surface \"$HARNESS_SURFACE\" --title \"Grok\" --body \"Done\"",
+  "on-error": "PATH=\"$HOME/Library/Application Support/Harness/bin:$PATH\" kouen-cli notify --surface \"$HARNESS_SURFACE\" --title \"Grok\" --body \"Error\""
 }
 ```
 
