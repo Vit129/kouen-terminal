@@ -15,12 +15,12 @@ Writes `~/.config/opencode/plugins/kouen.js`:
 
 ```js
 // kouen-managed — surfaces OpenCode session events in Kouen. Safe to delete.
-export const HarnessNotify = async ({ $ }) => ({
+export const KouenNotify = async ({ $ }) => ({
   "session.idle": async () => {
-    await $`PATH="$HOME/Library/Application Support/Harness/bin:$PATH" kouen-cli notify --surface "${process.env.HARNESS_SURFACE ?? ""}" --title OpenCode --body Done`
+    await $`PATH="$HOME/Library/Application Support/Kouen/bin:$PATH" kouen-cli notify --surface "${process.env.KOUEN_SURFACE ?? ""}" --title OpenCode --body Done`
   },
   "permission.asked": async () => {
-    await $`PATH="$HOME/Library/Application Support/Harness/bin:$PATH" kouen-cli notify --surface "${process.env.HARNESS_SURFACE ?? ""}" --title OpenCode --body "Awaiting input"`
+    await $`PATH="$HOME/Library/Application Support/Kouen/bin:$PATH" kouen-cli notify --surface "${process.env.KOUEN_SURFACE ?? ""}" --title OpenCode --body "Awaiting input"`
   },
 })
 ```
@@ -28,7 +28,7 @@ export const HarnessNotify = async ({ $ }) => ({
 - `session.idle` fires when the agent finishes a turn and goes quiet.
 - `permission.asked` fires when it needs your approval.
 
-The plugin reads `$HARNESS_SURFACE` (exported by Kouen for every pane) so the
+The plugin reads `$KOUEN_SURFACE` (exported by Kouen for every pane) so the
 notification lands on the right tab. It loads on OpenCode's next session.
 Re-running `install-hooks opencode` overwrites this file in place (backing up
 the previous copy).

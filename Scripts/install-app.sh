@@ -11,17 +11,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 DEST="/Applications/Kouen.app"
-# Mirrors HarnessPaths.resolveDataRootName: prefer Kouen if it already exists (already
-# migrated, or a fresh install); fall back to reading Harness if that's what's actually on
-# disk (an upgrade nothing has migrated yet). Never a physical move — see that function's
-# doc comment for why.
-if [[ -d "$HOME/Library/Application Support/Kouen" ]]; then
-  APP_SUPPORT="$HOME/Library/Application Support/Kouen"
-elif [[ -d "$HOME/Library/Application Support/Harness" ]]; then
-  APP_SUPPORT="$HOME/Library/Application Support/Harness"
-else
-  APP_SUPPORT="$HOME/Library/Application Support/Kouen"
-fi
+APP_SUPPORT="$HOME/Library/Application Support/Kouen"
 APP_SUPPORT_BIN="$APP_SUPPORT/bin"
 LAUNCH_AGENT="$HOME/Library/LaunchAgents/com.vit129.kouen.daemon.plist"
 NO_BUILD=0
@@ -42,21 +32,10 @@ done
 echo "==> Stopping production runtime..."
 launchctl bootout "gui/$(id -u)" "$LAUNCH_AGENT" 2>/dev/null || true
 launchctl bootout "gui/$(id -u)/com.vit129.kouen.daemon" 2>/dev/null || true
-# One-time migration off each pre-rename label/plist (harmless once nothing's left under them).
-launchctl bootout "gui/$(id -u)/com.vit129.harness.daemon" 2>/dev/null || true
-rm -f "$HOME/Library/LaunchAgents/com.vit129.harness.daemon.plist"
-launchctl bootout "gui/$(id -u)/com.robert.harness.daemon" 2>/dev/null || true
-rm -f "$HOME/Library/LaunchAgents/com.robert.harness.daemon.plist"
 "$ROOT/Kouen.app/Contents/MacOS/kouen-cli" daemon stop 2>/dev/null || true
 pkill -f "/Applications/Kouen.app/Contents/MacOS/KouenDaemon" 2>/dev/null || true
 pkill -f "$APP_SUPPORT_BIN/KouenDaemon" 2>/dev/null || true
 pkill -x Kouen 2>/dev/null || true
-# One-time migration: the app bundle name changed too (Harness.app -> Kouen.app), so an old
-# install at the old path is a separate bundle this script never touches otherwise — quit it
-# and remove it so two copies aren't left running/installed side by side.
-pkill -f "/Applications/Harness.app/Contents/MacOS/Harness" 2>/dev/null || true
-pkill -f "/Applications/Harness.app/Contents/MacOS/harness-mcp" 2>/dev/null || true
-rm -rf "/Applications/Harness.app"
 sleep 1
 
 # --- Build ---

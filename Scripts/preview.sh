@@ -4,17 +4,17 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-PREVIEW_HOME="$ROOT/.harness-preview"
+PREVIEW_HOME="$ROOT/.kouen-preview"
 APP="$PREVIEW_HOME/KouenPreview.app"
 mkdir -p "$PREVIEW_HOME"
 
-# HARNESS_HOME (and therefore the control socket path) must fit inside
+# KOUEN_HOME (and therefore the control socket path) must fit inside
 # sockaddr_un.sun_path (103 bytes on Darwin). A worktree checkout under
 # .claude/worktrees/<random-name> can push "$PREVIEW_HOME/kouen.sock" over
 # that limit, so keep the actual runtime state in a short, stable path under
 # /tmp keyed off $ROOT instead of inside the repo.
-PREVIEW_HARNESS_HOME="/tmp/harness-preview-$(printf '%s' "$ROOT" | md5 | cut -c1-10)"
-mkdir -p "$PREVIEW_HARNESS_HOME"
+PREVIEW_KOUEN_HOME="/tmp/kouen-preview-$(printf '%s' "$ROOT" | md5 | cut -c1-10)"
+mkdir -p "$PREVIEW_KOUEN_HOME"
 
 xml_escape() {
   local value="${1:-}"
@@ -34,7 +34,7 @@ if [[ -n "$(git status --short 2>/dev/null || true)" ]]; then
   GIT_DIRTY="+dirty"
 fi
 PREVIEW_BUILT_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-PREVIEW_TASK_LABEL="${HARNESS_PREVIEW_TASK:-${PREVIEW_TASK:-}}"
+PREVIEW_TASK_LABEL="${KOUEN_PREVIEW_TASK:-${PREVIEW_TASK:-}}"
 if [[ -n "$PREVIEW_TASK_LABEL" ]]; then
   PREVIEW_BUILD_LABEL="$PREVIEW_TASK_LABEL · $GIT_BRANCH@$GIT_SHA$GIT_DIRTY"
 else
@@ -43,10 +43,10 @@ fi
 
 # ─── Build (shared .build/debug output) ───────────────────────────────────────
 # Only rebuild if sources are newer than the binary, or binary doesn't exist.
-HARNESS_BIN="$ROOT/.build/debug/Harness"
-if [[ ! -x "$HARNESS_BIN" ]] || [[ -n "$(find "$ROOT/Packages" "$ROOT/Apps" "$ROOT/Tools" -name '*.swift' -newer "$HARNESS_BIN" 2>/dev/null | head -n1)" ]]; then
+KOUEN_BIN="$ROOT/.build/debug/Kouen"
+if [[ ! -x "$KOUEN_BIN" ]] || [[ -n "$(find "$ROOT/Packages" "$ROOT/Apps" "$ROOT/Tools" -name '*.swift' -newer "$KOUEN_BIN" 2>/dev/null | head -n1)" ]]; then
   echo "Building debug..."
-  swift build --product Harness
+  swift build --product Kouen
   swift build --product KouenDaemon
   swift build --product kouen-cli
 else
@@ -58,12 +58,12 @@ BUILD_DIR="$ROOT/.build/debug"
 # ─── Kill previous preview (ONLY preview, never prod) ─────────────────────────
 pkill -f "$APP/Contents/MacOS/Kouen" 2>/dev/null || true
 pkill -f "$APP/Contents/MacOS/KouenDaemon" 2>/dev/null || true
-rm -f "$PREVIEW_HARNESS_HOME/kouen.sock" "$PREVIEW_HARNESS_HOME/daemon.pid"
+rm -f "$PREVIEW_KOUEN_HOME/kouen.sock" "$PREVIEW_KOUEN_HOME/daemon.pid"
 
 # ─── Package preview app bundle ───────────────────────────────────────────────
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
-cp "$BUILD_DIR/Harness" "$APP/Contents/MacOS/Kouen"
+cp "$BUILD_DIR/Kouen" "$APP/Contents/MacOS/Kouen"
 cp "$BUILD_DIR/KouenDaemon" "$APP/Contents/MacOS/KouenDaemon"
 cp "$BUILD_DIR/kouen-cli" "$APP/Contents/MacOS/kouen-cli"
 chmod +x "$APP/Contents/MacOS/"*
@@ -76,21 +76,21 @@ if [[ ! -d "$FRAMEWORK" ]]; then
   FRAMEWORK="$(find "$ROOT/.build/artifacts" "$ROOT/.build" -name Sparkle.framework -type d 2>/dev/null | head -n1 || true)"
 fi
 if [[ -z "$FRAMEWORK" || ! -d "$FRAMEWORK" ]]; then
-  echo "error: Sparkle.framework not found under .build — build the Harness product first." >&2
+  echo "error: Sparkle.framework not found under .build — build the Kouen product first." >&2
   exit 1
 fi
 ditto "$FRAMEWORK" "$APP/Contents/Frameworks/Sparkle.framework"
 if ! otool -l "$APP/Contents/MacOS/Kouen" | grep -q "@executable_path/../Frameworks"; then
   install_name_tool -add_rpath "@executable_path/../Frameworks" "$APP/Contents/MacOS/Kouen"
 fi
-if [[ -f "$ROOT/Apps/Harness/Resources/Kouen.icns" ]]; then
-  cp "$ROOT/Apps/Harness/Resources/Kouen.icns" "$APP/Contents/Resources/Kouen.icns"
+if [[ -f "$ROOT/Apps/Kouen/Resources/Kouen.icns" ]]; then
+  cp "$ROOT/Apps/Kouen/Resources/Kouen.icns" "$APP/Contents/Resources/Kouen.icns"
 fi
-if [[ -f "$ROOT/Apps/Harness/Resources/KouenLogo.png" ]]; then
-  cp "$ROOT/Apps/Harness/Resources/KouenLogo.png" "$APP/Contents/Resources/KouenLogo.png"
+if [[ -f "$ROOT/Apps/Kouen/Resources/KouenLogo.png" ]]; then
+  cp "$ROOT/Apps/Kouen/Resources/KouenLogo.png" "$APP/Contents/Resources/KouenLogo.png"
 fi
-if [[ -d "$ROOT/Apps/Harness/Resources/Fonts" ]]; then
-  ditto "$ROOT/Apps/Harness/Resources/Fonts" "$APP/Contents/Resources/Fonts"
+if [[ -d "$ROOT/Apps/Kouen/Resources/Fonts" ]]; then
+  ditto "$ROOT/Apps/Kouen/Resources/Fonts" "$APP/Contents/Resources/Fonts"
 fi
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -100,15 +100,15 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleDevelopmentRegion</key>
   <string>en</string>
   <key>CFBundleExecutable</key>
-  <string>Harness</string>
+  <string>Kouen</string>
   <key>CFBundleIconFile</key>
-  <string>Harness</string>
+  <string>Kouen</string>
   <key>CFBundleIdentifier</key>
   <string>com.vit129.kouen.preview</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleName</key>
-  <string>Harness Preview</string>
+  <string>Kouen Preview</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
@@ -123,19 +123,19 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <string>Fonts</string>
   <key>NSPrincipalClass</key>
   <string>NSApplication</string>
-  <key>HarnessPreviewHome</key>
-  <string>$PREVIEW_HARNESS_HOME</string>
-  <key>HarnessPreviewBuildLabel</key>
+  <key>KouenPreviewHome</key>
+  <string>$PREVIEW_KOUEN_HOME</string>
+  <key>KouenPreviewBuildLabel</key>
   <string>$(xml_escape "$PREVIEW_BUILD_LABEL")</string>
-  <key>HarnessPreviewBuiltAt</key>
+  <key>KouenPreviewBuiltAt</key>
   <string>$(xml_escape "$PREVIEW_BUILT_AT")</string>
-  <key>HarnessPreviewGitBranch</key>
+  <key>KouenPreviewGitBranch</key>
   <string>$(xml_escape "$GIT_BRANCH")</string>
-  <key>HarnessPreviewGitSHA</key>
+  <key>KouenPreviewGitSHA</key>
   <string>$(xml_escape "$GIT_SHA")</string>
-  <key>HarnessPreviewGitDirty</key>
+  <key>KouenPreviewGitDirty</key>
   <string>$(xml_escape "$GIT_DIRTY")</string>
-  <key>HarnessPreviewGitSubject</key>
+  <key>KouenPreviewGitSubject</key>
   <string>$(xml_escape "$GIT_SUBJECT")</string>
 </dict>
 </plist>
@@ -147,25 +147,25 @@ codesign --force --sign - --entitlements "$ROOT/Kouen.entitlements" "$APP/Conten
 codesign --force --sign - --deep "$APP" >/dev/null
 
 # ─── Launch ───────────────────────────────────────────────────────────────────
-# The app's DaemonLauncher detects HarnessPreviewHome and spawns an isolated
+# The app's DaemonLauncher detects KouenPreviewHome and spawns an isolated
 # daemon automatically — no need to pre-spawn one here.
 cat <<EOF
 
-Launching Harness Preview (isolated SIT environment).
+Launching Kouen Preview (isolated SIT environment).
 App bundle:       $APP
-State directory:  $PREVIEW_HARNESS_HOME
-Socket:           $PREVIEW_HARNESS_HOME/kouen.sock
+State directory:  $PREVIEW_KOUEN_HOME
+Socket:           $PREVIEW_KOUEN_HOME/kouen.sock
 Build label:      $PREVIEW_BUILD_LABEL
 
 Production app is NOT affected.
 
 Preview CLI:
-  HARNESS_HOME="$PREVIEW_HARNESS_HOME" "$BUILD_DIR/kouen-cli" ping
+  KOUEN_HOME="$PREVIEW_KOUEN_HOME" "$BUILD_DIR/kouen-cli" ping
 
 EOF
 
 if [[ "${PREVIEW_SIGNPOSTS:-0}" == "1" ]]; then
-  HARNESS_HOME="$PREVIEW_HARNESS_HOME" "$APP/Contents/MacOS/Kouen" -HARNESS_FRAME_SIGNPOSTS 1 &
+  KOUEN_HOME="$PREVIEW_KOUEN_HOME" "$APP/Contents/MacOS/Kouen" -KOUEN_FRAME_SIGNPOSTS 1 &
 else
-  HARNESS_HOME="$PREVIEW_HARNESS_HOME" "$APP/Contents/MacOS/Kouen" &
+  KOUEN_HOME="$PREVIEW_KOUEN_HOME" "$APP/Contents/MacOS/Kouen" &
 fi

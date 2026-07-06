@@ -25,9 +25,9 @@ Update this file together with `claude.md` / `agents.md` when those sections cha
 Kouen renders terminals with its **own** self-contained stack — there is **no
 third-party terminal engine dependency** (the entire terminal stack is first-party; the only
 external package is Sparkle, GUI auto-update only). `TerminalHostView`
-hosts `HarnessTerminalSurfaceView` (a `CAMetalLayer` view) driving `HarnessTerminalEngine`
-(VT parser + screen/scrollback), `HarnessTheme` (490-theme catalog + `.harnesstheme`), and
-`HarnessTerminalRenderer` (CoreText atlas + Metal). Features: themed translucent canvas with
+hosts `KouenTerminalSurfaceView` (a `CAMetalLayer` view) driving `KouenTerminalEngine`
+(VT parser + screen/scrollback), `KouenTheme` (490-theme catalog + `.kouentheme`), and
+`KouenTerminalRenderer` (CoreText atlas + Metal). Features: themed translucent canvas with
 untouched program output (`applyThemeToTerminalOutput` toggles theme-colored output), balanced
 window padding (centered grid) + a live resize HUD, cursor styles + blink (DECSCUSR; `0` / a
 bare `CSI SP q` resets to the *user-configured* style — the Ghostty/kitty semantics, not a hard
@@ -62,8 +62,8 @@ The opt-in config import (`TerminalConfigImporter`) reads compatible source-term
 users moving in keep their colors/font — kept by product decision.
 
 **Before touching the terminal renderer or theme system, read the relevant package entry points under `Packages/` and keep [../claude.md](../claude.md) authority rules in mind:**
-`HarnessTerminalEngine`, `HarnessCopyMode`, `HarnessTheme`, `HarnessTerminalRenderer`,
-`HarnessTerminalKit`.
+`KouenTerminalEngine`, `KouenCopyMode`, `KouenTheme`, `KouenTerminalRenderer`,
+`KouenTerminalKit`.
 
 **Renderer/engine invariants** (recently hardened — keep these):
 - **Block elements** (`U+2580–U+259F`) and **box-drawing** (`U+2500–U+257F`) render
@@ -97,11 +97,11 @@ users moving in keep their colors/font — kept by product decision.
   emulator owns it) to drop the per-emit ARC weak-load. DEC special graphics still replays scalar-wise.
   ALL of this MUST stay byte-for-byte equal to `feedScalarwise` — proven by `AsciiFastPathTests` (incl.
   a SIMD boundary-offset test) + `CodepointRunFastPathTests` (well-formed unicode + every malformed
-  class, each at 8 chunk-splits). Runtime kill-switch: `HARNESS_DISABLE_BULK_UTF8=1` reverts to the
+  class, each at 8 chunk-splits). Runtime kill-switch: `KOUEN_DISABLE_BULK_UTF8=1` reverts to the
   per-byte decode. `IL`/`DL`/`ICH`/`DCH` shift via `memmove` like `scrollUp`/`scrollDown`
   (`TerminalGridCell` is a trivial value type). `FrameBuilder` resolves `RenderColor` channels via a
   256-entry LUT (bit-identical to the `Float(i)/255` divide it replaces).
-- **Resize:** `HarnessTerminalSurfaceView.updateGridSize` *rounds* the drawable (no edge seam
+- **Resize:** `KouenTerminalSurfaceView.updateGridSize` *rounds* the drawable (no edge seam
   under `.topLeft`) and `layout()` renders synchronously inside a `CATransaction` (no stretch
   flicker). The drawable resizes every frame; the authoritative **grid reflow + PTY `SIGWINCH`**
   fire per path:
@@ -159,7 +159,7 @@ users moving in keep their colors/font — kept by product decision.
   per present via `FrameBuilder.applyHighlights` (which re-runs the exact same private
   `appendRow` the baked path uses, so shaded rows are **byte-identical by construction**; IME
   preedit applies after via `applyPreedit` as before). Per-row overlay FINGERPRINTS
-  (`HarnessTerminalSurfaceView.overlayRowKeys`, geometry-hashed — no cell walks; stored
+  (`KouenTerminalSurfaceView.overlayRowKeys`, geometry-hashed — no cell walks; stored
   queue-side in `SurfaceEmulatorState.lastOverlayKeys`) diff against the previous build and
   union exactly the changed rows into the render damage: a selection drag re-encodes the rows it
   crossed, a static highlight adds zero per-frame work, clearing dirties exactly the old rows.
@@ -204,7 +204,7 @@ users moving in keep their colors/font — kept by product decision.
 ## Repository map
 
 ```
-harness/
+kouen/
 ├── Package.swift, project.yml, Makefile, Kouen.entitlements
 ├── Kouen.xcodeproj/             # generated via xcodegen
 ├── .github/workflows/ci.yml       # swift build/test + non-blocking benchmarks
@@ -214,7 +214,7 @@ harness/
 ├── marketing/                     # HyperFrames promo video — see marketing/README.md (not app code)
 ├── Apps/Kouen/
 │   ├── Resources/Assets.xcassets, Kouen.icns (generated)
-│   └── Sources/HarnessApp/
+│   └── Sources/KouenApp/
 │       ├── AppDelegate.swift, main.swift, Resources/Info.plist
 │       ├── Services/              # SessionCoordinator, MainExecutor, KeybindingsService,
 │       │                          # TerminalPaneRegistry, TerminalPaneRegistryAccess,
@@ -223,36 +223,36 @@ harness/
 │       ├── Settings/              # SettingsViewController, KeyRecorderView, LiveTerminalPreview
 │       └── UI/                    # MainSplit, sidebar, tabs, PrefixKeymap, CommandPrompt,
 │                                  # CopyMode, StatusLine, notifications, CommandPalette, Chrome,
-│                                  # DisplayPanesOverlay, AboutPanelController, HarnessControls,
+│                                  # DisplayPanesOverlay, AboutPanelController, KouenControls,
 │                                  # Notch/ (Agent Notch HUD)
 ├── Packages/
-│   ├── CHarnessSys/               # C ioctl shim (variadic PTY sizing on Linux)
-│   ├── HarnessCore/               # Models, IPC, SessionEditor, Commands, Keybindings,
+│   ├── CKouenSys/               # C ioctl shim (variadic PTY sizing on Linux)
+│   ├── KouenCore/               # Models, IPC, SessionEditor, Commands, Keybindings,
 │   │                              # Options, Events, Format, Layouts, Buffers, Agents,
 │   │                              # ShellIntegration, Session/PaneRectSolver
-│   ├── HarnessTerminalEngine/     # VT parser, screen/scrollback, images, input encoder
-│   ├── HarnessCopyMode/           # Shared copy-mode reducer for GUI + attach-window
-│   ├── HarnessTheme/              # 490-theme catalog + .harnesstheme import/export
-│   ├── HarnessTerminalRenderer/   # FrameBuilder, CoreText glyph atlas, Metal renderer
-│   ├── HarnessTerminalKit/        # TerminalHostView, ThemeManager, GridCompositor,
-│   │                              # HarnessTerminalSurfaceView (native CAMetalLayer view)
-│   ├── HarnessOnboarding/         # Embedded SwiftUI first-run wizard
-│   └── HarnessDaemon/
-│       ├── Sources/HarnessDaemon/ # HarnessDaemonCore: SurfaceRegistry, DaemonServer,
+│   ├── KouenTerminalEngine/     # VT parser, screen/scrollback, images, input encoder
+│   ├── KouenCopyMode/           # Shared copy-mode reducer for GUI + attach-window
+│   ├── KouenTheme/              # 490-theme catalog + .kouentheme import/export
+│   ├── KouenTerminalRenderer/   # FrameBuilder, CoreText glyph atlas, Metal renderer
+│   ├── KouenTerminalKit/        # TerminalHostView, ThemeManager, GridCompositor,
+│   │                              # KouenTerminalSurfaceView (native CAMetalLayer view)
+│   ├── KouenOnboarding/         # Embedded SwiftUI first-run wizard
+│   └── KouenDaemon/
+│       ├── Sources/KouenDaemon/ # KouenDaemonCore: SurfaceRegistry, DaemonServer,
 │       │                          # RealPty, AgentScanner
-│       └── Sources/HarnessDaemonMain/main.swift
-├── Tools/harness/Sources/HarnessCLI/  # HarnessCLI, AttachClient, WindowAttachClient,
+│       └── Sources/KouenDaemonMain/main.swift
+├── Tools/kouen/Sources/KouenCLI/  # KouenCLI, AttachClient, WindowAttachClient,
 │                                      # AgentHookInstaller
 ├── Tests/
-│   ├── HarnessBenchmarks/
-│   ├── HarnessCopyModeTests/
-│   ├── HarnessCoreTests/
-│   ├── HarnessDaemonTests/
-│   ├── HarnessOnboardingTests/
-│   ├── HarnessTerminalEngineTests/
-│   ├── HarnessTerminalKitTests/
-│   ├── HarnessTerminalRendererTests/
-│   └── HarnessThemeTests/
+│   ├── KouenBenchmarks/
+│   ├── KouenCopyModeTests/
+│   ├── KouenCoreTests/
+│   ├── KouenDaemonTests/
+│   ├── KouenOnboardingTests/
+│   ├── KouenTerminalEngineTests/
+│   ├── KouenTerminalKitTests/
+│   ├── KouenTerminalRendererTests/
+│   └── KouenThemeTests/
 ├── Scripts/                       # build-release, package-app, preview.sh, generate-app-icon.sh,
 │                                  # create-dmg.sh, sign-and-notarize.sh, generate-appcast.sh,
 │                                  # finalize-release.sh, completions/
@@ -269,28 +269,28 @@ harness/
 
 | Product | Target | Role |
 |---------|--------|------|
-| `HarnessCore` | `HarnessCore` | Shared library |
-| `HarnessTerminalEngine` | `HarnessTerminalEngine` | Pure Swift VT engine + grid/scrollback/images |
-| `HarnessCopyMode` | `HarnessCopyMode` | Pure copy-mode state/reducer over engine grids |
-| `HarnessTheme` | `HarnessTheme` | Theme catalog + `.harnesstheme` documents |
-| `HarnessTerminalRenderer` | `HarnessTerminalRenderer` | Frame builder + CoreText/Metal rendering |
-| `HarnessTerminalKit` | `HarnessTerminalKit` | Native terminal surface host + compositor |
-| `HarnessOnboarding` | `HarnessOnboarding` | Embedded first-run wizard |
-| `CHarnessSys` | `CHarnessSys` | C `ioctl` shim for PTY resize (Linux; linked by daemon/engine) |
-| `Kouen` | `HarnessApp` | GUI |
-| `HarnessDaemon` | `HarnessDaemon` | Thin `main` over `HarnessDaemonCore` |
-| — | `HarnessDaemonCore` | Testable daemon logic |
-| `kouen-cli` | `HarnessCLI` | CLI client (depends on terminal packages for attach/compositor) |
+| `KouenCore` | `KouenCore` | Shared library |
+| `KouenTerminalEngine` | `KouenTerminalEngine` | Pure Swift VT engine + grid/scrollback/images |
+| `KouenCopyMode` | `KouenCopyMode` | Pure copy-mode state/reducer over engine grids |
+| `KouenTheme` | `KouenTheme` | Theme catalog + `.kouentheme` documents |
+| `KouenTerminalRenderer` | `KouenTerminalRenderer` | Frame builder + CoreText/Metal rendering |
+| `KouenTerminalKit` | `KouenTerminalKit` | Native terminal surface host + compositor |
+| `KouenOnboarding` | `KouenOnboarding` | Embedded first-run wizard |
+| `CKouenSys` | `CKouenSys` | C `ioctl` shim for PTY resize (Linux; linked by daemon/engine) |
+| `Kouen` | `KouenApp` | GUI |
+| `KouenDaemon` | `KouenDaemon` | Thin `main` over `KouenDaemonCore` |
+| — | `KouenDaemonCore` | Testable daemon logic |
+| `kouen-cli` | `KouenCLI` | CLI client (depends on terminal packages for attach/compositor) |
 
-**One external dependency.** Every library/daemon/CLI product is first-party pure Swift; the GUI app's **only** package dependency is **Sparkle** (macOS auto-update), pinned `.upToNextMinor(from: "2.9.2")` (the audited line; `Package.resolved` locks the exact revision). `Package.swift` lists Sparkle alone, so `git clone && swift build` fetches just that one package and builds on any machine. The terminal engine, theme system, renderer, daemon core, and CLI link nothing external. The whole package builds in the **Swift 6 language mode** (complete strict concurrency everywhere); the two foundational, dependency-free libraries — `HarnessCore` and `HarnessTerminalEngine` — additionally treat **warnings as errors** (`strictFoundationSettings`) so a Sendable/data-race/deprecation warning in the layer everything builds on can't rot.
+**One external dependency.** Every library/daemon/CLI product is first-party pure Swift; the GUI app's **only** package dependency is **Sparkle** (macOS auto-update), pinned `.upToNextMinor(from: "2.9.2")` (the audited line; `Package.resolved` locks the exact revision). `Package.swift` lists Sparkle alone, so `git clone && swift build` fetches just that one package and builds on any machine. The terminal engine, theme system, renderer, daemon core, and CLI link nothing external. The whole package builds in the **Swift 6 language mode** (complete strict concurrency everywhere); the two foundational, dependency-free libraries — `KouenCore` and `KouenTerminalEngine` — additionally treat **warnings as errors** (`strictFoundationSettings`) so a Sendable/data-race/deprecation warning in the layer everything builds on can't rot.
 
 ---
 
 ## IPC
 
-JSON over `harness.sock` via `IPCEnvelope` / `IPCReply` (`IPCCodec`). Clients: `DaemonClient` (CLI), `DaemonSessionService` (app). Server: `DaemonServer` → `SurfaceRegistry`.
+JSON over `kouen.sock` via `IPCEnvelope` / `IPCReply` (`IPCCodec`). Clients: `DaemonClient` (CLI), `DaemonSessionService` (app). Server: `DaemonServer` → `SurfaceRegistry`.
 
-Extend in [`IPCMessage.swift`](Packages/HarnessCore/Sources/HarnessCore/IPC/IPCMessage.swift).
+Extend in [`IPCMessage.swift`](Packages/KouenCore/Sources/KouenCore/IPC/IPCMessage.swift).
 
 | Group | Requests (representative) |
 |-------|---------------------------|
@@ -321,7 +321,7 @@ editor.setTabStatus(workspaceID: match.workspaceID, tabID: match.tabID, ...)
 
 ## kouen-cli
 
-Binary: `.build/{debug,release}/kouen-cli`, `Kouen.app/Contents/MacOS/kouen-cli`, or `~/Library/Application Support/Harness/bin/kouen-cli` after `install`.
+Binary: `.build/{debug,release}/kouen-cli`, `Kouen.app/Contents/MacOS/kouen-cli`, or `~/Library/Application Support/Kouen/bin/kouen-cli` after `install`.
 
 Requires daemon running (app or launchd). Full flags: `kouen-cli` (no args) or [docs/COMMANDS.md](docs/COMMANDS.md).
 
@@ -340,7 +340,7 @@ Requires daemon running (app or launchd). Full flags: `kouen-cli` (no args) or [
 | **Options** | `set-option` (`setw`) `-g status on`, `show-options -g` |
 | **Environment** | `set-environment [-g] [-u] [-s <sessionID>] <key> [value]` (`setenv`), `show-environment [-g] [-s <sessionID>]` (`showenv`) — injected into pane shells on spawn/respawn |
 | **Hooks / sync** | `bind-hook after-new-tab 'display-message "new tab"'`, `list-hooks`, `unbind-hook --id <uuid>`, `wait-for [-S|-L|-U] <channel>` |
-| **Agents** | `notify --surface "$HARNESS_SURFACE" --body "…"` (`--message` alias), `detect-agent`, `install-hooks claude-code` |
+| **Agents** | `notify --surface "$KOUEN_SURFACE" --body "…"` (`--message` alias), `detect-agent`, `install-hooks claude-code` |
 | **Diagnostics** | `color-check` (ANSI/256/truecolor swatches), `theme-preview [--theme <name>] [--all]` (deterministic themed sample output); both are local stdout and do not open the daemon |
 | **Display** | `display-message '#{cwd_basename}'` |
 | **Install** | `install` (copy CLI to app support `bin/`, fish completion, LaunchAgent when bundled), `install-shell-integration [bash|zsh|fish|all]` |
@@ -358,14 +358,14 @@ Requires daemon running (app or launchd). Full flags: `kouen-cli` (no args) or [
 
 The headline feature: `kouen-cli attach-window` renders a tab's **full split layout** (every pane, borders, status line, active-pane cursor) into any plain terminal, including over ssh — like tmux, but Kouen-native.
 
-**Why a native engine.** Faithful compositing of N side-by-side panes needs each pane's **styled cell grid**, not just text. `HarnessGridTerminal` (in `HarnessTerminalEngine`) is a headless VT emulator exposing `readGrid()` for exactly that — pure Swift, no external dependency.
+**Why a native engine.** Faithful compositing of N side-by-side panes needs each pane's **styled cell grid**, not just text. `KouenGridTerminal` (in `KouenTerminalEngine`) is a headless VT emulator exposing `readGrid()` for exactly that — pure Swift, no external dependency.
 
-**Headless + synchronous.** `HarnessGridTerminal` wraps the engine's `TerminalEmulator` with a value-snapshot `readGrid()` — no Metal, no IO thread — so compositing N panes off-screen is fully synchronous and crash-free.
+**Headless + synchronous.** `KouenGridTerminal` wraps the engine's `TerminalEmulator` with a value-snapshot `readGrid()` — no Metal, no IO thread — so compositing N panes off-screen is fully synchronous and crash-free.
 
 **Pipeline (client-side emulation; the daemon stays a dumb byte pipe):**
 
 ```
-daemon PTY bytes ──subscribeSurfaceOutput──▶ HarnessGridTerminal (per pane)
+daemon PTY bytes ──subscribeSurfaceOutput──▶ KouenGridTerminal (per pane)
                   replayScrollback (seed)        │ readGrid() → TerminalGridSnapshot
 PaneNode tree ──PaneRectSolver──▶ [PaneRect] ────┤
                                                  ▼
@@ -374,25 +374,25 @@ PaneNode tree ──PaneRectSolver──▶ [PaneRect] ────┤
 
 | Piece | File | Role |
 |-------|------|------|
-| `HarnessGridTerminal` | `HarnessTerminalEngine` | Headless per-pane VT emulator; `readGrid()` → snapshot |
-| `TerminalGridSnapshot` | `HarnessTerminalEngine` | Value snapshot of a viewport (codepoints, SGR colors, attrs, wide, cursor) |
-| `PaneRectSolver` | `HarnessCore/Session/PaneRectSolver.swift` | `PaneNode` + cols×rows → interior `[PaneRect]` with 1-cell dividers |
-| `GridCompositor` | `HarnessTerminalKit/GridCompositor.swift` | Panes → ANSI frame: box-drawing borders, SGR re-emit, back-buffer diff, status, cursor |
-| `WindowAttachClient` | `HarnessCLI/WindowAttachClient.swift` | Live wiring: subscribe/seed/composite, raw TTY (reuses `AttachClient`), SIGWINCH, **snapshot-push** structure tracking, prefix bytes → `KeyTable` → `CommandIPCTranslator`, follows the session's active tab |
+| `KouenGridTerminal` | `KouenTerminalEngine` | Headless per-pane VT emulator; `readGrid()` → snapshot |
+| `TerminalGridSnapshot` | `KouenTerminalEngine` | Value snapshot of a viewport (codepoints, SGR colors, attrs, wide, cursor) |
+| `PaneRectSolver` | `KouenCore/Session/PaneRectSolver.swift` | `PaneNode` + cols×rows → interior `[PaneRect]` with 1-cell dividers |
+| `GridCompositor` | `KouenTerminalKit/GridCompositor.swift` | Panes → ANSI frame: box-drawing borders, SGR re-emit, back-buffer diff, status, cursor |
+| `WindowAttachClient` | `KouenCLI/WindowAttachClient.swift` | Live wiring: subscribe/seed/composite, raw TTY (reuses `AttachClient`), SIGWINCH, **snapshot-push** structure tracking, prefix bytes → `KeyTable` → `CommandIPCTranslator`, follows the session's active tab |
 
 **Geometry invariant:** `.horizontal` = side-by-side (first = left), `.vertical` = stacked (first = top), `ratio` = first child's fraction — matches the GUI's `split.isVertical = direction == .horizontal`. **Surface-key invariant:** `PaneLeaf.surfaceID.uuidString` is the daemon surface key (used directly for `subscribeSurfaceOutput`/`sendData`/`resizeSurface`). **Active pane is server-authoritative** (`Tab.activePaneID`/`lastActivePaneID`, schema v3): cycle/directional select commit via `selectPane`/`selectPaneDirectional` IPC and the GUI + compositor mirror it.
 
 **Prefix routing:** the compositor decodes post-prefix bytes (printable / `C-x` / `M-x` / CSI+SS3 arrows with xterm mod codes, tolerant of split reads) into a `KeySpec`, looks it up in the merged prefix `KeyTable` (`KeybindingsStore.load` — user `keybindings.json` overrides apply), and runs the resulting `Command` through the shared **`CommandIPCTranslator`** (the same mapping the GUI `MainExecutor` and the daemon hook executor use). Status line is `FormatString` over `status`/`status-left`/`status-right` from `showOptions`.
 
-**`CommandIPCTranslator`** (`HarnessCore/Commands`): pure `Command` + `CommandTarget` → `.requests([IPCRequest])` / `.clientLocal(Command)` / `.unresolved`. The **one** home of the split-direction inversion (`Command.SplitDirection` is divider-orientation — `.vertical` = side-by-side per `CommandParser`; the layout `SplitDirection` is the opposite, so `layoutDirection(for:)` inverts). Adopted by the GUI, the compositor, and `DaemonCommandExecutor` so a prefix verb, a `keybindings.json` override, and a hook-fired command behave identically.
+**`CommandIPCTranslator`** (`KouenCore/Commands`): pure `Command` + `CommandTarget` → `.requests([IPCRequest])` / `.clientLocal(Command)` / `.unresolved`. The **one** home of the split-direction inversion (`Command.SplitDirection` is divider-orientation — `.vertical` = side-by-side per `CommandParser`; the layout `SplitDirection` is the opposite, so `layoutDirection(for:)` inverts). Adopted by the GUI, the compositor, and `DaemonCommandExecutor` so a prefix verb, a `keybindings.json` override, and a hook-fired command behave identically.
 
 **Multi-client sizing:** `DaemonServer` records each client's requested PTY size per surface and resizes to the **smallest** (tmux `window-size smallest`); a surface grows back when a small client detaches.
 
 **Concurrency invariant (compositor):** the stdin reader thread does **only** `read()` — every byte is handed to `renderQueue`, the single owner of all input/mode/layout state (`inPrefix`, `prefixPending`, `pendingTable`, `copyMode`, `rects`, `activeSurface`, …). Never touch that state off `renderQueue`. Teardown drains the queue (`renderQueue.sync`) and sets `tornDown` before the final cleanup write, so no `composeAndWrite` races the reset sequence.
 
-**Robustness invariants (daemon/IPC):** client sockets are **non-blocking**; `DaemonServer.send` buffers unsent bytes per-fd and flushes from a writable `DispatchSource` (a slow/stuck client can never block the serial queue or hang shutdown), dropping a client past `maxWriteBacklog`. The client's `DaemonSubscription` mirrors this: the read loop closes the fd **under `writeLock`** on teardown and `writeFrame` re-checks the cancelled/finished flags, so a fire-and-forget keystroke write can never land on a closed (and possibly recycled) descriptor mid-teardown. IPC frames are length-prefixed and bounded by `IPCCodec.maxPayloadLength` (16 MiB); an over-cap declared length **throws** so the reader drops the (unrecoverable) connection instead of mis-framing. A framed request the daemon can't decode (version skew) — **or one that de-frames cleanly but carries no request** (`{}` / `{"request":null}`) — replies `error("unrecognized request")` and keeps the connection (only a `tooLarge`/unrecoverable frame drops it), so a single bad request never silently hangs a client. `wait-for` releases a **held lock on holder disconnect** (hands it to the next queued locker via `WaitForRegistry.remove`) so a crashed holder can't wedge the channel forever. The PTY scrollback ring evicts by advancing a **head index** (O(1)) with batched compaction — never `removeFirst()` per chunk on the read hot path — and `respawn` reuses the surface's **original shell**, not the ambient `$SHELL`. The PTY master `write()` is **non-blocking** (an `EAGAIN`-loop on the surface's own serial `writeQueue`), so a backed-up shell never blocks `SurfaceRegistry.lock` or the IPC serial queue; the per-subscriber delivery queue is depth-bounded, and the `pipe-pane` tee + hook child `Process`es run on their own bounded queue and are reaped, so one stalled piped command can't wedge fan-out for every subscriber. `processMonitors` evicts orphan `monitors` keys (output that raced `closeSurfaces`) so the map can't grow unbounded. `WaitForRegistry` prunes channels left empty by a signal/unlock/disconnect (the map can't grow per unique channel name). `capture-pane` and reattach `replay` decode scrollback **lossily** (`String(decoding:as:UTF8.self)`) so a multibyte split at an eviction seam can't blank the history. Corrupt `layout.json`/`options.json`/`hooks.json`/`environment.json` (daemon) **and** `settings.json`/`keybindings.json` (app) are renamed `.corrupt` via the shared `HarnessPaths.backupCorruptFile` (which gates the "backed up" log on the *actual* move, so a failed backup is never reported as success; `atomicWrite` likewise logs save failures) and replaced with in-memory defaults — never silently overwritten — so a partial write never discards a user's config; `settings.json` is rewritten **only** when a migration actually mutates it (a no-op launch never rewrites it), and a changed source-terminal config never auto-overwrites visuals the user already customized (re-import is the consented path). `VTParser` caps OSC (1 MiB)/CSI-params (32)/intermediates (8) so hostile output can't grow them without bound and always recovers to ground (`ParserRobustnessTests`). The **control socket is `0o600` and `accept()` verifies the peer euid via `getpeereid`** (only the owning user can drive the daemon); the Kouen home + subdirs are `0o700`. `pipe-pane`/hook failures never log the command (secret hygiene). Keep these contracts in code; there is no separate reliability doc in this checkout.
+**Robustness invariants (daemon/IPC):** client sockets are **non-blocking**; `DaemonServer.send` buffers unsent bytes per-fd and flushes from a writable `DispatchSource` (a slow/stuck client can never block the serial queue or hang shutdown), dropping a client past `maxWriteBacklog`. The client's `DaemonSubscription` mirrors this: the read loop closes the fd **under `writeLock`** on teardown and `writeFrame` re-checks the cancelled/finished flags, so a fire-and-forget keystroke write can never land on a closed (and possibly recycled) descriptor mid-teardown. IPC frames are length-prefixed and bounded by `IPCCodec.maxPayloadLength` (16 MiB); an over-cap declared length **throws** so the reader drops the (unrecoverable) connection instead of mis-framing. A framed request the daemon can't decode (version skew) — **or one that de-frames cleanly but carries no request** (`{}` / `{"request":null}`) — replies `error("unrecognized request")` and keeps the connection (only a `tooLarge`/unrecoverable frame drops it), so a single bad request never silently hangs a client. `wait-for` releases a **held lock on holder disconnect** (hands it to the next queued locker via `WaitForRegistry.remove`) so a crashed holder can't wedge the channel forever. The PTY scrollback ring evicts by advancing a **head index** (O(1)) with batched compaction — never `removeFirst()` per chunk on the read hot path — and `respawn` reuses the surface's **original shell**, not the ambient `$SHELL`. The PTY master `write()` is **non-blocking** (an `EAGAIN`-loop on the surface's own serial `writeQueue`), so a backed-up shell never blocks `SurfaceRegistry.lock` or the IPC serial queue; the per-subscriber delivery queue is depth-bounded, and the `pipe-pane` tee + hook child `Process`es run on their own bounded queue and are reaped, so one stalled piped command can't wedge fan-out for every subscriber. `processMonitors` evicts orphan `monitors` keys (output that raced `closeSurfaces`) so the map can't grow unbounded. `WaitForRegistry` prunes channels left empty by a signal/unlock/disconnect (the map can't grow per unique channel name). `capture-pane` and reattach `replay` decode scrollback **lossily** (`String(decoding:as:UTF8.self)`) so a multibyte split at an eviction seam can't blank the history. Corrupt `layout.json`/`options.json`/`hooks.json`/`environment.json` (daemon) **and** `settings.json`/`keybindings.json` (app) are renamed `.corrupt` via the shared `KouenPaths.backupCorruptFile` (which gates the "backed up" log on the *actual* move, so a failed backup is never reported as success; `atomicWrite` likewise logs save failures) and replaced with in-memory defaults — never silently overwritten — so a partial write never discards a user's config; `settings.json` is rewritten **only** when a migration actually mutates it (a no-op launch never rewrites it), and a changed source-terminal config never auto-overwrites visuals the user already customized (re-import is the consented path). `VTParser` caps OSC (1 MiB)/CSI-params (32)/intermediates (8) so hostile output can't grow them without bound and always recovers to ground (`ParserRobustnessTests`). The **control socket is `0o600` and `accept()` verifies the peer euid via `getpeereid`** (only the owning user can drive the daemon); the Kouen home + subdirs are `0o700`. `pipe-pane`/hook failures never log the command (secret hygiene). Keep these contracts in code; there is no separate reliability doc in this checkout.
 
-**Tests:** `GridCompositorTests` (borders/SGR/diff), `GridCompositorCopyModeTests`, `PaneRectSolverTests` (layout), `CommandIPCTranslatorTests` (verb mapping + split inversion), `HarnessGridTerminalTests` (engine fidelity), `CopyModeReducerTests`, and renderer/engine conformance suites. Run AppKit-linked grid tests via `xcrun xctest` only if `swift test`'s parallel runner is flaky.
+**Tests:** `GridCompositorTests` (borders/SGR/diff), `GridCompositorCopyModeTests`, `PaneRectSolverTests` (layout), `CommandIPCTranslatorTests` (verb mapping + split inversion), `KouenGridTerminalTests` (engine fidelity), `CopyModeReducerTests`, and renderer/engine conformance suites. Run AppKit-linked grid tests via `xcrun xctest` only if `swift test`'s parallel runner is flaky.
 
 **Parity:** the compositor now has copy-mode + SGR mouse, `-t session:window.pane` targeting, `wait-for`, the `bind -n` root table, and `switch-client -T` modal key tables — the broad tmux verb surface is captured in [docs/COMMANDS.md](docs/COMMANDS.md) and [docs/MULTIPLEXER_GUIDE.md](docs/MULTIPLEXER_GUIDE.md): control mode `-CC`, `link-window`, `display-popup`/`-menu`, `lock`/`clock-mode`, `command-prompt`, `choose-*`, `confirm-before`, `pipe-pane`, `capture-pane -S/-E/-e/-J`, command aliases. Deliberate architectural divergences are called out in [docs/MIGRATION.md](docs/MIGRATION.md); grouped sessions and session-lifecycle options should not be half-wired against Kouen's value-typed session-owned tabs + always-visible-sessions model.
 
@@ -400,7 +400,7 @@ PaneNode tree ──PaneRectSolver──▶ [PaneRect] ────┤
 
 ## Settings
 
-`HarnessSettings` in `settings.json`. High-signal fields:
+`KouenSettings` in `settings.json`. High-signal fields:
 
 | Field | Purpose |
 |-------|---------|
@@ -435,17 +435,17 @@ PaneNode tree ──PaneRectSolver──▶ [PaneRect] ────┤
 
 **Terminal config import** (`TerminalConfigImporter`): reads a compatible source terminal config so users migrating in keep their colors/font. The font **face** is imported but the font **size** is not — `fontSize` is Kouen-owned (default 16); `makeDefaults`/`applyImportedDefaults`/`resetToImportedConfig` deliberately don't pull `font-size` from the source terminal (a terminal's size preference doesn't carry over). **Do not strip `#` in values** — only lines starting with `#` are comments. Re-import via Settings or `source-config` / prefix `r`. `minimumContrast` is imported into `settings.json` and enforced by the renderer (`CellColorResolver`).
 
-**Apply colors (single source of truth):** `ThemeManager.resolvedCanvas(themeName:custom*Hex:)` resolves the canvas bg/fg/cursor (explicit custom > theme preset > baseline). **Both** `TerminalHostView.applyNativeAppearance` (→ `HarnessTerminalSurfaceView.configureAppearance`) and `HarnessChrome.update` consume it, so terminal canvas and chrome paint the **identical** color — no seam. `CellColorResolver` stays byte-exact and gamut-free; `FrameBuilder` is the RGBColor→RenderColor boundary, and the Metal clear color must use the same converter as default cell backgrounds. Chrome is **fully flat**: `HarnessChromePalette` paints the resting sidebar/tab/status background as the *exact* terminal color (no lift), so the window reads as one seamless surface — only interaction states (active/hover) blend toward the foreground. Program **output** keeps untouched/default ANSI colors unless `applyThemeToTerminalOutput` is on; the daemon PTY exports `COLORTERM=truecolor` (with `TERM=xterm-256color`, see `RealPty`) so TUIs like Claude Code emit true 24-bit color instead of a washed 256-color fallback, and the off-mode baseline ANSI palette (`ThemeManager.defaultBaselinePaletteHex`) is the bundled muted ANSI-16 set. Selecting a theme seeds the full editable color set into `settings.json` (`SessionCoordinator.setTheme` + `ThemeManager.presetColors`); colors flow from settings. **Translucency + blur:** the native canvas honors `backgroundOpacity` (default-bg cells get the alpha so the one window-wide CGS `WindowBlur` shows through), while glyphs and explicit program backgrounds stay opaque so output reads true. Chrome backdrop: `ChromeBackdrop` with `.underWindowBackground` or Liquid Glass — **not** `.sidebar` / `.titlebar` (blue tint).
+**Apply colors (single source of truth):** `ThemeManager.resolvedCanvas(themeName:custom*Hex:)` resolves the canvas bg/fg/cursor (explicit custom > theme preset > baseline). **Both** `TerminalHostView.applyNativeAppearance` (→ `KouenTerminalSurfaceView.configureAppearance`) and `KouenChrome.update` consume it, so terminal canvas and chrome paint the **identical** color — no seam. `CellColorResolver` stays byte-exact and gamut-free; `FrameBuilder` is the RGBColor→RenderColor boundary, and the Metal clear color must use the same converter as default cell backgrounds. Chrome is **fully flat**: `KouenChromePalette` paints the resting sidebar/tab/status background as the *exact* terminal color (no lift), so the window reads as one seamless surface — only interaction states (active/hover) blend toward the foreground. Program **output** keeps untouched/default ANSI colors unless `applyThemeToTerminalOutput` is on; the daemon PTY exports `COLORTERM=truecolor` (with `TERM=xterm-256color`, see `RealPty`) so TUIs like Claude Code emit true 24-bit color instead of a washed 256-color fallback, and the off-mode baseline ANSI palette (`ThemeManager.defaultBaselinePaletteHex`) is the bundled muted ANSI-16 set. Selecting a theme seeds the full editable color set into `settings.json` (`SessionCoordinator.setTheme` + `ThemeManager.presetColors`); colors flow from settings. **Translucency + blur:** the native canvas honors `backgroundOpacity` (default-bg cells get the alpha so the one window-wide CGS `WindowBlur` shows through), while glyphs and explicit program backgrounds stay opaque so output reads true. Chrome backdrop: `ChromeBackdrop` with `.underWindowBackground` or Liquid Glass — **not** `.sidebar` / `.titlebar` (blue tint).
 
 ---
 
 ## Agent integration
 
-Shell env: `/usr/bin/env HARNESS_SURFACE=<uuid> $SHELL -l`
+Shell env: `/usr/bin/env KOUEN_SURFACE=<uuid> $SHELL -l`
 
-**Detection:** `AgentDetector` + daemon `AgentScanner` (~1.5s) on process tree from shell PID. Kinds: codex, claude-code, cursor, pi, hermes, openclaw, opencode, aider, gemini, goose, generic. **`install-hooks`** writes configs for six agents (codex, claude-code, cursor, pi, hermes, openclaw); it **deep-merges** into the agent's existing config (e.g. `~/.claude/settings.json`) — never overwrites — and is idempotent (`JSONMerge.deepMerge` in HarnessCore, covered by `HarnessCoreTests`). Codex's hooks use the event/matcher shape (NOT the inert `on_pause`/`on_done` keys) **and** `install` enables `[features] hooks = true` in `~/.codex/config.toml` (Codex won't load `hooks.json` otherwise — mirrors the Skillz integration). Agents with no shell-command hook mechanism (opencode, aider, gemini, goose) are **not** installable — they notify via the hook-independent activity path once detected. The install logic lives in **`HarnessCore.AgentHookInstaller`** (`install`/`isInstalled`/`installableAgents`, `homeOverride` for tests), shared by the CLI shim (`AgentHookInstallerCLI`) **and** the GUI's per-agent "Install hooks" button (Settings ▸ Agents) — no shelling out, no duplication.
+**Detection:** `AgentDetector` + daemon `AgentScanner` (~1.5s) on process tree from shell PID. Kinds: codex, claude-code, cursor, pi, hermes, openclaw, opencode, aider, gemini, goose, generic. **`install-hooks`** writes configs for six agents (codex, claude-code, cursor, pi, hermes, openclaw); it **deep-merges** into the agent's existing config (e.g. `~/.claude/settings.json`) — never overwrites — and is idempotent (`JSONMerge.deepMerge` in KouenCore, covered by `KouenCoreTests`). Codex's hooks use the event/matcher shape (NOT the inert `on_pause`/`on_done` keys) **and** `install` enables `[features] hooks = true` in `~/.codex/config.toml` (Codex won't load `hooks.json` otherwise — mirrors the Skillz integration). Agents with no shell-command hook mechanism (opencode, aider, gemini, goose) are **not** installable — they notify via the hook-independent activity path once detected. The install logic lives in **`KouenCore.AgentHookInstaller`** (`install`/`isInstalled`/`installableAgents`, `homeOverride` for tests), shared by the CLI shim (`AgentHookInstallerCLI`) **and** the GUI's per-agent "Install hooks" button (Settings ▸ Agents) — no shelling out, no duplication.
 
-**OSC 9;4 progress pipeline:** `TerminalProgressReport` (engine, `HarnessTerminalEngine`) parses `ESC ] 9 ; 4 ; <state> ; <value> ST` (ConEmu/Ghostty/Windows Terminal semantics) and invokes `onProgress` on the surface view. `SurfaceProgressTracker` (`@MainActor`, app-local, never persisted) aggregates reports per surface and expires them after a hardcoded **15 s stale timeout** (re-armed by each keep-alive) — matching Ghostty's cleanup window for programs that die without sending the remove. `TabPillView` reads `SurfaceProgressTracker.shared.isActive(_:)` and paints the **working dot** (Ghostty-style tiny indicator before the tab title) while the report is live. **Fallback for agents that don't emit OSC 9;4** (e.g. Codex): the tab dot also lights when `tab.agent?.activity == .working` and the tab is not already `.waiting` — the activity comes from `AgentDetector` / `AgentScanner` output recency via the daemon. An explicit OSC 9;4 report always outranks the fallback.
+**OSC 9;4 progress pipeline:** `TerminalProgressReport` (engine, `KouenTerminalEngine`) parses `ESC ] 9 ; 4 ; <state> ; <value> ST` (ConEmu/Ghostty/Windows Terminal semantics) and invokes `onProgress` on the surface view. `SurfaceProgressTracker` (`@MainActor`, app-local, never persisted) aggregates reports per surface and expires them after a hardcoded **15 s stale timeout** (re-armed by each keep-alive) — matching Ghostty's cleanup window for programs that die without sending the remove. `TabPillView` reads `SurfaceProgressTracker.shared.isActive(_:)` and paints the **working dot** (Ghostty-style tiny indicator before the tab title) while the report is live. **Fallback for agents that don't emit OSC 9;4** (e.g. Codex): the tab dot also lights when `tab.agent?.activity == .working` and the tab is not already `.waiting` — the activity comes from `AgentDetector` / `AgentScanner` output recency via the daemon. An explicit OSC 9;4 report always outranks the fallback.
 
 **Title fallback:** `AgentTitleInference.kind(from: tab.title)` when proc-tree misses agent (sidebar/tab use `tab.agent?.kind ?? inference`).
 
@@ -453,7 +453,7 @@ Shell env: `/usr/bin/env HARNESS_SURFACE=<uuid> $SHELL -l`
 
 ```bash
 kouen-cli install-hooks claude-code
-kouen-cli notify --surface "$HARNESS_SURFACE" --body "Approval required"
+kouen-cli notify --surface "$KOUEN_SURFACE" --body "Approval required"
 ```
 
 Per-agent guides: [docs/agent-hooks/](docs/agent-hooks/). Daemon hooks (`hooks.json`): `after-new-tab`, `after-new-session`, `after-kill-tab`, `after-split-pane`, `after-kill-pane`, `after-resize-pane`, `pane-exited`, `client-attached`, `client-detached`, `agent-state-changed`, `notification-posted` (full list in [docs/COMMANDS.md](docs/COMMANDS.md)).
@@ -464,20 +464,20 @@ Per-agent guides: [docs/agent-hooks/](docs/agent-hooks/). Daemon hooks (`hooks.j
 
 **Notification delivery (one path):** `SessionCoordinator.deliverAgentAlert(event:title:body:)` is the single sink. It first gates on the per-event "which events notify me" choice (`settings.isEventEnabled(event)`, backed by `notificationEvents`), then honors the two delivery toggles — banner (`systemNotificationsEnabled`) and chime (`notificationSoundEnabled`). The `NotificationEvent` cases and their sites: `.agentWaiting` — the explicit `kouen-cli notify` path (`pushNewRemoteNotifications`, rich message, owns `.waiting` tabs) plus `terminalHostDidRequestDesktopNotification`; `.agentFinished` — the **hook-independent** `pushAgentActivityNotifications` path firing on the agent-activity `working → idle/awaiting` edge (the AI stopped producing output), so a ping lands for **any detected agent under any shell** with no hook install; `.bell` — `terminalHostDidRingBell`; `.commandFinished` — `terminalHostDidFinishCommand`. The activity path skips `.waiting` tabs (so the two never double-fire), skips the pane you're actively watching, and has a 30s per-surface cooldown so a streaming agent can't spam. Only the OS banner is gated by these settings — the in-app sidebar ring/waiting state (`requestDaemon(.notify)`) is independent.
 
-**Chrome icon buttons (one source of truth):** every circular chrome button — `NotificationBellButton`, the sidebar toggle, footer gear/＋/palette, tab-strip ＋/overflow (all `SoftIconButton`) — paints through **`HarnessDesign.applyIconButtonChrome(to:bounds:isHovered:)`**: a subtle `surfaceElevated` disc + `borderStrong` rim (the same as the adjacent search field), flat (no drop shadow), hover lifts toward foreground. They follow the theme like the session cards instead of floating as opaque near-black discs. The **active top-tab pill** (`TabPillView.applyChrome`) is painted identically to the **selected session card** (`SessionCardRowView`): accent-tinted fill + accent rim + `elevation1` + card radius, so the tab strip and the side tab read as one system.
+**Chrome icon buttons (one source of truth):** every circular chrome button — `NotificationBellButton`, the sidebar toggle, footer gear/＋/palette, tab-strip ＋/overflow (all `SoftIconButton`) — paints through **`KouenDesign.applyIconButtonChrome(to:bounds:isHovered:)`**: a subtle `surfaceElevated` disc + `borderStrong` rim (the same as the adjacent search field), flat (no drop shadow), hover lifts toward foreground. They follow the theme like the session cards instead of floating as opaque near-black discs. The **active top-tab pill** (`TabPillView.applyChrome`) is painted identically to the **selected session card** (`SessionCardRowView`): accent-tinted fill + accent rim + `elevation1` + card radius, so the tab strip and the side tab read as one system.
 
 **Brand icons:** `AgentChipView`, `TabPillView`, the `MenuBarController` menu, and Settings ▸ Agents render each agent's mark from **`AgentIconArt`** via **`SVGPathParser`** → `CGPath` and **`AgentIconRenderer`** (`templateImage` tintable by `contentTintColor`; `coloredImage` baked for `NSMenuItem`; `monogramTemplate` for the text-only fallback). Sources (attribution in [docs/THIRD-PARTY-NOTICES.md](docs/THIRD-PARTY-NOTICES.md)): **lobe-icons** `@lobehub/icons-static-svg` (MIT) for `codex`, `claude`, `cursor`, `openclaw`, `opencode`, `gemini`, `goose`; a **vendor brand mark** (matching the Skillz app) for `pi` (Inflection). No bundled raster assets — vector, crisp at any size, the same procedural approach as the box-drawing. Agents with no mark (Hermes, Aider) fall back to a tinted two-letter monogram (`AgentIconRenderer.monogramTemplate`); the per-agent color override tints it. **Hermes** uses the monogram deliberately: its official mark is a detailed portrait that is illegible at the 14–18px sizes the icon is shown at.
 
-**MCP (Model Context Protocol):** `kouen-mcp` is a JSON-RPC 2.0 MCP server (stdin/stdout transport) that lets AI agents call Kouen as a tool provider — direction is **agent → Kouen**, opposite of the shelved ACP sidebar. 27 tools across 6 categories: session/pane control, file I/O, git, workbench, browser pane, and agent orchestration. The binary ships at `Kouen.app/Contents/MacOS/kouen-mcp` in production builds (alongside `kouen-cli` and `HarnessDaemon`). Tool policy gating: dangerous tools (control, shell) are blocked by default; enable via `~/Library/Application Support/Harness/mcp-policy.json` → `"allowControl": true` or `HARNESS_MCP_ALLOW_CONTROL=1` env var.
+**MCP (Model Context Protocol):** `kouen-mcp` is a JSON-RPC 2.0 MCP server (stdin/stdout transport) that lets AI agents call Kouen as a tool provider — direction is **agent → Kouen**, opposite of the shelved ACP sidebar. 27 tools across 6 categories: session/pane control, file I/O, git, workbench, browser pane, and agent orchestration. The binary ships at `Kouen.app/Contents/MacOS/kouen-mcp` in production builds (alongside `kouen-cli` and `KouenDaemon`). Tool policy gating: dangerous tools (control, shell) are blocked by default; enable via `~/Library/Application Support/Kouen/mcp-policy.json` → `"allowControl": true` or `KOUEN_MCP_ALLOW_CONTROL=1` env var.
 
 MCP setup (one command):
 ```bash
-kouen-cli mcp setup    # detects Claude Code / Kiro / Agy, writes mcpServers.harness to each config
+kouen-cli mcp setup    # detects Claude Code / Kiro / Agy, writes mcpServers.kouen to each config
 kouen-cli mcp status   # show which agents are configured
 kouen-cli mcp remove   # remove kouen-mcp from all agent configs
 ```
 
-Or configure a single agent via **Settings ▸ Agents** — each supported agent row has an "Add MCP" / "✓ MCP" button that reads/writes the same config files. Config targets: Claude Code (`~/.claude.json`), Kiro (`~/.kiro/settings/mcp.json`), Agy/Gemini (`~/.gemini/settings.json`). Codex uses a plugin marketplace instead of `mcpServers` in `config.toml` and is not directly configurable this way. `MCPConfigWriter` (HarnessCore) owns reads/writes; the GUI delegates to it off-main with a `Toast` confirmation. MCP architecture details: `agent-memory/knowledge/architecture/mcp-server.md`.
+Or configure a single agent via **Settings ▸ Agents** — each supported agent row has an "Add MCP" / "✓ MCP" button that reads/writes the same config files. Config targets: Claude Code (`~/.claude.json`), Kiro (`~/.kiro/settings/mcp.json`), Agy/Gemini (`~/.gemini/settings.json`). Codex uses a plugin marketplace instead of `mcpServers` in `config.toml` and is not directly configurable this way. `MCPConfigWriter` (KouenCore) owns reads/writes; the GUI delegates to it off-main with a `Toast` confirmation. MCP architecture details: `agent-memory/knowledge/architecture/mcp-server.md`.
 
 ---
 
@@ -495,20 +495,20 @@ Or configure a single agent via **Settings ▸ Agents** — each supported agent
 > Sidebar header is **search field + notification bell + sidebar toggle** (single active
 > workspace — the workspace pill / switcher and footer "new workspace" button are dormant,
 > not wired into the UI; `WorkspacePillButton` / `WorkspaceSwitcherPanelView` stay in
-> `HarnessSidebarPanelViewController` for easy re-enable).
+> `KouenSidebarPanelViewController` for easy re-enable).
 
 | Component | File | Notes |
 |-----------|------|-------|
 | Window shell | `MainWindowController` | Root window, chrome palette |
 | Main menu | `MainMenuBuilder` | Global shortcuts (Cmd+P, …) |
 | Main split | `MainSplitViewController` | Snapshot observer; sidebar collapse via `SplitChromeDelegate.allowFullCollapse` (divider min drops to 0 for a programmatic collapse, stays 200 for user drags) + a tab-strip toggle button; traffic-light leading inset applies to `WindowTitleStripView` (via `ContentAreaViewController.setTabBarLeadingInset`) when the sidebar collapses — the tab bar itself receives inset 0 (it sits below the title strip, already clear of the lights) |
-| Sidebar | `HarnessSidebarPanelViewController` | Sessions, agents |
+| Sidebar | `KouenSidebarPanelViewController` | Sessions, agents |
 | Tab bar | `TerminalTabBarView` | `SoftIconButton`: `isBordered = false` for `+` |
 | Terminals | `ContentAreaViewController` | Pane mount on structure change |
-| Copy mode | `HarnessCopyMode`, `TerminalHostView` / `HarnessTerminalSurfaceView` | Shared reducer over engine grids; vim/emacs tables; yank to pasteboard + buffer |
+| Copy mode | `KouenCopyMode`, `TerminalHostView` / `KouenTerminalSurfaceView` | Shared reducer over engine grids; vim/emacs tables; yank to pasteboard + buffer |
 | Status line | `StatusLineView` | `OptionStore` + `FormatString` |
 | Notifications | `NotificationBellButton`, `NotificationDropdownPanelView` | Waiting-tab badge + dropdown |
-| Agent Notch HUD | `NotchPanelController`, `AgentNotchViewModel`, `AgentNotchRootView` | macOS notch overlay; `AgentNotchProjection` in HarnessCore |
+| Agent Notch HUD | `NotchPanelController`, `AgentNotchViewModel`, `AgentNotchRootView` | macOS notch overlay; `AgentNotchProjection` in KouenCore |
 | Title strip | `WindowTitleStripView` | Draggable strip above the tab bar (30 pt); shows active tab's `folder · basename` (Ghostty-style); hidden while an agent owns the pane; traffic-light leading inset slides in via `setLeadingInset` when sidebar collapses; hosted by `ContentAreaViewController` |
 | Window edge border | `WindowBorderOverlayView` | Click-through hairline overlay on the window's inner edge; color/opacity from `windowBorderHex` / `windowBorderOpacity` settings; auto-hidden in fullscreen |
 | Scrollbar | `TerminalScrollbarView` | Transient auto-hide overlay scrollbar in `TerminalHostView`; purely decorative (click-through, no track chrome); shares debounced-fade timing with `ResizeHUDView` |
@@ -516,11 +516,11 @@ Or configure a single agent via **Settings ▸ Agents** — each supported agent
 | Default terminal | `DefaultTerminalManager`, `DefaultTerminalOpener` | Settings ▸ Terminal — `ssh`/`telnet`/`x-man-page` + `.command`/`.tool`; `AppDelegate` opens URLs via `SessionCoordinator.openDefaultTerminalLaunch`. **Gotcha:** `NSWorkspace.setDefaultApplication` completions must be `@Sendable` (invoked off main actor; Swift 6 traps MainActor-isolated closures). |
 | Display panes | `DisplayPanesOverlay` | Prefix `q` / `display-panes` — tmux-style numbered overlay |
 | About | `AboutPanelController` | Menu → About Kouen |
-| Onboarding | `OnboardingController` → `HarnessOnboarding` | Thin app bridge to the embedded SwiftUI immersive first-run wizard; first launch + Help → Welcome; dismisses back into Kouen, never exits the app |
+| Onboarding | `OnboardingController` → `KouenOnboarding` | Thin app bridge to the embedded SwiftUI immersive first-run wizard; first launch + Help → Welcome; dismisses back into Kouen, never exits the app |
 | Prefix / prompt | `PrefixKeymap`, `CommandPromptController` | |
 | Palette | `CommandPaletteController` | `Cmd+P`, MRU; featured themes only |
 | Menu bar | `MenuBarController` | `NSStatusItem` (Kouen mark, template); menu lists active agent sessions + every workspace's sessions from the daemon snapshot (shell-agnostic); rebuilt on open |
-| Design / chrome | `HarnessDesign`, `HarnessChrome` | Tokens, `ChromeBackdrop`, `HarnessPillButton` (theme-aware monochrome primary/secondary — used by onboarding + settings instead of system-blue bezels), Liquid Glass |
+| Design / chrome | `KouenDesign`, `KouenChrome` | Tokens, `ChromeBackdrop`, `KouenPillButton` (theme-aware monochrome primary/secondary — used by onboarding + settings instead of system-blue bezels), Liquid Glass |
 | Toast / blur | `Toast`, `WindowBlur` | Transient feedback, backdrop blur |
 | App launch | `AppDelegate` | Daemon, prefix keymap, shell tracker |
 | Coordinator | `SessionCoordinator` | IPC, registry, themes |
@@ -530,8 +530,8 @@ Or configure a single agent via **Settings ▸ Agents** — each supported agent
 | Pane lookup | `TerminalPaneRegistryAccess` | `@MainActor` lookup by `SurfaceID` |
 | Shell tracker | `SurfaceShellTracker` | cwd polling via proc tree |
 | Daemon fallback | `DaemonLauncher` | Starts daemon when launchd unavailable |
-| Terminal | `TerminalHostView` | Hosts `HarnessTerminalSurfaceView`; daemon I/O |
-| Settings UI | `SettingsViewController`, `KeyRecorderView`, `LiveTerminalPreview`, `HarnessControls` | Standalone native macOS Settings window via `SettingsWindowController` (not embedded); rebuilt per open; standard titled window, sidebar vibrancy, native search, and pages **Appearance · Colors · Terminal · Keys · Agents · Advanced** as grouped preference sections. Form controls in `HarnessControls.swift` use system semantic colors and the user accent so the window tracks macOS light/dark appearance while keeping Kouen-specific controls for sliders, swatches, segmented choices, and searchable selects. `LiveTerminalPreview` remains a theme-true mini pane. **Agents** page = per-agent rows (icon + matched executables + color swatch + one-click Install hooks). **Advanced** = curated daemon-owned `OptionStore` options (status format, mouse, base-index, monitor, repeat-time, pane borders…) read/written via `showOptions`/`setOption` IPC. |
+| Terminal | `TerminalHostView` | Hosts `KouenTerminalSurfaceView`; daemon I/O |
+| Settings UI | `SettingsViewController`, `KeyRecorderView`, `LiveTerminalPreview`, `KouenControls` | Standalone native macOS Settings window via `SettingsWindowController` (not embedded); rebuilt per open; standard titled window, sidebar vibrancy, native search, and pages **Appearance · Colors · Terminal · Keys · Agents · Advanced** as grouped preference sections. Form controls in `KouenControls.swift` use system semantic colors and the user accent so the window tracks macOS light/dark appearance while keeping Kouen-specific controls for sliders, swatches, segmented choices, and searchable selects. `LiveTerminalPreview` remains a theme-true mini pane. **Agents** page = per-agent rows (icon + matched executables + color swatch + one-click Install hooks). **Advanced** = curated daemon-owned `OptionStore` options (status format, mouse, base-index, monitor, repeat-time, pane borders…) read/written via `showOptions`/`setOption` IPC. |
 | Daemon | `SurfaceRegistry`, `RealPty`, `DaemonServer` | Session authority |
 | Core | `SessionEditor`, `CommandParser`, `OptionStore`, `HookRegistry`, `PasteBufferStore`, `FormatString` | |
 
@@ -543,7 +543,7 @@ Or configure a single agent via **Settings ▸ Agents** — each supported agent
 make build | preview | preview-stop | preview-clean | release | release-notes | package | dmg | smoke-dmg | sign | appcast | finalize | hotfix-release | icon | clean
 xcodegen generate
 swift test                                    # fast, deterministic
-HARNESS_LIVE_DAEMON_TESTS=1 swift test        # + real shell / socket tests
+KOUEN_LIVE_DAEMON_TESTS=1 swift test        # + real shell / socket tests
 ```
 
 `make package` is an alias for `make release`. Optional marketing video targets (`video-dev`, `video-render`, …) live in the Makefile and run under `marketing/video` — see [marketing/README.md](marketing/README.md).
@@ -554,41 +554,41 @@ HARNESS_LIVE_DAEMON_TESTS=1 swift test        # + real shell / socket tests
 
 **Release order (do not reorder):** `make release` → `make sign` → `make dmg` → `Scripts/finalize-release.sh`. `dmg`/`sign` operate on the **existing** `Kouen.app` and must NOT re-run `release` (a rebuild would clobber the signature with an unsigned bundle). `package-app.sh` resolves + verifies `Sparkle.framework` and **fails** the build if it's missing (the app links Sparkle and would crash when the menu touches the updater). `sign-and-notarize.sh` fails loud when notarization creds are absent (unless `--sign-only`) and `codesign --verify --deep --strict` after signing/stapling; `finalize-release.sh` single-sources the version/TAG from the built `Info.plist`, reads the signing identity back from the signed app, auto-detects the repo via `gh`, and never masks the `spctl` Gatekeeper check.
 
-Bundle in `Kouen.app/Contents/MacOS/`: `Kouen`, `HarnessDaemon`, `kouen-cli`; icon at `Contents/Resources/Kouen.icns`.
+Bundle in `Kouen.app/Contents/MacOS/`: `Kouen`, `KouenDaemon`, `kouen-cli`; icon at `Contents/Resources/Kouen.icns`.
 
-**Building in Xcode:** `xcodegen generate` (only after adding/removing files or editing `project.yml`), then `open Kouen.xcodeproj`; pick the **`Kouen`** scheme + **My Mac** and ⌘B / ⌘R. The app target depends on `HarnessDaemon` + `kouen-cli` and a `postBuildScript` copies both into the bundle, so one build refreshes all three. The generated scheme currently includes Core/Daemon/TerminalKit/CopyMode tests; use `swift test` for the full SPM suite (engine, renderer, theme, benchmarks gate, etc.).
+**Building in Xcode:** `xcodegen generate` (only after adding/removing files or editing `project.yml`), then `open Kouen.xcodeproj`; pick the **`Kouen`** scheme + **My Mac** and ⌘B / ⌘R. The app target depends on `KouenDaemon` + `kouen-cli` and a `postBuildScript` copies both into the bundle, so one build refreshes all three. The generated scheme currently includes Core/Daemon/TerminalKit/CopyMode tests; use `swift test` for the full SPM suite (engine, renderer, theme, benchmarks gate, etc.).
 
-**Daemon restart (critical, learned the hard way):** `HarnessDaemon` is a separate launchd process (`KeepAlive`) — rebuilding/relaunching the app does **not** restart it. Daemon-code changes (PTY env like `COLORTERM`, IPC, session authority) only take effect after you restart it **and** open a fresh pane (PTY env is applied at shell spawn):
+**Daemon restart (critical, learned the hard way):** `KouenDaemon` is a separate launchd process (`KeepAlive`) — rebuilding/relaunching the app does **not** restart it. Daemon-code changes (PTY env like `COLORTERM`, IPC, session authority) only take effect after you restart it **and** open a fresh pane (PTY env is applied at shell spawn):
 
 ```bash
-launchctl kickstart -k gui/$(id -u)/com.robert.harness.daemon
+launchctl kickstart -k gui/$(id -u)/com.robert.kouen.daemon
 ```
 
 App/renderer changes (colors, chrome, opacity, Settings) need only ⌘R. The launchd plist points at the build it was installed from (often DerivedData Debug); `make release` users run `kouen-cli install` once to repoint it at the release bundle, else the old binary keeps running.
 
-**HarnessCoreTests:** `SessionEditor`, `SessionEditorPhase4`, `IPCCodec`, `KeyTokenParser`, `KeyTable`, `FormatString`, `CommandParser`, `CommandIPCTranslator`, `PasteBufferStore`, `LaunchAgentInstaller`, `HarnessSettings`, `AgentDetector`, `AgentNotchProjectionTests`, `DaemonClient`, `HarnessPaths`, `TerminalConfigImporter`, `PaneRectSolver`, `JSONMerge`, `AgentHookInstaller`, `ShellIntegration`, `EnvironmentStore`, targeting, options, alerts, and tmux migration.
+**KouenCoreTests:** `SessionEditor`, `SessionEditorPhase4`, `IPCCodec`, `KeyTokenParser`, `KeyTable`, `FormatString`, `CommandParser`, `CommandIPCTranslator`, `PasteBufferStore`, `LaunchAgentInstaller`, `KouenSettings`, `AgentDetector`, `AgentNotchProjectionTests`, `DaemonClient`, `KouenPaths`, `TerminalConfigImporter`, `PaneRectSolver`, `JSONMerge`, `AgentHookInstaller`, `ShellIntegration`, `EnvironmentStore`, targeting, options, alerts, and tmux migration.
 
-**HarnessDaemonTests:** `SurfaceRegistry`, `ShellLaunchProfile`, `ScrollbackFileTests`, `DaemonRoundTrip`, `RealPtyLifecycle` (`DaemonRoundTrip` and `RealPtyLifecycle` opt-in via `HARNESS_LIVE_DAEMON_TESTS=1`).
+**KouenDaemonTests:** `SurfaceRegistry`, `ShellLaunchProfile`, `ScrollbackFileTests`, `DaemonRoundTrip`, `RealPtyLifecycle` (`DaemonRoundTrip` and `RealPtyLifecycle` opt-in via `KOUEN_LIVE_DAEMON_TESTS=1`).
 
-**HarnessOnboardingTests:** onboarding wizard coverage.
+**KouenOnboardingTests:** onboarding wizard coverage.
 
-**HarnessCopyModeTests:** `CopyModeReducerTests` for shared GUI/compositor copy-mode motions, selection, search, prompt jumps, and side effects.
+**KouenCopyModeTests:** `CopyModeReducerTests` for shared GUI/compositor copy-mode motions, selection, search, prompt jumps, and side effects.
 
-**HarnessThemeTests:** theme document import/export plus catalog/resource coverage.
+**KouenThemeTests:** theme document import/export plus catalog/resource coverage.
 
-**HarnessCLITests:** `flagValue` argument-parsing coverage (the shared flag extractor behind the `kouen-cli` subcommands, incl. the flag-present-but-no-value case) — a `@testable import` of the `@main` `HarnessCLI` executable target, no library split.
+**KouenCLITests:** `flagValue` argument-parsing coverage (the shared flag extractor behind the `kouen-cli` subcommands, incl. the flag-present-but-no-value case) — a `@testable import` of the `@main` `KouenCLI` executable target, no library split.
 
-**HarnessTerminalKitTests:** `GridCompositorTests`, `GridCompositorCopyModeTests`, `HarnessTerminalSurfaceWorkerTests` (experimental off-main parser/frame pipeline).
+**KouenTerminalKitTests:** `GridCompositorTests`, `GridCompositorCopyModeTests`, `KouenTerminalSurfaceWorkerTests` (experimental off-main parser/frame pipeline).
 
-**HarnessTerminalRendererTests:** `FrameBuilderTests` (incl. color conversion, selection and prompt gutter), `FrameBuilderCopyModeTests`, `GlyphRasterizerTests` (incl. shaped-run cache), `CellColorResolverTests`, `MetalRendererTests` (offscreen structural render guardrails; `HARNESS_WRITE_RENDER_SNAPSHOTS=1` writes optional PNGs to `/tmp/HarnessRenderSnapshots` for human debugging only).
+**KouenTerminalRendererTests:** `FrameBuilderTests` (incl. color conversion, selection and prompt gutter), `FrameBuilderCopyModeTests`, `GlyphRasterizerTests` (incl. shaped-run cache), `CellColorResolverTests`, `MetalRendererTests` (offscreen structural render guardrails; `KOUEN_WRITE_RENDER_SNAPSHOTS=1` writes optional PNGs to `/tmp/KouenRenderSnapshots` for human debugging only).
 
-**HarnessTerminalEngineTests:** `HarnessGridTerminalTests`, `InputEncoderTests` (incl. mouse), `ScrollbackTests`, `EngineConformanceTests`, `VTConformanceCorpusTests`, `ParserRobustnessTests` (hostile/oversized OSC/CSI/DCS stay bounded + recover), `AsciiFastPathTests` + `CodepointRunFastPathTests` (the SIMD ASCII run path and the bulk-UTF-8 codepoint path are byte-for-byte equal to `feedScalarwise` across well-formed + malformed input at 8 chunk-splits), `TerminalProtocolCompatibilityTests` (OSC 9/777/22, tab stops, charsets), `KittyKeyboardTests` (CSI u + modifyOtherKeys; legacy byte-identical when off), `ImageProtocolTests` (Sixel/Kitty/iTerm2 decode + placement, headless), `ClipboardOSCTests`, `SemanticPromptTests`. Renderer `MetalRendererTests` adds offscreen render-readback coverage.
+**KouenTerminalEngineTests:** `KouenGridTerminalTests`, `InputEncoderTests` (incl. mouse), `ScrollbackTests`, `EngineConformanceTests`, `VTConformanceCorpusTests`, `ParserRobustnessTests` (hostile/oversized OSC/CSI/DCS stay bounded + recover), `AsciiFastPathTests` + `CodepointRunFastPathTests` (the SIMD ASCII run path and the bulk-UTF-8 codepoint path are byte-for-byte equal to `feedScalarwise` across well-formed + malformed input at 8 chunk-splits), `TerminalProtocolCompatibilityTests` (OSC 9/777/22, tab stops, charsets), `KittyKeyboardTests` (CSI u + modifyOtherKeys; legacy byte-identical when off), `ImageProtocolTests` (Sixel/Kitty/iTerm2 decode + placement, headless), `ClipboardOSCTests`, `SemanticPromptTests`. Renderer `MetalRendererTests` adds offscreen render-readback coverage.
 
-**HarnessBenchmarks** (opt-in perf baselines for VT parse / readGrid / scrollback / IPC codec / compositor / frame building / renderer stats / atlas caches / off-main stall sampling): `make bench` or `HARNESS_BENCHMARKS=1 swift test -c release --filter HarnessBenchmarks` (skipped otherwise so `swift test` stays fast). Benchmarks print JSON timing lines; do not gate CI on absolute timings. The engine gate is `testConsumerScoreboard` (`consumer_<workload>` with the `feedNanos`/`frameBuildNanos` split — parse dominates, frame build is ~0.1 ms); `testIPCInclusiveScoreboard` runs the same payloads through the real `IPCCodec` output frame to confirm the daemon framing/chunking tax is negligible. The cross-terminal `Scripts/benchmarks/terminal_stress_runner.py` drain is **not** an engine measure (PTY-drain, ±25–33% on window focus, can move opposite to engine speed) — gate on the in-process scoreboard, not the drain ratios.
+**KouenBenchmarks** (opt-in perf baselines for VT parse / readGrid / scrollback / IPC codec / compositor / frame building / renderer stats / atlas caches / off-main stall sampling): `make bench` or `KOUEN_BENCHMARKS=1 swift test -c release --filter KouenBenchmarks` (skipped otherwise so `swift test` stays fast). Benchmarks print JSON timing lines; do not gate CI on absolute timings. The engine gate is `testConsumerScoreboard` (`consumer_<workload>` with the `feedNanos`/`frameBuildNanos` split — parse dominates, frame build is ~0.1 ms); `testIPCInclusiveScoreboard` runs the same payloads through the real `IPCCodec` output frame to confirm the daemon framing/chunking tax is negligible. The cross-terminal `Scripts/benchmarks/terminal_stress_runner.py` drain is **not** an engine measure (PTY-drain, ±25–33% on window focus, can move opposite to engine speed) — gate on the in-process scoreboard, not the drain ratios.
 
-**Frame signpost instrumentation (`HARNESS_FRAME_SIGNPOSTS=1`):** `FrameSignposter` (`HarnessTerminalKit`) is gated off by default (each call is a single branch when disabled, so it is safe on the hot path). Enable with `PREVIEW_SIGNPOSTS=1 make preview` — `open` strips the shell environment, so the preview script passes the flag as a launch argument (`open -n … --args -HARNESS_FRAME_SIGNPOSTS 1`, read via `UserDefaults`); setting `HARNESS_FRAME_SIGNPOSTS=1` in the launch environment also works for direct binary launches (`xctrace … --launch`). This enables `os_signpost` intervals around the per-frame `parse → gridRead → frameBuild → present` pipeline on the `com.robert.harness / frame` track, and `TerminalRenderStats` splits `encodeNanos` into `buildInstancesNanos` (CPU instance build) + `uploadNanos` (GPU buffer upload) so a slow encode is attributable per value boundary (grid read / frame build / instance build / upload). The periodic log line blends samples from ALL presenting surfaces — single visible surface for attribution. The `present` interval is the most informative: it wraps `nextDrawable()` + `inFlightSemaphore.wait()` on the main thread and captures the vsync / GPU back-pressure stall. Every 120 frames it also logs p50/p95/max present latency (µs) to the unified log, readable with `log stream --predicate 'subsystem == "com.robert.harness"'` without Instruments. Profile with `xctrace record --template 'os_signpost'` on a `make preview` run.
+**Frame signpost instrumentation (`KOUEN_FRAME_SIGNPOSTS=1`):** `FrameSignposter` (`KouenTerminalKit`) is gated off by default (each call is a single branch when disabled, so it is safe on the hot path). Enable with `PREVIEW_SIGNPOSTS=1 make preview` — `open` strips the shell environment, so the preview script passes the flag as a launch argument (`open -n … --args -KOUEN_FRAME_SIGNPOSTS 1`, read via `UserDefaults`); setting `KOUEN_FRAME_SIGNPOSTS=1` in the launch environment also works for direct binary launches (`xctrace … --launch`). This enables `os_signpost` intervals around the per-frame `parse → gridRead → frameBuild → present` pipeline on the `com.robert.kouen / frame` track, and `TerminalRenderStats` splits `encodeNanos` into `buildInstancesNanos` (CPU instance build) + `uploadNanos` (GPU buffer upload) so a slow encode is attributable per value boundary (grid read / frame build / instance build / upload). The periodic log line blends samples from ALL presenting surfaces — single visible surface for attribution. The `present` interval is the most informative: it wraps `nextDrawable()` + `inFlightSemaphore.wait()` on the main thread and captures the vsync / GPU back-pressure stall. Every 120 frames it also logs p50/p95/max present latency (µs) to the unified log, readable with `log stream --predicate 'subsystem == "com.robert.kouen"'` without Instruments. Profile with `xctrace record --template 'os_signpost'` on a `make preview` run.
 
-New mode/persistence/security tests also live in **HarnessCoreTests** (`ExperienceModeTests`, `SessionPersistenceTests`, `HookRegistryTests`, perms in `HarnessPathsTests`) and **HarnessDaemonTests** (`closeEphemeralSessions` + socket-perms in `DaemonRoundTripTests`).
+New mode/persistence/security tests also live in **KouenCoreTests** (`ExperienceModeTests`, `SessionPersistenceTests`, `HookRegistryTests`, perms in `KouenPathsTests`) and **KouenDaemonTests** (`closeEphemeralSessions` + socket-perms in `DaemonRoundTripTests`).
 
 **Smoke:**
 
@@ -627,7 +627,7 @@ Full shortcut reference (global menu + prefix table + copy mode): [docs/KEYBINDI
 | Dragging a tab moves the whole window | the tab strip sits in the `.fullSizeContentView` titlebar drag region and AppKit treats a pill drag as a window move | `TabPillView.mouseDownCanMoveWindow = false` — pills reorder via their own `mouseDragged` → `onDragChanged`; the empty tab-bar background keeps the default `true` so it still drags the window |
 | Sidebar won't fully collapse | Divider min clamped at 200 | Set `SplitChromeDelegate.allowFullCollapse` during the programmatic collapse so the divider can reach 0 |
 | No agent chip | Proc-tree miss | `AgentTitleInference` |
-| First-run tour / what's-new banner missing or repeating | `version-state.json` out of sync, or banner suppressed | One-shot per build: daemon records the build in `version-state.json` when the first *user-created* surface consumes it (`SurfaceRegistry.injectVersionBannerIfPending`; rendered by `TerminalBanner`, notes from `GeneratedReleaseNotes.swift`). Delete the file to re-show; `update-banner off` option suppresses. Only `HarnessDaemonMain` enables it (`DaemonServer(enableVersionBanner: true)`) — embedded/test registries never banner |
+| First-run tour / what's-new banner missing or repeating | `version-state.json` out of sync, or banner suppressed | One-shot per build: daemon records the build in `version-state.json` when the first *user-created* surface consumes it (`SurfaceRegistry.injectVersionBannerIfPending`; rendered by `TerminalBanner`, notes from `GeneratedReleaseNotes.swift`). Delete the file to re-show; `update-banner off` option suppresses. Only `KouenDaemonMain` enables it (`DaemonServer(enableVersionBanner: true)`) — embedded/test registries never banner |
 | Xcode build fails | Stale project | `xcodegen generate` |
 
 ---

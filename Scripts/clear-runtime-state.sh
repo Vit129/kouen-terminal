@@ -6,15 +6,7 @@
 # options, hooks, environment, and installed agent metadata.
 set -euo pipefail
 
-# Mirrors HarnessPaths.resolveDataRootName: prefer Kouen if it already exists (already
-# migrated, or a fresh install); fall back to Harness if that's what's actually on disk.
-if [[ -d "$HOME/Library/Application Support/Kouen" ]]; then
-  APP_SUPPORT="$HOME/Library/Application Support/Kouen"
-elif [[ -d "$HOME/Library/Application Support/Harness" ]]; then
-  APP_SUPPORT="$HOME/Library/Application Support/Harness"
-else
-  APP_SUPPORT="$HOME/Library/Application Support/Kouen"
-fi
+APP_SUPPORT="$HOME/Library/Application Support/Kouen"
 CACHE_ROOT="$HOME/Library/Caches/Kouen"
 
 echo "==> Clearing production runtime state..."

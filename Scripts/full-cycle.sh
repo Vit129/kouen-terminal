@@ -85,17 +85,17 @@ fi
 # app/daemon, preserves workspace/session state instead of wiping it, and — when the
 # IPC wire protocol didn't change (the common case) — skips restarting the daemon
 # entirely, so PTYs and agent tasks running under it survive this release. It also
-# safely hands off to a detached process when run from inside a Harness pane, unlike
-# `make install`'s unconditional `pkill -x Harness` which would kill this very session.
+# safely hands off to a detached process when run from inside a Kouen pane, unlike
+# `make install`'s unconditional `pkill -x Kouen` which would kill this very session.
 echo ""
 echo "▶ Step 4: Building production app and installing (graceful)..."
 if ! Scripts/install-graceful.sh; then
   echo ""
   echo "❌ Production build failed — rolling back version bump..."
   git checkout -- \
-    Apps/Harness/Sources/HarnessApp/Resources/Info.plist \
-    Packages/HarnessCore/Sources/HarnessCore/HarnessVersion.swift \
-    Packages/HarnessCore/Sources/HarnessCore/ReleaseNotes/GeneratedReleaseNotes.swift \
+    Apps/Kouen/Sources/KouenApp/Resources/Info.plist \
+    Packages/KouenCore/Sources/KouenCore/KouenVersion.swift \
+    Packages/KouenCore/Sources/KouenCore/ReleaseNotes/GeneratedReleaseNotes.swift \
     CHANGELOG.md
   echo "↩️  Version files restored. Fix the build and try again."
   exit 1
@@ -104,7 +104,7 @@ fi
 # Step 5: Generate CHANGELOG + tag + GitHub release via git-cliff.
 echo ""
 echo "▶ Step 5: Generating CHANGELOG and creating GitHub release..."
-NEW_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$ROOT/Apps/Harness/Sources/HarnessApp/Resources/Info.plist")"
+NEW_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$ROOT/Apps/Kouen/Sources/KouenApp/Resources/Info.plist")"
 TAG="v${NEW_VERSION}"
 
 if ! command -v git-cliff &>/dev/null; then

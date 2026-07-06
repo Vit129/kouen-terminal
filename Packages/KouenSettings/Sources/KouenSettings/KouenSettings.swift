@@ -1,0 +1,764 @@
+import Foundation
+import KouenIPC
+
+public enum TerminalColorRenderingMode: String, Codable, Sendable {
+    case accurate
+    case vivid
+}
+
+public enum TerminalColorGamut: String, Codable, Sendable {
+    case sRGB = "srgb"
+    case displayP3 = "display-p3"
+    case auto
+
+    public static func resolved(
+        renderingMode: TerminalColorRenderingMode,
+        requested: TerminalColorGamut
+    ) -> TerminalColorGamut {
+        switch renderingMode {
+        case .accurate:
+            // Accurate mode is the authored sRGB identity path regardless of the stored gamut.
+            return .sRGB
+        case .vivid:
+            // This task's wide-gamut path is explicit Display-P3 output.
+            return .displayP3
+        }
+    }
+}
+
+public enum TerminalTextRenderingMode: String, Codable, Sendable {
+    case native
+    case crisp
+    case soft
+
+    public var glyphGamma: Float {
+        switch self {
+        case .native: return 1.0
+        case .crisp: return 0.8
+        case .soft: return 1.15
+        }
+    }
+}
+
+/// When the live grid-size overlay ("120 × 32") is shown while resizing the window (Ghostty's
+/// `resize-overlay`). `afterFirst` (default) skips the overlay on the terminal's first sizing
+/// (opening a window isn't a resize) but shows it on every interactive resize after.
+public enum ResizeOverlayMode: String, Codable, Sendable, CaseIterable {
+    case afterFirst = "after-first"
+    case always
+    case never
+}
+
+/// Where the resize overlay is drawn within the surface.
+public enum ResizeOverlayPosition: String, Codable, Sendable, CaseIterable {
+    case center
+    case topRight = "top-right"
+    case bottomRight = "bottom-right"
+}
+
+private enum LegacyKouenSettingsCodingKeys: String, CodingKey {
+    case tmuxControlsEnabled
+    /// Removed in favor of the per-event `notificationEvents` map; still read here to migrate
+    /// an existing on/off choice into `notificationEvents[.commandFinished]`.
+    case commandFinishedNotifications
+}
+
+public struct KouenSettings: Codable, Sendable, Equatable {
+    public var fontSize: Float
+    public var fontFamily: String
+    public var defaultShell: String
+    public var defaultCWD: String
+    public var transparentTitlebar: Bool
+    public var sidebarVisible: Bool
+    public var sidebarOnRight: Bool
+    public var sidebarCollapsedOnLaunch: Bool
+    /// Restore the main window's size + position across launches. When false (default),
+    /// the window opens at its built-in default size, centered. Window-level only — the
+    /// frame is persisted via `NSWindow.setFrameAutosaveName`.
+    public var restoreWindowSize: Bool
+    public var backgroundOpacity: Float
+    public var backgroundBlur: Int
+    public var windowPaddingX: Float
+    public var windowPaddingY: Float
+    /// Custom hex (`#rrggbb`) overrides imported from terminal config when present.
+    /// `nil` means "use the active theme color".
+    public var customBackgroundHex: String?
+    public var customForegroundHex: String?
+    public var customCursorHex: String?
+    /// Signature of the terminal config last imported into these defaults.
+    /// Used to migrate stale early settings without overwriting later manual edits.
+    public var importedConfigSignature: String?
+    /// Prefix key (default `ctrl-a`). Format: `mod1-mod2-key`,
+    /// where mod is `ctrl|cmd|opt|shift`. Set empty string to disable.
+    public var prefixKey: String
+    /// Number of lines kept in scrollback per pane (passed to the renderer + RealPty).
+    public var scrollbackLines: Int
+    /// Cursor shape: `block`, `bar`, or `underline` (`cursor-style`).
+    public var cursorStyle: String
+    /// Whether the text cursor blinks (`cursor-style-blink`).
+    public var cursorBlink: Bool
+    /// Copy a mouse selection to the clipboard automatically (`copy-on-select`).
+    public var copyOnSelect: Bool
+    /// Terminal color overrides (terminal parity). `nil` = derive from the active
+    /// theme preset. Applied by the native renderer.
+    public var selectionBackgroundHex: String?
+    public var selectionForegroundHex: String?
+    public var boldColorHex: String?
+    public var cursorTextHex: String?
+    /// 16 ANSI palette overrides (`palette N=#hex`). `nil` slots fall back to the
+    /// active theme preset. Seeded from a theme, importable from terminal config.
+    public var paletteHex: [String?]
+    /// Per-agent brand color overrides keyed by `AgentKind.rawValue`.
+    /// Missing keys use the built-in agent default.
+    public var agentColorOverrides: [String: String]
+    /// Color of the 1px hairline divider between sidebar and content (and any
+    /// other in-window divider line). nil → derive from the theme.
+    public var dividerHex: String?
+    /// Color of the bottom status line's text. nil → derive from the theme.
+    public var statusLineHex: String?
+    /// Hairline border around the entire window edge (Ghostty's faint perimeter line),
+    /// helping the window stand out from same-tone backgrounds. nil → derive from the
+    /// theme (light grey on dark themes, dark grey on light).
+    public var windowBorderHex: String?
+    /// Opacity of the window-edge hairline, 0–1. 0 hides it entirely.
+    public var windowBorderOpacity: Float
+    /// Delivery channel: show a macOS banner for an enabled notification event (which events
+    /// notify is decided per-event by `notificationEvents` / `isEventEnabled(_:)`). When false,
+    /// the in-window bell badge still updates but the OS banner is suppressed; an enabled event
+    /// can still chime if `notificationSoundEnabled` is on.
+    public var systemNotificationsEnabled: Bool
+    /// Play a sound ("chime") with agent notifications. When `systemNotificationsEnabled`
+    /// is on, the banner carries the sound; when banners are off but this is on, Kouen
+    /// plays an in-app chime so an agent stopping / needing input is still audible.
+    public var notificationSoundEnabled: Bool
+    /// Controls the top-center Agent Notch HUD. `.automatic` shows it only for Agent Workspace.
+    public var notchVisibilityMode: NotchVisibilityMode
+    /// Open the Agent Notch HUD when the pointer intentionally hovers over it.
+    public var notchOpenOnHover: Bool
+    /// Terminal color interpretation. `.accurate` is the authored sRGB identity path.
+    /// `.vivid` opts into Display-P3 conversion plus a capped saturation lift.
+    ///
+    /// INVARIANT: `colorRendering` and the legacy `vividColors` bool are deliberately kept in lockstep
+    /// by their mutual `didSet`s (vivid ⇔ true) so the new enum and the old on-disk bool always agree
+    /// — old configs/callers keep working while new code reads the explicit mode. The `!=` guard in
+    /// each setter is what stops the two `didSet`s from recursing forever; never drop it.
+    public var colorRendering: TerminalColorRenderingMode {
+        didSet {
+            let legacyValue = colorRendering == .vivid
+            if vividColors != legacyValue { vividColors = legacyValue }
+        }
+    }
+    /// INVARIANT: stored and round-tripped through Codable for forward/migration compatibility, but
+    /// NOT consulted by gamut resolution today — `TerminalColorGamut.resolved` derives the gamut
+    /// purely from `colorRendering` (accurate → sRGB, vivid → Display-P3). Kept so a future policy
+    /// can honor an explicit request without a schema break; don't remove it just because it's unread.
+    public var colorGamut: TerminalColorGamut
+    /// Text antialiasing coverage mode. This only maps to glyph coverage gamma; it never
+    /// participates in RGB conversion.
+    ///
+    /// INVARIANT: paired with the legacy `linearBlending` bool the same way `colorRendering`/`vividColors`
+    /// are — the mutual `didSet`s keep them in sync (crisp ⇔ true) for on-disk back-compat, and the
+    /// `!=` guard breaks the otherwise-infinite write loop. `.native`/`.soft` both map to `false`.
+    public var textRendering: TerminalTextRenderingMode {
+        didSet {
+            let legacyValue = textRendering == .crisp
+            if linearBlending != legacyValue { linearBlending = legacyValue }
+        }
+    }
+    /// Legacy compatibility field. Kept in sync with `colorRendering` so old configs and
+    /// existing callers preserve behavior while new code uses the explicit mode.
+    public var vividColors: Bool {
+        didSet {
+            let mode: TerminalColorRenderingMode = vividColors ? .vivid : .accurate
+            if colorRendering != mode { colorRendering = mode }
+        }
+    }
+    /// Legacy compatibility field. `true` maps to `.crisp`; `false` maps to `.native`.
+    public var linearBlending: Bool {
+        didSet {
+            let mode: TerminalTextRenderingMode = linearBlending ? .crisp : .native
+            if textRendering != mode { textRendering = mode }
+        }
+    }
+    /// When true, the active theme's 16 ANSI colors recolor terminal *output* too. Default
+    /// false: the canvas (default bg/fg/cursor) always follows the
+    /// theme so it matches the chrome, but program output keeps untouched/default ANSI
+    /// colors — programs render their true colors over a themed, optionally translucent
+    /// canvas.
+    public var applyThemeToTerminalOutput: Bool
+    /// Programming-font ligatures (e.g. `=>`, `!=`, `->`) via CoreText run shaping. On by
+    /// default; turn off for the fastest one-glyph-per-cell path.
+    public var ligatures: Bool
+    /// Moves terminal byte ingestion (VT parse) and frame building to a per-surface serial worker
+    /// queue, keeping only AppKit/Metal presentation on the main thread — so heavy output never
+    /// contends with input handling, scrolling, or layout. **Default on.** Safe because the
+    /// emulator is confined to that serial queue (every main-thread reader snapshots via
+    /// `queue.sync`), stale builds are dropped by a render-generation tag, and the row-reuse cache
+    /// is queue-owned. An explicitly stored `false` is honored (opt-out).
+    public var offMainParserFramePipeline: Bool
+    /// Real-time (Ghostty-style) live resize: while dragging the window edge, reflow the grid and
+    /// signal the running program (`SIGWINCH`) at every cell boundary, so interactive programs
+    /// (vim/htop/tmux) redraw continuously instead of waiting for the drag to end. **Default on.**
+    /// An explicitly stored `false` reverts to the legacy defer-to-release behavior (the authoritative
+    /// reflow + `SIGWINCH` fire once, when the drag ends).
+    public var liveResizeReflow: Bool
+    /// Draw the OSC 133 prompt gutter — a per-row stripe in the left margin marking shell
+    /// prompts (green = success, red = failure). Off by default; the marks still power
+    /// jump-to-prompt either way, so this only controls the stripe's visibility.
+    public var showPromptGutter: Bool
+    /// Show the bottom status line (workspace · git · clock). When false the band is
+    /// hidden and the terminal split extends to the window bottom. Read by
+    /// `StatusLineView.refresh` (alongside the `status` option and `effectiveStatusLineEnabled`).
+    public var showStatusLine: Bool
+    /// The user-facing experience (Plain / Persistent / Full / Agent). Drives which chrome
+    /// is shown, the default session-persistence policy, and onboarding copy — all on top of
+    /// the same daemon session core. See `ExperienceMode`.
+    public var experienceMode: ExperienceMode
+    /// Explicit override for Kouen controls visibility (prefix key + status line) as a single
+    /// umbrella. `nil` derives from `experienceMode`. Lets a Persistent/Agent user opt into both
+    /// the prefix and status line without switching to Full Terminal, or a Full Terminal user turn
+    /// them both off without changing modes. The finer-grained `prefixKeyEnabled` /
+    /// `statusLineEnabled` below take precedence over this when set.
+    public var kouenControlsEnabled: Bool?
+    /// Per-component override for the command prefix, independent of the status line. `nil` falls
+    /// back to `kouenControlsEnabled`, then the mode's `showsPrefixByDefault`. Lets any preset be
+    /// tuned one piece at a time (e.g. Full Terminal with the status line but no prefix).
+    public var prefixKeyEnabled: Bool?
+    /// Per-component override for the bottom status line, independent of the prefix. `nil` falls
+    /// back to `kouenControlsEnabled`, then the mode's `showsStatusLineByDefault`. Lets a Plain
+    /// terminal show a status line without arming the prefix, and vice versa.
+    public var statusLineEnabled: Bool?
+    /// When the live resize dimensions overlay ("120 × 32") is shown while resizing the window.
+    public var resizeOverlay: ResizeOverlayMode
+    /// Where the resize overlay is positioned within the surface.
+    public var resizeOverlayPosition: ResizeOverlayPosition
+    /// Distribute the leftover sub-cell space evenly so the grid is centered, instead of parking
+    /// the remainder at the bottom-right edge (Ghostty's `window-padding-balance`).
+    public var windowPaddingBalance: Bool
+    /// Minimum WCAG contrast ratio (1…21) forced between a cell's foreground and its background.
+    /// 1 = off (no adjustment). Imported from a terminal config's `minimum-contrast`.
+    public var minimumContrast: Double
+    /// When both are set, the active theme follows the macOS system appearance: `lightThemeName`
+    /// under Light, `darkThemeName` under Dark. nil = off (the single `themeName` is used).
+    public var lightThemeName: String?
+    public var darkThemeName: String?
+    /// Per-mode `backgroundOpacity` override applied whenever auto light/dark switches to that
+    /// theme. `nil` leaves `backgroundOpacity` untouched for that mode. Lets a light theme with
+    /// a near-white background stay fully opaque (translucency over a busy desktop makes light
+    /// text/backgrounds unreadable) while a dark theme keeps the translucent look.
+    public var lightThemeOpacity: Float?
+    public var darkThemeOpacity: Float?
+    /// Confirm before pasting text containing newlines / control characters when the program has
+    /// not enabled bracketed paste — guards against blind multi-line command execution.
+    public var pasteProtection: Bool
+    /// Minimum runtime (seconds) for the `commandFinished` notification — only commands that
+    /// ran at least this long fire it (uses OSC 133 timing).
+    public var commandFinishedThresholdSeconds: Int
+    /// Per-event desktop-banner gating, keyed by `NotificationEvent.rawValue`. A sparse map:
+    /// an absent key falls back to the event's `defaultEnabled`, so older `settings.json` files
+    /// decode to today's behavior. The two global channel toggles (`systemNotificationsEnabled`
+    /// = show banner, `notificationSoundEnabled` = play chime) still decide *how* an enabled
+    /// event is delivered; this map decides *which* events notify. Read via `isEventEnabled(_:)`.
+    public var notificationEvents: [String: Bool]
+    /// Map bold + palette colors 0–7 to their bright variants 8–15 (classic terminal
+    /// behavior, Ghostty `bold-is-bright`). Off keeps the theme's exact colors for bold text.
+    public var boldIsBright: Bool
+    /// Start a detected language server when a code preview opens.
+    public var lspAutoStart: Bool
+    /// Custom language-server executable overrides keyed by language id (`swift`, `python`, etc.).
+    public var lspServers: [String: String]
+    /// Mode to open files when selected in the file tree ("preview", "editor", "cat", "vi", "terminalOnly").
+    public var fileClickAction: String
+    /// Anthropic API key for the built-in Claude chat sidebar and inline AI completions.
+    /// Stored in settings.json (plain text). Users who prefer Keychain can leave this empty
+    /// and set ANTHROPIC_API_KEY in their environment instead.
+    public var claudeAPIKey: String?
+    /// Whether inline AI ghost-text completion is enabled in the terminal input (Tab to accept).
+    public var inlineAICompletion: Bool
+    /// Post-processing shader effect applied over the rendered terminal frame.
+    /// Values: "none" (default), "scanlines", "grain", "bloom".
+    public var terminalShaderEffect: String
+    /// Default URL opened when a new browser pane or tab is created.
+    public var browserHomePage: String
+
+    /// Whether the *umbrella* Kouen controls are on (prefix or status line). Kept for onboarding
+    /// copy and tests; the prefix and status line each resolve independently via the effective
+    /// accessors below, so a preset can show one without the other.
+    public var showsKouenControls: Bool {
+        effectivePrefixKeyEnabled || effectiveStatusLineEnabled
+    }
+
+    /// Whether the command prefix should be armed. Precedence: the per-component override wins,
+    /// then the legacy umbrella `kouenControlsEnabled`, then the mode default. Consulted by
+    /// `PrefixKeymap` (via `effectivePrefixKey`).
+    public var effectivePrefixKeyEnabled: Bool {
+        prefixKeyEnabled ?? kouenControlsEnabled ?? experienceMode.showsPrefixByDefault
+    }
+
+    /// Whether the bottom status line should show. Same precedence as the prefix, but resolved
+    /// separately. Consulted by `StatusLineView`.
+    /// Final fallback is `showStatusLine` (default true) — acts as a migration shim for users
+    /// who never explicitly toggled the status line in Settings after the SwiftUI migration
+    /// (2159a77). Without it, plain-mode users silently inherit showsStatusLineByDefault=false.
+    public var effectiveStatusLineEnabled: Bool {
+        statusLineEnabled ?? kouenControlsEnabled ?? showStatusLine
+    }
+
+    /// The prefix shortcut string to actually arm, or `nil` to disable the prefix entirely.
+    /// `nil` when the prefix is disabled (by mode/override) or when the user blanked the prefix in
+    /// Settings — fixes the old bug where an empty `prefixKey` silently fell back to Ctrl-A.
+    public var effectivePrefixKey: String? {
+        guard effectivePrefixKeyEnabled else { return nil }
+        let trimmed = prefixKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    public init(
+        // First-run "out of the box" look (a fresh install with no imported config):
+        // translucent + blurred canvas, Nerd Font, roomy padding, copy-on-select on.
+        fontSize: Float = 16,
+        fontFamily: String = "JetBrainsMono Nerd Font",
+        defaultShell: String = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh",
+        defaultCWD: String = FileManager.default.homeDirectoryForCurrentUser.path,
+        transparentTitlebar: Bool = true,
+        sidebarVisible: Bool = true,
+        sidebarOnRight: Bool = false,
+        sidebarCollapsedOnLaunch: Bool = false,
+        restoreWindowSize: Bool = false,
+        backgroundOpacity: Float = 0.63,
+        backgroundBlur: Int = 16,
+        windowPaddingX: Float = 14,
+        windowPaddingY: Float = 14,
+        customBackgroundHex: String? = nil,
+        customForegroundHex: String? = nil,
+        customCursorHex: String? = nil,
+        importedConfigSignature: String? = nil,
+        prefixKey: String = "ctrl-a",
+        scrollbackLines: Int = 10_000,
+        cursorStyle: String = "bar",
+        cursorBlink: Bool = true,
+        copyOnSelect: Bool = true,
+        selectionBackgroundHex: String? = nil,
+        selectionForegroundHex: String? = nil,
+        boldColorHex: String? = nil,
+        cursorTextHex: String? = nil,
+        paletteHex: [String?] = Array(repeating: nil, count: 16),
+        agentColorOverrides: [String: String] = [:],
+        // nil = derive from theme (dark themes resolve to a quiet #1E1E1E hairline; see
+        // MainSplitViewController.resolvedDividerColor). A pinned value would override that
+        // on every theme, so leave it unset.
+        dividerHex: String? = nil,
+        statusLineHex: String? = nil,
+        windowBorderHex: String? = nil,
+        windowBorderOpacity: Float = 0.25,
+        systemNotificationsEnabled: Bool = false,
+        notificationSoundEnabled: Bool = true,
+        notchVisibilityMode: NotchVisibilityMode = .automatic,
+        notchOpenOnHover: Bool = true,
+        colorRendering: TerminalColorRenderingMode? = nil,
+        colorGamut: TerminalColorGamut = .auto,
+        textRendering: TerminalTextRenderingMode? = nil,
+        vividColors: Bool = false,
+        linearBlending: Bool = false,
+        applyThemeToTerminalOutput: Bool = false,
+        ligatures: Bool = true,
+        offMainParserFramePipeline: Bool = true,
+        liveResizeReflow: Bool = true,
+        showPromptGutter: Bool = true,
+        showStatusLine: Bool = true,
+        // Fresh installs default to the simplest experience — a fast native terminal.
+        // Existing installs migrate to `.full` in `init(from:)` so no
+        // current user loses the prefix/status they already have.
+        experienceMode: ExperienceMode = .plain,
+        kouenControlsEnabled: Bool? = nil,
+        prefixKeyEnabled: Bool? = nil,
+        statusLineEnabled: Bool? = nil,
+        resizeOverlay: ResizeOverlayMode = .afterFirst,
+        resizeOverlayPosition: ResizeOverlayPosition = .center,
+        windowPaddingBalance: Bool = true,
+        minimumContrast: Double = 3.5,
+        lightThemeName: String? = nil,
+        darkThemeName: String? = nil,
+        lightThemeOpacity: Float? = nil,
+        darkThemeOpacity: Float? = nil,
+        pasteProtection: Bool = true,
+        commandFinishedThresholdSeconds: Int = 10,
+        notificationEvents: [String: Bool] = [:],
+        boldIsBright: Bool = true,
+        lspAutoStart: Bool = false,
+        lspServers: [String: String] = [:],
+        fileClickAction: String = "preview",
+        claudeAPIKey: String? = nil,
+        inlineAICompletion: Bool = false,
+        terminalShaderEffect: String = "none",
+        browserHomePage: String = "https://www.google.com"
+    ) {
+        self.fontSize = KouenSettings.clampedFontSize(fontSize)
+        self.fontFamily = fontFamily
+        self.defaultShell = defaultShell
+        self.defaultCWD = defaultCWD
+        self.transparentTitlebar = transparentTitlebar
+        self.sidebarVisible = sidebarVisible
+        self.sidebarOnRight = sidebarOnRight
+        self.sidebarCollapsedOnLaunch = sidebarCollapsedOnLaunch
+        self.restoreWindowSize = restoreWindowSize
+        self.backgroundOpacity = backgroundOpacity
+        self.backgroundBlur = backgroundBlur
+        self.windowPaddingX = KouenSettings.clampedPadding(windowPaddingX)
+        self.windowPaddingY = KouenSettings.clampedPadding(windowPaddingY)
+        self.customBackgroundHex = customBackgroundHex
+        self.customForegroundHex = customForegroundHex
+        self.customCursorHex = customCursorHex
+        self.importedConfigSignature = importedConfigSignature
+        self.prefixKey = prefixKey
+        self.scrollbackLines = scrollbackLines
+        self.cursorStyle = cursorStyle
+        self.cursorBlink = cursorBlink
+        self.copyOnSelect = copyOnSelect
+        self.selectionBackgroundHex = selectionBackgroundHex
+        self.selectionForegroundHex = selectionForegroundHex
+        self.boldColorHex = boldColorHex
+        self.cursorTextHex = cursorTextHex
+        self.paletteHex = KouenSettings.normalizedPalette(paletteHex)
+        self.agentColorOverrides = KouenSettings.normalizedAgentColorOverrides(agentColorOverrides)
+        self.dividerHex = dividerHex
+        self.statusLineHex = statusLineHex
+        self.windowBorderHex = windowBorderHex
+        self.windowBorderOpacity = max(0, min(1, windowBorderOpacity))
+        self.systemNotificationsEnabled = systemNotificationsEnabled
+        self.notificationSoundEnabled = notificationSoundEnabled
+        self.notchVisibilityMode = notchVisibilityMode
+        self.notchOpenOnHover = notchOpenOnHover
+        let resolvedColorRendering = colorRendering ?? (vividColors ? .vivid : .accurate)
+        let resolvedTextRendering = textRendering ?? (linearBlending ? .crisp : .native)
+        self.colorRendering = resolvedColorRendering
+        self.colorGamut = colorGamut
+        self.textRendering = resolvedTextRendering
+        self.vividColors = resolvedColorRendering == .vivid
+        self.linearBlending = resolvedTextRendering == .crisp
+        self.applyThemeToTerminalOutput = applyThemeToTerminalOutput
+        self.ligatures = ligatures
+        self.offMainParserFramePipeline = offMainParserFramePipeline
+        self.liveResizeReflow = liveResizeReflow
+        self.showPromptGutter = showPromptGutter
+        self.showStatusLine = showStatusLine
+        self.experienceMode = experienceMode
+        self.kouenControlsEnabled = kouenControlsEnabled
+        self.prefixKeyEnabled = prefixKeyEnabled
+        self.statusLineEnabled = statusLineEnabled
+        self.resizeOverlay = resizeOverlay
+        self.resizeOverlayPosition = resizeOverlayPosition
+        self.windowPaddingBalance = windowPaddingBalance
+        self.minimumContrast = KouenSettings.clampedContrast(minimumContrast)
+        self.lightThemeName = lightThemeName
+        self.darkThemeName = darkThemeName
+        self.lightThemeOpacity = lightThemeOpacity
+        self.darkThemeOpacity = darkThemeOpacity
+        self.pasteProtection = pasteProtection
+        self.commandFinishedThresholdSeconds = max(0, commandFinishedThresholdSeconds)
+        self.notificationEvents = notificationEvents
+        self.boldIsBright = boldIsBright
+        self.lspAutoStart = lspAutoStart
+        self.lspServers = lspServers
+        self.fileClickAction = fileClickAction
+        self.claudeAPIKey = claudeAPIKey
+        self.inlineAICompletion = inlineAICompletion
+        self.terminalShaderEffect = terminalShaderEffect
+        self.browserHomePage = browserHomePage
+    }
+
+    /// Ensure the palette always has exactly 16 slots so index access is safe even if a
+    /// hand-edited or older settings file carries a different count.
+    public static func normalizedPalette(_ raw: [String?]) -> [String?] {
+        if raw.count == 16 { return raw }
+        if raw.count < 16 { return raw + Array(repeating: nil, count: 16 - raw.count) }
+        return Array(raw.prefix(16))
+    }
+
+    public static func normalizedAgentColorOverrides(_ raw: [String: String]) -> [String: String] {
+        raw.reduce(into: [:]) { result, item in
+            guard AgentKind(rawValue: item.key) != nil,
+                  let normalized = normalizedHex(item.value)
+            else { return }
+            result[item.key] = normalized
+        }
+    }
+
+    public static func normalizedHex(_ raw: String) -> String? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let cleaned = trimmed.hasPrefix("#") ? String(trimmed.dropFirst()) : trimmed
+        guard cleaned.count == 6, cleaned.allSatisfy(\.isHexDigit) else { return nil }
+        return "#\(cleaned.uppercased())"
+    }
+
+    public func agentColorHex(for kind: AgentKind) -> String {
+        agentColorOverrides[kind.rawValue] ?? "#\(kind.dotHex.uppercased())"
+    }
+
+    /// Whether `event` is allowed to fire a notification. Falls back to the event's
+    /// `defaultEnabled` when the user hasn't made an explicit choice, so the sparse
+    /// `notificationEvents` map stays small and old configs behave as before.
+    public func isEventEnabled(_ event: NotificationEvent) -> Bool {
+        notificationEvents[event.rawValue] ?? event.defaultEnabled
+    }
+
+    /// Record an explicit per-event notification choice.
+    public mutating func setEventEnabled(_ event: NotificationEvent, _ enabled: Bool) {
+        notificationEvents[event.rawValue] = enabled
+    }
+
+    /// Reset visual fields to either the user's imported terminal config or the source terminal's
+    /// stock baseline. Preserves shell, cwd, sidebar/titlebar chrome, prefix key, and
+    /// agent color overrides so selecting "Default" changes appearance, not behavior.
+    public mutating func resetToImportedConfig(imported: ImportedTerminalConfig? = nil) {
+        // Fall back to the first-run defaults (the memberwise init) so "Reset to defaults"
+        // always lands on the same out-of-the-box look — no separate set of magic numbers.
+        let defaults = KouenSettings()
+        backgroundOpacity = imported?.backgroundOpacity ?? defaults.backgroundOpacity
+        backgroundBlur = imported?.backgroundBlur ?? defaults.backgroundBlur
+        customBackgroundHex = imported?.backgroundHex
+        customForegroundHex = imported?.foregroundHex
+        customCursorHex = imported?.cursorColorHex
+        selectionBackgroundHex = imported?.selectionBackgroundHex
+        selectionForegroundHex = imported?.selectionForegroundHex
+        boldColorHex = imported?.boldColorHex
+        cursorTextHex = imported?.cursorTextHex
+        dividerHex = nil
+        statusLineHex = nil
+        windowBorderHex = nil
+        windowBorderOpacity = defaults.windowBorderOpacity
+        paletteHex = KouenSettings.normalizedPalette(imported?.paletteHex ?? Array(repeating: nil, count: 16))
+        fontFamily = imported?.fontFamily ?? defaults.fontFamily
+        fontSize = defaults.fontSize // Kouen-owned (import the face, not the size).
+        windowPaddingX = imported?.windowPaddingX ?? defaults.windowPaddingX
+        windowPaddingY = imported?.windowPaddingY ?? defaults.windowPaddingY
+        cursorStyle = imported?.cursorStyle ?? defaults.cursorStyle
+        cursorBlink = imported?.cursorBlink ?? defaults.cursorBlink
+        copyOnSelect = imported?.copyOnSelect ?? defaults.copyOnSelect
+        minimumContrast = KouenSettings.clampedContrast(imported?.minimumContrast ?? defaults.minimumContrast)
+        importedConfigSignature = imported?.signature
+    }
+
+    /// Decoder that gracefully accepts older settings files missing the newer fields.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let legacyContainer = try decoder.container(keyedBy: LegacyKouenSettingsCodingKeys.self)
+        let imported = TerminalConfigImporter.load()
+        let fallback = KouenSettings.makeDefaults(imported: imported)
+
+        fontSize = KouenSettings.clampedFontSize(
+            try container.decodeIfPresent(Float.self, forKey: .fontSize) ?? fallback.fontSize)
+        fontFamily = try container.decodeIfPresent(String.self, forKey: .fontFamily) ?? fallback.fontFamily
+        defaultShell = try container.decodeIfPresent(String.self, forKey: .defaultShell) ?? fallback.defaultShell
+        defaultCWD = try container.decodeIfPresent(String.self, forKey: .defaultCWD) ?? fallback.defaultCWD
+        transparentTitlebar = try container.decodeIfPresent(Bool.self, forKey: .transparentTitlebar) ?? fallback.transparentTitlebar
+        sidebarVisible = try container.decodeIfPresent(Bool.self, forKey: .sidebarVisible) ?? fallback.sidebarVisible
+        sidebarOnRight = try container.decodeIfPresent(Bool.self, forKey: .sidebarOnRight) ?? fallback.sidebarOnRight
+        sidebarCollapsedOnLaunch = try container.decodeIfPresent(Bool.self, forKey: .sidebarCollapsedOnLaunch) ?? fallback.sidebarCollapsedOnLaunch
+        restoreWindowSize = try container.decodeIfPresent(Bool.self, forKey: .restoreWindowSize) ?? fallback.restoreWindowSize
+        backgroundOpacity = try container.decodeIfPresent(Float.self, forKey: .backgroundOpacity) ?? fallback.backgroundOpacity
+        backgroundBlur = try container.decodeIfPresent(Int.self, forKey: .backgroundBlur) ?? fallback.backgroundBlur
+        windowPaddingX = KouenSettings.clampedPadding(
+            try container.decodeIfPresent(Float.self, forKey: .windowPaddingX) ?? fallback.windowPaddingX)
+        windowPaddingY = KouenSettings.clampedPadding(
+            try container.decodeIfPresent(Float.self, forKey: .windowPaddingY) ?? fallback.windowPaddingY)
+        customBackgroundHex = try container.decodeIfPresent(String.self, forKey: .customBackgroundHex) ?? fallback.customBackgroundHex
+        customForegroundHex = try container.decodeIfPresent(String.self, forKey: .customForegroundHex) ?? fallback.customForegroundHex
+        customCursorHex = try container.decodeIfPresent(String.self, forKey: .customCursorHex) ?? fallback.customCursorHex
+        importedConfigSignature = try container.decodeIfPresent(String.self, forKey: .importedConfigSignature)
+        prefixKey = try container.decodeIfPresent(String.self, forKey: .prefixKey) ?? fallback.prefixKey
+        scrollbackLines = try container.decodeIfPresent(Int.self, forKey: .scrollbackLines) ?? fallback.scrollbackLines
+        cursorStyle = try container.decodeIfPresent(String.self, forKey: .cursorStyle) ?? fallback.cursorStyle
+        cursorBlink = try container.decodeIfPresent(Bool.self, forKey: .cursorBlink) ?? fallback.cursorBlink
+        copyOnSelect = try container.decodeIfPresent(Bool.self, forKey: .copyOnSelect) ?? fallback.copyOnSelect
+        selectionBackgroundHex = try container.decodeIfPresent(String.self, forKey: .selectionBackgroundHex) ?? fallback.selectionBackgroundHex
+        selectionForegroundHex = try container.decodeIfPresent(String.self, forKey: .selectionForegroundHex) ?? fallback.selectionForegroundHex
+        boldColorHex = try container.decodeIfPresent(String.self, forKey: .boldColorHex) ?? fallback.boldColorHex
+        cursorTextHex = try container.decodeIfPresent(String.self, forKey: .cursorTextHex) ?? fallback.cursorTextHex
+        paletteHex = KouenSettings.normalizedPalette(try container.decodeIfPresent([String?].self, forKey: .paletteHex) ?? fallback.paletteHex)
+        let agentColors = try container.decodeIfPresent([String: String].self, forKey: .agentColorOverrides) ?? fallback.agentColorOverrides
+        agentColorOverrides = KouenSettings.normalizedAgentColorOverrides(agentColors)
+        dividerHex = try container.decodeIfPresent(String.self, forKey: .dividerHex)
+        statusLineHex = try container.decodeIfPresent(String.self, forKey: .statusLineHex)
+        windowBorderHex = try container.decodeIfPresent(String.self, forKey: .windowBorderHex)
+        windowBorderOpacity = max(0, min(1,
+            try container.decodeIfPresent(Float.self, forKey: .windowBorderOpacity) ?? fallback.windowBorderOpacity))
+        systemNotificationsEnabled = try container.decodeIfPresent(Bool.self, forKey: .systemNotificationsEnabled) ?? true
+        notificationSoundEnabled = try container.decodeIfPresent(Bool.self, forKey: .notificationSoundEnabled) ?? true
+        notchVisibilityMode = try container.decodeIfPresent(NotchVisibilityMode.self, forKey: .notchVisibilityMode) ?? .automatic
+        notchOpenOnHover = try container.decodeIfPresent(Bool.self, forKey: .notchOpenOnHover) ?? true
+        let legacyVivid = try container.decodeIfPresent(Bool.self, forKey: .vividColors)
+        let decodedColorRendering = try container.decodeIfPresent(TerminalColorRenderingMode.self, forKey: .colorRendering)
+        let resolvedColorRendering = decodedColorRendering
+            ?? ((legacyVivid ?? fallback.vividColors) ? .vivid : fallback.colorRendering)
+        colorRendering = resolvedColorRendering
+        colorGamut = try container.decodeIfPresent(TerminalColorGamut.self, forKey: .colorGamut) ?? fallback.colorGamut
+
+        let legacyLinear = try container.decodeIfPresent(Bool.self, forKey: .linearBlending)
+        let decodedTextRendering = try container.decodeIfPresent(TerminalTextRenderingMode.self, forKey: .textRendering)
+        let resolvedTextRendering = decodedTextRendering
+            ?? ((legacyLinear ?? fallback.linearBlending) ? .crisp : fallback.textRendering)
+        textRendering = resolvedTextRendering
+        vividColors = resolvedColorRendering == .vivid
+        linearBlending = resolvedTextRendering == .crisp
+        applyThemeToTerminalOutput = try container.decodeIfPresent(Bool.self, forKey: .applyThemeToTerminalOutput) ?? fallback.applyThemeToTerminalOutput
+        ligatures = try container.decodeIfPresent(Bool.self, forKey: .ligatures) ?? fallback.ligatures
+        // Default on when the key is absent (existing installs get the fast path); an explicitly
+        // stored `false` is honored as an opt-out.
+        offMainParserFramePipeline = try container.decodeIfPresent(Bool.self, forKey: .offMainParserFramePipeline) ?? true
+        // Default on when the key is absent (existing installs get real-time resize); an explicitly
+        // stored `false` is honored as an opt-out to the legacy defer-to-release behavior.
+        liveResizeReflow = try container.decodeIfPresent(Bool.self, forKey: .liveResizeReflow) ?? true
+        showPromptGutter = try container.decodeIfPresent(Bool.self, forKey: .showPromptGutter) ?? fallback.showPromptGutter
+        showStatusLine = try container.decodeIfPresent(Bool.self, forKey: .showStatusLine) ?? fallback.showStatusLine
+        // Behavior-preserving migration: a settings file that predates modes was written by a
+        // user who already had the prefix + status line, i.e. the full Kouen experience.
+        // Default the absent key to `.full` (NOT the fresh-install `.plain`) so upgrading never
+        // silently strips features. New installs get `.plain` via `makeDefaults`.
+        experienceMode = try container.decodeIfPresent(ExperienceMode.self, forKey: .experienceMode) ?? .full
+        kouenControlsEnabled =
+            try container.decodeIfPresent(Bool.self, forKey: .kouenControlsEnabled)
+            ?? legacyContainer.decodeIfPresent(Bool.self, forKey: .tmuxControlsEnabled)
+        // Per-component overrides — absent in older files, so they decode to nil and fall back to
+        // the legacy umbrella `kouenControlsEnabled` (then the mode) via the effective accessors.
+        // No data migration needed: an existing file with `kouenControlsEnabled` keeps behaving
+        // exactly as before until the user touches a finer toggle.
+        prefixKeyEnabled = try container.decodeIfPresent(Bool.self, forKey: .prefixKeyEnabled)
+        statusLineEnabled = try container.decodeIfPresent(Bool.self, forKey: .statusLineEnabled)
+        resizeOverlay = try container.decodeIfPresent(ResizeOverlayMode.self, forKey: .resizeOverlay) ?? fallback.resizeOverlay
+        resizeOverlayPosition = try container.decodeIfPresent(ResizeOverlayPosition.self, forKey: .resizeOverlayPosition) ?? fallback.resizeOverlayPosition
+        windowPaddingBalance = try container.decodeIfPresent(Bool.self, forKey: .windowPaddingBalance) ?? fallback.windowPaddingBalance
+        minimumContrast = KouenSettings.clampedContrast(
+            try container.decodeIfPresent(Double.self, forKey: .minimumContrast) ?? fallback.minimumContrast)
+        lightThemeName = try container.decodeIfPresent(String.self, forKey: .lightThemeName)
+        darkThemeName = try container.decodeIfPresent(String.self, forKey: .darkThemeName)
+        lightThemeOpacity = try container.decodeIfPresent(Float.self, forKey: .lightThemeOpacity)
+        darkThemeOpacity = try container.decodeIfPresent(Float.self, forKey: .darkThemeOpacity)
+        pasteProtection = try container.decodeIfPresent(Bool.self, forKey: .pasteProtection) ?? fallback.pasteProtection
+        commandFinishedThresholdSeconds =
+            try container.decodeIfPresent(Int.self, forKey: .commandFinishedThresholdSeconds) ?? fallback.commandFinishedThresholdSeconds
+        var decodedEvents = try container.decodeIfPresent([String: Bool].self, forKey: .notificationEvents) ?? [:]
+        // One-time migration: fold the legacy standalone `commandFinishedNotifications` bool into the
+        // per-event map, unless the map already carries an explicit choice for it.
+        if decodedEvents[NotificationEvent.commandFinished.rawValue] == nil,
+           let legacyCommandFinished = try legacyContainer.decodeIfPresent(Bool.self, forKey: .commandFinishedNotifications) {
+            decodedEvents[NotificationEvent.commandFinished.rawValue] = legacyCommandFinished
+        }
+        notificationEvents = decodedEvents
+        boldIsBright = try container.decodeIfPresent(Bool.self, forKey: .boldIsBright) ?? fallback.boldIsBright
+        lspAutoStart = try container.decodeIfPresent(Bool.self, forKey: .lspAutoStart) ?? fallback.lspAutoStart
+        lspServers = try container.decodeIfPresent([String: String].self, forKey: .lspServers) ?? fallback.lspServers
+        fileClickAction = try container.decodeIfPresent(String.self, forKey: .fileClickAction) ?? fallback.fileClickAction
+        claudeAPIKey = try container.decodeIfPresent(String.self, forKey: .claudeAPIKey)
+        inlineAICompletion = try container.decodeIfPresent(Bool.self, forKey: .inlineAICompletion) ?? fallback.inlineAICompletion
+        terminalShaderEffect = try container.decodeIfPresent(String.self, forKey: .terminalShaderEffect) ?? fallback.terminalShaderEffect
+        browserHomePage = try container.decodeIfPresent(String.self, forKey: .browserHomePage) ?? fallback.browserHomePage
+    }
+
+    /// Whether the user (or a prior import) has populated any editable visual field. Gates the
+    /// auto-backfill in `load()`: a changed source-terminal config must never silently overwrite
+    /// colors/font the user is relying on (they re-import explicitly to opt in).
+    public var hasUserVisualCustomizations: Bool {
+        customBackgroundHex != nil || customForegroundHex != nil || customCursorHex != nil
+            || selectionBackgroundHex != nil || selectionForegroundHex != nil
+            || boldColorHex != nil || cursorTextHex != nil
+            || paletteHex.contains { $0 != nil }
+    }
+
+    /// Opacity bounds. The user can pick any value from fully transparent to
+    /// solid — that's an intentional product choice for power users who want
+    /// extreme translucency. The 0.05 floor stays just to make sure dragging
+    /// the slider to the far left doesn't strand the window completely
+    /// invisible with no way to find it on screen.
+    public static func clampedOpacity(_ value: Float) -> Float {
+        max(0.05, min(1.0, value))
+    }
+
+    /// Background blur (pixels). 0 = no blur, 100 = aggressive heavy frost.
+    /// The window blur caps the effective radius internally; we expose the full
+    /// useful range so settings doesn't feel artificially constrained.
+    public static func clampedBlur(_ value: Int) -> Int {
+        max(0, min(100, value))
+    }
+
+    /// Minimum-contrast WCAG ratio bounds. 1 = off (no adjustment); 21 = maximum (black on white).
+    public static func clampedContrast(_ value: Double) -> Double {
+        max(1, min(21, value))
+    }
+
+    /// Font-size bounds (points), matching the Cmd+/- zoom policy in `SessionCoordinator.applyFontSize`.
+    /// Out-of-range values are a footgun: ≥~500 overflows the glyph atlas page (invisible text),
+    /// ≤~1 forces a multi-hundred-megabyte grid allocation. Clamp at every persistence boundary.
+    public static func clampedFontSize(_ value: Float) -> Float {
+        max(8, min(32, value))
+    }
+
+    /// Window padding (points) is never negative. The renderer already neutralizes negatives, so
+    /// this is belt-and-braces — it keeps the persisted value sane regardless of the read site.
+    public static func clampedPadding(_ value: Float) -> Float {
+        max(0, value)
+    }
+
+    /// Builds a default settings instance, layering imported config values over hardcoded defaults.
+    public static func makeDefaults(imported: ImportedTerminalConfig?) -> KouenSettings {
+        var settings = KouenSettings()
+        guard let imported else { return settings }
+        if let value = imported.fontFamily { settings.fontFamily = value }
+        // Font *size* is Kouen-owned (default 16), not imported: a source terminal's size
+        // preference doesn't carry over — only the font face does.
+        if let value = imported.defaultShell { settings.defaultShell = value }
+        if let value = imported.backgroundOpacity { settings.backgroundOpacity = value }
+        if let value = imported.backgroundBlur { settings.backgroundBlur = value }
+        if let value = imported.windowPaddingX { settings.windowPaddingX = value }
+        if let value = imported.windowPaddingY { settings.windowPaddingY = value }
+        if let value = imported.backgroundHex { settings.customBackgroundHex = value }
+        if let value = imported.foregroundHex { settings.customForegroundHex = value }
+        if let value = imported.cursorColorHex { settings.customCursorHex = value }
+        if let value = imported.cursorStyle { settings.cursorStyle = value }
+        if let value = imported.cursorBlink { settings.cursorBlink = value }
+        if let value = imported.copyOnSelect { settings.copyOnSelect = value }
+        if let value = imported.minimumContrast { settings.minimumContrast = KouenSettings.clampedContrast(value) }
+        if let value = imported.boldIsBright { settings.boldIsBright = value }
+        // Ghostty `theme = light:X,dark:Y` → Kouen auto light/dark pair.
+        if let light = imported.lightThemeName, let dark = imported.darkThemeName {
+            settings.lightThemeName = light
+            settings.darkThemeName = dark
+        }
+        settings.selectionBackgroundHex = imported.selectionBackgroundHex
+        settings.selectionForegroundHex = imported.selectionForegroundHex
+        settings.boldColorHex = imported.boldColorHex
+        settings.cursorTextHex = imported.cursorTextHex
+        settings.paletteHex = KouenSettings.normalizedPalette(imported.paletteHex)
+        settings.importedConfigSignature = imported.signature
+        return settings
+    }
+
+    public mutating func applyImportedDefaults(_ imported: ImportedTerminalConfig) {
+        if let value = imported.fontFamily { fontFamily = value }
+        // Font size is Kouen-owned (see makeDefaults) — import the face, not the size.
+        if let value = imported.defaultShell { defaultShell = value }
+        if let value = imported.backgroundOpacity { backgroundOpacity = value }
+        if let value = imported.backgroundBlur { backgroundBlur = value }
+        if let value = imported.windowPaddingX { windowPaddingX = value }
+        if let value = imported.windowPaddingY { windowPaddingY = value }
+        if let value = imported.backgroundHex { customBackgroundHex = value }
+        if let value = imported.foregroundHex { customForegroundHex = value }
+        if let value = imported.cursorColorHex { customCursorHex = value }
+        if let value = imported.cursorStyle { cursorStyle = value }
+        if let value = imported.cursorBlink { cursorBlink = value }
+        if let value = imported.copyOnSelect { copyOnSelect = value }
+        if let value = imported.minimumContrast { minimumContrast = KouenSettings.clampedContrast(value) }
+        if let value = imported.boldIsBright { boldIsBright = value }
+        if let light = imported.lightThemeName, let dark = imported.darkThemeName {
+            lightThemeName = light
+            darkThemeName = dark
+        }
+        selectionBackgroundHex = imported.selectionBackgroundHex
+        selectionForegroundHex = imported.selectionForegroundHex
+        boldColorHex = imported.boldColorHex
+        cursorTextHex = imported.cursorTextHex
+        paletteHex = KouenSettings.normalizedPalette(imported.paletteHex)
+        importedConfigSignature = imported.signature
+    }
+}

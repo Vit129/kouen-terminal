@@ -1,0 +1,256 @@
+import Foundation
+import XCTest
+@testable import KouenTheme
+
+final class RGBColorTests: XCTestCase {
+    func testParsesSixDigitHex() {
+        let c = RGBColor(hex: "#1e1e2e")
+        XCTAssertEqual(c, RGBColor(red: 0x1e, green: 0x1e, blue: 0x2e))
+    }
+
+    func testParsesWithoutHash() {
+        XCTAssertEqual(RGBColor(hex: "ff8800"), RGBColor(red: 255, green: 136, blue: 0))
+    }
+
+    func testParsesShorthand() {
+        XCTAssertEqual(RGBColor(hex: "#f80"), RGBColor(red: 0xff, green: 0x88, blue: 0x00))
+    }
+
+    func testParsesAlpha() {
+        let c = RGBColor(hex: "#11223380")
+        XCTAssertEqual(c, RGBColor(red: 0x11, green: 0x22, blue: 0x33, alpha: 0x80))
+    }
+
+    func testRejectsMalformed() {
+        XCTAssertNil(RGBColor(hex: "#xyz"))
+        XCTAssertNil(RGBColor(hex: "#12345"))
+        XCTAssertNil(RGBColor(hex: ""))
+    }
+
+    func testHexRoundTrip() {
+        XCTAssertEqual(RGBColor(hex: "#1e1e2e")?.hexString, "#1e1e2e")
+        XCTAssertEqual(RGBColor(hex: "#11223380")?.hexString, "#11223380")
+    }
+
+    func testBrightnessClassification() {
+        XCTAssertTrue(RGBColor(hex: "#000000")!.isDark)
+        XCTAssertFalse(RGBColor(hex: "#ffffff")!.isDark)
+    }
+
+    func testCodableUsesHexString() throws {
+        let color = RGBColor(hex: "#89b4fa")!
+        let data = try JSONEncoder().encode(color)
+        XCTAssertEqual(String(data: data, encoding: .utf8), "\"#89b4fa\"")
+        let decoded = try JSONDecoder().decode(RGBColor.self, from: data)
+        XCTAssertEqual(decoded, color)
+    }
+}
+
+final class KouenThemeCatalogTests: XCTestCase {
+    func testDefaultThemeExists() {
+        XCTAssertNotNil(KouenThemeCatalog.theme(named: KouenThemeCatalog.defaultThemeName))
+    }
+
+    func testDefaultThemeUsesMutedBaselinePalette() {
+        let theme = KouenThemeCatalog.theme(named: KouenThemeCatalog.defaultThemeName)
+
+        XCTAssertEqual(KouenThemeCatalog.defaultThemeName, "Kouen Default")
+        XCTAssertEqual(theme?.backgroundHex, "#000000")
+        XCTAssertEqual(theme?.foregroundHex, "#ffffff")
+        XCTAssertEqual(theme?.paletteHex, [
+            "#1d1f21", "#cc6666", "#b5bd68", "#f0c674",
+            "#81a2be", "#b294bb", "#8abeb7", "#c5c8c6",
+            "#666666", "#d54e53", "#b9ca4a", "#e7c547",
+            "#7aa6da", "#c397d8", "#70c0b1", "#eaeaea",
+        ])
+    }
+
+    func testLegacyDefaultThemeNameStillResolves() {
+        XCTAssertEqual(
+            KouenThemeCatalog.theme(named: "Ghostty Default"),
+            KouenThemeCatalog.theme(named: KouenThemeCatalog.defaultThemeName)
+        )
+    }
+
+    func testAllFeaturedThemesPresent() {
+        for name in KouenThemeCatalog.featuredNames {
+            XCTAssertNotNil(KouenThemeCatalog.theme(named: name), "missing featured theme \(name)")
+        }
+    }
+
+    func testCommunityThemesResourceIsBundled() {
+        XCTAssertEqual(KouenThemeCatalog.allThemes.count, 490)
+        XCTAssertNotNil(KouenThemeCatalog.theme(named: "Zenwritten Light"))
+        XCTAssertNotNil(KouenThemeCatalog.theme(named: "0x96f"))
+    }
+
+    func testLookupIsCaseInsensitive() {
+        XCTAssertNotNil(KouenThemeCatalog.theme(named: "dracula"))
+        XCTAssertNotNil(KouenThemeCatalog.theme(named: "DRACULA"))
+    }
+
+    func testEveryThemeHasSixteenColorPalette() {
+        for theme in KouenThemeCatalog.allThemes {
+            XCTAssertEqual(theme.palette.count, 16, "\(theme.name) palette is not 16 colors")
+        }
+    }
+
+    func testSearchEmptyReturnsAll() {
+        XCTAssertEqual(KouenThemeCatalog.search("").count, KouenThemeCatalog.allThemes.count)
+    }
+
+    func testSearchFiltersByName() {
+        let results = KouenThemeCatalog.search("tokyo")
+        // Robust to catalog size: the query must filter (fewer than all), every result
+        // must match it, and the canonical theme must be present.
+        XCTAssertFalse(results.isEmpty)
+        XCTAssertLessThan(results.count, KouenThemeCatalog.allThemes.count)
+        XCTAssertTrue(results.allSatisfy { $0.name.lowercased().contains("tokyo") })
+        XCTAssertTrue(results.contains { $0.name == "Tokyo Night" })
+    }
+
+    func testDarkThemesAreClassifiedDark() {
+        XCTAssertTrue(KouenThemeCatalog.theme(named: "Catppuccin Mocha")!.isDark)
+    }
+}
+
+final class ThemeDocumentTests: XCTestCase {
+    private func sampleDocument() -> ThemeDocument {
+        let def = KouenThemeCatalog.theme(named: "Dracula")!
+        let appearance = ThemeDocument.Appearance(
+            backgroundOpacity: 0.95,
+            backgroundBlur: 20,
+            fontFamily: "JetBrains Mono",
+            fontSize: 14,
+            sourceColorSpace: .sRGB,
+            appearance: .dark,
+            supportsWideGamut: false,
+            contrastGrade: .high,
+            applyToTerminalOutput: true
+        )
+        return ThemeDocument(definition: def, appearance: appearance, author: "robert")
+    }
+
+    func testRoundTripPreservesContent() throws {
+        let doc = sampleDocument()
+        let data = try doc.encoded()
+        let restored = try ThemeDocument.decoded(from: data)
+        XCTAssertEqual(restored, doc)
+    }
+
+    func testEncodedJSONUsesHexColors() throws {
+        let data = try sampleDocument().encoded()
+        let json = String(data: data, encoding: .utf8) ?? ""
+        XCTAssertTrue(json.contains("#282a36"), "background hex should appear in JSON")
+        XCTAssertTrue(json.contains("\"sourceColorSpace\""))
+        XCTAssertTrue(json.contains("\"applyToTerminalOutput\""))
+    }
+
+    func testOldThemeJSONWithoutColorSpaceMetadataLoads() throws {
+        let legacy = Data("""
+        {
+          "version": 1,
+          "name": "Legacy",
+          "colors": {
+            "background": "#000000",
+            "foreground": "#ffffff",
+            "palette": [
+              "#000000", "#800000", "#008000", "#808000",
+              "#000080", "#800080", "#008080", "#c0c0c0",
+              "#808080", "#ff0000", "#00ff00", "#ffff00",
+              "#0000ff", "#ff00ff", "#00ffff", "#ffffff"
+            ]
+          },
+          "appearance": {
+            "fontFamily": "Menlo",
+            "fontSize": 14
+          }
+        }
+        """.utf8)
+
+        let doc = try ThemeDocument.decoded(from: legacy)
+
+        XCTAssertEqual(doc.name, "Legacy")
+        XCTAssertEqual(doc.appearance?.sourceColorSpace, .sRGB)
+        XCTAssertEqual(doc.appearance?.supportsWideGamut, false)
+    }
+
+    func testThemeMetadataRoundTrips() throws {
+        var doc = sampleDocument()
+        doc.appearance?.sourceColorSpace = .displayP3
+        doc.appearance?.appearance = .light
+        doc.appearance?.supportsWideGamut = true
+        doc.appearance?.contrastGrade = .medium
+
+        let restored = try ThemeDocument.decoded(from: try doc.encoded())
+
+        XCTAssertEqual(restored.appearance?.sourceColorSpace, .displayP3)
+        XCTAssertEqual(restored.appearance?.appearance, .light)
+        XCTAssertEqual(restored.appearance?.supportsWideGamut, true)
+        XCTAssertEqual(restored.appearance?.contrastGrade, .medium)
+    }
+
+    func testDefinitionConversionRoundTrip() {
+        let def = KouenThemeCatalog.theme(named: "Nord")!
+        let doc = ThemeDocument(definition: def)
+        XCTAssertEqual(doc.themeDefinition, def)
+    }
+
+    func testRejectsUnsupportedVersion() {
+        var doc = sampleDocument()
+        doc.version = ThemeDocument.currentVersion + 1
+        XCTAssertThrowsError(try doc.encoded()) { error in
+            XCTAssertEqual(error as? ThemeDocumentError, .unsupportedVersion(doc.version))
+        }
+    }
+
+    func testRejectsWrongPaletteCount() {
+        var doc = sampleDocument()
+        doc.colors.palette = Array(doc.colors.palette.prefix(8))
+        XCTAssertThrowsError(try doc.encoded()) { error in
+            XCTAssertEqual(error as? ThemeDocumentError, .wrongPaletteCount(8))
+        }
+    }
+
+    func testRejectsEmptyName() {
+        var doc = sampleDocument()
+        doc.name = "   "
+        XCTAssertThrowsError(try doc.encoded()) { error in
+            XCTAssertEqual(error as? ThemeDocumentError, .emptyName)
+        }
+    }
+
+    func testDecodeMalformedThrows() {
+        let garbage = Data("not json".utf8)
+        XCTAssertThrowsError(try ThemeDocument.decoded(from: garbage))
+    }
+}
+
+final class ThemeDiagnosticsTests: XCTestCase {
+    func testColorCheckContainsANSIAndTruecolorSequences() {
+        let output = ThemeDiagnostics.colorCheck()
+
+        XCTAssertTrue(output.contains("ANSI 0-15"))
+        XCTAssertTrue(output.contains("\u{1B}[40m"))
+        XCTAssertTrue(output.contains("\u{1B}[107m"))
+        XCTAssertTrue(output.contains("\u{1B}[48;5;16m"))
+        XCTAssertTrue(output.contains("\u{1B}[48;5;255m"))
+        XCTAssertTrue(output.contains("\u{1B}[48;2;255;0;0m"))
+        XCTAssertTrue(output.contains("\u{1B}[48;2;0;255;255m"))
+        XCTAssertTrue(output.contains("\u{1B}[1mbold\u{1B}[0m"))
+        XCTAssertTrue(output.contains("\u{1B}[38;2;255;255;255;48;2;0;64;128m"))
+    }
+
+    func testThemePreviewContainsPromptDiagnosticsAndAgentSections() {
+        let output = ThemeDiagnostics.themePreview(KouenThemeCatalog.theme(named: "Dracula")!)
+
+        XCTAssertTrue(output.contains("PROMPTS"))
+        XCTAssertTrue(output.contains("$ swift test"))
+        XCTAssertTrue(output.contains("DIAGNOSTICS"))
+        XCTAssertTrue(output.contains("error:"))
+        XCTAssertTrue(output.contains("AGENTS"))
+        XCTAssertTrue(output.contains("waiting for approval"))
+        XCTAssertTrue(output.contains("SELECTION / SEARCH"))
+        XCTAssertTrue(output.contains("ANSI SWATCHES"))
+    }
+}

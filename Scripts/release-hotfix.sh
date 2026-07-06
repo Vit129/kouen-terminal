@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 # Fork notice: the appcast deploy-check below (--deploy-appcast) diffs against
-# https://harnesscli.dev/appcast.xml, upstream's own live feed — this fork has no appcast
+# https://kouencli.dev/appcast.xml, upstream's own live feed — this fork has no appcast
 # hosted anywhere, so that check isn't meaningful here unless run with --deploy-appcast omitted.
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -14,7 +14,7 @@ Usage:
 
 Options:
   --version X.Y.Z       CFBundleShortVersionString. Defaults to the tag without "v".
-  --release-name NAME   GitHub release title. Defaults to "Harness X.Y.Z (N)".
+  --release-name NAME   GitHub release title. Defaults to "Kouen X.Y.Z (N)".
   --no-deploy-appcast   Do not commit appcast.xml to the website repository.
   --skip-tests          Skip swift test before dispatching the release workflow.
   --dry-run             Print the plan without changing files or dispatching GitHub Actions.
@@ -22,10 +22,10 @@ Options:
 
 What this does:
   1. Requires a clean tracked worktree.
-  2. Updates Harness Info.plist to version/build.
+  2. Updates Kouen Info.plist to version/build.
   3. Runs swift test unless --skip-tests is set.
   4. Commits, pushes main, and force-moves the requested tag.
-  5. Dispatches the Release Harness workflow and watches it.
+  5. Dispatches the Release Kouen workflow and watches it.
   6. Validates the GitHub release appcast and the live website appcast.
   7. Downloads the final DMG, computes SHA-256, updates README download copy,
      commits/pushes it, force-moves the tag, and retargets the GitHub release.
@@ -93,7 +93,7 @@ fi
 [[ "$version" == "${tag#v}" ]] || { echo "--version must match --tag without v" >&2; exit 2; }
 
 if [[ -z "$release_name" ]]; then
-  release_name="Harness $version ($build)"
+  release_name="Kouen $version ($build)"
 fi
 
 deploy_appcast_input=false
@@ -121,7 +121,7 @@ require_clean_tracked_worktree() {
 plist_set() {
   local key="$1"
   local value="$2"
-  run /usr/libexec/PlistBuddy -c "Set :$key $value" Apps/Harness/Sources/HarnessApp/Resources/Info.plist
+  run /usr/libexec/PlistBuddy -c "Set :$key $value" Apps/Kouen/Sources/KouenApp/Resources/Info.plist
 }
 
 workflow_run_id_for_head() {
@@ -172,7 +172,7 @@ write_release_notes() {
   local checksum="$1"
   local notes="$2"
   cat > "$notes" <<EOF
-Signed and notarized Harness $version ($build).
+Signed and notarized Kouen $version ($build).
 
 - Version: $version
 - Build: $build
@@ -212,15 +212,15 @@ run git pull --ff-only origin main
 plist_set CFBundleShortVersionString "$version"
 plist_set CFBundleVersion "$build"
 
-run git diff -- Apps/Harness/Sources/HarnessApp/Resources/Info.plist
+run git diff -- Apps/Kouen/Sources/KouenApp/Resources/Info.plist
 
 if [[ "$run_tests" == "1" ]]; then
   run swift test
 fi
 
-if ! git diff --quiet -- Apps/Harness/Sources/HarnessApp/Resources/Info.plist; then
-  run git add Apps/Harness/Sources/HarnessApp/Resources/Info.plist
-  run git commit -m "Prepare Harness $version build $build release"
+if ! git diff --quiet -- Apps/Kouen/Sources/KouenApp/Resources/Info.plist; then
+  run git add Apps/Kouen/Sources/KouenApp/Resources/Info.plist
+  run git commit -m "Prepare Kouen $version build $build release"
 else
   echo "Info.plist already has the requested version/build."
 fi
@@ -242,7 +242,7 @@ if [[ "$dry_run" == "1" ]]; then
 fi
 
 run_id="$(workflow_run_id_for_head "$head_sha")" || {
-  echo "Could not find dispatched Release Harness workflow run for $head_sha" >&2
+  echo "Could not find dispatched Release Kouen workflow run for $head_sha" >&2
   exit 1
 }
 
@@ -263,7 +263,7 @@ grep -q "https://github.com/Vit129/kouen-terminal/releases/download/$tag/Kouen.d
 grep -q "sparkle:edSignature=" "$tmpdir/appcast.xml"
 
 if [[ "$deploy_appcast" == "1" ]]; then
-  curl -fsSL -H 'Cache-Control: no-cache' https://harnesscli.dev/appcast.xml -o "$tmpdir/live-appcast.xml"
+  curl -fsSL -H 'Cache-Control: no-cache' https://kouencli.dev/appcast.xml -o "$tmpdir/live-appcast.xml"
   diff -u "$tmpdir/appcast.xml" "$tmpdir/live-appcast.xml"
 fi
 
@@ -277,7 +277,7 @@ update_readme_download "$checksum"
 
 if ! git diff --quiet -- README.md; then
   run git add README.md
-  run git commit -m "Update Harness $version build $build download copy"
+  run git commit -m "Update Kouen $version build $build download copy"
   run git push origin main
   run git tag -f "$tag" HEAD
   run git push origin "refs/tags/$tag" --force

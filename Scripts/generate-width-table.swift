@@ -7,7 +7,7 @@
 // in `CharacterWidth.swift` change:
 //
 //   swift Scripts/generate-width-table.swift > \
-//     Packages/HarnessTerminalEngine/Sources/HarnessTerminalEngine/Width/CharacterWidthTable.swift
+//     Packages/KouenTerminalEngine/Sources/KouenTerminalEngine/Width/CharacterWidthTable.swift
 //
 // The table is correct *by construction*: every BMP cell is filled by evaluating `referenceWidth`
 // (the exact linear-scan semantics of the shipped `CharacterWidth`), and the astral planes are
