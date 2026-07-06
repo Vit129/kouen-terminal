@@ -1,4 +1,4 @@
-.PHONY: run debug prod start install install-no-build install-graceful install-graceful-no-build build bench preview preview-stop preview-clean clean-state release release-notes package dmg smoke-dmg sign appcast finalize hotfix-release icon clean video-skills video-dev video-check video-render video-doctor
+.PHONY: run debug prod start install install-no-build install-graceful install-graceful-no-build build bench preview preview-stop preview-clean clean-state release release-notes package dmg smoke-dmg sign appcast finalize icon clean video-skills video-dev video-check video-render video-doctor
 
 run:
 	./Scripts/run.sh run
@@ -83,9 +83,6 @@ appcast:
 # APPLE_APP_PASSWORD) and one keychain Allow for the Sparkle key. See Scripts/finalize-release.sh.
 finalize:
 	./Scripts/finalize-release.sh
-
-hotfix-release:
-	./Scripts/release-hotfix.sh
 
 clean:
 	swift package clean

@@ -540,7 +540,7 @@ Or configure a single agent via **Settings ▸ Agents** — each supported agent
 ## Build and test
 
 ```bash
-make build | preview | preview-stop | preview-clean | release | release-notes | package | dmg | smoke-dmg | sign | appcast | finalize | hotfix-release | icon | clean
+make build | preview | preview-stop | preview-clean | release | release-notes | package | dmg | smoke-dmg | sign | appcast | finalize | icon | clean
 xcodegen generate
 swift test                                    # fast, deterministic
 KOUEN_LIVE_DAEMON_TESTS=1 swift test        # + real shell / socket tests
