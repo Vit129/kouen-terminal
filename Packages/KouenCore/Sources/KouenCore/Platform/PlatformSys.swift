@@ -10,7 +10,7 @@ import Darwin
 import Glibc
 #endif
 
-// MARK: - stderr
+// MARK: - stderr / stdout
 
 /// A concurrency-safe stderr `FILE*` for the codebase's `fputs(_, kouenStderr)` logging idiom.
 ///
@@ -21,6 +21,13 @@ import Glibc
 /// stream is safe to share — `fputs` on it is atomic for the small lines we log.
 public nonisolated(unsafe) let kouenStderr: UnsafeMutablePointer<FILE> = {
     guard let stream = fdopen(2, "w") else { fatalError("fdopen(stderr) failed") }
+    setvbuf(stream, nil, _IONBF, 0)
+    return stream
+}()
+
+/// `kouenStderr`'s counterpart for stdout — same reasoning, fd 1 instead of fd 2.
+public nonisolated(unsafe) let kouenStdout: UnsafeMutablePointer<FILE> = {
+    guard let stream = fdopen(1, "w") else { fatalError("fdopen(stdout) failed") }
     setvbuf(stream, nil, _IONBF, 0)
     return stream
 }()
