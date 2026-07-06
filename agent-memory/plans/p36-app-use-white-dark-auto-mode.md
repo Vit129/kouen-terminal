@@ -75,6 +75,35 @@ Caveat inherent to this technique (not a bug, just how it works): only the *runn
 app's Dock tile swaps. Finder, Launchpad, and "Get Info" still show the static light
 icon from `Kouen.icns`/Info.plist, since those are read before the process exists.
 
+**Follow-up bug found after shipping: dark tile rendered ~17% bigger than the light one.**
+Screenshot-measured (pixel column-brightness scan across Dock rows), confirmed real —
+not Dock's active-app magnification (ruled out: Vit clicked away, Kouen shrank to normal
+vs *other* apps, but light-vs-dark still differed when compared directly). Root cause:
+macOS's icon *compositor* auto-shrinks/pads full-bleed legacy-style square icons to match
+the modern template proportions — but that compositor only runs for statically-declared
+icons (`.icns` via `CFBundleIconFile`). A raw `NSImage` handed to
+`NSApp.applicationIconImage` at runtime skips that compositor entirely and renders at
+literal full-bleed size, so it looked bigger than the auto-shrunk light one even though
+both source images were the same nominal canvas size. Two prior fix attempts (declaring
+`image.size = NSSize(512,512)` to correct a suspected DPI/point misinterpretation;
+shipping the file at literal 512×512 px instead of 1024) made *zero* measured difference
+— proof the bug was never about pixel dimensions or point-size declaration, only about
+which icons get OS auto-padding. Real fix: manually shrink the dark PNG's content to
+~85.6% scale (empirically matched against the light icon's measured on-screen footprint)
+centered on a transparent-padded canvas, baking in by hand what the compositor gives the
+static icon for free. Confirmed pixel-equal to the light icon in a direct side-by-side
+Dock screenshot after this fix.
+**Lesson: if a runtime-injected image looks larger than a static-icon sibling with
+identical nominal content, suspect the OS's icon-compositor padding step, not
+DPI/point-size — check by comparing measured on-screen footprints, and if there's no
+change in size after a DPI-related fix, that alone is evidence to stop chasing that
+theory.** Neither Tahoe nor any macOS version exposes this auto-padding to
+runtime-injected icons — Icon Composer/`.icon` only applies at the static asset-catalog
+level (`CFBundleIconName` lookup), not to `NSApp.applicationIconImage`. Apple's actual
+recommended fix (since Big Sur, not Tahoe-specific) is to author all icon art — static
+*and* any runtime-swapped image — against Apple's official Icon Template from the start,
+so no image ever depends on the OS's inconsistent legacy-icon leniency.
+
 ### Rejected directions (for context, don't re-litigate without new information)
 
 - Full logo redesign (K + tree canopy + lamp-post glow, bold shapes instead of fine
