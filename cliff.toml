@@ -2,11 +2,11 @@
 header = """
 # Changelog
 
-All notable changes to Harness are documented here. The format is based on
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and Harness follows
+All notable changes to Kouen are documented here. The format is based on
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and Kouen follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
-[GitHub Releases](https://github.com/Vit129/harness-terminal/releases).
+[GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
 """
 body = """
 {% if version %}\
@@ -17,7 +17,7 @@ body = """
 {% for group, commits in commits | group_by(attribute="group") %}
 ### {{ group }}
 {% for commit in commits %}\
-- {{ commit.message | upper_first }} ([`{{ commit.id | truncate(length=7, end="") }}`](https://github.com/Vit129/harness-terminal/commit/{{ commit.id }}))\
+- {{ commit.message | upper_first }} ([`{{ commit.id | truncate(length=7, end="") }}`](https://github.com/Vit129/kouen-terminal/commit/{{ commit.id }}))\
 {% if commit.breaking %} ⚠️ BREAKING{% endif %}
 {% endfor %}\
 {% endfor %}\n
@@ -29,7 +29,7 @@ conventional_commits = true
 filter_unconventional = true
 split_commits = false
 commit_preprocessors = [
-  { pattern = "\\(#([0-9]+)\\)", replace = "([#$1](https://github.com/Vit129/harness-terminal/pull/$1))" },
+  { pattern = "\\(#([0-9]+)\\)", replace = "([#$1](https://github.com/Vit129/kouen-terminal/pull/$1))" },
 ]
 commit_parsers = [
   { message = "^feat", group = "Added" },

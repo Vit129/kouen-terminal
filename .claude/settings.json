@@ -55,11 +55,11 @@
     "bgIsolation": "none"
   },
   "mcpServers": {
-    "harness": {
-      "command": "/Applications/Harness.app/Contents/MacOS/harness-mcp",
+    "kouen": {
+      "command": "/Applications/Kouen.app/Contents/MacOS/kouen-mcp",
       "args": [],
       "env": {
-        "HARNESS_MCP_ALLOW_CONTROL": "1"
+        "KOUEN_MCP_ALLOW_CONTROL": "1"
       }
     },
     "graphify": {

@@ -1,4 +1,4 @@
-name: Harness
+name: Kouen
 options:
   bundleIdPrefix: com.robert
   deploymentTarget:
@@ -6,46 +6,46 @@ options:
   createIntermediateGroups: true
 settings:
   base:
-    # Harness does not ship App Intents or App Shortcuts. Disabling App Intents
+    # Kouen does not ship App Intents or App Shortcuts. Disabling App Intents
     # link generation keeps Xcode runs from repeatedly talking to linkd's
     # autoShortcut service for metadata we do not use.
     LM_ENABLE_LINK_GENERATION: NO
     LM_FILTER_WARNINGS: YES
     ENABLE_APPINTENTS_DEPLOYMENT_AWARE_PROCESSING: NO
 packages:
-  Harness:
+  Kouen:
     path: .
   Sparkle:
     url: https://github.com/sparkle-project/Sparkle
     from: 2.6.0
 targets:
-  Harness:
+  Kouen:
     type: application
     platform: macOS
     sources:
-      - Apps/Harness/Sources/HarnessApp
-      - Apps/Harness/Resources/Harness.icns
-      - Apps/Harness/Resources/HarnessLogo.png
-      - Apps/Harness/Resources/Assets.xcassets
+      - Apps/Kouen/Sources/KouenApp
+      - Apps/Kouen/Resources/Kouen.icns
+      - Apps/Kouen/Resources/KouenLogo.png
+      - Apps/Kouen/Resources/Assets.xcassets
       # Bundled "Symbols Nerd Font Mono" (MIT). A folder reference so it lands at
       # Contents/Resources/Fonts/ verbatim, matching ATSApplicationFontsPath = Fonts.
-      - path: Apps/Harness/Resources/Fonts
+      - path: Apps/Kouen/Resources/Fonts
         type: folder
     dependencies:
-      - target: HarnessDaemon
+      - target: KouenDaemon
         embed: false
-      - target: harness-cli
+      - target: kouen-cli
         embed: false
-      - package: Harness
-        product: HarnessCore
-      - package: Harness
-        product: HarnessTerminalKit
-      - package: Harness
-        product: HarnessTerminalRenderer
-      - package: Harness
-        product: HarnessTheme
-      - package: Harness
-        product: HarnessOnboarding
+      - package: Kouen
+        product: KouenCore
+      - package: Kouen
+        product: KouenTerminalKit
+      - package: Kouen
+        product: KouenTerminalRenderer
+      - package: Kouen
+        product: KouenTheme
+      - package: Kouen
+        product: KouenOnboarding
       # Sparkle ships as a binary xcframework via SPM; Xcode auto-embeds + code-signs
       # the resolved Sparkle.framework into Contents/Frameworks. Do NOT set embed/codeSign
       # here — XcodeGen would emit a Copy-Files phase referencing the bare product name
@@ -54,9 +54,9 @@ targets:
       - package: Sparkle
         product: Sparkle
     settings:
-      PRODUCT_BUNDLE_IDENTIFIER: com.robert.harness
-      INFOPLIST_FILE: Apps/Harness/Sources/HarnessApp/Resources/Info.plist
-      CODE_SIGN_ENTITLEMENTS: Harness.entitlements
+      PRODUCT_BUNDLE_IDENTIFIER: com.vit129.kouen
+      INFOPLIST_FILE: Apps/Kouen/Sources/KouenApp/Resources/Info.plist
+      CODE_SIGN_ENTITLEMENTS: Kouen.entitlements
       SWIFT_VERSION: "6.0"
       MACOSX_DEPLOYMENT_TARGET: "15.0"
       ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
@@ -65,161 +65,161 @@ targets:
         script: |
           set -euo pipefail
           mkdir -p "$TARGET_BUILD_DIR/$EXECUTABLE_FOLDER_PATH"
-          cp "$BUILT_PRODUCTS_DIR/HarnessDaemon" "$TARGET_BUILD_DIR/$EXECUTABLE_FOLDER_PATH/HarnessDaemon"
-          cp "$BUILT_PRODUCTS_DIR/harness-cli" "$TARGET_BUILD_DIR/$EXECUTABLE_FOLDER_PATH/harness-cli"
+          cp "$BUILT_PRODUCTS_DIR/KouenDaemon" "$TARGET_BUILD_DIR/$EXECUTABLE_FOLDER_PATH/KouenDaemon"
+          cp "$BUILT_PRODUCTS_DIR/kouen-cli" "$TARGET_BUILD_DIR/$EXECUTABLE_FOLDER_PATH/kouen-cli"
         inputFiles:
-          - $(BUILT_PRODUCTS_DIR)/HarnessDaemon
-          - $(BUILT_PRODUCTS_DIR)/harness-cli
+          - $(BUILT_PRODUCTS_DIR)/KouenDaemon
+          - $(BUILT_PRODUCTS_DIR)/kouen-cli
         outputFiles:
-          - $(TARGET_BUILD_DIR)/$(EXECUTABLE_FOLDER_PATH)/HarnessDaemon
-          - $(TARGET_BUILD_DIR)/$(EXECUTABLE_FOLDER_PATH)/harness-cli
-  HarnessDaemonCore:
+          - $(TARGET_BUILD_DIR)/$(EXECUTABLE_FOLDER_PATH)/KouenDaemon
+          - $(TARGET_BUILD_DIR)/$(EXECUTABLE_FOLDER_PATH)/kouen-cli
+  KouenDaemonCore:
     type: library.static
     platform: macOS
     sources:
-      - Packages/HarnessDaemon/Sources/HarnessDaemon
+      - Packages/KouenDaemon/Sources/KouenDaemon
     dependencies:
-      - package: Harness
-        product: HarnessCore
-      - package: Harness
-        product: HarnessTerminalEngine
-      - package: Harness
-        product: CHarnessSys
+      - package: Kouen
+        product: KouenCore
+      - package: Kouen
+        product: KouenTerminalEngine
+      - package: Kouen
+        product: CKouenSys
     settings:
       SWIFT_VERSION: "6.0"
       MACOSX_DEPLOYMENT_TARGET: "15.0"
       # Pure-Swift target — no Objective-C consumers. Disabling the generated
       # `-Swift.h` header and defines-module avoids a spurious umbrella-header
-      # warning about HarnessDaemonCore-Swift.h.
+      # warning about KouenDaemonCore-Swift.h.
       SWIFT_INSTALL_OBJC_HEADER: NO
       DEFINES_MODULE: NO
-      OTHER_SWIFT_FLAGS: "$(inherited) -Xcc -fmodule-map-file=$(GENERATED_MODULEMAP_DIR)/CHarnessSys.modulemap"
-  HarnessDaemon:
+      OTHER_SWIFT_FLAGS: "$(inherited) -Xcc -fmodule-map-file=$(GENERATED_MODULEMAP_DIR)/CKouenSys.modulemap"
+  KouenDaemon:
     type: tool
     platform: macOS
     sources:
-      - Packages/HarnessDaemon/Sources/HarnessDaemonMain
+      - Packages/KouenDaemon/Sources/KouenDaemonMain
     dependencies:
-      - target: HarnessDaemonCore
-      - package: Harness
-        product: HarnessCore
-      - package: Harness
-        product: HarnessTerminalEngine
-      - package: Harness
-        product: CHarnessSys
+      - target: KouenDaemonCore
+      - package: Kouen
+        product: KouenCore
+      - package: Kouen
+        product: KouenTerminalEngine
+      - package: Kouen
+        product: CKouenSys
     settings:
-      PRODUCT_BUNDLE_IDENTIFIER: com.robert.harness.daemon
-      PRODUCT_NAME: HarnessDaemon
+      PRODUCT_BUNDLE_IDENTIFIER: com.vit129.kouen.daemon
+      PRODUCT_NAME: KouenDaemon
       SWIFT_VERSION: "6.0"
       MACOSX_DEPLOYMENT_TARGET: "15.0"
-  harness-cli:
+  kouen-cli:
     type: tool
     platform: macOS
     sources:
-      - Tools/harness/Sources/HarnessCLI
+      - Tools/kouen/Sources/KouenCLI
     dependencies:
-      - package: Harness
-        product: HarnessCore
-      - package: Harness
-        product: HarnessTerminalEngine
-      - package: Harness
-        product: HarnessTerminalKit
-      - package: Harness
-        product: HarnessTheme
-      - package: Harness
-        product: CHarnessSys
+      - package: Kouen
+        product: KouenCore
+      - package: Kouen
+        product: KouenTerminalEngine
+      - package: Kouen
+        product: KouenTerminalKit
+      - package: Kouen
+        product: KouenTheme
+      - package: Kouen
+        product: CKouenSys
     settings:
-      PRODUCT_BUNDLE_IDENTIFIER: com.robert.harness.cli
-      PRODUCT_NAME: harness-cli
+      PRODUCT_BUNDLE_IDENTIFIER: com.vit129.kouen.cli
+      PRODUCT_NAME: kouen-cli
       SWIFT_VERSION: "6.0"
       MACOSX_DEPLOYMENT_TARGET: "15.0"
-      OTHER_SWIFT_FLAGS: "$(inherited) -Xcc -fmodule-map-file=$(GENERATED_MODULEMAP_DIR)/CHarnessSys.modulemap"
-  HarnessCoreTests:
+      OTHER_SWIFT_FLAGS: "$(inherited) -Xcc -fmodule-map-file=$(GENERATED_MODULEMAP_DIR)/CKouenSys.modulemap"
+  KouenCoreTests:
     type: bundle.unit-test
     platform: macOS
     sources:
-      - Tests/HarnessCoreTests
+      - Tests/KouenCoreTests
     dependencies:
-      - package: Harness
-        product: HarnessCore
+      - package: Kouen
+        product: KouenCore
     settings:
-      PRODUCT_BUNDLE_IDENTIFIER: com.robert.harness.HarnessCoreTests
+      PRODUCT_BUNDLE_IDENTIFIER: com.vit129.kouen.KouenCoreTests
       GENERATE_INFOPLIST_FILE: YES
       SWIFT_VERSION: "6.0"
       MACOSX_DEPLOYMENT_TARGET: "15.0"
-  HarnessDaemonTests:
+  KouenDaemonTests:
     type: bundle.unit-test
     platform: macOS
     sources:
-      - Tests/HarnessDaemonTests
+      - Tests/KouenDaemonTests
     dependencies:
-      - target: HarnessDaemonCore
-      - package: Harness
-        product: HarnessCore
-      - package: Harness
-        product: HarnessTerminalEngine
-      - package: Harness
-        product: CHarnessSys
+      - target: KouenDaemonCore
+      - package: Kouen
+        product: KouenCore
+      - package: Kouen
+        product: KouenTerminalEngine
+      - package: Kouen
+        product: CKouenSys
     settings:
-      PRODUCT_BUNDLE_IDENTIFIER: com.robert.harness.HarnessDaemonTests
+      PRODUCT_BUNDLE_IDENTIFIER: com.vit129.kouen.KouenDaemonTests
       GENERATE_INFOPLIST_FILE: YES
       SWIFT_VERSION: "6.0"
       MACOSX_DEPLOYMENT_TARGET: "15.0"
-  HarnessCopyModeTests:
+  KouenCopyModeTests:
     type: bundle.unit-test
     platform: macOS
     sources:
-      - Tests/HarnessCopyModeTests
+      - Tests/KouenCopyModeTests
     dependencies:
-      - package: Harness
-        product: HarnessCopyMode
-      - package: Harness
-        product: HarnessCore
-      - package: Harness
-        product: HarnessTerminalEngine
+      - package: Kouen
+        product: KouenCopyMode
+      - package: Kouen
+        product: KouenCore
+      - package: Kouen
+        product: KouenTerminalEngine
     settings:
-      PRODUCT_BUNDLE_IDENTIFIER: com.robert.harness.HarnessCopyModeTests
+      PRODUCT_BUNDLE_IDENTIFIER: com.vit129.kouen.KouenCopyModeTests
       GENERATE_INFOPLIST_FILE: YES
       SWIFT_VERSION: "6.0"
       MACOSX_DEPLOYMENT_TARGET: "15.0"
-  HarnessTerminalKitTests:
+  KouenTerminalKitTests:
     type: bundle.unit-test
     platform: macOS
     sources:
-      - Tests/HarnessTerminalKitTests
+      - Tests/KouenTerminalKitTests
     dependencies:
-      - package: Harness
-        product: HarnessCore
-      - package: Harness
-        product: HarnessTerminalEngine
-      - package: Harness
-        product: HarnessCopyMode
-      - package: Harness
-        product: HarnessTerminalKit
-      - package: Harness
-        product: HarnessTheme
+      - package: Kouen
+        product: KouenCore
+      - package: Kouen
+        product: KouenTerminalEngine
+      - package: Kouen
+        product: KouenCopyMode
+      - package: Kouen
+        product: KouenTerminalKit
+      - package: Kouen
+        product: KouenTheme
     settings:
-      PRODUCT_BUNDLE_IDENTIFIER: com.robert.harness.HarnessTerminalKitTests
+      PRODUCT_BUNDLE_IDENTIFIER: com.vit129.kouen.KouenTerminalKitTests
       GENERATE_INFOPLIST_FILE: YES
       SWIFT_VERSION: "6.0"
       MACOSX_DEPLOYMENT_TARGET: "15.0"
 schemes:
-  Harness:
+  Kouen:
     build:
       targets:
-        Harness: all
-        HarnessDaemon: all
-        harness-cli: all
-        HarnessCoreTests: [test]
-        HarnessDaemonTests: [test]
-        HarnessTerminalKitTests: [test]
-        HarnessCopyModeTests: [test]
+        Kouen: all
+        KouenDaemon: all
+        kouen-cli: all
+        KouenCoreTests: [test]
+        KouenDaemonTests: [test]
+        KouenTerminalKitTests: [test]
+        KouenCopyModeTests: [test]
     run:
       config: Debug
     test:
       config: Debug
       targets:
-        - HarnessCoreTests
-        - HarnessDaemonTests
-        - HarnessTerminalKitTests
-        - HarnessCopyModeTests
+        - KouenCoreTests
+        - KouenDaemonTests
+        - KouenTerminalKitTests
+        - KouenCopyModeTests
