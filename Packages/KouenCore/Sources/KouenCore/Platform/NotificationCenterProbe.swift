@@ -1,5 +1,7 @@
 import Foundation
+#if canImport(UserNotifications)
 import UserNotifications
+#endif
 
 /// Guards against the corrupted-notification-database crash on some macOS 26 installs:
 /// `UNUserNotificationCenter.current()` crashes while reading the database, and that crash
@@ -28,7 +30,13 @@ public enum NotificationCenterProbe {
     /// (crash-recovery path, idempotence) without touching the real framework API — a unit test
     /// can't simulate the actual crash (that would kill the test process too), but it can set
     /// `pendingKey` directly to simulate "a prior launch never returned from this call".
+    #if canImport(UserNotifications)
     public nonisolated(unsafe) static var probeAction: () -> Void = { _ = UNUserNotificationCenter.current() }
+    #else
+    // Linux (daemon/CLI only, no notification center to probe): stays a no-op default;
+    // only macOS callers (KouenApp, KouenOnboarding) ever touch this type at runtime.
+    public nonisolated(unsafe) static var probeAction: () -> Void = {}
+    #endif
 
     /// True once a prior probe attempt never returned - callers must not touch
     /// `UNUserNotificationCenter` while this is true.
