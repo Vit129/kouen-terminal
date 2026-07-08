@@ -2,6 +2,84 @@
 
 Older releases. See [CHANGELOG.md](../CHANGELOG.md) for recent versions.
 
+## [3.14.0] - 2026-07-04
+
+### Added
+- Open every http/https link in the in-app Browser Pane ([`36ea9b6`](https://github.com/Vit129/harness-terminal/commit/36ea9b6a546741a7661ba32002ff66c6478e97b3))
+- Route web links to the in-app browser pane, fix popup crash (release v3.14.0) ([`2c98e9e`](https://github.com/Vit129/harness-terminal/commit/2c98e9ec6dc2b700faeb97c0de81dfc6f8d4277f))
+
+### Fixed
+- Respect sound toggle in foreground and route banner clicks to their pane ([`2202305`](https://github.com/Vit129/harness-terminal/commit/2202305e8c5f296450ef2fd599d0e70861c01612))
+- Prevent crash when a browser popup reuses the opener's WKWebViewConfiguration ([`149d28b`](https://github.com/Vit129/harness-terminal/commit/149d28ba8c639bbaa8d7f63633157077e65baf10))
+
+## [3.13.3] - 2026-07-04
+
+### Added
+- Render local .html files in the embedded browser pane on double-click (release v3.13.3) ([`70ba89c`](https://github.com/Vit129/harness-terminal/commit/70ba89ce0a9954d0cab6c11561d58cf577caaf78))
+
+### Fixed
+- Auto-tag commit message when Info.plist is staged ([`e4d8d51`](https://github.com/Vit129/harness-terminal/commit/e4d8d51693ab8b863ebdb50777300db022c893eb))
+
+## [3.13.2] - 2026-07-03
+
+### Added
+- Wire auto-rebuild hook + gitignore wiki/log bloat ([`3ee42f8`](https://github.com/Vit129/harness-terminal/commit/3ee42f822bc15fc3bf4ed6aad54f5597c9027bcb))
+
+### Fixed
+- Notification Step 1, S1 daemon-reuse install, H5 bootout quoting bug ([`85354d2`](https://github.com/Vit129/harness-terminal/commit/85354d23e192f1ba5d7ae70bef39c751cac29b80))
+- Notification Step 1, S1 daemon-reuse install, H5 bootout quoting bug (v3.13.2) ([`8a9fcf7`](https://github.com/Vit129/harness-terminal/commit/8a9fcf7d3a9529faf3b02804acbab077dee656af))
+
+## [3.13.1] - 2026-07-02
+
+### Added
+- Support non-interactive option with patch version bump ([`5dbb64e`](https://github.com/Vit129/harness-terminal/commit/5dbb64eacb5f4d1c6fef7f22ae0fda6e558e26fd))
+
+### Documentation
+- Drop hardcoded release version from README ([`c7fb340`](https://github.com/Vit129/harness-terminal/commit/c7fb3403052e2a918c774c97515d800167e7a17a))
+
+### Fixed
+- Preserve selection on reload, fix clicking agent tool-call paths ([`587fa90`](https://github.com/Vit129/harness-terminal/commit/587fa906c3ae07eb4e9018861b6ab6220716ef3f))
+
+## [3.13.0] - 2026-07-02
+
+### Added
+- Visible divider between panes + 3-way corner drag ([`b83773e`](https://github.com/Vit129/harness-terminal/commit/b83773e99b7f5e67ba2e5a28cde58ae7074e23ae))
+- Visible divider between panes + 3-way corner drag ([`b556b4f`](https://github.com/Vit129/harness-terminal/commit/b556b4fede55ab3ff9e50a74f296f36430ec6e79))
+- SSH socket auto-detect for remote host manager (P23/PBI-SSH-008) ([`a634720`](https://github.com/Vit129/harness-terminal/commit/a6347206a6e4da3896b36807c76b718f296de362))
+- Explicit New Agent Task command palette flow (P32 Phase 1) ([`5641273`](https://github.com/Vit129/harness-terminal/commit/5641273f9c4708843229105cd7a73af85272dcda))
+- Task metadata + sidebar UI for agent task tabs (P32 Phase 2) ([`d9c1ad1`](https://github.com/Vit129/harness-terminal/commit/d9c1ad1a8c3635cc40e22ddc2db788dcb029e6d3))
+- Wire archiveScript teardown hook + close out P32 (Phase 3+4) ([`a9317c6`](https://github.com/Vit129/harness-terminal/commit/a9317c6c8dabe0179cae92a4ec8d7bc01b254863))
+- Surface agent notification text in sidebar (P33 Phase 2) ([`001da1e`](https://github.com/Vit129/harness-terminal/commit/001da1ef686bbd68ae0778d45cc61e6f549bf1c1))
+- Color git-change file previews like the diff instead of raw unified text ([`c238bc0`](https://github.com/Vit129/harness-terminal/commit/c238bc016d08a3b321bfe7591b73f45ea2d4df00))
+- Scope file preview tabs per terminal Tab ([`b405e32`](https://github.com/Vit129/harness-terminal/commit/b405e321ac04143be9a1ed8d7d891e536cc698f4))
+- Expand editor LSP + syntax highlighting to 21 languages ([`9838134`](https://github.com/Vit129/harness-terminal/commit/98381347ec727f64ab092b15a9ad1f904135905e))
+- Capture exact command text on OSC 133 command boundary (P34 F1 slice 1) ([`2ca7fbb`](https://github.com/Vit129/harness-terminal/commit/2ca7fbb860a30559cec72394c97b1fec9d1d8c40))
+- Block copy actions + MCP block access (P34 F2/F3) ([`8049605`](https://github.com/Vit129/harness-terminal/commit/8049605ed45c90fee90e30ba065b7267c1c0802c))
+- Add setPaneLabel MCP tool for per-pane purpose labels ([`965f7b3`](https://github.com/Vit129/harness-terminal/commit/965f7b3e821727446642b723c9b7afa6ecafd2e1))
+- Let spawnSession/splitPane set a pane label atomically ([`c9ee32c`](https://github.com/Vit129/harness-terminal/commit/c9ee32ce99ced761e6d912cc2af4ebcf6d26283a))
+- Link worktree cards to running agents, add diff-vs-main ([`301e838`](https://github.com/Vit129/harness-terminal/commit/301e838d52ef489ae09aa895fbcc53ec171d3475))
+
+### Changed
+- Replace ⌘-click block action bar with right-click context menu ([`1723136`](https://github.com/Vit129/harness-terminal/commit/17231362f9594c2b99af58981844f1ced6e8cd2d))
+
+### Documentation
+- V3.12.0 accuracy pass — remove stale inline AI chat claims, verify MCP/browser round-trip fixed, fix P33 status, add feature-provenance + P34 plan ([`ead9f57`](https://github.com/Vit129/harness-terminal/commit/ead9f5795786f01a2d4e95d837bb3265869bd99b))
+- Fix CONTEXT.md commit-status note for P34 F2/F3 ([`a2b6c38`](https://github.com/Vit129/harness-terminal/commit/a2b6c38ffd09ce35ca15254eda211aeb26f561b4))
+- Log two backlog decisions from P34 follow-up discussion ([`84ac1aa`](https://github.com/Vit129/harness-terminal/commit/84ac1aa2a6b6442603c50c660bfaf950f09efc23))
+- Archive P32 setPaneLabel + P34 right-click backlog items as shipped ([`8506b36`](https://github.com/Vit129/harness-terminal/commit/8506b36f4c4fbd533ea97828a1d30fa41b2d641b))
+- Archive atomic pane-label-on-create follow-up as shipped ([`a52b923`](https://github.com/Vit129/harness-terminal/commit/a52b923204162dfc47505f887b8cf891ef030057))
+
+### Fixed
+- Repair swift test build broken by ACP removal ([`ec22918`](https://github.com/Vit129/harness-terminal/commit/ec22918cf65c759ee7b069c175191e15dc0a2e9b))
+- Surface addAgentTask errors via NSAlert instead of silent no-op (P32 Phase 2) ([`36cf813`](https://github.com/Vit129/harness-terminal/commit/36cf813bcf78c438292bc8d960a2354c8aecbbb1))
+- Pin sidebar width against proportional resize; smaller default + always-open ([`80b82db`](https://github.com/Vit129/harness-terminal/commit/80b82db38455a973b506d1ce41932822c5920153))
+- Unify running/status classification + replace dot with agent icon ([`eb0c89b`](https://github.com/Vit129/harness-terminal/commit/eb0c89bde4c87ed1a8c4fb3ec1e21b188031adf3))
+- Unify Board status classification/color + fix Board tab layout ([`49a67ba`](https://github.com/Vit129/harness-terminal/commit/49a67babfaa5ce3d61819dfd3e26d76c71de9d65))
+- Show PR checks status dot, remove dead PR poller (P33 Phase 1) ([`20b521b`](https://github.com/Vit129/harness-terminal/commit/20b521b6910e792ab5b7096d3b5d90fcaed67347))
+- NSSplitView first-reveal blank panel + wire diff popover (P33 Phase 3) ([`0aa1326`](https://github.com/Vit129/harness-terminal/commit/0aa1326b2cade5f0f968fbc7405e47ad8a144081))
+- Address 4 findings from Opus code review ([`575e864`](https://github.com/Vit129/harness-terminal/commit/575e864b53ded1c5917b67e65727c3f66f61975a))
+- Stop blanket .git/ FSEvent filter from swallowing external commit/push ([`405021e`](https://github.com/Vit129/harness-terminal/commit/405021e53b7e9d41d2568d46daa6780f5055b8af))
+
 ## [3.12.0] - 2026-06-30
 
 ### Added
