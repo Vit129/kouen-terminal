@@ -188,12 +188,12 @@ final class FileViewerViewController: NSViewController {
         }
         messageLabel.isHidden = true
         syntaxView.isHidden = true
-        quickLookView.isHidden = false
         if quickLookView.previewItem?.previewItemURL == url {
             quickLookView.refreshPreviewItem()
         } else {
             quickLookView.previewItem = url as NSURL
         }
+        quickLookView.isHidden = false
     }
 
     private func showMessage(_ message: String) {

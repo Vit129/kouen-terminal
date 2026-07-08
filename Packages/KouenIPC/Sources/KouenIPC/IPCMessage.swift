@@ -3,7 +3,10 @@ import Foundation
 /// Current IPC wire-format version. Bump whenever a breaking change is made to
 /// `IPCRequest` or `IPCResponse`. The daemon rejects `identifyClient` messages
 /// whose `protocolVersion` does not match this value.
-public let ipcProtocolVersion: Int = 1
+///
+/// Bumped 2026-07-06 (P25 W1 slice 2): added `.mobileListClients`/`.mobileRevokeClient`
+/// to `IPCRequest` and `.mobileClients` to `IPCResponse`.
+public let ipcProtocolVersion: Int = 2
 
 public enum IPCRequest: Codable, Sendable {
     case ping
@@ -12,6 +15,12 @@ public enum IPCRequest: Codable, Sendable {
     /// List every running agent (one row per tab carrying a detected `Tab.agent`)
     /// with its workspace/session/tab/pane context, state, and `.waiting` signal.
     case listAgents
+    /// P25 F3: list every device currently paired to the mobile WS bridge.
+    /// Empty on daemons where the bridge never started (opt-in, see `MobileBridgeServer`).
+    case mobileListClients
+    /// P25 F3: revoke one paired device by id — cancels its live connection if attached
+    /// and drops it from the paired-devices table. `.error` if the id isn't paired.
+    case mobileRevokeClient(id: String)
     case newWorkspace(name: String)
     case newSession(workspaceID: UUID, cwd: String?, name: String?, shell: String? = nil, worktreePath: String? = nil, parentRepoPath: String? = nil, taskName: String? = nil)
     /// tmux `new-session -t <session>`: an independent session grouped with the target,
@@ -303,6 +312,7 @@ public enum IPCResponse: Codable, Sendable {
     case workspaces([WorkspaceSummary])
     case surfaces([SurfaceSummary])
     case agents([AgentSessionSummary])
+    case mobileClients([PairedDeviceSummary])
     case workspaceID(UUID)
     case sessionID(UUID)
     case tabID(UUID)

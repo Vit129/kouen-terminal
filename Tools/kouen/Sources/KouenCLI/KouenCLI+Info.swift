@@ -263,6 +263,8 @@ extension KouenCLI {
           daemon-stats [--json] [--pretty]
           list-clients [--json] [--pretty]
           detach-client --client <uuid>
+          mobile-list-clients [--json] [--pretty]     (devices paired to the mobile WS bridge)
+          mobile-revoke-client --device <id>
           bind-key [-T <table>] <spec> <command...>
           unbind-key [-T <table>] <spec>
           list-keys [-T <table>]

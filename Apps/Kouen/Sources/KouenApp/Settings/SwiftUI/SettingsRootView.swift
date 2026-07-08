@@ -67,7 +67,7 @@ struct SettingsRootView: View {
         case .keys:       SettingsKeysView(model: model)
         case .agents:     SettingsAgentsView(model: model)
         case .advanced:   SettingsAdvancedView(model: model)
-        case .remote:     SettingsRemoteView()
+        case .remote:     SettingsRemoteView(model: model)
         }
     }
 }
