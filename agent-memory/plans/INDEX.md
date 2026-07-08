@@ -6,7 +6,6 @@
 |------|-------|--------|
 | [p25-ios-ipados-support.md](p25-ios-ipados-support.md) | P25 — iOS/iPadOS Support | Planning |
 | [p8-macos27-adoption.md](p8-macos27-adoption.md) | P8 — macOS 27 Golden Gate Adoption | Active |
-| [p35-oauth-login-embedded-browser.md](p35-oauth-login-embedded-browser.md) | P35 — Fix Google/OAuth login inside embedded browser | Not started |
 
 ## Completed
 
@@ -16,6 +15,8 @@
 
 | Plan | Version | Notes |
 |------|---------|-------|
+| P36 — App Icon Auto/Light/Dark | Unreleased | Runtime Dock-icon swap via appearance KVO (macOS has no static per-appearance mechanism for `idiom:mac` icons); fixed white-edge SVG bug + 17% size-mismatch bug (2026-07-06) — see completed-archive.md |
+| P35 — Fix Google/OAuth login inside embedded browser | Unreleased | Root cause: popup webview double-load severed `window.opener`; added `webViewDidClose` (2026-07-06) — see completed-archive.md |
 | P34 — Block-Based Terminal | Unreleased | F1 command-boundary capture (zsh/fish `133;C`), F2 Copy Output/Command Only, F3 `kouenGetLastBlock`/`kouenGetBlock` MCP tools; bookmark deferred (2026-07-02) — see completed-archive.md |
 | P33 — Visibility Gaps | Unreleased | PR checks-status dot, sidebar notification text, commit-diff popover rewire, sidebar first-reveal blank-panel fix, 4-finding Opus review pass (2026-07-02) — see completed-archive.md |
 | P32 — Task-Based Agent Worktrees | Unreleased | Explicit "New Agent Task" palette action, `taskName` metadata, `archiveScript` teardown wired, task switcher via existing ⌘1-9 (2026-07-01–02) — see completed-archive.md |
