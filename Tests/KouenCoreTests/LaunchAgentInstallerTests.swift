@@ -18,6 +18,20 @@ final class LaunchAgentInstallerTests: XCTestCase {
         XCTAssertTrue(plist.contains("<key>RunAtLoad</key>"), "RunAtLoad ensures the daemon starts on user login")
     }
 
+    func testMobileBridgePortOmittedByDefaultButEmbeddedWhenGiven() {
+        let daemon = URL(fileURLWithPath: "/Applications/Kouen.app/Contents/MacOS/KouenDaemon")
+        let home = URL(fileURLWithPath: "/Users/test/Library/Application Support/Kouen")
+        let log = URL(fileURLWithPath: "/Users/test/Library/Application Support/Kouen/logs/daemon.log")
+
+        let withoutBridge = LaunchAgentInstaller.plist(daemonPath: daemon, kouenHome: home, logPath: log)
+        XCTAssertFalse(withoutBridge.contains("KOUEN_MOBILE_BRIDGE_PORT"),
+                       "mobile bridge must stay off by default — no env var means MobileBridgeServer never starts")
+
+        let withBridge = LaunchAgentInstaller.plist(daemonPath: daemon, kouenHome: home, logPath: log, mobileBridgePort: 7777)
+        XCTAssertTrue(withBridge.contains("<key>KOUEN_MOBILE_BRIDGE_PORT</key>"))
+        XCTAssertTrue(withBridge.contains("<string>7777</string>"))
+    }
+
     func testIsInstalledReflectsFilesystem() throws {
         // Don't touch the real LaunchAgents path; just confirm the API uses
         // FileManager.default which honors the URL we expose.

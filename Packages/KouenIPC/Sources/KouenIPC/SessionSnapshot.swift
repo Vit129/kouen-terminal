@@ -75,3 +75,16 @@ public struct SurfaceSummary: Codable, Sendable, Equatable {
         self.cwd = cwd
     }
 }
+
+/// P25 F3: one device paired to the mobile WS bridge (`kouen-cli mobile list-clients`).
+public struct PairedDeviceSummary: Codable, Sendable, Equatable {
+    public var id: String
+    public var label: String
+    public var pairedAt: Date
+
+    public init(id: String, label: String, pairedAt: Date) {
+        self.id = id
+        self.label = label
+        self.pairedAt = pairedAt
+    }
+}

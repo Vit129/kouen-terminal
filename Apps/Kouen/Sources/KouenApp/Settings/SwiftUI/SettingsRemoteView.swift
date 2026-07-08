@@ -3,6 +3,8 @@ import SwiftUI
 import KouenCore
 
 struct SettingsRemoteView: View {
+    var model: SettingsModel
+
     @State private var hosts: [RemoteHost] = []
     @State private var selectedID: String? = nil
     @State private var editName = ""
@@ -17,6 +19,10 @@ struct SettingsRemoteView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
+                mobilePairingSection
+
+                Divider()
+
                 Text("Saved SSH tunnels to remote Kouen daemons. TCP remains disabled until it has a TLS layer.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
@@ -38,6 +44,23 @@ struct SettingsRemoteView: View {
         .onReceive(NotificationCenter.default.publisher(for: RemoteHostsService.connectionDidFail)) { note in
             let msg = (note.userInfo?["error"] as? String) ?? "Connection failed"
             statusMessage = "⚠️ \(msg)"
+        }
+    }
+
+    // MARK: - Mobile pairing
+
+    private var mobilePairingSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Toggle("Enable mobile pairing", isOn: Binding(
+                get: { model.settings.mobileBridgeEnabled },
+                set: { enabled in
+                    model.update(\.mobileBridgeEnabled, enabled)
+                    DaemonLauncher.shared.restartForMobileBridgeSettingChange()
+                }
+            ))
+            Text("Lets a phone pair via QR (`kouen-cli mobile-list-clients`/`mobile-revoke-client` manage paired devices). Binds loopback + Tailscale only, never plain LAN. Restarting the daemon to apply — running PTYs/agents survive, same as an app update.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 

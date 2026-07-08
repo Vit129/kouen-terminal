@@ -34,8 +34,19 @@ public enum LaunchAgentInstaller {
         }
     }
 
-    public static func plist(daemonPath: URL, kouenHome: URL, logPath: URL) -> String {
-        """
+    /// `mobileBridgePort` nil = P25 mobile pairing bridge stays off (default); a value enables
+    /// it in the launchd-supervised production daemon by setting the same env var
+    /// `Scripts/mobile-web.sh` uses for the isolated dev daemon (`MobileBridgeServer.swift`
+    /// only starts when it sees `KOUEN_MOBILE_BRIDGE_PORT` at process launch).
+    public static func plist(daemonPath: URL, kouenHome: URL, logPath: URL, mobileBridgePort: UInt16? = nil) -> String {
+        let mobileBridgeEnvXML = mobileBridgePort.map {
+            """
+
+                <key>KOUEN_MOBILE_BRIDGE_PORT</key>
+                <string>\($0)</string>
+            """
+        } ?? ""
+        return """
         <?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
         <plist version="1.0">
@@ -49,7 +60,7 @@ public enum LaunchAgentInstaller {
             <key>EnvironmentVariables</key>
             <dict>
                 <key>KOUEN_HOME</key>
-                <string>\(kouenHome.path)</string>
+                <string>\(kouenHome.path)</string>\(mobileBridgeEnvXML)
             </dict>
             <key>RunAtLoad</key>
             <true/>
@@ -78,7 +89,11 @@ public enum LaunchAgentInstaller {
     /// a no-op. If content differs, we `bootout` the old service first so the
     /// new configuration takes effect.
     @discardableResult
-    public static func install(daemonPath: URL, kouenHome: URL = KouenPaths.applicationSupport) throws -> InstallReport {
+    public static func install(
+        daemonPath: URL,
+        kouenHome: URL = KouenPaths.applicationSupport,
+        mobileBridgePort: UInt16? = nil
+    ) throws -> InstallReport {
         guard FileManager.default.fileExists(atPath: daemonPath.path) else {
             throw InstallError.daemonNotFound(daemonPath)
         }
@@ -86,7 +101,7 @@ public enum LaunchAgentInstaller {
         let plistURL = KouenPaths.launchAgentURL
         try FileManager.default.createDirectory(at: plistURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         let logURL = KouenPaths.daemonLogURL
-        let desired = plist(daemonPath: daemonPath, kouenHome: kouenHome, logPath: logURL)
+        let desired = plist(daemonPath: daemonPath, kouenHome: kouenHome, logPath: logURL, mobileBridgePort: mobileBridgePort)
         let existed = FileManager.default.fileExists(atPath: plistURL.path)
         let existingContent = existed ? (try? String(contentsOf: plistURL, encoding: .utf8)) : nil
         let changed = existingContent != desired

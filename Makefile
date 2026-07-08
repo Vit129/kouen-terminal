@@ -1,4 +1,4 @@
-.PHONY: run debug prod start install install-no-build install-graceful install-graceful-no-build build bench preview preview-stop preview-clean clean-state release release-notes package dmg smoke-dmg sign appcast finalize icon clean video-skills video-dev video-check video-render video-doctor
+.PHONY: run debug prod start install install-no-build install-graceful install-graceful-no-build build bench preview preview-stop preview-clean clean-state release release-notes package dmg smoke-dmg sign appcast finalize icon clean video-skills video-dev video-check video-render video-doctor mobile-web mobile-web-stop mobile-web-clean
 
 run:
 	./Scripts/run.sh run
@@ -46,6 +46,17 @@ preview-clean:
 	rm -rf .kouen-preview
 	rm -rf "/tmp/kouen-preview-$$(printf '%s' "$(CURDIR)" | md5 | cut -c1-10)"
 	-tccutil reset All com.vit129.kouen.preview 2>/dev/null || true
+
+# P25 Web/PWA MVP: isolated headless daemon with the mobile WS bridge enabled, plus a
+# smoke-test page — never touches the production daemon/GUI. See Scripts/mobile-web.sh.
+mobile-web:
+	./Scripts/mobile-web.sh
+
+mobile-web-stop:
+	-kill "$$(cat "/tmp/kouen-mobile-web-$$(printf '%s' "$(CURDIR)" | md5 | cut -c1-10)/daemon.pid" 2>/dev/null)" 2>/dev/null
+
+mobile-web-clean: mobile-web-stop
+	rm -rf "/tmp/kouen-mobile-web-$$(printf '%s' "$(CURDIR)" | md5 | cut -c1-10)"
 
 icon:
 	./Scripts/generate-app-icon.sh
