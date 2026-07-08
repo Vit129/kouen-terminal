@@ -103,6 +103,12 @@ private func installSignalHandlers(server: DaemonServer, shutdown: @escaping @Se
 /// DispatchSource holders must outlive their registration; the array keeps them alive.
 nonisolated(unsafe) private var signalSources: [DispatchSourceSignal] = []
 
+/// Retained for the daemon's lifetime — see the assignment site for why a bare
+/// temporary would silently break every closure inside it.
+#if canImport(Network)
+nonisolated(unsafe) private var mobileBridgeServer: MobileBridgeServer?
+#endif
+
 // MARK: - Stale instance handling
 
 /// If a previous daemon left a PID file behind and that PID is no longer a live
@@ -173,6 +179,22 @@ do {
     try server.start()
     AgentScanner.shared.start(registry: server.registry)
     daemonLog("KouenDaemon ready (socket=\(KouenPaths.socketURL.path))")
+
+    // P25 W1 slice 1: opt-in mobile WS bridge, disabled unless explicitly requested.
+    // Unavailable on the Linux headless build (Network.framework is Apple-only).
+    #if canImport(Network)
+    if let portString = ProcessInfo.processInfo.environment["KOUEN_MOBILE_BRIDGE_PORT"],
+       let port = UInt16(portString) {
+        let pageURLPort = ProcessInfo.processInfo.environment["KOUEN_MOBILE_BRIDGE_PAGE_PORT"]
+            .flatMap(Int.init) ?? 8080
+        // Must outlive this `if let` — a bare `MobileBridgeServer().start(...)` temporary
+        // gets deallocated the instant `start()` returns, silently turning every `[weak
+        // self]` closure inside it (listener callbacks, the pairing loop) into a no-op.
+        mobileBridgeServer = MobileBridgeServer()
+        mobileBridgeServer?.start(wsPort: port, pageURLPort: pageURLPort, store: server.pairedDevices, log: daemonLog)
+    }
+    #endif
+
     server.runLoop()
 } catch {
     daemonLog("KouenDaemon failed: \(error)")

@@ -485,8 +485,8 @@ final class GitPanelView: NSView {
             if !commit.success {
                 syncButton.isEnabled = true
                 syncButton.title = "Sync ▾"
-                let msg = commit.stderr.prefix(120)
-                Toast.show("✗ Commit failed: \(msg)", in: self, hold: 3.0)
+                let msg = GitPanelView.toastErrorSummary(commit.stderr)
+                Toast.show("✗ Commit failed: \(msg)", in: self, hold: 4.0)
                 await refresh()
                 watchDebounce?.cancel()
                 return
@@ -499,8 +499,8 @@ final class GitPanelView: NSView {
             if push.success {
                 Toast.show("✓ Committed & pushed", in: self)
             } else {
-                let errMsg = push.stderr.prefix(120)
-                Toast.show("✗ Push failed: \(errMsg)", in: self, hold: 3.0)
+                let errMsg = GitPanelView.toastErrorSummary(push.stderr)
+                Toast.show("✗ Push failed: \(errMsg)", in: self, hold: 4.0)
             }
             await refresh()
             watchDebounce?.cancel()
@@ -921,8 +921,8 @@ final class GitPanelView: NSView {
                 if clearField { commitField.stringValue = "" }
                 Toast.show("✓ \(label) complete", in: self)
             } else {
-                let msg = result.stderr.prefix(120)
-                Toast.show("✗ \(label) failed: \(msg)", in: self, hold: 3.0)
+                let msg = GitPanelView.toastErrorSummary(result.stderr)
+                Toast.show("✗ \(label) failed: \(msg)", in: self, hold: 4.0)
             }
             await refresh()
             // Git ops modify .git/ and fire FSEvents — cancel the debounced refresh
@@ -932,6 +932,21 @@ final class GitPanelView: NSView {
     }
 
     private struct GitResult { let output: String; let stderr: String; let success: Bool }
+
+    /// Reduces raw git stderr (often multi-line, full of `hint:` boilerplate) to a
+    /// single line fit for a toast: prefers `error:`/`fatal:` lines over noise like
+    /// the `To <remote>` / `hint:` lines git prints alongside the real failure, and
+    /// marks truncation with `…` so a cut string doesn't read as a complete one.
+    nonisolated static func toastErrorSummary(_ stderr: String) -> String {
+        let lines = stderr.split(separator: "\n", omittingEmptySubsequences: true)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.hasPrefix("hint:") }
+        let errorLines = lines.filter { $0.hasPrefix("error:") || $0.hasPrefix("fatal:") }
+        let summary = (errorLines.isEmpty ? lines : errorLines).joined(separator: " ")
+        let fallback = summary.isEmpty ? stderr.trimmingCharacters(in: .whitespacesAndNewlines) : summary
+        guard fallback.count > 120 else { return fallback }
+        return String(fallback.prefix(120)) + "…"
+    }
 
     private func runGitWithStatus(_ args: [String], in directory: String) async -> GitResult {
         do {

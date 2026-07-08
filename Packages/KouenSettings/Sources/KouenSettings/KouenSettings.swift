@@ -202,6 +202,11 @@ public struct KouenSettings: Codable, Sendable, Equatable {
     /// An explicitly stored `false` reverts to the legacy defer-to-release behavior (the authoritative
     /// reflow + `SIGWINCH` fire once, when the drag ends).
     public var liveResizeReflow: Bool
+    /// Enables the P25 mobile pairing bridge (WS+QR pairing on loopback+Tailscale only) in the
+    /// production daemon. **Default off.** Changing this requires a daemon restart to take
+    /// effect — `DaemonLauncher` only reads it when (re)installing the LaunchAgent/fallback
+    /// process, not while a daemon is already running.
+    public var mobileBridgeEnabled: Bool
     /// Draw the OSC 133 prompt gutter — a per-row stripe in the left margin marking shell
     /// prompts (green = success, red = failure). Off by default; the marks still power
     /// jump-to-prompt either way, so this only controls the stripe's visibility.
@@ -364,6 +369,7 @@ public struct KouenSettings: Codable, Sendable, Equatable {
         ligatures: Bool = true,
         offMainParserFramePipeline: Bool = true,
         liveResizeReflow: Bool = true,
+        mobileBridgeEnabled: Bool = false,
         showPromptGutter: Bool = true,
         showStatusLine: Bool = true,
         // Fresh installs default to the simplest experience — a fast native terminal.
@@ -440,6 +446,7 @@ public struct KouenSettings: Codable, Sendable, Equatable {
         self.ligatures = ligatures
         self.offMainParserFramePipeline = offMainParserFramePipeline
         self.liveResizeReflow = liveResizeReflow
+        self.mobileBridgeEnabled = mobileBridgeEnabled
         self.showPromptGutter = showPromptGutter
         self.showStatusLine = showStatusLine
         self.experienceMode = experienceMode
@@ -610,6 +617,7 @@ public struct KouenSettings: Codable, Sendable, Equatable {
         // Default on when the key is absent (existing installs get real-time resize); an explicitly
         // stored `false` is honored as an opt-out to the legacy defer-to-release behavior.
         liveResizeReflow = try container.decodeIfPresent(Bool.self, forKey: .liveResizeReflow) ?? true
+        mobileBridgeEnabled = try container.decodeIfPresent(Bool.self, forKey: .mobileBridgeEnabled) ?? false
         showPromptGutter = try container.decodeIfPresent(Bool.self, forKey: .showPromptGutter) ?? fallback.showPromptGutter
         showStatusLine = try container.decodeIfPresent(Bool.self, forKey: .showStatusLine) ?? fallback.showStatusLine
         // Behavior-preserving migration: a settings file that predates modes was written by a

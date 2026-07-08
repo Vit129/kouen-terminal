@@ -243,6 +243,10 @@ struct KouenCLI {
                 try printClients(args, client: client)
             case "detach-client":
                 try handleDetachClient(args, client: client)
+            case "mobile-list-clients":
+                try printMobileClients(args, client: client)
+            case "mobile-revoke-client":
+                try handleMobileRevokeClient(args, client: client)
             case "bind-key", "bind":
                 try handleBindKey(args)
             case "unbind-key", "unbind":
