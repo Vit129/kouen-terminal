@@ -19,6 +19,12 @@ final class FileChangeWatcher {
 
     /// Start watching `path`, replacing any previous watch. `onChange` fires on the
     /// main queue, debounced, after the file is written, extended, renamed, or deleted.
+    ///
+    /// Deliberately excludes `.attrib`: QuickLook writes a `com.apple.lastuseddate#PS`
+    /// xattr on the file every time it renders a preview, which would fire `.attrib`
+    /// on this same watch and re-trigger `onChange` -> another QuickLook render ->
+    /// another xattr write, an infinite reload loop that reads as flicker for any
+    /// QuickLook-routed file (images, PDF, CSV, Office docs).
     func start(path: String, onChange: @escaping () -> Void) {
         stop()
         let fd = open(path, O_EVTONLY)
@@ -26,7 +32,7 @@ final class FileChangeWatcher {
 
         let newSource = DispatchSource.makeFileSystemObjectSource(
             fileDescriptor: fd,
-            eventMask: [.write, .delete, .rename, .extend, .attrib],
+            eventMask: [.write, .delete, .rename, .extend],
             queue: .main
         )
         newSource.setEventHandler { [weak self] in
