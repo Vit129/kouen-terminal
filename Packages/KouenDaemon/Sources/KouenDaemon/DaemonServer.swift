@@ -10,6 +10,10 @@ import KouenCore
 /// @unchecked Sendable: socket-accept and subscription state are confined to the serial `queue`.
 public final class DaemonServer: @unchecked Sendable {
     public let registry: SurfaceRegistry
+    /// P25 F3: paired mobile-device table, shared with `MobileBridgeServer` by whichever
+    /// caller starts it (`KouenDaemonMain/main.swift`) so IPC (`mobile list-clients`/
+    /// `mobile revoke`) and the WS bridge see the same devices.
+    public let pairedDevices = PairedDeviceStore()
     private var listener: DispatchSourceRead?
     private let queue = DispatchQueue(label: "com.vit129.kouen.daemon")
     private var clientBuffers: [Int32: Data] = [:]
@@ -427,6 +431,16 @@ public final class DaemonServer: @unchecked Sendable {
                     pending.continuation.resume(returning: response)
                 }
                 send(.ok, to: fd)
+                continue
+            case .mobileListClients:
+                send(.mobileClients(pairedDevices.list()), to: fd)
+                continue
+            case let .mobileRevokeClient(id):
+                if pairedDevices.revoke(id: id) {
+                    send(.ok, to: fd)
+                } else {
+                    send(.error("no paired device with id \(id)"), to: fd)
+                }
                 continue
             default:
                 break

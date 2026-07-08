@@ -127,6 +127,28 @@ extension KouenCLI {
         }
     }
 
+    /// P25 F3: devices paired to the mobile WS bridge (`MobileBridgeServer`) — distinct
+    /// from `list-clients`/`detach-client` above, which are raw IPC connections (GUI,
+    /// kouen-cli, MCP), not phone/tablet pairings.
+    static func printMobileClients(_ args: [String], client: DaemonClient) throws {
+        let response = try checkedRequest(client, .mobileListClients)
+        guard case let .mobileClients(items) = response else { throw DaemonClientError.unexpectedResponse }
+        try emit(items, args) {
+            if items.isEmpty { print("No paired mobile devices.") }
+            for item in items {
+                print("\(item.id)\t\(item.label)\t\(item.pairedAt)")
+            }
+        }
+    }
+
+    static func handleMobileRevokeClient(_ args: [String], client: DaemonClient) throws {
+        guard let id = flagValue(args, flag: "--device") else {
+            fputs("Usage: kouen-cli mobile-revoke-client --device <id>\n", kouenStderr)
+            exit(1)
+        }
+        _ = try checkedRequest(client, .mobileRevokeClient(id: id))
+    }
+
     static func handleRemote(_ args: [String]) throws -> Int32 {
         let store = RemoteHostStore()
         let sub = args.count > 1 ? args[1] : "list"

@@ -141,6 +141,17 @@ public enum KouenPaths {
         sessionsDirectory.appendingPathComponent("remote-hosts.json.lock")
     }
 
+    /// P25 F3: devices paired to the mobile WS bridge (`PairedDeviceStore`), so a paired
+    /// phone/iPad survives a daemon restart without a fresh QR scan.
+    public static var pairedDevicesURL: URL {
+        sessionsDirectory.appendingPathComponent("paired-devices.json")
+    }
+
+    /// Sidecar lock file for `paired-devices.json`, same shape as `remoteHostsLockURL`.
+    public static var pairedDevicesLockURL: URL {
+        sessionsDirectory.appendingPathComponent("paired-devices.json.lock")
+    }
+
     /// Local sockets that SSH forwards to remote daemons (one per connected host). Kept short and
     /// under the runtime dir so the forwarded path comfortably fits `sockaddr_un.sun_path`.
     public static var tunnelsDirectory: URL {

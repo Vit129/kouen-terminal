@@ -1,6 +1,7 @@
 import Darwin
 import Foundation
 import KouenCore
+import KouenSettings
 
 /// Connects the app to the long-lived `KouenDaemon` process. The daemon is
 /// owned by launchd (installed by `LaunchAgentInstaller`) in release builds so it
@@ -45,6 +46,28 @@ final class DaemonLauncher: @unchecked Sendable {
     }()
 
     private init() {}
+
+    /// Matches `Scripts/mobile-web.sh`'s default — no Settings field for the port itself since
+    /// only enabling/disabling the bridge was asked for.
+    private static let mobileBridgePort: UInt16 = 7777
+
+    private func mobileBridgePortIfEnabled() -> UInt16? {
+        KouenSettings.load().mobileBridgeEnabled ? Self.mobileBridgePort : nil
+    }
+
+    /// Call after the mobile-bridge Settings toggle changes. That setting isn't covered by the
+    /// build-handshake staleness check `ensureRunningBlocking` normally relies on, so it needs an
+    /// explicit restart cue here instead of waiting for the next staleness poll.
+    func restartForMobileBridgeSettingChange() {
+        queue.async { [weak self] in
+            guard let self else { return }
+            if self.isPreview {
+                self.spawnFallbackProcess(forceRestart: true)
+            } else {
+                self.restartStaleDaemon()
+            }
+        }
+    }
 
     /// Ensure a daemon is reachable, off the main thread. `completion` runs on the
     /// main thread with `true` if the daemon answers. Safe to call at launch — the
@@ -145,7 +168,7 @@ final class DaemonLauncher: @unchecked Sendable {
     /// could subscribe to a momentarily-missing surface and freeze.
     private func restartStaleDaemon() {
         guard let executable = launchAgentDaemonTarget(),
-              let report = try? LaunchAgentInstaller.install(daemonPath: executable)
+              let report = try? LaunchAgentInstaller.install(daemonPath: executable, mobileBridgePort: mobileBridgePortIfEnabled())
         else {
             // No installable LaunchAgent (e.g. daemon binary not found) — best-effort kick.
             LaunchAgentInstaller.relaunch()
@@ -190,7 +213,7 @@ final class DaemonLauncher: @unchecked Sendable {
     private func installLaunchAgentIfPossible() -> Bool {
         guard let executable = launchAgentDaemonTarget() else { return false }
         do {
-            _ = try LaunchAgentInstaller.install(daemonPath: executable)
+            _ = try LaunchAgentInstaller.install(daemonPath: executable, mobileBridgePort: mobileBridgePortIfEnabled())
             return true
         } catch {
             fputs("Kouen: LaunchAgent install failed: \(error) — using in-process daemon\n", kouenStderr)
@@ -198,9 +221,17 @@ final class DaemonLauncher: @unchecked Sendable {
         }
     }
 
-    private func spawnFallbackProcess() {
-        // Don't stack duplicate spawns if a previous one is still coming up.
-        if let existing = fallbackProcess, existing.isRunning { return }
+    private func spawnFallbackProcess(forceRestart: Bool = false) {
+        if let existing = fallbackProcess {
+            // Don't stack duplicate spawns if a previous one is still coming up, unless the
+            // caller explicitly wants a restart (mobile-bridge setting just changed).
+            guard forceRestart || !existing.isRunning else { return }
+            if existing.isRunning {
+                existing.terminate()
+                existing.waitUntilExit()
+            }
+            fallbackProcess = nil
+        }
         guard let executable = daemonExecutableURL() else {
             fputs("Kouen: could not locate KouenDaemon executable\n", kouenStderr)
             return
@@ -211,6 +242,9 @@ final class DaemonLauncher: @unchecked Sendable {
         proc.standardError = nil
         var environment = ProcessInfo.processInfo.environment
         environment["KOUEN_HOME"] = KouenPaths.applicationSupport.path
+        if let port = mobileBridgePortIfEnabled() {
+            environment["KOUEN_MOBILE_BRIDGE_PORT"] = String(port)
+        }
         proc.environment = environment
         try? KouenPaths.ensureDirectories()
         do {
