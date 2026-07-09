@@ -192,6 +192,9 @@ do {
         // self]` closure inside it (listener callbacks, the pairing loop) into a no-op.
         mobileBridgeServer = MobileBridgeServer()
         mobileBridgeServer?.start(wsPort: port, pageURLPort: pageURLPort, store: server.pairedDevices, log: daemonLog)
+        // P37 B1: let the IPC layer read the live pairing URL/countdown from the bridge, the
+        // same shared-reference pattern as `server.pairedDevices` above (main.swift holds both).
+        server.mobilePairingInfoProvider = { mobileBridgeServer?.currentPairingInfo() ?? (url: nil, secondsRemaining: 0, enabled: false) }
     }
     #endif
 

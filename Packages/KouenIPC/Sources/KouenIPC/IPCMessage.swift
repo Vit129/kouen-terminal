@@ -6,7 +6,14 @@ import Foundation
 ///
 /// Bumped 2026-07-06 (P25 W1 slice 2): added `.mobileListClients`/`.mobileRevokeClient`
 /// to `IPCRequest` and `.mobileClients` to `IPCResponse`.
-public let ipcProtocolVersion: Int = 2
+///
+/// Bumped 2026-07-08 (P37 Phase B): added `.mobilePairingInfo` to both enums. Bumping
+/// (rather than relying on the additive-case graceful-degradation path) is deliberate:
+/// this release also changes daemon-side bridge *behavior* (P37 Phase A hardening —
+/// rate-limit, per-device secret, off-`.main` queue), and `install-graceful.sh` reuses
+/// the running daemon untouched whenever the protocol is unchanged. A bump is the signal
+/// that forces the daemon to restart into the new binary so the hardening actually ships.
+public let ipcProtocolVersion: Int = 3
 
 public enum IPCRequest: Codable, Sendable {
     case ping
@@ -21,6 +28,11 @@ public enum IPCRequest: Codable, Sendable {
     /// P25 F3: revoke one paired device by id — cancels its live connection if attached
     /// and drops it from the paired-devices table. `.error` if the id isn't paired.
     case mobileRevokeClient(id: String)
+    /// P37 B1: current mobile-bridge pairing state, for the in-app QR panel (Settings ▸
+    /// Remote) so a user never has to read the URL out of daemon.log. Returns the live
+    /// pairing URL, seconds until the current token rotates, and whether the bridge is
+    /// enabled. Nil URL when the bridge is off (opt-in, see `MobileBridgeServer`).
+    case mobilePairingInfo
     case newWorkspace(name: String)
     case newSession(workspaceID: UUID, cwd: String?, name: String?, shell: String? = nil, worktreePath: String? = nil, parentRepoPath: String? = nil, taskName: String? = nil)
     /// tmux `new-session -t <session>`: an independent session grouped with the target,
@@ -313,6 +325,10 @@ public enum IPCResponse: Codable, Sendable {
     case surfaces([SurfaceSummary])
     case agents([AgentSessionSummary])
     case mobileClients([PairedDeviceSummary])
+    /// P37 B1: reply to `mobilePairingInfo`. `url` is nil when the bridge is disabled or
+    /// hasn't minted its first token yet; `secondsRemaining` counts down to the next token
+    /// rotation; `enabled` mirrors the `mobileBridgeEnabled` setting the daemon started with.
+    case mobilePairingInfo(url: String?, secondsRemaining: Int, enabled: Bool)
     case workspaceID(UUID)
     case sessionID(UUID)
     case tabID(UUID)

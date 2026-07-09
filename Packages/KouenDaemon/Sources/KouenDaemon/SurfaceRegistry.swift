@@ -282,7 +282,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
         switch request {
         case .openGitPanel:
             return .ok // intercepted at connection layer; never reaches here
-        case .mobileListClients, .mobileRevokeClient:
+        case .mobileListClients, .mobileRevokeClient, .mobilePairingInfo:
             return .ok // intercepted at connection layer; never reaches here
         case .ping:
             return .pong
