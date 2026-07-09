@@ -14,6 +14,12 @@ public final class DaemonServer: @unchecked Sendable {
     /// caller starts it (`KouenDaemonMain/main.swift`) so IPC (`mobile list-clients`/
     /// `mobile revoke`) and the WS bridge see the same devices.
     public let pairedDevices = PairedDeviceStore()
+    /// P37 B1: supplies the live mobile-bridge pairing state for `mobilePairingInfo`. Set by
+    /// `KouenDaemonMain/main.swift` right after it starts `MobileBridgeServer` (which owns the
+    /// URL/token). Left nil when the bridge never started (opt-in / Linux) — the IPC handler
+    /// then reports `enabled: false`. A closure, not a typed reference, so this cross-platform
+    /// type never has to `import Network` (the bridge is `canImport(Network)`-gated).
+    public var mobilePairingInfoProvider: (@Sendable () -> (url: String?, secondsRemaining: Int, enabled: Bool))?
     private var listener: DispatchSourceRead?
     private let queue = DispatchQueue(label: "com.vit129.kouen.daemon")
     private var clientBuffers: [Int32: Data] = [:]
@@ -441,6 +447,10 @@ public final class DaemonServer: @unchecked Sendable {
                 } else {
                     send(.error("no paired device with id \(id)"), to: fd)
                 }
+                continue
+            case .mobilePairingInfo:
+                let info = mobilePairingInfoProvider?() ?? (url: nil, secondsRemaining: 0, enabled: false)
+                send(.mobilePairingInfo(url: info.url, secondsRemaining: info.secondsRemaining, enabled: info.enabled), to: fd)
                 continue
             default:
                 break

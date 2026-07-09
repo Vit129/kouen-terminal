@@ -146,8 +146,25 @@ final class DaemonLauncher: @unchecked Sendable {
     /// doesn't change between rebuilds — when the bundled binary is newer than the daemon's
     /// start. The handshake is authoritative: it survives daemon restarts, which reset the
     /// start time the mtime heuristic compares against and made it permanently read "fresh".
-    private func daemonIsStale(_ stats: DaemonStats) -> Bool {
-        if stats.isStale(comparedTo: KouenVersion.build) { return true }
+    ///
+    /// A build mismatch alone isn't enough to force a restart, though: `install-graceful.sh`
+    /// deliberately preserves a running daemon across a UI-only release when its IPC protocol
+    /// still matches and it's holding live surfaces (protecting PTYs/agent sessions across the
+    /// app update). If we didn't mirror that check here, this launcher would restart the very
+    /// daemon install-graceful.sh just decided to keep, seconds after the app relaunches.
+    /// Returning `false` (not falling through) is what skips `bundledDaemonIsNewer` below —
+    /// falling through would defeat this, since `refreshInstalledBinaries()` (called just
+    /// before this in `ensureRunningBlocking`) already gave the on-disk binary a fresh mtime by
+    /// the time we get here.
+    /// ponytail: accepted ceiling — the preserved daemon keeps running its OLD build's
+    /// non-protocol code (bugfixes, etc.) until the next protocol bump, crash, or reboot, since
+    /// this path skips both `restartStaleDaemon()` and `install()`'s plist rewrite. That's the
+    /// same tradeoff `install-graceful.sh` already makes; nothing new here.
+    func daemonIsStale(_ stats: DaemonStats) -> Bool {
+        if stats.isStale(comparedTo: KouenVersion.build) {
+            if stats.protocolVersion == ipcProtocolVersion, stats.surfaceCount > 0 { return false }
+            return true
+        }
         return bundledDaemonIsNewer(than: stats)
     }
 

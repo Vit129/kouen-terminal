@@ -1,4 +1,5 @@
 import AppKit
+import CoreImage
 import SwiftUI
 import KouenCore
 
@@ -15,6 +16,13 @@ struct SettingsRemoteView: View {
     @State private var editSocket = ""
     @State private var statusMessage = ""
     @State private var isDetectingSocket = false
+
+    // P37 B2: in-app pairing QR state, refreshed by the poll loop in `mobilePairingSection`.
+    @State private var pairingURL: String? = nil
+    @State private var pairingQR: NSImage? = nil
+    @State private var pairingSecondsRemaining = 0
+    @State private var pairingDaemonReportsEnabled = false
+    @State private var pairedDevices: [PairedDeviceSummary] = []
 
     var body: some View {
         ScrollView {
@@ -61,7 +69,140 @@ struct SettingsRemoteView: View {
             Text("Lets a phone pair via QR (`kouen-cli mobile-list-clients`/`mobile-revoke-client` manage paired devices). Binds loopback + Tailscale only, never plain LAN. Restarting the daemon to apply — running PTYs/agents survive, same as an app update.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+
+            if model.settings.mobileBridgeEnabled {
+                pairingQRPanel
+                pairedDevicesList
+            }
         }
+        // P37 B2: poll the live pairing URL/countdown ~1s while this pane is visible — the
+        // token rotates every 15s, so the QR must refresh itself. `.task(id:)` restarts the
+        // loop when the toggle flips and cancels it when the pane disappears, so a closed
+        // Settings window costs zero IPC traffic.
+        .task(id: model.settings.mobileBridgeEnabled) {
+            guard model.settings.mobileBridgeEnabled else {
+                pairingURL = nil
+                pairingQR = nil
+                return
+            }
+            while !Task.isCancelled {
+                await refreshPairingInfo()
+                try? await Task.sleep(for: .seconds(1))
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var pairingQRPanel: some View {
+        if let qr = pairingQR, let url = pairingURL {
+            VStack(alignment: .leading, spacing: 8) {
+                // `.interpolation(.none)` keeps the upscaled QR modules hard-edged —
+                // the default (bilinear) smoothing blurs them enough to slow camera scans.
+                Image(nsImage: qr)
+                    .interpolation(.none)
+                    .resizable()
+                    .frame(width: 200, height: 200)
+                ProgressView(value: Double(min(max(pairingSecondsRemaining, 0), 15)), total: 15)
+                    .frame(width: 200)
+                HStack(spacing: 6) {
+                    Text(url)
+                        .font(.system(size: 11, design: .monospaced))
+                        .textSelection(.enabled)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Button {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(url, forType: .string)
+                    } label: {
+                        Image(systemName: "doc.on.doc")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Copy pairing URL")
+                }
+                Text("Scan with your phone's camera — the code rotates every 15 seconds.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.top, 4)
+        } else {
+            // Enabled but no URL: either the daemon is still (re)starting, or no WS listener
+            // is up (port squatted — R4). Both self-heal into the QR on a later poll tick.
+            Label(
+                pairingDaemonReportsEnabled
+                    ? "Bridge is on, but not listening — the port may be in use. Check logs/daemon.log."
+                    : "Waiting for the daemon's pairing bridge…",
+                systemImage: pairingDaemonReportsEnabled ? "exclamationmark.triangle" : "hourglass"
+            )
+            .font(.caption)
+            .foregroundStyle(pairingDaemonReportsEnabled ? Color.orange : Color.secondary)
+            .padding(.top, 4)
+        }
+    }
+
+    @ViewBuilder
+    private var pairedDevicesList: some View {
+        if !pairedDevices.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Paired devices")
+                    .font(.system(size: 12, weight: .semibold))
+                    .padding(.top, 6)
+                ForEach(pairedDevices, id: \.id) { device in
+                    HStack(spacing: 8) {
+                        Text(device.label)
+                            .font(.system(size: 12))
+                        Text(device.pairedAt.formatted(date: .abbreviated, time: .shortened))
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Revoke") {
+                            Task {
+                                _ = await SessionCoordinator.shared.requestDaemon(.mobileRevokeClient(id: device.id))
+                                await refreshPairingInfo()
+                            }
+                        }
+                        .controlSize(.small)
+                    }
+                }
+            }
+        }
+    }
+
+    private func refreshPairingInfo() async {
+        if case let .mobilePairingInfo(url, seconds, enabled)? =
+            await SessionCoordinator.shared.requestDaemon(.mobilePairingInfo) {
+            pairingDaemonReportsEnabled = enabled
+            pairingSecondsRemaining = seconds
+            if url != pairingURL {
+                pairingURL = url
+                // Regenerate only when the token actually rotated — a CIFilter render per
+                // poll tick for an unchanged URL is pure waste.
+                pairingQR = url.flatMap(Self.qrImage(for:))
+            }
+        } else {
+            pairingDaemonReportsEnabled = false
+            pairingURL = nil
+            pairingQR = nil
+        }
+        if case let .mobileClients(devices)? =
+            await SessionCoordinator.shared.requestDaemon(.mobileListClients) {
+            pairedDevices = devices
+        }
+    }
+
+    /// CIQRCodeGenerator emits 1pt/module; integer-upscale via CoreImage (crisp by
+    /// construction), and the view's `.interpolation(.none)` handles the final fit.
+    private static func qrImage(for string: String) -> NSImage? {
+        guard let data = string.data(using: .utf8),
+              let filter = CIFilter(name: "CIQRCodeGenerator")
+        else { return nil }
+        filter.setValue(data, forKey: "inputMessage")
+        filter.setValue("M", forKey: "inputCorrectionLevel")
+        guard let output = filter.outputImage else { return nil }
+        let scaled = output.transformed(by: CGAffineTransform(scaleX: 8, y: 8))
+        let rep = NSCIImageRep(ciImage: scaled)
+        let image = NSImage(size: rep.size)
+        image.addRepresentation(rep)
+        return image
     }
 
     // MARK: - Host list panel
