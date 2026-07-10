@@ -7,8 +7,8 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
 ## [4.3.1] - 2026-07-10
 
-### Added
-- Release version bump to v4.3.1.
+### Fixed
+- Stop worktree branch cache clobbering, silent terminal file-link failures, and uncapped git panel history (release v4.3.1) ([`a60766d`](https://github.com/Vit129/kouen-terminal/commit/a60766dc6e1a5822ff8dd954a0fc6d9ee30ec745))
 
 ## [4.3.0] - 2026-07-10
 
