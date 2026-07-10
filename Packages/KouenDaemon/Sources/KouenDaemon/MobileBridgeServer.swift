@@ -19,7 +19,8 @@ import Network
 //   1. Client sends the pairing token as a single TEXT frame.
 //   2. On success, bridge sends `{"sessions":[{surfaceID,tabTitle,cwd}, ...]}` (TEXT).
 //   3. Client sends control messages as TEXT/JSON: `{"attach":"<surfaceID>"}`,
-//      `{"detach":true}`, `{"spawn":{"cwd":"..."}}` (cwd optional).
+//      `{"detach":true}`, `{"spawn":{"cwd":"..."}}` (cwd optional), `{"resize":{"cols":N,
+//      "rows":N}}` (P37 Phase C — only meaningful while attached).
 //   4. Once attached, PTY output arrives as BINARY frames; the client sends keystrokes
 //      back as BINARY frames (TEXT frames are always parsed as control messages, never
 //      as input — this is how the two are told apart on one connection).
@@ -51,6 +52,18 @@ public final class MobileBridgeServer: @unchecked Sendable {
     /// `bridgeQueue` AND from IPC reads on the daemon queue.
     private let wsReadyLock = NSLock()
     private var wsReadyHosts: Set<String> = []
+
+    /// Lets `start()`/`stop()` be called repeatedly on the same instance — the daemon now
+    /// owns one `MobileBridgeServer` for its whole lifetime and starts/stops it in place from
+    /// `.setMobileBridgeEnabled` (Settings toggle), instead of a full daemon restart minting a
+    /// fresh instance each time. Also the cancellation flag `runPairingLoop` polls between
+    /// token rotations, since its sleep can no longer just run forever.
+    private let lifecycleLock = NSLock()
+    private var _isRunning = false
+    private var isRunning: Bool {
+        get { lifecycleLock.lock(); defer { lifecycleLock.unlock() }; return _isRunning }
+        set { lifecycleLock.lock(); _isRunning = newValue; lifecycleLock.unlock() }
+    }
 
     private func setWSListener(host: String, ready: Bool) {
         wsReadyLock.lock()
@@ -182,43 +195,176 @@ public final class MobileBridgeServer: @unchecked Sendable {
     /// in the dev flow, so the production/preview daemon (spawned by `DaemonLauncher`,
     /// no such script involved) printed a pairing URL nothing was listening on — confirmed
     /// via a direct `curl` against a real `make preview` daemon returning connection refused.
-    /// Not the real mobile client (that's W3 — the xterm.js session-switcher UI from
-    /// `agent-memory/plans/p25-mobile-session-switcher-design.html`); this is a bare-bones
-    /// smoke test: pair, list sessions, spawn, attach, send/receive raw text. No terminal
-    /// rendering, no ANSI handling.
+    /// P37 Phase C (W3): the real client, replacing the old bare-bones smoke-test page —
+    /// xterm.js terminal (real ANSI/cursor rendering) + the session-switcher UI from
+    /// `agent-memory/plans/p25-mobile-session-switcher-design.html` (dark terminal aesthetic,
+    /// session list, switcher sheet). Resize now round-trips: `FitAddon` measures the
+    /// container, the client sends `{"resize":{cols,rows}}`, `handleControlMessage` forwards
+    /// it to `DaemonClient.resize`.
     private static let embeddedPageHTML = #"""
     <!doctype html>
-    <title>Kouen Mobile Bridge — smoke test</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Kouen Mobile</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
     <style>
-      body { font-family: ui-monospace, monospace; max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
-      button { font: inherit; padding: 0.4rem 0.8rem; }
-      #output { background: #111; color: #eee; padding: 1rem; height: 300px; overflow: auto; white-space: pre-wrap; }
-      #input { width: 100%; font: inherit; padding: 0.4rem; box-sizing: border-box; }
-      li { margin: 0.4rem 0; }
+    \#(MobileBridgeWebAssets.xtermCSS)
+    </style>
+    <style>
+      :root {
+        --bg: #100d0b; --surface: #1a1613; --surface-3: #241f1b;
+        --text: #ede8e2; --muted: #9b8f80; --border: #322a23;
+        --accent: #d77757; --accent-cyan: #5ec4c1; --live: #7fb878;
+        --code-font: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+        --ui-font: -apple-system, "SF Pro Text", system-ui, sans-serif;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; margin: 0; }
+      body {
+        background: var(--bg); color: var(--text); font-family: var(--ui-font);
+        display: flex; flex-direction: column; overflow: hidden;
+      }
+      .view { flex: 1; display: none; flex-direction: column; min-height: 0; }
+      .view.active { display: flex; }
+
+      #view-home, #view-paired {
+        align-items: center; justify-content: center; text-align: center; padding: 0 2rem; gap: 1rem;
+      }
+      .mark { font-family: var(--code-font); font-size: 1.6rem; color: var(--accent); }
+      #view-home h4, #view-paired h4 { margin: 0; font-size: 1rem; font-weight: 600; }
+      #view-home p, #view-paired p { margin: 0; color: var(--muted); font-size: 0.85rem; max-width: 26ch; }
+      #token {
+        font: inherit; font-family: var(--code-font); text-align: center; letter-spacing: 0.1em;
+        background: var(--surface-3); border: 1px solid var(--border); color: var(--text);
+        border-radius: 8px; padding: 0.6rem 0.8rem; width: 10rem;
+      }
+      .btn {
+        appearance: none; border: none; cursor: pointer; background: var(--accent); color: #100d0b;
+        font-family: var(--ui-font); font-weight: 600; font-size: 0.9rem;
+        padding: 0.65rem 1.3rem; border-radius: 20px; margin-top: 0.4rem;
+      }
+      .btn:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 2px; }
+      .check {
+        width: 44px; height: 44px; border-radius: 50%; background: var(--live); color: #0a0807;
+        display: flex; align-items: center; justify-content: center; font-size: 1.3rem; font-weight: 700;
+      }
+
+      .list-header {
+        padding: 0.9rem 1.1rem 0.8rem; border-bottom: 1px solid var(--surface-3); flex-shrink: 0;
+        display: flex; align-items: flex-end; justify-content: space-between; gap: 0.6rem;
+      }
+      .list-header .host { font-family: var(--code-font); font-size: 0.68rem; color: var(--muted); letter-spacing: 0.03em; }
+      .list-header h4 { margin: 0.15rem 0 0; font-size: 1.05rem; }
+      .list-header-text { min-width: 0; }
+      .sessions { flex: 1; overflow-y: auto; padding: 0.6rem 0.8rem; display: flex; flex-direction: column; gap: 0.5rem; }
+      .session-card {
+        display: flex; align-items: center; gap: 0.7rem; background: var(--surface); border: 1px solid var(--surface-3);
+        border-radius: 12px; padding: 0.7rem 0.8rem; cursor: pointer; text-align: left; width: 100%;
+        color: inherit; font-family: inherit;
+      }
+      .session-card:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 1px; }
+      .session-card .glyph { color: var(--accent); font-size: 1rem; width: 1.1rem; flex-shrink: 0; }
+      .session-card .meta { min-width: 0; flex: 1; }
+      .session-card .title { font-size: 0.87rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .session-card .cwd { font-family: var(--code-font); font-size: 0.7rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 0.15rem; }
+      .pill { flex-shrink: 0; width: 7px; height: 7px; border-radius: 50%; background: var(--live); }
+      .empty { color: var(--muted); font-size: 0.85rem; text-align: center; padding: 2rem 1rem; }
+
+      .add-btn {
+        appearance: none; border: none; cursor: pointer; flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%;
+        background: var(--surface-3); color: var(--text); font-size: 1.1rem; line-height: 1;
+        display: flex; align-items: center; justify-content: center;
+      }
+      .add-btn:active { transform: scale(0.94); }
+
+      .term-header {
+        display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0.7rem;
+        border-bottom: 1px solid var(--surface-3); flex-shrink: 0;
+      }
+      .iconbtn { appearance: none; background: none; border: none; color: var(--text); font-size: 1.1rem; padding: 0.2rem 0.4rem; cursor: pointer; line-height: 1; }
+      .term-header .title { font-size: 0.85rem; font-weight: 600; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      #term-body { flex: 1; min-height: 0; overflow: hidden; padding: 0.4rem; background: #100d0b; }
+      #xterm-container { height: 100%; }
+
+      .sheet-backdrop {
+        position: fixed; inset: 0; background: rgba(0,0,0,0.45); opacity: 0; pointer-events: none;
+        transition: opacity 0.2s ease; z-index: 5;
+      }
+      .sheet-backdrop.open { opacity: 1; pointer-events: auto; }
+      .sheet {
+        position: fixed; left: 0; right: 0; bottom: 0; background: var(--surface);
+        border-radius: 18px 18px 0 0; border-top: 1px solid var(--border);
+        transform: translateY(100%); transition: transform 0.25s ease; max-height: 70%;
+        display: flex; flex-direction: column; z-index: 6;
+      }
+      .sheet.open { transform: translateY(0); }
+      .sheet-handle { width: 32px; height: 4px; background: var(--border); border-radius: 2px; margin: 0.6rem auto; flex-shrink: 0; }
+      .sheet .list-header { padding: 0 0.4rem 0.6rem; border-bottom: none; }
+
+      .error-banner {
+        position: fixed; top: 0; left: 0; right: 0; background: #c0392b; color: #fff; font-size: 0.8rem;
+        padding: 0.5rem 1rem; text-align: center; z-index: 10; display: none;
+      }
+      .error-banner.show { display: block; }
     </style>
 
-    <div id="pair">
-      <p>Paste the token the daemon printed to its console:
-        <input id="token" autocomplete="off">
-        <button onclick="connect()">Connect</button>
-      </p>
+    <div id="view-home" class="view active">
+      <div class="mark">⌁ kouen</div>
+      <h4>Not paired</h4>
+      <p>Open this page via the QR code shown in Kouen's Settings ▸ Remote panel.</p>
+      <input id="token" placeholder="or paste code" autocomplete="off" inputmode="numeric">
+      <button class="btn" onclick="connect()">Connect</button>
     </div>
 
-    <div id="sessions" style="display:none">
-      <h3>Sessions <button onclick="spawnSession()">+ new</button></h3>
-      <ul id="list"></ul>
+    <div id="view-paired" class="view">
+      <div class="check">&#10003;</div>
+      <h4>Paired</h4>
+      <p id="paired-sub"></p>
     </div>
 
-    <div id="term" style="display:none">
-      <p><button onclick="detach()">&larr; back to sessions</button></p>
-      <pre id="output"></pre>
-      <input id="input" placeholder="type and press Enter" autocomplete="off">
+    <div id="view-list" class="view">
+      <div class="list-header">
+        <div class="list-header-text">
+          <div class="host" id="list-host"></div>
+          <h4 id="list-count">0 sessions</h4>
+        </div>
+        <button class="add-btn" onclick="spawnSession()" aria-label="New session">+</button>
+      </div>
+      <div class="sessions" id="sessions-main"></div>
     </div>
+
+    <div id="view-term" class="view">
+      <div class="term-header">
+        <button class="iconbtn" onclick="detach()" aria-label="Back to sessions">&larr;</button>
+        <div class="title" id="term-title">—</div>
+        <button class="iconbtn" onclick="openSheet()" aria-label="Switch session">&#8645;</button>
+      </div>
+      <div id="term-body"><div id="xterm-container"></div></div>
+    </div>
+
+    <div class="sheet-backdrop" id="sheet-backdrop" onclick="closeSheet()">
+      <div class="sheet" id="sheet" onclick="event.stopPropagation()">
+        <div class="sheet-handle"></div>
+        <div class="list-header">
+          <div class="list-header-text"><h4 id="sheet-count" style="font-size:0.9rem;">0 sessions</h4></div>
+          <button class="add-btn" onclick="spawnSession()" aria-label="New session">+</button>
+        </div>
+        <div class="sessions" id="sessions-sheet"></div>
+      </div>
+    </div>
+
+    <div class="error-banner" id="error-banner"></div>
 
     <script>
-      let ws;
+    \#(MobileBridgeWebAssets.xtermJS)
+    </script>
+    <script>
+    \#(MobileBridgeWebAssets.addonFitJS)
+    </script>
+    <script>
+      let ws, term, fitAddon;
+      let currentSurfaceID = null;
+      let sessionsCache = [];
       let authed = false;
+      let hasShownPairedToast = false;
       const params = new URLSearchParams(location.search);
       const wsPort = params.get('wsport') || 7777;
       // P37 A2: a returning device re-auths with the credentials it was issued on its first
@@ -226,6 +372,91 @@ public final class MobileBridgeServer: @unchecked Sendable {
       // host so credentials from one Mac aren't replayed against another.
       const credKey = 'kouenDeviceCreds:' + location.hostname;
       function storedCreds() { try { return JSON.parse(localStorage.getItem(credKey)); } catch { return null; } }
+
+      function showError(msg) {
+        const el = document.getElementById('error-banner');
+        el.textContent = msg;
+        el.classList.add('show');
+        setTimeout(() => el.classList.remove('show'), 4000);
+      }
+
+      function goto(name) {
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        document.getElementById('view-' + name).classList.add('active');
+      }
+
+      function sessionCard(s) {
+        const btn = document.createElement('button');
+        btn.className = 'session-card';
+        btn.onclick = () => attach(s.surfaceID);
+        const glyph = document.createElement('span'); glyph.className = 'glyph'; glyph.textContent = '›';
+        const meta = document.createElement('span'); meta.className = 'meta';
+        const title = document.createElement('div'); title.className = 'title'; title.textContent = s.tabTitle || '(untitled)';
+        const cwd = document.createElement('div'); cwd.className = 'cwd'; cwd.textContent = s.cwd;
+        meta.append(title, cwd);
+        const pill = document.createElement('span'); pill.className = 'pill';
+        btn.append(glyph, meta, pill);
+        return btn;
+      }
+
+      // Built via DOM (not innerHTML interpolation) so a tab title/cwd containing HTML-like
+      // text from the user's own shell can never inject markup into this page.
+      function renderSessions(sessions) {
+        sessionsCache = sessions;
+        document.getElementById('list-host').textContent = location.hostname + ' · via tailscale';
+        for (const id of ['sessions-main', 'sessions-sheet']) {
+          const container = document.getElementById(id);
+          container.innerHTML = '';
+          if (sessions.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'empty';
+            empty.textContent = 'No sessions yet — tap + to start one';
+            container.appendChild(empty);
+          } else {
+            sessions.forEach(s => container.appendChild(sessionCard(s)));
+          }
+        }
+        const label = sessions.length + (sessions.length === 1 ? ' session' : ' sessions');
+        document.getElementById('list-count').textContent = label;
+        document.getElementById('sheet-count').textContent = label;
+      }
+
+      function sendResize() {
+        if (!term || !ws || ws.readyState !== WebSocket.OPEN) return;
+        ws.send(JSON.stringify({ resize: { cols: term.cols, rows: term.rows } }));
+      }
+
+      function mountTerminal(surfaceID) {
+        if (term) { term.dispose(); term = null; }
+        currentSurfaceID = surfaceID;
+        const meta = sessionsCache.find(s => s.surfaceID === surfaceID);
+        document.getElementById('term-title').textContent = meta ? meta.tabTitle : surfaceID;
+        term = new Terminal({
+          fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace',
+          fontSize: 13,
+          theme: { background: '#100d0b', foreground: '#ede8e2', cursor: '#ede8e2' },
+          scrollback: 5000,
+          convertEol: true,
+        });
+        fitAddon = new FitAddon.FitAddon();
+        term.loadAddon(fitAddon);
+        const container = document.getElementById('xterm-container');
+        container.innerHTML = '';
+        term.open(container);
+        fitAddon.fit();
+        sendResize();
+        term.onData(data => { if (ws && ws.readyState === WebSocket.OPEN) ws.send(new TextEncoder().encode(data)); });
+        term.onResize(() => sendResize());
+        goto('term');
+        closeSheet();
+      }
+
+      function disposeTerminal() {
+        if (term) { term.dispose(); term = null; }
+        currentSurfaceID = null;
+      }
+
+      window.addEventListener('resize', () => { if (fitAddon && currentSurfaceID) fitAddon.fit(); });
 
       function connect() {
         ws = new WebSocket(`ws://${location.hostname}:${wsPort}/`);
@@ -235,10 +466,11 @@ public final class MobileBridgeServer: @unchecked Sendable {
           // Returning device: send deviceAuth instead of the token. On failure (revoked /
           // stale secret) the daemon closes the socket; onclose falls back to a token pairing.
           if (creds) ws.send(JSON.stringify({ deviceAuth: creds }));
-          else ws.send(document.getElementById('token').value);
+          else ws.send(document.getElementById('token').value.trim());
         };
-        ws.onerror = (e) => alert('WebSocket error — check the daemon is running and the token is current.');
+        ws.onerror = () => showError('WebSocket error — check the daemon is running and the code is current.');
         ws.onclose = () => {
+          disposeTerminal();
           // A deviceAuth that got rejected (device revoked, or a stale secret) closes the
           // socket before we ever saw a sessions list — the stored secret is dead, so drop it
           // and reload to the plain token field for a fresh pairing.
@@ -249,57 +481,45 @@ public final class MobileBridgeServer: @unchecked Sendable {
             let msg;
             try { msg = JSON.parse(ev.data); } catch { return; }
             if (msg.deviceCredentials) { localStorage.setItem(credKey, JSON.stringify(msg.deviceCredentials)); return; }
-            if (msg.sessions) { authed = true; showSessions(msg.sessions); return; }
-            else if (msg.ok === 'attached') showTerm();
-            else if (msg.ok === 'detached' || msg.detached) requestSessions();
-            else if (msg.error) alert(msg.error);
-          } else {
-            const text = new TextDecoder().decode(ev.data);
-            const out = document.getElementById('output');
-            out.textContent += text;
-            out.scrollTop = out.scrollHeight;
+            if (msg.sessions) {
+              authed = true;
+              renderSessions(msg.sessions);
+              if (!hasShownPairedToast) {
+                hasShownPairedToast = true;
+                const n = msg.sessions.length;
+                document.getElementById('paired-sub').textContent = n + (n === 1 ? ' session available' : ' sessions available');
+                goto('paired');
+                setTimeout(() => goto('list'), 700);
+              } else {
+                goto('list');
+              }
+            } else if (msg.ok === 'attached') {
+              mountTerminal(msg.surfaceID);
+            } else if (msg.ok === 'detached' || msg.detached) {
+              disposeTerminal();
+              goto('list');
+            } else if (msg.error) {
+              showError(msg.error);
+            }
+          } else if (term) {
+            term.write(new Uint8Array(ev.data));
           }
         };
       }
 
-      function requestSessions() {
-        // The daemon already pushes the list right after auth; this just re-shows the
-        // last-known list view (a real client would re-request via detach's own push).
-        document.getElementById('term').style.display = 'none';
-        document.getElementById('sessions').style.display = '';
-      }
-
-      function showSessions(sessions) {
-        document.getElementById('pair').style.display = 'none';
-        document.getElementById('term').style.display = 'none';
-        document.getElementById('sessions').style.display = '';
-        document.getElementById('list').innerHTML = sessions.map(s =>
-          `<li><button onclick='attach(${JSON.stringify(s.surfaceID)})'>${s.tabTitle} — ${s.cwd}</button></li>`
-        ).join('') || '<li>(no sessions yet — try + new)</li>';
-      }
-
-      function attach(id) { ws.send(JSON.stringify({ attach: id })); }
-      function spawnSession() { ws.send(JSON.stringify({ spawn: {} })); }
+      function attach(id) { closeSheet(); ws.send(JSON.stringify({ attach: id })); }
+      function spawnSession() { closeSheet(); ws.send(JSON.stringify({ spawn: {} })); }
       function detach() { ws.send(JSON.stringify({ detach: true })); }
+      function openSheet() { document.getElementById('sheet-backdrop').classList.add('open'); document.getElementById('sheet').classList.add('open'); }
+      function closeSheet() { document.getElementById('sheet-backdrop').classList.remove('open'); document.getElementById('sheet').classList.remove('open'); }
 
-      function showTerm() {
-        document.getElementById('sessions').style.display = 'none';
-        document.getElementById('output').textContent = '';
-        document.getElementById('term').style.display = '';
-      }
-
-      document.getElementById('input').addEventListener('keydown', (e) => {
-        if (e.key !== 'Enter') return;
-        ws.send(new TextEncoder().encode(e.target.value + '\n'));
-        e.target.value = '';
-      });
+      document.getElementById('token').addEventListener('keydown', e => { if (e.key === 'Enter') connect(); });
 
       // Auto-connect when we can do it without a tap: a stored device credential (returning
       // device, P37 A2) needs no token at all; otherwise a token in the URL (QR scan) — the
       // token expires in pairingLifetime (15s), and phone unlock + camera app + page load
       // already eats into that, so waiting on a manual Connect tap timed out before.
       if (storedCreds()) {
-        document.getElementById('pair').style.display = 'none';
         connect();
       } else if (params.get('token')) {
         document.getElementById('token').value = params.get('token');
@@ -432,17 +652,18 @@ public final class MobileBridgeServer: @unchecked Sendable {
     }
 
     /// Generates a fresh pairing token, prints its QR, and waits it out before generating
-    /// the next one — runs forever on a background thread. No longer needs an interactive
-    /// console prompt (the old "pick a session" step): since a token now grants the whole
-    /// daemon rather than one surface, there's nothing left to ask the operator to choose.
-    /// This also lifts the earlier "must run in a real foreground terminal" constraint.
+    /// the next one — runs on a background thread until `stop()` flips `isRunning` false.
+    /// No longer needs an interactive console prompt (the old "pick a session" step): since
+    /// a token now grants the whole daemon rather than one surface, there's nothing left to
+    /// ask the operator to choose. This also lifts the earlier "must run in a real foreground
+    /// terminal" constraint.
     private func runPairingLoop(wsPort: UInt16, pageURLPort: Int, log: @escaping @Sendable (String) -> Void) {
         let tailscaleHost = detectTailscaleHost()
         let host = tailscaleHost ?? "127.0.0.1"
         if tailscaleHost == nil {
             log("mobile bridge: Tailscale IP not detected — QR will use loopback (same-Mac testing only)")
         }
-        while true {
+        while isRunning {
             let token = String(format: "%06d", Int.random(in: 0..<1_000_000))
             // `makePageListener` serves `embeddedPageHTML` for any path, so the root path
             // is enough here. `wsport` lets the page know which port to open the WS
@@ -461,7 +682,13 @@ public final class MobileBridgeServer: @unchecked Sendable {
             // redirected to a log file, or the daemon launched detached — so without an
             // explicit flush this can sit unseen for the entire `pairingLifetime` sleep.
             fflush(stdout)
-            Thread.sleep(forTimeInterval: pairingLifetime)
+            // Slept in small increments (not one `Thread.sleep(pairingLifetime)`) so `stop()`
+            // is noticed within a fraction of a second instead of up to 15s later.
+            var slept: TimeInterval = 0
+            while slept < pairingLifetime && isRunning {
+                Thread.sleep(forTimeInterval: 0.25)
+                slept += 0.25
+            }
         }
     }
 
@@ -471,7 +698,11 @@ public final class MobileBridgeServer: @unchecked Sendable {
         var attach: String?
         var detach: Bool?
         var spawn: SpawnPayload?
+        /// P37 Phase C: `{"resize":{"cols":N,"rows":N}}`, sent by `FitAddon` whenever the
+        /// mobile client's viewport changes — forwarded straight to `DaemonClient.resize`.
+        var resize: ResizePayload?
         struct SpawnPayload: Decodable { var cwd: String? }
+        struct ResizePayload: Decodable { var cols: Int; var rows: Int }
     }
 
     // MARK: - Server -> client payloads (TEXT/JSON)
@@ -654,6 +885,11 @@ public final class MobileBridgeServer: @unchecked Sendable {
             state.controlQueue.async { [weak self] in
                 self?.handleSpawn(cwd: spawn.cwd, connection: connection, state: state)
             }
+        } else if let resize = message.resize, let surfaceID = state.surfaceID, let subscription = state.subscription {
+            // `resize` lives on the subscription (not a one-shot `DaemonClient`), same as the
+            // native GUI's resize vote — its lifetime is tied to this attach, released
+            // automatically on detach/disconnect (see `DaemonSubscription.resize`'s doc comment).
+            subscription.resize(surfaceID, rows: UInt16(clamping: resize.rows), cols: UInt16(clamping: resize.cols))
         } else {
             sendText(#"{"error":"unrecognized control message"}"#, on: connection)
         }
@@ -797,20 +1033,25 @@ public final class MobileBridgeServer: @unchecked Sendable {
     }
 
     /// Starts the WS bridge bound to loopback + (if detected) the Tailscale interface,
-    /// and the pairing loop on a background thread. No-op-safe to call once; caller
-    /// (main.swift) gates this behind the KOUEN_MOBILE_BRIDGE_PORT opt-in.
+    /// and the pairing loop on a background thread. Safe to call again after `stop()` — the
+    /// Settings toggle now starts/stops this in place rather than restarting the daemon.
     public func start(
         wsPort: UInt16,
         pageURLPort: Int,
         store: PairedDeviceStore,
         log: @escaping @Sendable (String) -> Void
     ) {
+        guard !isRunning else {
+            log("mobile bridge: already running, ignoring start()")
+            return
+        }
         guard let port = NWEndpoint.Port(rawValue: wsPort) else {
             log("mobile bridge: invalid port \(wsPort), not starting")
             return
         }
         self.store = store
         self.log = log
+        isRunning = true
         store.onRevoke = { [weak self] id in self?.cancelConnection(forDeviceID: id) }
 
         // Every listener (WS + page) binds ONLY the hosts this returns — loopback plus a
@@ -863,6 +1104,27 @@ public final class MobileBridgeServer: @unchecked Sendable {
         }
     }
 
+    /// Tears down every listener and live connection and stops the pairing loop (within
+    /// ~0.25s — see `runPairingLoop`'s sleep granularity). Safe to call when not running
+    /// (no-op). Does NOT clear `PairedDeviceStore` — paired devices stay authorized so a
+    /// later `start()` doesn't force every phone through the QR flow again.
+    public func stop() {
+        guard isRunning else { return }
+        isRunning = false
+        listeners.forEach { $0.cancel() }
+        listeners.removeAll()
+        wsReadyLock.lock()
+        wsReadyHosts.removeAll()
+        wsReadyLock.unlock()
+        liveConnectionsLock.lock()
+        let connections = Array(liveConnections.values)
+        liveConnections.removeAll()
+        liveConnectionsLock.unlock()
+        connections.forEach { $0.cancel() }
+        pairingBox.current = nil
+        log?("mobile bridge: stopped")
+    }
+
     /// P37 bind-scope invariant (security-critical, plan risk R6): the bridge has NO TLS. Its
     /// only wire encryption is WireGuard (the Tailscale interface); the loopback interface never
     /// leaves the machine. So it may bind ONLY `127.0.0.1` and a detected Tailscale IP — NEVER an
@@ -884,14 +1146,13 @@ public final class MobileBridgeServer: @unchecked Sendable {
     /// live pairing URL — nil until the first token is minted, and nil whenever NO WS listener
     /// is `.ready` (port squatted, R4): a URL nobody is listening behind would render a QR
     /// that can never work, so `enabled == true` + nil URL is exactly the panel's "bridge on
-    /// but not listening" error state. `enabled` is always true here — this method is only
-    /// reachable once `start()` has run, and main.swift only wires the IPC provider then; a
-    /// disabled bridge is represented by the provider being absent (DaemonServer then reports
-    /// enabled=false).
+    /// but not listening" error state. `enabled` mirrors `isRunning` — false both when the
+    /// bridge was never started AND after `stop()`, matching the toggle's off state now that
+    /// `start()`/`stop()` can happen live instead of only once at daemon launch.
     public func currentPairingInfo() -> (url: String?, secondsRemaining: Int, enabled: Bool) {
-        guard anyWSListenerReady, let pending = pairingBox.current else { return (nil, 0, true) }
+        guard anyWSListenerReady, let pending = pairingBox.current else { return (nil, 0, isRunning) }
         let remaining = max(0, Int(pending.expiresAt.timeIntervalSinceNow.rounded()))
-        return (pending.url, remaining, true)
+        return (pending.url, remaining, isRunning)
     }
 }
 #endif

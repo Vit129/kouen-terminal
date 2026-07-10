@@ -20,6 +20,10 @@ public final class DaemonServer: @unchecked Sendable {
     /// then reports `enabled: false`. A closure, not a typed reference, so this cross-platform
     /// type never has to `import Network` (the bridge is `canImport(Network)`-gated).
     public var mobilePairingInfoProvider: (@Sendable () -> (url: String?, secondsRemaining: Int, enabled: Bool))?
+    /// Backs `.setMobileBridgeEnabled` — starts/stops `MobileBridgeServer` in place. Set by
+    /// `KouenDaemonMain/main.swift` alongside `mobilePairingInfoProvider`; nil (no-op) on
+    /// platforms/builds where the bridge doesn't exist (Linux).
+    public var mobileBridgeSetEnabledHandler: (@Sendable (Bool) -> Void)?
     private var listener: DispatchSourceRead?
     private let queue = DispatchQueue(label: "com.vit129.kouen.daemon")
     private var clientBuffers: [Int32: Data] = [:]
@@ -451,6 +455,14 @@ public final class DaemonServer: @unchecked Sendable {
             case .mobilePairingInfo:
                 let info = mobilePairingInfoProvider?() ?? (url: nil, secondsRemaining: 0, enabled: false)
                 send(.mobilePairingInfo(url: info.url, secondsRemaining: info.secondsRemaining, enabled: info.enabled), to: fd)
+                continue
+            case let .setMobileBridgeEnabled(enabled):
+                guard let handler = mobileBridgeSetEnabledHandler else {
+                    send(.error("mobile bridge unavailable on this daemon"), to: fd)
+                    continue
+                }
+                handler(enabled)
+                send(.ok, to: fd)
                 continue
             default:
                 break
