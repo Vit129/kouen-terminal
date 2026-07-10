@@ -209,47 +209,33 @@ extension KouenTerminalSurfaceView {
     /// surprising handler (e.g. a custom app scheme) on ⌘-click. No `file:` — an OSC 8
     /// hyperlink comes from terminal output (possibly a remote host), and opening an
     /// arbitrary local path via NSWorkspace executes .app bundles and .command scripts.
-    /// File paths (absolute or relative to cwd) open in Kouen's file preview instead.
+    /// File paths (absolute, or relative to this terminal's last-known cwd) are handed to
+    /// the host as a best-effort candidate; the host resolves/validates them against the
+    /// authoritative workbench cwd (this surface's own OSC-7 `currentCwd` can be nil or
+    /// stale — e.g. a non-interactive agent subprocess that never emits OSC 7) and opens
+    /// them in Kouen's file preview — never via NSWorkspace.
     private func openLink(_ string: String) {
-        // Check if it's a local file path first
-        let path = resolveFilePath(string)
-        if let path, FileManager.default.fileExists(atPath: path) {
-            let isDirectory = (try? FileManager.default.attributesOfItem(atPath: path)[.type] as? FileAttributeType) == .typeDirectory
-            guard !isDirectory else { return }
-            // Don't open executables (.app, .command, etc.) — security
-            guard !path.hasSuffix(".app"), !path.hasSuffix(".command"), !path.hasSuffix(".tool") else { return }
-            // HTML files open in the browser pane, not file preview
-            if path.hasSuffix(".html") || path.hasSuffix(".htm") {
+        if let scheme = URL(string: string)?.scheme?.lowercased(), scheme != "file" {
+            // Every http/https link opens in the in-app Browser Pane instead of switching to
+            // the system browser. mailto/ftp/ftps still hand off — there's no in-app handler
+            // for those schemes. Any other scheme is refused outright.
+            guard let url = URL(string: string) else { return }
+            if ["http", "https"].contains(scheme) {
                 NotificationCenter.default.post(
                     name: Notification.Name("KouenOpenInBrowserPaneURL"),
                     object: nil,
-                    userInfo: ["url": URL(fileURLWithPath: path)]
+                    userInfo: ["url": url]
                 )
-                return
+            } else if ["mailto", "ftp", "ftps"].contains(scheme) {
+                NSWorkspace.shared.open(url)
             }
-            NotificationCenter.default.post(
-                name: Notification.Name("KouenOpenFilePreview"),
-                object: nil,
-                userInfo: ["path": path]
-            )
             return
         }
-        guard let url = URL(string: string), let scheme = url.scheme?.lowercased(),
-              ["http", "https", "mailto", "ftp", "ftps"].contains(scheme) else { return }
-
-        // Every http/https link opens in the in-app Browser Pane instead of switching to
-        // the system browser. mailto/ftp/ftps still hand off — there's no in-app handler
-        // for those schemes.
-        if ["http", "https"].contains(scheme) {
-            NotificationCenter.default.post(
-                name: Notification.Name("KouenOpenInBrowserPaneURL"),
-                object: nil,
-                userInfo: ["url": url]
-            )
-            return
-        }
-
-        NSWorkspace.shared.open(url)
+        NotificationCenter.default.post(
+            name: Notification.Name("KouenOpenFilePreview"),
+            object: nil,
+            userInfo: ["path": resolveFilePath(string) ?? string]
+        )
     }
 
     private func resolveFilePath(_ string: String) -> String? {

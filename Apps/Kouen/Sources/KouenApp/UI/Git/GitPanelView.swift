@@ -16,6 +16,8 @@ final class GitPanelView: NSView {
     private var lastNumstat = ""
     private var lastPorcelain = ""
     private var lastLog = ""
+    private var historyLimit = 25
+    private let historyPageSize = 25
 
     private struct RepoEntry: Equatable {
         let path: String
@@ -978,7 +980,7 @@ final class GitPanelView: NSView {
         async let aheadBehindTask = runGit(["rev-list", "--left-right", "--count", "@{upstream}...HEAD"], in: path)
         async let numstatTask = runGit(["diff", "--numstat", "HEAD"], in: path)
         async let porcelainTask = runGit(["status", "--porcelain"], in: path)
-        async let logTask = runGit(["log", "--format=%H|%an|%ar|%s", "-25"], in: path)
+        async let logTask = runGit(["log", "--format=%H|%an|%ar|%s", "-\(historyLimit)"], in: path)
 
         let branch = await branchTask
         let aheadBehind = await aheadBehindTask
@@ -1111,12 +1113,29 @@ final class GitPanelView: NSView {
 
         // History
         historyStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        for line in log.components(separatedBy: "\n").prefix(25) where !line.isEmpty {
+        let logLines = log.components(separatedBy: "\n").filter { !$0.isEmpty }
+        for line in logLines {
             let card = makeHistoryCard(line)
             historyStack.addArrangedSubview(card)
             card.leadingAnchor.constraint(equalTo: historyStack.leadingAnchor).isActive = true
             card.trailingAnchor.constraint(equalTo: historyStack.trailingAnchor).isActive = true
         }
+        // `git log -N` returning exactly N commits means there may be more — offer to fetch
+        // another page rather than silently capping history at historyLimit forever.
+        if logLines.count >= historyLimit {
+            let loadMore = NSButton(title: "Load more", target: self, action: #selector(loadMoreHistoryAction))
+            loadMore.bezelStyle = .recessed
+            loadMore.controlSize = .small
+            loadMore.font = .systemFont(ofSize: 11, weight: .medium)
+            loadMore.translatesAutoresizingMaskIntoConstraints = false
+            historyStack.addArrangedSubview(loadMore)
+            loadMore.leadingAnchor.constraint(equalTo: historyStack.leadingAnchor).isActive = true
+        }
+    }
+
+    @objc private func loadMoreHistoryAction() {
+        historyLimit += historyPageSize
+        Task { await refresh() }
     }
 
     // MARK: - Row builders

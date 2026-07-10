@@ -115,14 +115,28 @@ extension SessionCoordinator {
         }
     }
 
-    /// Walk up from `path` to find `.git/HEAD` and return the current branch name.
+    /// Walk up from `path` to find `.git` and return the current branch name from its `HEAD`.
     /// Returns nil for detached HEAD, worktrees with non-standard HEAD, or paths outside a repo.
     /// ponytail: direct file read — no subprocess, no blocking git invocation.
     private nonisolated static func readGitHead(at path: String) -> String? {
         var url = URL(fileURLWithPath: path, isDirectory: true)
         for _ in 0 ..< 16 {
-            let head = url.appendingPathComponent(".git/HEAD")
-            if let content = try? String(contentsOf: head, encoding: .utf8) {
+            let dotGit = url.appendingPathComponent(".git")
+            var isDirectory: ObjCBool = false
+            if FileManager.default.fileExists(atPath: dotGit.path, isDirectory: &isDirectory) {
+                let headURL: URL
+                if isDirectory.boolValue {
+                    headURL = dotGit.appendingPathComponent("HEAD")
+                } else {
+                    // Linked worktree: `.git` is a file containing "gitdir: <path/to/worktrees/name>".
+                    // Follow the redirect instead of walking past it to the main repo's HEAD.
+                    guard let redirect = try? String(contentsOf: dotGit, encoding: .utf8),
+                          let gitdirLine = redirect.split(separator: "\n").first(where: { $0.hasPrefix("gitdir:") })
+                    else { return nil }
+                    let gitdirPath = gitdirLine.dropFirst("gitdir:".count).trimmingCharacters(in: .whitespaces)
+                    headURL = URL(fileURLWithPath: gitdirPath).appendingPathComponent("HEAD")
+                }
+                guard let content = try? String(contentsOf: headURL, encoding: .utf8) else { return nil }
                 let s = content.trimmingCharacters(in: .whitespacesAndNewlines)
                 // "ref: refs/heads/main" → "main"; a detached HEAD is a bare hash → nil
                 guard s.hasPrefix("ref: refs/heads/") else { return nil }
