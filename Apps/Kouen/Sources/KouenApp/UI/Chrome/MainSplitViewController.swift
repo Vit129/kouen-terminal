@@ -175,7 +175,29 @@ final class MainSplitViewController: NSViewController {
     }
 
     @objc private func openFilePreviewFromTerminal(_ notification: Notification) {
-        guard let path = notification.userInfo?["path"] as? String else { return }
+        guard let rawPath = notification.userInfo?["path"] as? String else { return }
+        // The terminal surface's own OSC-7 cwd tracking can be nil or stale (e.g. a
+        // non-interactive agent subprocess that never emits OSC 7), so a raw candidate that
+        // doesn't exist as-is gets a second, authoritative resolution attempt here — same
+        // workbench-cwd + fuzzy-path fallback vi `:e` uses.
+        let resolvedPath = FileManager.default.fileExists(atPath: rawPath)
+            ? rawPath
+            : contentVC.resolveTerminalLinkPath(rawPath)
+        guard let path = resolvedPath else { return }
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory), !isDirectory.boolValue,
+              // Don't open executables (.app, .command, etc.) — security
+              !path.hasSuffix(".app"), !path.hasSuffix(".command"), !path.hasSuffix(".tool")
+        else { return }
+        // HTML files open in the browser pane, not file preview
+        if path.hasSuffix(".html") || path.hasSuffix(".htm") {
+            NotificationCenter.default.post(
+                name: Notification.Name("KouenOpenInBrowserPaneURL"),
+                object: nil,
+                userInfo: ["url": URL(fileURLWithPath: path)]
+            )
+            return
+        }
         contentVC.openFileTab(path: path)
         setSidebarVisible(true, animated: true)
         sidebar.selectFilesTab(revealPath: path)

@@ -26,6 +26,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
     var currentFilePath: String? { filePreview.currentFilePath }
 
     func openFileTab(path: String) { filePreview.openFileTab(path: path) }
+    func resolveTerminalLinkPath(_ path: String) -> String? { filePreview.resolveTerminalLinkPath(path) }
     func closeFileTab(id: FileTabID) { filePreview.closeFileTab(id: id) }
     func selectFileTab(id: FileTabID) { filePreview.selectFileTab(id: id) }
     func navigateCurrentFile(line: Int, column: Int) { filePreview.navigateCurrentFile(line: line, column: column) }

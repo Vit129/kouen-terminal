@@ -3,21 +3,21 @@ _Auto-generated from GRAPH_REPORT.md · do not edit manually_
 _Regen: `graphify update .`_
 
 ## Summary
-- 14480 nodes · 31850 edges · 3350 communities (880 shown, 2470 thin omitted)
-- Extraction: 89% EXTRACTED · 11% INFERRED · 0% AMBIGUOUS · INFERRED: 3482 edges (avg confidence: 0.8)
+- 14445 nodes · 31819 edges · 3373 communities (901 shown, 2472 thin omitted)
+- Extraction: 89% EXTRACTED · 11% INFERRED · 0% AMBIGUOUS · INFERRED: 3484 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 
 ## Graph Freshness
-- Built from commit: `fb70d91c`
+- Built from commit: `dbbe2604`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 
 ## God Nodes (most connected - your core abstractions)
 1. `SessionEditor` - 170 edges
-2. `SurfaceRegistry` - 154 edges
-3. `IPCRequest` - 154 edges
+2. `IPCRequest` - 155 edges
+3. `SurfaceRegistry` - 154 edges
 4. `DaemonClient` - 149 edges
 5. `SessionCoordinator` - 124 edges
 6. `KouenTerminalSurfaceView` - 124 edges
@@ -32,15 +32,15 @@ A high-degree node isn't always architecturally central - a widely-used
 utility/config file can rack up more edges than a real coupler while only
 ever touching one area. This ranks by how many DIFFERENT communities a
 node's neighbors span, not by raw edge count.
-1. `IPCRequest` - bridges 136 areas (154 edges)
+1. `IPCRequest` - bridges 141 areas (155 edges)
 2. `Command` - bridges 101 areas (107 edges)
-3. `SessionCoordinator` - bridges 56 areas (124 edges)
-4. `IPCResponse` - bridges 54 areas (72 edges)
-5. `MenuTarget` - bridges 53 areas (60 edges)
+3. `SessionCoordinator` - bridges 57 areas (124 edges)
+4. `IPCResponse` - bridges 57 areas (72 edges)
+5. `MenuTarget` - bridges 52 areas (60 edges)
 6. `SpecialKey` - bridges 52 areas (56 edges)
 7. `EngineConformanceTests` - bridges 50 areas (76 edges)
 8. `AgentKind` - bridges 45 areas (92 edges)
-9. `KouenPaths` - bridges 43 areas (100 edges)
+9. `SurfaceRegistry` - bridges 44 areas (154 edges)
 
 ## Surprising Connections (you probably didn't know these)
 - `SUI` --calls--> `Color`  [INFERRED]

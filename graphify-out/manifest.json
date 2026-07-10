@@ -9,19 +9,9 @@
     "ast_hash": "20253a428cb7f51daf1fce6127d0f6eb",
     "semantic_hash": ""
   },
-  "agent-memory/CONTEXT.md": {
-    "mtime": 1783558255.305797,
-    "ast_hash": "075490ebffea937cbe3f5515327828f9",
-    "semantic_hash": ""
-  },
   "agent-memory/INDEX.md": {
     "mtime": 1782015829.1599853,
     "ast_hash": "fffe0f336cc932c1fe6a5bacb6113fc5",
-    "semantic_hash": ""
-  },
-  "agent-memory/MEMORY.md": {
-    "mtime": 1783552110.9576092,
-    "ast_hash": "6f0f9b04b654de1dbc88fcf5b7b173bc",
     "semantic_hash": ""
   },
   "agent-memory/PLAYBOOK.md": {
@@ -32,11 +22,6 @@
   "agent-memory/SKILL-LOG.md": {
     "mtime": 1781446829.0783982,
     "ast_hash": "ba34ac1f7d0838f1eb4ba8db16102de3",
-    "semantic_hash": ""
-  },
-  "agent-memory/USER-PROFILE.md": {
-    "mtime": 1781276095.8195171,
-    "ast_hash": "c809877dfdb7b9335e6c3da1c48609ab",
     "semantic_hash": ""
   },
   "Package.swift": {
@@ -730,8 +715,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/Services/DaemonLauncher.swift": {
-    "mtime": 1783557923.6450756,
-    "ast_hash": "7a6920b9de968bd96a445ad0b8a31844",
+    "mtime": 1783585938.1988356,
+    "ast_hash": "3030f49e54a8079ff41f1be78ac4c7ff",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/Services/DaemonSyncService.swift": {
@@ -810,8 +795,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/Services/SessionCoordinator+HostDelegate.swift": {
-    "mtime": 1783306380.734867,
-    "ast_hash": "20d03f8ad1712e3b30a1db2a8b36186d",
+    "mtime": 1783654092.907658,
+    "ast_hash": "8e4518d9539e536ae0d135d730bbcd5b",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/Services/SessionCoordinator.swift": {
@@ -935,8 +920,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/Settings/SwiftUI/SettingsRemoteView.swift": {
-    "mtime": 1783551611.5503416,
-    "ast_hash": "597e26afc337b6501df619df9bcd34fe",
+    "mtime": 1783585925.0969667,
+    "ast_hash": "ecd23d0ac5c1fd60e95ec426c014528f",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/Settings/SwiftUI/SettingsRootView.swift": {
@@ -970,13 +955,13 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Chrome/ContentAreaViewController.swift": {
-    "mtime": 1783306380.7432883,
-    "ast_hash": "b11e27053657dcdf58312ae8351efc90",
+    "mtime": 1783654123.7775607,
+    "ast_hash": "c589d27bfd673164aa83581af47061ab",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Chrome/FilePreviewCoordinator.swift": {
-    "mtime": 1783306380.7434437,
-    "ast_hash": "10c09b9997b0a57087b04a7be547c2cd",
+    "mtime": 1783654131.1614323,
+    "ast_hash": "e2057a44023eacf392e261442ed90fad",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Chrome/KouenChrome.swift": {
@@ -995,8 +980,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Chrome/MainSplitViewController.swift": {
-    "mtime": 1783306380.74427,
-    "ast_hash": "d8207dec9f337998b0415e51dbcd7a9f",
+    "mtime": 1783654116.1583705,
+    "ast_hash": "7ff90e7ef3e902ae7ba6f8a0de223409",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Chrome/MainWindowController.swift": {
@@ -1605,8 +1590,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/KouenVersion.swift": {
-    "mtime": 1783558471.477859,
-    "ast_hash": "c92b35936f3ab4e8c618ad05f6f1550d",
+    "mtime": 1783643684.3507884,
+    "ast_hash": "fa8026980f73257ca33b7bfb64a6dd00",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Layouts/LayoutTemplate.swift": {
@@ -1695,8 +1680,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/GeneratedReleaseNotes.swift": {
-    "mtime": 1783558472.220118,
-    "ast_hash": "3a8a5171f7f88a6ad910633443eda1fa",
+    "mtime": 1783643685.0123568,
+    "ast_hash": "252b25ddf81184bb901817f97ad66ff6",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/ReleaseNotes.swift": {
@@ -1775,8 +1760,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/DaemonServer.swift": {
-    "mtime": 1783524064.164817,
-    "ast_hash": "defc44ebd17dd05bc1b542ff0086dcef",
+    "mtime": 1783585850.97254,
+    "ast_hash": "4e3c4b128bf29af45076d3cf1cf5e307",
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/FormatContextBuilder.swift": {
@@ -1800,8 +1785,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/SurfaceRegistry.swift": {
-    "mtime": 1783551410.2887108,
-    "ast_hash": "01878cc050119856cf5c5a6e0c93cfb2",
+    "mtime": 1783585854.386574,
+    "ast_hash": "8e67cb68115f55754cb1cb786d5fb587",
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/VersionBannerState.swift": {
@@ -1815,8 +1800,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemonMain/main.swift": {
-    "mtime": 1783524070.4573042,
-    "ast_hash": "0abd6efc7cf9b3c2ffbe67f9b91098e5",
+    "mtime": 1783585916.8679402,
+    "ast_hash": "e980efe195fcaae16212f97aebd42285",
     "semantic_hash": ""
   },
   "Packages/KouenIPC/Sources/KouenIPC/AgentNotification.swift": {
@@ -1850,8 +1835,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenIPC/Sources/KouenIPC/IPCMessage.swift": {
-    "mtime": 1783523768.879379,
-    "ast_hash": "752d1db37caf231444e0d3c46d977576",
+    "mtime": 1783585840.9615912,
+    "ast_hash": "ad880cd2bce870e566f4f9dedc177d95",
     "semantic_hash": ""
   },
   "Packages/KouenIPC/Sources/KouenIPC/Identifiers.swift": {
@@ -2285,8 +2270,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenTerminalKit/Sources/KouenTerminalKit/KouenTerminalSurfaceView+SelectionAndLinks.swift": {
-    "mtime": 1783306380.8418074,
-    "ast_hash": "269c159b4ba9f145e6b641a16468e484",
+    "mtime": 1783654107.3599863,
+    "ast_hash": "84768458920aa8bd64de00b68f8d76a0",
     "semantic_hash": ""
   },
   "Packages/KouenTerminalKit/Sources/KouenTerminalKit/KouenTerminalSurfaceView+Thumbnail.swift": {
@@ -3690,8 +3675,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/MobileBridgeServer.swift": {
-    "mtime": 1783555124.6569898,
-    "ast_hash": "e9386c5af381fad0e21dbe7914366aab",
+    "mtime": 1783589353.935541,
+    "ast_hash": "2ed645ccb05da87864d03caa860dbb4e",
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/PairedDeviceStore.swift": {
@@ -3730,13 +3715,18 @@
     "semantic_hash": ""
   },
   "agent-memory/plans/p37-mobile-connect-v1.md": {
-    "mtime": 1783523449.8134923,
-    "ast_hash": "86f7f4a7a62439fdd6ed21ec42e5d69e",
+    "mtime": 1783602450.6632187,
+    "ast_hash": "a5acb666124fb596f6c1ab45e574db46",
     "semantic_hash": ""
   },
   "Tests/KouenAppTests/DaemonLauncherTests.swift": {
     "mtime": 1783557986.3635433,
     "ast_hash": "336ec3b60f1841ed0e3b7914d33dd4ee",
+    "semantic_hash": ""
+  },
+  "Packages/KouenDaemon/Sources/KouenDaemon/MobileBridgeWebAssets.swift": {
+    "mtime": 1783589461.790485,
+    "ast_hash": "39fb6da69f040ac9b1be921f8ae76ea9",
     "semantic_hash": ""
   }
 }

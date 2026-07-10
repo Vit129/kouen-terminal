@@ -301,6 +301,24 @@ final class FilePreviewCoordinator {
         hosts.forEach { $0.setPresentsWithTransaction(false) }
     }
 
+    /// Resolves a file path referenced in terminal output (e.g. a ⌘-clicked link) against the
+    /// authoritative workbench cwd, with a fuzzy-path fallback — used when the terminal
+    /// surface's own OSC-7 cwd was nil/stale and the raw candidate doesn't exist as-is.
+    /// Silent (no `DisplayMessage`): unlike vi `:e`, this fires from a passive click, not a
+    /// typed command, so an unresolvable link should just no-op rather than show an overlay.
+    func resolveTerminalLinkPath(_ path: String) -> String? {
+        var expanded = (path as NSString).expandingTildeInPath
+        let cwd = currentWorkbenchCWD()
+        if !expanded.hasPrefix("/") {
+            expanded = (cwd as NSString).appendingPathComponent(expanded)
+        }
+        if FileManager.default.fileExists(atPath: expanded) { return expanded }
+        if case .unique(let match) = FuzzyPathResolver.resolve(query: path, root: cwd, limit: 5) {
+            return match
+        }
+        return nil
+    }
+
     private func resolveViPath(_ path: String, command: String) -> String? {
         var expanded = (path as NSString).expandingTildeInPath
         let cwd = currentWorkbenchCWD()
