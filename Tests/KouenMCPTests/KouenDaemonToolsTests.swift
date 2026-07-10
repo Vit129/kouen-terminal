@@ -45,7 +45,7 @@ final class KouenDaemonToolsTests: XCTestCase {
         let policy = ToolPolicy.load(from: missingPolicyURL, environment: [:])
         XCTAssertTrue(policy.isToolAllowed("kouenBoard"))
 
-        let registry = ToolRegistry(policy: policy)
+        let registry = ToolRegistry(policy: { policy })
         guard case let .object(root) = registry.listTools(),
               case let .array(tools) = root["tools"]
         else {
@@ -62,7 +62,7 @@ final class KouenDaemonToolsTests: XCTestCase {
     func testPolicyExplicitDenyBlocksControlTools() async throws {
         let policyURL = try writePolicy(#"{ "version": 1, "allowControl": false, "allowedTools": [] }"#)
         let policy = ToolPolicy.load(from: policyURL, environment: [:])
-        let registry = ToolRegistry(policy: policy)
+        let registry = ToolRegistry(policy: { policy })
 
         let params: AnyCodable = .object([
             "name": .string("sendPaneText"),
@@ -81,7 +81,7 @@ final class KouenDaemonToolsTests: XCTestCase {
     func testPolicyAllowsNamedToolOnly() async throws {
         let policyURL = try writePolicy(#"{ "version": 1, "allowControl": false, "allowedTools": ["writeFile"] }"#)
         let policy = ToolPolicy.load(from: policyURL, environment: [:])
-        let registry = ToolRegistry(policy: policy)
+        let registry = ToolRegistry(policy: { policy })
         let outputURL = temporaryDirectory().appendingPathComponent("policy-write.txt")
 
         let writeParams: AnyCodable = .object([
@@ -137,6 +137,43 @@ final class KouenDaemonToolsTests: XCTestCase {
         XCTAssertEqual(CommandIPCTranslator.layoutDirection(forPaneDirection: "down"), .vertical)
         XCTAssertEqual(CommandIPCTranslator.layoutDirection(forPaneDirection: "RIGHT"), .horizontal)
         XCTAssertNil(CommandIPCTranslator.layoutDirection(forPaneDirection: "diagonal"))
+    }
+
+    /// Regression for the bug where `ToolRegistry.init(policy: ToolPolicy = ToolPolicy.load())`
+    /// took a frozen *value*, loaded exactly once at construction, and captured it into the
+    /// closures handed to `KouenDaemonTools`/`KouenBrowserTools` — so editing `mcp-policy.json`
+    /// on disk had zero effect on an already-running `kouen-mcp` process until it was killed
+    /// and relaunched (real-world symptom: `allowControl: true` written to disk, tool calls on
+    /// the live process kept reporting disabled). `init(policy:)` now takes the *resolver*
+    /// closure — this test injects one that re-reads a controllable temp file (mirroring
+    /// production's default `{ ToolPolicy.load() }`), denies a control tool through the real
+    /// `callTool` dispatch path, rewrites the file, and asserts the *same* registry instance
+    /// allows it on the very next call with no new `ToolRegistry` constructed in between.
+    func testToolRegistryReloadsPolicyFromDiskOnEveryCall() async throws {
+        let policyURL = try writePolicy(#"{ "version": 1, "allowControl": false, "allowedTools": [] }"#)
+        let registry = ToolRegistry(policy: { ToolPolicy.load(from: policyURL, environment: [:]) })
+        let outputURL = temporaryDirectory().appendingPathComponent("reload-live.txt")
+
+        let params: AnyCodable = .object([
+            "name": .string("writeFile"),
+            "arguments": .object([
+                "path": .string(outputURL.path),
+                "content": .string("after reload"),
+            ]),
+        ])
+        let (deniedResult, deniedError) = await registry.callTool(params: params)
+        XCTAssertNil(deniedResult)
+        XCTAssertEqual(deniedError?.code, -32000)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: outputURL.path))
+
+        // Rewrite the same file to now allow it — no new ToolRegistry constructed.
+        try #"{ "version": 1, "allowControl": true, "allowedTools": [] }"#
+            .write(to: policyURL, atomically: true, encoding: .utf8)
+
+        let (allowedResult, allowedError) = await registry.callTool(params: params)
+        XCTAssertNil(allowedError, "ToolRegistry must re-resolve the policy on every call, not cache the value from construction time")
+        XCTAssertNotNil(allowedResult)
+        XCTAssertEqual(try String(contentsOf: outputURL, encoding: .utf8), "after reload")
     }
 
     func testToolRegistryRejectsNonStringKeys() async {

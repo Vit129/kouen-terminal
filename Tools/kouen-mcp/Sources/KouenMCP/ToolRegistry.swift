@@ -2,20 +2,31 @@ import Foundation
 import KouenCore
 
 /// Registry of MCP tools exposed to agents.
+///
+/// Policy is re-resolved on every check rather than loaded once at construction —
+/// `mcp-policy.json` (or `KOUEN_MCP_ALLOW_CONTROL`) can change at any time while a
+/// daemon/mcp process keeps running for hours, and a stale in-memory snapshot would
+/// silently ignore that change until the process was killed and relaunched.
+///
+/// `init(policy:)` takes the resolver itself (defaulting to a fresh `ToolPolicy.load()`
+/// per call) rather than a frozen `ToolPolicy` value — that's what makes the reload-on-
+/// every-check behavior real instead of just theoretically possible. Tests can pass a
+/// closure that always returns the same fixed policy for determinism, or one that reads
+/// a controllable temp file to assert live-reload behavior end-to-end.
 struct ToolRegistry: Sendable {
-    private let policy: ToolPolicy
+    private let resolvePolicy: @Sendable () -> ToolPolicy
     private let daemonTools: KouenDaemonTools
     private let browserTools: KouenBrowserTools
 
-    init(policy: ToolPolicy = ToolPolicy.load()) {
-        self.policy = policy
+    init(policy resolvePolicy: @escaping @Sendable () -> ToolPolicy = { ToolPolicy.load() }) {
+        self.resolvePolicy = resolvePolicy
         self.daemonTools = KouenDaemonTools(
-            isToolAllowed: { policy.isToolAllowed($0) },
-            disabledError: { policy.disabledError(for: $0) }
+            isToolAllowed: { resolvePolicy().isToolAllowed($0) },
+            disabledError: { resolvePolicy().disabledError(for: $0) }
         )
         self.browserTools = KouenBrowserTools(
-            isToolAllowed: { policy.isToolAllowed($0) },
-            disabledError: { policy.disabledError(for: $0) }
+            isToolAllowed: { resolvePolicy().isToolAllowed($0) },
+            disabledError: { resolvePolicy().disabledError(for: $0) }
         )
     }
 
@@ -242,8 +253,8 @@ struct ToolRegistry: Sendable {
     }
 
     private func writeFile(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
-        guard policy.isToolAllowed("writeFile") else {
-            return (nil, policy.disabledError(for: "writeFile"))
+        guard resolvePolicy().isToolAllowed("writeFile") else {
+            return (nil, resolvePolicy().disabledError(for: "writeFile"))
         }
         guard case let .string(path)? = args["path"],
               case let .string(content)? = args["content"] else {
@@ -391,8 +402,8 @@ struct ToolRegistry: Sendable {
     // MARK: - Terminal tools
 
     private func runCommand(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
-        guard policy.isToolAllowed("runCommand") else {
-            return (nil, policy.disabledError(for: "runCommand"))
+        guard resolvePolicy().isToolAllowed("runCommand") else {
+            return (nil, resolvePolicy().disabledError(for: "runCommand"))
         }
         guard case let .string(command)? = args["command"] else {
             return (nil, JSONRPCError(code: -32602, message: "Missing 'command' parameter"))
