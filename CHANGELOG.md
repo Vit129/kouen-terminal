@@ -8,7 +8,7 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [4.3.0] - 2026-07-10
 
 ### Added
-- Release version bump to v4.3.0.
+- Mobile bridge Settings toggle no longer restarts daemon + P37 Phase C real terminal client (release v4.3.0) ([`36d09db`](https://github.com/Vit129/kouen-terminal/commit/36d09db783b1bebdd633481a09849aab84313117))
 
 ## [4.2.0] - 2026-07-09
 

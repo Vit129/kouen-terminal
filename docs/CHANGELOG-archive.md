@@ -2,6 +2,27 @@
 
 Older releases. See [CHANGELOG.md](../CHANGELOG.md) for recent versions.
 
+## [4.1.0] - 2026-07-08
+
+### Added
+- Add QuickTerminalController, a visor-style ⌥Space terminal panel ([`c800173`](https://github.com/Vit129/kouen-terminal/commit/c800173bae53c4ace9967c270a1bdd3eda366dc2))
+- Darken app icon green + add dark-mode Dock icon via runtime swap ([`7be5721`](https://github.com/Vit129/kouen-terminal/commit/7be572185b3bd60eeee37633b7740d6c03bb1c2b))
+- P25 mobile pairing bridge — pairing MVP + production wiring (build 195) ([`97afd2e`](https://github.com/Vit129/kouen-terminal/commit/97afd2e48da2fd83e6697a590b42680fe10e5ab5))
+
+### Documentation
+- Add fork maintainer's copyright to LICENSE ([`c88785d`](https://github.com/Vit129/kouen-terminal/commit/c88785d55941b737638b796205f7d1ba9e5927c4))
+- Update agent memory notes ([`c9d9736`](https://github.com/Vit129/kouen-terminal/commit/c9d9736d21f2422a5f07183e4929cef2b0815682))
+
+### Fixed
+- Bump CI's pinned Xcode from 16 to 26.5 to match the dev toolchain ([`4c494e0`](https://github.com/Vit129/kouen-terminal/commit/4c494e0111ffa8c4ce26beacb39fa1467ff6801f))
+- Guard UserNotifications import for Linux headless daemon build ([`ae55714`](https://github.com/Vit129/kouen-terminal/commit/ae557146e1c5781fcf3727eca5e3f3f05e951eb1))
+- Use the existing kouenStderr/new kouenStdout idiom in CLI install-tools/agent ([`56e5c35`](https://github.com/Vit129/kouen-terminal/commit/56e5c3509cb27c7911de0e3a64da4875a9e3b20d))
+- Pad dark Dock icon to match light icon's OS-auto-shrunk size ([`e6a1316`](https://github.com/Vit129/kouen-terminal/commit/e6a13163394bd4f9e7fc3ff867473e50394a37e9))
+- OAuth login and nested-iframe scroll in embedded browser pane ([`db5c34d`](https://github.com/Vit129/kouen-terminal/commit/db5c34d9188d69b013890af223814337d0bde065))
+- Prune legacy harness-cli hook entries on agent reinstall ([`57936a3`](https://github.com/Vit129/kouen-terminal/commit/57936a3f24b2738fd3aafb4937fa56c2f369203d))
+- Stop QuickLook preview flicker loop from self-triggered attrib events ([`9bca6ab`](https://github.com/Vit129/kouen-terminal/commit/9bca6abcceef322744413628cd37536490ef1825))
+- Clean up git panel error toast for push/fetch/pull failures ([`c7a675a`](https://github.com/Vit129/kouen-terminal/commit/c7a675a04bae56fae331d72f7745e15056d33303))
+
 ## [4.0.0] - 2026-07-06
 
 ### Added
