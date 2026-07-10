@@ -63,10 +63,10 @@ struct SettingsRemoteView: View {
                 get: { model.settings.mobileBridgeEnabled },
                 set: { enabled in
                     model.update(\.mobileBridgeEnabled, enabled)
-                    DaemonLauncher.shared.restartForMobileBridgeSettingChange()
+                    SessionCoordinator.shared.requestDaemon(.setMobileBridgeEnabled(enabled))
                 }
             ))
-            Text("Lets a phone pair via QR (`kouen-cli mobile-list-clients`/`mobile-revoke-client` manage paired devices). Binds loopback + Tailscale only, never plain LAN. Restarting the daemon to apply — running PTYs/agents survive, same as an app update.")
+            Text("Lets a phone pair via QR (`kouen-cli mobile-list-clients`/`mobile-revoke-client` manage paired devices). Binds loopback + Tailscale only, never plain LAN. Takes effect immediately — no restart, running PTYs/agents are unaffected.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 

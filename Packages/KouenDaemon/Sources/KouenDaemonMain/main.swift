@@ -180,21 +180,35 @@ do {
     AgentScanner.shared.start(registry: server.registry)
     daemonLog("KouenDaemon ready (socket=\(KouenPaths.socketURL.path))")
 
-    // P25 W1 slice 1: opt-in mobile WS bridge, disabled unless explicitly requested.
-    // Unavailable on the Linux headless build (Network.framework is Apple-only).
+    // P25 W1 slice 1: opt-in mobile WS bridge. Unavailable on the Linux headless build
+    // (Network.framework is Apple-only). The instance is always created so the Settings
+    // toggle (`.setMobileBridgeEnabled`) can start/stop it in the running daemon — no restart
+    // needed any more, which used to drop whatever pane/agent hosted the toggle click.
     #if canImport(Network)
-    if let portString = ProcessInfo.processInfo.environment["KOUEN_MOBILE_BRIDGE_PORT"],
-       let port = UInt16(portString) {
-        let pageURLPort = ProcessInfo.processInfo.environment["KOUEN_MOBILE_BRIDGE_PAGE_PORT"]
-            .flatMap(Int.init) ?? 8080
-        // Must outlive this `if let` — a bare `MobileBridgeServer().start(...)` temporary
-        // gets deallocated the instant `start()` returns, silently turning every `[weak
-        // self]` closure inside it (listener callbacks, the pairing loop) into a no-op.
-        mobileBridgeServer = MobileBridgeServer()
-        mobileBridgeServer?.start(wsPort: port, pageURLPort: pageURLPort, store: server.pairedDevices, log: daemonLog)
-        // P37 B1: let the IPC layer read the live pairing URL/countdown from the bridge, the
-        // same shared-reference pattern as `server.pairedDevices` above (main.swift holds both).
-        server.mobilePairingInfoProvider = { mobileBridgeServer?.currentPairingInfo() ?? (url: nil, secondsRemaining: 0, enabled: false) }
+    let bridgeWSPort = ProcessInfo.processInfo.environment["KOUEN_MOBILE_BRIDGE_PORT"]
+        .flatMap(UInt16.init) ?? 7777
+    let bridgePageURLPort = ProcessInfo.processInfo.environment["KOUEN_MOBILE_BRIDGE_PAGE_PORT"]
+        .flatMap(Int.init) ?? 8080
+    // Must outlive this scope — a bare `MobileBridgeServer().start(...)` temporary gets
+    // deallocated the instant `start()` returns, silently turning every `[weak self]` closure
+    // inside it (listener callbacks, the pairing loop) into a no-op.
+    let bridge = MobileBridgeServer()
+    mobileBridgeServer = bridge
+    // P37 B1: let the IPC layer read the live pairing URL/countdown from the bridge, the
+    // same shared-reference pattern as `server.pairedDevices` above (main.swift holds both).
+    server.mobilePairingInfoProvider = { mobileBridgeServer?.currentPairingInfo() ?? (url: nil, secondsRemaining: 0, enabled: false) }
+    server.mobileBridgeSetEnabledHandler = { enabled in
+        if enabled {
+            bridge.start(wsPort: bridgeWSPort, pageURLPort: bridgePageURLPort, store: server.pairedDevices, log: daemonLog)
+        } else {
+            bridge.stop()
+        }
+    }
+    // Still opt-in at boot: only auto-start if the setting was already on when the daemon
+    // launched (env var set by the LaunchAgent plist install). A live toggle afterward goes
+    // through `mobileBridgeSetEnabledHandler` above instead.
+    if ProcessInfo.processInfo.environment["KOUEN_MOBILE_BRIDGE_PORT"] != nil {
+        bridge.start(wsPort: bridgeWSPort, pageURLPort: bridgePageURLPort, store: server.pairedDevices, log: daemonLog)
     }
     #endif
 

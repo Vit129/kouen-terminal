@@ -10,8 +10,8 @@
     "semantic_hash": ""
   },
   "agent-memory/CONTEXT.md": {
-    "mtime": 1783519825.975805,
-    "ast_hash": "c1cadb33ff60a9fc8521360aebbb9d28",
+    "mtime": 1783558255.305797,
+    "ast_hash": "075490ebffea937cbe3f5515327828f9",
     "semantic_hash": ""
   },
   "agent-memory/INDEX.md": {
@@ -20,8 +20,8 @@
     "semantic_hash": ""
   },
   "agent-memory/MEMORY.md": {
-    "mtime": 1783545912.7491708,
-    "ast_hash": "b813282fba3f3803fbdc5dc910086a12",
+    "mtime": 1783552110.9576092,
+    "ast_hash": "6f0f9b04b654de1dbc88fcf5b7b173bc",
     "semantic_hash": ""
   },
   "agent-memory/PLAYBOOK.md": {
@@ -730,8 +730,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/Services/DaemonLauncher.swift": {
-    "mtime": 1783519825.9566412,
-    "ast_hash": "7729f421e03e6a4fc62c7e602aa01093",
+    "mtime": 1783557923.6450756,
+    "ast_hash": "7a6920b9de968bd96a445ad0b8a31844",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/Services/DaemonSyncService.swift": {
@@ -1605,8 +1605,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/KouenVersion.swift": {
-    "mtime": 1783522635.6979518,
-    "ast_hash": "2dedeaf31b70b525c35307e22d402552",
+    "mtime": 1783558471.477859,
+    "ast_hash": "c92b35936f3ab4e8c618ad05f6f1550d",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Layouts/LayoutTemplate.swift": {
@@ -1695,8 +1695,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/GeneratedReleaseNotes.swift": {
-    "mtime": 1783522636.4153981,
-    "ast_hash": "77f4bce81fd67b0e5b0aa13ed80e0cc7",
+    "mtime": 1783558472.220118,
+    "ast_hash": "3a8a5171f7f88a6ad910633443eda1fa",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/ReleaseNotes.swift": {
@@ -3690,8 +3690,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/MobileBridgeServer.swift": {
-    "mtime": 1783551659.489546,
-    "ast_hash": "6e46d7de61b1a08aa9573d00c538adc9",
+    "mtime": 1783555124.6569898,
+    "ast_hash": "e9386c5af381fad0e21dbe7914366aab",
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/PairedDeviceStore.swift": {
@@ -3715,8 +3715,8 @@
     "semantic_hash": ""
   },
   "Tests/KouenDaemonTests/MobileBridgePairingTests.swift": {
-    "mtime": 1783551702.0946822,
-    "ast_hash": "3798c9c713c0b79825502f0b75b13c8f",
+    "mtime": 1783555144.9791498,
+    "ast_hash": "f734b9e1f142d57b8a9832a764fe4fe8",
     "semantic_hash": ""
   },
   "agent-memory/plans/p25-mobile-session-switcher-design.html": {
@@ -3732,6 +3732,11 @@
   "agent-memory/plans/p37-mobile-connect-v1.md": {
     "mtime": 1783523449.8134923,
     "ast_hash": "86f7f4a7a62439fdd6ed21ec42e5d69e",
+    "semantic_hash": ""
+  },
+  "Tests/KouenAppTests/DaemonLauncherTests.swift": {
+    "mtime": 1783557986.3635433,
+    "ast_hash": "336ec3b60f1841ed0e3b7914d33dd4ee",
     "semantic_hash": ""
   }
 }

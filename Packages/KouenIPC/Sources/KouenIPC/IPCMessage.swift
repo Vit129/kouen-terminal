@@ -33,6 +33,10 @@ public enum IPCRequest: Codable, Sendable {
     /// pairing URL, seconds until the current token rotates, and whether the bridge is
     /// enabled. Nil URL when the bridge is off (opt-in, see `MobileBridgeServer`).
     case mobilePairingInfo
+    /// Starts or stops the mobile WS bridge in the already-running daemon, so the Settings
+    /// toggle no longer needs a full daemon restart to take effect (that used to drop every
+    /// live PTY/agent session hosted by the pane it restarted).
+    case setMobileBridgeEnabled(Bool)
     case newWorkspace(name: String)
     case newSession(workspaceID: UUID, cwd: String?, name: String?, shell: String? = nil, worktreePath: String? = nil, parentRepoPath: String? = nil, taskName: String? = nil)
     /// tmux `new-session -t <session>`: an independent session grouped with the target,

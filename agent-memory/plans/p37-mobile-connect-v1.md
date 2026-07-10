@@ -54,12 +54,14 @@ Phone (Tailscale app, same tailnet)
   - URL as selectable monospace `Text` + copy button
   - Paired-devices list below (name, first-paired date, Revoke button) — data from `mobile-list-clients` IPC path
 
-### Phase C — Real mobile client (W3, replaces smoke-test page)
-- xterm.js terminal + session-switcher list per `p25-mobile-session-switcher-design.html` (dark terminal aesthetic already specified there — implementation agent reads that file for tokens/layout, does NOT invent a new design).
-- Served the same way (embedded in daemon; consider moving to a generated-resource step if the string gets unwieldy — R7).
-- Reconnect flow uses A2 device secret (no re-scan).
-- Resize-sync (old W2) folds in here: client sends `{"resize":{cols,rows}}`, daemon forwards to PTY.
-- Out of scope for v1: file preview/attach, git panel, LSP, notifications (former W4+).
+### Phase C — Real mobile client (W3, replaces smoke-test page) — DONE 2026-07-09, uncommitted
+- xterm.js terminal + session-switcher list per `p25-mobile-session-switcher-design.html` (dark terminal aesthetic already specified there — implementation agent reads that file for tokens/layout, does NOT invent a new design). Shipped: `@xterm/xterm` 5.5.0 + `@xterm/addon-fit` 0.10.0 vendored from jsdelivr (user-confirmed source), all four views from the design doc (home/paired-toast/list/term/sheet).
+- Served the same way (embedded in daemon; consider moving to a generated-resource step if the string gets unwieldy — R7). Shipped as-is, embedded — R7 accepted as designed. One twist R7 didn't anticipate: minified xterm.js has literal C0 control bytes (raw ESC 0x1B for mouse-tracking), which a raw Swift string literal rejects outright — vendored as base64 in a new `MobileBridgeWebAssets.swift` instead, decoded once at load.
+- Reconnect flow uses A2 device secret (no re-scan). Shipped, reused as-is from Phase A.
+- Resize-sync (old W2) folds in here: client sends `{"resize":{cols,rows}}`, daemon forwards to PTY. Shipped: `FitAddon` → `term.onResize` → WS → `handleControlMessage` → `DaemonSubscription.resize()` (per-connection vote, not a fresh `DaemonClient`).
+- Out of scope for v1: file preview/attach, git panel, LSP, notifications (former W4+). Still out of scope, untouched.
+- Verified: build clean (app+daemon), `MobileBridgePairingTests` 11/11, robot 10/10, AND a live scripted-WS round-trip (auth → sessions → spawn → attach → resize → real PTY echo → detach) against an isolated daemon instance — not just build-green (see MEMORY.md 2026-07-09).
+- **Not done:** real-phone scan E2E (only scripted/loopback verified); deploy to the actual running app (`make prod`/`install` + relaunch).
 
 ## Verification gates (every phase)
 - `swift build` + `swift test` green, `Tests/robot/run.sh` 10/10

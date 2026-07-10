@@ -55,20 +55,6 @@ final class DaemonLauncher: @unchecked Sendable {
         KouenSettings.load().mobileBridgeEnabled ? Self.mobileBridgePort : nil
     }
 
-    /// Call after the mobile-bridge Settings toggle changes. That setting isn't covered by the
-    /// build-handshake staleness check `ensureRunningBlocking` normally relies on, so it needs an
-    /// explicit restart cue here instead of waiting for the next staleness poll.
-    func restartForMobileBridgeSettingChange() {
-        queue.async { [weak self] in
-            guard let self else { return }
-            if self.isPreview {
-                self.spawnFallbackProcess(forceRestart: true)
-            } else {
-                self.restartStaleDaemon()
-            }
-        }
-    }
-
     /// Ensure a daemon is reachable, off the main thread. `completion` runs on the
     /// main thread with `true` if the daemon answers. Safe to call at launch — the
     /// UI can build immediately and refresh from the callback.
