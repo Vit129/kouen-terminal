@@ -79,3 +79,4 @@ __pycache__/
 
 # Transient memory-hook marker — leaks into commits periodically (see 79b75bab), never source.
 agent-memory/.memory-pending
+
