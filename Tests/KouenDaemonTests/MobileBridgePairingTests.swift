@@ -30,7 +30,7 @@ final class MobileBridgePairingTests: XCTestCase {
     // MARK: - A1: lockout accounting
 
     func testLockoutTripsOnExactlyTheNthFailureAndOnlyReportsOnce() {
-        let box = MobileBridgeServer.PairingBox(maxAttempts: 5)
+        let box = MobileBridgeServer.PairingBox(maxAttempts: 5, graceWindow: 60)
         box.current = .init(token: "123456", url: "http://x/", expiresAt: .distantFuture)
         for i in 1...4 {
             XCTAssertFalse(box.recordFailure(), "failure \(i) must not report the lockout transition")
@@ -43,7 +43,7 @@ final class MobileBridgePairingTests: XCTestCase {
     }
 
     func testTokenRotationResetsLockout() {
-        let box = MobileBridgeServer.PairingBox(maxAttempts: 2)
+        let box = MobileBridgeServer.PairingBox(maxAttempts: 2, graceWindow: 60)
         box.current = .init(token: "111111", url: "http://x/", expiresAt: .distantFuture)
         _ = box.recordFailure()
         _ = box.recordFailure()
@@ -51,6 +51,38 @@ final class MobileBridgePairingTests: XCTestCase {
         // The pairing loop's next `current = ...` write is the release condition.
         box.current = .init(token: "222222", url: "http://x/", expiresAt: .distantFuture)
         XCTAssertFalse(box.isLockedOut)
+    }
+
+    // MARK: - Rotation-boundary grace (proven real-device root cause: a phone holds the
+    // page-URL token from load time while the server rotates past it before connect)
+
+    func testPreviousTokenStaysRedeemableAcrossOneRotation() {
+        let box = MobileBridgeServer.PairingBox(maxAttempts: 5, graceWindow: 60)
+        // Phone loaded its page while "111111" was current (expires soon).
+        box.current = .init(token: "111111", url: "http://x/", expiresAt: Date().addingTimeInterval(1))
+        // Server rotates before the phone's frame lands — "111111" moves to the grace slot.
+        box.current = .init(token: "222222", url: "http://x/", expiresAt: .distantFuture)
+        XCTAssertEqual(box.check("222222"), .accepted, "current token must pair")
+        XCTAssertEqual(box.check("111111"), .accepted, "the just-rotated-out token must still pair within grace — the bug this fixes")
+        XCTAssertEqual(box.check("999999"), .mismatch, "an unrelated token is a mismatch, not accepted")
+    }
+
+    func testGraceExpiryClassifiesAsExpiredNotMismatch() {
+        // graceWindow 0 => the previous token's grace deadline is already past the instant it rotates.
+        let box = MobileBridgeServer.PairingBox(maxAttempts: 5, graceWindow: 0)
+        box.current = .init(token: "111111", url: "http://x/", expiresAt: Date().addingTimeInterval(-1))
+        box.current = .init(token: "222222", url: "http://x/", expiresAt: .distantFuture)
+        XCTAssertEqual(box.check("111111"), .expired, "correct-but-lapsed token reads as expired (a real device that was too slow), not mismatch")
+        XCTAssertEqual(box.check("222222"), .accepted)
+    }
+
+    func testClearMakesEveryTokenUnredeemable() {
+        let box = MobileBridgeServer.PairingBox(maxAttempts: 5, graceWindow: 60)
+        box.current = .init(token: "111111", url: "http://x/", expiresAt: .distantFuture)
+        box.current = .init(token: "222222", url: "http://x/", expiresAt: .distantFuture)
+        box.clear() // what stop() calls — a stopped bridge must not leave the last token redeemable via grace
+        XCTAssertEqual(box.check("222222"), .noActivePairing)
+        XCTAssertEqual(box.check("111111"), .noActivePairing)
     }
 
     // MARK: - Constant-time compare
