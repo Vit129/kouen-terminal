@@ -611,7 +611,8 @@ public final class TerminalHostView: NSView {
         bar.onClose = { [weak self] in self?.hideFind() }
         addSubview(bar)
         NSLayoutConstraint.activate([
-            bar.topAnchor.constraint(equalTo: topAnchor, constant: 8),
+            // Below PaneSplitButtonsView (top:8 + 22pt buttons + 6pt insets = 36pt tall), not on top of it.
+            bar.topAnchor.constraint(equalTo: topAnchor, constant: 44),
             bar.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
         ])
         nativeView.onFindResultsChanged = { [weak bar] current, total in bar?.setResults(current: current, total: total) }
