@@ -181,6 +181,69 @@ struct ToolRegistry: Sendable {
                 param("workspaceId", "string", "Workspace UUID (optional, uses active workspace if omitted)"),
                 param("cwd", "string", "Working directory for the new session (optional)"),
             ]),
+            toolDef("kouenTaskList", "List Tasks — checklist items scoped to a session. Omit sessionId to list across every session (powers the Task Dashboard)", [
+                param("sessionId", "string", "Session UUID to filter by (optional, omit for all sessions)"),
+            ]),
+            toolDef("kouenTaskGet", "Get a single Task by id", [
+                param("id", "string", "Task UUID"),
+            ]),
+            toolDef("kouenTaskCreate", "Create a Task belonging to a session", [
+                param("sessionId", "string", "Session UUID this Task belongs to"),
+                param("title", "string", "Task title"),
+            ]),
+            toolDef("kouenTaskUpdate", "Update a Task's title and/or done state", [
+                param("id", "string", "Task UUID"),
+                param("title", "string", "New title (optional)"),
+                param("done", "boolean", "New done state (optional)"),
+            ]),
+            toolDef("kouenTaskDelete", "Delete a Task", [
+                param("id", "string", "Task UUID"),
+            ]),
+            toolDef("kouenWorktreeList", "List git worktrees for a repository (Kouen's worktree-per-branch-per-agent isolation)", [
+                param("repoPath", "string", "Repository root path (contains .git)"),
+            ]),
+            toolDef("kouenWorktreeCreate", "Create an isolated git worktree for a repository (requires MCP policy allowlist or KOUEN_MCP_ALLOW_CONTROL=1)", [
+                param("repoPath", "string", "Repository root path (contains .git)"),
+                param("sessionId", "string", "Identifier used as the worktree folder name"),
+                param("branch", "string", "Branch name to create/checkout (optional, detached HEAD if omitted)"),
+                param("baseRef", "string", "Ref to branch from, e.g. 'origin/main' (optional, defaults to HEAD)"),
+            ]),
+            toolDef("kouenWorktreeRemove", "Remove a git worktree (requires MCP policy allowlist or KOUEN_MCP_ALLOW_CONTROL=1)", [
+                param("repoPath", "string", "Repository root path (contains .git)"),
+                param("worktreePath", "string", "Path to the worktree to remove"),
+                param("force", "boolean", "Discard uncommitted changes in the worktree (optional, default false — never silently discards work)"),
+            ]),
+            toolDef("kouenHostList", "List configured remote hosts (Settings > Remote) reachable by SSH. Read-only — creating/editing a host stays a Settings-UI-only action", []),
+            toolDef("kouenAutomationList", "List Automations — scheduled agent launches", []),
+            toolDef("kouenAutomationGet", "Get a single Automation by id", [
+                param("id", "string", "Automation UUID"),
+            ]),
+            toolDef("kouenAutomationCreate", "Create an Automation. On fire, spawns a session in repoPath, launches agent, then types prompt (requires MCP policy allowlist or KOUEN_MCP_ALLOW_CONTROL=1)", [
+                param("repoPath", "string", "Working directory to spawn the session in"),
+                param("agent", "string", "Agent to launch: 'claude', 'codex', 'kiro', or 'gemini'"),
+                param("prompt", "string", "Text typed into the agent after launch — e.g. \"ทำต่อ agent-memory/plans/p40.../dev-task-progress.md\" to resume a specific plan via this project's own continuation convention"),
+                param("intervalMinutes", "number", "Minutes between auto-fires. 0 disables auto-fire (manual/run-now only)"),
+                param("workspaceId", "string", "Workspace UUID to spawn in (optional, uses first workspace if omitted)"),
+            ]),
+            toolDef("kouenAutomationUpdate", "Update an Automation's repoPath/agent/prompt/intervalMinutes (requires MCP policy allowlist or KOUEN_MCP_ALLOW_CONTROL=1)", [
+                param("id", "string", "Automation UUID"),
+                param("repoPath", "string", "New working directory (optional)"),
+                param("agent", "string", "New agent (optional)"),
+                param("prompt", "string", "New prompt text (optional)"),
+                param("intervalMinutes", "number", "New auto-fire interval in minutes (optional)"),
+            ]),
+            toolDef("kouenAutomationDelete", "Delete an Automation (requires MCP policy allowlist or KOUEN_MCP_ALLOW_CONTROL=1)", [
+                param("id", "string", "Automation UUID"),
+            ]),
+            toolDef("kouenAutomationPause", "Pause an Automation's auto-fire schedule (requires MCP policy allowlist or KOUEN_MCP_ALLOW_CONTROL=1)", [
+                param("id", "string", "Automation UUID"),
+            ]),
+            toolDef("kouenAutomationResume", "Resume a paused Automation's auto-fire schedule (requires MCP policy allowlist or KOUEN_MCP_ALLOW_CONTROL=1)", [
+                param("id", "string", "Automation UUID"),
+            ]),
+            toolDef("kouenAutomationRunNow", "Fire an Automation immediately, bypassing its schedule and enabled state (requires MCP policy allowlist or KOUEN_MCP_ALLOW_CONTROL=1)", [
+                param("id", "string", "Automation UUID"),
+            ]),
         ])])
     }
 
@@ -234,6 +297,23 @@ struct ToolRegistry: Sendable {
         case "kouenBrowserGoForward": return await kouenBrowserGoForward(args)
         case "kouenBrowserReload": return await kouenBrowserReload(args)
         case "kouenSpawnAgent": return await kouenSpawnAgent(args)
+        case "kouenTaskList": return await kouenTaskList(args)
+        case "kouenTaskGet": return await kouenTaskGet(args)
+        case "kouenTaskCreate": return await kouenTaskCreate(args)
+        case "kouenTaskUpdate": return await kouenTaskUpdate(args)
+        case "kouenTaskDelete": return await kouenTaskDelete(args)
+        case "kouenWorktreeList": return await kouenWorktreeList(args)
+        case "kouenWorktreeCreate": return await kouenWorktreeCreate(args)
+        case "kouenWorktreeRemove": return await kouenWorktreeRemove(args)
+        case "kouenHostList": return await daemonTools.hostList()
+        case "kouenAutomationList": return await daemonTools.automationList()
+        case "kouenAutomationGet": return await kouenAutomationGet(args)
+        case "kouenAutomationCreate": return await kouenAutomationCreate(args)
+        case "kouenAutomationUpdate": return await kouenAutomationUpdate(args)
+        case "kouenAutomationDelete": return await kouenAutomationDelete(args)
+        case "kouenAutomationPause": return await kouenAutomationPause(args)
+        case "kouenAutomationResume": return await kouenAutomationResume(args)
+        case "kouenAutomationRunNow": return await kouenAutomationRunNow(args)
         default:
             return (nil, JSONRPCError(code: -32602, message: "Unknown tool: \(name)"))
         }
@@ -313,6 +393,136 @@ struct ToolRegistry: Sendable {
             return (nil, JSONRPCError(code: -32602, message: "Missing 'blockId' parameter"))
         }
         return await daemonTools.getBlock(surfaceId: surfaceId, blockId: blockId)
+    }
+
+    // MARK: - Task tools
+
+    private func kouenTaskList(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        await daemonTools.taskList(sessionId: optionalStringArg(args["sessionId"]))
+    }
+
+    private func kouenTaskGet(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        guard case let .string(id)? = args["id"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'id' parameter"))
+        }
+        return await daemonTools.taskGet(id: id)
+    }
+
+    private func kouenTaskCreate(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        guard case let .string(sessionId)? = args["sessionId"],
+              case let .string(title)? = args["title"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'sessionId' or 'title' parameter"))
+        }
+        return await daemonTools.taskCreate(sessionId: sessionId, title: title)
+    }
+
+    private func kouenTaskUpdate(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        guard case let .string(id)? = args["id"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'id' parameter"))
+        }
+        let done: Bool?
+        if case let .bool(d)? = args["done"] { done = d } else { done = nil }
+        return await daemonTools.taskUpdate(id: id, title: optionalStringArg(args["title"]), done: done)
+    }
+
+    private func kouenTaskDelete(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        guard case let .string(id)? = args["id"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'id' parameter"))
+        }
+        return await daemonTools.taskDelete(id: id)
+    }
+
+    // MARK: - Worktree tools
+
+    private func kouenWorktreeList(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        guard case let .string(repoPath)? = args["repoPath"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'repoPath' parameter"))
+        }
+        return await daemonTools.worktreeList(repoPath: repoPath)
+    }
+
+    private func kouenWorktreeCreate(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        guard case let .string(repoPath)? = args["repoPath"],
+              case let .string(sessionId)? = args["sessionId"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'repoPath' or 'sessionId' parameter"))
+        }
+        return await daemonTools.worktreeCreate(
+            repoPath: repoPath,
+            sessionID: sessionId,
+            branch: optionalStringArg(args["branch"]),
+            baseRef: optionalStringArg(args["baseRef"])
+        )
+    }
+
+    private func kouenWorktreeRemove(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        guard case let .string(repoPath)? = args["repoPath"],
+              case let .string(worktreePath)? = args["worktreePath"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'repoPath' or 'worktreePath' parameter"))
+        }
+        let force = boolArg(args["force"], default: false)
+        return await daemonTools.worktreeRemove(repoPath: repoPath, worktreePath: worktreePath, force: force)
+    }
+
+    // MARK: - Automation tools
+
+    private func kouenAutomationGet(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        guard case let .string(id)? = args["id"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'id' parameter"))
+        }
+        return await daemonTools.automationGet(id: id)
+    }
+
+    private func kouenAutomationCreate(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        guard case let .string(repoPath)? = args["repoPath"],
+              case let .string(agent)? = args["agent"],
+              case let .string(prompt)? = args["prompt"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'repoPath', 'agent', or 'prompt' parameter"))
+        }
+        let intervalMinutes = intArg(args["intervalMinutes"], default: 0)
+        return await daemonTools.automationCreate(
+            repoPath: repoPath, workspaceId: optionalStringArg(args["workspaceId"]),
+            agent: agent, prompt: prompt, intervalMinutes: intervalMinutes
+        )
+    }
+
+    private func kouenAutomationUpdate(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        guard case let .string(id)? = args["id"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'id' parameter"))
+        }
+        var intervalMinutes: Int?
+        if case let .int(i)? = args["intervalMinutes"] { intervalMinutes = i }
+        return await daemonTools.automationUpdate(
+            id: id, repoPath: optionalStringArg(args["repoPath"]), agent: optionalStringArg(args["agent"]),
+            prompt: optionalStringArg(args["prompt"]), intervalMinutes: intervalMinutes
+        )
+    }
+
+    private func kouenAutomationDelete(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        guard case let .string(id)? = args["id"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'id' parameter"))
+        }
+        return await daemonTools.automationDelete(id: id)
+    }
+
+    private func kouenAutomationPause(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        guard case let .string(id)? = args["id"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'id' parameter"))
+        }
+        return await daemonTools.automationPause(id: id)
+    }
+
+    private func kouenAutomationResume(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        guard case let .string(id)? = args["id"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'id' parameter"))
+        }
+        return await daemonTools.automationResume(id: id)
+    }
+
+    private func kouenAutomationRunNow(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        guard case let .string(id)? = args["id"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'id' parameter"))
+        }
+        return await daemonTools.automationRunNow(id: id)
     }
 
     private func setPaneLabel(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
@@ -709,5 +919,10 @@ struct ToolRegistry: Sendable {
     private func optionalStringArg(_ value: AnyCodable?) -> String? {
         guard case let .string(s)? = value else { return nil }
         return s
+    }
+
+    private func intArg(_ value: AnyCodable?, default defaultValue: Int) -> Int {
+        guard case let .int(i)? = value else { return defaultValue }
+        return i
     }
 }

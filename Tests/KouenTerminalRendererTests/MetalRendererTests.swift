@@ -137,6 +137,80 @@ final class MetalRendererTests: XCTestCase {
         XCTAssertEqual(size.height, renderer.cellPixelHeight * 24)
     }
 
+    // MARK: - Shader effect overlay (P40 F4)
+
+    /// An unrecognized `shaderEffect` string falls through `overlayMode`'s `default: 0` case —
+    /// same behavior as "none", not a crash. Guards `KouenSettings.terminalShaderEffect`'s doc
+    /// comment claim.
+    func testUnrecognizedShaderEffectBehavesAsNone() throws {
+        let (device, renderer) = try makeRenderer()
+        let frame = backgroundFrame(Array(repeating: RenderColor(red: 0.5, green: 0.5, blue: 0.5, alpha: 1), count: 10))
+        let (w, h) = renderer.surfacePixelSize(columns: 10, rows: 1)
+
+        renderer.shaderEffect = "none"
+        let none = try renderFixture(frame, name: "shader-none", cols: 10, rows: 1, device: device, renderer: renderer)
+        renderer.shaderEffect = "bloom" // not implemented — see doc-comment fix in KouenSettings.swift
+        let unrecognized = try renderFixture(frame, name: "shader-unrecognized", cols: 10, rows: 1, device: device, renderer: renderer)
+
+        let a = none.pixel(w / 2, h / 2)
+        let b = unrecognized.pixel(w / 2, h / 2)
+        XCTAssertTrue(a == b, "Expected unrecognized shaderEffect to render identically to \"none\", got \(a) vs \(b)")
+    }
+
+    func testScanlinesDarkenAlternatingPixelRows() throws {
+        let (device, renderer) = try makeRenderer()
+        let frame = backgroundFrame(Array(repeating: RenderColor(red: 0.7, green: 0.7, blue: 0.7, alpha: 1), count: 10))
+        let (w, h) = renderer.surfacePixelSize(columns: 10, rows: 1)
+
+        renderer.shaderEffect = "none"
+        let baseline = try renderFixture(frame, name: "shader-scanlines-none", cols: 10, rows: 1, device: device, renderer: renderer)
+        renderer.shaderEffect = "scanlines"
+        let scanlines = try renderFixture(frame, name: "shader-scanlines-on", cols: 10, rows: 1, device: device, renderer: renderer)
+
+        var foundDarkerRow = false
+        for y in 0..<h {
+            if scanlines.pixel(w / 2, y).0 < baseline.pixel(w / 2, y).0 {
+                foundDarkerRow = true
+                break
+            }
+        }
+        XCTAssertTrue(foundDarkerRow, "Expected scanlines to darken at least one pixel row")
+    }
+
+    func testCRTDarkensCorners() throws {
+        let (device, renderer) = try makeRenderer()
+        let frame = backgroundFrame(Array(repeating: RenderColor(red: 0.7, green: 0.7, blue: 0.7, alpha: 1), count: 20))
+
+        renderer.shaderEffect = "none"
+        let baseline = try renderFixture(frame, name: "shader-crt-none", cols: 20, rows: 1, device: device, renderer: renderer)
+        renderer.shaderEffect = "crt"
+        let crt = try renderFixture(frame, name: "shader-crt-on", cols: 20, rows: 1, device: device, renderer: renderer)
+
+        XCTAssertLessThan(crt.pixel(0, 0).0, baseline.pixel(0, 0).0, "Expected CRT's vignette to darken the corner")
+    }
+
+    func testGrainAndVignetteChangeOutputFromBaseline() throws {
+        for mode in ["grain", "vignette"] {
+            let (device, renderer) = try makeRenderer()
+            let frame = backgroundFrame(Array(repeating: RenderColor(red: 0.6, green: 0.6, blue: 0.6, alpha: 1), count: 10))
+            let (w, h) = renderer.surfacePixelSize(columns: 10, rows: 1)
+
+            renderer.shaderEffect = "none"
+            let baseline = try renderFixture(frame, name: "shader-\(mode)-none", cols: 10, rows: 1, device: device, renderer: renderer)
+            renderer.shaderEffect = mode
+            let result = try renderFixture(frame, name: "shader-\(mode)-on", cols: 10, rows: 1, device: device, renderer: renderer)
+
+            var anyDifference = false
+            outer: for y in 0..<h {
+                for x in 0..<w where result.pixel(x, y) != baseline.pixel(x, y) {
+                    anyDifference = true
+                    break outer
+                }
+            }
+            XCTAssertTrue(anyDifference, "Expected \(mode) overlay to change at least one pixel from baseline")
+        }
+    }
+
     /// Glitchless live resize: a transaction-synchronized present (commit → waitUntilScheduled →
     /// drawable.present) must succeed against a layer in `presentsWithTransaction` mode and record
     /// the bounded schedule wait in the stats; the async path must leave that stat at zero (it's

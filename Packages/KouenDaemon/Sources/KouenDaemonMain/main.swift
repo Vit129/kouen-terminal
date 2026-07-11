@@ -178,6 +178,7 @@ atexit { removePIDFile() }
 do {
     try server.start()
     AgentScanner.shared.start(registry: server.registry)
+    AutomationScheduler.shared.start(registry: server.registry)
     daemonLog("KouenDaemon ready (socket=\(KouenPaths.socketURL.path))")
 
     // P25 W1 slice 1: opt-in mobile WS bridge. Unavailable on the Linux headless build

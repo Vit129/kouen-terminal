@@ -453,6 +453,293 @@ struct KouenDaemonTools: Sendable {
         ])), nil)
     }
 
+    // MARK: - Tasks (P40 F1)
+
+    func taskList(sessionId: String?) async -> (AnyCodable?, JSONRPCError?) {
+        let sessionID = sessionId.flatMap(UUID.init(uuidString:))
+        guard let response = await send(.taskList(sessionID: sessionID)) else {
+            return (nil, Self.daemonUnavailableError)
+        }
+        guard case let .tasks(tasks) = response else {
+            return (nil, JSONRPCError(code: -32000, message: "Unexpected response to taskList"))
+        }
+        return (toolResult(json: .array(tasks.map(Self.taskJSON))), nil)
+    }
+
+    func taskGet(id: String) async -> (AnyCodable?, JSONRPCError?) {
+        guard let uuid = UUID(uuidString: id) else {
+            return (nil, JSONRPCError(code: -32602, message: "'id' is not a valid UUID"))
+        }
+        guard let response = await send(.taskGet(id: uuid)) else {
+            return (nil, Self.daemonUnavailableError)
+        }
+        guard case let .taskInfo(task) = response else {
+            return (nil, JSONRPCError(code: -32000, message: "Unexpected response to taskGet"))
+        }
+        guard let task else {
+            return (nil, JSONRPCError(code: -32000, message: "Task not found"))
+        }
+        return (toolResult(json: Self.taskJSON(task)), nil)
+    }
+
+    func taskCreate(sessionId: String, title: String) async -> (AnyCodable?, JSONRPCError?) {
+        guard let sessionID = UUID(uuidString: sessionId) else {
+            return (nil, JSONRPCError(code: -32602, message: "'sessionId' is not a valid UUID"))
+        }
+        guard let response = await send(.taskCreate(sessionID: sessionID, title: title)) else {
+            return (nil, Self.daemonUnavailableError)
+        }
+        guard case let .taskInfo(task) = response, let task else {
+            return (nil, JSONRPCError(code: -32000, message: "Unexpected response to taskCreate"))
+        }
+        return (toolResult(json: Self.taskJSON(task)), nil)
+    }
+
+    func taskUpdate(id: String, title: String?, done: Bool?) async -> (AnyCodable?, JSONRPCError?) {
+        guard let uuid = UUID(uuidString: id) else {
+            return (nil, JSONRPCError(code: -32602, message: "'id' is not a valid UUID"))
+        }
+        guard let response = await send(.taskUpdate(id: uuid, title: title, done: done)) else {
+            return (nil, Self.daemonUnavailableError)
+        }
+        switch response {
+        case let .taskInfo(task):
+            guard let task else {
+                return (nil, JSONRPCError(code: -32000, message: "Unexpected response to taskUpdate"))
+            }
+            return (toolResult(json: Self.taskJSON(task)), nil)
+        case let .error(message):
+            return (nil, JSONRPCError(code: -32000, message: message))
+        default:
+            return (nil, JSONRPCError(code: -32000, message: "Unexpected response to taskUpdate"))
+        }
+    }
+
+    func taskDelete(id: String) async -> (AnyCodable?, JSONRPCError?) {
+        guard let uuid = UUID(uuidString: id) else {
+            return (nil, JSONRPCError(code: -32602, message: "'id' is not a valid UUID"))
+        }
+        return await okResponse(for: .taskDelete(id: uuid), expected: "taskDelete")
+    }
+
+    private static func taskJSON(_ task: TaskSummary) -> AnyCodable {
+        .object([
+            "id": .string(task.id.uuidString),
+            "sessionId": .string(task.sessionID.uuidString),
+            "title": .string(task.title),
+            "done": .bool(task.done),
+            "createdAt": .string(ISO8601DateFormatter().string(from: task.createdAt)),
+            "updatedAt": .string(ISO8601DateFormatter().string(from: task.updatedAt)),
+        ])
+    }
+
+    // MARK: - Worktree (MCP resource, P40 F2)
+
+    func worktreeList(repoPath: String) async -> (AnyCodable?, JSONRPCError?) {
+        guard let response = await send(.worktreeList(repoPath: repoPath)) else {
+            return (nil, Self.daemonUnavailableError)
+        }
+        guard case let .worktrees(infos) = response else {
+            return (nil, JSONRPCError(code: -32000, message: "Unexpected response to worktreeList"))
+        }
+        return (toolResult(json: .array(infos.map(Self.worktreeJSON))), nil)
+    }
+
+    func worktreeCreate(
+        repoPath: String, sessionID: String, branch: String?, baseRef: String?
+    ) async -> (AnyCodable?, JSONRPCError?) {
+        guard isToolAllowed("kouenWorktreeCreate") else { return (nil, disabledError("kouenWorktreeCreate")) }
+        guard let response = await send(.worktreeCreate(
+            repoPath: repoPath, sessionID: sessionID, branch: branch, baseRef: baseRef
+        )) else {
+            return (nil, Self.daemonUnavailableError)
+        }
+        switch response {
+        case let .worktreePath(path):
+            guard let path else {
+                return (nil, JSONRPCError(code: -32000, message: "git worktree add failed"))
+            }
+            return (toolResult(json: .object(["path": .string(path)])), nil)
+        case let .error(message):
+            return (nil, JSONRPCError(code: -32000, message: message))
+        default:
+            return (nil, JSONRPCError(code: -32000, message: "Unexpected response to worktreeCreate"))
+        }
+    }
+
+    func worktreeRemove(repoPath: String, worktreePath: String, force: Bool) async -> (AnyCodable?, JSONRPCError?) {
+        guard isToolAllowed("kouenWorktreeRemove") else { return (nil, disabledError("kouenWorktreeRemove")) }
+        return await okResponse(
+            for: .worktreeRemove(repoPath: repoPath, worktreePath: worktreePath, force: force),
+            expected: "worktreeRemove"
+        )
+    }
+
+    private static func worktreeJSON(_ info: WorktreeInfoSummary) -> AnyCodable {
+        .object([
+            "path": .string(info.path),
+            "branch": info.branch.map(AnyCodable.string) ?? .null,
+            "head": .string(info.head),
+            "bare": .bool(info.bare),
+        ])
+    }
+
+    // MARK: - Hosts (MCP resource, read-only, P40 F3)
+
+    /// Direct file read, same as `kouen-cli`'s `RemoteHostStore()` usage — no daemon
+    /// round trip needed, `RemoteHostStore` isn't daemon-owned in-memory state (unlike
+    /// `TaskStore`), it's a small, read-rarely JSON file. All 4 `RemoteHost` fields are
+    /// safe to expose: none carry credentials — `sshArgs` is validated against
+    /// `SSHTunnelManager`'s allowlist, where `-i` is an identity *file path*, never key
+    /// material. No create/update/delete tool — Settings UI stays the only write path
+    /// (SSH config has security implications not delegated to external agents).
+    func hostList() async -> (AnyCodable?, JSONRPCError?) {
+        let hosts = RemoteHostStore().load()
+        return (toolResult(json: .array(hosts.map(Self.hostJSON))), nil)
+    }
+
+    private static func hostJSON(_ host: RemoteHost) -> AnyCodable {
+        .object([
+            "name": .string(host.name),
+            "sshTarget": .string(host.sshTarget),
+            "remoteSocketPath": .string(host.remoteSocketPath),
+            "sshArgs": .array(host.sshArgs.map(AnyCodable.string)),
+        ])
+    }
+
+    // MARK: - Automations (P41)
+
+    func automationList() async -> (AnyCodable?, JSONRPCError?) {
+        guard let response = await send(.automationList) else {
+            return (nil, Self.daemonUnavailableError)
+        }
+        guard case let .automations(list) = response else {
+            return (nil, JSONRPCError(code: -32000, message: "Unexpected response to automationList"))
+        }
+        return (toolResult(json: .array(list.map(Self.automationJSON))), nil)
+    }
+
+    func automationGet(id: String) async -> (AnyCodable?, JSONRPCError?) {
+        guard let uuid = UUID(uuidString: id) else {
+            return (nil, JSONRPCError(code: -32602, message: "'id' is not a valid UUID"))
+        }
+        guard let response = await send(.automationGet(id: uuid)) else {
+            return (nil, Self.daemonUnavailableError)
+        }
+        guard case let .automationInfo(automation) = response else {
+            return (nil, JSONRPCError(code: -32000, message: "Unexpected response to automationGet"))
+        }
+        guard let automation else {
+            return (nil, JSONRPCError(code: -32000, message: "Automation not found"))
+        }
+        return (toolResult(json: Self.automationJSON(automation)), nil)
+    }
+
+    func automationCreate(
+        repoPath: String, workspaceId: String?, agent: String, prompt: String, intervalMinutes: Int
+    ) async -> (AnyCodable?, JSONRPCError?) {
+        guard isToolAllowed("kouenAutomationCreate") else { return (nil, disabledError("kouenAutomationCreate")) }
+        let workspaceID = workspaceId.flatMap(UUID.init(uuidString:))
+        guard let response = await send(.automationCreate(
+            repoPath: repoPath, workspaceID: workspaceID, agent: agent, prompt: prompt,
+            intervalMinutes: intervalMinutes
+        )) else {
+            return (nil, Self.daemonUnavailableError)
+        }
+        guard case let .automationInfo(automation) = response, let automation else {
+            return (nil, JSONRPCError(code: -32000, message: "Unexpected response to automationCreate"))
+        }
+        return (toolResult(json: Self.automationJSON(automation)), nil)
+    }
+
+    func automationUpdate(
+        id: String, repoPath: String?, agent: String?, prompt: String?, intervalMinutes: Int?
+    ) async -> (AnyCodable?, JSONRPCError?) {
+        guard isToolAllowed("kouenAutomationUpdate") else { return (nil, disabledError("kouenAutomationUpdate")) }
+        guard let uuid = UUID(uuidString: id) else {
+            return (nil, JSONRPCError(code: -32602, message: "'id' is not a valid UUID"))
+        }
+        guard let response = await send(.automationUpdate(
+            id: uuid, repoPath: repoPath, agent: agent, prompt: prompt, intervalMinutes: intervalMinutes
+        )) else {
+            return (nil, Self.daemonUnavailableError)
+        }
+        switch response {
+        case let .automationInfo(automation):
+            guard let automation else {
+                return (nil, JSONRPCError(code: -32000, message: "Unexpected response to automationUpdate"))
+            }
+            return (toolResult(json: Self.automationJSON(automation)), nil)
+        case let .error(message):
+            return (nil, JSONRPCError(code: -32000, message: message))
+        default:
+            return (nil, JSONRPCError(code: -32000, message: "Unexpected response to automationUpdate"))
+        }
+    }
+
+    func automationDelete(id: String) async -> (AnyCodable?, JSONRPCError?) {
+        guard isToolAllowed("kouenAutomationDelete") else { return (nil, disabledError("kouenAutomationDelete")) }
+        guard let uuid = UUID(uuidString: id) else {
+            return (nil, JSONRPCError(code: -32602, message: "'id' is not a valid UUID"))
+        }
+        return await okResponse(for: .automationDelete(id: uuid), expected: "automationDelete")
+    }
+
+    func automationPause(id: String) async -> (AnyCodable?, JSONRPCError?) {
+        guard isToolAllowed("kouenAutomationPause") else { return (nil, disabledError("kouenAutomationPause")) }
+        return await automationSetEnabled(id: id, enabled: false, toolName: "automationPause")
+    }
+
+    func automationResume(id: String) async -> (AnyCodable?, JSONRPCError?) {
+        guard isToolAllowed("kouenAutomationResume") else { return (nil, disabledError("kouenAutomationResume")) }
+        return await automationSetEnabled(id: id, enabled: true, toolName: "automationResume")
+    }
+
+    private func automationSetEnabled(id: String, enabled: Bool, toolName: String) async -> (AnyCodable?, JSONRPCError?) {
+        guard let uuid = UUID(uuidString: id) else {
+            return (nil, JSONRPCError(code: -32602, message: "'id' is not a valid UUID"))
+        }
+        guard let response = await send(.automationSetEnabled(id: uuid, enabled: enabled)) else {
+            return (nil, Self.daemonUnavailableError)
+        }
+        switch response {
+        case let .automationInfo(automation):
+            guard let automation else {
+                return (nil, JSONRPCError(code: -32000, message: "Unexpected response to \(toolName)"))
+            }
+            return (toolResult(json: Self.automationJSON(automation)), nil)
+        case let .error(message):
+            return (nil, JSONRPCError(code: -32000, message: message))
+        default:
+            return (nil, JSONRPCError(code: -32000, message: "Unexpected response to \(toolName)"))
+        }
+    }
+
+    func automationRunNow(id: String) async -> (AnyCodable?, JSONRPCError?) {
+        guard isToolAllowed("kouenAutomationRunNow") else { return (nil, disabledError("kouenAutomationRunNow")) }
+        guard let uuid = UUID(uuidString: id) else {
+            return (nil, JSONRPCError(code: -32602, message: "'id' is not a valid UUID"))
+        }
+        return await okResponse(for: .automationRunNow(id: uuid), expected: "automationRunNow")
+    }
+
+    private static func automationJSON(_ automation: AutomationSummary) -> AnyCodable {
+        .object([
+            "id": .string(automation.id.uuidString),
+            "repoPath": .string(automation.repoPath),
+            "workspaceId": automation.workspaceID.map { AnyCodable.string($0.uuidString) } ?? .null,
+            "agent": .string(automation.agent),
+            "prompt": .string(automation.prompt),
+            "intervalMinutes": .int(automation.intervalMinutes),
+            "enabled": .bool(automation.enabled),
+            "lastRunAt": automation.lastRunAt.map { AnyCodable.string(ISO8601DateFormatter().string(from: $0)) } ?? .null,
+            "lastRunStatus": automation.lastRunStatus.map(AnyCodable.string) ?? .null,
+            "nextRunAt": automation.nextRunAt.map { AnyCodable.string(ISO8601DateFormatter().string(from: $0)) } ?? .null,
+            "createdAt": .string(ISO8601DateFormatter().string(from: automation.createdAt)),
+            "updatedAt": .string(ISO8601DateFormatter().string(from: automation.updatedAt)),
+        ])
+    }
+
     // MARK: - Helpers
 
     private func send(_ request: IPCRequest) async -> IPCResponse? {

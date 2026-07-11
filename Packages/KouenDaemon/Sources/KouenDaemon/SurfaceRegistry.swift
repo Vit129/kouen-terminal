@@ -10,6 +10,8 @@ public final class SurfaceRegistry: @unchecked Sendable {
     private let store = SessionStore()
     private let lock = NSLock()
     private let bufferStore = PasteBufferStore()
+    private let taskStore = TaskStore()
+    private let automationStore = AutomationStore()
     public let optionStore = OptionStore()
     public let environmentStore = EnvironmentStore()
     public let hookRegistry = HookRegistry()
@@ -879,6 +881,62 @@ public final class SurfaceRegistry: @unchecked Sendable {
             return .buffers(summaries)
         case let .deleteBuffer(name):
             return bufferStore.delete(name) ? .ok : .error("Buffer not found")
+        case let .taskList(sessionID):
+            let summaries = taskStore.list(sessionID: sessionID).map(Self.taskSummary)
+            return .tasks(summaries)
+        case let .taskGet(id):
+            return .taskInfo(taskStore.get(id: id).map(Self.taskSummary))
+        case let .taskCreate(sessionID, title):
+            return .taskInfo(Self.taskSummary(taskStore.create(sessionID: sessionID, title: title)))
+        case let .taskUpdate(id, title, done):
+            guard let updated = taskStore.update(id: id, title: title, done: done) else {
+                return .error("Task not found")
+            }
+            return .taskInfo(Self.taskSummary(updated))
+        case let .taskDelete(id):
+            return taskStore.delete(id: id) ? .ok : .error("Task not found")
+        case let .worktreeList(repoPath):
+            let infos = WorktreeManager().list(repoPath: repoPath).map(Self.worktreeInfoSummary)
+            return .worktrees(infos)
+        case let .worktreeCreate(repoPath, sessionID, branch, baseRef):
+            guard let path = WorktreeManager().create(
+                repoPath: repoPath, sessionID: sessionID, branch: branch, baseRef: baseRef
+            ) else {
+                return .error("git worktree add failed")
+            }
+            return .worktreePath(path)
+        case let .worktreeRemove(repoPath, worktreePath, force):
+            let ok = WorktreeManager().remove(repoPath: repoPath, worktreePath: worktreePath, force: force)
+            return ok ? .ok : .error("git worktree remove failed")
+        case .automationList:
+            return .automations(automationStore.list().map(Self.automationSummary))
+        case let .automationGet(id):
+            return .automationInfo(automationStore.get(id: id).map(Self.automationSummary))
+        case let .automationCreate(repoPath, workspaceID, agent, prompt, intervalMinutes):
+            let automation = automationStore.create(
+                repoPath: repoPath, workspaceID: workspaceID, agent: agent, prompt: prompt,
+                intervalMinutes: intervalMinutes
+            )
+            return .automationInfo(Self.automationSummary(automation))
+        case let .automationUpdate(id, repoPath, agent, prompt, intervalMinutes):
+            guard let updated = automationStore.update(
+                id: id, repoPath: repoPath, agent: agent, prompt: prompt, intervalMinutes: intervalMinutes
+            ) else {
+                return .error("Automation not found")
+            }
+            return .automationInfo(Self.automationSummary(updated))
+        case let .automationDelete(id):
+            return automationStore.delete(id: id) ? .ok : .error("Automation not found")
+        case let .automationSetEnabled(id, enabled):
+            guard let updated = automationStore.setEnabled(id: id, enabled: enabled) else {
+                return .error("Automation not found")
+            }
+            return .automationInfo(Self.automationSummary(updated))
+        case let .automationRunNow(id):
+            guard let automation = automationStore.get(id: id) else {
+                return .error("Automation not found")
+            }
+            return fireAutomationLocked(automation) ? .ok : .error("Automation spawn failed")
         case let .pasteBuffer(surfaceID, name, bracketed):
             guard let session = sessions[surfaceID] else { return .error("Surface not found") }
             let buffer: PasteBufferStore.Buffer?
@@ -1979,5 +2037,90 @@ public final class SurfaceRegistry: @unchecked Sendable {
                 }
             }
         }
+    }
+
+    private static func taskSummary(_ task: KouenTask) -> TaskSummary {
+        TaskSummary(
+            id: task.id, sessionID: task.sessionID, title: task.title, done: task.done,
+            createdAt: task.createdAt, updatedAt: task.updatedAt
+        )
+    }
+
+    private static func worktreeInfoSummary(_ info: WorktreeManager.WorktreeInfo) -> WorktreeInfoSummary {
+        WorktreeInfoSummary(path: info.path, branch: info.branch, head: info.head, bare: info.bare)
+    }
+
+    // MARK: - Automations (P41)
+
+    /// Called by `AutomationScheduler`'s timer (own queue, doesn't hold `lock`) once
+    /// per tick. Mirrors how `AgentScanner` calls plain registry methods directly.
+    public func tickAutomations() {
+        acquireRegistryLock()
+        let due = automationStore.dueAutomations(asOf: Date())
+        for automation in due {
+            _ = fireAutomationLocked(automation)
+        }
+        lock.unlock()
+    }
+
+    /// Spawns a session, launches `automation.agent`, then (after a short delay) types
+    /// `automation.prompt` — same steps `.newSession`/`.send` perform under `handle()`.
+    /// Callers must already hold `lock` (either `handle()`'s own for `.automationRunNow`,
+    /// or `tickAutomations()`'s own acquisition for the scheduler).
+    @discardableResult
+    private func fireAutomationLocked(_ automation: KouenAutomation) -> Bool {
+        let workspaceID = automation.workspaceID ?? editor.snapshot.workspaces.first?.id
+        guard let workspaceID,
+              let sessionID = editor.addSession(to: workspaceID, cwd: automation.repoPath, name: "Automation")
+        else {
+            automationStore.recordRun(id: automation.id, status: "error: spawn failed")
+            return false
+        }
+        ensureSessionSurfaces(sessionID: sessionID, shell: nil)
+        commit()
+        fireHookLocked(.afterNewSession)
+        fireHookLocked(.sessionCreated)
+
+        guard let ws = editor.snapshot.workspaces.first(where: { $0.id == workspaceID }),
+              let session = ws.sessions.first(where: { $0.id == sessionID }),
+              let leaf = session.tabs.first?.rootPane.allLeaves().first
+        else {
+            automationStore.recordRun(id: automation.id, status: "error: surface not ready")
+            return false
+        }
+        let surfaceID = (leaf.activeSurfaceID ?? leaf.surfaceID).uuidString
+        sessions[surfaceID]?.write(Self.automationLaunchCommand(for: automation.agent))
+
+        // ponytail: fixed 3s delay before typing the prompt — heuristic for CLI
+        // cold-start, not a readiness check. Ceiling: a slow/cold CLI start could still
+        // lose the prompt to the shell. Upgrade path: poll pane output for a ready
+        // marker (same idea as kouenSpawnAgent's waitForPaneOutput-based callers) if
+        // this proves flaky in practice.
+        let prompt = automation.prompt
+        let automationID = automation.id
+        hookQueue.asyncAfter(deadline: .now() + 3) { [weak self] in
+            guard let self else { return }
+            _ = self.handle(.send(surfaceID: surfaceID, text: prompt + "\n"))
+        }
+        automationStore.recordRun(id: automationID, status: "ok")
+        return true
+    }
+
+    private static func automationLaunchCommand(for agent: String) -> String {
+        switch agent.lowercased() {
+        case "codex": return "codex\n"
+        case "kiro": return "kiro\n"
+        case "gemini": return "gemini\n"
+        default: return "claude\n"
+        }
+    }
+
+    private static func automationSummary(_ automation: KouenAutomation) -> AutomationSummary {
+        AutomationSummary(
+            id: automation.id, repoPath: automation.repoPath, workspaceID: automation.workspaceID,
+            agent: automation.agent, prompt: automation.prompt, intervalMinutes: automation.intervalMinutes,
+            enabled: automation.enabled, lastRunAt: automation.lastRunAt, lastRunStatus: automation.lastRunStatus,
+            nextRunAt: automation.nextRunAt, createdAt: automation.createdAt, updatedAt: automation.updatedAt
+        )
     }
 }

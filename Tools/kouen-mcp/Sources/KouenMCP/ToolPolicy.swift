@@ -28,6 +28,14 @@ struct ToolPolicy: Sendable {
         "kouenBrowserGoBack",
         "kouenBrowserGoForward",
         "kouenBrowserReload",
+        "kouenWorktreeCreate",
+        "kouenWorktreeRemove",
+        "kouenAutomationCreate",
+        "kouenAutomationUpdate",
+        "kouenAutomationDelete",
+        "kouenAutomationPause",
+        "kouenAutomationResume",
+        "kouenAutomationRunNow",
     ]
 
     private let allowControl: Bool

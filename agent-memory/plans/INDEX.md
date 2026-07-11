@@ -4,6 +4,8 @@
 
 | File | Title | Status |
 |------|-------|--------|
+| [p41-automations/dev-task-progress.md](p41-automations/dev-task-progress.md) | P41 — Automations (scheduled agent launches, `kouen-mcp`) | All tasks built, build/test/robot green, live-check pending |
+| [p40-mcp-surface-and-shader-presets/dev-task-progress.md](p40-mcp-surface-and-shader-presets/dev-task-progress.md) | P40 — MCP Surface Expansion (Tasks/Worktrees/Hosts) + Shader Presets | All 19 tasks built, build/test green, live-check pending |
 | [p39-competitive-feature-gaps.md](p39-competitive-feature-gaps.md) | P39 — Competitive Feature Gaps (cmux/Supacode/Superset/WezTerm/Zed) | All 5 phases built, live-check pending |
 | [p38-competitive-feature-gaps.md](p38-competitive-feature-gaps.md) | P38 — Competitive Feature Gaps (cross-agent diff dashboard/subagent pane visibility/thread-view/image protocol/scripting hook) | Planning |
 | [p37-mobile-connect-v1.md](p37-mobile-connect-v1.md) | P37 — Mobile Connect v1 (QR+Tailscale hardening, in-app QR, real client) | Active |

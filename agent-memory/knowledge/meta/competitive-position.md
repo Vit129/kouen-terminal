@@ -40,7 +40,7 @@
 | Extensions/plugins ecosystem | iTerm2 (python API), WezTerm (Lua) — includes tpm-style plugin manager (resurrect/continuum/thumbs) |
 | GPU shader customization | Ghostty |
 | Large community (1M+ users) | Warp, iTerm2, Ghostty |
-| Block-based terminal (command grouping) | Warp — planned P34 |
+| ~~Block-based terminal (command grouping)~~ | **STALE — already shipped, P34, 2026-07-02.** Command-boundary capture (OSC 133 `C`/`D`, zsh/fish native preexec), Copy Output/Command Only, right-click block context menu, `kouenGetLastBlock`/`kouenGetBlock` MCP tools. Only block-bookmarking was deferred, by explicit user choice, not a gap. Feature Matrix row below corrected to ✓. |
 
 ## Not gaps — deliberate positioning differences (no action)
 
@@ -86,7 +86,7 @@
 | No account required | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ |
 | Open source | ✓ | ✗ | ✓ | ✓ | ✗ | ✗ | ✓ | ✗ | ✓ |
 | Cross-platform GUI | ✗ | ✓ | ✗ | partial | ✗ | ✗ | ✓ | ✗ | ✓ (terminal-native) |
-| Block-based terminal | ✗ (planned, P34) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Block-based terminal | ✓ (P34, shipped 2026-07-02) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
 
 ## Positioning Statement
 
@@ -96,9 +96,207 @@
 > No account required, runs on macOS 15+, works headless in CI, and combines agent-ready
 > MCP tooling + tmux-style persistence + IDE navigation."
 
+## Deep web research refresh (2026-07-11, 3 parallel research passes)
+
+Prior sections above were largely internal-code-verified or lightly researched. This
+pass did live web research (official docs/changelogs/GitHub issues, not just marketing
+copy) across terminals, AI-agent-terminals, and AI-IDEs. Corrections and new findings:
+
+**Corrections to earlier claims:**
+- **G3 (Supacode PR merge strategy) — original "who has it" attribution unverified.**
+  Deep research found no confirmed per-hunk staging or squash/rebase/merge picker in
+  Supacode's own docs/site. The G3 gap may have been sourced from a stale/inaccurate
+  read of Supacode's marketing copy. Kouen's C2 implementation stands regardless (it's
+  a real feature we built), but don't cite Supacode as the competitor that forced it.
+- **USP #1 ("MCP server built-in" as unique) is no longer fully accurate.** Two
+  competitors now expose their own internal state via MCP the same direction as
+  `kouen-mcp` (external agent → app), not just consume external MCP servers:
+  - **JetBrains IDE MCP Server** (built into IntelliJ/PyCharm/WebStorm/etc. since
+    2025.2) — external MCP clients can pull diagnostics, run tests, execute terminal
+    commands, modify files. Direct structural analog to `kouen-mcp`.
+    [jetbrains.com/help/idea/mcp-server.html]
+  - **Superset's own MCP server** (`api.superset.sh/api/v2/agent/mcp`) — exposes
+    Tasks/Workspaces/Agents/Terminals/Automations/Projects/Hosts, OAuth2.1 or
+    API-key auth. [docs.superset.sh/mcp] — already reflected correctly in the
+    Feature Matrix's Superset MCP cell (✓), just wasn't reflected in the USP list.
+  Kouen's actual remaining differentiator: combining MCP-server-outward *with* a
+  terminal-panes-as-primary-surface + tmux-style daemon multiplexer + browser-pane
+  DevTools API, in one native macOS app, no account. No single competitor combines
+  all four; several now match one or two.
+
+**New competitive pressure not previously tracked:**
+- **Warp** has invested heavily in agent-hosting (auto-detects/hosts Claude Code,
+  Codex, Gemini CLI, OpenCode, Antigravity; Oz cloud agents; subagent swarms as of
+  2026.05.14) — broader agent-hosting breadth than Kouen's selector. But confirmed
+  **MCP-client-only** (no MCP server of its own), confirmed **no cross-quit daemon
+  persistence** (open issue #9416), **no hunk staging** (open issue #8542), **no
+  embedded browser pane** (open issues #10627/#9194/#8548) — the things Kouen already
+  ships are still open feature requests in Warp's own tracker.
+- **Zed** created and open-sourced **ACP** (Agent Client Protocol, Jan 2026,
+  co-launched with JetBrains) — lets Claude Code/Gemini CLI/Codex run **side by side
+  inside Zed** as first-class guest agents. This is a real competitor to Kouen's
+  "agent selector" concept, and Zed is cross-platform (macOS/Linux/Windows) where
+  Kouen is macOS-only. Zed does not expose an outward MCP server itself (ACP is
+  host-serves-guest-agent, not generic external MCP).
+- **JetBrains Air** (free public preview, March 2026, macOS-only) — standalone
+  dashboard running Codex/Claude/Gemini/Junie simultaneously on separate tasks with
+  real-time per-agent status. Closest 2026 product concept to Kouen's multi-agent
+  selector, delivered as a separate app rather than integrated into one terminal.
+- **cmux** momentum is high (~18.8k GitHub stars, 48+ releases, v0.64.17 as of
+  2026-06-23): daemon-backed session persistence (`~/Library/Application
+  Support/cmux/`), scriptable browser pane (DOM snapshot/click/fill/JS-eval,
+  imports cookies from 20+ browsers) closely paralleling Kouen's browser-pane API,
+  and beta remote-tmux-mirroring-over-SSH. Exposes a Unix-socket + CLI control
+  surface, not MCP. No confirmed hunk staging or merge-strategy picker.
+- **Category is crowding fast**: new entrants found this pass — **AgentsRoom**
+  (agentsroom.dev, visual multi-agent dashboard + mobile companion apps),
+  **Parallel Code** (parallelcode.app, git-worktree-per-agent, Electron), **OpenAI's
+  own Codex desktop app** (launched 2026-02-02), **GitHub's own Copilot app**
+  (announced Build 2026, multi-agent desktop workspace). Platform vendors (OpenAI,
+  GitHub) are now shipping first-party competitors to the independent terminal
+  wrappers, not just startups. Not yet feature-compared — watch list only.
+
+## AI-IDE landscape (adjacent category — editors, not terminals)
+
+Not directly competing on "terminal" but increasingly overlap on agent-orchestration
+and MCP-exposure. Kouen-relevant deltas only (full per-product detail was gathered
+but isn't repeated here — re-run the research pass if a fresh full writeup is needed):
+
+| Product | Multi-agent (Kouen selector analog) | Exposes own state via MCP outward | Terminal/daemon model | Platform |
+|---|---|---|---|---|
+| Zed | ✓ via ACP (Claude/Gemini/Codex side by side) | ✗ (ACP is host-serves-guest, not generic MCP) | Built-in terminal, partial session persistence (agent-thread persistence buggy per open issues) | macOS/Linux/Windows |
+| Cursor | Cloud Agents, up to 8 concurrent (task-parallel, not vendor-switching) | ✗ (MCP client only) | Terminal in cloud VM, reported persistence bugs | macOS/Win/Linux (VS Code fork) |
+| Windsurf → **rebranded Devin Desktop, 2026-06-02** | Worktree-grouped multi-agent + ACP adoption | Partial (ACP only, not general MCP) | Built-in terminal + separate "Devin for Terminal" CLI | Not confirmed cross-OS in this pass |
+| VS Code + Copilot | Companion App for parallel agent sessions (Apr 2026 preview) | Stated but unconfirmed scope ("MCP server bridging to external agents", Apr 2026 release notes) | Standard integrated terminal | macOS/Win/Linux |
+| JetBrains (IDE + Air) | ✓ **JetBrains Air** (Codex/Claude/Gemini/Junie simultaneous, Mar 2026 preview) | ✓ **confirmed** — IDE MCP Server since 2025.2 | Standard IDE terminal, no daemon | IDEs cross-platform; Air is macOS-only preview |
+
+Net: JetBrains is the only adjacent-category product that matches Kouen on *both*
+multi-agent orchestration and MCP-server-outward — but as two separate products (IDE
++ Air), not unified with a terminal-daemon/multiplexer the way Kouen is.
+
 ## Sources (2026-07-11 research)
-- cmux: https://github.com/manaflow-ai/cmux
+- cmux: https://github.com/manaflow-ai/cmux , https://github.com/manaflow-ai/cmux/releases
 - Supacode: https://supacode.sh/ , https://github.com/supabitapp/supacode
-- Superset: https://superset.sh/ , https://github.com/superset-sh/superset
-- WezTerm: https://wezterm.org/config/lua/config/mux_enable_ssh_agent.html
-- Zed: https://zed.dev/docs/ai/agent-panel , https://andrew.ooo/answers/what-is-zed-terminal-threads-may-2026/
+- Superset: https://superset.sh/ , https://github.com/superset-sh/superset , https://docs.superset.sh/mcp
+- WezTerm: https://wezterm.org/config/lua/config/mux_enable_ssh_agent.html , https://wezterm.org/multiplexing.html
+- Zed: https://zed.dev/docs/ai/agent-panel , https://zed.dev/acp , https://zed.dev/docs/ai/external-agents
+- Warp: https://docs.warp.dev/knowledge-and-collaboration/mcp , https://docs.warp.dev/changelog/2026 , github.com/warpdotdev/warp issues #9416/#8542/#10627
+- iTerm2: https://iterm2.com/documentation-ai-chat.html , https://iterm2.com/documentation-restoration.html
+- Ghostty: https://ghostty.org/docs/features/ssh , github.com/ghostty-org/ghostty discussions #3358/#12571/#12290
+- Kitty: https://sw.kovidgoyal.net/kitty/kittens/ssh , https://sw.kovidgoyal.net/kitty/changelog
+- Rio: https://github.com/raphamorim/rio
+- JetBrains: https://www.jetbrains.com/help/idea/mcp-server.html , https://blog.jetbrains.com/junie/2026/03/junie-cli-the-llm-agnostic-coding-agent-is-now-in-beta/
+- Cursor: https://cursor.com/docs/mcp , https://www.buildfastwithai.com/blogs/cursor-cloud-agents-development-environments-2026
+- Windsurf/Devin Desktop: https://devin.ai/blog/windsurf-is-now-devin-desktop , https://docs.devin.ai/desktop/changelog
+- VS Code/Copilot: https://github.blog/news-insights/product-news/github-copilot-agent-mode-activated/ , https://code.visualstudio.com/docs/agent-customization/mcp-servers
+- Watch list: https://agentsroom.dev/ , https://www.producthunt.com/products/parallel-code
+
+## First-party vendor apps + ACP decision (2026-07-11, follow-up research pass)
+
+**Claude Code Desktop** (code.claude.com/docs/en/desktop) — biggest first-party threat.
+Rebuilt Apr 2026 around parallel sessions + per-session git worktree isolation. Has an
+in-app Browser pane (external sites too, clean profile, permission-gated — announced
+Jul 10, 2026) and a Remote/cloud execution mode that survives closing the laptop
+entirely, checkable from claude.ai/code or iOS. **MCP: client only** in the desktop
+GUI — the CLI can `claude mcp serve` its own native tools, but the desktop app itself
+doesn't expose session/pane state outward the way `kouen-mcp` does. No tmux-style
+multiplexer, no SSH-agent-forwarding toggle, no PR-merge-strategy picker (has
+auto-fix/auto-merge toggle instead, opaque method choice). macOS/Windows/Linux(beta).
+No account-free tier — bundled into Claude subscription only.
+**Correction (user hands-on observation, not doc-sourced):** the Browser/Terminal
+panes are **reactive tool invocations**, not standing infrastructure — they only spin
+up when the agent decides to open one or the user types a command that triggers it.
+Kouen's daemon keeps terminal panes as the persistent primary surface from app
+launch; the browser pane attaches to an already-running daemon-backed process rather
+than cold-starting on first use. This is a real architectural difference the doc
+research above didn't surface (docs describe *what* the panes do, not *when* they
+exist) — worth keeping in the positioning statement as "always-on" vs "on-demand."
+
+**OpenAI Codex** — merged into the unified ChatGPT desktop app Jul 9, 2026 (Chat/Work/
+Codex tabs, one binary). Codex mode: worktree-isolated parallel agents, in-app browser
+(same on-demand/reactive caveat as Claude Code Desktop above, per user observation),
+SSH devbox support, Codex Remote (GA Jun 25, 2026). **MCP: client AND server** — Codex
+CLI can itself be invoked as an MCP tool by other clients, a more explicit bidirectional
+story than Claude's. No terminal-panes-as-primary-surface, no multiplexer, no git hunk
+staging (output model is diff/PR-only, never direct edits). Subscription-bundled only.
+
+**ChatGPT app (Chat/Work modes)** — no longer a separate "app for code"; Work mode
+(new Jul 9, 2026, GPT-5.6) does general knowledge-work automation with a browser +
+Computer Use, not terminal/git-focused. Not a meaningful separate comparison point
+from Codex mode above.
+
+Net: none of the three exposes MCP outward from their primary desktop surface the way
+Kouen does (Codex CLI is the closest, via its own MCP-server mode) — but Claude Code
+Desktop's Remote execution (survives full machine shutdown, not just app quit) is a
+genuinely stronger persistence story than Kouen's daemon in one respect: it doesn't
+need *your* Mac running at all. Worth tracking, not yet a gap to close (different
+architecture — cloud-hosted vs local-daemon — not a feature toggle).
+
+**Superset/cmux control-surface gap-mine — what's genuinely new for Kouen:**
+Skeptical dive into Superset's full MCP tool list (Tasks/Workspaces/Agents/Terminals/
+Automations/Projects/Hosts) found most categories already have a Kouen equivalent
+under a different name (Agents≈`kouenSpawnAgent`+`kouenList`, Terminals — Kouen is
+actually *ahead*, Superset has no output-read tool at all vs Kouen's
+`readPaneOutput`/`kouenGetBlock`/`kouenGrep`/etc.). Three real gaps:
+1. **Tasks** — persistent MCP-addressable task object (CRUD, status/priority/assignee),
+   independent of any running pane. `kouenBoard` is read-only, derived from live pane
+   classification — not the same thing.
+2. **Automations** — RRULE-scheduled recurring agent runs (pause/resume/run-now/logs).
+   No cron/scheduler concept exists anywhere in Kouen today. Real gap.
+3. **Hosts via MCP** — `RemoteHostStore` already exists internally (backs Settings →
+   Remote), just never exposed as an MCP tool. Smaller lift than it looks — expose,
+   don't build.
+cmux has no Automations/Hosts-registry either (ad-hoc SSH only) — this isn't an
+industry-standard pattern, just a Superset-specific idea worth stealing selectively.
+Not scoped into a plan yet — flag for a future P-number if Automations/Tasks get
+prioritized.
+
+**ACP re-evaluation — still not worth building.** New data since the earlier "not
+worth it" call: Anthropic explicitly closed the `claude-code` ACP request as **"not
+planned"** (issue #6686) — confirmed fact now, not a guess. OpenAI pushes MCP-server
+mode instead, no official ACP. For both of Kouen's two most-used agents (Claude Code,
+Codex), ACP only works via a community/Zed-maintained adapter subprocess — not the
+`claude`/`codex` binaries Kouen already runs — trading a working OSC/regex detection
+layer for a *different* subprocess dependency, against a protocol still shipping v2
+RFDs for core permission UX (not post-1.0). Terminal-category precedent is a single
+6-week-old experimental Microsoft Windows Terminal fork, not an established pattern.
+Gemini CLI is the one agent with clean native `--acp` support — cheap if Kouen ever
+wants ACP for Gemini specifically, but not a reason to build the whole host layer.
+**Re-check trigger**: revisit if either Anthropic or OpenAI reverses and ships native
+ACP for their main CLI.
+
+## P40 gap-closure update (2026-07-11, same day, synthesis against research above — no
+new web pass run, competitor doc pages don't move within hours)
+
+Of the 4 real Superset/cmux control-surface gaps identified above ("Superset/cmux
+control-surface gap-mine"), P40 closed 3:
+
+| Gap | Status | Note |
+|---|---|---|
+| Tasks | **Closed** — `kouenTaskList/Get/Create/Update/Delete` | Different model than Superset's (session-scoped, not global) — a deliberate choice, not a copy. Superset's Tasks are independent of any session; Kouen's belong to exactly one. |
+| Worktree (was "Workspaces") via MCP | **Closed** — `kouenWorktreeList/Create/Remove` | Wraps existing `WorktreeManager`, no new domain logic. |
+| Hosts via MCP | **Closed** — `kouenHostList` (read-only) | Exposes existing `RemoteHostStore`, no new storage. |
+| Automations | **Closed (P41, 2026-07-11)** — `kouenAutomationList/Get/Create/Update/Delete/Pause/Resume/RunNow` | Simpler model than Superset's: fixed `intervalMinutes` (no RRULE), `lastRunAt`/`lastRunStatus` instead of a full log store. Connection to `agent-memory/plans` is a `prompt`-text convention, not a Kouen-side plan-parsing feature — see LANGUAGE.md. |
+
+Net effect: Kouen's MCP surface grew from 27 to 44 tools this session (Tasks ×5,
+Worktree ×3, Hosts ×1, Automations ×8 in the P41 follow-up). This directly narrows the
+one dimension where Superset was ahead (breadth of MCP-addressable resources) without
+adopting Superset's global-object data model — Kouen's session-scoping stays
+consistent with its existing worktree-per-session/agent-per-pane philosophy rather
+than bolting on a foreign concept.
+
+**Shader presets — reverted, not a competitive dimension.** Explored as part of this
+plan (Ghostty's GPU shader customization gap from the original 5-item list), but the
+underlying capability turned out to already exist pre-session with zero UI exposure.
+User judged exposing it not worth the surface area ("gimmick") after seeing it live —
+reverted the Settings picker. Not a loss against any competitor: none of the terminals
+compared in this doc (Warp/iTerm2/WezTerm/cmux/Supacode/Superset) have shipped this
+either — Ghostty remains the only one with real GPU shader customization. Kouen's
+non-decision here is a legitimate "we could, we chose not to" position, same class as
+the ACP non-adoption above — not a gap to revisit unless user reconsiders.
+
+**Where Kouen stands now, one line**: on the MCP-completeness axis specifically
+(the dimension Superset led on), Kouen is at parity or ahead for every resource type
+except Projects (`projects_list`, marginal value per earlier research, not built).
+Everything else from the original 5-item competitive list is closed, deferred by
+choice, or was never a real gap to begin with.

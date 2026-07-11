@@ -1,0 +1,118 @@
+import Foundation
+import KouenIPC
+
+/// A session-scoped checklist item, addressable via `kouen-mcp`. Belongs to exactly one
+/// session — there is no global, session-independent Task (see LANGUAGE.md).
+public struct KouenTask: Codable, Sendable, Equatable, Identifiable {
+    public let id: UUID
+    public var sessionID: SessionID
+    public var title: String
+    public var done: Bool
+    public let createdAt: Date
+    public var updatedAt: Date
+
+    public init(
+        id: UUID = UUID(), sessionID: SessionID, title: String, done: Bool = false,
+        createdAt: Date = Date(), updatedAt: Date = Date()
+    ) {
+        self.id = id
+        self.sessionID = sessionID
+        self.title = title
+        self.done = done
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+}
+
+/// Daemon-owned Task storage so Tasks survive `Kouen.app` quitting, mirroring
+/// `PasteBufferStore`'s persistence shape. A session closing does NOT delete its
+/// Tasks — they remain listable (the Task Dashboard groups them under "closed
+/// sessions"); deletion is always an explicit user action, never an eviction side
+/// effect (see design.md's Tactical Design — data loss on routine tab-close would be
+/// surprising).
+public final class TaskStore: @unchecked Sendable {
+    private var tasks: [KouenTask] = []
+    private let lock = NSLock()
+    private let url: URL
+
+    public init(url: URL = KouenPaths.tasksURL) {
+        self.url = url
+        self.tasks = Self.loadFromDisk(at: url)
+    }
+
+    /// All Tasks, or only those owned by `sessionID` when provided. `nil` powers the
+    /// Task Dashboard's cross-session view.
+    public func list(sessionID: SessionID? = nil) -> [KouenTask] {
+        lock.lock(); defer { lock.unlock() }
+        guard let sessionID else { return tasks }
+        return tasks.filter { $0.sessionID == sessionID }
+    }
+
+    public func get(id: UUID) -> KouenTask? {
+        lock.lock(); defer { lock.unlock() }
+        return tasks.first { $0.id == id }
+    }
+
+    @discardableResult
+    public func create(sessionID: SessionID, title: String) -> KouenTask {
+        lock.lock()
+        let task = KouenTask(sessionID: sessionID, title: title)
+        tasks.append(task)
+        let toSave = tasks
+        lock.unlock()
+        save(toSave)
+        return task
+    }
+
+    @discardableResult
+    public func update(id: UUID, title: String? = nil, done: Bool? = nil) -> KouenTask? {
+        lock.lock()
+        guard let index = tasks.firstIndex(where: { $0.id == id }) else {
+            lock.unlock()
+            return nil
+        }
+        if let title { tasks[index].title = title }
+        if let done { tasks[index].done = done }
+        tasks[index].updatedAt = Date()
+        let updated = tasks[index]
+        let toSave = tasks
+        lock.unlock()
+        save(toSave)
+        return updated
+    }
+
+    @discardableResult
+    public func delete(id: UUID) -> Bool {
+        lock.lock()
+        guard let index = tasks.firstIndex(where: { $0.id == id }) else {
+            lock.unlock()
+            return false
+        }
+        tasks.remove(at: index)
+        let toSave = tasks
+        lock.unlock()
+        save(toSave)
+        return true
+    }
+
+    private static func loadFromDisk(at url: URL) -> [KouenTask] {
+        guard let data = try? Data(contentsOf: url) else { return [] }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        guard let tasks = try? decoder.decode([KouenTask].self, from: data) else {
+            KouenPaths.backupCorruptFile(at: url, label: "KouenDaemon")
+            return []
+        }
+        return tasks
+    }
+
+    private func save(_ snapshot: [KouenTask]) {
+        try? KouenPaths.ensureDirectories()
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        if let data = try? encoder.encode(snapshot) {
+            try? data.write(to: url, options: .atomic)
+        }
+    }
+}
