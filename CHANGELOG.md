@@ -8,7 +8,15 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [4.4.0] - 2026-07-11
 
 ### Added
-- Release version bump to v4.4.0.
+- P39 competitive-gap closes — SSH agent forwarding, sidebar port badge, git hunk staging, in-app PR merge, fleet visibility badge ([`4e6549e`](https://github.com/Vit129/kouen-terminal/commit/4e6549e948b31bbc8589902da765d52c6fdd551a))
+- Add Tasks/Worktree/Hosts MCP tools and Automations scheduler (release v5.0.0) ([`97180fd`](https://github.com/Vit129/kouen-terminal/commit/97180fd03897b155eec66f1c33024db6dca0d265))
+
+### Fixed
+- Reload MCP tool policy on every check, not once at construction ([`7678351`](https://github.com/Vit129/kouen-terminal/commit/7678351f8e715667de72a3a05a0f167317673410))
+- Move Cmd+F find bar below pane's browser/split/close icon row ([`1d796a5`](https://github.com/Vit129/kouen-terminal/commit/1d796a5774ec5173fa4393ba2f72a5b89d6f815e))
+- Mobile pairing rejected every real device because the token rotated out before connect ([`c8bd2bc`](https://github.com/Vit129/kouen-terminal/commit/c8bd2bc2d272fbec2e8afc3f6bd23ef7141002f8))
+- Browser pane sends a real Safari UA so Google/Apple OAuth doesn't reject it ([`e955924`](https://github.com/Vit129/kouen-terminal/commit/e955924494f177336e1925ca17414e5c01c18e9f))
+- Correct release to v4.4.0 (was mistakenly major-bumped) and scope kouenBrowserOpen to the calling agent's own session ([`eed2a9f`](https://github.com/Vit129/kouen-terminal/commit/eed2a9fd972c0de3e01fc50c398afc6472501361))
 
 ## [4.3.1] - 2026-07-10
 
