@@ -1,17 +1,20 @@
 import Foundation
 import KouenCore
 
-/// Drives three periodic background jobs for the daemon:
+/// Drives four periodic background jobs for the daemon:
 ///   1. metadataTimer (1.5s)   — cwd + foreground command per surface; O(N) cheap syscalls.
 ///   2. agentScanTimer (30s)   — proc_listpids fallback for agents without OSC 26 hooks;
 ///                               OSC 26 is the primary real-time path, this is just a safety net.
 ///   3. cwdTimer (0.5s)        — lightweight shell-cwd-only probe when a subprocess is in the fg.
+///   4. portScanTimer (5s)     — TCP listening-port scan per surface (P39 G1 sidebar badge);
+///                               forks `lsof` once per tick, so slower than the syscall-only timers.
 /// @unchecked Sendable: all mutable state confined to the serial `queue`.
 public final class AgentScanner: @unchecked Sendable {
     public static let shared = AgentScanner()
     private var metadataTimer: DispatchSourceTimer?
     private var agentScanTimer: DispatchSourceTimer?
     private var cwdTimer: DispatchSourceTimer?
+    private var portScanTimer: DispatchSourceTimer?
     private weak var registry: SurfaceRegistry?
     private let queue = DispatchQueue(label: "com.vit129.kouen.agent-scanner")
 
@@ -20,6 +23,7 @@ public final class AgentScanner: @unchecked Sendable {
         metadataTimer?.cancel()
         agentScanTimer?.cancel()
         cwdTimer?.cancel()
+        portScanTimer?.cancel()
 
         // Surface metadata: cwd + foreground command (cheap per-surface proc_pidinfo) — every 1.5s
         let mt = DispatchSource.makeTimerSource(queue: queue)
@@ -43,6 +47,15 @@ public final class AgentScanner: @unchecked Sendable {
         cwdTimer.setEventHandler { [weak self] in self?.registry?.refreshCwdOnly() }
         cwdTimer.resume()
         self.cwdTimer = cwdTimer
+
+        // Listening-port scan (batched `lsof`) — every 5s. Slower than the syscall-only
+        // timers above since it forks a process; still fast enough that a dev server shows
+        // up in the sidebar within one tick of starting.
+        let pt = DispatchSource.makeTimerSource(queue: queue)
+        pt.schedule(deadline: .now() + 5, repeating: 5)
+        pt.setEventHandler { [weak self] in self?.registry?.refreshListeningPorts() }
+        pt.resume()
+        portScanTimer = pt
     }
 
     /// Stop all timers (orderly daemon shutdown / between tests). Safe to call repeatedly.
@@ -53,6 +66,8 @@ public final class AgentScanner: @unchecked Sendable {
         agentScanTimer = nil
         cwdTimer?.cancel()
         cwdTimer = nil
+        portScanTimer?.cancel()
+        portScanTimer = nil
     }
 
     private func scanAgents() {

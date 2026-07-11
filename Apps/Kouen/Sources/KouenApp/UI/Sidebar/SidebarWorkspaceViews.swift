@@ -316,10 +316,13 @@ struct SidebarFooterView: View {
         let _ = model.chromeEpoch
         let c = KouenDesign.chrome
         let epoch = model.chromeEpoch
+        // P39 G5: lightweight fleet-at-a-glance badge — piggybacks on the same
+        // chromeEpoch-driven re-render as everything else here, no new data plumbing.
+        let needsAttention = SessionCoordinator.shared.agentsList().filter(\.waiting).count
         HStack(spacing: 2) {
             FooterIconButton(symbol: "gearshape", tooltip: "Settings (⌘,)", chromeEpoch: epoch, action: onSettings)
             Spacer()
-            FooterIconButton(symbol: "sparkles", tooltip: "Agents", chromeEpoch: epoch, action: onAgents)
+            FooterIconButton(symbol: "sparkles", tooltip: "Agents", chromeEpoch: epoch, badgeCount: needsAttention, action: onAgents)
             RecentProjectsMenuButton(chromeEpoch: epoch, provider: recentProjectsProvider, onSelect: onOpenRecent)
             FooterIconButton(symbol: "plus", tooltip: "New session", chromeEpoch: epoch, action: onNewSession)
             FooterIconButton(symbol: "command", tooltip: "Command palette (⌘K)", chromeEpoch: epoch, action: onPalette)
@@ -335,6 +338,7 @@ private struct FooterIconButton: View {
     let symbol: String
     let tooltip: String
     let chromeEpoch: Int
+    var badgeCount: Int = 0
     let action: () -> Void
     @State private var isHovered = false
 
@@ -352,9 +356,19 @@ private struct FooterIconButton: View {
                             ? c.textPrimary.withAlphaComponent(c.isDark ? 0.10 : 0.09)
                             : NSColor.clear))
                 )
+                .overlay(alignment: .topTrailing) {
+                    if badgeCount > 0 {
+                        Text("\(min(badgeCount, 9))")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(minWidth: 12, minHeight: 12)
+                            .background(Circle().fill(Color.red))
+                            .offset(x: 3, y: -3)
+                    }
+                }
         }
         .buttonStyle(.plain)
-        .help(tooltip)
+        .help(badgeCount > 0 ? "\(tooltip) — \(badgeCount) need attention" : tooltip)
         .onHover { isHovered = $0 }
     }
 }

@@ -277,6 +277,15 @@ private struct SidebarSessionItemRow: View {
                 Spacer()
 
                 HStack(spacing: 4) {
+                    // P39 G1: lowest listening port across every tab, so a background dev
+                    // server still shows up even when a different tab is active/selected.
+                    if let port = session.tabs.compactMap({ $0.listeningPorts.min() }).min() {
+                        Button(action: { openInBrowserPane(port: port) }) {
+                            SidebarBadgeLabel(text: ":\(port)", color: Color(nsColor: c.textSecondary).opacity(0.7))
+                        }
+                        .buttonStyle(.plain)
+                        .help("Open localhost:\(port) in the browser pane")
+                    }
                     if let pr = metadata?.prNumber {
                         let prColor: Color = (metadata?.aheadCount ?? 0) > 0
                             ? .green : Color(nsColor: c.accent)
@@ -341,6 +350,13 @@ private struct SidebarSessionItemRow: View {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(session.id.uuidString, forType: .string)
         }
+        if let prNumber = metadata?.prNumber {
+            Divider()
+            Button("Merge PR #\(prNumber)…") {
+                mergePR(number: prNumber, cwd: cwd)
+            }
+            .disabled(!(metadata?.prChecksStatus == .pass && metadata?.prMergeable == true))
+        }
         Divider()
         Button("Split session right") {
             guard let wsID = model.activeWorkspaceID else { return }
@@ -366,6 +382,58 @@ private struct SidebarSessionItemRow: View {
             Button("Close other sessions", role: .destructive) {
                 closeOtherSessions()
             }
+        }
+    }
+
+    /// P39 G3 — minimal-risk merge: no pre-selected method (the picker opens on the placeholder
+    /// item; leaving it there and hitting "Merge" is treated as cancel, not "pick one for me"),
+    /// confirmation shows PR#/title/target branch, and the caller already gated this action on
+    /// `checksStatus == .pass && mergeable == true` — `gh pr merge`'s own branch-protection
+    /// refusal is the only additional safety backstop, no app-side force option.
+    private func mergePR(number: Int, cwd: String) {
+        let title = metadata?.prTitle ?? ""
+        let target = metadata?.prBaseBranch ?? "the default branch"
+
+        let alert = NSAlert()
+        alert.messageText = "Merge PR #\(number)?"
+        alert.informativeText = "\(title)\n\nInto \(target)"
+        alert.alertStyle = .warning
+        let mergeButton = alert.addButton(withTitle: "Merge")
+        alert.addButton(withTitle: "Cancel")
+        mergeButton.keyEquivalent = ""
+
+        let popup = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 260, height: 24), pullsDown: false)
+        popup.addItem(withTitle: "Choose merge method…")
+        popup.addItem(withTitle: "Squash and merge")
+        popup.addItem(withTitle: "Rebase and merge")
+        popup.addItem(withTitle: "Merge commit")
+        popup.selectItem(at: 0)
+        alert.accessoryView = popup
+
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        let method: GitHubCLIClient.MergeMethod
+        switch popup.indexOfSelectedItem {
+        case 1: method = .squash
+        case 2: method = .rebase
+        case 3: method = .merge
+        default: return  // placeholder still selected — no method chosen, treat as cancel
+        }
+
+        Task {
+            let result = await Task.detached(priority: .utility) {
+                GitHubCLIClient().merge(repoPath: cwd, prNumber: number, method: method)
+            }.value
+            let resultAlert = NSAlert()
+            if result.success {
+                resultAlert.messageText = "Merged PR #\(number)"
+                resultAlert.alertStyle = .informational
+            } else {
+                resultAlert.messageText = "Merge failed"
+                resultAlert.informativeText = result.errorMessage ?? "Unknown error"
+                resultAlert.alertStyle = .critical
+            }
+            resultAlert.addButton(withTitle: "OK")
+            resultAlert.runModal()
         }
     }
 
@@ -444,6 +512,18 @@ private struct SidebarSessionItemRow: View {
             }
         }
         return nil
+    }
+
+    /// Reuses the same notification `KouenTerminalSurfaceView`'s click-to-open localhost-link
+    /// handler posts — one browser-pane-opening path for both the passive text-detection route
+    /// and this proactive sidebar-badge route (P39 G1).
+    private func openInBrowserPane(port: Int) {
+        guard let url = URL(string: "http://localhost:\(port)") else { return }
+        NotificationCenter.default.post(
+            name: Notification.Name("KouenOpenInBrowserPaneURL"),
+            object: nil,
+            userInfo: ["url": url]
+        )
     }
 
     private func agentColor(for kind: AgentKind) -> Color {

@@ -859,6 +859,14 @@ public struct SessionEditor: Sendable {
         bumpRevision()
     }
 
+    /// TCP ports the tab's process tree is listening on (P39 G1), refreshed by the daemon's
+    /// metadata scan alongside cwd/currentCommand — same per-tab granularity.
+    public mutating func updateTabListeningPorts(surfaceID: SurfaceID, ports: [Int]) {
+        guard let match = tabIndex(surfaceID: surfaceID) else { return }
+        snapshot.workspaces[match.workspaceIndex].sessions[match.sessionIndex].tabs[match.tabIndex].listeningPorts = ports
+        bumpRevision()
+    }
+
     /// Stamps the tab's `lastMCPControlAt` so the UI can show a "MCP" badge.
     public mutating func stampMCPActivity(surfaceID: SurfaceID, at date: Date) {
         guard let match = tabIndex(surfaceID: surfaceID) else { return }

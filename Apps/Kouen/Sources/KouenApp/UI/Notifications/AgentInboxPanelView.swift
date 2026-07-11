@@ -59,13 +59,28 @@ private struct AgentInboxBody: View {
     let agents: [AgentSessionSummary]
     let onSelect: (AgentSessionSummary) -> Void
 
+    /// P39 G5: fleet-at-a-glance counts in the header — a human watching several agents run
+    /// gets this without opening an MCP client; `agents` is already the roster this popover
+    /// renders, no new data plumbing.
+    private var needsAttentionCount: Int { agents.filter(\.waiting).count }
+
     var body: some View {
         VStack(spacing: 0) {
             // Header
-            HStack {
+            HStack(spacing: 6) {
                 Text("Agents")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(Color(KouenDesign.chrome.textTertiary))
+                if !agents.isEmpty {
+                    Text("· \(agents.count) running")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color(KouenDesign.chrome.textTertiary))
+                }
+                if needsAttentionCount > 0 {
+                    Text("· \(needsAttentionCount) need you")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color.red)
+                }
                 Spacer()
             }
             .padding(.horizontal, 14)

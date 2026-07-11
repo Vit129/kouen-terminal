@@ -211,7 +211,9 @@ public enum AgentDetector {
         return descendantPIDs(of: pid, allPIDs: allPIDs, parentMap: parents)
     }
 
-    private static func descendantPIDs(of pid: Int32,
+    /// Shared with `ListeningPortScanner` (P39 G1), which reuses the same pre-built
+    /// `allPIDs`/`parentMap` pass rather than re-walking `proc_listpids` per surface.
+    static func descendantPIDs(of pid: Int32,
                                        allPIDs: [Int32],
                                        parentMap: [Int32: Int32]) -> [Int32] {
         guard !allPIDs.isEmpty else { return [] }

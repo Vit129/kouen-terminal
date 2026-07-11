@@ -1248,6 +1248,52 @@ public final class SurfaceRegistry: @unchecked Sendable {
         if changed { commit() }
     }
 
+    /// TCP-listening-port refresh (P39 G1): one batched `lsof` across every surface's process
+    /// tree, mirroring `refreshSurfaceMetadata`'s off-lock probe / re-validate-then-commit shape
+    /// so a slow `lsof` fork never blocks IPC (`sendData`, snapshots) the way holding `lock`
+    /// during the probe would.
+    public func refreshListeningPorts() {
+        lock.lock()
+        let snap = Array(sessions)
+        lock.unlock()
+
+        var roots: [String: Int32] = [:]
+        var probedPID: [String: pid_t] = [:]
+        roots.reserveCapacity(snap.count)
+        for (key, session) in snap {
+            let pid = session.currentChildPID
+            roots[key] = pid
+            probedPID[key] = pid
+        }
+        guard !roots.isEmpty else { return }
+
+        // Off-lock: forks `lsof`, so this must never run while `lock` is held.
+        let portsByKey = ListeningPortScanner.scan(roots: roots)
+
+        lock.lock()
+        defer { lock.unlock() }
+        var changed = false
+        for (key, session) in snap {
+            // Re-validate identity + child PID before committing — the probed root PID may
+            // belong to an already-respawned child by the time `lsof` returns.
+            guard sessions[key] === session,
+                  session.currentChildPID == probedPID[key],
+                  let uuid = UUID(uuidString: key),
+                  let match = editor.tab(for: uuid)
+            else { continue }
+            let tab = editor.snapshot.workspaces
+                .first(where: { $0.id == match.workspaceID })?
+                .sessions.flatMap { $0.tabs }
+                .first(where: { $0.id == match.tabID })
+            let ports = portsByKey[key] ?? []
+            if tab?.listeningPorts != ports {
+                editor.updateTabListeningPorts(surfaceID: uuid, ports: ports)
+                changed = true
+            }
+        }
+        if changed { commit() }
+    }
+
     /// Lightweight CWD-only refresh: reads each surface's direct shell PID cwd via a single
     /// `proc_pidinfo` syscall (no process-tree walk). O(N) where N = open surfaces, ~0.1ms
     /// total. Suitable for 500ms polling without significant CPU cost.
