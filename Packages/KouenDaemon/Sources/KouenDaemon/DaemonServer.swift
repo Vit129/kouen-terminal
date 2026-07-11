@@ -314,9 +314,11 @@ public final class DaemonServer: @unchecked Sendable {
                 }
                 send(.ok, to: fd)
                 continue
-            case let .browserOpen(url, direction):
+            case let .browserOpen(url, direction, originSurfaceID):
                 Task {
-                    let resp = await self.forwardBrowserRequest(paneID: nil, req: .open(url: url, direction: direction))
+                    let resp = await self.forwardBrowserRequest(
+                        paneID: nil, req: .open(url: url, direction: direction, originSurfaceID: originSurfaceID)
+                    )
                     self.queue.async {
                         self.send(.browserSuccess(resp), to: fd)
                     }

@@ -66,7 +66,7 @@ final class DaemonBrowserRoutingTests: XCTestCase {
         // that never comes (timeout 1 s). We only care that routing fired correctly.
         let url = URL(string: "https://example.com")!
         DispatchQueue.global().async {
-            _ = try? DaemonClient().request(.browserOpen(url: url, direction: nil), timeout: 1.0)
+            _ = try? DaemonClient().request(.browserOpen(url: url, direction: nil, originSurfaceID: nil), timeout: 1.0)
         }
 
         // Give the daemon time to forward the request before asserting.
@@ -91,7 +91,7 @@ final class DaemonBrowserRoutingTests: XCTestCase {
         // Send browserOpen on a background thread — daemon will forward it to the GUI
         // and await the GUI's browserResponse.
         DispatchQueue.global().async {
-            let resp = try? DaemonClient().request(.browserOpen(url: url, direction: nil), timeout: 5.0)
+            let resp = try? DaemonClient().request(.browserOpen(url: url, direction: nil, originSurfaceID: nil), timeout: 5.0)
             responseBox.set(resp)
             done.fulfill()
         }

@@ -197,7 +197,12 @@ public enum IPCRequest: Codable, Sendable {
     case runGit(args: [String], cwd: String)
 
     // Browser tool integration (P14)
-    case browserOpen(url: URL, direction: SplitDirection?)
+    // `originSurfaceID`: the pane the calling agent is actually running in (from its own
+    // `KOUEN_SURFACE` env var) — anchors the new browser pane to that agent's own
+    // session/tab instead of whatever tab the human currently has focused in the GUI.
+    // `nil` falls back to the GUI's active tab (menu/keyboard-triggered opens have no
+    // originating agent surface).
+    case browserOpen(url: URL, direction: SplitDirection?, originSurfaceID: UUID?)
     case browserNavigate(paneID: UUID, url: URL)
     case browserWait(paneID: UUID, timeoutSeconds: Double?)
     case browserSnapshot(paneID: UUID, interactive: Bool?)
@@ -245,7 +250,7 @@ public enum IPCRequest: Codable, Sendable {
 }
 
 public enum BrowserRequestPayload: Codable, Sendable {
-    case open(url: URL, direction: SplitDirection?)
+    case open(url: URL, direction: SplitDirection?, originSurfaceID: UUID?)
     case navigate(paneID: UUID, url: URL)
     case wait(paneID: UUID, timeoutSeconds: Double?)
     case snapshot(paneID: UUID, interactive: Bool?)
