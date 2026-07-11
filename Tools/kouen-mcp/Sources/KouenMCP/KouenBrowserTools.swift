@@ -39,7 +39,11 @@ struct KouenBrowserTools: Sendable {
             direction = dir
         }
 
-        guard let response = await send(.browserOpen(url: url, direction: direction)) else {
+        // Anchor the new pane to the calling agent's own session/tab (set by RealPty on
+        // spawn) instead of whichever tab the human happens to have focused right now.
+        let originSurfaceID = ProcessInfo.processInfo.environment["KOUEN_SURFACE"].flatMap(UUID.init(uuidString:))
+
+        guard let response = await send(.browserOpen(url: url, direction: direction, originSurfaceID: originSurfaceID)) else {
             return (nil, JSONRPCError(code: -32000, message: "Daemon unavailable"))
         }
 

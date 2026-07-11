@@ -157,12 +157,15 @@ final class SplitPaneCoordinator {
         }
     }
 
-    func openBrowserPane(url: URL, direction: SplitDirection, paneID: PaneID = UUID()) {
-        // activePaneID was unused — the browser is always inserted at the root level
-        // beside all terminal panes, so only workspace+tab need to exist.
-        guard let workspace = coord.snapshot.activeWorkspace,
-              let tab = workspace.activeTab
-        else { return }
+    /// `originSurfaceID`: anchors the new browser pane to the tab that surface actually
+    /// lives in (e.g. the MCP-calling agent's own pane, via its `KOUEN_SURFACE` env var)
+    /// instead of whatever tab the human currently has focused — an agent working in
+    /// session A shouldn't have its `kouenBrowserOpen` land in session B just because a
+    /// human happened to be looking at B. Falls back to the active tab when `nil` or not
+    /// found (menu/keyboard-triggered opens have no originating agent surface).
+    func openBrowserPane(url: URL, direction: SplitDirection, paneID: PaneID = UUID(), originSurfaceID: SurfaceID? = nil) {
+        let originTab = originSurfaceID.flatMap { coord.surfaceIndex[$0]?.tab }
+        guard let tab = originTab ?? coord.snapshot.activeWorkspace?.activeTab else { return }
 
         let resolvedURL: URL
         if let savedURLString = UserDefaults.standard.string(forKey: "browserPane.\(paneID.uuidString).url"),
