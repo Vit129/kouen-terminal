@@ -13,6 +13,7 @@ struct SettingsRemoteView: View {
     @State private var editPort = ""
     @State private var editIdentity = ""
     @State private var editJump = ""
+    @State private var editAgentForwarding = false
     @State private var editSocket = ""
     @State private var statusMessage = ""
     @State private var isDetectingSocket = false
@@ -23,6 +24,11 @@ struct SettingsRemoteView: View {
     @State private var pairingSecondsRemaining = 0
     @State private var pairingDaemonReportsEnabled = false
     @State private var pairedDevices: [PairedDeviceSummary] = []
+    // A paired device reconnects via its stored secret (P37 A2) — it never needs the QR
+    // again, so once at least one device is paired the rotating QR is pointless noise by
+    // default. This only gates the QR's visibility, not pairing itself: the daemon keeps
+    // rotating tokens underneath regardless, so toggling this back on always shows a live one.
+    @State private var showQRManually = false
 
     var body: some View {
         ScrollView {
@@ -71,12 +77,16 @@ struct SettingsRemoteView: View {
                 .foregroundStyle(.secondary)
 
             if model.settings.mobileBridgeEnabled {
-                pairingQRPanel
+                if pairedDevices.isEmpty || showQRManually {
+                    pairingQRPanel
+                } else {
+                    pairedAlreadyBanner
+                }
                 pairedDevicesList
             }
         }
         // P37 B2: poll the live pairing URL/countdown ~1s while this pane is visible — the
-        // token rotates every 15s, so the QR must refresh itself. `.task(id:)` restarts the
+        // token rotates every 45s, so the QR must refresh itself. `.task(id:)` restarts the
         // loop when the toggle flips and cancels it when the pane disappears, so a closed
         // Settings window costs zero IPC traffic.
         .task(id: model.settings.mobileBridgeEnabled) {
@@ -92,17 +102,36 @@ struct SettingsRemoteView: View {
         }
     }
 
+    /// Shown instead of the live QR once ≥1 device is already paired — re-showing a
+    /// rotating token nobody needs anymore was the whole ask (paired devices reconnect via
+    /// their stored secret, never the QR).
+    private var pairedAlreadyBanner: some View {
+        HStack(spacing: 8) {
+            Label("\(pairedDevices.count) device\(pairedDevices.count == 1 ? "" : "s") paired", systemImage: "checkmark.circle.fill")
+                .font(.caption)
+                .foregroundStyle(Color.green)
+            Spacer()
+            Button("Pair another device") { showQRManually = true }
+                .controlSize(.small)
+        }
+        .padding(.top, 4)
+    }
+
     @ViewBuilder
     private var pairingQRPanel: some View {
         if let qr = pairingQR, let url = pairingURL {
             VStack(alignment: .leading, spacing: 8) {
+                if showQRManually && !pairedDevices.isEmpty {
+                    Button("Done — hide QR") { showQRManually = false }
+                        .controlSize(.small)
+                }
                 // `.interpolation(.none)` keeps the upscaled QR modules hard-edged —
                 // the default (bilinear) smoothing blurs them enough to slow camera scans.
                 Image(nsImage: qr)
                     .interpolation(.none)
                     .resizable()
                     .frame(width: 200, height: 200)
-                ProgressView(value: Double(min(max(pairingSecondsRemaining, 0), 15)), total: 15)
+                ProgressView(value: Double(min(max(pairingSecondsRemaining, 0), 45)), total: 45)
                     .frame(width: 200)
                 HStack(spacing: 6) {
                     Text(url)
@@ -119,7 +148,7 @@ struct SettingsRemoteView: View {
                     .buttonStyle(.borderless)
                     .help("Copy pairing URL")
                 }
-                Text("Scan with your phone's camera — the code rotates every 15 seconds.")
+                Text("Scan with your phone's camera — the code rotates every 45 seconds.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -265,6 +294,11 @@ struct SettingsRemoteView: View {
                     TextField("jump-host", text: $editJump)
                         .frame(width: 280)
                 }
+                LabeledContent("Agent forwarding") {
+                    Toggle("", isOn: $editAgentForwarding)
+                        .labelsHidden()
+                        .help("Forward SSH_AUTH_SOCK (-A) so git/gh on the remote can use your local keys")
+                }
                 LabeledContent("Socket path") {
                     HStack(spacing: 8) {
                         TextField("/home/user/.config/kouen/kouen.sock", text: $editSocket)
@@ -326,6 +360,7 @@ struct SettingsRemoteView: View {
         editPort = host?.sshArgValue(after: "-p") ?? ""
         editIdentity = host?.sshArgValue(after: "-i") ?? ""
         editJump = host?.sshArgValue(after: "-J") ?? ""
+        editAgentForwarding = host?.sshArgs.contains("-A") ?? false
         editSocket = host?.remoteSocketPath ?? ""
         refreshStatus()
     }
@@ -339,6 +374,7 @@ struct SettingsRemoteView: View {
         selectedID = nil
         editName = ""; editTarget = ""; editPort = ""
         editIdentity = ""; editJump = ""; editSocket = ""
+        editAgentForwarding = false
         refreshStatus("New host")
     }
 
@@ -370,6 +406,7 @@ struct SettingsRemoteView: View {
         appendSSHArg("-p", editPort, to: &args)
         appendSSHArg("-i", editIdentity, to: &args)
         appendSSHArg("-J", editJump, to: &args)
+        if editAgentForwarding { args.append("-A") }
         let host = RemoteHost(name: name, sshTarget: target, remoteSocketPath: socket, sshArgs: args)
         let oldName = selectedID
         let isRename = oldName != nil && oldName != name

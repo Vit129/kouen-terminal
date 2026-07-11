@@ -7,7 +7,12 @@ import Observation
 struct RepoGitMetadata: Sendable, Equatable {
     let prNumber: Int?
     let prURL: String?
+    let prTitle: String?
+    let prBaseBranch: String?
     let prChecksStatus: GitHubCLIClient.ChecksStatus?
+    /// `nil` when there's no PR at all; `false` covers both real conflicts and GitHub still
+    /// computing merge state — P39 G3's merge action treats both the same (don't offer to merge).
+    let prMergeable: Bool?
     let aheadCount: Int?
     let behindCount: Int?
 }
@@ -319,14 +324,17 @@ final class SidebarListModel {
     }
 
     private func fetchGitMetadata(for path: String, branch: String) async -> RepoGitMetadata {
-        let empty = RepoGitMetadata(prNumber: nil, prURL: nil, prChecksStatus: nil, aheadCount: nil, behindCount: nil)
+        let empty = RepoGitMetadata(prNumber: nil, prURL: nil, prTitle: nil, prBaseBranch: nil, prChecksStatus: nil, prMergeable: nil, aheadCount: nil, behindCount: nil)
         guard Self.cachedGhPath != nil, await fetchHasRemote(for: path) else { return empty }
 
         return await Task.detached(priority: .utility) {
             let pr = GitHubCLIClient().prForCurrentBranch(repoPath: path)
             let prNumber = pr?.number
             let prURL = pr?.url
+            let prTitle = pr?.title
+            let prBaseBranch = pr?.baseRefName
             let prChecksStatus = pr?.checksStatus
+            let prMergeable = pr.map { $0.mergeable }
 
             var aheadCount: Int? = nil
             var behindCount: Int? = nil
@@ -348,7 +356,7 @@ final class SidebarListModel {
                 }
             } catch {}
 
-            return RepoGitMetadata(prNumber: prNumber, prURL: prURL, prChecksStatus: prChecksStatus, aheadCount: aheadCount, behindCount: behindCount)
+            return RepoGitMetadata(prNumber: prNumber, prURL: prURL, prTitle: prTitle, prBaseBranch: prBaseBranch, prChecksStatus: prChecksStatus, prMergeable: prMergeable, aheadCount: aheadCount, behindCount: behindCount)
         }.value
     }
 

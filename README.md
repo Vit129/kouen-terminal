@@ -77,7 +77,10 @@ See [USAGE.md](USAGE.md) for the full install, run, CLI, and remote/headless gui
 - Multi-agent workflows — run Claude Code, Codex, and Gemini CLI in parallel panes with per-agent statusline showing model, context usage, and rate limits.
 - Optional tmux-style controls: prefix key, status line, copy mode, paste buffers, hooks, command prompt, and many tmux-compatible commands.
 - IDE-like navigation — double-click folders to cd, ⌘P fuzzy jump to any directory via zoxide frecency, ⌘⇧J frecency dir picker (↩ cd · ⌘↩ open new tab), ⌘⇧R saved command recipes, ⌘-click file paths, `:cd` from the command prompt, and **Open With Kouen** from Finder on any source file.
-- Sidebar tools for sessions, file navigation, real-time Git workflows (one-step Commit & Push), command palette, and editor/LSP flows across 21 languages — see [Editor & LSP](#editor--lsp).
+- Sidebar tools for sessions, file navigation, real-time Git workflows (one-step Commit & Push, per-hunk stage/unstage, PR merge with squash/rebase/merge picker), command palette, and editor/LSP flows across 21 languages — see [Editor & LSP](#editor--lsp).
+- Sidebar dev-server detection — live listening-port badge per session, click to open in the browser pane.
+- SSH agent forwarding for remote hosts, toggleable per host in Settings.
+- Fleet visibility — footer badge + Agent Inbox header show running/needs-attention counts across all active agent sessions.
 - Stable under long sessions — per-pane controller trees and browser network buffers are bounded and released on pane close; memory stays flat across hours of use.
 
 ## Keyboard Shortcuts

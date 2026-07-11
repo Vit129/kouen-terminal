@@ -797,6 +797,154 @@ final class GitPanelView: NSView {
         return (scroll, textView, fileRanges)
     }
 
+    // MARK: - Hunk staging (P39 G4)
+
+    /// Splits `git diff`/`git diff --cached` output for a single file into the shared file
+    /// header (`diff --git`/`index`/`---`/`+++` lines, needed on every per-hunk patch for
+    /// `git apply` to accept it) and each individual `@@ …` hunk's lines. Pure/testable —
+    /// no process spawn, no popover.
+    nonisolated static func parseDiffHunks(_ text: String) -> (header: [String], hunks: [[String]]) {
+        let lines = text.components(separatedBy: "\n")
+        guard let firstHunkIndex = lines.firstIndex(where: { $0.hasPrefix("@@") }) else {
+            return (lines, [])
+        }
+        let header = Array(lines[0..<firstHunkIndex])
+        var hunks: [[String]] = []
+        var current: [String] = []
+        for line in lines[firstHunkIndex...] {
+            if line.hasPrefix("@@") {
+                if !current.isEmpty { hunks.append(current) }
+                current = [line]
+            } else {
+                current.append(line)
+            }
+        }
+        if !current.isEmpty { hunks.append(current) }
+        // Drop a trailing empty element from the final line's "\n" split — not a real hunk line.
+        if hunks.last?.last == "" { hunks[hunks.count - 1].removeLast() }
+        return (header, hunks)
+    }
+
+    /// A single hunk's patch text, valid on its own for `git apply --cached [-R]`.
+    nonisolated static func patchText(header: [String], hunk: [String]) -> String {
+        (header + hunk).joined(separator: "\n") + "\n"
+    }
+
+    /// Applies (or reverses) one hunk's patch against the index only, via a temp file — `runGit`
+    /// goes through `Process` args, not stdin, so the patch is written to disk first, same
+    /// tmp-file pattern `showChangedFileDiff`/`showCommitDetail` already use for diff text.
+    private func applyHunkPatch(header: [String], hunk: [String], reverse: Bool, path: String) async -> GitResult {
+        let tmpDir = NSTemporaryDirectory() + "kouen-patch/"
+        try? FileManager.default.createDirectory(atPath: tmpDir, withIntermediateDirectories: true)
+        let tmpPath = tmpDir + "\(UUID().uuidString).patch"
+        let patch = Self.patchText(header: header, hunk: hunk)
+        do {
+            try patch.write(toFile: tmpPath, atomically: true, encoding: .utf8)
+        } catch {
+            return GitResult(output: "", stderr: "Failed to write patch: \(error.localizedDescription)", success: false)
+        }
+        defer { try? FileManager.default.removeItem(atPath: tmpPath) }
+        var args = ["apply", "--cached"]
+        if reverse { args.append("-R") }
+        args.append(tmpPath)
+        return await runGitWithStatus(args, in: path)
+    }
+
+    @objc private func showHunkStaging(_ sender: NSButton) {
+        guard let path = currentPath, let file = sender.toolTip else { return }
+        Task {
+            async let unstagedTask = runGit(["diff", "--", file], in: path)
+            async let stagedTask = runGit(["diff", "--cached", "--", file], in: path)
+            let unstaged = await unstagedTask
+            let staged = await stagedTask
+            guard sender.window != nil else { return }
+            presentHunkStagingPopover(unstagedDiff: unstaged, stagedDiff: staged, anchor: sender)
+        }
+    }
+
+    private func presentHunkStagingPopover(unstagedDiff: String, stagedDiff: String, anchor: NSView) {
+        let (unstagedHeader, unstagedHunks) = Self.parseDiffHunks(unstagedDiff)
+        let (stagedHeader, stagedHunks) = Self.parseDiffHunks(stagedDiff)
+
+        let stack = NSStackView()
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 6
+        stack.edgeInsets = NSEdgeInsets(top: 8, left: 8, bottom: 8, right: 8)
+        stack.translatesAutoresizingMaskIntoConstraints = false
+
+        if unstagedHunks.isEmpty && stagedHunks.isEmpty {
+            stack.addArrangedSubview(makeLabel("No hunks — file is fully staged, fully unstaged, or untracked."))
+        }
+        if !unstagedHunks.isEmpty {
+            let label = makeLabel("Unstaged")
+            label.font = .boldSystemFont(ofSize: 12)
+            stack.addArrangedSubview(label)
+            for hunk in unstagedHunks {
+                stack.addArrangedSubview(makeHunkCard(header: unstagedHeader, hunk: hunk, reverse: false))
+            }
+        }
+        if !stagedHunks.isEmpty {
+            let label = makeLabel("Staged")
+            label.font = .boldSystemFont(ofSize: 12)
+            stack.addArrangedSubview(label)
+            for hunk in stagedHunks {
+                stack.addArrangedSubview(makeHunkCard(header: stagedHeader, hunk: hunk, reverse: true))
+            }
+        }
+
+        let scroll = NSScrollView()
+        scroll.hasVerticalScroller = true
+        scroll.drawsBackground = false
+        scroll.translatesAutoresizingMaskIntoConstraints = false
+        scroll.documentView = stack
+        let contentView = NSView(frame: NSRect(x: 0, y: 0, width: 480, height: 420))
+        contentView.addSubview(scroll)
+        NSLayoutConstraint.activate([
+            scroll.topAnchor.constraint(equalTo: contentView.topAnchor),
+            scroll.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            scroll.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            scroll.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+            stack.leadingAnchor.constraint(equalTo: scroll.contentView.leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: scroll.contentView.trailingAnchor),
+            stack.topAnchor.constraint(equalTo: scroll.contentView.topAnchor),
+        ])
+
+        let controller = NSViewController()
+        controller.view = contentView
+        let popover = NSPopover()
+        popover.contentViewController = controller
+        popover.behavior = .transient
+        popover.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .maxX)
+    }
+
+    private func makeHunkCard(header: [String], hunk: [String], reverse: Bool) -> NSView {
+        let (scroll, _, _) = Self.makeDiffScrollView(hunk.joined(separator: "\n"))
+        scroll.translatesAutoresizingMaskIntoConstraints = false
+        scroll.heightAnchor.constraint(equalToConstant: min(180, CGFloat(hunk.count) * 14 + 16)).isActive = true
+
+        let button = HunkActionButton(title: reverse ? "Unstage" : "Stage") { [weak self] in
+            guard let self, let path = self.currentPath else { return }
+            Task {
+                let result = await self.applyHunkPatch(header: header, hunk: hunk, reverse: reverse, path: path)
+                if result.success {
+                    Toast.show("✓ Hunk \(reverse ? "unstaged" : "staged")", in: self)
+                } else {
+                    Toast.show("✗ \(GitPanelView.toastErrorSummary(result.stderr))", in: self, hold: 4.0)
+                }
+                await self.refresh()
+            }
+        }
+
+        let card = NSStackView(views: [scroll, button])
+        card.orientation = .vertical
+        card.alignment = .trailing
+        card.spacing = 4
+        card.translatesAutoresizingMaskIntoConstraints = false
+        scroll.widthAnchor.constraint(equalToConstant: 440).isActive = true
+        return card
+    }
+
     private func presentCommitDetail(_ text: String, anchor: NSView) {
         let (scroll, textView, fileRanges) = Self.makeDiffScrollView(text)
 
@@ -950,20 +1098,28 @@ final class GitPanelView: NSView {
         return String(fallback.prefix(120)) + "…"
     }
 
+    /// `DaemonClient.request()` is synchronous under the hood (blocking queue.sync + poll/read
+    /// loop, up to its 2s timeout) despite this function's own `async` signature — without
+    /// `Task.detached` here, every caller's `Task { }` (implicitly @MainActor, since this is an
+    /// NSView) blocks the main thread for the full IPC round-trip. Found via review while adding
+    /// hunk staging (P39 C1) — fixed at the shared call site so the pre-existing Sync/Pull/Push
+    /// button and worktree-remove get the same fix, not just the new caller (RL-052).
     private func runGitWithStatus(_ args: [String], in directory: String) async -> GitResult {
-        do {
-            let client = DaemonClient()
-            let response = try client.request(.runGit(args: args, cwd: directory))
-            if case let .gitResult(output, stderr, success) = response {
-                return GitResult(output: output, stderr: stderr, success: success)
-            } else if case let .error(err) = response {
-                return GitResult(output: "", stderr: err, success: false)
-            } else {
-                return GitResult(output: "", stderr: "Unexpected daemon response", success: false)
+        await Task.detached(priority: .utility) {
+            do {
+                let client = DaemonClient()
+                let response = try client.request(.runGit(args: args, cwd: directory))
+                if case let .gitResult(output, stderr, success) = response {
+                    return GitResult(output: output, stderr: stderr, success: success)
+                } else if case let .error(err) = response {
+                    return GitResult(output: "", stderr: err, success: false)
+                } else {
+                    return GitResult(output: "", stderr: "Unexpected daemon response", success: false)
+                }
+            } catch {
+                return GitResult(output: "", stderr: error.localizedDescription, success: false)
             }
-        } catch {
-            return GitResult(output: "", stderr: error.localizedDescription, success: false)
-        }
+        }.value
     }
 
     // MARK: - Refresh
@@ -1240,6 +1396,28 @@ final class GitPanelView: NSView {
             statsLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
             rowViews.append(statsLabel)
         }
+
+        // P39 G4: per-hunk stage/unstage, separate from the whole-file `check` toggle above.
+        // Bug found in manual testing: no explicit size constraint meant a plain NSButton with
+        // only an image (no intrinsic content size guarantee) collapsed to zero-width inside the
+        // .fill-distribution NSStackView — same class of issue StageToggleButton avoids with its
+        // explicit 16x16 constraints. Symbol falls back to a certainly-valid one if
+        // "square.split.2x1" ever fails to resolve, so a bad symbol name can't reproduce this.
+        let hunksButton = NSButton(
+            image: NSImage(systemSymbolName: "square.split.2x1", accessibilityDescription: "Stage hunks")
+                ?? NSImage(systemSymbolName: "list.bullet", accessibilityDescription: "Stage hunks")
+                ?? NSImage(),
+            target: self, action: #selector(showHunkStaging(_:)))
+        hunksButton.translatesAutoresizingMaskIntoConstraints = false
+        hunksButton.isBordered = false
+        hunksButton.bezelStyle = .inline
+        hunksButton.toolTip = file
+        hunksButton.setContentHuggingPriority(.required, for: .horizontal)
+        hunksButton.setButtonType(.momentaryChange)
+        (hunksButton.cell as? NSButtonCell)?.imageScaling = .scaleProportionallyDown
+        hunksButton.widthAnchor.constraint(equalToConstant: 16).isActive = true
+        hunksButton.heightAnchor.constraint(equalToConstant: 16).isActive = true
+        rowViews.append(hunksButton)
 
         check.setContentHuggingPriority(.required, for: .horizontal)
         rowViews.append(check)
@@ -1763,6 +1941,30 @@ private final class StageToggleButton: NSButton {
         contentTintColor = .white
         setAccessibilityLabel(isStaged ? "Unstage file" : "Stage file")
     }
+}
+
+/// A small `NSButton` that runs a closure instead of a target/action pair — used for the
+/// dynamically-built hunk-staging popover (P39 G4), where each button's action needs to close
+/// over that specific hunk's patch text.
+private final class HunkActionButton: NSButton {
+    private let onClick: () -> Void
+
+    init(title: String, onClick: @escaping () -> Void) {
+        self.onClick = onClick
+        super.init(frame: .zero)
+        self.title = title
+        bezelStyle = .recessed
+        controlSize = .small
+        font = .systemFont(ofSize: 11, weight: .medium)
+        translatesAutoresizingMaskIntoConstraints = false
+        target = self
+        action = #selector(handleClick)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError() }
+
+    @objc private func handleClick() { onClick() }
 }
 
 private final class FlippedView: NSView {

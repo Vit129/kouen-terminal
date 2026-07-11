@@ -68,6 +68,24 @@ final class RemoteHostStoreTests: XCTestCase {
         XCTAssertFalse(result.saved, "a failed write must report saved == false")
     }
 
+    /// P39 A — save/load round trip for the Agent Forwarding toggle's `-A` flag, decoupled from
+    /// the separate SwiftUI form-reload behavior (a different, unconfirmed concern raised in
+    /// manual testing). This is the guarantee Phase A actually depends on: what the UI toggle
+    /// writes must survive a real store round trip and still be accepted by the tunnel builder.
+    func testAgentForwardingFlagRoundTripsThroughStoreAndIsAcceptedByTunnelBuilder() throws {
+        let store = RemoteHostStore()
+        store.upsert(RemoteHost(
+            name: "devbox", sshTarget: "rob@devbox",
+            remoteSocketPath: "/home/rob/.local/share/kouen/kouen.sock", sshArgs: ["-A"]))
+
+        let loaded = store.host(named: "devbox")
+        XCTAssertEqual(loaded?.sshArgs, ["-A"], "the exact flag the UI toggle writes must round-trip unchanged")
+
+        let args = try SSHTunnelManager.sshArguments(
+            for: try XCTUnwrap(loaded), localSocket: URL(fileURLWithPath: "/tmp/kouen.sock"))
+        XCTAssertTrue(args.contains("-A"), "the persisted flag must actually reach the real ssh invocation")
+    }
+
     func testSSHTunnelAllowsSafeUserArgs() throws {
         let host = RemoteHost(
             name: "build",

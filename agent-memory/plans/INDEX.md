@@ -4,7 +4,8 @@
 
 | File | Title | Status |
 |------|-------|--------|
-| [p38-competitive-feature-gaps.md](p38-competitive-feature-gaps.md) | P38 — Competitive Feature Gaps (cmux/Supacode/Superset/WezTerm/Zed) | Planning |
+| [p39-competitive-feature-gaps.md](p39-competitive-feature-gaps.md) | P39 — Competitive Feature Gaps (cmux/Supacode/Superset/WezTerm/Zed) | All 5 phases built, live-check pending |
+| [p38-competitive-feature-gaps.md](p38-competitive-feature-gaps.md) | P38 — Competitive Feature Gaps (cross-agent diff dashboard/subagent pane visibility/thread-view/image protocol/scripting hook) | Planning |
 | [p37-mobile-connect-v1.md](p37-mobile-connect-v1.md) | P37 — Mobile Connect v1 (QR+Tailscale hardening, in-app QR, real client) | Active |
 | [p25-ios-ipados-support.md](p25-ios-ipados-support.md) | P25 — iOS/iPadOS Support | Planning (W1 done → continued as P37) |
 | [p8-macos27-adoption.md](p8-macos27-adoption.md) | P8 — macOS 27 Golden Gate Adoption | Active |

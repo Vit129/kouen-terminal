@@ -20,8 +20,14 @@ public struct GitHubCLIClient: Sendable {
         public let state: PRState
         public let url: String
         public let headRefName: String
+        public let baseRefName: String
         public let isDraft: Bool
         public let checksStatus: ChecksStatus
+        /// `true` only when GitHub reports the PR as cleanly mergeable (`"MERGEABLE"`) — `false`
+        /// for conflicts or while GitHub is still computing the merge state (`"UNKNOWN"`). P39
+        /// G3's merge action gates on this: never offer to merge something GitHub itself hasn't
+        /// confirmed is clean.
+        public let mergeable: Bool
     }
 
     public enum PRState: String, Sendable, Equatable {
@@ -39,7 +45,7 @@ public struct GitHubCLIClient: Sendable {
 
     /// Get PR info for the current branch in the given repo directory.
     public func prForCurrentBranch(repoPath: String) -> PRInfo? {
-        let fields = "number,title,state,url,headRefName,isDraft,statusCheckRollup"
+        let fields = "number,title,state,url,headRefName,baseRefName,isDraft,statusCheckRollup,mergeable"
         guard let output = runGH(
             ["pr", "view", "--json", fields],
             in: repoPath
@@ -72,6 +78,54 @@ public struct GitHubCLIClient: Sendable {
     @discardableResult
     public func rerunFailed(repoPath: String, runID: Int) -> Bool {
         runGH(["run", "rerun", "\(runID)", "--failed"], in: repoPath) != nil
+    }
+
+    // MARK: - Merge (P39 G3)
+
+    public enum MergeMethod: Sendable {
+        case squash, rebase, merge
+
+        var flag: String {
+            switch self {
+            case .squash: return "--squash"
+            case .rebase: return "--rebase"
+            case .merge: return "--merge"
+            }
+        }
+    }
+
+    public struct MergeResult: Sendable, Equatable {
+        public let success: Bool
+        public let errorMessage: String?
+    }
+
+    /// Merges `prNumber` with an explicitly-chosen method. No default method — every caller must
+    /// pass one; there is deliberately no "just merge however gh feels like today" entry point.
+    /// `gh pr merge` itself refuses on branch protection / merge conflicts, which is the only
+    /// safety backstop this needs — no app-side force option, ever.
+    public func merge(repoPath: String, prNumber: Int, method: MergeMethod) -> MergeResult {
+        guard let ghPath = Self.cachedGhPath else {
+            return MergeResult(success: false, errorMessage: "gh CLI not found")
+        }
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: ghPath)
+        process.arguments = ["pr", "merge", "\(prNumber)", method.flag, "--delete-branch=false"]
+        process.currentDirectoryURL = URL(fileURLWithPath: repoPath)
+        let errPipe = Pipe()
+        process.standardOutput = Pipe()
+        process.standardError = errPipe
+        do {
+            try process.run()
+            process.waitUntilExit()
+            if process.terminationStatus == 0 {
+                return MergeResult(success: true, errorMessage: nil)
+            }
+            let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
+            let message = String(data: errData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            return MergeResult(success: false, errorMessage: (message?.isEmpty ?? true) ? "gh pr merge failed" : message)
+        } catch {
+            return MergeResult(success: false, errorMessage: error.localizedDescription)
+        }
     }
 
     // MARK: - Private
@@ -125,7 +179,9 @@ public struct GitHubCLIClient: Sendable {
         } catch { return nil }
     }
 
-    private func parsePRInfo(_ json: String) -> PRInfo? {
+    /// Not private: exercised directly by `GitHubCLIClientTests` against a JSON fixture, since
+    /// `prForCurrentBranch` itself depends on a real `gh` CLI + network and can't be unit tested.
+    func parsePRInfo(_ json: String) -> PRInfo? {
         guard let data = json.data(using: .utf8),
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let number = obj["number"] as? Int,
@@ -138,10 +194,13 @@ public struct GitHubCLIClient: Sendable {
         let state = PRState(rawValue: stateStr) ?? .open
         let isDraft = obj["isDraft"] as? Bool ?? false
         let checksStatus = parseChecksStatus(obj["statusCheckRollup"])
+        let baseRef = obj["baseRefName"] as? String ?? ""
+        let mergeable = (obj["mergeable"] as? String) == "MERGEABLE"
 
         return PRInfo(
             number: number, title: title, state: state, url: url,
-            headRefName: headRef, isDraft: isDraft, checksStatus: checksStatus
+            headRefName: headRef, baseRefName: baseRef, isDraft: isDraft,
+            checksStatus: checksStatus, mergeable: mergeable
         )
     }
 
