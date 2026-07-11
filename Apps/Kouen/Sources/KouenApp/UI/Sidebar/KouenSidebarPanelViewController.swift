@@ -341,6 +341,66 @@ final class KouenSidebarPanelViewController: NSViewController {
         }
     }
 
+    private var taskDashboard: TaskDashboardView?
+    private nonisolated(unsafe) var taskDashboardMonitor: Any?
+
+    /// P40 F1-H: float the Task Dashboard over the window's content view, same
+    /// anchor-above-footer presentation as `showAgentsInbox`.
+    private func showTaskDashboard() {
+        if taskDashboard != nil {
+            dismissTaskDashboard()
+            return
+        }
+        let coordinator = SessionCoordinator.shared
+        let dashboard = TaskDashboardView(onJumpToSession: { [weak self] sessionID in
+            self?.dismissTaskDashboard()
+            guard let workspaceID = coordinator.snapshot.workspaces.first(where: { workspace in
+                workspace.sessions.contains { $0.id == sessionID }
+            })?.id else { return }
+            coordinator.selectSession(workspaceID: workspaceID, sessionID: sessionID)
+        })
+        dashboard.alphaValue = 0
+        dashboard.translatesAutoresizingMaskIntoConstraints = true
+        dashboard.layer?.zPosition = 100
+
+        let host = view.window?.contentView ?? view
+        let width: CGFloat = 320
+        let height = dashboard.preferredHeight
+        let footerInHost = host.convert(footerHostingView.bounds, from: footerHostingView)
+        let originX: CGFloat = 8
+        let originY = footerInHost.maxY + 6
+        dashboard.frame = NSRect(x: originX, y: originY, width: width, height: height)
+        host.addSubview(dashboard)
+        taskDashboard = dashboard
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.12
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            dashboard.animator().alphaValue = 1
+        }
+        installTaskDashboardMonitor()
+    }
+
+    private func dismissTaskDashboard() {
+        taskDashboard?.removeFromSuperview()
+        taskDashboard = nil
+        if let monitor = taskDashboardMonitor {
+            NSEvent.removeMonitor(monitor)
+            taskDashboardMonitor = nil
+        }
+    }
+
+    private func installTaskDashboardMonitor() {
+        taskDashboardMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            guard let self, let dashboard = self.taskDashboard else { return event }
+            let dashboardPoint = dashboard.convert(event.locationInWindow, from: nil)
+            if dashboard.bounds.contains(dashboardPoint) { return event }
+            let footerPoint = self.footerHostingView.convert(event.locationInWindow, from: nil)
+            if self.footerHostingView.bounds.contains(footerPoint) { return event }
+            self.dismissTaskDashboard()
+            return event
+        }
+    }
+
     private func setupSectionLabel() {
         let hosting = NSHostingView(rootView: SidebarSectionLabelView(model: sidebarSectionModel))
         hosting.translatesAutoresizingMaskIntoConstraints = false
@@ -630,6 +690,7 @@ final class KouenSidebarPanelViewController: NSViewController {
             model: sidebarFooterModel,
             onSettings: { [weak self] in self?.openSettings() },
             onAgents: { [weak self] in self?.showAgentsInbox() },
+            onTasks: { [weak self] in self?.showTaskDashboard() },
             onOpenRecent: { [weak self] path in self?.openRecentPath(path) },
             onNewSession: { [weak self] in self?.addSession() },
             onPalette: { [weak self] in self?.openPalette() },

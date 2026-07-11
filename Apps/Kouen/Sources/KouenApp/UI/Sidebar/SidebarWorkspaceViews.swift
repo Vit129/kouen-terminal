@@ -307,6 +307,7 @@ struct SidebarFooterView: View {
     let model: SidebarFooterModel
     let onSettings: () -> Void
     let onAgents: () -> Void
+    let onTasks: () -> Void
     let onOpenRecent: (String) -> Void
     let onNewSession: () -> Void
     let onPalette: () -> Void
@@ -322,6 +323,7 @@ struct SidebarFooterView: View {
         HStack(spacing: 2) {
             FooterIconButton(symbol: "gearshape", tooltip: "Settings (⌘,)", chromeEpoch: epoch, action: onSettings)
             Spacer()
+            FooterIconButton(symbol: "checklist", tooltip: "Tasks", chromeEpoch: epoch, action: onTasks)
             FooterIconButton(symbol: "sparkles", tooltip: "Agents", chromeEpoch: epoch, badgeCount: needsAttention, action: onAgents)
             RecentProjectsMenuButton(chromeEpoch: epoch, provider: recentProjectsProvider, onSelect: onOpenRecent)
             FooterIconButton(symbol: "plus", tooltip: "New session", chromeEpoch: epoch, action: onNewSession)

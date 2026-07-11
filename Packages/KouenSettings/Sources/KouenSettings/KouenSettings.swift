@@ -281,7 +281,9 @@ public struct KouenSettings: Codable, Sendable, Equatable {
     /// Whether inline AI ghost-text completion is enabled in the terminal input (Tab to accept).
     public var inlineAICompletion: Bool
     /// Post-processing shader effect applied over the rendered terminal frame.
-    /// Values: "none" (default), "scanlines", "grain", "bloom".
+    /// Values: "none" (default), "scanlines", "grain", "vignette", "crt" — must match
+    /// `TerminalMetalRenderer`'s `overlayMode` switch exactly; an unrecognized string
+    /// silently falls through to its `default: overlayMode = 0` (i.e. behaves as "none").
     public var terminalShaderEffect: String
     /// Default URL opened when a new browser pane or tab is created.
     public var browserHomePage: String

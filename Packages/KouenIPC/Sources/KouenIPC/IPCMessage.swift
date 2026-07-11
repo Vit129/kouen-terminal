@@ -214,6 +214,34 @@ public enum IPCRequest: Codable, Sendable {
     case browserResponse(id: UUID, response: BrowserResponsePayload)
     // Sidebar navigation
     case openGitPanel(repoPath: String?)
+
+    // Tasks (P40 F1): session-scoped checklist items, MCP-addressable. `sessionID == nil`
+    // in `taskList` returns Tasks across every session (powers the Task Dashboard).
+    case taskList(sessionID: UUID?)
+    case taskGet(id: UUID)
+    case taskCreate(sessionID: UUID, title: String)
+    case taskUpdate(id: UUID, title: String?, done: Bool?)
+    case taskDelete(id: UUID)
+
+    // Worktree (MCP resource, P40 F2): wraps `WorktreeManager` 1:1, no new domain logic.
+    // `force: true` on `worktreeRemove` requires explicit per-call opt-in (mirrors
+    // `WorktreeManager.remove(force:)`'s own default of `false` — never silently discard
+    // uncommitted work).
+    case worktreeList(repoPath: String)
+    case worktreeCreate(repoPath: String, sessionID: String, branch: String?, baseRef: String?)
+    case worktreeRemove(repoPath: String, worktreePath: String, force: Bool)
+
+    // Automations (P41): scheduled agent launches. `intervalMinutes == 0` means
+    // manual/run-now only — never auto-fires. Connection to `agent-memory/plans` is
+    // purely the `prompt` text convention (e.g. "ทำต่อ p40"); Kouen has no plan-file
+    // awareness, it just spawns a session and types the prompt, same as a human would.
+    case automationList
+    case automationGet(id: UUID)
+    case automationCreate(repoPath: String, workspaceID: UUID?, agent: String, prompt: String, intervalMinutes: Int)
+    case automationUpdate(id: UUID, repoPath: String?, agent: String?, prompt: String?, intervalMinutes: Int?)
+    case automationDelete(id: UUID)
+    case automationSetEnabled(id: UUID, enabled: Bool)
+    case automationRunNow(id: UUID)
 }
 
 public enum BrowserRequestPayload: Codable, Sendable {
@@ -369,6 +397,18 @@ public enum IPCResponse: Codable, Sendable {
     case browserSuccess(BrowserResponsePayload)
     // Sidebar navigation push
     case openGitPanel(repoPath: String?)
+
+    // Tasks (P40 F1)
+    case taskInfo(TaskSummary?)
+    case tasks([TaskSummary])
+
+    // Worktree (MCP resource, P40 F2)
+    case worktrees([WorktreeInfoSummary])
+    case worktreePath(String?)
+
+    // Automations (P41)
+    case automationInfo(AutomationSummary?)
+    case automations([AutomationSummary])
 }
 
 public struct OptionEntry: Codable, Sendable, Equatable {

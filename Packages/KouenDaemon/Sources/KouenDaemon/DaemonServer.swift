@@ -840,6 +840,7 @@ public final class DaemonServer: @unchecked Sendable {
         // Stop the background timers first (they have their own queues), then tear down the
         // socket layer. Otherwise a scan/monitor tick could fire against a half-stopped server.
         AgentScanner.shared.stop()
+        AutomationScheduler.shared.stop()
         registry.stopMonitoring()
         // Persist any buffered scrollback before tearing down, so a graceful restart replays the
         // most recent output instead of losing the last debounce window.

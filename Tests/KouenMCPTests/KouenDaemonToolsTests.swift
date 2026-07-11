@@ -59,6 +59,173 @@ final class KouenDaemonToolsTests: XCTestCase {
         XCTAssertTrue(names.contains("kouenBoard"))
     }
 
+    /// P40 F1: Task tools are read/write but not gated behind the control flag (same
+    /// tier as kouenBoard, not sendPaneText) — Tasks are Kouen-app-local bookkeeping,
+    /// not a mechanism to run arbitrary commands.
+    func testTaskToolsAreRegistered() async {
+        let missingPolicyURL = temporaryDirectory().appendingPathComponent("missing-policy.json")
+        let policy = ToolPolicy.load(from: missingPolicyURL, environment: [:])
+        let registry = ToolRegistry(policy: { policy })
+        guard case let .object(root) = registry.listTools(),
+              case let .array(tools) = root["tools"]
+        else {
+            XCTFail("Expected listTools() to return { tools: [...] }")
+            return
+        }
+        let names: Set<String> = Set(tools.compactMap {
+            guard case let .object(tool) = $0, case let .string(name) = tool["name"] else { return nil }
+            return name
+        })
+        for expected in ["kouenTaskList", "kouenTaskGet", "kouenTaskCreate", "kouenTaskUpdate", "kouenTaskDelete"] {
+            XCTAssertTrue(names.contains(expected), "Expected \(expected) to be registered")
+        }
+    }
+
+    func testKouenTaskGetRejectsInvalidUUID() async {
+        let tools = KouenDaemonTools(controlEnabled: { true })
+        let (result, error) = await tools.taskGet(id: "not-a-uuid")
+        XCTAssertNil(result)
+        XCTAssertEqual(error?.code, -32602)
+    }
+
+    /// P40 F2: kouenWorktreeList is read-only (never gated), Create/Remove mutate the
+    /// filesystem and must be gated like sendPaneText/spawnSession.
+    func testWorktreeToolsAreRegisteredWithCorrectGating() async {
+        let missingPolicyURL = temporaryDirectory().appendingPathComponent("missing-policy.json")
+        let policy = ToolPolicy.load(from: missingPolicyURL, environment: [:])
+        XCTAssertTrue(policy.isToolAllowed("kouenWorktreeList"))
+        XCTAssertFalse(policy.isToolAllowed("kouenWorktreeCreate"))
+        XCTAssertFalse(policy.isToolAllowed("kouenWorktreeRemove"))
+
+        let registry = ToolRegistry(policy: { policy })
+        guard case let .object(root) = registry.listTools(),
+              case let .array(tools) = root["tools"]
+        else {
+            XCTFail("Expected listTools() to return { tools: [...] }")
+            return
+        }
+        let names: Set<String> = Set(tools.compactMap {
+            guard case let .object(tool) = $0, case let .string(name) = tool["name"] else { return nil }
+            return name
+        })
+        for expected in ["kouenWorktreeList", "kouenWorktreeCreate", "kouenWorktreeRemove"] {
+            XCTAssertTrue(names.contains(expected), "Expected \(expected) to be registered")
+        }
+    }
+
+    func testKouenWorktreeCreateBlockedWhenGateClosed() async {
+        let tools = KouenDaemonTools(controlEnabled: { false })
+        let (result, error) = await tools.worktreeCreate(
+            repoPath: "/tmp", sessionID: "x", branch: nil, baseRef: nil
+        )
+        XCTAssertNil(result)
+        XCTAssertEqual(error, KouenDaemonTools.controlDisabledError)
+    }
+
+    /// P40 F3: kouenHostList is registered, read-only (never gated), and there is no
+    /// create/update/delete counterpart — the write boundary is enforced by absence,
+    /// not a runtime check, so this also guards against one being added by accident.
+    func testHostListIsRegisteredReadOnlyAndHasNoWriteCounterpart() async {
+        let missingPolicyURL = temporaryDirectory().appendingPathComponent("missing-policy.json")
+        let policy = ToolPolicy.load(from: missingPolicyURL, environment: [:])
+        XCTAssertTrue(policy.isToolAllowed("kouenHostList"))
+
+        let registry = ToolRegistry(policy: { policy })
+        guard case let .object(root) = registry.listTools(),
+              case let .array(tools) = root["tools"]
+        else {
+            XCTFail("Expected listTools() to return { tools: [...] }")
+            return
+        }
+        let names: Set<String> = Set(tools.compactMap {
+            guard case let .object(tool) = $0, case let .string(name) = tool["name"] else { return nil }
+            return name
+        })
+        XCTAssertTrue(names.contains("kouenHostList"))
+        for forbidden in ["kouenHostCreate", "kouenHostUpdate", "kouenHostDelete", "kouenHostRemove"] {
+            XCTAssertFalse(names.contains(forbidden), "\(forbidden) must not exist — Settings UI is the only write path")
+        }
+    }
+
+    /// P41: List/Get are read-only (never gated), Create/Update/Delete/Pause/Resume/RunNow
+    /// mutate state (spawn a session on RunNow) and must be gated like sendPaneText/spawnSession.
+    func testAutomationToolsAreRegisteredWithCorrectGating() async {
+        let missingPolicyURL = temporaryDirectory().appendingPathComponent("missing-policy.json")
+        let policy = ToolPolicy.load(from: missingPolicyURL, environment: [:])
+        XCTAssertTrue(policy.isToolAllowed("kouenAutomationList"))
+        XCTAssertTrue(policy.isToolAllowed("kouenAutomationGet"))
+        XCTAssertFalse(policy.isToolAllowed("kouenAutomationCreate"))
+        XCTAssertFalse(policy.isToolAllowed("kouenAutomationUpdate"))
+        XCTAssertFalse(policy.isToolAllowed("kouenAutomationDelete"))
+        XCTAssertFalse(policy.isToolAllowed("kouenAutomationPause"))
+        XCTAssertFalse(policy.isToolAllowed("kouenAutomationResume"))
+        XCTAssertFalse(policy.isToolAllowed("kouenAutomationRunNow"))
+
+        let registry = ToolRegistry(policy: { policy })
+        guard case let .object(root) = registry.listTools(),
+              case let .array(tools) = root["tools"]
+        else {
+            XCTFail("Expected listTools() to return { tools: [...] }")
+            return
+        }
+        let names: Set<String> = Set(tools.compactMap {
+            guard case let .object(tool) = $0, case let .string(name) = tool["name"] else { return nil }
+            return name
+        })
+        for expected in [
+            "kouenAutomationList", "kouenAutomationGet", "kouenAutomationCreate", "kouenAutomationUpdate",
+            "kouenAutomationDelete", "kouenAutomationPause", "kouenAutomationResume", "kouenAutomationRunNow",
+        ] {
+            XCTAssertTrue(names.contains(expected), "Expected \(expected) to be registered")
+        }
+    }
+
+    func testKouenAutomationGetRejectsInvalidUUID() async {
+        let tools = KouenDaemonTools(controlEnabled: { true })
+        let (result, error) = await tools.automationGet(id: "not-a-uuid")
+        XCTAssertNil(result)
+        XCTAssertEqual(error?.code, -32602)
+    }
+
+    func testKouenAutomationCreateBlockedWhenGateClosed() async {
+        let tools = KouenDaemonTools(controlEnabled: { false })
+        let (result, error) = await tools.automationCreate(
+            repoPath: "/tmp", workspaceId: nil, agent: "claude", prompt: "hi", intervalMinutes: 0
+        )
+        XCTAssertNil(result)
+        XCTAssertEqual(error, KouenDaemonTools.controlDisabledError)
+    }
+
+    func testKouenAutomationRunNowBlockedWhenGateClosed() async {
+        let tools = KouenDaemonTools(controlEnabled: { false })
+        let (result, error) = await tools.automationRunNow(id: UUID().uuidString)
+        XCTAssertNil(result)
+        XCTAssertEqual(error, KouenDaemonTools.controlDisabledError)
+    }
+
+    func testHostListReturnsConfiguredHosts() async throws {
+        let previousHome = getenv("KOUEN_HOME").map { String(cString: $0) }
+        let home = temporaryDirectory()
+        setenv("KOUEN_HOME", home.path, 1)
+        defer {
+            if let previousHome { setenv("KOUEN_HOME", previousHome, 1) } else { unsetenv("KOUEN_HOME") }
+        }
+        try KouenPaths.ensureDirectories()
+        RemoteHostStore().upsert(RemoteHost(name: "devbox", sshTarget: "rob@devbox", remoteSocketPath: "/home/rob/.local/share/kouen/kouen.sock"))
+
+        let tools = KouenDaemonTools(controlEnabled: { false })
+        let (result, error) = await tools.hostList()
+        XCTAssertNil(error)
+        guard case let .object(obj)? = result, case let .array(content)? = obj["content"],
+              case let .object(first)? = content.first, case let .string(text)? = first["text"]
+        else {
+            XCTFail("Expected tool result content")
+            return
+        }
+        XCTAssertTrue(text.contains("devbox"))
+        XCTAssertTrue(text.contains("rob@devbox"))
+    }
+
     func testPolicyExplicitDenyBlocksControlTools() async throws {
         let policyURL = try writePolicy(#"{ "version": 1, "allowControl": false, "allowedTools": [] }"#)
         let policy = ToolPolicy.load(from: policyURL, environment: [:])

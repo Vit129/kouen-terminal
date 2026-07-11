@@ -238,6 +238,14 @@ public enum KouenPaths {
         applicationSupport.appendingPathComponent("buffers.json")
     }
 
+    public static var tasksURL: URL {
+        applicationSupport.appendingPathComponent("tasks.json")
+    }
+
+    public static var automationsURL: URL {
+        applicationSupport.appendingPathComponent("automations.json")
+    }
+
     public static var fishCompletionDirectory: URL {
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".config/fish/completions", isDirectory: true)

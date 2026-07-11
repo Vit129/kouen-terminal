@@ -294,6 +294,66 @@ right category of fix, not a JS `scrollTop` polyfill. Log `deltaPrevented` in th
 **bubble** phase, not capture — a capture-phase listener fires before the page's own bubble
 handlers and gives a false "nothing prevented this" reading.
 
+## CASE: Google/Apple OAuth blocked by default WKWebView user agent (2026-07-10)
+
+**Symptom:** "Sign in with Google" / "Sign in with Apple" buttons on third-party sites
+loaded in the browser pane classify into Google's restricted OAuth flow
+(`flowName=GeneralOAuthLite` vs the standard `GeneralOAuthFlow`) instead of the normal
+consent flow — precursor to the `disallowed_useragent` interstitial ("This browser or app
+may not be secure"). Root cause: `WKWebViewConfiguration()`'s default UA omits the
+`Version/x.y Safari/605.1.15` suffix real Safari sends; Google/Apple's OAuth endpoints key
+embedded-webview detection off that. Popup/opener handoff itself (P35, 2026-07-06,
+`db5c34d9`) was already correct — this is a separate, earlier-stage gate.
+
+**Fix (`BrowserPaneView.swift`):** `customUserAgent = desktopSafariUserAgent` (a hardcoded
+Safari-format UA string) set on the `WKWebView` at all 3 construction sites: `init`
+(non-warmed path), `createTab` (new tab / popup path), `BrowserPaneRegistry.prewarm` (warm
+pool). All 3 must be covered — a warmed webview from the pool skips `init`'s branch
+entirely, and popup tabs go through `createTab`, not `init`.
+
+**Verified:** curl'd `accounts.google.com/o/oauth2/v2/auth` with the pre-fix (no
+Version/Safari suffix) vs post-fix UA — server-side `flowName` differs
+(`GeneralOAuthLite` → `GeneralOAuthFlow`), confirming Google's endpoint reclassifies the UA
+as fixed. Could not drive an actual `disallowed_useragent` interstitial or a full login
+(needs a valid OAuth client + real account), so this confirms the classification gate
+moved, not that end-to-end login now succeeds — verify with a real account/site before
+calling OAuth login fully working.
+
+**Known ceiling (`ponytail:` in code):** the UA string is hardcoded to the Safari version
+installed at fix time (26.5) and will rot as WebKit ships new versions — Google's
+classifier may eventually key off the specific version number lagging too far behind. No
+runtime derivation of the "real" UA was attempted (WKWebView has no sync API for its
+default UA — only observable via an async JS eval after a page loads).
+
+**Follow-up (2026-07-10, same day):** `setupConsoleLogRedirection` (console-log capture,
+compositor-kick, `#if DEBUG` scroll probe) and `setupNetworkCapture` (fetch/XHR override,
+captures request/response bodies incl. tokens, exposed via `kouenBrowserNetwork` MCP tool)
+all inject JS into every page at `.atDocumentStart`, `forMainFrameOnly: false` — exactly
+the "read every keystroke / intercept session" capability Google's embedded-webview policy
+warns about, even though Kouen's intent is only local debugging. Added
+`oauthGuardJS` (`Self.oauthGuardJS`, near `desktopSafariUserAgent`) — a one-line
+`if ([hosts].indexOf(location.hostname) !== -1) return;` prepended inside all 4 injected
+IIFEs — so none of these scripts run at all on `accounts.google.com` / `appleid.apple.com`.
+Deliberately narrow allowlist (`oauthOriginBlocklist`): only hosts whose *entire* surface is
+auth, not broad app domains (`github.com`, `facebook.com`) where a wildcard would also kill
+debugging on unrelated pages. Extend the array if a new provider's login page needs the same
+protection.
+
+**Out of scope (explicitly deferred, not built):**
+- Native `Sign in with Apple` (`ASAuthorizationController`) — needs a new entitlement +
+  Associated Domains (`webcredentials:`); web-based Apple ID sign-in rides the same UA fix
+  as Google and needs neither.
+- `ASWebAuthenticationSession` / system-browser OAuth handoff — structurally doesn't fit:
+  Kouen's browser pane is a general browser where the *site* owns the OAuth client and
+  redirect target (not Kouen), so a system-browser session would land the callback in
+  Safari, not the WKWebView tab the user is looking at.
+- Per-pane/incognito `WKWebsiteDataStore` isolation — panes intentionally keep the current
+  shared persistent store (login state shared across tabs/restarts).
+- WebAuthn/passkey and SMS/TOTP 2FA — no code changes made; WKWebView's built-in
+  `navigator.credentials` support (macOS 13+) and plain page-content OTP entry are expected
+  to work once the OAuth UA gate above is cleared, but this needs a real-account
+  verification pass, not just a claim.
+
 ## Local HTML Rendering (2026-07-04)
 
 Double-clicking a `.html`/`.htm` file in the file tree (`FileTreeSwiftUIView.openFile()`)
