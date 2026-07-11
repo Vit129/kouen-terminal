@@ -2,6 +2,11 @@
 
 Older releases. See [CHANGELOG.md](../CHANGELOG.md) for recent versions.
 
+## [4.2.0] - 2026-07-09
+
+### Added
+- P37 mobile-bridge hardening + S1 daemon-restart fix (release v4.2.0) ([`fb70d91`](https://github.com/Vit129/kouen-terminal/commit/fb70d91c02f4cc8239c58f5dd330c5e915971b6d))
+
 ## [4.1.0] - 2026-07-08
 
 ### Added
