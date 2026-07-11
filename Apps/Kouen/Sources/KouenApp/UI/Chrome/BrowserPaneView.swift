@@ -52,6 +52,28 @@ public final class BrowserPaneView: NSView {
     private let progressLine = BrowserProgressLine()
     private var progressObservation: NSKeyValueObservation?
 
+    // WKWebView's default UA drops the "Version/x.y Safari/605.1.15" suffix real Safari
+    // sends, which Google/Apple OAuth's embedded-webview detection keys on (disallowed_useragent).
+    // ponytail: hardcoded to the Safari version installed at dev time (26.5) — rots as WebKit
+    // updates; bump when OAuth starts failing again or a newer Safari version ships.
+    static let desktopSafariUserAgent =
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+
+    // ponytail: minimal allowlist of known OAuth/SSO authorization hosts. Kouen's own debug
+    // script injection (console capture, network capture, scroll-fix) must not run here —
+    // console/fetch/XHR overrides are exactly the "read every keystroke / intercept session"
+    // capability Google's embedded-webview policy warns about, even though Kouen's intent is
+    // only local debugging. Deliberately narrow: whole-domain identity hosts only (their
+    // entire surface is auth), not broad app domains like github.com/facebook.com where a
+    // wildcard would also kill debugging on unrelated pages. Extend if a new provider's login
+    // page needs the same protection.
+    private static let oauthOriginBlocklist = ["accounts.google.com", "appleid.apple.com"]
+
+    private static var oauthGuardJS: String {
+        let hosts = oauthOriginBlocklist.map { "'\($0)'" }.joined(separator: ", ")
+        return "if ([\(hosts)].indexOf(location.hostname) !== -1) return;"
+    }
+
     public convenience init(url: URL, paneID: PaneID = UUID()) {
         let web: WKWebView
         if let warmed = BrowserPaneRegistry.shared.dequeueWarmedWebView() {
@@ -62,6 +84,7 @@ public final class BrowserPaneView: NSView {
             web = WKWebView(frame: .zero, configuration: config)
             web.allowsMagnification = true
             web.allowsBackForwardNavigationGestures = true
+            web.customUserAgent = Self.desktopSafariUserAgent
 #if DEBUG
             web.configuration.preferences.setValue(true, forKey: "developerExtrasEnabled")
 #endif
@@ -347,6 +370,7 @@ public final class BrowserPaneView: NSView {
         newWeb.navigationDelegate = self
         newWeb.uiDelegate = self
         newWeb.translatesAutoresizingMaskIntoConstraints = false
+        newWeb.customUserAgent = Self.desktopSafariUserAgent
 
         // A reused configuration (popup/window.open via createWebViewWith) shares its
         // WKUserContentController with the opener tab, which already has these handlers
@@ -450,6 +474,7 @@ public final class BrowserPaneView: NSView {
     private func setupConsoleLogRedirection(for webView: WKWebView) {
         let js = """
         (function() {
+            \(Self.oauthGuardJS)
             if (window.__kouenConsoleRedirected) return;
             window.__kouenConsoleRedirected = true;
             var levels = ['log', 'info', 'warn', 'error', 'debug'];
@@ -489,6 +514,7 @@ public final class BrowserPaneView: NSView {
         // first wheel arrives. JS only *signals*; the native side does the fix.
         var kickJS = """
         (function() {
+            \(Self.oauthGuardJS)
             if (window.self === window.top) return;   // nested frames only
             if (window.__kouenKickBound) return;
             window.__kouenKickBound = true;
@@ -509,6 +535,7 @@ public final class BrowserPaneView: NSView {
         // after the native scroll. moved=false before the kick lands, moved=true after.
         kickJS += """
         (function() {
+            \(Self.oauthGuardJS)
             if (window.self === window.top || window.__kouenScrollProbe) return;
             window.__kouenScrollProbe = true;
             window.addEventListener('wheel', function(e) {
@@ -560,6 +587,7 @@ public final class BrowserPaneView: NSView {
     private func setupNetworkCapture(for webView: WKWebView) {
         let js = """
         (function() {
+            \(Self.oauthGuardJS)
             if (window.__kouenNetworkCaptured) return;
             window.__kouenNetworkCaptured = true;
             window.__kouenNetwork = [];
@@ -997,6 +1025,7 @@ public final class BrowserPaneRegistry {
         let web = WKWebView(frame: .zero, configuration: config)
         web.allowsMagnification = true
         web.allowsBackForwardNavigationGestures = true
+        web.customUserAgent = BrowserPaneView.desktopSafariUserAgent
 #if DEBUG
         web.configuration.preferences.setValue(true, forKey: "developerExtrasEnabled")
 #endif
