@@ -839,12 +839,19 @@ public final class BrowserPaneView: NSView {
     public func snapshot(interactive: Bool) async throws -> BrowserSnapshot {
         let script = """
         (function(){
+          // Clear stale stamps from a prior snapshot first — an element that dropped out of
+          // THIS snapshot must not keep answering to its old ref (that would make a later
+          // querySelector('[data-kouen-ref="eN"]') resolve to a stale, wrong node in document
+          // order instead of correctly missing).
+          document.querySelectorAll('[data-kouen-ref]').forEach(function(e){e.removeAttribute('data-kouen-ref');});
           var els=[],i=0;
           document.querySelectorAll('a,button,input,select,textarea,[role=button],[role=link],[role=checkbox],[role=radio],[role=combobox],[role=menuitem]').forEach(function(el){
             var r=el.getBoundingClientRect();
             var visible=r.width>0&&r.height>0&&getComputedStyle(el).visibility!=='hidden'&&getComputedStyle(el).display!=='none';
+            var id='e'+(++i);
+            el.setAttribute('data-kouen-ref', id);
             els.push({
-              id:'e'+(++i),
+              id:id,
               tag:el.tagName.toLowerCase(),
               role:el.getAttribute('role')||el.tagName.toLowerCase(),
               text:(el.innerText||el.getAttribute('aria-label')||'').trim().slice(0,80),
