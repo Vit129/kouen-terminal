@@ -8,7 +8,11 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [4.4.1] - 2026-07-12
 
 ### Added
-- Release version bump to v4.4.1.
+- Reveal cat/view'd files in the sidebar file tree (OSC 7736) ([`4ae745a`](https://github.com/Vit129/kouen-terminal/commit/4ae745a57493f7f30017f7dfa969d06e1148de37))
+
+### Fixed
+- Copy-mode yank leaked kouen-cat line numbers past the SGR 73/74 exclude marker ([`4989bc0`](https://github.com/Vit129/kouen-terminal/commit/4989bc0ac5c664ba9326ff8aa6118dc0f60cb622))
+- Mobile-created sessions register as real tabs so they show and stay selectable; enable iOS predictive text in mobile terminal (release v4.4.1) ([`ea1568b`](https://github.com/Vit129/kouen-terminal/commit/ea1568b6c28df8ba64522a503bf5fd263be025b9))
 
 ## [4.4.0] - 2026-07-11
 
