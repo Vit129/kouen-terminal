@@ -23,8 +23,8 @@ access" threat model.
 
 ## Summary
 - Total tasks: 15
-- Completed: 3
-- Remaining: 12
+- Completed: 5
+- Remaining: 10
 
 ## D1 — File preview (read-only)
 
@@ -35,8 +35,10 @@ access" threat model.
 - [x] ✅ Run test scripts — `Tests/KouenDaemonTests/MobileBridgeFilePreviewTests.swift` (7 tests: utf8 text, binary→base64+image mime, unknown-ext→octet-stream, missing path, directory-as-file, sorted listing with isDirectory flags, missing dir) — all pass. Full `swift test` green except a pre-existing, unrelated `UNUserNotificationCenter` sandbox crash documented at `SessionCoordinatorTypes.swift:51` (macOS-install-specific, nothing to do with this change). `Tests/robot/run.sh` 23/23.
 
 ### Client Application
-- [ ] Embedded page: file picker view (reuse `listDirectory` response) + preview overlay (`<pre>` for text, `<img src="data:...">` for images) in `MobileBridgeServer`'s embedded HTML/JS.
-- [ ] ✅ Run test scripts — `swift test --filter MobileBridge`, `Tests/robot/run.sh`
+- [x] Embedded page: files sheet (reuses `.list-header`/`.sessions`/`.session-card` classes as-is — zero new list CSS needed) with drill-in/up navigation, opened via a new 📁 toolbar button in `.term-header`; preview view (`#view-file`, wired into the existing `goto()` view switcher) renders `<pre>` for text, `<img src="data:...">` for images, a fallback message for anything else.
+- [x] ✅ Run test scripts — `swift test --filter MobileBridge`, `Tests/robot/run.sh` (23/23) both green. Additionally verified LIVE against a real isolated daemon (`make mobile-web`) through a real Chrome tab (not just the WKWebView `kouenBrowserOpen` pane — that one silently failed to open the WS connection at all, root cause not yet understood, noted below as a follow-up rather than blocking this task): full flow exercised — pair → session list → attach → open files sheet (defaulted to the session's own cwd) → drill into `subdir` (renders "Empty directory") → up-navigate back → open `notes.txt` (renders exact text content) → open `pixel.png` (renders the actual base64 image). All matched expectations exactly.
+
+**Note for later:** `mcp__kouen__kouenBrowserOpen` (Kouen's own WKWebView browser pane) opened this page fine but its WebSocket connection silently closed with no error reaching the daemon at all (`ws.onerror` fired client-side, zero corresponding connection ever logged server-side) — worth a follow-up investigation (WKWebView ATS or App-Bound Domains restriction is the leading guess) since it means that pane can't currently be used to dogfood mobile-bridge pages from the desktop app itself. Not a regression from this change and not blocking — real Chrome and (per P37's own gates) a real phone are the actual target clients.
 
 ## D2 — File/image attach (upload)
 
