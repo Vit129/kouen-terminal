@@ -943,8 +943,15 @@ public final class MobileBridgeServer: @unchecked Sendable {
         /// P37 Phase C: `{"resize":{"cols":N,"rows":N}}`, sent by `FitAddon` whenever the
         /// mobile client's viewport changes — forwarded straight to `DaemonClient.resize`.
         var resize: ResizePayload?
+        /// P37 Phase D: `{"readFile":{"path":"..."}}` — read-only, mirrors `ToolRegistry.readFile`'s
+        /// contract (`Tools/kouen-mcp/Sources/KouenMCP/ToolRegistry.swift:324`), not a new one.
+        var readFile: FileReadRequest?
+        /// `{"listDirectory":{"path":"..."}}` — feeds the phone's own file picker.
+        var listDirectory: DirectoryListRequest?
         struct SpawnPayload: Decodable { var cwd: String? }
         struct ResizePayload: Decodable { var cols: Int; var rows: Int }
+        struct FileReadRequest: Decodable { var path: String }
+        struct DirectoryListRequest: Decodable { var path: String }
     }
 
     // MARK: - Server -> client payloads (TEXT/JSON)
@@ -960,6 +967,27 @@ public final class MobileBridgeServer: @unchecked Sendable {
     private struct AttachedAck: Encodable { var ok = "attached"; var surfaceID: String }
     private struct DetachedAck: Encodable { var ok = "detached" }
     private struct SpawnedAck: Encodable { var ok = "spawned"; var surfaceID: String }
+
+    /// P37 Phase D (D1). `encoding` is "utf8" when the bytes decode as UTF-8 text (the exact
+    /// check `ToolRegistry.readFile` already uses), "base64" otherwise — no extension allowlist,
+    /// so any text file previews regardless of its extension and any non-text file still comes
+    /// through (as an opaque blob the client can `<img>` if `mimeType` says image/*, otherwise
+    /// show a "can't preview" fallback).
+    struct FileReadResponse: Encodable {
+        struct FileInfo: Encodable {
+            var path: String
+            var mimeType: String
+            var encoding: String
+            var content: String
+            var truncated: Bool
+        }
+        var file: FileInfo
+    }
+    struct DirectoryListResponse: Encodable {
+        struct Entry: Encodable { var name: String; var isDirectory: Bool }
+        struct Listing: Encodable { var path: String; var entries: [Entry] }
+        var directory: Listing
+    }
 
     // MARK: - Device re-auth (P37 A2)
 
@@ -1313,6 +1341,81 @@ public final class MobileBridgeServer: @unchecked Sendable {
         handleAttach(surfaceID: surfaceID, connection: connection, state: state)
     }
 
+    /// Read cap for `handleReadFile` — outgoing WS frames aren't size-limited by this bridge
+    /// (`encodeWSFrame` has no send-side cap, unlike the 64 KiB `maxWSFrameBytes` ceiling on
+    /// incoming frames), but an unbounded read of an arbitrarily large file would still balloon
+    /// daemon memory and the phone's network transfer for no benefit — 5 MiB covers any real
+    /// source file or a phone-camera-sized photo with room to spare.
+    private static let maxFileReadBytes = 5 * 1024 * 1024
+
+    /// Extensions this bridge will label as `image/*` so the mobile client knows it can `<img>`
+    /// the base64 content instead of treating it as an opaque download. Deliberately NOT reusing
+    /// `FileViewerViewController.quickLookExtensions` — that list drives macOS QuickLook (PDF,
+    /// Office docs, etc. via a native panel), which a web page can't render at all; this is only
+    /// the subset a plain HTML `<img>` tag understands.
+    private static let imageMimeTypesByExtension: [String: String] = [
+        "png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
+        "gif": "image/gif", "webp": "image/webp",
+    ]
+
+    /// Pure path→response logic for `{"readFile"}` (P37 Phase D1), split out from the
+    /// connection-bound wrapper below so a test can drive it directly against a real temp file
+    /// — same "static + request/no-network-needed" shape `resolveSpawnedSurfaceID`/
+    /// `focusSurfaceOnMac` already use above. nil means "cannot read" (missing path, a
+    /// directory, or a permission error) — the caller turns that into the WS error frame.
+    /// Text-vs-binary split reuses the exact check `ToolRegistry.readFile` uses
+    /// (`Tools/kouen-mcp/Sources/KouenMCP/ToolRegistry.swift:328`): if the bytes decode as UTF-8,
+    /// it's text; otherwise base64 + a best-effort image mime type. Same trust boundary as
+    /// `attach`/`spawn` — a paired device already has full shell access via the PTY, so there's
+    /// no separate permission check here (see the plan doc's note on why per-capability scoping
+    /// was dropped).
+    static func readFileInfo(path: String) -> FileReadResponse.FileInfo? {
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: path),
+              (attributes[.type] as? FileAttributeType) != .typeDirectory,
+              let size = (attributes[.size] as? Int),
+              let handle = FileHandle(forReadingAtPath: path)
+        else { return nil }
+        defer { try? handle.close() }
+        let data = handle.readData(ofLength: Self.maxFileReadBytes)
+        let truncated = size > data.count
+        if let text = String(data: data, encoding: .utf8) {
+            return .init(path: path, mimeType: "text/plain", encoding: "utf8", content: text, truncated: truncated)
+        }
+        let ext = (path as NSString).pathExtension.lowercased()
+        let mime = Self.imageMimeTypesByExtension[ext] ?? "application/octet-stream"
+        return .init(path: path, mimeType: mime, encoding: "base64", content: data.base64EncodedString(), truncated: truncated)
+    }
+
+    /// Pure path→entries logic for `{"listDirectory"}` (P37 Phase D1) — same shape as
+    /// `ToolRegistry.listDirectory` (`Tools/kouen-mcp/Sources/KouenMCP/ToolRegistry.swift:351`),
+    /// plus an `isDirectory` flag per entry so the client can distinguish folders (drill in)
+    /// from files (preview). nil means "cannot list" (missing/unreadable path).
+    static func listDirectoryEntries(path: String) -> [DirectoryListResponse.Entry]? {
+        let fm = FileManager.default
+        guard let names = try? fm.contentsOfDirectory(atPath: path) else { return nil }
+        return names.sorted().map { name in
+            var isDir: ObjCBool = false
+            fm.fileExists(atPath: (path as NSString).appendingPathComponent(name), isDirectory: &isDir)
+            return .init(name: name, isDirectory: isDir.boolValue)
+        }
+    }
+
+    private func handleReadFile(path: String, connection: NWConnection) {
+        guard let info = Self.readFileInfo(path: path) else {
+            sendText(#"{"error":"cannot read file"}"#, on: connection)
+            return
+        }
+        sendJSON(FileReadResponse(file: info), on: connection)
+    }
+
+    private func handleListDirectory(path: String, connection: NWConnection) {
+        guard let entries = Self.listDirectoryEntries(path: path) else {
+            sendText(#"{"error":"cannot list directory"}"#, on: connection)
+            return
+        }
+        sendJSON(DirectoryListResponse(directory: .init(path: path, entries: entries)), on: connection)
+    }
+
     private func handleControlMessage(_ text: String, connection: NWConnection, state: ConnectionState) {
         guard let data = text.data(using: .utf8),
               let message = try? JSONDecoder().decode(ControlMessage.self, from: data)
@@ -1335,6 +1438,14 @@ public final class MobileBridgeServer: @unchecked Sendable {
             // native GUI's resize vote — its lifetime is tied to this attach, released
             // automatically on detach/disconnect (see `DaemonSubscription.resize`'s doc comment).
             subscription.resize(surfaceID, rows: UInt16(clamping: resize.rows), cols: UInt16(clamping: resize.cols))
+        } else if let readFile = message.readFile {
+            state.controlQueue.async { [weak self] in
+                self?.handleReadFile(path: readFile.path, connection: connection)
+            }
+        } else if let listDirectory = message.listDirectory {
+            state.controlQueue.async { [weak self] in
+                self?.handleListDirectory(path: listDirectory.path, connection: connection)
+            }
         } else {
             sendText(#"{"error":"unrecognized control message"}"#, on: connection)
         }
