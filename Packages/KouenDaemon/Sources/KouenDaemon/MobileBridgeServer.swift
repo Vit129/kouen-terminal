@@ -6,6 +6,7 @@ import CoreImage
 import CryptoKit
 import Foundation
 import KouenCore
+import KouenSettings
 import Network
 
 // P25 W1: WS<->daemon mobile bridge, originally proven as `Spikes/MobileBridgeSpike`
@@ -415,6 +416,16 @@ public final class MobileBridgeServer: @unchecked Sendable {
       }
       #file-body img { max-width: 100%; display: block; border-radius: 8px; }
       #file-body .empty { padding-top: 2rem; }
+
+      /* P37 Phase D2: the attach affordance is a leading row in the files sheet, not a 4th
+         toolbar icon (the header already has back/title/files/switch — no room to spare on a
+         narrow phone) — same call the design mockup landed on. */
+      .attach-row {
+        display: flex; align-items: center; gap: 0.7rem; background: transparent; border: 1px dashed var(--border);
+        border-radius: 12px; padding: 0.65rem 0.75rem; width: calc(100% - 1.6rem); margin: 0.6rem 0.8rem 0;
+        color: var(--accent); font-family: inherit; font-weight: 600; font-size: 0.85rem; flex-shrink: 0;
+      }
+      .attach-row .glyph { width: 1.1rem; text-align: center; flex-shrink: 0; }
     </style>
 
     <div id="view-home" class="view active">
@@ -481,9 +492,14 @@ public final class MobileBridgeServer: @unchecked Sendable {
           </div>
           <button class="add-btn" onclick="filesGoUp()" aria-label="Up one level">&uarr;</button>
         </div>
+        <button class="attach-row" onclick="document.getElementById('attach-input').click()">
+          <span class="glyph">&#8593;</span>
+          Upload photo or file
+        </button>
         <div class="sessions" id="files-list"></div>
       </div>
     </div>
+    <input type="file" id="attach-input" style="display:none" onchange="attachSelectedFile(this)">
 
     <div class="error-banner" id="error-banner"></div>
 
@@ -800,6 +816,27 @@ public final class MobileBridgeServer: @unchecked Sendable {
       }
       function closeFilePreview() { goto('term'); }
 
+      // P37 Phase D2: mirrors the server's own `maxFileReadBytes` (5 MiB) so an oversized pick
+      // fails fast client-side instead of wasting a slow mobile upload before the server rejects it.
+      const MAX_ATTACH_BYTES = 5 * 1024 * 1024;
+
+      function attachSelectedFile(input) {
+        const file = input.files && input.files[0];
+        input.value = ''; // so picking the same file again still fires 'change'
+        if (!file) return;
+        if (file.size > MAX_ATTACH_BYTES) { showError('File is too large (max 5 MB).'); return; }
+        const reader = new FileReader();
+        reader.onload = () => {
+          // readAsDataURL yields "data:<mime>;base64,<content>" — only the part after the
+          // comma is the base64 payload the server expects.
+          const base64 = reader.result.slice(reader.result.indexOf(',') + 1);
+          ws.send(JSON.stringify({ attachFile: { name: file.name, mimeType: file.type, content: base64 } }));
+          closeFilesSheet();
+        };
+        reader.onerror = () => showError('Could not read the selected file.');
+        reader.readAsDataURL(file);
+      }
+
       document.getElementById('token').addEventListener('keydown', e => { if (e.key === 'Enter') connect(); });
 
       // Auto-connect when we can do it without a tap: a stored device credential (returning
@@ -1078,10 +1115,15 @@ public final class MobileBridgeServer: @unchecked Sendable {
         var readFile: FileReadRequest?
         /// `{"listDirectory":{"path":"..."}}` — feeds the phone's own file picker.
         var listDirectory: DirectoryListRequest?
+        /// P37 Phase D2: `{"attachFile":{"name":"...","mimeType":"...","content":"<base64>"}}` —
+        /// the reverse of `readFile`. Requires an active `attach` (there's no surface to paste
+        /// the resulting path into otherwise).
+        var attachFile: AttachFileRequest?
         struct SpawnPayload: Decodable { var cwd: String? }
         struct ResizePayload: Decodable { var cols: Int; var rows: Int }
         struct FileReadRequest: Decodable { var path: String }
         struct DirectoryListRequest: Decodable { var path: String }
+        struct AttachFileRequest: Decodable { var name: String; var mimeType: String?; var content: String }
     }
 
     // MARK: - Server -> client payloads (TEXT/JSON)
@@ -1118,6 +1160,9 @@ public final class MobileBridgeServer: @unchecked Sendable {
         struct Listing: Encodable { var path: String; var entries: [Entry] }
         var directory: Listing
     }
+    /// P37 Phase D2. `path` is the temp path the file was written to, mainly for the client to
+    /// display — the actual delivery already happened via the shell-quoted paste into the PTY.
+    private struct FileAttachedAck: Encodable { var ok = "fileAttached"; var path: String }
 
     // MARK: - Device re-auth (P37 A2)
 
@@ -1530,6 +1575,70 @@ public final class MobileBridgeServer: @unchecked Sendable {
         }
     }
 
+    /// P37 Phase D2 (file/image attach). Writes to the same `KouenPaths.pastedImagesDirectory`
+    /// desktop drag-drop already uses for pasted images (`PasteController.writePastedImage`,
+    /// `KouenTerminalKit`) — same directory, same permissions (0o755 dir / 0o644 file), same
+    /// `<prefix>-<unix-timestamp>-<uuid-prefix-8>[.ext]` naming and 24h prune-on-write. Can't
+    /// literally call that function (it's `@MainActor`/`AppKit`, not importable into the
+    /// headless daemon target) so the convention is replicated here rather than the exact
+    /// symbol — but it is the same convention, not a new one. Only the filename's extension
+    /// comes from the caller-supplied `name` (never a full path component), so a malicious
+    /// `name` (e.g. containing `../`) can't escape the directory.
+    static func writeAttachedFile(name: String, data: Data) -> String? {
+        let dir = KouenPaths.pastedImagesDirectory
+        let readableDir: [FileAttributeKey: Any] = [.posixPermissions: 0o755]
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true, attributes: readableDir)
+        try? FileManager.default.setAttributes(readableDir, ofItemAtPath: dir.path)
+        pruneAttachedFiles(in: dir)
+        let ext = (name as NSString).pathExtension
+        let base = "attached-\(Int(Date().timeIntervalSince1970))-\(UUID().uuidString.prefix(8))"
+        let url = dir.appendingPathComponent(ext.isEmpty ? base : "\(base).\(ext)")
+        do {
+            try data.write(to: url)
+            try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: url.path)
+            return url.path
+        } catch {
+            return nil
+        }
+    }
+
+    /// Same 24h threshold and shared directory as `PasteController.prunePastedImages` — kept
+    /// separate only because that one is `internal` to a different (AppKit) target.
+    private static func pruneAttachedFiles(in dir: URL, olderThan maxAge: TimeInterval = 24 * 60 * 60) {
+        let fm = FileManager.default
+        guard let entries = try? fm.contentsOfDirectory(
+            at: dir, includingPropertiesForKeys: [.contentModificationDateKey], options: [.skipsHiddenFiles]
+        ) else { return }
+        let cutoff = Date().addingTimeInterval(-maxAge)
+        for url in entries {
+            let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+            if let modified, modified < cutoff { try? fm.removeItem(at: url) }
+        }
+    }
+
+    /// Mirrors the desktop drag-drop flow's end state exactly (dropped image → temp PNG →
+    /// shell-quoted path pasted into the PTY) — only the source differs, an uploaded blob
+    /// instead of `NSPasteboard`. Requires an active attach: there is no surface to paste into
+    /// otherwise, and unlike `readFile`/`listDirectory` this one has a real side effect, so it
+    /// doesn't make sense to run against a connection that isn't looking at a terminal.
+    private func handleAttachFile(name: String, base64Content: String, connection: NWConnection, state: ConnectionState) {
+        guard let surfaceID = state.surfaceID, let subscription = state.subscription else {
+            sendText(#"{"error":"attach to a session before sending a file"}"#, on: connection)
+            return
+        }
+        guard let data = Data(base64Encoded: base64Content), !data.isEmpty, data.count <= Self.maxFileReadBytes else {
+            sendText(#"{"error":"file is empty, invalid, or too large"}"#, on: connection)
+            return
+        }
+        guard let path = Self.writeAttachedFile(name: name, data: data) else {
+            sendText(#"{"error":"failed to save the uploaded file"}"#, on: connection)
+            return
+        }
+        let quoted = ShellQuoting.quote(path)
+        _ = subscription.sendInput(Data(quoted.utf8), surfaceID: surfaceID)
+        sendJSON(FileAttachedAck(path: path), on: connection)
+    }
+
     private func handleReadFile(path: String, connection: NWConnection) {
         guard let info = Self.readFileInfo(path: path) else {
             sendText(#"{"error":"cannot read file"}"#, on: connection)
@@ -1576,6 +1685,10 @@ public final class MobileBridgeServer: @unchecked Sendable {
             state.controlQueue.async { [weak self] in
                 self?.handleListDirectory(path: listDirectory.path, connection: connection)
             }
+        } else if let attachFile = message.attachFile {
+            state.controlQueue.async { [weak self] in
+                self?.handleAttachFile(name: attachFile.name, base64Content: attachFile.content, connection: connection, state: state)
+            }
         } else {
             sendText(#"{"error":"unrecognized control message"}"#, on: connection)
         }
@@ -1608,7 +1721,13 @@ public final class MobileBridgeServer: @unchecked Sendable {
                 receiveLoop(connection, state: state)
                 return
             case .oversized:
-                connection.cancel()
+                // Graceful close (P37 Phase D2), not the abrupt `connection.cancel()` this used
+                // to be — that tears down the TCP connection without a WS closing handshake,
+                // which browsers treat as an unexplained abnormal closure (`ws.onerror` with no
+                // reason) instead of surfacing this specific error. Same reasoning `rejectAndClose`
+                // already documents for the auth-failure paths; this was the one place that still
+                // used the abrupt form.
+                rejectAndClose(#"{"error":"message too large"}"#, on: connection)
                 return
             case let .frame(frame, consumed):
                 state.frameBuffer.removeFirst(consumed)
@@ -1734,13 +1853,16 @@ public final class MobileBridgeServer: @unchecked Sendable {
     }
 
     /// Was sized against `NWProtocolWebSocket.Options.maximumMessageSize`; now enforced by
-    /// hand in `parseOneWSFrame`. An inbound frame has no cap BEFORE authentication — hit by
-    /// the raw byte compare against the pairing token and by `authorizeReturningDevice`'s
-    /// JSON decode, both of which run on unauthenticated input. Every real frame on this
-    /// protocol is small: control JSON is a few hundred bytes at most, and PTY input frames
-    /// are keystrokes — 64 KiB is generous headroom for either while still bounding what an
-    /// unauthenticated peer can make the daemon buffer/decode.
-    private static let maxWSFrameBytes = 64 * 1024
+    /// hand in `parseOneWSFrame`. Raised from the original 64 KiB (P37 Phase D2): an
+    /// `attachFile` payload is base64 (~33% overhead) over up to `maxFileReadBytes` (5 MiB) of
+    /// raw file content, so the JSON envelope carrying it can reach ~7 MiB — 8 MiB leaves
+    /// headroom above that without being unbounded. An inbound frame has no cap BEFORE
+    /// authentication either (hit by the raw token compare and `authorizeReturningDevice`'s
+    /// JSON decode), so this is also the most an unauthenticated peer can make the daemon
+    /// buffer per connection — accepted the same way the rest of this bridge already accepts
+    /// loopback+Tailscale as the trust boundary (see the plan doc's R6 note), not the raw
+    /// internet.
+    private static let maxWSFrameBytes = 8 * 1024 * 1024
 
     /// One listener per bind host, serving both the plain page and the WS bridge on the
     /// SAME port (see the framing section's doc comment above `webSocketGUID` for why: a
