@@ -60,6 +60,12 @@ final class DaemonSyncService {
                         )
                     }
                 },
+                onActivateWindow: {
+                    // A phone tapped a session; the daemon already drove the select, so the active
+                    // tab has moved — bring the Mac window forward to it (same activation the notch
+                    // uses when a background agent event needs attention).
+                    Task { @MainActor in AgentNotchWindowActivator.bringKouenToFront() }
+                },
                 onEnd: { [weak self] in
                     // Daemon restarted or socket dropped — clear the dead sub so
                     // ensureSnapshotSubscription() can re-subscribe on next call.

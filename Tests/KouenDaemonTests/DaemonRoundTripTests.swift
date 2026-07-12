@@ -375,6 +375,53 @@ final class DaemonRoundTripTests: XCTestCase {
         XCTAssertEqual(size?.cols, 200, "surface must grow back when the small client detaches (cols)")
     }
 
+    /// Feature B (mobile must never shrink the Mac's terminal): with a native and a mobile-labeled
+    /// client on the same surface, the phone's smaller vote must NOT win — the surface holds the
+    /// native size the whole time and never shrinks to the mobile size at all. This is the exact
+    /// opposite of the all-native `testResizeVotesOnSubscriptionsHoldSmallestThenGrowBack`, where a
+    /// real shrink to the small vote is the whole point. A mobile vote may still *grow* the surface,
+    /// and once the phone is the sole client, plain smallest-wins sizes it to the phone.
+    func testMobileVoteNeverShrinksNativeSurface() throws {
+        let client = DaemonClient()
+        guard case let .surfaces(surfaces) = try client.request(.listSurfaces), let target = surfaces.first else {
+            return XCTFail("expected a default surface")
+        }
+        let sid = target.surfaceID
+        // The MOBILE subscriber doubles as the output capture so it survives the native cancel
+        // (needed for the mobile-only phase). Its label marks its vote as mobile at the server.
+        let output = OutputAccumulator()
+        let native = try client.subscribeSurfaceOutput(surfaceID: sid) { _, _ in }
+        let mobile = try client.subscribeSurfaceOutput(surfaceID: sid, label: MobileBridgeServer.clientLabel) { data, _ in
+            _ = output.appendAndContains(String(decoding: data, as: UTF8.self), marker: "")
+        }
+        defer { native.cancel(); mobile.cancel() }
+        usleep(200_000)
+
+        native.resize(sid, rows: 50, cols: 200)
+        mobile.resize(sid, rows: 24, cols: 80)
+        usleep(300_000)
+        // The proof: queried AFTER the small mobile vote lands, the surface is STILL the native
+        // size — it never shrank to 24×80 (in the all-native test, 24×80 would win right here).
+        var size = try queryPTYSize(client, surfaceID: sid, output: output)
+        XCTAssertEqual(size?.rows, 50, "a mobile vote must not shrink below the native floor (rows)")
+        XCTAssertEqual(size?.cols, 200, "a mobile vote must not shrink below the native floor (cols)")
+
+        // A mobile vote LARGER than the native floor may still grow the surface (up, never down).
+        mobile.resize(sid, rows: 60, cols: 220)
+        usleep(300_000)
+        size = try queryPTYSize(client, surfaceID: sid, output: output)
+        XCTAssertEqual(size?.rows, 60, "a mobile vote larger than the native floor may grow the surface (rows)")
+        XCTAssertEqual(size?.cols, 220, "a mobile vote larger than the native floor may grow the surface (cols)")
+
+        // Drop the native client → the phone is now the sole client → plain smallest-wins sizes to it.
+        mobile.resize(sid, rows: 24, cols: 80)
+        native.cancel()
+        usleep(300_000)
+        size = try queryPTYSize(client, surfaceID: sid, output: output)
+        XCTAssertEqual(size?.rows, 24, "mobile-only attachment sizes to the phone's own vote (rows)")
+        XCTAssertEqual(size?.cols, 80, "mobile-only attachment sizes to the phone's own vote (cols)")
+    }
+
     /// `detachSurface` (per-surface release, connection stays open) must also drop the caller's
     /// size vote so the surface grows back to the remaining clients' smallest size.
     func testDetachSurfaceDropsResizeVote() throws {
@@ -453,6 +500,54 @@ final class DaemonRoundTripTests: XCTestCase {
         _ = try client.request(.newWorkspace(name: "push"))
         wait(for: [pushed], timeout: 5)
         XCTAssertGreaterThan(seen.value, 0)
+    }
+
+    /// Live-daemon precondition for the mobile-bridge "session list stays live" fix
+    /// (`MobileBridgeServer.startSessionListSubscription`): a mobile connection's session-list
+    /// subscription IS a `subscribeSnapshot(label: MobileBridgeServer.clientLabel)` call held open
+    /// for the connection's whole lifetime — its `onRevision` just re-sends the flat session list.
+    /// `sendSessionList` itself needs a real `NWConnection` from inside `MobileBridgeServer`, which
+    /// isn't practical to drive from this XCTest target, so this instead proves the exact mechanism
+    /// `onRevision` depends on: TWO separate `.newTab` calls (the same call `resolveSpawnedSurfaceID`
+    /// makes for a phone's "+" tap, or any other device spawning a session) each push a fresh
+    /// revision to the SAME, still-open, never-re-subscribed subscription. Before this fix, the
+    /// bridge only ever called `sendSessionList` once, right after auth, and never opened this
+    /// subscription at all — an already-connected mobile page had no way to hear about a second
+    /// session created later without disconnecting and reconnecting. This is the daemon-side
+    /// guarantee the fix's `onRevision` relies on to keep an idle mobile page current indefinitely.
+    func testMobileSessionListSubscriptionPushesOnNewTabWithoutReauthenticating() throws {
+        let client = DaemonClient()
+        let seen = AtomicCounter()
+        let firstPush = expectation(description: "revision pushed after first .newTab")
+        let secondPush = expectation(description: "revision pushed after second .newTab, same subscription")
+        firstPush.assertForOverFulfill = false
+        secondPush.assertForOverFulfill = false
+
+        let subscription = try client.subscribeSnapshot(label: MobileBridgeServer.clientLabel) { _ in
+            seen.increment()
+            if seen.value == 1 { firstPush.fulfill() }
+            if seen.value >= 2 { secondPush.fulfill() }
+        }
+        defer { subscription.cancel() }
+
+        usleep(200_000) // let the subscription register, mirroring auth-time setup
+
+        // The same daemon call a phone's "+" tap makes (`resolveSpawnedSurfaceID` -> `.newTab`).
+        let firstSurfaceID = MobileBridgeServer.resolveSpawnedSurfaceID(cwd: nil) { try? client.request($0) }
+        XCTAssertNotNil(firstSurfaceID, "expected the first .newTab to resolve a surface")
+        wait(for: [firstPush], timeout: 5)
+
+        // A second, independent mutation (e.g. another device spawning its own session) — must
+        // reach the SAME subscription with no re-subscribe/re-auth in between.
+        let secondSurfaceID = MobileBridgeServer.resolveSpawnedSurfaceID(cwd: nil) { try? client.request($0) }
+        XCTAssertNotNil(secondSurfaceID, "expected the second .newTab to resolve a surface")
+        wait(for: [secondPush], timeout: 5)
+
+        XCTAssertGreaterThanOrEqual(
+            seen.value, 2,
+            "each .newTab mutation must push its own revision on the SAME subscription — an "
+                + "already-connected mobile page must not need to reconnect to see a new session"
+        )
     }
 
     /// Hook symmetry for long-lived subscription clients: registering a subscription must fire

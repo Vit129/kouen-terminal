@@ -255,6 +255,16 @@ public final class MobileBridgeServer: @unchecked Sendable {
             get { lock.lock(); defer { lock.unlock() }; return _subscription }
             set { lock.lock(); _subscription = newValue; lock.unlock() }
         }
+        /// Live for the WHOLE connection (auth → disconnect), unlike `subscription` above which
+        /// is per-attach and gets replaced/cleared on every attach/detach. Pushes a fresh session
+        /// list to the phone whenever the daemon's snapshot revision bumps (new tab, another
+        /// device spawning a session, etc.) — without this, an already-connected mobile page only
+        /// ever sees the one-time list sent right after auth and needs a reconnect to catch up.
+        var snapshotSubscription: DaemonSubscription? {
+            get { lock.lock(); defer { lock.unlock() }; return _snapshotSubscription }
+            set { lock.lock(); _snapshotSubscription = newValue; lock.unlock() }
+        }
+        private var _snapshotSubscription: DaemonSubscription?
         /// Set once, at authorization — the id `PairedDeviceStore` tracks this
         /// connection under, so a `mobile-revoke-client` can cancel it specifically.
         var deviceID: String? {
@@ -453,6 +463,16 @@ public final class MobileBridgeServer: @unchecked Sendable {
     <script>
       let ws, term, fitAddon;
       let currentSurfaceID = null;
+      // Survives a dropped socket (unlike `currentSurfaceID`, which `disposeTerminal` clears on
+      // every close) so a reconnect can resume the same terminal instead of dumping the user
+      // back to the session list. Cleared only on an intentional detach/session-end, not on a
+      // connection drop.
+      let lastAttachedSurfaceID = null;
+      // Guards against a feedback loop: attaching selects the tab on the Mac, which bumps the
+      // daemon's snapshot revision, which re-pushes `{sessions:...}` to this same connection
+      // (the live session-list subscription) — without this flag, the resume branch below would
+      // see that push, re-send `{attach}`, get re-selected, re-bump, forever.
+      let resumeAttachInFlight = false;
       let sessionsCache = [];
       let authed = false;
       let hasShownPairedToast = false;
@@ -523,6 +543,8 @@ public final class MobileBridgeServer: @unchecked Sendable {
       function mountTerminal(surfaceID) {
         if (term) { term.dispose(); term = null; }
         currentSurfaceID = surfaceID;
+        lastAttachedSurfaceID = surfaceID;
+        resumeAttachInFlight = false;
         const meta = sessionsCache.find(s => s.surfaceID === surfaceID);
         document.getElementById('term-title').textContent = meta ? meta.tabTitle : surfaceID;
         term = new Terminal({
@@ -578,6 +600,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
         // error occurred). Log only; `onclose`'s close code is the actual signal.
         ws.onerror = () => console.error('[kouen mobile] websocket error');
         ws.onclose = (ev) => {
+          resumeAttachInFlight = false;
           disposeTerminal();
           // A deviceAuth that got rejected (device revoked, or a stale secret) closes the
           // socket before we ever saw a sessions list — the stored secret is dead, so drop it
@@ -601,18 +624,34 @@ public final class MobileBridgeServer: @unchecked Sendable {
             if (msg.sessions) {
               authed = true;
               renderSessions(msg.sessions);
-              if (!hasShownPairedToast) {
+              if (currentSurfaceID) {
+                // Live background update (the session list changed elsewhere) while already
+                // attached and viewing a terminal — the cache above is refreshed for whenever the
+                // switcher sheet opens next; do not navigate or touch the attach, or a selection
+                // side-effect of attaching (Mac focus-follow bumps the snapshot revision) would
+                // re-trigger this same push and loop forever.
+              } else if (!hasShownPairedToast) {
                 hasShownPairedToast = true;
                 const n = msg.sessions.length;
                 document.getElementById('paired-sub').textContent = n + (n === 1 ? ' session available' : ' sessions available');
                 goto('paired');
                 setTimeout(() => goto('list'), 700);
+              } else if (!resumeAttachInFlight && lastAttachedSurfaceID && msg.sessions.some(s => s.surfaceID === lastAttachedSurfaceID)) {
+                // A reconnect (iOS dropped the socket on screen-lock/app-switch, see the
+                // visibilitychange handler below) lands here with the same session list request
+                // every fresh connect sends — resume the terminal the user was actually looking
+                // at instead of dumping them back to the list. `resumeAttachInFlight` covers the
+                // case where the AttachedAck (which would set currentSurfaceID and end this
+                // branch) hasn't landed yet but another sessions push already has.
+                resumeAttachInFlight = true;
+                ws.send(JSON.stringify({ attach: lastAttachedSurfaceID }));
               } else {
                 goto('list');
               }
             } else if (msg.ok === 'attached') {
               mountTerminal(msg.surfaceID);
             } else if (msg.ok === 'detached' || msg.detached) {
+              lastAttachedSurfaceID = null;
               disposeTerminal();
               goto('list');
             } else if (msg.error) {
@@ -643,6 +682,20 @@ public final class MobileBridgeServer: @unchecked Sendable {
         document.getElementById('token').value = params.get('token');
         connect();
       }
+
+      // iOS Safari closes a background tab's WebSocket on screen-lock/app-switch to save power,
+      // without ever running this page's JS to notice — so without this, coming back to the tab
+      // silently shows a dead session until the user manually reloads. `visibilitychange` fires
+      // the moment the tab is foregrounded again; `pageshow` with `persisted` additionally covers
+      // Safari restoring the page straight from its back-forward cache instead of re-running the
+      // script at all (a separate iOS-specific path that skips the code above entirely).
+      function reconnectIfDropped() {
+        if (!authed && !storedCreds()) return; // never paired yet — nothing to resume
+        if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+        connect();
+      }
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reconnectIfDropped(); });
+      window.addEventListener('pageshow', e => { if (e.persisted) reconnectIfDropped(); });
     </script>
     """#
 
@@ -1117,6 +1170,23 @@ public final class MobileBridgeServer: @unchecked Sendable {
         sendJSON(push, on: connection)
     }
 
+    /// Opens the connection's long-lived session-list subscription right after auth (both auth
+    /// paths below call this once) so a mobile page stays live instead of needing a
+    /// disconnect/reconnect to see a new tab or another device's spawned session. Mirrors the
+    /// native GUI's own `DaemonSyncService.ensureSnapshotSubscription` — `onRevision` here just
+    /// re-sends the current list rather than diffing/hydrating a local snapshot, since the phone
+    /// only ever needs the flat session list, not the full layout tree. `onRevision` fires on the
+    /// subscription's own dedicated queue (see `DaemonSubscription`), not `bridgeQueue` — calling
+    /// `sendSessionList` from there is the same off-queue `NWConnection.send` pattern `handleAttach`
+    /// already relies on for `onData`/`onReplay`.
+    private func startSessionListSubscription(on connection: NWConnection, state: ConnectionState) {
+        let client = DaemonClient()
+        state.snapshotSubscription = try? client.subscribeSnapshot(
+            label: Self.clientLabel,
+            onRevision: { [weak self] _ in self?.sendSessionList(on: connection) }
+        )
+    }
+
     /// Attaches the connection to `surfaceID`, replacing any previous attachment on it
     /// first — a `{"detach"}` a client skipped before sending `{"attach"}` again must not
     /// leave the old subscription running alongside the new one.
@@ -1137,6 +1207,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
         do {
             let subscription = try client.attachReplayingSurfaceOutput(
                 surfaceID: surfaceID,
+                label: Self.clientLabel, // marks this size vote as mobile (Feature B floor)
                 onReplay: { [weak self] text in self?.sendBinary(Data(text.utf8), on: connection) },
                 onData: { [weak self] data, _ in self?.sendBinary(data, on: connection) },
                 onEnd: { [weak self] in
@@ -1152,6 +1223,13 @@ public final class MobileBridgeServer: @unchecked Sendable {
             state.surfaceID = surfaceID
             state.subscription = subscription
             sendJSON(AttachedAck(surfaceID: surfaceID), on: connection)
+            // Feature A: a phone tap/spawn reached here (the native GUI never calls this bridge),
+            // so jump the Mac's own window to the same session and bring it to the foreground. The
+            // selects move the daemon-authoritative selection (GUI follows via snapshot sync); the
+            // `.activateGUIWindow` push tells the GUI process to activate its window. Best-effort —
+            // failures never break the phone's attach.
+            Self.focusSurfaceOnMac(surfaceID: surfaceID, request: { try? client.request($0) })
+            _ = try? client.request(.activateGUIWindow)
         } catch {
             sendText(#"{"error":"failed to attach to the terminal session"}"#, on: connection)
         }
@@ -1175,6 +1253,39 @@ public final class MobileBridgeServer: @unchecked Sendable {
     /// joins the `SessionEditor` tree, so it shows up nowhere (GUI list, `.listSurfaces`, the
     /// bridge's own session switcher) and can never be reselected — the exact ghost-session bug.
     /// `.newTab` registers the tab in `editor` and `commit()`s it, so it's visible everywhere.
+    /// Label every mobile-bridge subscription connection carries at the `DaemonServer`
+    /// client-tracking layer, so `applyEffectiveSize` can tell a phone's size vote apart from a
+    /// native Mac window's (Feature B — a phone must never shrink the Mac's terminal below what a
+    /// native client established). Mirrors the GUI's own `"KouenGUI"` label convention.
+    static let clientLabel = "KouenMobileBridge"
+
+    /// Feature A: resolve `surfaceID` → its (workspace, session, tab) and drive the daemon's
+    /// `.selectWorkspace`/`.selectSession`/`.selectTab` so the Mac's active selection jumps to the
+    /// same session the phone just tapped/created. Static + `request`-driven (like
+    /// `resolveSpawnedSurfaceID`) so a live-daemon test can drive it against a real `SurfaceRegistry`
+    /// directly and assert the selects landed. Returns the resolved location (nil if the surface
+    /// isn't in the tree — e.g. it closed between the tap and this call). The window *activation*
+    /// itself is a separate GUI-process step (`.activateGUIWindow` → GUI `NSApp.activate`); this
+    /// only moves the daemon-authoritative selection the GUI then syncs to.
+    @discardableResult
+    static func focusSurfaceOnMac(
+        surfaceID: String,
+        request: (IPCRequest) -> IPCResponse?
+    ) -> (workspaceID: UUID, sessionID: UUID, tabID: UUID)? {
+        guard case let .snapshot(snapshot)? = request(.getSnapshot) else { return nil }
+        for workspace in snapshot.workspaces {
+            for session in workspace.sessions {
+                for tab in session.tabs where tab.rootPane.allSurfaceIDs().contains(where: { $0.uuidString == surfaceID }) {
+                    _ = request(.selectWorkspace(id: workspace.id))
+                    _ = request(.selectSession(workspaceID: workspace.id, sessionID: session.id))
+                    _ = request(.selectTab(workspaceID: workspace.id, tabID: tab.id))
+                    return (workspace.id, session.id, tab.id)
+                }
+            }
+        }
+        return nil
+    }
+
     static func resolveSpawnedSurfaceID(cwd: String?, request: (IPCRequest) -> IPCResponse?) -> String? {
         guard case let .snapshot(snapshot)? = request(.getSnapshot),
               let workspaceID = snapshot.activeWorkspaceID ?? snapshot.workspaces.first?.id,
@@ -1237,6 +1348,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
             guard let self else { return }
             if error != nil {
                 state.subscription?.cancel()
+                state.snapshotSubscription?.cancel()
                 return
             }
             if let data { state.frameBuffer.append(data) }
@@ -1328,6 +1440,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
                 state.deviceID = deviceID
                 registerLive(connection, deviceID: deviceID)
                 sendSessionList(on: connection)
+                startSessionListSubscription(on: connection, state: state)
                 return true
             }
             // New pairing via the rotating 6-digit token. Refuse once the window's
@@ -1367,6 +1480,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
             registerLive(connection, deviceID: deviceID)
             sendJSON(DeviceCredentials(deviceCredentials: .init(id: deviceID, secret: secret)), on: connection)
             sendSessionList(on: connection)
+            startSessionListSubscription(on: connection, state: state)
             return true
         }
 
@@ -1426,6 +1540,9 @@ public final class MobileBridgeServer: @unchecked Sendable {
                         self?.log?("mobile bridge: connection from \(connection.endpoint) cancelled — authorized=\(state.authorized) pageServed=\(state.pageServed) deviceID=\(state.deviceID ?? "nil")")
                     }
                     state.subscription?.cancel()
+                    // Connection is going away for good (unlike a per-attach detach), so the
+                    // whole-connection session-list subscription dies with it too.
+                    state.snapshotSubscription?.cancel()
                     // Only drops the *live* entry — the device stays paired (persists
                     // in PairedDeviceStore) so a reconnect doesn't need a fresh QR scan.
                     //
