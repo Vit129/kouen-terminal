@@ -438,11 +438,6 @@ public final class MobileBridgeServer: @unchecked Sendable {
 
       /* P37 Phase D3 (browser mirror) — deliberately minimal chrome for this MVP, NOT the
          tab-strip/webview redesign (that's a separate, larger, not-yet-built phase). */
-      #browser-url {
-        flex: 1; min-width: 0; font: inherit; font-family: var(--code-font); font-size: 0.78rem;
-        background: var(--surface-3); border: 1px solid var(--border); color: var(--text);
-        border-radius: 8px; padding: 0.35rem 0.6rem;
-      }
       .browser-toolbar {
         display: flex; gap: 0.5rem; padding: 0.5rem 0.7rem; border-bottom: 1px solid var(--surface-3); flex-shrink: 0;
       }
@@ -450,8 +445,8 @@ public final class MobileBridgeServer: @unchecked Sendable {
         appearance: none; border: 1px solid var(--border); background: var(--surface); color: var(--muted);
         border-radius: 8px; padding: 0.3rem 0.6rem; font-size: 0.72rem; font-family: inherit; cursor: pointer;
       }
-      #browser-body { flex: 1; min-height: 0; overflow: auto; }
-      #browser-frame-img { width: 100%; display: block; }
+      #preview-body { flex: 1; min-height: 0; overflow: auto; }
+      #preview-body img { width: 100%; display: block; }
       .browser-el {
         display: flex; flex-direction: column; gap: 0.1rem; padding: 0.6rem 0.8rem;
         border-bottom: 1px solid var(--surface-3); text-align: left; width: 100%; background: none; border-left: none; border-right: none; border-top: none;
@@ -459,65 +454,135 @@ public final class MobileBridgeServer: @unchecked Sendable {
       }
       .browser-el .tag { font-family: var(--code-font); font-size: 0.65rem; color: var(--accent-cyan); }
       .browser-el .label { font-size: 0.82rem; }
+
+      /* P37 Phase E: preview chrome (tab strip + webview toolbar), ported visually from the
+         desktop's own FileTabPillView (pill tabs, accent top-edge on active) and BrowserPaneView's
+         toolbar (back/forward/reload/path field) — reusing this page's existing tokens, not new
+         ones. Locked design: tab-strip replaces D1's single #view-file and D3's single #view-browser
+         with one shared pane type; nav buttons are only meaningful (and only shown) on a browser tab. */
+      .tabstrip {
+        display: flex; gap: 1px; padding: 4px 6px 0; border-bottom: 1px solid var(--surface-3);
+        overflow-x: auto; flex-shrink: 0; background: var(--surface);
+      }
+      .filetab {
+        display: flex; align-items: center; gap: 5px; height: 26px; padding: 0 6px 0 10px;
+        border-radius: 5px 5px 0 0; font-size: 0.72rem; color: var(--muted); white-space: nowrap;
+        flex-shrink: 0; cursor: pointer;
+      }
+      .filetab.active { background: var(--bg); color: var(--text); box-shadow: inset 0 1px 0 var(--accent); font-weight: 600; }
+      .filetab .x { opacity: 0.6; font-size: 0.65rem; margin-left: 2px; }
+      .webbar {
+        display: flex; align-items: center; gap: 6px; padding: 6px 8px; background: var(--bg);
+        border-bottom: 1px solid var(--surface-3); flex-shrink: 0;
+      }
+      .webbar .nav { color: var(--muted); font-size: 0.9rem; cursor: pointer; padding: 0 2px; }
+      .webbar .nav.hidden-nav { visibility: hidden; }
+      .webbar .reload { color: var(--muted); font-size: 0.78rem; cursor: pointer; }
+      #preview-pathfield {
+        flex: 1; min-width: 0; font: inherit; font-family: var(--code-font); font-size: 0.72rem;
+        background: var(--surface); border: 1px solid var(--surface-3); color: var(--text);
+        border-radius: 6px; padding: 3px 9px;
+      }
+      #preview-pathfield[readonly] { color: var(--muted); background: var(--surface-3); }
+
+      /* ---- Tablet (>=768px): persistent session rail, replacing the phone's full-screen
+         list view + bottom switcher sheet. Additive only — the <768px phone layout below
+         this breakpoint is untouched. */
+      #app-layout { display: flex; flex: 1; min-height: 0; }
+      #main-content { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+      #tablet-rail { display: none; }
+      @media (min-width: 768px) {
+        #tablet-rail {
+          display: flex; flex-direction: column; width: 260px; flex-shrink: 0;
+          border-right: 1px solid var(--surface-3); background: var(--bg); position: relative;
+        }
+        #tablet-rail.collapsed { width: 40px; align-items: center; padding-top: 0.7rem; }
+        #tablet-rail.collapsed .list-header, #tablet-rail.collapsed .sessions { display: none; }
+        #rail-collapse-btn {
+          appearance: none; background: none; border: none; color: var(--muted); font-size: 1rem;
+          padding: 0.3rem; cursor: pointer; line-height: 1; position: absolute; top: 0.6rem; right: 0.5rem;
+        }
+        #tablet-rail.collapsed #rail-collapse-btn { position: static; margin: 0 auto; }
+        /* Opening a file/browser tab is a full-screen takeover on tablet too — rail hidden,
+           same as the terminal it replaces (locked design, frame 06). */
+        body.preview-active #tablet-rail { display: none; }
+        #term-empty { display: none; }
+        body.tablet-unattached #term-empty { display: flex; }
+        body.tablet-unattached #xterm-container { display: none; }
+      }
     </style>
 
-    <div id="view-home" class="view active">
-      <div class="mark">⌁ kouen</div>
-      <h4>Not paired</h4>
-      <p>Open this page via the QR code shown in Kouen's Settings ▸ Remote panel.</p>
-      <input id="token" placeholder="or paste code" autocomplete="off" inputmode="numeric">
-      <button class="btn" onclick="connect()">Connect</button>
-    </div>
-
-    <div id="view-paired" class="view">
-      <div class="check">&#10003;</div>
-      <h4>Paired</h4>
-      <p id="paired-sub"></p>
-    </div>
-
-    <div id="view-list" class="view">
-      <div class="list-header">
-        <div class="list-header-text">
-          <div class="host" id="list-host"></div>
-          <h4 id="list-count">0 sessions</h4>
+    <div id="app-layout">
+      <div id="tablet-rail">
+        <div class="list-header">
+          <div class="list-header-text">
+            <div class="host" id="rail-host"></div>
+            <h4 id="rail-count">0 sessions</h4>
+          </div>
+          <button class="add-btn" onclick="spawnSession()" aria-label="New session">+</button>
         </div>
-        <button class="add-btn" onclick="spawnSession()" aria-label="New session">+</button>
+        <div class="sessions" id="sessions-rail"></div>
+        <button class="iconbtn" id="rail-collapse-btn" onclick="toggleRailCollapse()" aria-label="Collapse sidebar">&#8676;</button>
       </div>
-      <div class="sessions" id="sessions-main"></div>
-    </div>
 
-    <div id="view-term" class="view">
-      <div class="term-header">
-        <button class="iconbtn" onclick="detach()" aria-label="Back to sessions">&larr;</button>
-        <div class="title" id="term-title">—</div>
-        <button class="iconbtn" onclick="openFilesSheet()" aria-label="Browse files">&#128193;</button>
-        <button class="iconbtn" onclick="openBrowserView()" aria-label="Browse the web">&#127760;</button>
-        <button class="iconbtn" onclick="openSheet()" aria-label="Switch session">&#8645;</button>
-      </div>
-      <div id="term-body"><div id="xterm-container"></div></div>
-    </div>
+      <div id="main-content">
+        <div id="view-home" class="view active">
+          <div class="mark">⌁ kouen</div>
+          <h4>Not paired</h4>
+          <p>Open this page via the QR code shown in Kouen's Settings ▸ Remote panel.</p>
+          <input id="token" placeholder="or paste code" autocomplete="off" inputmode="numeric">
+          <button class="btn" onclick="connect()">Connect</button>
+        </div>
 
-    <div id="view-file" class="view">
-      <div class="term-header">
-        <button class="iconbtn" onclick="closeFilePreview()" aria-label="Back to terminal">&larr;</button>
-        <div class="title" id="file-title">—</div>
-      </div>
-      <div id="file-body"></div>
-    </div>
+        <div id="view-paired" class="view">
+          <div class="check">&#10003;</div>
+          <h4>Paired</h4>
+          <p id="paired-sub"></p>
+        </div>
 
-    <div id="view-browser" class="view">
-      <div class="term-header">
-        <button class="iconbtn" onclick="closeBrowserView()" aria-label="Back to terminal">&larr;</button>
-        <input id="browser-url" placeholder="https://…" autocomplete="off" autocapitalize="off" spellcheck="false">
-        <button class="iconbtn" onclick="browserGo()" aria-label="Go">&rarr;</button>
-      </div>
-      <div class="browser-toolbar">
-        <button onclick="browserRefreshSnapshot()">Refresh elements</button>
-        <button onclick="browserRefreshFrame()">Refresh screenshot</button>
-      </div>
-      <div id="browser-body">
-        <img id="browser-frame-img" style="display:none">
-        <div id="browser-elements"></div>
+        <div id="view-list" class="view">
+          <div class="list-header">
+            <div class="list-header-text">
+              <div class="host" id="list-host"></div>
+              <h4 id="list-count">0 sessions</h4>
+            </div>
+            <button class="add-btn" onclick="spawnSession()" aria-label="New session">+</button>
+          </div>
+          <div class="sessions" id="sessions-main"></div>
+        </div>
+
+        <div id="view-term" class="view">
+          <div class="term-header">
+            <button class="iconbtn" onclick="detach()" aria-label="Back to sessions">&larr;</button>
+            <div class="title" id="term-title">—</div>
+            <button class="iconbtn" onclick="openFilesSheet()" aria-label="Browse files">&#128193;</button>
+            <button class="iconbtn" onclick="openBrowserView()" aria-label="Browse the web">&#127760;</button>
+            <button class="iconbtn" onclick="openSheet()" aria-label="Switch session">&#8645;</button>
+          </div>
+          <div id="term-body">
+            <div id="term-empty" class="empty">Select a session from the sidebar</div>
+            <div id="xterm-container"></div>
+          </div>
+        </div>
+
+        <div id="view-preview" class="view">
+          <div class="term-header">
+            <button class="iconbtn" onclick="closePreview()" aria-label="Back to terminal">&larr;</button>
+            <div class="title" id="preview-title">—</div>
+          </div>
+          <div class="tabstrip" id="preview-tabstrip"></div>
+          <div class="webbar">
+            <span class="nav" id="preview-back" onclick="previewNavBack()">&#8249;</span>
+            <span class="nav" id="preview-forward" onclick="previewNavForward()">&#8250;</span>
+            <span class="reload" id="preview-reload" onclick="previewNavReload()">&#8635;</span>
+            <input id="preview-pathfield" autocomplete="off" autocapitalize="off" spellcheck="false">
+          </div>
+          <div class="browser-toolbar" id="preview-browser-toolbar">
+            <button onclick="browserRefreshSnapshot()">Refresh elements</button>
+            <button onclick="browserRefreshFrame()">Refresh screenshot</button>
+          </div>
+          <div id="preview-body"></div>
+        </div>
       </div>
     </div>
 
@@ -599,6 +664,27 @@ public final class MobileBridgeServer: @unchecked Sendable {
       function goto(name) {
         document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
         document.getElementById('view-' + name).classList.add('active');
+        // P37 Phase E: opening a file/browser tab is a full-screen takeover on tablet too —
+        // drives the `body.preview-active #tablet-rail{display:none}` rule, one call site
+        // instead of every place that navigates in/out of the preview view remembering to do it.
+        document.body.classList.toggle('preview-active', name === 'preview');
+      }
+
+      // P37 Phase E: tablet breakpoint matches the CSS media query exactly (768px) — used to
+      // decide whether the session-switch flow lands on the persistent rail (tablet) or the
+      // full-screen list/sheet (phone), not just for styling.
+      function isTabletLayout() { return window.matchMedia('(min-width: 768px)').matches; }
+
+      let railCollapsed = false;
+      function toggleRailCollapse() {
+        railCollapsed = !railCollapsed;
+        document.getElementById('tablet-rail').classList.toggle('collapsed', railCollapsed);
+        document.getElementById('rail-collapse-btn').innerHTML = railCollapsed ? '&#8677;' : '&#8676;';
+        // The rail's own width change is a container resize, not a viewport resize — xterm's
+        // FitAddon only listens for the latter (see the existing `window.addEventListener('resize'...)`
+        // below), so it has to be told explicitly. Deferred past the CSS width transition so it
+        // measures the settled size, not mid-animation.
+        if (fitAddon && currentSurfaceID) setTimeout(() => fitAddon.fit(), 260);
       }
 
       function sessionCard(s) {
@@ -620,7 +706,8 @@ public final class MobileBridgeServer: @unchecked Sendable {
       function renderSessions(sessions) {
         sessionsCache = sessions;
         document.getElementById('list-host').textContent = location.hostname + ' · via tailscale';
-        for (const id of ['sessions-main', 'sessions-sheet']) {
+        document.getElementById('rail-host').textContent = location.hostname + ' · via tailscale';
+        for (const id of ['sessions-main', 'sessions-sheet', 'sessions-rail']) {
           const container = document.getElementById(id);
           container.innerHTML = '';
           if (sessions.length === 0) {
@@ -635,6 +722,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
         const label = sessions.length + (sessions.length === 1 ? ' session' : ' sessions');
         document.getElementById('list-count').textContent = label;
         document.getElementById('sheet-count').textContent = label;
+        document.getElementById('rail-count').textContent = label;
       }
 
       function sendResize() {
@@ -647,6 +735,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
         currentSurfaceID = surfaceID;
         lastAttachedSurfaceID = surfaceID;
         resumeAttachInFlight = false;
+        document.body.classList.remove('tablet-unattached');
         const meta = sessionsCache.find(s => s.surfaceID === surfaceID);
         document.getElementById('term-title').textContent = meta ? meta.tabTitle : surfaceID;
         term = new Terminal({
@@ -680,6 +769,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
       function disposeTerminal() {
         if (term) { term.dispose(); term = null; }
         currentSurfaceID = null;
+        document.body.classList.add('tablet-unattached');
       }
 
       window.addEventListener('resize', () => { if (fitAddon && currentSurfaceID) fitAddon.fit(); });
@@ -696,6 +786,19 @@ public final class MobileBridgeServer: @unchecked Sendable {
           // stale secret) the daemon closes the socket; onclose falls back to a token pairing.
           if (creds) ws.send(JSON.stringify({ deviceAuth: creds }));
           else ws.send(document.getElementById('token').value.trim());
+          // P37 Phase E: a fresh WS connection means a fresh server-side ConnectionState, so
+          // any previously-open browser-mirror tab's paneID is gone (the daemon's own
+          // .browserPaneID guard now reports "open a page first" instead of resuming). Clear
+          // the cached snapshot/frame so the tab doesn't keep showing stale content as if it
+          // were still live — the next interaction naturally re-opens a fresh pane via
+          // handleBrowserNavigate's existing fallback. File tabs are untouched: their content
+          // is static and survives a socket drop fine.
+          const browserTab = findBrowserTab();
+          if (browserTab) {
+            browserTab.snapshot = null;
+            browserTab.frame = null;
+            if (browserTab.id === activePreviewTabId) renderActivePreviewTab();
+          }
         };
         // `onerror` never carries a reason (browsers withhold it deliberately — MDN/WHATWG:
         // an error event here is not supposed to be used to relay information about why the
@@ -737,7 +840,10 @@ public final class MobileBridgeServer: @unchecked Sendable {
                 const n = msg.sessions.length;
                 document.getElementById('paired-sub').textContent = n + (n === 1 ? ' session available' : ' sessions available');
                 goto('paired');
-                setTimeout(() => goto('list'), 700);
+                // Tablet: the rail is the session switcher (persistent, always visible) — the
+                // full-screen list view's whole job on phone, so tablet skips straight to the
+                // terminal (its own empty state prompts "select from the sidebar" until attached).
+                setTimeout(() => goto(isTabletLayout() ? 'term' : 'list'), 700);
               } else if (!resumeAttachInFlight && lastAttachedSurfaceID && msg.sessions.some(s => s.surfaceID === lastAttachedSurfaceID)) {
                 // A reconnect (iOS dropped the socket on screen-lock/app-switch, see the
                 // visibilitychange handler below) lands here with the same session list request
@@ -748,22 +854,40 @@ public final class MobileBridgeServer: @unchecked Sendable {
                 resumeAttachInFlight = true;
                 ws.send(JSON.stringify({ attach: lastAttachedSurfaceID }));
               } else {
-                goto('list');
+                goto(isTabletLayout() ? 'term' : 'list');
               }
             } else if (msg.ok === 'attached') {
               mountTerminal(msg.surfaceID);
             } else if (msg.ok === 'detached' || msg.detached) {
               lastAttachedSurfaceID = null;
               disposeTerminal();
-              goto('list');
+              goto(isTabletLayout() ? 'term' : 'list');
             } else if (msg.directory) {
               renderFileEntries(msg.directory);
             } else if (msg.file) {
-              showFilePreview(msg.file);
+              // Routed by path (the response's own natural key), not a wire-protocol tab id —
+              // re-render only if this is still the visible tab, never force-switch to it (a
+              // late response for a background tab must not steal focus from whatever the user
+              // is actually looking at).
+              const fileTab = findFileTab(msg.file.path);
+              if (fileTab) {
+                fileTab.content = msg.file;
+                if (fileTab.id === activePreviewTabId) renderActivePreviewTab();
+              }
             } else if (msg.browserSnapshot) {
-              renderBrowserSnapshot(msg.browserSnapshot);
+              const browserTab = findBrowserTab();
+              if (browserTab) {
+                browserTab.snapshot = msg.browserSnapshot;
+                browserTab.url = msg.browserSnapshot.url;
+                browserTab.title = msg.browserSnapshot.title || 'Web';
+                if (browserTab.id === activePreviewTabId) { renderActivePreviewTab(); renderPreviewTabstrip(); }
+              }
             } else if (msg.browserFrame) {
-              renderBrowserFrame(msg.browserFrame);
+              const browserTab = findBrowserTab();
+              if (browserTab) {
+                browserTab.frame = msg.browserFrame.png;
+                if (browserTab.id === activePreviewTabId) renderActivePreviewTab();
+              }
             } else if (msg.ok === 'browserOpened' || msg.ok === 'browserNavigated' || msg.ok === 'browserInteracted') {
               // Auto-refresh the element list after anything that could have changed the page —
               // one fewer tap than making the user hit "Refresh elements" every time.
@@ -825,7 +949,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
         btn.className = 'session-card';
         btn.onclick = () => entry.isDirectory
           ? listFiles(joinPath(filesCwd, entry.name))
-          : (closeFilesSheet(), ws.send(JSON.stringify({ readFile: { path: joinPath(filesCwd, entry.name) } })));
+          : openFileTab(joinPath(filesCwd, entry.name));
         const glyph = document.createElement('span'); glyph.className = 'glyph';
         glyph.textContent = entry.isDirectory ? '\u{1F4C1}' : '\u{1F4C4}';
         const meta = document.createElement('span'); meta.className = 'meta';
@@ -852,10 +976,130 @@ public final class MobileBridgeServer: @unchecked Sendable {
         }
       }
 
-      function showFilePreview(file) {
-        document.getElementById('file-title').textContent = file.path.slice(file.path.lastIndexOf('/') + 1);
-        const body = document.getElementById('file-body');
+      // P37 Phase E: unified tab model — replaces D1's single #view-file and D3's single
+      // #view-browser with one shared tab-strip + webview-chrome pane (locked design). Multiple
+      // file tabs can be open at once; at most ONE browser tab exists per connection (locked
+      // scope decision — opening a second URL reuses/renavigates the existing browser tab rather
+      // than spawning a second `BrowserPaneView` pane on the Mac).
+      let previewTabs = [];
+      let activePreviewTabId = null;
+      let previewTabSeq = 0;
+
+      function activePreviewTab() { return previewTabs.find(t => t.id === activePreviewTabId) || null; }
+      function findFileTab(path) { return previewTabs.find(t => t.kind === 'file' && t.path === path); }
+      function findBrowserTab() { return previewTabs.find(t => t.kind === 'browser'); }
+
+      function openFileTab(path) {
+        let tab = findFileTab(path);
+        if (!tab) {
+          tab = { id: 'tab' + (++previewTabSeq), kind: 'file', title: path.slice(path.lastIndexOf('/') + 1), path, content: null };
+          previewTabs.push(tab);
+        }
+        activatePreviewTab(tab.id);
+        ws.send(JSON.stringify({ readFile: { path } }));
+        closeFilesSheet();
+        goto('preview');
+      }
+
+      function openBrowserTab(url) {
+        let tab = findBrowserTab();
+        if (!tab) {
+          tab = { id: 'tab' + (++previewTabSeq), kind: 'browser', title: 'Web', url, snapshot: null, frame: null };
+          previewTabs.push(tab);
+        } else {
+          tab.url = url;
+        }
+        activatePreviewTab(tab.id);
+        ws.send(JSON.stringify({ browserNavigate: { url } }));
+        goto('preview');
+      }
+
+      // The 🌐 toolbar button: reopen the existing browser tab if one is already open (no
+      // re-navigate — just switch back to it), otherwise prompt for a starting URL.
+      function openBrowserView() {
+        const existing = findBrowserTab();
+        if (existing) { activatePreviewTab(existing.id); goto('preview'); return; }
+        const url = window.prompt('Open URL', 'https://');
+        if (!url || url === 'https://') return;
+        openBrowserTab(normalizeURL(url));
+      }
+
+      function normalizeURL(raw) {
+        const url = raw.trim();
+        return /^[a-z][a-z0-9+.-]*:\/\//i.test(url) ? url : 'https://' + url;
+      }
+
+      function activatePreviewTab(id) {
+        activePreviewTabId = id;
+        renderPreviewTabstrip();
+        renderActivePreviewTab();
+      }
+
+      function closePreviewTab(id) {
+        const tab = previewTabs.find(t => t.id === id);
+        if (!tab) return;
+        previewTabs = previewTabs.filter(t => t.id !== id);
+        if (tab.kind === 'browser') ws.send(JSON.stringify({ browserClose: true }));
+        if (activePreviewTabId === id) {
+          const next = previewTabs[previewTabs.length - 1];
+          if (next) { activatePreviewTab(next.id); } else { activePreviewTabId = null; closePreview(); }
+        } else {
+          renderPreviewTabstrip();
+        }
+      }
+
+      // Back button: return to the terminal, tabs stay open (re-tap 📁/🌐 to come back to them)
+      // — a full close-everything would throw away file scroll position/browser state for no
+      // reason the locked design asked for.
+      function closePreview() { goto('term'); }
+
+      // Built via DOM (not innerHTML), same reasoning as `sessionCard`/`fileEntryRow` above.
+      function renderPreviewTabstrip() {
+        const container = document.getElementById('preview-tabstrip');
+        container.innerHTML = '';
+        previewTabs.forEach(t => {
+          const el = document.createElement('div');
+          el.className = 'filetab' + (t.id === activePreviewTabId ? ' active' : '');
+          const label = document.createElement('span'); label.textContent = t.title;
+          const x = document.createElement('span'); x.className = 'x'; x.textContent = '×';
+          x.onclick = (e) => { e.stopPropagation(); closePreviewTab(t.id); };
+          el.append(label, x);
+          el.onclick = () => activatePreviewTab(t.id);
+          container.appendChild(el);
+        });
+      }
+
+      function renderActivePreviewTab() {
+        const tab = activePreviewTab();
+        const pathfield = document.getElementById('preview-pathfield');
+        const browserToolbar = document.getElementById('preview-browser-toolbar');
+        const navEls = [document.getElementById('preview-back'), document.getElementById('preview-forward'), document.getElementById('preview-reload')];
+        const body = document.getElementById('preview-body');
+        if (!tab) { body.innerHTML = ''; return; }
+        document.getElementById('preview-title').textContent = tab.title;
+        if (tab.kind === 'file') {
+          pathfield.value = tab.path;
+          pathfield.readOnly = true;
+          browserToolbar.style.display = 'none';
+          navEls.forEach(n => n.classList.add('hidden-nav'));
+          renderFileTabBody(tab, body);
+        } else {
+          pathfield.value = tab.url || '';
+          pathfield.readOnly = false;
+          browserToolbar.style.display = 'flex';
+          navEls.forEach(n => n.classList.remove('hidden-nav'));
+          renderBrowserTabBody(tab, body);
+        }
+      }
+
+      function renderFileTabBody(tab, body) {
         body.innerHTML = '';
+        if (!tab.content) {
+          const loading = document.createElement('div'); loading.className = 'empty'; loading.textContent = 'Loading…';
+          body.appendChild(loading);
+          return;
+        }
+        const file = tab.content;
         if (file.encoding === 'utf8') {
           const pre = document.createElement('pre');
           pre.textContent = file.content + (file.truncated ? '\n\n… (truncated)' : '');
@@ -865,51 +1109,11 @@ public final class MobileBridgeServer: @unchecked Sendable {
           img.src = 'data:' + file.mimeType + ';base64,' + file.content;
           body.appendChild(img);
         } else {
-          const empty = document.createElement('div');
-          empty.className = 'empty';
+          const empty = document.createElement('div'); empty.className = 'empty';
           empty.textContent = 'Cannot preview this file type (' + file.mimeType + ').';
           body.appendChild(empty);
         }
-        goto('file');
       }
-      function closeFilePreview() { goto('term'); }
-
-      // P37 Phase D2: mirrors the server's own `maxFileReadBytes` (5 MiB) so an oversized pick
-      // fails fast client-side instead of wasting a slow mobile upload before the server rejects it.
-      const MAX_ATTACH_BYTES = 5 * 1024 * 1024;
-
-      function attachSelectedFile(input) {
-        const file = input.files && input.files[0];
-        input.value = ''; // so picking the same file again still fires 'change'
-        if (!file) return;
-        if (file.size > MAX_ATTACH_BYTES) { showError('File is too large (max 5 MB).'); return; }
-        const reader = new FileReader();
-        reader.onload = () => {
-          // readAsDataURL yields "data:<mime>;base64,<content>" — only the part after the
-          // comma is the base64 payload the server expects.
-          const base64 = reader.result.slice(reader.result.indexOf(',') + 1);
-          ws.send(JSON.stringify({ attachFile: { name: file.name, mimeType: file.type, content: base64 } }));
-          closeFilesSheet();
-        };
-        reader.onerror = () => showError('Could not read the selected file.');
-        reader.readAsDataURL(file);
-      }
-
-      // P37 Phase D3: browser mirror. MVP chrome only (url bar + element list + manual
-      // screenshot) — the tab-strip/webview redesign is a separate, not-yet-built phase.
-      function openBrowserView() { goto('browser'); }
-      function closeBrowserView() { goto('term'); }
-
-      function browserGo() {
-        let url = document.getElementById('browser-url').value.trim();
-        if (!url) return;
-        if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(url)) url = 'https://' + url;
-        ws.send(JSON.stringify({ browserNavigate: { url } }));
-      }
-      document.getElementById('browser-url').addEventListener('keydown', e => { if (e.key === 'Enter') browserGo(); });
-
-      function browserRefreshSnapshot() { ws.send(JSON.stringify({ browserSnapshot: true })); }
-      function browserRefreshFrame() { ws.send(JSON.stringify({ browserScreenshot: true })); }
 
       function browserInteract(ref, action, text) {
         ws.send(JSON.stringify({ browserInteract: { ref, action, text: text || null } }));
@@ -937,27 +1141,70 @@ public final class MobileBridgeServer: @unchecked Sendable {
         return btn;
       }
 
-      function renderBrowserSnapshot(snapshot) {
-        document.getElementById('browser-url').value = snapshot.url;
-        const container = document.getElementById('browser-elements');
-        container.innerHTML = '';
-        if (!snapshot.elements || snapshot.elements.length === 0) {
-          const empty = document.createElement('div');
-          empty.className = 'empty';
-          empty.textContent = 'No interactive elements found on this page.';
-          container.appendChild(empty);
-        } else {
-          snapshot.elements.forEach(el => container.appendChild(browserElementRow(el)));
+      function renderBrowserTabBody(tab, body) {
+        body.innerHTML = '';
+        if (tab.frame) {
+          const img = document.createElement('img');
+          img.src = 'data:image/png;base64,' + tab.frame;
+          body.appendChild(img);
+        }
+        if (tab.snapshot) {
+          if (!tab.snapshot.elements || tab.snapshot.elements.length === 0) {
+            const empty = document.createElement('div'); empty.className = 'empty';
+            empty.textContent = 'No interactive elements found on this page.';
+            body.appendChild(empty);
+          } else {
+            tab.snapshot.elements.forEach(el => body.appendChild(browserElementRow(el)));
+          }
         }
       }
 
-      function renderBrowserFrame(frame) {
-        const img = document.getElementById('browser-frame-img');
-        img.src = 'data:image/png;base64,' + frame.png;
-        img.style.display = 'block';
+      function browserRefreshSnapshot() { ws.send(JSON.stringify({ browserSnapshot: true })); }
+      function browserRefreshFrame() { ws.send(JSON.stringify({ browserScreenshot: true })); }
+
+      // P37 Phase E: real back/forward/reload for the ported webview toolbar — only shown
+      // (see `renderActivePreviewTab`'s `hidden-nav` toggle) on a browser-kind tab.
+      function previewNavBack() { if (activePreviewTab()?.kind === 'browser') ws.send(JSON.stringify({ browserGoBack: true })); }
+      function previewNavForward() { if (activePreviewTab()?.kind === 'browser') ws.send(JSON.stringify({ browserGoForward: true })); }
+      function previewNavReload() { if (activePreviewTab()?.kind === 'browser') ws.send(JSON.stringify({ browserReload: true })); }
+
+      document.getElementById('preview-pathfield').addEventListener('keydown', e => {
+        if (e.key !== 'Enter') return;
+        const tab = activePreviewTab();
+        if (!tab || tab.kind !== 'browser') return; // readonly on a file tab, nothing to submit
+        const url = normalizeURL(e.target.value);
+        if (!url) return;
+        tab.url = url;
+        ws.send(JSON.stringify({ browserNavigate: { url } }));
+      });
+
+      // P37 Phase D2: mirrors the server's own `maxFileReadBytes` (5 MiB) so an oversized pick
+      // fails fast client-side instead of wasting a slow mobile upload before the server rejects it.
+      const MAX_ATTACH_BYTES = 5 * 1024 * 1024;
+
+      function attachSelectedFile(input) {
+        const file = input.files && input.files[0];
+        input.value = ''; // so picking the same file again still fires 'change'
+        if (!file) return;
+        if (file.size > MAX_ATTACH_BYTES) { showError('File is too large (max 5 MB).'); return; }
+        const reader = new FileReader();
+        reader.onload = () => {
+          // readAsDataURL yields "data:<mime>;base64,<content>" — only the part after the
+          // comma is the base64 payload the server expects.
+          const base64 = reader.result.slice(reader.result.indexOf(',') + 1);
+          ws.send(JSON.stringify({ attachFile: { name: file.name, mimeType: file.type, content: base64 } }));
+          closeFilesSheet();
+        };
+        reader.onerror = () => showError('Could not read the selected file.');
+        reader.readAsDataURL(file);
       }
 
       document.getElementById('token').addEventListener('keydown', e => { if (e.key === 'Enter') connect(); });
+
+      // P37 Phase E: the page always starts with nothing attached — drives view-term's tablet
+      // empty state ("select a session from the sidebar") from the very first render, not just
+      // after a `disposeTerminal()` call (which never runs before a first attach).
+      document.body.classList.add('tablet-unattached');
 
       // Auto-connect when we can do it without a tap: a stored device credential (returning
       // device, P37 A2) needs no token at all; otherwise a token in the URL (QR scan) — the
@@ -1253,6 +1500,17 @@ public final class MobileBridgeServer: @unchecked Sendable {
         /// `{"browserScreenshot":true}` — manual refresh only (P37 Phase D risk note: start
         /// without continuous polling until ref-tap is validated live).
         var browserScreenshot: Bool?
+        /// P37 Phase E: the ported webview-style toolbar's back/forward/reload — real navigation
+        /// history actions, only meaningful (and only shown by the client) on a browser-kind
+        /// preview tab. All three reuse already-wired `IPCRequest` cases, same as every other
+        /// browser control message here — no new IPC.
+        var browserGoBack: Bool?
+        var browserGoForward: Bool?
+        var browserReload: Bool?
+        /// `{"browserClose":true}` — sent when the client closes its (single, per Phase E's
+        /// locked "1 browser tab per connection" scope) browser tab, so the Mac-side pane doesn't
+        /// linger until the whole connection tears down.
+        var browserClose: Bool?
         struct SpawnPayload: Decodable { var cwd: String? }
         struct ResizePayload: Decodable { var cols: Int; var rows: Int }
         struct FileReadRequest: Decodable { var path: String }
@@ -1919,6 +2177,41 @@ public final class MobileBridgeServer: @unchecked Sendable {
         }
     }
 
+    /// P37 Phase E: real back/forward/reload for the ported webview toolbar's nav buttons —
+    /// only meaningful on a browser-kind preview tab, hidden by the client on a file tab. All
+    /// three share one shape: request the corresponding already-wired `IPCRequest` case, reply
+    /// with the same `"browserNavigated"` ok-kind `handleBrowserNavigate` uses so the client's
+    /// existing auto-refresh-snapshot-on-navigate wiring fires without any new client-side case.
+    private func handleBrowserNavHistory(_ makeRequest: (UUID) -> IPCRequest, connection: NWConnection, state: ConnectionState) {
+        guard let paneID = state.browserPaneID else {
+            sendText(#"{"error":"open a page first"}"#, on: connection)
+            return
+        }
+        let client = DaemonClient()
+        guard case let .browserSuccess(payload)? = try? client.request(makeRequest(paneID), timeout: 31) else {
+            sendText(#"{"error":"browser request failed"}"#, on: connection)
+            return
+        }
+        if case let .error(message) = payload {
+            sendJSON(ErrorAck(error: message), on: connection)
+        } else {
+            sendJSON(BrowserOkAck(ok: "browserNavigated"), on: connection)
+        }
+    }
+
+    /// Closes this connection's mirrored browser pane on an explicit client request (tab close),
+    /// not just on connection teardown — Phase D3's teardown-only close left the pane open for
+    /// as long as the WS connection itself stayed up, which is fine for "the phone dropped" but
+    /// wrong for "the user tapped the tab's × while still connected."
+    private func handleBrowserClose(connection: NWConnection, state: ConnectionState) {
+        if let paneID = state.browserPaneID {
+            let client = DaemonClient()
+            _ = try? client.request(.browserClose(paneID: paneID), timeout: 10)
+            state.browserPaneID = nil
+        }
+        sendJSON(BrowserOkAck(ok: "browserClosed"), on: connection)
+    }
+
     private func handleReadFile(path: String, connection: NWConnection) {
         guard let info = Self.readFileInfo(path: path) else {
             sendText(#"{"error":"cannot read file"}"#, on: connection)
@@ -1984,6 +2277,22 @@ public final class MobileBridgeServer: @unchecked Sendable {
         } else if message.browserScreenshot == true {
             state.controlQueue.async { [weak self] in
                 self?.handleBrowserScreenshot(connection: connection, state: state)
+            }
+        } else if message.browserGoBack == true {
+            state.controlQueue.async { [weak self] in
+                self?.handleBrowserNavHistory({ .browserGoBack(paneID: $0) }, connection: connection, state: state)
+            }
+        } else if message.browserGoForward == true {
+            state.controlQueue.async { [weak self] in
+                self?.handleBrowserNavHistory({ .browserGoForward(paneID: $0) }, connection: connection, state: state)
+            }
+        } else if message.browserReload == true {
+            state.controlQueue.async { [weak self] in
+                self?.handleBrowserNavHistory({ .browserReload(paneID: $0) }, connection: connection, state: state)
+            }
+        } else if message.browserClose == true {
+            state.controlQueue.async { [weak self] in
+                self?.handleBrowserClose(connection: connection, state: state)
             }
         } else {
             sendText(#"{"error":"unrecognized control message"}"#, on: connection)
