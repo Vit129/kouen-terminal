@@ -394,6 +394,12 @@ public final class MobileBridgeServer: @unchecked Sendable {
       .term-header .title { font-size: 0.85rem; font-weight: 600; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       #term-body { flex: 1; min-height: 0; overflow: hidden; padding: 0.4rem; background: #100d0b; }
       #xterm-container { height: 100%; }
+      /* Base state: hidden everywhere, including phone (<768px), which never had a base rule of
+         its own before this fix — the only `display` rule lived inside the tablet media query,
+         so this tablet-only "select a session" label was rendering above the live terminal on
+         every phone session too. Found via code review. Tablet's own visible state
+         (`body.tablet-unattached #term-empty`) still lives in the media query below. */
+      #term-empty { display: none; }
 
       .sheet-backdrop {
         position: fixed; inset: 0; background: rgba(0,0,0,0.45); opacity: 0; pointer-events: none;
@@ -416,15 +422,6 @@ public final class MobileBridgeServer: @unchecked Sendable {
       }
       .error-banner.show { display: block; }
 
-      /* P37 Phase D1: file preview — reuses .list-header/.sessions/.session-card (files sheet)
-         and .view/.term-header (preview view) as-is, only the content area below needs its own rules. */
-      #file-body { flex: 1; min-height: 0; overflow: auto; padding: 0.8rem; }
-      #file-body pre {
-        margin: 0; font-family: var(--code-font); font-size: 0.8rem; white-space: pre-wrap;
-        word-break: break-word; color: var(--text);
-      }
-      #file-body img { max-width: 100%; display: block; border-radius: 8px; }
-      #file-body .empty { padding-top: 2rem; }
 
       /* P37 Phase D2: the attach affordance is a leading row in the files sheet, not a 4th
          toolbar icon (the header already has back/title/files/switch — no room to spare on a
@@ -445,8 +442,16 @@ public final class MobileBridgeServer: @unchecked Sendable {
         appearance: none; border: 1px solid var(--border); background: var(--surface); color: var(--muted);
         border-radius: 8px; padding: 0.3rem 0.6rem; font-size: 0.72rem; font-family: inherit; cursor: pointer;
       }
-      #preview-body { flex: 1; min-height: 0; overflow: auto; }
-      #preview-body img { width: 100%; display: block; }
+      /* Retargeted from D1's #file-body (Phase E folded the single-file view into this shared
+         preview pane) rather than left dead — deleting outright would have shipped file-preview
+         text with no padding/code-font/wrap, falling back to the browser's bare <pre> default. */
+      #preview-body { flex: 1; min-height: 0; overflow: auto; padding: 0.8rem; }
+      #preview-body pre {
+        margin: 0; font-family: var(--code-font); font-size: 0.8rem; white-space: pre-wrap;
+        word-break: break-word; color: var(--text);
+      }
+      #preview-body img { max-width: 100%; display: block; border-radius: 8px; }
+      #preview-body .empty { padding-top: 2rem; }
       .browser-el {
         display: flex; flex-direction: column; gap: 0.1rem; padding: 0.6rem 0.8rem;
         border-bottom: 1px solid var(--surface-3); text-align: left; width: 100%; background: none; border-left: none; border-right: none; border-top: none;
@@ -506,7 +511,6 @@ public final class MobileBridgeServer: @unchecked Sendable {
         /* Opening a file/browser tab is a full-screen takeover on tablet too — rail hidden,
            same as the terminal it replaces (locked design, frame 06). */
         body.preview-active #tablet-rail { display: none; }
-        #term-empty { display: none; }
         body.tablet-unattached #term-empty { display: flex; }
         body.tablet-unattached #xterm-container { display: none; }
       }
@@ -2195,6 +2199,13 @@ public final class MobileBridgeServer: @unchecked Sendable {
         if case let .error(message) = payload {
             sendJSON(ErrorAck(error: message), on: connection)
         } else {
+            // Found via code review: without this, back/forward/reload had the exact same
+            // race `handleBrowserNavigate` already works around — the GUI acks the history
+            // action before the page finishes loading, so the client's auto-refresh-snapshot
+            // (fired on this same "browserNavigated" ok-kind) would systematically capture the
+            // *previous* page. `waitForBrowserLoad` is a no-op if the page isn't actually
+            // loading (see its own doc comment), so a cached/instant history nav doesn't stall.
+            waitForBrowserLoad(paneID: paneID, client: client)
             sendJSON(BrowserOkAck(ok: "browserNavigated"), on: connection)
         }
     }
