@@ -19,6 +19,8 @@ public protocol TerminalHostDelegate: AnyObject {
     func terminalHostDidClose(surfaceID: SurfaceID)
     /// OSC 7735 — open the given path in the sidebar file viewer (line numbers in gutter, not copyable).
     func terminalHostDidRequestOpenFile(_ path: String, surfaceID: SurfaceID)
+    /// OSC 7736 — scroll/highlight the given path in the sidebar file tree, no viewer tab opened.
+    func terminalHostDidRequestRevealFile(_ path: String, surfaceID: SurfaceID)
 }
 
 extension TerminalHostDelegate {
@@ -28,6 +30,8 @@ extension TerminalHostDelegate {
     public func terminalHostDidUpdateProgress(_ report: TerminalProgressReport, surfaceID: SurfaceID) {}
     /// Default no-op — only the GUI layer can open file tabs.
     public func terminalHostDidRequestOpenFile(_ path: String, surfaceID: SurfaceID) {}
+    /// Default no-op — only the GUI layer can reveal tree rows.
+    public func terminalHostDidRequestRevealFile(_ path: String, surfaceID: SurfaceID) {}
 }
 
 /// Hosts one terminal pane: Kouen's native `KouenTerminalSurfaceView` (GPU renderer +
@@ -274,6 +278,10 @@ public final class TerminalHostView: NSView {
         native.onOpenFile = { [weak self] path in
             guard let self else { return }
             self.hostDelegate?.terminalHostDidRequestOpenFile(path, surfaceID: self.surfaceID)
+        }
+        native.onRevealFile = { [weak self] path in
+            guard let self else { return }
+            self.hostDelegate?.terminalHostDidRequestRevealFile(path, surfaceID: self.surfaceID)
         }
         native.onOutputTrigger = { [weak self] pattern, title in
             guard let self else { return }

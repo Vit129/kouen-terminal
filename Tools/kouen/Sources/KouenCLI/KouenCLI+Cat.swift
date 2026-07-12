@@ -15,6 +15,13 @@ extension KouenCLI {
         }
         do {
             let text = try KouenFilePreviewLoader.load(path: path)
+            // When running inside Kouen, emit OSC 7736 so the sidebar file tree scrolls to and
+            // highlights this file — tree only, no viewer tab (that's `kouen view`'s job).
+            if ProcessInfo.processInfo.environment["KOUEN_SURFACE_ID"] != nil {
+                let expanded = (path.trimmingCharacters(in: .whitespacesAndNewlines) as NSString).expandingTildeInPath
+                let abs = URL(fileURLWithPath: expanded).path
+                print("\u{1B}]7736;\(abs)\u{07}", terminator: "")
+            }
             let lines = text.components(separatedBy: "\n")
             let width = String(lines.count).count
             for (i, line) in lines.enumerated() {

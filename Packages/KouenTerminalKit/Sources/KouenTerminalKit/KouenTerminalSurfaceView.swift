@@ -337,6 +337,7 @@ public final class KouenTerminalSurfaceView: NSView {
     /// — the host forwards this to its delegate.
     public var onDesktopNotification: ((_ title: String?, _ body: String) -> Void)?
     public var onOpenFile: ((String) -> Void)?
+    public var onRevealFile: ((String) -> Void)?
     /// OSC 26 agent status — `(identity, activity, prompt)`. `identity` maps to `AgentKind.rawValue`;
     /// `activity` maps to `AgentActivity.rawValue` (plus `"waiting_input"` which maps to `.awaiting`).
     /// `prompt` is set when `status=waiting_input` and carries the permission request text.
@@ -1208,6 +1209,13 @@ public final class KouenTerminalSurfaceView: NSView {
                 self?.onOpenFile?(path)
             } else {
                 DispatchQueue.main.async { [weak self] in self?.onOpenFile?(path) }
+            }
+        }
+        emulator.onRevealFile = { [weak self] path in
+            if Thread.isMainThread {
+                self?.onRevealFile?(path)
+            } else {
+                DispatchQueue.main.async { [weak self] in self?.onRevealFile?(path) }
             }
         }
         emulator.onPointerShapeChange = { [weak self] shape in

@@ -566,6 +566,18 @@ final class KouenSidebarPanelViewController: NSViewController {
         selectSidebarTab(index: 2)
     }
 
+    /// Scrolls/highlights `path` in the file tree in the background — unlike
+    /// `selectFilesTab(revealPath:)`, does not switch sidebar sections or force it visible.
+    /// Mirrors the passive cwd-follow in `reload()`, for callers (e.g. `kouen cat`/`view`) that
+    /// want the tree ready without yanking focus off whatever section is currently showing.
+    func revealFileInTreeQuietly(path: String) {
+        let parentDir = (path as NSString).deletingLastPathComponent
+        let root = WorktreeManager().repoRoot(for: parentDir) ?? parentDir
+        let activeSessionID = SessionCoordinator.shared.snapshot.activeWorkspace?.activeSessionID
+        fileTreeView.updateRoot(path: root, sessionID: activeSessionID)
+        fileTreeView.revealFileInTree(path: path)
+    }
+
     /// Switches the sidebar to the Files tab and reveals `path` in the file tree
     /// (expands ancestors, highlights the row, and scrolls to it).
     func selectFilesTab(revealPath path: String) {

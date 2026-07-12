@@ -56,6 +56,12 @@ extension SessionCoordinator: TerminalHostDelegate {
 
     func terminalHostDidRequestOpenFile(_ path: String, surfaceID: SurfaceID) {
         MainExecutor.shared.executeSurfacingErrors(.workbench(.view(path: path)))
+        terminalHostDidRequestRevealFile(path, surfaceID: surfaceID)
+    }
+
+    func terminalHostDidRequestRevealFile(_ path: String, surfaceID: SurfaceID) {
+        NotificationCenter.default.post(
+            name: Notification.Name("KouenRevealFileInTree"), object: nil, userInfo: ["path": path])
     }
 }
 
