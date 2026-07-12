@@ -72,6 +72,9 @@ public final class TerminalEmulator: VTParserHandler {
     public var onPointerShapeChange: ((String?) -> Void)?
     /// OSC 7735 — Kouen-specific: open the given absolute path in the sidebar file viewer.
     public var onOpenFile: ((String) -> Void)?
+    /// OSC 7736 — Kouen-specific: scroll/highlight the given absolute path in the sidebar file
+    /// tree, without opening a viewer tab (e.g. `kouen cat`/`view` printing inline).
+    public var onRevealFile: ((String) -> Void)?
     /// OSC 26 — Kouen agent protocol: `identity=<kind>;status=<activity>[;prompt=<url-encoded>]`.
     /// Fired when an agent process emits its status into the PTY stream.
     public var onAgentStatus: ((_ identity: String?, _ status: String, _ prompt: String?) -> Void)?
@@ -462,6 +465,7 @@ public final class TerminalEmulator: VTParserHandler {
         case "133": handleSemanticPrompt(payload)          // OSC 133 ; A/B/C/D — shell integration
         case "1337": handleITerm2Image(payload)            // iTerm2 inline image (File=…)
         case "7735": onOpenFile?(payload)                  // Kouen: open file in sidebar viewer
+        case "7736": onRevealFile?(payload)                // Kouen: reveal file in sidebar tree only
         case "26": handleAgentStatus(payload)              // Kouen OSC 26 agent protocol
         default: break
         }

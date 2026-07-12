@@ -147,6 +147,12 @@ final class MainSplitViewController: NSViewController {
             name: Notification.Name("KouenOpenInBrowserPaneURL"),
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(revealFileInTreeFromTerminal(_:)),
+            name: Notification.Name("KouenRevealFileInTree"),
+            object: nil
+        )
     }
 
     deinit { NotificationCenter.default.removeObserver(self) }
@@ -201,6 +207,15 @@ final class MainSplitViewController: NSViewController {
         contentVC.openFileTab(path: path)
         setSidebarVisible(true, animated: true)
         sidebar.selectFilesTab(revealPath: path)
+    }
+
+    @objc private func revealFileInTreeFromTerminal(_ notification: Notification) {
+        guard let rawPath = notification.userInfo?["path"] as? String else { return }
+        let resolvedPath = FileManager.default.fileExists(atPath: rawPath)
+            ? rawPath
+            : contentVC.resolveTerminalLinkPath(rawPath)
+        guard let path = resolvedPath else { return }
+        sidebar.revealFileInTreeQuietly(path: path)
     }
 
     @objc private func openURLInBrowserPaneFromTerminal(_ notification: Notification) {
