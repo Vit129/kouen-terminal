@@ -10,12 +10,15 @@ private struct FakeGrid: CopyModeGridSource {
     let columns: Int
     let viewportRows: Int
     let promptRows: [Int]
+    /// Columns excluded from copy (SGR 73/74) on every line, e.g. `kouen cat` line numbers.
+    let excludedColumns: Set<Int>
 
-    init(_ lines: [String], columns: Int? = nil, viewportRows: Int? = nil, prompts: [Int] = []) {
+    init(_ lines: [String], columns: Int? = nil, viewportRows: Int? = nil, prompts: [Int] = [], excludedColumns: Set<Int> = []) {
         self.lines = lines
         self.columns = columns ?? (lines.map(\.count).max() ?? 1)
         self.viewportRows = viewportRows ?? lines.count
         self.promptRows = prompts
+        self.excludedColumns = excludedColumns
     }
 
     var totalLines: Int { lines.count }
@@ -24,7 +27,7 @@ private struct FakeGrid: CopyModeGridSource {
         var cells = Array(repeating: TerminalGridCell.blank, count: columns)
         guard index >= 0, index < lines.count else { return cells }
         for (i, scalar) in lines[index].unicodeScalars.enumerated() where i < columns {
-            cells[i] = TerminalGridCell(codepoint: scalar.value)
+            cells[i] = TerminalGridCell(codepoint: scalar.value, excludedFromCopy: excludedColumns.contains(i))
         }
         return cells
     }
@@ -136,6 +139,17 @@ final class CopyModeReducerTests: XCTestCase {
         s = reduce(s, .cursorDown, grid) // lines 0..1
         let (_, effect) = CopyModeReducer.reduce(s, .copySelectionAndCancel, grid: grid)
         XCTAssertEqual(effect, .copyAndCancel("alpha\nbeta"))
+    }
+
+    /// Regression: `kouen cat` wraps its line-number prefix in SGR 73/74 (excludedFromCopy).
+    /// Copy-mode yank must skip those cells the same way plain mouse-drag selection does.
+    func testCharSelectionSkipsExcludedFromCopyCells() {
+        let grid = FakeGrid(["1 hello"], columns: 7, excludedColumns: [0, 1])
+        var s = CopyModeReducer.initialState(grid: grid, cursorLine: 0, cursorColumn: 0)
+        s = reduce(s, .beginSelection, grid)
+        for _ in 0..<6 { s = reduce(s, .cursorRight, grid) } // cursor at last column
+        let (_, effect) = CopyModeReducer.reduce(s, .copySelectionAndCancel, grid: grid)
+        XCTAssertEqual(effect, .copyAndCancel("hello"))
     }
 
     func testBlockSelectionText() {

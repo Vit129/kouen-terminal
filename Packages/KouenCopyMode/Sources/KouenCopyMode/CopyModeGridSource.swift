@@ -109,6 +109,7 @@ extension CopyModeGridSource {
         while c < cells.count {
             let cell = cells[c]
             if cell.width == .spacerTail { c += 1; continue }
+            if cell.excludedFromCopy { c += 1; continue }
             // One Character per cell = base scalar + any combining marks (a Thai cluster is a single
             // grapheme), so column/character mapping stays 1:1. `cluster.first` takes that single
             // grapheme; the engine guarantees one (combining marks fold into the base, non-extending
