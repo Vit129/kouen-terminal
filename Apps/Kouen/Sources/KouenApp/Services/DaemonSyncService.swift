@@ -126,14 +126,18 @@ final class DaemonSyncService {
                 _ = await request(.browserResponse(id: id, response: .error("Browser pane not found")))
                 return
             }
-            
-            // extract the index from elementID, e.g. "e3" -> 3
-            let numericString = elementID.trimmingCharacters(in: CharacterSet.decimalDigits.inverted)
-            guard let index = Int(numericString) else {
-                _ = await request(.browserResponse(id: id, response: .error("Invalid element ID '\(elementID)'")))
-                return
-            }
-            
+
+            // Look the element up by the `data-kouen-ref` attribute `snapshot()` stamped it
+            // with (BrowserPaneView.swift), not by re-enumerating a selector list and indexing
+            // positionally. The old positional approach used a DIFFERENT (shorter) selector
+            // list than snapshot's, so any element matched only by snapshot's extra selectors
+            // ([role=link]/[role=checkbox]/etc.) ahead of the target silently shifted every
+            // index after it — interact would click the wrong element with no error. Attribute
+            // lookup is also immune to the DOM reshaping between the snapshot call and this one
+            // (ads/lazy-load/SPA re-render): a stale or already-gone ref now correctly reports
+            // "element not found" instead of hitting whatever now happens to sit at that index.
+            let escapedElementID = elementID.replacingOccurrences(of: "\\", with: "\\\\")
+                                             .replacingOccurrences(of: "\"", with: "\\\"")
             let script: String
             if action.lowercased() == "type" {
                 let escapedText = (text ?? "").replacingOccurrences(of: "\\", with: "\\\\")
@@ -141,8 +145,7 @@ final class DaemonSyncService {
                                                .replacingOccurrences(of: "\n", with: "\\n")
                 script = """
                 (function(){
-                  var all=document.querySelectorAll('a,button,input,select,textarea,[role=button]');
-                  var el=all[\(index) - 1];
+                  var el=document.querySelector('[data-kouen-ref="\(escapedElementID)"]');
                   if(!el) return JSON.stringify({ok:false,error:'element not found'});
                   el.focus();
                   el.value = "\(escapedText)";
@@ -154,8 +157,7 @@ final class DaemonSyncService {
             } else if action.lowercased() == "click" {
                 script = """
                 (function(){
-                  var all=document.querySelectorAll('a,button,input,select,textarea,[role=button]');
-                  var el=all[\(index) - 1];
+                  var el=document.querySelector('[data-kouen-ref="\(escapedElementID)"]');
                   if(!el) return JSON.stringify({ok:false,error:'element not found'});
                   el.click();
                   return JSON.stringify({ok:true});
@@ -164,8 +166,7 @@ final class DaemonSyncService {
             } else if action.lowercased() == "scroll" {
                 script = """
                 (function(){
-                  var all=document.querySelectorAll('a,button,input,select,textarea,[role=button]');
-                  var el=all[\(index) - 1];
+                  var el=document.querySelector('[data-kouen-ref="\(escapedElementID)"]');
                   if(!el) return JSON.stringify({ok:false,error:'element not found'});
                   el.scrollIntoView({ behavior: 'smooth', block: 'center' });
                   return JSON.stringify({ok:true});
@@ -175,7 +176,7 @@ final class DaemonSyncService {
                 _ = await request(.browserResponse(id: id, response: .error("Unknown action '\(action)'")))
                 return
             }
-            
+
             do {
                 let jsonResult = try await view.evaluateJS(script)
                 struct JSResult: Codable {
