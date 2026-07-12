@@ -96,6 +96,13 @@ Design session 2026-07-12, artifact: https://claude.ai/code/artifact/f97619f7-df
 - [ ] **Not verified:** phone-width (`<768px`) live re-check specifically for Phase E — the phone code path itself is unchanged (D1/D2/D3 already verified it live; Phase E's phone-facing changes are the tab-strip/webview chrome replacing single-file/single-browser views, which reuses the same `.view`/`goto()` mechanism already proven). Structurally sound by code review, not re-confirmed live under time constraints — flagging honestly rather than claiming full coverage.
 - [ ] Real-GUI round trip for the browser tab (navigate → real `BrowserPaneView` → snapshot → interact) — same open item D3 already carried, still not done; needs `make preview` with a real GUI window, attempted once this session and aborted for the code-review detour.
 
+**Second Opus-model pass (post-implementation, independent) found and Sonnet fixed 3 issues, commit `4a782d69`:**
+- **[Important]** `#term-empty`'s only `display` rule lived entirely inside the tablet media query — phone had no base rule, so the tablet-only empty-state label was rendering above the live terminal on every phone session. Fixed: base `display:none` moved outside the media query.
+- **[Suggestion]** `handleBrowserNavHistory` (back/forward/reload, added this phase) skipped the same `waitForBrowserLoad` call `handleBrowserNavigate` already needed — the auto-refreshed element list after a history nav was systematically a beat early. Fixed by reusing the same wait (severity was already capped by the `bdfbb0b6` ref-based lookup fix: stale ref → clean "not found", never a wrong click).
+- **[Suggestion]** Dead `#file-body` CSS (orphaned when Phase E folded the single-file view into `#preview-body`) retargeted rather than deleted — deleting outright would have silently shipped file-preview text with no padding/code-font/wrap.
+
+Everything else the reviewer checked (cross-boundary WS↔ControlMessage contract completeness, tab state-machine edges — last-tab-close/non-active-close/rapid-double-open/empty-array reads, `sessionCard()` reuse across 3 render targets, `handleBrowserClose`'s deliberate no-guard idempotency, `bdfbb0b6`'s stamp-order/escaping/pre-existing-attribute handling) came back clean.
+
 ## Risks carried into implementation
 - D3 interaction latency/touch-mapping is the one open UX question in the design — validate snapshot+ref-tap manually before investing in the screenshot-polling client UI.
 - Real-phone E2E (camera QR scan → Safari → touch) still hasn't been done for any P37 phase, D included — scripted WS client only proves the protocol, not the on-device UX.
