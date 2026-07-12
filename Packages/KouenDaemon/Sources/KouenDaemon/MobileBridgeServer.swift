@@ -288,6 +288,15 @@ public final class MobileBridgeServer: @unchecked Sendable {
         /// Temporary diagnostic (P37 real-device WS debugging) — gates the one-shot
         /// first-frame log in `handleFrame`.
         var loggedFirstFrame = false
+        /// P37 Phase D3 (browser mirror). The GUI's `BrowserPaneView` tab this connection is
+        /// mirroring, if any — nil until the first `{"browserNavigate"}` opens one (`.browserOpen`
+        /// IPC, no `paneID` yet), set from the `.open(paneID:)` response, then reused for every
+        /// subsequent navigate/snapshot/interact/screenshot on this connection.
+        var browserPaneID: UUID? {
+            get { lock.lock(); defer { lock.unlock() }; return _browserPaneID }
+            set { lock.lock(); _browserPaneID = newValue; lock.unlock() }
+        }
+        private var _browserPaneID: UUID?
     }
 
     /// The pairing page, served by this process itself (see `makeUnifiedListener`) — not a
@@ -426,6 +435,30 @@ public final class MobileBridgeServer: @unchecked Sendable {
         color: var(--accent); font-family: inherit; font-weight: 600; font-size: 0.85rem; flex-shrink: 0;
       }
       .attach-row .glyph { width: 1.1rem; text-align: center; flex-shrink: 0; }
+
+      /* P37 Phase D3 (browser mirror) — deliberately minimal chrome for this MVP, NOT the
+         tab-strip/webview redesign (that's a separate, larger, not-yet-built phase). */
+      #browser-url {
+        flex: 1; min-width: 0; font: inherit; font-family: var(--code-font); font-size: 0.78rem;
+        background: var(--surface-3); border: 1px solid var(--border); color: var(--text);
+        border-radius: 8px; padding: 0.35rem 0.6rem;
+      }
+      .browser-toolbar {
+        display: flex; gap: 0.5rem; padding: 0.5rem 0.7rem; border-bottom: 1px solid var(--surface-3); flex-shrink: 0;
+      }
+      .browser-toolbar button {
+        appearance: none; border: 1px solid var(--border); background: var(--surface); color: var(--muted);
+        border-radius: 8px; padding: 0.3rem 0.6rem; font-size: 0.72rem; font-family: inherit; cursor: pointer;
+      }
+      #browser-body { flex: 1; min-height: 0; overflow: auto; }
+      #browser-frame-img { width: 100%; display: block; }
+      .browser-el {
+        display: flex; flex-direction: column; gap: 0.1rem; padding: 0.6rem 0.8rem;
+        border-bottom: 1px solid var(--surface-3); text-align: left; width: 100%; background: none; border-left: none; border-right: none; border-top: none;
+        color: inherit; font-family: inherit;
+      }
+      .browser-el .tag { font-family: var(--code-font); font-size: 0.65rem; color: var(--accent-cyan); }
+      .browser-el .label { font-size: 0.82rem; }
     </style>
 
     <div id="view-home" class="view active">
@@ -458,6 +491,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
         <button class="iconbtn" onclick="detach()" aria-label="Back to sessions">&larr;</button>
         <div class="title" id="term-title">—</div>
         <button class="iconbtn" onclick="openFilesSheet()" aria-label="Browse files">&#128193;</button>
+        <button class="iconbtn" onclick="openBrowserView()" aria-label="Browse the web">&#127760;</button>
         <button class="iconbtn" onclick="openSheet()" aria-label="Switch session">&#8645;</button>
       </div>
       <div id="term-body"><div id="xterm-container"></div></div>
@@ -469,6 +503,22 @@ public final class MobileBridgeServer: @unchecked Sendable {
         <div class="title" id="file-title">—</div>
       </div>
       <div id="file-body"></div>
+    </div>
+
+    <div id="view-browser" class="view">
+      <div class="term-header">
+        <button class="iconbtn" onclick="closeBrowserView()" aria-label="Back to terminal">&larr;</button>
+        <input id="browser-url" placeholder="https://…" autocomplete="off" autocapitalize="off" spellcheck="false">
+        <button class="iconbtn" onclick="browserGo()" aria-label="Go">&rarr;</button>
+      </div>
+      <div class="browser-toolbar">
+        <button onclick="browserRefreshSnapshot()">Refresh elements</button>
+        <button onclick="browserRefreshFrame()">Refresh screenshot</button>
+      </div>
+      <div id="browser-body">
+        <img id="browser-frame-img" style="display:none">
+        <div id="browser-elements"></div>
+      </div>
     </div>
 
     <div class="sheet-backdrop" id="sheet-backdrop" onclick="closeSheet()">
@@ -710,6 +760,14 @@ public final class MobileBridgeServer: @unchecked Sendable {
               renderFileEntries(msg.directory);
             } else if (msg.file) {
               showFilePreview(msg.file);
+            } else if (msg.browserSnapshot) {
+              renderBrowserSnapshot(msg.browserSnapshot);
+            } else if (msg.browserFrame) {
+              renderBrowserFrame(msg.browserFrame);
+            } else if (msg.ok === 'browserOpened' || msg.ok === 'browserNavigated' || msg.ok === 'browserInteracted') {
+              // Auto-refresh the element list after anything that could have changed the page —
+              // one fewer tap than making the user hit "Refresh elements" every time.
+              ws.send(JSON.stringify({ browserSnapshot: true }));
             } else if (msg.error) {
               sawServerError = true;
               showError(msg.error);
@@ -835,6 +893,68 @@ public final class MobileBridgeServer: @unchecked Sendable {
         };
         reader.onerror = () => showError('Could not read the selected file.');
         reader.readAsDataURL(file);
+      }
+
+      // P37 Phase D3: browser mirror. MVP chrome only (url bar + element list + manual
+      // screenshot) — the tab-strip/webview redesign is a separate, not-yet-built phase.
+      function openBrowserView() { goto('browser'); }
+      function closeBrowserView() { goto('term'); }
+
+      function browserGo() {
+        let url = document.getElementById('browser-url').value.trim();
+        if (!url) return;
+        if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(url)) url = 'https://' + url;
+        ws.send(JSON.stringify({ browserNavigate: { url } }));
+      }
+      document.getElementById('browser-url').addEventListener('keydown', e => { if (e.key === 'Enter') browserGo(); });
+
+      function browserRefreshSnapshot() { ws.send(JSON.stringify({ browserSnapshot: true })); }
+      function browserRefreshFrame() { ws.send(JSON.stringify({ browserScreenshot: true })); }
+
+      function browserInteract(ref, action, text) {
+        ws.send(JSON.stringify({ browserInteract: { ref, action, text: text || null } }));
+      }
+
+      // Built via DOM (not innerHTML), same reasoning as `sessionCard`/`fileEntryRow` above —
+      // page text/labels come straight from whatever site is loaded.
+      function browserElementRow(el) {
+        const btn = document.createElement('button');
+        btn.className = 'browser-el';
+        const tag = document.createElement('span'); tag.className = 'tag';
+        tag.textContent = el.tag + (el.role ? ' · ' + el.role : '');
+        const label = document.createElement('span'); label.className = 'label';
+        label.textContent = el.text || el.placeholder || el.value || '(no label)';
+        btn.append(tag, label);
+        const isTextInput = el.tag === 'input' || el.tag === 'textarea';
+        btn.onclick = () => {
+          if (isTextInput) {
+            const text = window.prompt('Type into "' + label.textContent + '"', el.value || '');
+            if (text !== null) browserInteract(el.id, 'type', text);
+          } else {
+            browserInteract(el.id, 'click');
+          }
+        };
+        return btn;
+      }
+
+      function renderBrowserSnapshot(snapshot) {
+        document.getElementById('browser-url').value = snapshot.url;
+        const container = document.getElementById('browser-elements');
+        container.innerHTML = '';
+        if (!snapshot.elements || snapshot.elements.length === 0) {
+          const empty = document.createElement('div');
+          empty.className = 'empty';
+          empty.textContent = 'No interactive elements found on this page.';
+          container.appendChild(empty);
+        } else {
+          snapshot.elements.forEach(el => container.appendChild(browserElementRow(el)));
+        }
+      }
+
+      function renderBrowserFrame(frame) {
+        const img = document.getElementById('browser-frame-img');
+        img.src = 'data:image/png;base64,' + frame.png;
+        img.style.display = 'block';
       }
 
       document.getElementById('token').addEventListener('keydown', e => { if (e.key === 'Enter') connect(); });
@@ -1119,11 +1239,27 @@ public final class MobileBridgeServer: @unchecked Sendable {
         /// the reverse of `readFile`. Requires an active `attach` (there's no surface to paste
         /// the resulting path into otherwise).
         var attachFile: AttachFileRequest?
+        /// P37 Phase D3 (browser mirror): `{"browserNavigate":{"url":"..."}}` — opens the
+        /// mirrored `BrowserPaneView` tab on first use (no `paneID` tracked yet), navigates the
+        /// existing one on every call after.
+        var browserNavigate: BrowserNavigateRequest?
+        /// `{"browserSnapshot":true}` — same trigger-flag shape as `detach`, no payload beyond
+        /// presence. Requires a pane already opened via `browserNavigate`.
+        var browserSnapshot: Bool?
+        /// `{"browserInteract":{"ref":"e3","action":"click","text":null}}` — `ref` is an element
+        /// id from the last `browserSnapshot` response, same contract `kouenBrowserInteract`
+        /// (the MCP tool) already uses, deliberately not raw x/y coordinates.
+        var browserInteract: BrowserInteractRequest?
+        /// `{"browserScreenshot":true}` — manual refresh only (P37 Phase D risk note: start
+        /// without continuous polling until ref-tap is validated live).
+        var browserScreenshot: Bool?
         struct SpawnPayload: Decodable { var cwd: String? }
         struct ResizePayload: Decodable { var cols: Int; var rows: Int }
         struct FileReadRequest: Decodable { var path: String }
         struct DirectoryListRequest: Decodable { var path: String }
         struct AttachFileRequest: Decodable { var name: String; var mimeType: String?; var content: String }
+        struct BrowserNavigateRequest: Decodable { var url: String }
+        struct BrowserInteractRequest: Decodable { var ref: String; var action: String; var text: String? }
     }
 
     // MARK: - Server -> client payloads (TEXT/JSON)
@@ -1163,6 +1299,21 @@ public final class MobileBridgeServer: @unchecked Sendable {
     /// P37 Phase D2. `path` is the temp path the file was written to, mainly for the client to
     /// display — the actual delivery already happened via the shell-quoted paste into the PTY.
     private struct FileAttachedAck: Encodable { var ok = "fileAttached"; var path: String }
+
+    // P37 Phase D3 (browser mirror)
+    private struct BrowserOkAck: Encodable { var ok: String }
+    /// Dynamic error text (from the GUI's own `BrowserResponsePayload.error`, not a fixed
+    /// string this file already inlines elsewhere) needs real JSON encoding for safe quoting —
+    /// unlike the static `#"{"error":"..."}"#` literals used throughout this file.
+    private struct ErrorAck: Encodable { var error: String }
+    /// `BrowserSnapshot`/`BrowserElement` are already `Codable` in `KouenIPC` (the exact type
+    /// `kouenBrowserSnapshot`, the MCP tool, already returns) — forwarded through verbatim, not
+    /// re-modeled, so the phone gets the identical ref/bounds/text shape an agent would.
+    private struct BrowserSnapshotAck: Encodable { var browserSnapshot: BrowserSnapshot }
+    private struct BrowserFramePush: Encodable {
+        struct Frame: Encodable { var png: String }
+        var browserFrame: Frame
+    }
 
     // MARK: - Device re-auth (P37 A2)
 
@@ -1639,6 +1790,135 @@ public final class MobileBridgeServer: @unchecked Sendable {
         sendJSON(FileAttachedAck(path: path), on: connection)
     }
 
+    /// P37 Phase D3 (browser mirror). Opens the mirrored `BrowserPaneView` tab on first use
+    /// (`.browserOpen`, no `paneID` tracked yet — same IPC request `kouenBrowserOpen`/the desktop
+    /// menu use) and navigates the existing one on every call after. Both paths already round-trip
+    /// through `DaemonServer.forwardBrowserRequest` → the GUI process → a real `BrowserPaneView` →
+    /// back (`DaemonBrowserRoutingTests` already covers that plumbing's routing/timeout/disconnect
+    /// behavior) — this is only the WS-facing glue, no new IPC surface.
+    private func handleBrowserNavigate(urlString: String, connection: NWConnection, state: ConnectionState) {
+        guard let url = URL(string: urlString), url.scheme != nil else {
+            sendText(#"{"error":"invalid URL"}"#, on: connection)
+            return
+        }
+        let client = DaemonClient()
+        let request: IPCRequest = state.browserPaneID.map { .browserNavigate(paneID: $0, url: url) }
+            ?? .browserOpen(url: url, direction: nil, originSurfaceID: nil)
+        guard case let .browserSuccess(payload)? = try? client.request(request, timeout: 31) else {
+            sendText(#"{"error":"browser request failed"}"#, on: connection)
+            return
+        }
+        state.browserPaneID = Self.nextBrowserPaneID(current: state.browserPaneID, response: payload)
+        switch payload {
+        case let .open(paneID):
+            waitForBrowserLoad(paneID: paneID, client: client)
+            sendJSON(BrowserOkAck(ok: "browserOpened"), on: connection)
+        case .ok:
+            waitForBrowserLoad(paneID: state.browserPaneID, client: client)
+            sendJSON(BrowserOkAck(ok: "browserNavigated"), on: connection)
+        case let .error(message):
+            sendJSON(ErrorAck(error: message), on: connection)
+        default:
+            sendJSON(BrowserOkAck(ok: "browserNavigated"), on: connection)
+        }
+    }
+
+    /// Pure state-transition logic for `handleBrowserNavigate`, split out so a test can drive it
+    /// without a live connection — same "static, no socket needed" shape `readFileInfo`/
+    /// `listDirectoryEntries` already use. `.error` clearing `current` (not just leaving it
+    /// alone) is the actual regression fix: found via code review — without it, a closed-on-the-
+    /// Mac pane (or any other "Browser pane not found" response) left `browserPaneID` pointing at
+    /// a dead pane forever, since every subsequent navigate kept re-targeting the same stale id
+    /// and kept failing, with no path back to `.browserOpen` short of a full WS reconnect.
+    /// Clearing it here means the *next* navigate's `state.browserPaneID.map` in the caller finds
+    /// nil and opens a fresh pane instead.
+    static func nextBrowserPaneID(current: UUID?, response: BrowserResponsePayload) -> UUID? {
+        switch response {
+        case let .open(paneID): return paneID
+        case .error: return nil
+        default: return current
+        }
+    }
+
+    /// Best-effort: `DaemonSyncService`'s `.navigate` case acks `.ok` immediately after calling
+    /// `view.navigate(to:)`, before the page actually finishes loading — the client's own
+    /// auto-refresh-snapshot-on-navigate (see the embedded page's `ws.onmessage`) would otherwise
+    /// systematically capture the *previous* page. `.browserWait` already exists for exactly
+    /// this (the MCP tool's own load-wait path) — reused here, result ignored either way: a
+    /// timeout just means the snapshot that follows might still be a beat early, not that the
+    /// navigate itself failed. `paneID` optional only to make the `.ok` call site painless; nil
+    /// (shouldn't happen — `.ok` only reaches here after `.browserPaneID` was already set) is a
+    /// no-op.
+    private func waitForBrowserLoad(paneID: UUID?, client: DaemonClient) {
+        guard let paneID else { return }
+        _ = try? client.request(.browserWait(paneID: paneID, timeoutSeconds: 10), timeout: 15)
+    }
+
+    /// `interactive: true` — the phone always wants the tappable-element list, never the
+    /// no-elements "just the page text" mode `kouenBrowserSnapshot` also supports.
+    private func handleBrowserSnapshot(connection: NWConnection, state: ConnectionState) {
+        guard let paneID = state.browserPaneID else {
+            sendText(#"{"error":"open a page first"}"#, on: connection)
+            return
+        }
+        let client = DaemonClient()
+        guard case let .browserSuccess(payload)? = try? client.request(.browserSnapshot(paneID: paneID, interactive: true), timeout: 31) else {
+            sendText(#"{"error":"snapshot failed"}"#, on: connection)
+            return
+        }
+        switch payload {
+        case let .snapshot(snapshot):
+            sendJSON(BrowserSnapshotAck(browserSnapshot: snapshot), on: connection)
+        case let .error(message):
+            sendJSON(ErrorAck(error: message), on: connection)
+        default:
+            sendText(#"{"error":"unexpected snapshot response"}"#, on: connection)
+        }
+    }
+
+    /// `ref` is an element id from the client's last `browserSnapshot` — same ref-based contract
+    /// `kouenBrowserInteract` already uses, deliberately not raw x/y touch coordinates (those
+    /// don't map cleanly onto a desktop-rendered page a phone is only viewing, not sized to).
+    private func handleBrowserInteract(ref: String, action: String, text: String?, connection: NWConnection, state: ConnectionState) {
+        guard let paneID = state.browserPaneID else {
+            sendText(#"{"error":"open a page first"}"#, on: connection)
+            return
+        }
+        let client = DaemonClient()
+        guard case let .browserSuccess(payload)? = try? client.request(.browserInteract(paneID: paneID, action: action, elementID: ref, text: text), timeout: 31) else {
+            sendText(#"{"error":"interact failed"}"#, on: connection)
+            return
+        }
+        if case let .error(message) = payload {
+            sendJSON(ErrorAck(error: message), on: connection)
+        } else {
+            sendJSON(BrowserOkAck(ok: "browserInteracted"), on: connection)
+        }
+    }
+
+    /// Manual-refresh only (P37 Phase D3 risk note): the client calls this from an explicit
+    /// button tap, never a poll loop — continuous frame streaming is explicitly out of scope
+    /// until ref-tap interaction is validated live to actually be enough on its own.
+    private func handleBrowserScreenshot(connection: NWConnection, state: ConnectionState) {
+        guard let paneID = state.browserPaneID else {
+            sendText(#"{"error":"open a page first"}"#, on: connection)
+            return
+        }
+        let client = DaemonClient()
+        guard case let .browserSuccess(payload)? = try? client.request(.browserScreenshot(paneID: paneID), timeout: 31) else {
+            sendText(#"{"error":"screenshot failed"}"#, on: connection)
+            return
+        }
+        switch payload {
+        case let .screenshot(png):
+            sendJSON(BrowserFramePush(browserFrame: .init(png: png)), on: connection)
+        case let .error(message):
+            sendJSON(ErrorAck(error: message), on: connection)
+        default:
+            sendText(#"{"error":"unexpected screenshot response"}"#, on: connection)
+        }
+    }
+
     private func handleReadFile(path: String, connection: NWConnection) {
         guard let info = Self.readFileInfo(path: path) else {
             sendText(#"{"error":"cannot read file"}"#, on: connection)
@@ -1688,6 +1968,22 @@ public final class MobileBridgeServer: @unchecked Sendable {
         } else if let attachFile = message.attachFile {
             state.controlQueue.async { [weak self] in
                 self?.handleAttachFile(name: attachFile.name, base64Content: attachFile.content, connection: connection, state: state)
+            }
+        } else if let browserNavigate = message.browserNavigate {
+            state.controlQueue.async { [weak self] in
+                self?.handleBrowserNavigate(urlString: browserNavigate.url, connection: connection, state: state)
+            }
+        } else if message.browserSnapshot == true {
+            state.controlQueue.async { [weak self] in
+                self?.handleBrowserSnapshot(connection: connection, state: state)
+            }
+        } else if let browserInteract = message.browserInteract {
+            state.controlQueue.async { [weak self] in
+                self?.handleBrowserInteract(ref: browserInteract.ref, action: browserInteract.action, text: browserInteract.text, connection: connection, state: state)
+            }
+        } else if message.browserScreenshot == true {
+            state.controlQueue.async { [weak self] in
+                self?.handleBrowserScreenshot(connection: connection, state: state)
             }
         } else {
             sendText(#"{"error":"unrecognized control message"}"#, on: connection)
@@ -1906,6 +2202,18 @@ public final class MobileBridgeServer: @unchecked Sendable {
                     // Connection is going away for good (unlike a per-attach detach), so the
                     // whole-connection session-list subscription dies with it too.
                     state.snapshotSubscription?.cancel()
+                    // Found via code review: iOS Safari drops the WS on screen-lock/backgrounding
+                    // (the existing `reconnectIfDropped` client logic exists exactly because of
+                    // this), and each reconnect that navigates again opens a brand-new
+                    // `BrowserPaneView` on the Mac (`browserPaneID` lives on `ConnectionState`,
+                    // not across connections) — without this, the old pane from every dropped
+                    // connection just accumulates, never closed. Best-effort, off `controlQueue`
+                    // so a slow/hung GUI can't stall this teardown handler for other connections.
+                    if let browserPaneID = state.browserPaneID {
+                        state.controlQueue.async {
+                            _ = try? DaemonClient().request(.browserClose(paneID: browserPaneID), timeout: 5)
+                        }
+                    }
                     // Only drops the *live* entry — the device stays paired (persists
                     // in PairedDeviceStore) so a reconnect doesn't need a fresh QR scan.
                     //
