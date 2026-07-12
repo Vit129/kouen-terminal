@@ -17,6 +17,12 @@ Documentation    Regression guards for the P37 mobile-bridge pairing bugs found 
 ...                    generic "WebSocket error" banner. Fix: rejectAndClose() sends a graceful
 ...                    close frame (opcode 0x8) with policy-violation code 1008, and the client
 ...                    surfaces errors from onmessage/onclose+code, not onerror.
+...              Bug 3: runPairingLoop unconditionally printed a QR + pairing URL every rotation
+...                    even when BOTH WS listeners failed to bind (e.g. another Kouen daemon
+...                    already holding the port) — the phone could scan a QR whose WebSocket could
+...                    never connect, with no clue why. Fix: gate the mint/print on
+...                    anyWSListenerReady, warning once (after a short debounce, to ride out the
+...                    normal async listener-ready race) instead of silently printing a dead QR.
 Library          OperatingSystem
 Library          Process
 
@@ -101,6 +107,19 @@ Bug 2 - Client onerror Does Not Clobber The Server Error Banner
     ...    msg=onerror must not call showError(); the reason is unavailable there by design
     Should Contain    ${content}    showError(ev.code === 1008
     ...    msg=the user-facing fallback banner must branch on the onclose close code, not onerror
+
+Bug 3 - QR Not Printed When No Listener Is Ready
+    [Documentation]    runPairingLoop must not mint a token or print a QR/pairing URL while
+    ...                anyWSListenerReady is false (both WS listeners failed to bind, e.g. port
+    ...                already held by another Kouen daemon instance) — otherwise the phone scans
+    ...                a QR whose WebSocket can never connect, with no clue why.
+    ${content}=    Get File    ${MOBILE_BRIDGE}
+    Should Contain    ${content}    guard anyWSListenerReady else {
+    ...    msg=runPairingLoop must guard the token-mint/print path on anyWSListenerReady
+    Should Contain    ${content}    mobile bridge: no WS listener bound — cannot pair
+    ...    msg=the not-ready branch must warn the operator instead of silently withholding the QR
+    Should Contain    ${content}    notReadyTicks >= 8 && !warnedNoListener
+    ...    msg=the warning must debounce past the normal async listener-ready startup race, not fire on the first not-ready tick
 
 Pairing Unit Tests Pass
     [Documentation]    Behavioral coverage of the grace logic (current+previous acceptance, grace

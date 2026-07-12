@@ -537,6 +537,14 @@ public final class MobileBridgeServer: @unchecked Sendable {
         const container = document.getElementById('xterm-container');
         container.innerHTML = '';
         term.open(container);
+        // xterm.js's hidden input textarea ships with autocorrect off (it doesn't want the OS
+        // rewriting what you type into a terminal). iOS Safari also gates its predictive/QuickType
+        // suggestion bar (and the swipe-right-to-accept gesture) on that same attribute, so typing
+        // in the terminal on a phone/tablet never showed suggestions at all. Flipped on by request
+        // — trade-off: iOS may now also silently auto-replace a typed word on space/punctuation,
+        // which can mangle a shell command mid-type.
+        const helperTextarea = container.querySelector('textarea');
+        if (helperTextarea) helperTextarea.setAttribute('autocorrect', 'on');
         fitAddon.fit();
         sendResize();
         term.onData(data => { if (ws && ws.readyState === WebSocket.OPEN) ws.send(new TextEncoder().encode(data)); });
@@ -824,7 +832,27 @@ public final class MobileBridgeServer: @unchecked Sendable {
         if tailscaleHost == nil {
             log("mobile bridge: Tailscale IP not detected — QR will use loopback (same-Mac testing only)")
         }
+        // Ticks (at the 0.25s granularity below) the listener has been not-ready, and whether
+        // the one-shot warning has already fired for the current not-ready stretch. Both reset
+        // the moment a listener goes ready again. The threshold (8 ticks ~= 2s) rides out the
+        // normal async startup race — `listener.start()` returns immediately but `.ready` lands
+        // a few ms later on `bridgeQueue` — without misreporting a real bind failure (e.g. port
+        // already held by another Kouen daemon instance) as if pairing were merely slow.
+        var notReadyTicks = 0
+        var warnedNoListener = false
         while isRunning {
+            guard anyWSListenerReady else {
+                notReadyTicks += 1
+                if notReadyTicks >= 8 && !warnedNoListener {
+                    print("mobile bridge: no WS listener bound — cannot pair (is another Kouen daemon holding the port?)")
+                    fflush(stdout)
+                    warnedNoListener = true
+                }
+                Thread.sleep(forTimeInterval: 0.25)
+                continue
+            }
+            notReadyTicks = 0
+            warnedNoListener = false
             let token = String(format: "%06d", Int.random(in: 0..<1_000_000))
             // The unified listener serves `embeddedPageHTML` for any non-upgrade path, so the root
             // is enough here. `wsport` lets the page know which port to open the WS
@@ -1138,18 +1166,40 @@ public final class MobileBridgeServer: @unchecked Sendable {
         sendJSON(DetachedAck(), on: connection)
     }
 
-    /// Spawns a new session (same daemon call the CLI/GUI use) and immediately attaches
+    /// Creates a brand-new *persistent* tab and returns the surface id a mobile client must
+    /// attach to. Split out (and `static`, taking the request function) so a live-daemon test can
+    /// drive it against a `SurfaceRegistry` directly and prove the returned surface is a real tab
+    /// visible in `.listSurfaces` — the ghost-session regression guard.
+    ///
+    /// Must go through `.newTab`, not `.createSurface`: `.createSurface` spins a raw PTY that never
+    /// joins the `SessionEditor` tree, so it shows up nowhere (GUI list, `.listSurfaces`, the
+    /// bridge's own session switcher) and can never be reselected — the exact ghost-session bug.
+    /// `.newTab` registers the tab in `editor` and `commit()`s it, so it's visible everywhere.
+    static func resolveSpawnedSurfaceID(cwd: String?, request: (IPCRequest) -> IPCResponse?) -> String? {
+        guard case let .snapshot(snapshot)? = request(.getSnapshot),
+              let workspaceID = snapshot.activeWorkspaceID ?? snapshot.workspaces.first?.id,
+              case let .tabID(tabID)? = request(.newTab(workspaceID: workspaceID, cwd: cwd, shell: nil)),
+              case let .snapshot(after)? = request(.getSnapshot)
+        else { return nil }
+        // The surface id everything else keys on is the pane leaf's `uuidString` — same string
+        // `SessionEditor.listSurfaces` reports and `ensureTabSurfaces`/attach spun the PTY under.
+        return after.workspaces
+            .flatMap(\.sessions)
+            .flatMap(\.tabs)
+            .first { $0.id == tabID }?
+            .rootPane.allSurfaceIDs().first?.uuidString
+    }
+
+    /// Spawns a new *persistent* tab (the same tab the GUI's "+" creates) and immediately attaches
     /// to it — matches the session-switcher mockup's "+ opens the terminal" flow.
     private func handleSpawn(cwd: String?, connection: NWConnection, state: ConnectionState) {
         let client = DaemonClient()
-        guard let response = try? client.request(.createSurface(cwd: cwd, shell: nil)),
-              case let .surfaceID(newID) = response
-        else {
+        guard let surfaceID = Self.resolveSpawnedSurfaceID(cwd: cwd, request: { try? client.request($0) }) else {
             sendText(#"{"error":"failed to spawn a new session"}"#, on: connection)
             return
         }
-        sendJSON(SpawnedAck(surfaceID: newID), on: connection)
-        handleAttach(surfaceID: newID, connection: connection, state: state)
+        sendJSON(SpawnedAck(surfaceID: surfaceID), on: connection)
+        handleAttach(surfaceID: surfaceID, connection: connection, state: state)
     }
 
     private func handleControlMessage(_ text: String, connection: NWConnection, state: ConnectionState) {

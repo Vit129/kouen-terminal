@@ -3,28 +3,28 @@ _Auto-generated from GRAPH_REPORT.md · do not edit manually_
 _Regen: `graphify update .`_
 
 ## Summary
-- 14547 nodes · 32124 edges · 3365 communities (910 shown, 2455 thin omitted)
-- Extraction: 89% EXTRACTED · 11% INFERRED · 0% AMBIGUOUS · INFERRED: 3519 edges (avg confidence: 0.8)
+- 14818 nodes · 33001 edges · 3391 communities (921 shown, 2470 thin omitted)
+- Extraction: 89% EXTRACTED · 11% INFERRED · 0% AMBIGUOUS · INFERRED: 3686 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 
 ## Graph Freshness
-- Built from commit: `73df2317`
+- Built from commit: `4989bc0a`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 
 ## God Nodes (most connected - your core abstractions)
-1. `SessionEditor` - 171 edges
-2. `SurfaceRegistry` - 155 edges
-3. `IPCRequest` - 155 edges
-4. `DaemonClient` - 149 edges
-5. `SessionCoordinator` - 124 edges
-6. `KouenTerminalSurfaceView` - 124 edges
-7. `AnyCodable` - 109 edges
-8. `Command` - 107 edges
-9. `KouenPaths` - 100 edges
-10. `TerminalScreen` - 100 edges
+1. `SurfaceRegistry` - 176 edges
+2. `SessionEditor` - 171 edges
+3. `IPCRequest` - 171 edges
+4. `DaemonClient` - 153 edges
+5. `AnyCodable` - 147 edges
+6. `SessionCoordinator` - 124 edges
+7. `KouenTerminalSurfaceView` - 124 edges
+8. `JSONRPCError` - 112 edges
+9. `KouenPaths` - 109 edges
+10. `Command` - 107 edges
 
 
 ## Cross-Cutting Nodes (span the most distinct areas of the codebase)
@@ -32,15 +32,15 @@ A high-degree node isn't always architecturally central - a widely-used
 utility/config file can rack up more edges than a real coupler while only
 ever touching one area. This ranks by how many DIFFERENT communities a
 node's neighbors span, not by raw edge count.
-1. `IPCRequest` - bridges 140 areas (155 edges)
+1. `IPCRequest` - bridges 151 areas (171 edges)
 2. `Command` - bridges 100 areas (107 edges)
-3. `SessionCoordinator` - bridges 55 areas (124 edges)
-4. `IPCResponse` - bridges 55 areas (72 edges)
-5. `MenuTarget` - bridges 54 areas (60 edges)
+3. `IPCResponse` - bridges 60 areas (82 edges)
+4. `SessionCoordinator` - bridges 56 areas (124 edges)
+5. `MenuTarget` - bridges 53 areas (60 edges)
 6. `SpecialKey` - bridges 52 areas (56 edges)
-7. `EngineConformanceTests` - bridges 50 areas (76 edges)
-8. `AgentKind` - bridges 45 areas (92 edges)
-9. `KouenPaths` - bridges 42 areas (100 edges)
+7. `SurfaceRegistry` - bridges 50 areas (176 edges)
+8. `EngineConformanceTests` - bridges 50 areas (76 edges)
+9. `KouenPaths` - bridges 45 areas (109 edges)
 
 ## Surprising Connections (you probably didn't know these)
 - `SUI` --calls--> `Color`  [INFERRED]
