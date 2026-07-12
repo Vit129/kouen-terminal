@@ -23,8 +23,8 @@ access" threat model.
 
 ## Summary
 - Total tasks: 15
-- Completed: 9
-- Remaining: 6
+- Completed: 13
+- Remaining: 2 (Integration section only)
 
 ## D1 — File preview (read-only)
 
@@ -55,13 +55,18 @@ access" threat model.
 ## D3 — Browser mirror (embedded, mirrors Mac's real BrowserPaneView)
 
 ### Server Logic
-- [ ] Add `.browserNavigate(url:)` / `.browserSnapshot` / `.browserInteract(ref:action:)` handling to `handleControlMessage` — forward through the existing `browserOpen`/`forwardBrowserRequest` IPC path (`DaemonServer.swift:837`) the MCP tools already use, targeting the active `BrowserPaneView` tab (open one via `.show()`/`direction` if none active).
-- [ ] `.browserFrame` push: periodic base64 PNG from `BrowserPaneView.screenshot()` (`:871`) — start disabled/manual-refresh only; do not build continuous polling until D3's snapshot+ref-tap path is validated live (see risk note below).
-- [ ] ✅ Run test scripts — new tests: navigate reaches a real `BrowserPaneView` tab, snapshot returns the same ref-tree shape `kouenBrowserSnapshot` MCP tool returns, interact-by-ref lands on the right element
+- [x] Add `.browserNavigate(url:)` / `.browserSnapshot` / `.browserInteract(ref:action:)` / `.browserScreenshot` handling to `handleControlMessage` — forward through the existing `browserOpen`/`browserNavigate`/`browserSnapshot`/`browserInteract`/`browserScreenshot`/`browserWait`/`browserClose` IPC cases (`DaemonServer.swift:326-439`), confirmed already fully wired end-to-end to a real `BrowserPaneView` via `DaemonSyncService.handleBrowserRequest` — zero new IPC surface, same `DaemonClient.request(...)` pattern every other MobileBridgeServer operation already uses. `state.browserPaneID` tracks the mirrored pane per connection, opened lazily on first navigate.
+- [x] `.browserFrame` push: on-demand base64 PNG from `BrowserPaneView.screenshot()` via `.browserScreenshot` — manual refresh only (client button), no polling built, per the risk note.
+- [x] **Two-pass code review (own pass + independent Fable-model agent pass, both converged) found and fixed 3 real bugs before commit:**
+  1. Stale `state.browserPaneID` never cleared on a `.error` response (e.g. the Mac user closed the mirrored pane) — every subsequent navigate kept re-targeting the dead pane forever, no recovery short of a full WS reconnect. Fixed: extracted the transition into a pure, testable `nextBrowserPaneID(current:response:)` — `.error` now clears to nil so the next navigate falls through to `.browserOpen`.
+  2. Browser panes accumulated on the Mac across iOS's automatic WS reconnects (screen-lock drops the socket; existing `reconnectIfDropped` client logic reopens it) — the old pane was never closed. Fixed: best-effort `.browserClose(paneID:)` fired from the connection's real teardown site (`stateUpdateHandler`'s `.cancelled/.failed` case), off `controlQueue` so a hung GUI can't stall other connections' teardown.
+  3. The client's auto-refresh-snapshot-after-navigate raced the real page load, since `DaemonSyncService`'s `.navigate` case acks `.ok` immediately after calling `view.navigate(to:)`, before the page finishes loading — the element list shown after "Go" was systematically the *previous* page's. Fixed: `handleBrowserNavigate` now calls the existing (previously unused by the bridge) `.browserWait(paneID:timeoutSeconds:10)` best-effort before acking, reusing IPC the MCP tool's own load-wait path already established.
+  - **Held for separate explicit sign-off, not yet fixed:** a 4th finding — `BrowserPaneView.snapshot()`'s element-enumeration selector (11 selectors) doesn't match `DaemonSyncService`'s interact selector (6 selectors), so a page with an element matched only by the extra 5 (`[role=link]`/`[role=checkbox]`/etc.) before the tapped one causes interact to click the wrong element by index. Pre-existing in the `kouenBrowserInteract` MCP tool too — fix touches shared code the live MCP browser tools also depend on, deliberately not bundled into this phase's commit.
+- [x] ✅ Run test scripts — `Tests/KouenDaemonTests/MobileBridgeBrowserTests.swift` (5 tests guarding the paneID state-transition, including the exact regression above) — all pass. Full suite 87/87 (27 skipped, pre-existing sandbox noise), `Tests/robot/run.sh` 23/23.
 
 ### Client Application
-- [ ] Embedded page: browser view — url bar, snapshot-driven tappable ref list/overlay (not raw x/y hit-testing), manual "refresh frame" button for the screenshot view.
-- [ ] ✅ Run test scripts — `swift test --filter MobileBridge`, `Tests/robot/run.sh`
+- [x] Embedded page: browser view (🌐 toolbar icon) — url bar, snapshot-driven tappable element list (`browserElementRow`, ref-based via `browserInteract(ref, action, text)` — not raw x/y hit-testing, matches the MCP tool's own contract), manual "Refresh screenshot" button. Deliberately minimal chrome for this MVP, NOT the tab-strip/webview redesign locked in the Phase E design session — that's separate, not-yet-built scope.
+- [x] ✅ Run test scripts — `swift test --filter MobileBridge` (87/87), `Tests/robot/run.sh` (23/23). Live-verified the WS wiring against a real isolated daemon (`make mobile-web`, no GUI) through real Chrome: navigate correctly round-tripped through `forwardBrowserRequest` and surfaced a clean `{"error":...}` to the phone (a "Request timed out" — expected, since with no real GUI running the daemon's `guiBrowserFD` fallback pointed at the bridge's own non-browser-aware snapshot subscription; not a bug, an environment artifact of testing without a real GUI). **Not yet done:** a full round trip against a real `BrowserPaneView` (needs `make preview` with a real GUI window) — attempted, aborted mid-session (user redirected to a full-codebase review instead); flagged here as a genuine open item, same as "real phone E2E" is already flagged for every other phase.
 
 ## Integration
 - [ ] End-to-end wiring — full flow through one connection: attach → readFile/listDirectory → attachFile upload → browserNavigate/snapshot/interact, no reconnect needed between capabilities
