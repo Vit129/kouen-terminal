@@ -405,6 +405,16 @@ public final class MobileBridgeServer: @unchecked Sendable {
         padding: 0.5rem 1rem; text-align: center; z-index: 10; display: none;
       }
       .error-banner.show { display: block; }
+
+      /* P37 Phase D1: file preview — reuses .list-header/.sessions/.session-card (files sheet)
+         and .view/.term-header (preview view) as-is, only the content area below needs its own rules. */
+      #file-body { flex: 1; min-height: 0; overflow: auto; padding: 0.8rem; }
+      #file-body pre {
+        margin: 0; font-family: var(--code-font); font-size: 0.8rem; white-space: pre-wrap;
+        word-break: break-word; color: var(--text);
+      }
+      #file-body img { max-width: 100%; display: block; border-radius: 8px; }
+      #file-body .empty { padding-top: 2rem; }
     </style>
 
     <div id="view-home" class="view active">
@@ -436,9 +446,18 @@ public final class MobileBridgeServer: @unchecked Sendable {
       <div class="term-header">
         <button class="iconbtn" onclick="detach()" aria-label="Back to sessions">&larr;</button>
         <div class="title" id="term-title">—</div>
+        <button class="iconbtn" onclick="openFilesSheet()" aria-label="Browse files">&#128193;</button>
         <button class="iconbtn" onclick="openSheet()" aria-label="Switch session">&#8645;</button>
       </div>
       <div id="term-body"><div id="xterm-container"></div></div>
+    </div>
+
+    <div id="view-file" class="view">
+      <div class="term-header">
+        <button class="iconbtn" onclick="closeFilePreview()" aria-label="Back to terminal">&larr;</button>
+        <div class="title" id="file-title">—</div>
+      </div>
+      <div id="file-body"></div>
     </div>
 
     <div class="sheet-backdrop" id="sheet-backdrop" onclick="closeSheet()">
@@ -449,6 +468,20 @@ public final class MobileBridgeServer: @unchecked Sendable {
           <button class="add-btn" onclick="spawnSession()" aria-label="New session">+</button>
         </div>
         <div class="sessions" id="sessions-sheet"></div>
+      </div>
+    </div>
+
+    <div class="sheet-backdrop" id="files-sheet-backdrop" onclick="closeFilesSheet()">
+      <div class="sheet" id="files-sheet" onclick="event.stopPropagation()">
+        <div class="sheet-handle"></div>
+        <div class="list-header">
+          <div class="list-header-text">
+            <div class="host" id="files-path"></div>
+            <h4 id="files-count" style="font-size:0.9rem;">0 items</h4>
+          </div>
+          <button class="add-btn" onclick="filesGoUp()" aria-label="Up one level">&uarr;</button>
+        </div>
+        <div class="sessions" id="files-list"></div>
       </div>
     </div>
 
@@ -474,6 +507,9 @@ public final class MobileBridgeServer: @unchecked Sendable {
       // see that push, re-send `{attach}`, get re-selected, re-bump, forever.
       let resumeAttachInFlight = false;
       let sessionsCache = [];
+      // P37 Phase D1: the directory currently shown in the files sheet — null until the sheet
+      // is opened for the first time, at which point it defaults to the attached session's cwd.
+      let filesCwd = null;
       let authed = false;
       let hasShownPairedToast = false;
       const params = new URLSearchParams(location.search);
@@ -654,6 +690,10 @@ public final class MobileBridgeServer: @unchecked Sendable {
               lastAttachedSurfaceID = null;
               disposeTerminal();
               goto('list');
+            } else if (msg.directory) {
+              renderFileEntries(msg.directory);
+            } else if (msg.file) {
+              showFilePreview(msg.file);
             } else if (msg.error) {
               sawServerError = true;
               showError(msg.error);
@@ -669,6 +709,96 @@ public final class MobileBridgeServer: @unchecked Sendable {
       function detach() { ws.send(JSON.stringify({ detach: true })); }
       function openSheet() { document.getElementById('sheet-backdrop').classList.add('open'); document.getElementById('sheet').classList.add('open'); }
       function closeSheet() { document.getElementById('sheet-backdrop').classList.remove('open'); document.getElementById('sheet').classList.remove('open'); }
+
+      // P37 Phase D1: file preview. Reuses .session-card (styled as a plain row here, glyph
+      // doubles as a folder/file icon) so no new list styling was needed for the files sheet.
+      function listFiles(path) {
+        filesCwd = path;
+        ws.send(JSON.stringify({ listDirectory: { path } }));
+      }
+
+      function openFilesSheet() {
+        // Defaults to the attached session's cwd on first open; a later open reuses whatever
+        // directory was last browsed, matching how the session switcher sheet keeps its state.
+        if (filesCwd === null) {
+          const meta = sessionsCache.find(s => s.surfaceID === currentSurfaceID);
+          listFiles((meta && meta.cwd) || '/');
+        } else {
+          listFiles(filesCwd);
+        }
+        document.getElementById('files-sheet-backdrop').classList.add('open');
+        document.getElementById('files-sheet').classList.add('open');
+      }
+      function closeFilesSheet() {
+        document.getElementById('files-sheet-backdrop').classList.remove('open');
+        document.getElementById('files-sheet').classList.remove('open');
+      }
+      function filesGoUp() {
+        if (!filesCwd) return;
+        const trimmed = filesCwd.replace(/\/+$/, '');
+        const parent = trimmed.slice(0, trimmed.lastIndexOf('/'));
+        listFiles(parent || '/');
+      }
+
+      function joinPath(base, name) {
+        return base.replace(/\/+$/, '') + '/' + name;
+      }
+
+      // Built via DOM (not innerHTML interpolation), same reasoning as `sessionCard` above —
+      // a file/directory name comes straight from the filesystem the user's own shell can write to.
+      function fileEntryRow(entry) {
+        const btn = document.createElement('button');
+        btn.className = 'session-card';
+        btn.onclick = () => entry.isDirectory
+          ? listFiles(joinPath(filesCwd, entry.name))
+          : (closeFilesSheet(), ws.send(JSON.stringify({ readFile: { path: joinPath(filesCwd, entry.name) } })));
+        const glyph = document.createElement('span'); glyph.className = 'glyph';
+        glyph.textContent = entry.isDirectory ? '\u{1F4C1}' : '\u{1F4C4}';
+        const meta = document.createElement('span'); meta.className = 'meta';
+        const title = document.createElement('div'); title.className = 'title'; title.textContent = entry.name;
+        meta.appendChild(title);
+        btn.append(glyph, meta);
+        return btn;
+      }
+
+      function renderFileEntries(directory) {
+        filesCwd = directory.path;
+        document.getElementById('files-path').textContent = directory.path;
+        const n = directory.entries.length;
+        document.getElementById('files-count').textContent = n + (n === 1 ? ' item' : ' items');
+        const container = document.getElementById('files-list');
+        container.innerHTML = '';
+        if (n === 0) {
+          const empty = document.createElement('div');
+          empty.className = 'empty';
+          empty.textContent = 'Empty directory';
+          container.appendChild(empty);
+        } else {
+          directory.entries.forEach(e => container.appendChild(fileEntryRow(e)));
+        }
+      }
+
+      function showFilePreview(file) {
+        document.getElementById('file-title').textContent = file.path.slice(file.path.lastIndexOf('/') + 1);
+        const body = document.getElementById('file-body');
+        body.innerHTML = '';
+        if (file.encoding === 'utf8') {
+          const pre = document.createElement('pre');
+          pre.textContent = file.content + (file.truncated ? '\n\n… (truncated)' : '');
+          body.appendChild(pre);
+        } else if (file.mimeType.startsWith('image/')) {
+          const img = document.createElement('img');
+          img.src = 'data:' + file.mimeType + ';base64,' + file.content;
+          body.appendChild(img);
+        } else {
+          const empty = document.createElement('div');
+          empty.className = 'empty';
+          empty.textContent = 'Cannot preview this file type (' + file.mimeType + ').';
+          body.appendChild(empty);
+        }
+        goto('file');
+      }
+      function closeFilePreview() { goto('term'); }
 
       document.getElementById('token').addEventListener('keydown', e => { if (e.key === 'Enter') connect(); });
 
