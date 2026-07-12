@@ -13,7 +13,13 @@ import Foundation
 /// rate-limit, per-device secret, off-`.main` queue), and `install-graceful.sh` reuses
 /// the running daemon untouched whenever the protocol is unchanged. A bump is the signal
 /// that forces the daemon to restart into the new binary so the hardening actually ships.
-public let ipcProtocolVersion: Int = 3
+///
+/// Bumped 2026-07-12: added `.activateGUIWindow` to `IPCRequest` and `.activateWindow` to
+/// `IPCResponse` — the daemon→GUI window-activation push a mobile-triggered session tap uses
+/// to bring the Mac window forward (Feature A). Both are additive/graceful (an old peer
+/// ignores them), but a bump forces the daemon to restart into the new binary on
+/// `install-graceful.sh` so the new push path is actually served.
+public let ipcProtocolVersion: Int = 4
 
 public enum IPCRequest: Codable, Sendable {
     case ping
@@ -219,6 +225,14 @@ public enum IPCRequest: Codable, Sendable {
     case browserResponse(id: UUID, response: BrowserResponsePayload)
     // Sidebar navigation
     case openGitPanel(repoPath: String?)
+    /// Ask the daemon to tell the GUI to bring its window to the foreground. Sent by
+    /// `MobileBridgeServer` after a phone-triggered attach/spawn has already driven the
+    /// `.selectWorkspace`/`.selectSession`/`.selectTab` selects, so the Mac window jumps to
+    /// (and activates on) the same session the phone just opened. The daemon forwards it to
+    /// the GUI's snapshot-subscriber fd as an `.activateWindow` push (same one-way channel as
+    /// `.openGitPanel`); a daemon that predates this case replies `.error` and the bridge
+    /// simply skips activation.
+    case activateGUIWindow
 
     // Tasks (P40 F1): session-scoped checklist items, MCP-addressable. `sessionID == nil`
     // in `taskList` returns Tasks across every session (powers the Task Dashboard).
@@ -402,6 +416,10 @@ public enum IPCResponse: Codable, Sendable {
     case browserSuccess(BrowserResponsePayload)
     // Sidebar navigation push
     case openGitPanel(repoPath: String?)
+    /// Pushed to the GUI's snapshot-subscriber fd (in answer to a mobile bridge
+    /// `.activateGUIWindow` request) so the GUI brings its window to the foreground for a
+    /// phone-triggered session tap. GUI-directed only; other clients ignore it.
+    case activateWindow
 
     // Tasks (P40 F1)
     case taskInfo(TaskSummary?)

@@ -282,7 +282,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
         acquireRegistryLock()
         defer { lock.unlock() }
         switch request {
-        case .openGitPanel:
+        case .openGitPanel, .activateGUIWindow:
             return .ok // intercepted at connection layer; never reaches here
         case .mobileListClients, .mobileRevokeClient, .mobilePairingInfo, .setMobileBridgeEnabled:
             return .ok // intercepted at connection layer; never reaches here

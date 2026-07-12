@@ -109,6 +109,7 @@ public final class DaemonClient: @unchecked Sendable {
         onRevision: @escaping @Sendable (Int) -> Void,
         onBrowserRequest: (@Sendable (UUID, UUID?, BrowserRequestPayload) -> Void)? = nil,
         onOpenGitPanel: (@Sendable (String?) -> Void)? = nil,
+        onActivateWindow: (@Sendable () -> Void)? = nil,
         onEnd: (@Sendable () -> Void)? = nil
     ) throws -> DaemonSubscription {
         let fd = try connectSocket()
@@ -124,6 +125,8 @@ public final class DaemonClient: @unchecked Sendable {
                     onBrowserRequest?(id, paneID, req)
                 case let .openGitPanel(repoPath):
                     onOpenGitPanel?(repoPath)
+                case .activateWindow:
+                    onActivateWindow?()
                 default:
                     break
                 }

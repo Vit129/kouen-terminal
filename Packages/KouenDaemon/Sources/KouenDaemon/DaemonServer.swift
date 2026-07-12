@@ -314,6 +314,15 @@ public final class DaemonServer: @unchecked Sendable {
                 }
                 send(.ok, to: fd)
                 continue
+            case .activateGUIWindow:
+                // Mobile-triggered "bring the Mac window forward" — forward to the GUI's
+                // snapshot-subscriber fd only (the daemon is a separate process and can't call
+                // `NSApp.activate` itself). Same one-way push channel as `.openGitPanel`.
+                if let guiFD = guiBrowserFD {
+                    self.send(.activateWindow, to: guiFD)
+                }
+                send(.ok, to: fd)
+                continue
             case let .browserOpen(url, direction, originSurfaceID):
                 Task {
                     let resp = await self.forwardBrowserRequest(
@@ -724,13 +733,24 @@ public final class DaemonServer: @unchecked Sendable {
         var minRows: UInt16 = .max, minCols: UInt16 = .max
         var maxRows: UInt16 = 0, maxCols: UInt16 = 0
         var latestRows: UInt16 = 0, latestCols: UInt16 = 0
-        var found = false
-        for sizes in clientSurfaceSizes.values {
+        // Track the shrink floor across NON-mobile (native) votes separately, plus the largest
+        // mobile vote, so a phone's small size can never truncate what a native Mac window shows
+        // (Feature B). Mobile votes only push the surface UP, never below the native floor.
+        var nativeMinRows: UInt16 = .max, nativeMinCols: UInt16 = .max
+        var mobileMaxRows: UInt16 = 0, mobileMaxCols: UInt16 = 0
+        var found = false, foundNative = false
+        for (voteFD, sizes) in clientSurfaceSizes {
             guard let size = sizes[surfaceID] else { continue }
             found = true
             minRows = min(minRows, size.rows); minCols = min(minCols, size.cols)
             maxRows = max(maxRows, size.rows); maxCols = max(maxCols, size.cols)
             latestRows = size.rows; latestCols = size.cols
+            if clients[voteFD]?.label == MobileBridgeServer.clientLabel {
+                mobileMaxRows = max(mobileMaxRows, size.rows); mobileMaxCols = max(mobileMaxCols, size.cols)
+            } else {
+                foundNative = true
+                nativeMinRows = min(nativeMinRows, size.rows); nativeMinCols = min(nativeMinCols, size.cols)
+            }
         }
         guard found, minRows > 0, minCols > 0 else { return }
         let mode = registry.optionStore.get("window-size")?.stringValue ?? "smallest"
@@ -738,7 +758,18 @@ public final class DaemonServer: @unchecked Sendable {
         switch mode {
         case "largest":  rows = maxRows; cols = maxCols
         case "latest":   rows = latestRows; cols = latestCols
-        default:         rows = minRows; cols = minCols      // "smallest"
+        default:  // "smallest"
+            if foundNative {
+                // At least one native client is attached: the floor is the smallest native vote,
+                // and a mobile vote can only raise it (never drop below it). With no mobile vote
+                // present, mobileMax stays 0 and this is exactly the old min-over-natives — so the
+                // pure-native multi-client contract is unchanged.
+                rows = max(nativeMinRows, mobileMaxRows); cols = max(nativeMinCols, mobileMaxCols)
+            } else {
+                // Mobile is the only client (e.g. a phone-spawned tab with no native window on it):
+                // plain smallest-wins so it still sizes to the phone's real dimensions.
+                rows = minRows; cols = minCols
+            }
         }
         _ = registry.handle(.resizeSurface(surfaceID: surfaceID, rows: rows, cols: cols))
     }

@@ -55,6 +55,50 @@ final class MobileBridgeSpawnTests: XCTestCase {
     /// to `.listSurfaces` because it never joins `editor`. Pins the contrast the fix depends on —
     /// if `.createSurface` ever started registering into the tree, `handleSpawn`'s choice would no
     /// longer matter and this test would flag that behavioral shift.
+    /// Feature A (phone tap jumps the Mac window): `focusSurfaceOnMac` must resolve a surfaceID to
+    /// its owning workspace/session/tab and drive the daemon's select so the Mac's active selection
+    /// moves to that tab. Drives a live `SurfaceRegistry` directly (same `.handle(...)` the loopback
+    /// `DaemonClient` would make) and asserts the active tab actually changed — the daemon-side half
+    /// of the jump. The `NSApp.activate` window-activation half is GUI-process-only and can't be
+    /// exercised from this target (see report); it's driven by the separate `.activateGUIWindow`
+    /// push the bridge also sends.
+    func testFocusSurfaceOnMacJumpsActiveSelectionToTappedSurface() throws {
+        try skipUnlessLiveDaemonTests()
+        let registry = SurfaceRegistry()
+        let handle: (IPCRequest) -> IPCResponse? = { registry.handle($0) }
+
+        func activeSurface() -> String? {
+            guard case let .snapshot(s)? = handle(.getSnapshot) else { return nil }
+            return s.activeWorkspace?.activeTab?.rootPane.allSurfaceIDs().first?.uuidString
+        }
+
+        guard case let .snapshot(initial)? = handle(.getSnapshot),
+              let workspace = initial.activeWorkspace,
+              let firstSurface = workspace.activeTab?.rootPane.allSurfaceIDs().first?.uuidString
+        else { return XCTFail("expected a default active tab") }
+
+        // A second tab in the same session, which `.newTab` makes the active one.
+        let secondSurface = try XCTUnwrap(
+            MobileBridgeServer.resolveSpawnedSurfaceID(cwd: nil, request: handle),
+            "spawning a second tab should resolve a surface"
+        )
+        XCTAssertNotEqual(firstSurface, secondSurface)
+        XCTAssertEqual(activeSurface(), secondSurface, "a freshly spawned tab is the active one")
+
+        // Focus the FIRST surface — a real jump off the currently-active second tab.
+        let location = MobileBridgeServer.focusSurfaceOnMac(surfaceID: firstSurface, request: handle)
+        XCTAssertEqual(location?.workspaceID, workspace.id, "focus must resolve the owning workspace")
+        XCTAssertEqual(activeSurface(), firstSurface, "focusing a surface must make its tab the active selection")
+
+        // And forward again to the second — the jump works in both directions.
+        _ = MobileBridgeServer.focusSurfaceOnMac(surfaceID: secondSurface, request: handle)
+        XCTAssertEqual(activeSurface(), secondSurface, "focus must jump the active selection to the tapped surface")
+
+        // An unresolvable surface returns nil and leaves the selection untouched (no spurious jump).
+        XCTAssertNil(MobileBridgeServer.focusSurfaceOnMac(surfaceID: UUID().uuidString, request: handle))
+        XCTAssertEqual(activeSurface(), secondSurface, "an unresolvable surface must not change the selection")
+    }
+
     func testCreateSurfaceIsInvisibleToListSurfaces() throws {
         try skipUnlessLiveDaemonTests()
         let registry = SurfaceRegistry()
