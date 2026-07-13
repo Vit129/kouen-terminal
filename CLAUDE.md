@@ -14,14 +14,14 @@ AppKit/SwiftUI/macOS → `macos-swiftui` | debugging → `debug-mantra` | review
 
 | Command | What it does |
 |---------|-------------|
-| `make preview` | Isolated preview build (own bundle id, socket, state) — use for dev |
-| `make prod` | Release build → signs → opens `Kouen.app` at repo root |
-| `make run` | Re-open existing `Kouen.app` without rebuilding |
-| `make install` | Release build → copy → `/Applications/Kouen.app` |
+| `make preview` | Isolated preview build (own bundle id, socket, state) — dev use |
+| `make prod` | Release build, signs, opens `Kouen.app` at repo root |
+| `make run` | Re-open existing `Kouen.app`, no rebuild |
+| `make install` | Release build, copy to `/Applications/Kouen.app` |
 | `swift build --product Kouen` | GUI app only |
 | `swift test` | Full test suite |
 | `swift test --filter <name>` | Filtered test |
-| `Tests/robot/run.sh` | **Run BEFORE every build** — regression invariants |
+| `Tests/robot/run.sh` | Run BEFORE every build — regression invariants |
 | `EXPORT_THEMES=1 swift test --filter ThemeCatalogEmbedTests` | Regenerate `BundledThemesData.swift` after theme edits |
 
 **Release entry point: always `make start`** — never bump version manually.
@@ -32,9 +32,9 @@ AppKit/SwiftUI/macOS → `macos-swiftui` | debugging → `debug-mantra` | review
 | Release (with bump) | `make start` → `Full cycle` → patch / minor / major |
 | Release (no bump) | `make start` → `Full cycle` → skip |
 
-Full cycle does: verify → bump → commit+push → prod → CHANGELOG → tag → GitHub release → install.
+Full cycle: verify → bump → commit+push → prod → CHANGELOG → tag → GitHub release → install.
 
-**Version sync rule** — these 4 files must always match. `prepare-release.sh` updates all 4 atomically; never edit one alone:
+**Version sync rule** — these 4 files must always match. `prepare-release.sh` updates all 4 atomic — never edit one alone:
 - `Apps/Kouen/Sources/KouenApp/Resources/Info.plist` (`CFBundleShortVersionString` + `CFBundleVersion`)
 - `Packages/KouenCore/Sources/KouenCore/KouenVersion.swift` (`short` + `build`)
 - `Packages/KouenCore/Sources/KouenCore/ReleaseNotes/GeneratedReleaseNotes.swift` (via `make release-notes`)
@@ -53,7 +53,7 @@ Full cycle does: verify → bump → commit+push → prod → CHANGELOG → tag 
 - **Daemon socket**: owner-only `0600`, rejects peers with different uid.
 - **`CharacterWidthTable.swift`**: generated + committed. Regenerate via `Scripts/generate-width-table.swift` if `CharacterWidth.swift` changes.
 - **`themes.json`**: excluded from SwiftPM build. Regenerate `BundledThemesData.swift` with theme export test.
-- **Release packaging order**: `dmg`/`sign`/`finalize` operate on existing `Kouen.app` — wrong order rebuilds away the signature.
+- **Release packaging order**: `dmg`/`sign`/`finalize` operate on existing `Kouen.app` — wrong order rebuilds away signature.
 
 ## Graphify
 
@@ -69,10 +69,10 @@ graphify update . && ~/.claude/scripts/generate-graph-summary.sh .  # rebuild in
 
 ## graphify
 
-This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+Project has knowledge graph at graphify-out/: god nodes, community structure, cross-file relationships.
 
 Rules:
-- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
-- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
-- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
-- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
+- Codebase questions: run `graphify query "<question>"` first when graphify-out/graph.json exists. `graphify path "<A>" "<B>"` for relationships, `graphify explain "<concept>"` for focused concepts. Returns scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- If graphify-out/wiki/index.md exists, use for broad navigation instead of raw source browsing.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain don't surface enough context.
+- After code changes, run `graphify update .` to keep graph current (AST-only, no API cost).
