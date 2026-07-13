@@ -624,6 +624,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
             <span class="nav" id="preview-back" onclick="previewNavBack()">&#8249;</span>
             <span class="nav" id="preview-forward" onclick="previewNavForward()">&#8250;</span>
             <span class="reload" id="preview-reload" onclick="previewNavReload()">&#8635;</span>
+            <span class="nav" id="preview-copy" onclick="copyPreviewPath()" aria-label="Copy path" title="Copy path">&#128203;</span>
             <input id="preview-pathfield" autocomplete="off" autocapitalize="off" spellcheck="false">
           </div>
           <div class="browser-toolbar" id="preview-browser-toolbar">
@@ -663,7 +664,12 @@ public final class MobileBridgeServer: @unchecked Sendable {
         <div class="sessions" id="files-list"></div>
       </div>
     </div>
-    <input type="file" id="attach-input" style="display:none" onchange="attachSelectedFile(this)">
+    <!-- `display:none` on a file input is a known WebKit/mobile-Safari trap: `.click()` can
+         silently no-op (no picker, no error) even from a real trusted tap. Standard cross-browser
+         hidden-file-input pattern instead: out of flow but still laid out, so the picker fires. -->
+    <input type="file" id="attach-input"
+           style="position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;"
+           onchange="attachSelectedFile(this)">
 
     <div class="error-banner" id="error-banner"></div>
 
@@ -950,6 +956,14 @@ public final class MobileBridgeServer: @unchecked Sendable {
         // which can mangle a shell command mid-type.
         const helperTextarea = container.querySelector('textarea');
         if (helperTextarea) helperTextarea.setAttribute('autocorrect', 'on');
+        // `goto`/`closeSheet` must run BEFORE `fitAddon.fit()` — `#view-term` is `display:none`
+        // until `goto` adds `.active`, and FitAddon measuring a hidden (0-width) container is a
+        // no-op, so `fit()` silently keeps the fresh `Terminal`'s untouched 80x24 default. On a
+        // real phone that default is way wider than the actual viewport: the shell wraps its
+        // output assuming 80 real columns, then xterm re-wraps that already-wrapped output a
+        // second time to fit the true narrow width, producing double-wrapped/interleaved text.
+        goto('term');
+        closeSheet();
         fitAddon.fit();
         sendResize();
         term.onData(data => {
@@ -958,8 +972,6 @@ public final class MobileBridgeServer: @unchecked Sendable {
           if (data === '\t') watchForCompletion(before);
         });
         term.onResize(() => sendResize());
-        goto('term');
-        closeSheet();
       }
 
       function disposeTerminal() {
@@ -1389,6 +1401,38 @@ public final class MobileBridgeServer: @unchecked Sendable {
       function previewNavBack() { if (activePreviewTab()?.kind === 'browser') ws.send(JSON.stringify({ browserGoBack: true })); }
       function previewNavForward() { if (activePreviewTab()?.kind === 'browser') ws.send(JSON.stringify({ browserGoForward: true })); }
       function previewNavReload() { if (activePreviewTab()?.kind === 'browser') ws.send(JSON.stringify({ browserReload: true })); }
+
+      // Copies whatever `preview-pathfield` currently shows — a real file path (file tab,
+      // readonly) or the current URL (browser tab) — works for both, no `kind` branch needed.
+      // `navigator.clipboard` requires a secure context; this page is normally served over plain
+      // http (LAN/Tailscale, not localhost), where Safari/Chrome don't expose it at all — the
+      // `execCommand('copy')` fallback below is the actual path most real deployments hit.
+      function copyPreviewPath() {
+        const field = document.getElementById('preview-pathfield');
+        const text = field.value;
+        if (!text) return;
+        const flash = () => {
+          const btn = document.getElementById('preview-copy');
+          const prev = btn.innerHTML;
+          btn.innerHTML = '&#10003;';
+          setTimeout(() => { btn.innerHTML = prev; }, 900);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(flash, () => legacyCopy(field, flash));
+        } else {
+          legacyCopy(field, flash);
+        }
+      }
+
+      function legacyCopy(field, onDone) {
+        const wasReadOnly = field.readOnly;
+        field.readOnly = true; // avoid popping the OS keyboard on a phone just to copy
+        field.focus();
+        field.select();
+        field.setSelectionRange(0, field.value.length);
+        try { document.execCommand('copy'); onDone(); } catch (e) { showError('Could not copy path.'); }
+        field.readOnly = wasReadOnly;
+      }
 
       document.getElementById('preview-pathfield').addEventListener('keydown', e => {
         if (e.key !== 'Enter') return;

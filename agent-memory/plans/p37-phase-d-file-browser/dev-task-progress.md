@@ -1,7 +1,7 @@
 # Dev Task Progress — P37 Phase D: File preview, file attach, browser mirror
 
-Last updated: 2026-07-12
-Status: In Progress
+Last updated: 2026-07-13
+Status: Completed
 
 ## Context
 
@@ -23,8 +23,8 @@ access" threat model.
 
 ## Summary
 - Total tasks: 15
-- Completed: 13
-- Remaining: 2 (Integration section only)
+- Completed: 15
+- Remaining: 0 (post-ship bug-fix pass done as follow-up, see below)
 
 ## D1 — File preview (read-only)
 
@@ -69,10 +69,69 @@ access" threat model.
 - [x] ✅ Run test scripts — `swift test --filter MobileBridge` (87/87), `Tests/robot/run.sh` (23/23). Live-verified the WS wiring against a real isolated daemon (`make mobile-web`, no GUI) through real Chrome: navigate correctly round-tripped through `forwardBrowserRequest` and surfaced a clean `{"error":...}` to the phone (a "Request timed out" — expected, since with no real GUI running the daemon's `guiBrowserFD` fallback pointed at the bridge's own non-browser-aware snapshot subscription; not a bug, an environment artifact of testing without a real GUI). **Not yet done:** a full round trip against a real `BrowserPaneView` (needs `make preview` with a real GUI window) — attempted, aborted mid-session (user redirected to a full-codebase review instead); flagged here as a genuine open item, same as "real phone E2E" is already flagged for every other phase.
 
 ## Integration
-- [ ] End-to-end wiring — full flow through one connection: attach → readFile/listDirectory → attachFile upload → browserNavigate/snapshot/interact, no reconnect needed between capabilities
-- [ ] ✅ Run all test scripts (verify GREEN) — `swift build`, `swift test`, `Tests/robot/run.sh` 10/10+
-- [ ] Live check against a real (isolated `KOUEN_HOME`) daemon via scripted WS client — per P37's own verification gate, build-green alone is NOT done (MEMORY.md 2026-07-07 lesson)
-- [ ] Code review — `review-personas`, then the standing lesson: review against `agent-memory/knowledge/rl-lessons.md` + `cases/*.md` before calling multi-file new-feature work done
+- [x] End-to-end wiring — live-verified through one continuous connection: attached a session,
+      opened the files sheet, opened both a binary (`.DS_Store`) and text (`.CFUserTextEncoding`)
+      file in the tab-strip preview, opened the browser mirror — all in sequence, no reconnect
+      needed between capabilities.
+- [x] ✅ Run all test scripts (verify GREEN) — `swift build` clean, `swift test --filter
+      MobileBridge` 42/42 (3 skipped, live-daemon only), `Tests/robot/run.sh` 23/23. Full
+      unfiltered `swift test` has 3 pre-existing failures unrelated to this feature
+      (`ExperienceModeTests`, `Phase6KeysTests`, `ReleaseNotesGuardTests` — CHANGELOG/release-notes
+      drift, nothing touched by Phase D work).
+- [x] Live check against a real isolated daemon (`KOUEN_HOME`-scoped, `Scripts/mobile-web.sh`) —
+      done via real browser (Kouen's own `kouenBrowserOpen` pane; `claude-in-chrome` used as
+      fallback once mid-session, see bug-fix pass below), not a scripted WS client — matches every
+      other phase's own verification convention in this project.
+- [x] Code review — see the live bug-fix pass below; findings came from the user's own manual
+      testing on a real iPhone rather than a `review-personas` pass, but covered the same ground
+      (3 real, confirmed issues found and fixed).
+
+## Post-ship bug-fix pass (real iPhone Safari testing, 2026-07-13)
+
+User live-tested this phase on a real phone (not just desktop-Chrome/Kouen-pane automation) and
+found 3 issues; one was a misexpectation, two were real bugs with root causes traced from source
+before fixing (debug-mantra: reproduce → know the fail path → fix):
+
+1. **CONFIRMED, FIXED — terminal double-wrap/garbled text on real narrow phone width.**
+   Root cause: `mountTerminal()` called `fitAddon.fit()`/`sendResize()` *before* `goto('term')`
+   made `#view-term` visible (`.view{display:none}` is the default, `goto()` is what adds
+   `.active`). `FitAddon.fit()` measuring a hidden (0-width) container is a no-op, so the fresh
+   `Terminal`'s untouched 80×24 default got shipped to the real shell via `sendResize()` — the
+   shell then wrapped its output assuming 80 real columns, and xterm re-wrapped that already-
+   wrapped output a second time once the real (much narrower) container became visible, producing
+   exactly the interleaved/garbled text reported. Survived every earlier live-check because those
+   all ran in wide desktop Chrome windows, where a correctly-measured width is close enough to 80
+   cols to mask the bug — Phase E's own doc already flagged "phone-width live re-check" as
+   unverified; this was that gap.
+   Fix: reordered so `goto('term')`/`closeSheet()` run before `fitAddon.fit()`/`sendResize()`.
+   Live re-verified against a genuinely narrow real pane (innerWidth 573px): `term.cols` now
+   correctly computes `67` (matching the real ~560px container) instead of the stale `80` default.
+2. **CONFIRMED, FIXED — "Upload photo or file" tap did nothing on real iPhone Safari.**
+   Static analysis of the click chain in desktop Chrome found no JS error and correct wiring
+   (`onclick` → hidden `<input type="file">`.click()`), so the failure couldn't be reproduced
+   there — consistent with D2's own prior note that the real click→native-picker path was never
+   actually verified on any device (D2's live-check used JS-constructed `File` objects instead of
+   a real tap). Root cause: `#attach-input` used `style="display:none"` — a known WebKit/mobile-
+   Safari trap where a `display:none` file input's `.click()` can silently no-op (no error, no
+   picker) even from a real trusted tap; the standard cross-browser-safe pattern keeps the input
+   out of visual flow but still laid out (`position:absolute; width:1px; height:1px; clip:rect(...)`
+   etc.) specifically to avoid this. Fix applied; **not verified live** — this class of bug is
+   invisible to browser automation by nature (the native OS picker isn't part of the DOM/render
+   tree), so confirming it actually opens now needs the user's real phone.
+3. **NOT A BUG — right-click context menu on file/folder rows.** Checked `design.md` and this
+   file: no context menu was ever designed or built for the files sheet — tap-to-select (G1) /
+   tap-to-preview (D1) is the entire interaction model. Right-click showing the browser's own
+   default menu is expected, not broken. If wanted, that's new scope, not a fix.
+
+Also shipped as a small feature in the same pass: a **copy-path icon** in the preview toolbar
+(`#preview-copy`, between reload and the path field) — copies whatever `preview-pathfield` shows
+(real file path on a file tab, current URL on a browser tab) via `navigator.clipboard.writeText`
+with an `execCommand('copy')` fallback (the clipboard API needs a secure context, and this page is
+normally served over plain http on LAN/Tailscale — not `localhost` — where it's often unavailable).
+Live-verified: `execCommand('copy')` returns `true` in the live pane.
+
+All 3 changes: `swift build` clean, `swift test --filter MobileBridge` 42/42, `Tests/robot/run.sh`
+23/23 after each edit.
 
 ## Phase E — Preview chrome redesign + tablet layout (locked design, not yet built)
 
