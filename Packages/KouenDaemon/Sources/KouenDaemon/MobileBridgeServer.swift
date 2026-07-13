@@ -702,6 +702,11 @@ public final class MobileBridgeServer: @unchecked Sendable {
       let filesPickerMode = false;
       let authed = false;
       let hasShownPairedToast = false;
+      // P37 Phase F4: backoff state for auto-reconnect after a previously-established session
+      // drops while the tab stays foregrounded (e.g. a wifi/cellular handoff mid-session) — the
+      // existing visibilitychange/pageshow path only covers backgrounding, not an active drop.
+      let reconnectAttempt = 0;
+      let reconnectTimer = null;
       const params = new URLSearchParams(location.search);
       // WS and the page are the same listener/port now (P37: a real phone could reach this
       // page over Tailscale but never a separate WS-only port) — `location.port` is the
@@ -991,6 +996,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
         // show a second, less specific banner on top of it (see `onclose` below).
         let sawServerError = false;
         ws.onopen = () => {
+          reconnectAttempt = 0; // a live connection again — reset the backoff below
           const creds = storedCreds();
           // Returning device: send deviceAuth instead of the token. On failure (revoked /
           // stale secret) the daemon closes the socket; onclose falls back to a token pairing.
@@ -1030,6 +1036,13 @@ public final class MobileBridgeServer: @unchecked Sendable {
               ? 'Pairing rejected — rescan the QR code.'
               : 'Connection lost — check the daemon is running and try again.');
           }
+          // A session that was genuinely up before (not a rejected pairing attempt — that path
+          // above already reloads or shows a fixed error) dropped for some other reason: retry
+          // with backoff instead of leaving the user stuck on a dead tab until they manually
+          // reload. Covers a wifi/cellular handoff happening while the tab stays foregrounded the
+          // whole time, which visibilitychange/pageshow's own reconnect never sees since the tab
+          // never left the foreground.
+          if (authed) scheduleAutoReconnect();
         };
         ws.onmessage = (ev) => {
           if (typeof ev.data === 'string') {
@@ -1489,9 +1502,34 @@ public final class MobileBridgeServer: @unchecked Sendable {
       // the moment the tab is foregrounded again; `pageshow` with `persisted` additionally covers
       // Safari restoring the page straight from its back-forward cache instead of re-running the
       // script at all (a separate iOS-specific path that skips the code above entirely).
+      // P37 Phase F4: backoff retry for a connection that dropped while the tab stayed
+      // foregrounded (`ws.onclose` schedules this directly) or that's about to be forced closed
+      // by `reconnectIfDropped` below. Capped at 30s; reset to 0 on a successful `onopen`.
+      function scheduleAutoReconnect() {
+        if (reconnectTimer) return; // already scheduled, don't stack timers
+        const delay = Math.min(30000, 1000 * (2 ** reconnectAttempt));
+        reconnectAttempt++;
+        reconnectTimer = setTimeout(() => {
+          reconnectTimer = null;
+          if (document.visibilityState === 'visible') connect();
+        }, delay);
+      }
+
       function reconnectIfDropped() {
         if (!authed && !storedCreds()) return; // never paired yet — nothing to resume
-        if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+        if (ws && ws.readyState === WebSocket.CONNECTING) return; // already reconnecting
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          // Don't trust a reported-OPEN socket here: after the *Mac* sleeps (not just the phone
+          // backgrounding), the underlying TCP can sit frozen for the whole nap with the browser
+          // never told it died — `readyState` keeps reporting OPEN until a send/receive actually
+          // times out. Foregrounding is cheap and infrequent enough that forcing a fresh connect
+          // unconditionally is simpler and more correct than trying to detect staleness.
+          // Detach handlers first so the dying socket's async close event can't touch app state
+          // (dispose the terminal, schedule a redundant reconnect) once the fresh one below is
+          // already mounting.
+          ws.onopen = ws.onclose = ws.onerror = ws.onmessage = null;
+          ws.close();
+        }
         connect();
       }
       document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reconnectIfDropped(); });
