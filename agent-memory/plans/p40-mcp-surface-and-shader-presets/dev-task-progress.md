@@ -79,6 +79,31 @@ No violations found, no fixes needed this pass.
 - [x] F1-H: Dashboard entry point — added a "checklist" footer icon next to the existing Agents/sparkles button (`SidebarFooterView`), wired to `showTaskDashboard()`/`dismissTaskDashboard()` in `KouenSidebarPanelViewController.swift`, exact structural mirror of `showAgentsInbox()`. Row tap jumps to the owning session via `SessionCoordinator.selectSession`.
 - [x] ✅ Run test scripts (verify GREEN): `swift build --product Kouen` clean
 
+**Follow-up 2026-07-13 — `cwd` field added to `KouenTask`/`TaskSummary`.** Live-checking this
+phase surfaced a real gap: a Task has no project/repo field at all, and the Task Dashboard is one
+global cross-project store (`~/Library/Application Support/Kouen/tasks.json`) — so once a Task's
+owning session closes, there was no way, even in principle, to know which project it came from
+(needed for the new "Kouen Task Sync" workflow in `~/.claude/rules/routing.md`, which graduates a
+Task into a real `agent-memory/plans/` entry). Fixed by capturing the creating session's
+active-tab cwd once, at `taskCreate` time (`SurfaceRegistry.swift`'s `.taskCreate` case resolves it
+from `editor.snapshot` before calling `TaskStore.create`) — the only point it's ever knowable.
+`cwd: String?` added to `KouenTask` (`TaskStore.swift`), `TaskSummary` (`KouenIPC`), and the
+`kouen-mcp` `taskJSON` response; optional throughout so pre-existing `tasks.json` entries (and any
+task created for an unrecognized/forged sessionID) decode/resolve to `nil`, not a crash. No wire
+version-gate needed — this is the control-channel JSON path (Task IPC), not the PTY hot path's
+binary-magic framing CLAUDE.md's version-gate rule targets.
+- [x] ✅ Run test scripts (verify GREEN): `swift build` clean; 5 new tests
+  (`TaskStoreTests`: capture+persist, default-nil, backward-compat decode of a pre-existing
+  tasks.json with no `cwd` key at all; `TaskIPCDaemonTests`: real session → correct cwd captured,
+  unknown/forged sessionID → nil, not a crash) — full suite 33/33 (was 28/28), `Tests/robot/run.sh`
+  23/23. Full unfiltered `swift test`: only the 3 pre-existing unrelated failures already tracked
+  (`ExperienceModeTests`/`Phase6KeysTests`/`ReleaseNotesGuardTests` — CHANGELOG/release-notes
+  drift) plus one confirmed-flaky `WorktreeIsolationTests` crash (passed clean in isolation,
+  untouched by this diff).
+- [ ] **Not yet live-checked**: real Task Dashboard interaction in `make preview` (add/toggle/jump
+  -to-session, and now also confirming the cwd actually shows up correctly end-to-end from a real
+  session) — still owed, same as the rest of P40's Integration section below.
+
 ## Server Logic — Worktree (MCP resource) (F2)
 - [x] F2-A: New IPC cases wrapping `WorktreeManager` 1:1 (`worktreeList(repoPath:)`, `worktreeCreate(repoPath:sessionID:branch:baseRef:)`, `worktreeRemove(repoPath:worktreePath:force:)`) — thin passthrough, no new domain logic. New `WorktreeInfoSummary` wire struct (KouenIPC), same `BlockSummary`/`TaskSummary` separation pattern.
 - [x] F2-B: `kouenWorktreeList`/`kouenWorktreeCreate`/`kouenWorktreeRemove` MCP tools in `ToolRegistry.swift`. `force: true` requires explicit per-call opt-in (no default-true). **Correction found while implementing**: `ToolPolicy.dangerousTools` is a denylist (tools NOT listed default to allowed) — `kouenWorktreeCreate`/`kouenWorktreeRemove` added to that set so the `isToolAllowed` gate check in `KouenDaemonTools` actually takes effect; `kouenWorktreeList` deliberately left off (read-only, same tier as `kouenList`/`kouenBoard`).

@@ -530,6 +530,7 @@ struct KouenDaemonTools: Sendable {
             "done": .bool(task.done),
             "createdAt": .string(ISO8601DateFormatter().string(from: task.createdAt)),
             "updatedAt": .string(ISO8601DateFormatter().string(from: task.updatedAt)),
+            "cwd": task.cwd.map(AnyCodable.string) ?? .null,
         ])
     }
 

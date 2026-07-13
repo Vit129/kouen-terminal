@@ -10,10 +10,16 @@ public struct KouenTask: Codable, Sendable, Equatable, Identifiable {
     public var done: Bool
     public let createdAt: Date
     public var updatedAt: Date
+    /// The creating session's active-tab cwd, captured once at `create()` time — not
+    /// re-derived later. A session can close (Tasks deliberately outlive it, see below),
+    /// at which point there is no other way to recover which project a Task came from;
+    /// stamping it up front is the only point where that information is ever available.
+    /// Optional so Tasks created before this field existed decode to nil, not a crash.
+    public var cwd: String?
 
     public init(
         id: UUID = UUID(), sessionID: SessionID, title: String, done: Bool = false,
-        createdAt: Date = Date(), updatedAt: Date = Date()
+        createdAt: Date = Date(), updatedAt: Date = Date(), cwd: String? = nil
     ) {
         self.id = id
         self.sessionID = sessionID
@@ -21,6 +27,7 @@ public struct KouenTask: Codable, Sendable, Equatable, Identifiable {
         self.done = done
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+        self.cwd = cwd
     }
 }
 
@@ -54,9 +61,9 @@ public final class TaskStore: @unchecked Sendable {
     }
 
     @discardableResult
-    public func create(sessionID: SessionID, title: String) -> KouenTask {
+    public func create(sessionID: SessionID, title: String, cwd: String? = nil) -> KouenTask {
         lock.lock()
-        let task = KouenTask(sessionID: sessionID, title: title)
+        let task = KouenTask(sessionID: sessionID, title: title, cwd: cwd)
         tasks.append(task)
         let toSave = tasks
         lock.unlock()

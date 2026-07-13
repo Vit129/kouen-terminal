@@ -887,7 +887,14 @@ public final class SurfaceRegistry: @unchecked Sendable {
         case let .taskGet(id):
             return .taskInfo(taskStore.get(id: id).map(Self.taskSummary))
         case let .taskCreate(sessionID, title):
-            return .taskInfo(Self.taskSummary(taskStore.create(sessionID: sessionID, title: title)))
+            // Captured once, here, because it's the only point this is ever knowable — the
+            // owning session can (and per design routinely does) close later, at which point
+            // there is no other way to recover which project the Task came from.
+            let cwd = editor.snapshot.workspaces
+                .flatMap { $0.sessions }
+                .first(where: { $0.id == sessionID })?
+                .activeTab?.cwd
+            return .taskInfo(Self.taskSummary(taskStore.create(sessionID: sessionID, title: title, cwd: cwd)))
         case let .taskUpdate(id, title, done):
             guard let updated = taskStore.update(id: id, title: title, done: done) else {
                 return .error("Task not found")
@@ -2042,7 +2049,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
     private static func taskSummary(_ task: KouenTask) -> TaskSummary {
         TaskSummary(
             id: task.id, sessionID: task.sessionID, title: task.title, done: task.done,
-            createdAt: task.createdAt, updatedAt: task.updatedAt
+            createdAt: task.createdAt, updatedAt: task.updatedAt, cwd: task.cwd
         )
     }
 
