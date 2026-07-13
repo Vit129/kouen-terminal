@@ -920,6 +920,13 @@ public final class MobileBridgeServer: @unchecked Sendable {
         currentSurfaceID = surfaceID;
         lastAttachedSurfaceID = surfaceID;
         resumeAttachInFlight = false;
+        // A pending G3 request from the PREVIOUS session must not render into this one — found
+        // via code review: `aiSuggestPending` was only ever cleared by the response handler, so
+        // switching sessions mid-request left it stuck true (blocking the AI button forever if
+        // the old request errored silently) and a late-arriving suggestion would pop into
+        // whichever session happened to be active when it finally landed.
+        aiSuggestPending = false;
+        clearCompletionStrip();
         document.body.classList.remove('tablet-unattached');
         const meta = sessionsCache.find(s => s.surfaceID === surfaceID);
         document.getElementById('term-title').textContent = meta ? meta.tabTitle : surfaceID;
@@ -958,6 +965,8 @@ public final class MobileBridgeServer: @unchecked Sendable {
       function disposeTerminal() {
         if (term) { term.dispose(); term = null; }
         currentSurfaceID = null;
+        aiSuggestPending = false;
+        clearCompletionStrip();
         document.body.classList.add('tablet-unattached');
       }
 
@@ -2484,6 +2493,17 @@ public final class MobileBridgeServer: @unchecked Sendable {
         init(_ text: String) { self.text = text }
     }
 
+    /// Lock-protected accumulator for a `Process` pipe's `readabilityHandler` (which Foundation
+    /// invokes on its own background dispatch queue) — Swift 6 strict concurrency rejects a
+    /// captured `var Data` mutated from that closure even behind a manually-paired `NSLock`, so
+    /// the lock has to live inside a class the compiler can see is safe to share.
+    private final class PipeBuffer: @unchecked Sendable {
+        private let lock = NSLock()
+        private var data = Data()
+        func append(_ chunk: Data) { lock.lock(); data.append(chunk); lock.unlock() }
+        func snapshot() -> Data { lock.lock(); defer { lock.unlock() }; return data }
+    }
+
     /// Cached `claude` CLI path resolution — mirrors `GitHubCLIClient.cachedGhPath`'s shape
     /// (`Packages/KouenCore/Sources/KouenCore/GitHub/GitHubCLIClient.swift`): common install
     /// locations first, `which` fallback for non-standard installs.
@@ -2527,6 +2547,15 @@ public final class MobileBridgeServer: @unchecked Sendable {
         "Suggest a single shell command for: \(commandBuffer). Context: cwd=\(cwd). Reply with ONLY the command, no explanation, no markdown formatting."
     }
 
+    /// Pure, testable in isolation. The prompt asks the CLI for a single command, but nothing
+    /// enforces that server-side, and the reply gets sent to the client as literal terminal
+    /// input — an embedded newline would auto-submit an unreviewed second command the instant
+    /// the user taps the suggestion (LF triggers accept-line in bash/zsh line editing, same as
+    /// CR). Found via code review, not hit live.
+    static func firstLine(of text: String) -> String {
+        text.split(whereSeparator: { $0.isNewline }).first.map(String.init) ?? ""
+    }
+
     /// 20s hard timeout — kills a hung subprocess rather than pinning this connection's
     /// suggestion slot forever. `cwd` is checked before `cachedClaudePath` so that guard is
     /// exercisable in tests regardless of whether `claude` happens to be installed on the
@@ -2547,6 +2576,30 @@ public final class MobileBridgeServer: @unchecked Sendable {
         let errPipe = Pipe()
         process.standardOutput = outPipe
         process.standardError = errPipe
+
+        // Drain both pipes concurrently as data arrives, rather than reading after the process
+        // exits — `claude -p` output isn't bounded like `gh pr merge`'s (the pattern this
+        // mirrors), so a reply larger than the pipe's OS buffer would block the child on
+        // write() forever, surfacing as a spurious 20s timeout instead of the real answer.
+        // Found via code review, not hit live. `readabilityHandler` fires on a background
+        // dispatch queue Foundation owns, hence the lock-protected `@unchecked Sendable` box
+        // rather than a captured `var` — same reasoning as this file's other lock-guarded state
+        // (e.g. `ConnectionState`).
+        let outputBuffer = PipeBuffer()
+        let errorBuffer = PipeBuffer()
+        outPipe.fileHandleForReading.readabilityHandler = { handle in
+            let chunk = handle.availableData
+            if !chunk.isEmpty { outputBuffer.append(chunk) }
+        }
+        errPipe.fileHandleForReading.readabilityHandler = { handle in
+            let chunk = handle.availableData
+            if !chunk.isEmpty { errorBuffer.append(chunk) }
+        }
+        defer {
+            outPipe.fileHandleForReading.readabilityHandler = nil
+            errPipe.fileHandleForReading.readabilityHandler = nil
+        }
+
         do {
             try process.run()
         } catch {
@@ -2562,14 +2615,20 @@ public final class MobileBridgeServer: @unchecked Sendable {
             return .failure("claude CLI timed out")
         }
         process.waitUntilExit()
+
+        let outText = String(data: outputBuffer.snapshot(), encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let errText = String(data: errorBuffer.snapshot(), encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
         if process.terminationStatus == 0 {
-            let data = outPipe.fileHandleForReading.readDataToEndOfFile()
-            let text = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            return text.isEmpty ? .failure("claude CLI returned no suggestion") : .success(text)
+            // Only the first line: the prompt asks for a single command, but nothing enforces
+            // that server-side, and this text gets sent to the client as literal terminal
+            // input — an embedded newline would auto-submit an unreviewed command the instant
+            // the user taps it (LF triggers accept-line in bash/zsh, same as CR). Found via
+            // code review, not hit live.
+            let firstLine = Self.firstLine(of: outText)
+            return firstLine.isEmpty ? .failure("claude CLI returned no suggestion") : .success(firstLine)
         }
-        let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
-        let message = String(data: errData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
-        return .failure(StringError((message?.isEmpty ?? true) ? "claude CLI failed" : message!))
+        return .failure(StringError(errText.isEmpty ? "claude CLI failed" : errText))
     }
 
     private func handleControlMessage(_ text: String, connection: NWConnection, state: ConnectionState) {

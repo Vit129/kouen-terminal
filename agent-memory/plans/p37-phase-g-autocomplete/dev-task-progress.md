@@ -1,7 +1,7 @@
 # Dev Task Progress — P37 Phase G: Autocomplete (mobile bridge)
 
 Last updated: 2026-07-13
-Status: In Progress
+Status: Completed
 
 ## Context
 
@@ -21,10 +21,10 @@ integration. No new bounded context — same reasoning every other Phase D/E/F e
   TDD-skeleton-first flow
 
 ## Summary
-- Total tasks: 27 (corrected — original "12" was a loose phase-level estimate, not an actual
-  checkbox count)
-- Completed: 12 (G1 + G2)
-- Remaining: 15 (G3 + Integration)
+- Total tasks: 28
+- Completed: 28
+- Remaining: 0
+- Status: Completed
 
 ## G1 — @ file-path picker ✅ DONE 2026-07-13
 
@@ -166,6 +166,43 @@ implementing:**
 - [x] Live check against a real daemon — satisfied by every phase's own live-check above (all
       three ran against real isolated `make mobile-web` daemons + real Chrome, not just
       build-green), plus the combined Integration check just above
-- [ ] Code review — `review-personas`, then the standing lesson: review against
-      `agent-memory/knowledge/rl-lessons.md` + `cases/*.md` before calling multi-file new-feature
-      work done
+- [x] Code review — Opus-model pass (background Agent, per this session's standing two-model
+      workflow) against the full G1/G2/G3 diff, cross-referenced with `GitHubCLIClient`/
+      `handleBrowserNavigate` as the claimed-consistency baselines. Found 3 real issues, none
+      previously self-flagged, all fixed same-pass (Sonnet):
+      1. **IMPORTANT — G3 newline auto-execute.** `runClaudeSuggest`'s success path only trimmed
+         leading/trailing whitespace; an embedded newline in the CLI's reply would survive into
+         `sendKeySeq`, and LF triggers `accept-line` in bash/zsh line editing same as CR — tapping
+         a 2-line suggestion would silently auto-run the first line. Fixed: extracted a pure
+         `MobileBridgeServer.firstLine(of:)`, take only the first line before returning `.success`.
+         Regression-tested (`testFirstLineStripsEmbeddedNewlines_soAMultiLineReplyCannotAutoSubmitASecondCommand`
+         and 3 sibling cases) since the failure mode is exactly the kind debug-mantra's own
+         "write a regression test that fails without the fix" rule targets, even though this was
+         caught by review rather than a live incident.
+      2. **IMPORTANT — G3 pipes drained only after process exit.** `runClaudeSuggest` originally
+         did `readDataToEndOfFile()` after `waitUntilExit()` — correctly mirrors
+         `GitHubCLIClient.merge`'s pattern (verified accurate by the reviewer), but `gh pr merge`'s
+         output is small/bounded and `claude -p`'s isn't; a reply larger than the OS pipe buffer
+         would block the child on `write()` forever, surfacing as a false "claude CLI timed out"
+         instead of the real answer. Fixed: `readabilityHandler`-based concurrent draining into a
+         lock-protected `PipeBuffer` (a tiny `@unchecked Sendable` class — Swift 6 strict
+         concurrency rejects a captured `var Data` mutated from `readabilityHandler`'s background
+         queue even behind a manually-paired `NSLock`, same reasoning this file already applies to
+         `ConnectionState`). Live re-verified after the refactor — real suggestion round-trip
+         still works correctly.
+      3. **MINOR — `aiSuggestPending` could get stuck / stale suggestion could render into the
+         wrong session.** Only ever cleared by the WS response handler — a session switch mid
+         -request left it stuck true, and a late response could pop into whichever session
+         happened to be active when it landed. Fixed: reset `aiSuggestPending = false` and
+         `clearCompletionStrip()` in both `mountTerminal` and `disposeTerminal`.
+      Reviewer also explicitly verified (not findings, confirmed correct): the `controlQueue`
+      per-connection reasoning from deviation #1, the `GitHubCLIClient` pattern match from
+      deviation #2, `shellQuotePath`'s escaping, G1's `filesPickerMode` close-path invariant, G2's
+      buffer-index bounds, Swift 6 Sendable conformance, and no shell-injection path (arguments
+      passed via `process.arguments` array, never shell-interpolated). Full diff details in the
+      review agent's report (not persisted as a separate file — summarized here per this
+      project's existing convention of recording review outcomes inline in the task doc, same as
+      Phase D3/E's own two-pass review entries above).
+      Post-fix: `swift build` clean, `swift test --filter MobileBridge` 42/42 (3 skipped, as
+      before — 4 new regression tests for finding #1), `Tests/robot/run.sh` 23/23, live re-verify
+      of the AI suggestion round trip after the pipe-draining refactor.
