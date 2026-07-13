@@ -21,9 +21,10 @@ integration. No new bounded context — same reasoning every other Phase D/E/F e
   TDD-skeleton-first flow
 
 ## Summary
-- Total tasks: 12
-- Completed: 6
-- Remaining: 6
+- Total tasks: 27 (corrected — original "12" was a loose phase-level estimate, not an actual
+  checkbox count)
+- Completed: 12 (G1 + G2)
+- Remaining: 15 (G3 + Integration)
 
 ## G1 — @ file-path picker ✅ DONE 2026-07-13
 
@@ -54,21 +55,41 @@ on the flag, D2's upload row hidden via the same flag. No new CSS at all.
       `'/Users/supavit.cho/.DS_Store'` landed correctly in the real PTY input line, shell-quoted
       exactly as designed
 
-## G2 — shell tab-completion suggestion strip (heuristic, best-effort)
+## G2 — shell tab-completion suggestion strip (heuristic, best-effort) ✅ DONE 2026-07-13
+
+**Deviation from design.md, found via live-testing:** the original heuristic (cursor-row-moved
+detection) was wrong — live-verified against a real zsh session, cursor position doesn't move at
+all after a multi-candidate Tab listing. zsh prints candidates below the prompt line then restores
+the cursor to its original position (a standard cursor save/restore trick so the in-progress
+command line isn't visually disturbed). Rewrote as a **content diff** instead: snapshot a fixed
+window of rows below the cursor before sending Tab, compare the same rows after — a row counts as
+fresh completion output only if it was blank before and has content now. This is resilient to
+cursor-restore behavior (what zsh actually does) and would also work in the design's originally
+assumed case (cursor moves to a reprinted prompt below) since it only depends on content, not
+cursor position.
 
 ### Client Application
-- [ ] `term.buffer.active` snapshot-before-Tab / read-after-Tab helper (~150ms debounce)
-- [ ] Heuristic token-list detection per design.md's exact signature — hard rule: ambiguous result
-      → show nothing, never a wrong/garbage suggestion
-- [ ] Render detected tokens as a tappable strip above `.kbd-toolbar` (new shared strip component,
-      reused by G3 — build this once, not twice)
-- [ ] Tap-to-insert via `sendKeySeq`, trailing space appended (matches normal shell completion)
-- [ ] ✅ Run test scripts — build clean; this is pure client heuristic logic, no server-side test
-      surface. Manual verification only (see Live check below) — flag if this needs a lightweight
-      JS-level test harness instead of relying on live-only verification
-- [ ] Live check: real Chrome + isolated daemon, real zsh session — confirm strip appears on an
-      actual multi-candidate Tab-completion, confirm it does NOT appear on a single-candidate
-      Tab (auto-completed inline, no menu) or on a normal command's stdout
+- [x] `snapshotRowsBelowCursor()` / content-diff detection (~150ms debounce) — see deviation above
+- [x] Heuristic token-list detection — hard rule holds: ambiguous result → show nothing
+- [x] Render detected tokens as a tappable strip (`.suggest-strip`, shared component — G3 will
+      reuse the same class/render function rather than a second strip)
+- [x] Tap-to-insert via `sendKeySeq`, trailing space appended
+- [x] ✅ Run test scripts — `swift build` clean, `swift test --filter MobileBridge` (35/35),
+      `Tests/robot/run.sh` 23/23 (pure client heuristic, no new server-side test surface — no
+      JS-level test harness built, live-check is the real verification for this one)
+- [x] Live check: real Chrome + isolated daemon, real zsh session, typed `ls .a` (matches 10 real
+      dotfiles/dirs in the home directory) and tapped Tab — real zsh menu appeared, strip rendered
+      all 10 candidates correctly (`.ado_orgs.cache`, `.agents/`, `.amazon-q.dotfiles.bak/`, etc.,
+      trailing `/` on directories preserved), tapped `.agents/` → inserted with trailing space,
+      strip cleared. **Known UX rough edge, not fixed this pass**: zsh's listing shows full
+      candidate names, not just the unmatched suffix, so tapping a candidate concatenates onto
+      whatever prefix was already typed (`ls .a` + tap `.agents/` → `ls .a.agents/`, needs manual
+      cleanup) — inherent to the heuristic (no visibility into "how much of the token the user
+      already typed" without real completion-protocol integration, which was explicitly the
+      shell-plugin option the interview rejected). **Not tested this session**: the
+      single-candidate inline-complete case (no menu). High confidence it's a no-op by
+      construction (nothing prints below the cursor, so the content diff finds nothing, so
+      nothing renders) but not empirically observed — flagging rather than silently assuming.
 
 ## G3 — AI command suggestion (via `claude` CLI subprocess)
 

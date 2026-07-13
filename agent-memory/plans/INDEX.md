@@ -4,7 +4,7 @@
 
 | File | Title | Status |
 |------|-------|--------|
-| [p37-phase-g-autocomplete/dev-task-progress.md](p37-phase-g-autocomplete/dev-task-progress.md) | P37 Phase G — Autocomplete (@ file-path, shell completion strip, AI suggestion via `claude` CLI) | G1 done (6/12), G2/G3 planned |
+| [p37-phase-g-autocomplete/dev-task-progress.md](p37-phase-g-autocomplete/dev-task-progress.md) | P37 Phase G — Autocomplete (@ file-path, shell completion strip, AI suggestion via `claude` CLI) | G1+G2 done (12/27), G3 planned |
 | [p37-phase-d-file-browser/dev-task-progress.md](p37-phase-d-file-browser/dev-task-progress.md) | P37 Phase D — File preview, file attach, browser mirror | Tasks planned, 0/15 built |
 | [p41-automations/dev-task-progress.md](p41-automations/dev-task-progress.md) | P41 — Automations (scheduled agent launches, `kouen-mcp`) | All tasks built, build/test/robot green, live-check pending |
 | [p40-mcp-surface-and-shader-presets/dev-task-progress.md](p40-mcp-surface-and-shader-presets/dev-task-progress.md) | P40 — MCP Surface Expansion (Tasks/Worktrees/Hosts) + Shader Presets | All 19 tasks built, build/test green, live-check pending |
