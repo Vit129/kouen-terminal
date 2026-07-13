@@ -22,21 +22,37 @@ integration. No new bounded context — same reasoning every other Phase D/E/F e
 
 ## Summary
 - Total tasks: 12
-- Completed: 0
-- Remaining: 12
+- Completed: 6
+- Remaining: 6
 
-## G1 — @ file-path picker
+## G1 — @ file-path picker ✅ DONE 2026-07-13
+
+**Deviation from design.md, smaller than planned:** design.md called for "a lightweight inline
+picker (not D1's full-screen files sheet)". On implementation, reusing D1's existing files-sheet
+DOM/CSS/state wholesale (`filesCwd`, `listFiles`, `fileEntryRow`, `renderFileEntries`) with a new
+`filesPickerMode` flag turned out strictly smaller than building a second near-identical sheet —
+same sheet, file-tap now branches `openFileTab(...)` (preview, D1) vs `insertFilePath(...)` (G1)
+on the flag, D2's upload row hidden via the same flag. No new CSS at all.
 
 ### Client Application
-- [ ] Add `@` button to the existing `.kbd-toolbar` row (`embeddedPageHTML`, shipped in `9c4706f3`)
-- [ ] Inline picker UI reusing `.sheet`/`.sheet-backdrop` CSS — drives navigation via the existing
-      `listDirectory` WS request (D1, zero new server-side surface)
-- [ ] Path selection → client-side shell-quote → insert via `sendKeySeq` (F2's existing helper)
-- [ ] Error handling: `listDirectory` failure surfaces inline, same pattern D1's files sheet uses
-- [ ] ✅ Run test scripts — `swift build`, `swift test --filter MobileBridge`, `Tests/robot/run.sh`
-      (no new server-side code path, so no new unit tests expected — verify nothing regressed)
-- [ ] Live check: real Chrome + isolated `make mobile-web` daemon — open picker, navigate, select
-      a file, confirm the shell-quoted path lands correctly in the real PTY input
+- [x] Add `@` button to the existing `.kbd-toolbar` row (`embeddedPageHTML`, shipped in `9c4706f3`)
+- [x] Picker UI — reused D1's files-sheet wholesale (see deviation note above) instead of a new
+      one; drives navigation via the existing `listDirectory` WS request (D1, zero new
+      server-side surface)
+- [x] Path selection → client-side shell-quote (`shellQuotePath`, single-quote wrap) → insert via
+      `sendKeySeq` (F2's existing helper)
+- [x] Error handling: already covered for free — `listDirectory` failures already route through
+      the existing generic `msg.error` → `showError()` path every WS response shares, nothing
+      picker-specific needed
+- [x] ✅ Run test scripts — `swift build` clean, `swift test --filter MobileBridge` (35/35, 3
+      skipped live-daemon-only, as before — no new server-side code path so no new unit tests),
+      `Tests/robot/run.sh` 23/23
+- [x] Live check: real Chrome + isolated `make mobile-web` daemon (fresh instance, non-default
+      ports to avoid the prod-daemon port conflict noted during F2 testing) — paired, attached
+      `Shell` session, tapped `@`, picker opened showing the real home directory (125 items, D2's
+      upload row correctly hidden), tapped `.DS_Store`, sheet closed and
+      `'/Users/supavit.cho/.DS_Store'` landed correctly in the real PTY input line, shell-quoted
+      exactly as designed
 
 ## G2 — shell tab-completion suggestion strip (heuristic, best-effort)
 
