@@ -592,6 +592,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
             <button onclick="sendKeySeq('\x1b[B')" aria-label="Down arrow">&darr;</button>
             <button onclick="sendKeySeq('\x1b[D')" aria-label="Left arrow">&larr;</button>
             <button onclick="sendKeySeq('\x1b[C')" aria-label="Right arrow">&rarr;</button>
+            <button onclick="openFilesPicker()" aria-label="Insert file path">@</button>
           </div>
         </div>
 
@@ -671,6 +672,10 @@ public final class MobileBridgeServer: @unchecked Sendable {
       // P37 Phase D1: the directory currently shown in the files sheet — null until the sheet
       // is opened for the first time, at which point it defaults to the attached session's cwd.
       let filesCwd = null;
+      // P37 Phase G1: reuses the D1 files sheet wholesale instead of building a second picker —
+      // same sheet/CSS/state, just a different terminal action on file tap (insert path vs.
+      // open preview) and the D2 upload row hidden since it's not relevant here.
+      let filesPickerMode = false;
       let authed = false;
       let hasShownPairedToast = false;
       const params = new URLSearchParams(location.search);
@@ -962,6 +967,26 @@ public final class MobileBridgeServer: @unchecked Sendable {
       function closeFilesSheet() {
         document.getElementById('files-sheet-backdrop').classList.remove('open');
         document.getElementById('files-sheet').classList.remove('open');
+        filesPickerMode = false;
+        document.querySelector('.attach-row').style.display = 'flex';
+      }
+
+      function openFilesPicker() {
+        filesPickerMode = true;
+        document.querySelector('.attach-row').style.display = 'none';
+        openFilesSheet();
+      }
+
+      // Minimal client-side shell quoting for path insertion — single-quote wrap, escape
+      // embedded `'` as `'\''`. Mirrors the desktop's `ShellQuoting.quote` convention (can't
+      // import it directly here, this is plain JS in a Swift string literal).
+      function shellQuotePath(path) {
+        return "'" + path.replace(/'/g, "'\\''") + "'";
+      }
+
+      function insertFilePath(path) {
+        closeFilesSheet();
+        sendKeySeq(shellQuotePath(path));
       }
       function filesGoUp() {
         if (!filesCwd) return;
@@ -981,7 +1006,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
         btn.className = 'session-card';
         btn.onclick = () => entry.isDirectory
           ? listFiles(joinPath(filesCwd, entry.name))
-          : openFileTab(joinPath(filesCwd, entry.name));
+          : (filesPickerMode ? insertFilePath(joinPath(filesCwd, entry.name)) : openFileTab(joinPath(filesCwd, entry.name)));
         const glyph = document.createElement('span'); glyph.className = 'glyph';
         glyph.textContent = entry.isDirectory ? '\u{1F4C1}' : '\u{1F4C4}';
         const meta = document.createElement('span'); meta.className = 'meta';
