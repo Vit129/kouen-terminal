@@ -1,7 +1,7 @@
 {
   "CLAUDE.md": {
-    "mtime": 1783953096.3650136,
-    "ast_hash": "4d88e8144670aad294889bea657da604",
+    "mtime": 1783953831.1201122,
+    "ast_hash": "003736e7860a201da959918920b7e71b",
     "semantic_hash": ""
   },
   "README.md": {
@@ -510,8 +510,8 @@
     "semantic_hash": ""
   },
   "agent-memory/plans/INDEX.md": {
-    "mtime": 1783947068.1166742,
-    "ast_hash": "44ee67cd3f401f8e17dd9d4250596aaa",
+    "mtime": 1783954477.32308,
+    "ast_hash": "c3c9cc8f15d08da623acfb432c557013",
     "semantic_hash": ""
   },
   "agent-memory/plans/completed-archive.md": {
@@ -3760,8 +3760,8 @@
     "semantic_hash": ""
   },
   "agent-memory/plans/p39-competitive-feature-gaps.md": {
-    "mtime": 1783771728.8406835,
-    "ast_hash": "d09d79b73f34ab3f2afcdea8a785e97d",
+    "mtime": 1783954266.1928167,
+    "ast_hash": "fbc51eb4ba32adeb0b320091ffdac10a",
     "semantic_hash": ""
   },
   "Tests/robot/mobile_bridge_pairing_bugs.robot": {
@@ -3855,8 +3855,8 @@
     "semantic_hash": ""
   },
   "agent-memory/plans/p40-mcp-surface-and-shader-presets/dev-task-progress.md": {
-    "mtime": 1783951778.9444416,
-    "ast_hash": "8e72e053854b30f9aaf8e6e3363c52aa",
+    "mtime": 1783954453.7392569,
+    "ast_hash": "adb1a87f22bc71149caeee057f65ddc8",
     "semantic_hash": ""
   },
   "agent-memory/plans/p41-automations/design.md": {
