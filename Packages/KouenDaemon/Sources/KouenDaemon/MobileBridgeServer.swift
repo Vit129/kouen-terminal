@@ -417,6 +417,21 @@ public final class MobileBridgeServer: @unchecked Sendable {
       .kbd-toolbar button:active { background: var(--accent); color: #100d0b; }
       body.tablet-unattached .kbd-toolbar { display: none; }
 
+      /* P37 Phase G2: shell tab-completion suggestion strip — shared component, G3's AI
+         suggestion reuses this same class rather than a second near-identical strip. Hidden by
+         default; JS toggles `.show` only when a detection actually fires. */
+      .suggest-strip {
+        display: none; gap: 0.4rem; padding: 0.4rem 0.6rem; overflow-x: auto; flex-shrink: 0;
+        background: var(--surface); border-top: 1px solid var(--surface-3);
+      }
+      .suggest-strip.show { display: flex; }
+      .suggest-strip button {
+        appearance: none; border: 1px solid var(--accent); background: var(--surface-3); color: var(--accent-cyan);
+        border-radius: 6px; padding: 0.35rem 0.7rem; font-size: 0.78rem; font-family: var(--code-font);
+        cursor: pointer; flex-shrink: 0; line-height: 1;
+      }
+      body.tablet-unattached .suggest-strip { display: none !important; }
+
       .sheet-backdrop {
         position: fixed; inset: 0; background: rgba(0,0,0,0.45); opacity: 0; pointer-events: none;
         transition: opacity 0.2s ease; z-index: 5;
@@ -583,9 +598,10 @@ public final class MobileBridgeServer: @unchecked Sendable {
             <div id="term-empty" class="empty">Select a session from the sidebar</div>
             <div id="xterm-container"></div>
           </div>
+          <div class="suggest-strip" id="completion-strip"></div>
           <div class="kbd-toolbar" id="kbd-toolbar">
             <button onclick="sendKeySeq('\x1b')" aria-label="Escape">Esc</button>
-            <button onclick="sendKeySeq('\t')" aria-label="Tab">Tab</button>
+            <button onclick="sendTab()" aria-label="Tab">Tab</button>
             <button onclick="sendKeySeq('\x03')" aria-label="Ctrl-C">^C</button>
             <button onclick="sendKeySeq('\x04')" aria-label="Ctrl-D">^D</button>
             <button onclick="sendKeySeq('\x1b[A')" aria-label="Up arrow">&uarr;</button>
@@ -765,7 +781,99 @@ public final class MobileBridgeServer: @unchecked Sendable {
         ws.send(JSON.stringify({ resize: { cols: term.cols, rows: term.rows } }));
       }
 
-      function sendKeySeq(seq) { if (ws && ws.readyState === WebSocket.OPEN) ws.send(new TextEncoder().encode(seq)); }
+      function sendKeySeq(seq) {
+        if (ws && ws.readyState === WebSocket.OPEN) ws.send(new TextEncoder().encode(seq));
+        clearCompletionStrip();
+      }
+
+      // Snapshot a fixed window of rows below the cursor BEFORE sending Tab, diff against the
+      // same rows after — a content diff, not a cursor-position check. Found live: zsh's default
+      // completion listing prints candidates below the prompt line then restores the cursor to
+      // its original position (terminal cursor save/restore), so the cursor never visibly moves;
+      // an earlier cursor-position-based version of this heuristic missed every real menu because
+      // of exactly that.
+      const COMPLETION_WATCH_ROWS = 8;
+      function snapshotRowsBelowCursor() {
+        if (!term) return null;
+        const buf = term.buffer.active;
+        const row = buf.baseY + buf.cursorY;
+        const rows = [];
+        for (let i = 1; i <= COMPLETION_WATCH_ROWS; i++) {
+          const line = buf.getLine(row + i);
+          rows.push(line ? line.translateToString(true).trim() : '');
+        }
+        return { row, rows };
+      }
+
+      function sendTab() {
+        const before = snapshotRowsBelowCursor();
+        sendKeySeq('\t');
+        watchForCompletion(before);
+      }
+
+      // P37 Phase G2: heuristic completion-menu detection — no shell-side setup, so this reads
+      // xterm.js's own rendered screen buffer after a Tab byte was sent rather than a structured
+      // completion protocol. Explicitly best-effort: tuned against zsh's default menu-listing
+      // shape (candidates print as short whitespace-separated tokens on rows that were blank
+      // immediately below the cursor before Tab was sent). Hard rule: any ambiguity shows
+      // nothing — a missed detection is fine, a wrong/garbage suggestion is not.
+      let completionWatchTimer = null;
+      function watchForCompletion(before) {
+        clearTimeout(completionWatchTimer);
+        if (!before) return;
+        completionWatchTimer = setTimeout(() => detectCompletionMenu(before), 150);
+      }
+
+      function detectCompletionMenu(before) {
+        if (!term) return;
+        const buf = term.buffer.active;
+        const candidateLines = [];
+        for (let i = 0; i < before.rows.length; i++) {
+          const line = buf.getLine(before.row + 1 + i);
+          const text = line ? line.translateToString(true).trim() : '';
+          // A row only counts as fresh completion output if it was blank before Tab and has
+          // content now — this is what makes the diff resilient to cursor-restore. Stop at the
+          // first gap once collection has started (trailing blank rows aren't more candidates).
+          if (text && !before.rows[i]) {
+            candidateLines.push(text);
+          } else if (candidateLines.length) {
+            break;
+          }
+        }
+        if (!candidateLines.length) return;
+
+        const tokens = [];
+        for (const line of candidateLines) {
+          for (const part of line.split(/\s{2,}|\t+/)) {
+            const token = part.trim();
+            // Reject anything containing an internal single space (reads as prose/output, not
+            // a completion token) or implausibly long (not a filename/command-fragment).
+            if (!token || token.length > 40 || /\s/.test(token)) continue;
+            tokens.push(token);
+          }
+        }
+        // A real completion menu lists multiple short candidates. Too few or an implausibly
+        // large count both read as "this isn't actually a completion menu" — stay silent.
+        if (tokens.length < 2 || tokens.length > 60) return;
+        renderCompletionStrip(tokens.slice(0, 20));
+      }
+
+      function renderCompletionStrip(tokens) {
+        const el = document.getElementById('completion-strip');
+        el.innerHTML = '';
+        tokens.forEach(t => {
+          const btn = document.createElement('button');
+          btn.textContent = t;
+          btn.onclick = () => sendKeySeq(t + ' ');
+          el.appendChild(btn);
+        });
+        el.classList.add('show');
+      }
+
+      function clearCompletionStrip() {
+        const el = document.getElementById('completion-strip');
+        if (el) { el.classList.remove('show'); el.innerHTML = ''; }
+      }
 
       function mountTerminal(surfaceID) {
         if (term) { term.dispose(); term = null; }
@@ -797,7 +905,11 @@ public final class MobileBridgeServer: @unchecked Sendable {
         if (helperTextarea) helperTextarea.setAttribute('autocorrect', 'on');
         fitAddon.fit();
         sendResize();
-        term.onData(sendKeySeq);
+        term.onData(data => {
+          const before = data === '\t' ? snapshotRowsBelowCursor() : null;
+          sendKeySeq(data);
+          if (data === '\t') watchForCompletion(before);
+        });
         term.onResize(() => sendResize());
         goto('term');
         closeSheet();
