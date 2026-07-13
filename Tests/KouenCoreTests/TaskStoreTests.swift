@@ -74,4 +74,42 @@ final class TaskStoreTests: XCTestCase {
         let store = TaskStore(url: url)
         XCTAssertNil(store.update(id: UUID(), title: "nope"))
     }
+
+    func testCreateCapturesCwdAndSurvivesTheSessionClosing() {
+        // The whole point of stamping cwd at create() time: it must still be readable
+        // long after the session (and any live cwd lookup for it) is gone.
+        let url = tmpURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let store = TaskStore(url: url)
+        let created = store.create(sessionID: SessionID(), title: "fix the thing", cwd: "/Users/vit/repo")
+        XCTAssertEqual(created.cwd, "/Users/vit/repo")
+        XCTAssertEqual(store.get(id: created.id)?.cwd, "/Users/vit/repo")
+    }
+
+    func testCreateWithoutCwdDefaultsToNil() {
+        let url = tmpURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let store = TaskStore(url: url)
+        let created = store.create(sessionID: SessionID(), title: "no cwd known")
+        XCTAssertNil(created.cwd)
+    }
+
+    func testDecodingOlderTasksJSONWithoutCwdKeyDefaultsToNilNotACrash() {
+        // Regression guard: tasks.json written before this field existed has no "cwd" key
+        // at all — synthesized Codable must decode that as nil, not fail the whole file
+        // (which would silently drop every pre-existing Task via KouenPaths.backupCorruptFile).
+        let url = tmpURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let id = UUID()
+        let now = ISO8601DateFormatter().string(from: Date())
+        let legacyJSON = """
+        [{"id":"\(id.uuidString)","sessionID":"\(UUID().uuidString)","title":"old task","done":false,"createdAt":"\(now)","updatedAt":"\(now)"}]
+        """
+        try! legacyJSON.write(to: url, atomically: true, encoding: .utf8)
+
+        let store = TaskStore(url: url)
+        let loaded = store.get(id: id)
+        XCTAssertEqual(loaded?.title, "old task")
+        XCTAssertNil(loaded?.cwd)
+    }
 }

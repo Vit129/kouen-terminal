@@ -77,4 +77,34 @@ final class TaskIPCDaemonTests: XCTestCase {
             return XCTFail("Expected .error from taskDelete on missing id")
         }
     }
+
+    func testTaskCreateCapturesTheOwningSessionsCwd() throws {
+        // Real regression target: taskCreate's session -> active-tab cwd lookup, added so a
+        // Kouen Task Sync workflow can tell which project a task came from even after its
+        // owning session closes (see ~/.claude/rules/routing.md's "Kouen Task Sync").
+        let registry = SurfaceRegistry()
+        let wsID = registry.snapshot.activeWorkspaceID!
+        // "/tmp" (not a made-up subpath) to match how every other daemon test in this file
+        // requests a session cwd — a nonexistent directory gets silently resolved elsewhere
+        // by newSession, which isn't this test's concern.
+        guard case let .sessionID(sessionID) = registry.handle(.newSession(workspaceID: wsID, cwd: "/tmp", name: "p40-f1")) else {
+            return XCTFail("expected sessionID")
+        }
+
+        guard case let .taskInfo(created?) = registry.handle(.taskCreate(sessionID: sessionID, title: "fix the bridge")) else {
+            return XCTFail("Expected .taskInfo from taskCreate")
+        }
+        XCTAssertEqual(created.cwd, "/tmp")
+    }
+
+    func testTaskCreateWithUnknownSessionLeavesCwdNil() {
+        // A sessionID that doesn't match any live session (e.g. a stale/forged one) must not
+        // crash the lookup — it should just come back with no cwd guess, same as before this
+        // field existed.
+        let registry = SurfaceRegistry()
+        guard case let .taskInfo(created?) = registry.handle(.taskCreate(sessionID: UUID(), title: "orphaned")) else {
+            return XCTFail("Expected .taskInfo from taskCreate")
+        }
+        XCTAssertNil(created.cwd)
+    }
 }
