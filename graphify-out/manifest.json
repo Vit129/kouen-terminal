@@ -510,8 +510,8 @@
     "semantic_hash": ""
   },
   "agent-memory/plans/INDEX.md": {
-    "mtime": 1783858198.5035222,
-    "ast_hash": "c40b19e8b1ab7ca7cab2a95d6ba259b1",
+    "mtime": 1783917210.5140288,
+    "ast_hash": "bff020a477575f2aa94597bd60304a56",
     "semantic_hash": ""
   },
   "agent-memory/plans/completed-archive.md": {
@@ -1590,8 +1590,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/KouenVersion.swift": {
-    "mtime": 1783848632.7793539,
-    "ast_hash": "b45ecc972ba4385a68abd69dd267a24f",
+    "mtime": 1783909375.7619781,
+    "ast_hash": "ac7babebc38f4741a33e8976c0b02f2d",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Layouts/LayoutTemplate.swift": {
@@ -1680,8 +1680,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/GeneratedReleaseNotes.swift": {
-    "mtime": 1783848636.380648,
-    "ast_hash": "c3140719c8539d16c528bc23ae533d13",
+    "mtime": 1783909376.454141,
+    "ast_hash": "4cc43f8e095001850b1bd7ea77d5d90b",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/ReleaseNotes.swift": {
@@ -3675,8 +3675,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/MobileBridgeServer.swift": {
-    "mtime": 1783869066.5843377,
-    "ast_hash": "da09e5930279f8e904c44e39f2836dbc",
+    "mtime": 1783917022.5533044,
+    "ast_hash": "658df1459749db9628d4146874fcb901",
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/PairedDeviceStore.swift": {
@@ -3715,8 +3715,8 @@
     "semantic_hash": ""
   },
   "agent-memory/plans/p37-mobile-connect-v1.md": {
-    "mtime": 1783857918.8505847,
-    "ast_hash": "cb96aa2d6390399394e4d7437097e725",
+    "mtime": 1783912462.9973001,
+    "ast_hash": "096a7f44c06ca0b4c77a1bafae3a71e4",
     "semantic_hash": ""
   },
   "Tests/KouenAppTests/DaemonLauncherTests.swift": {
@@ -3890,8 +3890,23 @@
     "semantic_hash": ""
   },
   "Tests/KouenAppTests/SidebarPlacementSyncTests.swift": {
-    "mtime": 1783906330.4717917,
-    "ast_hash": "63ddf2e00f4023a00d8e0ad8a0f593a6",
+    "mtime": 1783916857.9622982,
+    "ast_hash": "2842cf790c73c25c7b004dc13fb63f57",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/p37-phase-g-autocomplete/design.md": {
+    "mtime": 1783914046.2838151,
+    "ast_hash": "d333f870cad56a62074e3f0889447cbd",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/p37-phase-g-autocomplete/dev-task-progress.md": {
+    "mtime": 1783917204.4417274,
+    "ast_hash": "1bf11a1d66e2eb0bd0674e3db4903826",
+    "semantic_hash": ""
+  },
+  "Tests/KouenDaemonTests/MobileBridgeAISuggestTests.swift": {
+    "mtime": 1783917035.3093693,
+    "ast_hash": "3c93f4076f4da99c320d81759cf2c7b7",
     "semantic_hash": ""
   }
 }

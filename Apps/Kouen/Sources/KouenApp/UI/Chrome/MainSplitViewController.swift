@@ -172,6 +172,15 @@ final class MainSplitViewController: NSViewController {
 
     override func viewDidLayout() {
         super.viewDidLayout()
+        // AppKit runs several layout passes on window construction before it's ever
+        // shown — at that point the window is still pinned to `minSize` (480x400),
+        // not its real launch frame; the real frame lands a few passes later, once
+        // the window actually becomes visible. Applying the initial sidebar state
+        // (or letting the first Cmd+\ toggle run) against that transient size races
+        // the window's own resize-to-real-size, and the two `setPosition` writers can
+        // leave the divider at a stale width — content squeezed to sidebar width, the
+        // untouched sidebar showing blank. Wait for the window to actually be visible.
+        guard view.window?.isVisible == true else { return }
         if !didApplyInitialSidebarState && split.bounds.width > 0 {
             didApplyInitialSidebarState = true
             applyInitialSidebarState()
