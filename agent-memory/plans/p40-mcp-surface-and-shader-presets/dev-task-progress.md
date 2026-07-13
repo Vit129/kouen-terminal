@@ -1,7 +1,7 @@
 # Dev Task Progress — P40 MCP Surface Expansion + Shader Presets
 
-Last updated: 2026-07-11
-Status: Completed
+Last updated: 2026-07-13
+Status: Completed, live-checked
 
 ## Context
 - System: kouen-terminal
@@ -164,7 +164,29 @@ pipeline wiring needed — all done already by earlier unrelated work). Re-scope
   for every "build/unit-green only, live check still owed" phase.
 
 ## Integration
-- [ ] End-to-end wiring: full `swift build` (app+daemon+CLI+kouen-mcp) clean
-- [ ] ✅ Run all test scripts (verify GREEN): full `swift test`, `Tests/robot/run.sh`
-- [ ] Code review — second-pass review per this project's own feedback memory (`feedback_review-new-features-against-lessons.md`): check against `agent-memory/knowledge/rl-lessons.md` + `cases/*.md` before calling done, especially RL-052/RL-063 usage above
-- [ ] Update `agent-memory/plans/INDEX.md` with a P40 row
+- [x] End-to-end wiring: full `swift build` (app+daemon+CLI+kouen-mcp) clean — 2026-07-13.
+- [x] ✅ Run all test scripts (verify GREEN): full `swift test` 1856 tests, only the 3
+  pre-existing unrelated failures (`ExperienceModeTests`/`Phase6KeysTests`/
+  `ReleaseNotesGuardTests` — CHANGELOG/release-notes drift, untouched by P40), `Tests/robot/run.sh`
+  23/23 — 2026-07-13. (One full-suite run hit a known flaky `bundleProxyForCurrentProcess`
+  xctest crash unrelated to any specific test — passed clean on retry.)
+- [x] Code review — checked this session's only new P40 code (the Task `cwd` follow-up
+  above) against `agent-memory/knowledge/rl-lessons.md`'s full lesson list: RL-052
+  (`Task{}` on `@MainActor` blocking) and RL-063 (view captured across `await`) don't
+  apply — the diff is plain daemon/data-model Swift (`KouenTask`/`TaskSummary` fields,
+  `SurfaceRegistry`'s synchronous `.taskCreate` handler, `kouen-mcp` JSON serialization),
+  no MainActor UI or async-view-capture code touched. No other lesson in the file applies
+  either (AppKit view lifecycle, Metal rendering, SSH — none relevant to this diff).
+- [x] Update `agent-memory/plans/INDEX.md` with a P40 row — done 2026-07-13 (see INDEX.md).
+
+**Live-checked 2026-07-13** (real `make preview` build, real GUI, not just build-green):
+Task Dashboard — created a real task via the actual "New task..." UI, confirmed `cwd` was
+captured correctly in the on-disk `tasks.json` (`/Users/supavit.cho/.../tasks.json`
+directly, since `kouen-mcp` is bound to the production daemon, not this isolated preview
+instance). Worktree/Host — `kouenWorktreeList`/`kouenHostList` both returned correct real
+data (current repo's branch/head; empty host list, correctly matching zero configured
+remote hosts). Shader Presets (F4): UI was reverted 2026-07-11 by explicit user call
+("ไม่จำเป็น เหมือนเป็นแค่ gimmick ไร้สาระ") — nothing left to live-check there.
+**Not yet live-checked**: `kouenWorktreeCreate`/`Remove` (the actual write paths) — gated
+behind the MCP control-allowlist policy and would leave a real throwaway worktree to clean
+up; deferred unless explicitly requested.

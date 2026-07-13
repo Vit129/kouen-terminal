@@ -62,6 +62,14 @@ excluded from phases below.
   26/26 green. Not yet verified: real remote host with `git`/`gh` end-to-end (build-green
   only — see MEMORY.md 2026-07-07 lesson, live check still owed before calling this fully done).
 
+**Code-reviewed 2026-07-13** (no remote host configured on this Mac to test live against —
+`kouenHostList` returns `[]`): traced the full wiring end to end. `editAgentForwarding` syncs
+from `host?.sshArgs.contains("-A")` on load and appends `"-A"` back into `sshArgs` on save
+(`SettingsRemoteView.swift:363,409`); `SSHTunnelManager.swift:219` passes `host.sshArgs` through
+`validatedUserSSHArgs` into the real `ssh` invocation. Genuinely wired, not just a UI toggle.
+Real end-to-end verification (an actual remote host + `git`/`gh`) is still owed — flagging
+honestly rather than claiming full coverage from code review alone.
+
 ### Phase B — Sidebar dev-server visibility (G1) — DONE 2026-07-11
 - Confirmed passive `URLDetection` doesn't cover this: `visibleLinks()` only scans the
   currently-rendered viewport on demand, nothing retained per-surface — a background pane's
@@ -87,6 +95,17 @@ excluded from phases below.
   covers the `lsof -F pn` parser (IPv4/IPv6, empty input, malformed-line safety). Not yet
   verified: real dev server + real sidebar render (build/unit-green only — live check
   still owed, same caveat as Phase A).
+
+**Partially live-tested 2026-07-13**: started a real `python3 -m http.server 8765` in a
+real pane and confirmed via `readPaneOutput` it was genuinely listening — the actual test
+condition the scanner needs is real, not simulated. Code-reviewed the rest (native sidebar
+render, no MCP field exposes `listeningPorts`): `portScanTimer` confirmed active (5s tick,
+`AgentScanner.swift`), off-lock `lsof` scan re-validates instance identity + child-PID
+before committing (matches `refreshSurfaceMetadata`'s pattern, already checked by the
+2026-07-11 Opus review above), sidebar renders the lowest port across all tabs correctly
+(`SidebarSessionListView.swift:282`). Whether the badge actually rendered on screen for
+that test server was not independently confirmed by me (no way to screenshot the native
+window) — genuinely still owed.
 
 ### Phase C — Git workflow depth (G3, G4) — SPLIT 2026-07-11 (Opus planning pass)
 Re-scoped after discovering `GitHubCLIClient.swift` has zero merge capability today
@@ -116,6 +135,14 @@ originally estimated, and at very different risk levels — split by risk, not b
     standalone), and an unrelated `ExperienceModeTests` assertion failure. Not yet
     verified: staging a real hunk against a real repo end-to-end (build/unit-green
     only — live check still owed, same caveat as Phases A/B).
+
+  **Code-reviewed 2026-07-13** (native GUI-only, no MCP surface to drive it myself):
+  `parseDiffHunks` splits header/hunks correctly including the trailing-newline edge
+  case, `patchText` reconstructs a valid standalone single-hunk patch, `applyHunkPatch`
+  writes to a temp file (avoids `Process` arg-escaping issues) and cleans up via
+  `defer`, `showHunkStaging`'s async diff fetch guards `sender.window != nil` after
+  the `await` (RL-063 pattern applied correctly). Logic is sound; real hunk-staging-
+  against-a-real-repo still not exercised live.
 - **C2 = G3 (PR merge) — DONE 2026-07-11.** User sign-off received ("C until the end
   of all phase") before implementing — this is a new capability (the app gaining the
   ability to execute `gh pr merge` against the user's real GitHub repo), materially
@@ -141,11 +168,29 @@ originally estimated, and at very different risk levels — split by risk, not b
     only — live check still owed, same caveat as every other phase; this one
     especially warrants a real end-to-end try before relying on it).
 
+  **Code-reviewed 2026-07-13, deliberately not live-tested.** No default merge method
+  (every caller must pass one explicitly, no silent auto-pick), `--delete-branch=false`,
+  zero app-side force path, `mergeable` strictly parses the literal `"MERGEABLE"` string
+  (anything else defaults safely to `false`). Sound and conservative. A real merge was
+  **not** executed to "verify" this — it's a destructive, hard-to-reverse GitHub action
+  with no open PR to test against safely; code review is the appropriate bar here, not
+  execution.
+
 **All five phases (A, B, C1, C2, D) done as of 2026-07-11.** Every phase still owes
 its "live check against a real daemon/repo" gate (see Verification gates below) —
 build/test-green was achieved throughout, but no phase has been exercised against
 real hardware yet (real SSH host, real dev server, real hunk, real PR, real
 multi-agent session).
+
+**2026-07-13 verification pass.** All five gaps are native GUI-only (no MCP tool surfaces
+any of them directly), so a genuine runtime live-check wasn't reachable through the tools
+available this session — code-reviewed all five instead (see each phase's own
+"Code-reviewed 2026-07-13" note above), plus started a real listening dev server for G1/B
+to at least make the underlying test condition real rather than hypothetical. No new bugs
+found; the 2026-07-11 Opus review had already caught and fixed what needed fixing. Real
+on-screen confirmation (does the sidebar badge actually render, does a real merge/hunk/SSH
+session actually work end-to-end) is still genuinely owed — this pass raises confidence,
+it doesn't close the live-check gate.
 
 ## Post-implementation review (Opus, 2026-07-11)
 
@@ -218,6 +263,13 @@ data plumbing, as scoped):
   already-tested data, no new logic to regress. Not yet verified: real multi-agent
   session with the badge visibly updating (live check still owed, same caveat as
   every other phase in this doc).
+
+**Code-reviewed 2026-07-13** (native sidebar UI, no MCP surface — `kouenBoard`/`kouenList`
+are separate pre-existing tools, not this feature; do not conflate a `kouenBoard` check with
+verifying this badge). `.filter(\.waiting).count` over `SessionCoordinator.shared.agentsList()`
+reads correctly as a simple derived count, no new state to get out of sync. Real visual
+confirmation (does the red count badge actually render/update on the real sidebar) still
+not done.
 
 ### Phase D — Fleet visibility (G5) — RE-SCOPED 2026-07-11 (Opus planning pass)
 Not closing as "solved via MCP" — `kouenBoard`/`kouenList` solve the *agent-

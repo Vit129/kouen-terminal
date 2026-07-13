@@ -7,10 +7,10 @@
 | [p37-phase-g-autocomplete/dev-task-progress.md](p37-phase-g-autocomplete/dev-task-progress.md) | P37 Phase G — Autocomplete (@ file-path, shell completion strip, AI suggestion via `claude` CLI) | Completed (28/28), Opus review passed |
 | [p37-phase-d-file-browser/dev-task-progress.md](p37-phase-d-file-browser/dev-task-progress.md) | P37 Phase D — File preview, file attach, browser mirror | Completed (15/15) + Phase E built + post-ship bug-fix pass (real-phone testing) |
 | [p41-automations/dev-task-progress.md](p41-automations/dev-task-progress.md) | P41 — Automations (scheduled agent launches, `kouen-mcp`) | All tasks built, build/test/robot green, live-check pending |
-| [p40-mcp-surface-and-shader-presets/dev-task-progress.md](p40-mcp-surface-and-shader-presets/dev-task-progress.md) | P40 — MCP Surface Expansion (Tasks/Worktrees/Hosts) + Shader Presets | All 19 tasks built, build/test green, live-check pending |
-| [p39-competitive-feature-gaps.md](p39-competitive-feature-gaps.md) | P39 — Competitive Feature Gaps (cmux/Supacode/Superset/WezTerm/Zed) | All 5 phases built, live-check pending |
+| [p40-mcp-surface-and-shader-presets/dev-task-progress.md](p40-mcp-surface-and-shader-presets/dev-task-progress.md) | P40 — MCP Surface Expansion (Tasks/Worktrees/Hosts) + Shader Presets | Completed + live-checked (2026-07-13): Task Dashboard + new `cwd` field verified via real `make preview`, Worktree/Host verified via real MCP calls; shader UI was reverted earlier (user call), nothing to check there |
+| [p39-competitive-feature-gaps.md](p39-competitive-feature-gaps.md) | P39 — Competitive Feature Gaps (cmux/Supacode/Superset/WezTerm/Zed) | All 5 gaps built + code-reviewed 2026-07-13 (all native-GUI-only, no MCP surface to live-test directly) — real on-screen confirmation still owed for each |
 | [p38-competitive-feature-gaps.md](p38-competitive-feature-gaps.md) | P38 — Competitive Feature Gaps (cross-agent diff dashboard/subagent pane visibility/thread-view/image protocol/scripting hook) | Planning |
-| [p37-mobile-connect-v1.md](p37-mobile-connect-v1.md) | P37 — Mobile Connect v1 (QR+Tailscale hardening, in-app QR, real client) | Active |
+| [p37-mobile-connect-v1.md](p37-mobile-connect-v1.md) | P37 — Mobile Connect v1 (QR+Tailscale hardening, in-app QR, real client) | Active — F2/F3/F4 done (F4 reconnect resilience live-verified 2026-07-13), F5 deferred pending web feature completion, F6 parked, F1 blocked on user's own APNs cert setup |
 | [p25-ios-ipados-support.md](p25-ios-ipados-support.md) | P25 — iOS/iPadOS Support | Planning (W1 done → continued as P37) |
 | [p8-macos27-adoption.md](p8-macos27-adoption.md) | P8 — macOS 27 Golden Gate Adoption | Active |
 
