@@ -401,6 +401,22 @@ public final class MobileBridgeServer: @unchecked Sendable {
          (`body.tablet-unattached #term-empty`) still lives in the media query below. */
       #term-empty { display: none; }
 
+      /* P37 Phase F2: quick-tap row for keys the iOS soft keyboard doesn't expose (Esc/Tab/Ctrl
+         combos/arrows) — pinned above the keyboard, same idea Termius/Blink Shell ship. Hidden
+         via the same `tablet-unattached` class the terminal itself uses (set on load, cleared by
+         mountTerminal, added back by disposeTerminal) so it only shows while a session is live. */
+      .kbd-toolbar {
+        display: flex; gap: 0.4rem; padding: 0.4rem 0.6rem; overflow-x: auto; flex-shrink: 0;
+        background: var(--surface); border-top: 1px solid var(--surface-3);
+      }
+      .kbd-toolbar button {
+        appearance: none; border: 1px solid var(--border); background: var(--surface-3); color: var(--text);
+        border-radius: 6px; padding: 0.35rem 0.7rem; font-size: 0.78rem; font-family: var(--code-font);
+        cursor: pointer; flex-shrink: 0; line-height: 1;
+      }
+      .kbd-toolbar button:active { background: var(--accent); color: #100d0b; }
+      body.tablet-unattached .kbd-toolbar { display: none; }
+
       .sheet-backdrop {
         position: fixed; inset: 0; background: rgba(0,0,0,0.45); opacity: 0; pointer-events: none;
         transition: opacity 0.2s ease; z-index: 5;
@@ -566,6 +582,16 @@ public final class MobileBridgeServer: @unchecked Sendable {
           <div id="term-body">
             <div id="term-empty" class="empty">Select a session from the sidebar</div>
             <div id="xterm-container"></div>
+          </div>
+          <div class="kbd-toolbar" id="kbd-toolbar">
+            <button onclick="sendKeySeq('\x1b')" aria-label="Escape">Esc</button>
+            <button onclick="sendKeySeq('\t')" aria-label="Tab">Tab</button>
+            <button onclick="sendKeySeq('\x03')" aria-label="Ctrl-C">^C</button>
+            <button onclick="sendKeySeq('\x04')" aria-label="Ctrl-D">^D</button>
+            <button onclick="sendKeySeq('\x1b[A')" aria-label="Up arrow">&uarr;</button>
+            <button onclick="sendKeySeq('\x1b[B')" aria-label="Down arrow">&darr;</button>
+            <button onclick="sendKeySeq('\x1b[D')" aria-label="Left arrow">&larr;</button>
+            <button onclick="sendKeySeq('\x1b[C')" aria-label="Right arrow">&rarr;</button>
           </div>
         </div>
 
@@ -734,6 +760,8 @@ public final class MobileBridgeServer: @unchecked Sendable {
         ws.send(JSON.stringify({ resize: { cols: term.cols, rows: term.rows } }));
       }
 
+      function sendKeySeq(seq) { if (ws && ws.readyState === WebSocket.OPEN) ws.send(new TextEncoder().encode(seq)); }
+
       function mountTerminal(surfaceID) {
         if (term) { term.dispose(); term = null; }
         currentSurfaceID = surfaceID;
@@ -764,7 +792,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
         if (helperTextarea) helperTextarea.setAttribute('autocorrect', 'on');
         fitAddon.fit();
         sendResize();
-        term.onData(data => { if (ws && ws.readyState === WebSocket.OPEN) ws.send(new TextEncoder().encode(data)); });
+        term.onData(sendKeySeq);
         term.onResize(() => sendResize());
         goto('term');
         closeSheet();
