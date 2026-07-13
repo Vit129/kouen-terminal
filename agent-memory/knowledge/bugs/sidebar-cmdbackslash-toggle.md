@@ -110,3 +110,35 @@ guard abs(target - start) > 0.5 else {
 - `_sidebarLinkFired` / `animateSidebar` / `applySidebarVisibility`: `MainSplitViewController.swift` ~273–360
 - CADisplayLink introduced: commit `b9f94cd`
 - macOS 26 animation fix: commit `d5833b0`
+
+---
+
+## Bug #2 — Cmd+\ squeezes the real terminal pane, real sidebar shows black (2026-07-13)
+
+Different root cause, same shortcut, distinct symptom: after toggling the sidebar,
+the **content/terminal pane** gets squeezed down to `KouenDesign.sidebarWidth` (220pt)
+and the actual sidebar (never resized) is left showing black/blank at the leftover
+(large) width.
+
+**Root cause:** Settings → Appearance → "Sidebar on right" toggle called
+`model.update(\.sidebarOnRight, $0)`, which only persists the flag + calls
+`applySettingsToHosts()`. It never calls `updateSidebarPlacement()` — the function
+that physically reorders the `NSSplitView` subviews to match. Only the menu command
+(`toggleSidebarPosition()`, "Move Sidebar to Left/Right") did the flag-flip AND the
+physical reorder together.
+
+Once `settings.sidebarOnRight` and the live subview order disagree, the next
+Cmd+\ reads the NEW flag for `setSidebarWidth()`'s divider-position math and for
+`sidebarContainerView` (`subviews[sidebarOnRight ? 1 : 0]`) — but that index now
+points at the OLD physical view. The animation resizes/hides the real terminal
+content pane as if it were the sidebar; the real sidebar sits untouched at the
+leftover width with no chrome applied at that size.
+
+**Fix:** `SettingsAppearanceView.swift`'s "Sidebar on right" toggle now posts
+`Notification.Name("KouenSidebarPlacementChanged")` after `model.update(...)`.
+`MainSplitViewController` observes it and calls `updateSidebarPlacement()`
+(`MainSplitViewController.swift` — observer added in `viewDidLoad()`, handler
+`sidebarPlacementSettingChanged`), the same resync used by the menu command.
+
+**Regression test:** `Tests/KouenAppTests/SidebarPlacementSyncTests.swift` —
+reproduces the squeeze without the notification, verifies correct widths with it.

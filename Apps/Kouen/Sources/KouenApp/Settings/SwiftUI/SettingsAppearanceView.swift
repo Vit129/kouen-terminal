@@ -179,7 +179,18 @@ struct SettingsAppearanceView: View {
             ))
             Toggle("Sidebar on right", isOn: Binding(
                 get: { model.settings.sidebarOnRight },
-                set: { model.update(\.sidebarOnRight, $0) }
+                set: {
+                    model.update(\.sidebarOnRight, $0)
+                    // model.update only persists the flag — it doesn't touch the live
+                    // NSSplitView subview order, which `toggleSidebarPosition()`/the
+                    // menu command otherwise keeps in sync. Without this, the divider
+                    // math (setSidebarWidth/sidebarContainerView) reads the new flag
+                    // while the physical layout is still built for the old one, so the
+                    // next sidebar toggle animates the wrong view (real terminal pane
+                    // squeezed to sidebar width, real sidebar left showing blank).
+                    NotificationCenter.default.post(
+                        name: Notification.Name("KouenSidebarPlacementChanged"), object: nil)
+                }
             ))
             Toggle("Always collapse sidebar on launch", isOn: Binding(
                 get: { model.settings.sidebarCollapsedOnLaunch },

@@ -153,6 +153,19 @@ final class MainSplitViewController: NSViewController {
             name: Notification.Name("KouenRevealFileInTree"),
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(sidebarPlacementSettingChanged),
+            name: Notification.Name("KouenSidebarPlacementChanged"),
+            object: nil
+        )
+    }
+
+    /// Settings window changed `sidebarOnRight` directly (bypassing `toggleSidebarPosition()`,
+    /// which flips the flag AND reorders the NSSplitView subviews together). Resync this
+    /// window's physical layout to match, or the next sidebar toggle animates the wrong view.
+    @objc private func sidebarPlacementSettingChanged(_ note: Notification) {
+        updateSidebarPlacement()
     }
 
     deinit { NotificationCenter.default.removeObserver(self) }
