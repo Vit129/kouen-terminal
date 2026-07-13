@@ -8,6 +8,27 @@ import XCTest
 /// Deliberately NOT tested here (would need a real or faked `claude` binary, out of scope for a
 /// fast unit test): successful subprocess output parsing, and the 20s timeout-kills-process path.
 final class MobileBridgeAISuggestTests: XCTestCase {
+    /// Regression guard for a finding from an Opus-model code review (not hit live): the CLI is
+    /// asked for a single command but nothing enforces that server-side, and the reply is sent
+    /// to the client as literal terminal input — an unstripped embedded newline would auto-submit
+    /// an unreviewed second command the instant the user taps the suggestion (LF triggers
+    /// accept-line in bash/zsh, same as CR).
+    func testFirstLineStripsEmbeddedNewlines_soAMultiLineReplyCannotAutoSubmitASecondCommand() {
+        XCTAssertEqual(MobileBridgeServer.firstLine(of: "rm -rf /\ntouch pwned"), "rm -rf /")
+    }
+
+    func testFirstLineHandlesCRLFAndTrailingNewline() {
+        XCTAssertEqual(MobileBridgeServer.firstLine(of: "git status\r\n"), "git status")
+    }
+
+    func testFirstLineOfSingleLineTextIsUnchanged() {
+        XCTAssertEqual(MobileBridgeServer.firstLine(of: "ls -la"), "ls -la")
+    }
+
+    func testFirstLineOfEmptyTextIsEmpty() {
+        XCTAssertEqual(MobileBridgeServer.firstLine(of: ""), "")
+    }
+
     func testPromptTemplateWrapsCommandBufferAndCwd() {
         let prompt = MobileBridgeServer.buildSuggestPrompt(commandBuffer: "ls .a", cwd: "/Users/vit")
         XCTAssertTrue(prompt.contains("ls .a"))
