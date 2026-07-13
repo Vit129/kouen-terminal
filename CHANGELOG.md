@@ -8,7 +8,20 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [4.4.2] - 2026-07-13
 
 ### Added
-- Release version bump to v4.4.2.
+- Mobile-triggered Mac window focus + protect native window from phone resize votes ([`43b8265`](https://github.com/Vit129/kouen-terminal/commit/43b826582b72dc1a52ddf150f2e65c06f3decadf))
+- Mobile bridge readFile/listDirectory for read-only file preview (P37 Phase D1, server-side) ([`338f898`](https://github.com/Vit129/kouen-terminal/commit/338f898405d92b112a1cf9e9e47a5adbeaa5e13f))
+- Mobile bridge file preview UI — files sheet + text/image preview view (P37 Phase D1, client-side) ([`2313885`](https://github.com/Vit129/kouen-terminal/commit/2313885e0a8de70d1e5b49d77e3929ad9513175d))
+- Mobile bridge file/image attach (upload) — server + client (P37 Phase D2) ([`b3c03f9`](https://github.com/Vit129/kouen-terminal/commit/b3c03f9c9aa71bb726818a24017a4bfbc4e1b284))
+- Mobile bridge browser mirror — navigate/snapshot/interact/screenshot (P37 Phase D3) ([`0c5cd26`](https://github.com/Vit129/kouen-terminal/commit/0c5cd2626f86ed4ad27538a9f47649efe0d15463))
+- Mobile bridge unified preview tab-strip + tablet layout (P37 Phase E) ([`2f516b4`](https://github.com/Vit129/kouen-terminal/commit/2f516b4f4f1328dd5a9021cecacbefb200e9bb5a))
+
+### Documentation
+- Record second Opus review pass + fixes in Phase E task doc ([`7e095bf`](https://github.com/Vit129/kouen-terminal/commit/7e095bffcb1ffb2a5bc44a42688318d7635415a2))
+
+### Fixed
+- Browser interact used a different element list than snapshot, could click the wrong element ([`bdfbb0b`](https://github.com/Vit129/kouen-terminal/commit/bdfbb0b636f0250e326ee034a6bab29ba2f2eed4))
+- Phase E's #term-empty leaked onto phone, browser back/forward/reload raced the page load ([`4a782d6`](https://github.com/Vit129/kouen-terminal/commit/4a782d699ceb9c20d973baac5546fea0f089db38))
+- Resync sidebar-side layout when Settings toggles Sidebar-on-right, preventing stuck black panel on next Cmd+\ (release v4.4.2) ([`6ca22d8`](https://github.com/Vit129/kouen-terminal/commit/6ca22d8a884a067fc04b7b13447e9f76921eec29))
 
 ## [4.4.1] - 2026-07-12
 
