@@ -91,40 +91,81 @@ cursor position.
       construction (nothing prints below the cursor, so the content diff finds nothing, so
       nothing renders) but not empirically observed — flagging rather than silently assuming.
 
-## G3 — AI command suggestion (via `claude` CLI subprocess)
+## G3 — AI command suggestion (via `claude` CLI subprocess) ✅ DONE 2026-07-13
+
+**Two deviations from design.md, both found via reading actual code / live-testing before/while
+implementing:**
+
+1. **Queue design was over-engineered relative to the codebase's own established pattern.**
+   design.md called for a dedicated background dispatch queue, reasoning from the risk register's
+   R3 note ("everything runs on `.main`, one slow peer stalls the whole daemon"). Reading
+   `handleControlMessage`'s actual dispatch code before implementing showed every handler already
+   runs on `state.controlQueue` — a queue instance **per connection**, not a shared one — and
+   `handleBrowserNavigate` (right next to where G3's handler was added) already blocks that same
+   per-connection queue for up to 31s on a live `DaemonClient.request` call, uncontested. A slow
+   `claude` call on one connection's queue only delays that same connection's next message, never
+   other connections/PTY relay — R3's actual unaddressed target is the network *listener* layer
+   (Phase A3, still unbuilt), not this per-connection dispatch. Implemented the simpler way,
+   synchronous on `controlQueue` like every sibling handler — no new queueing complexity.
+2. **`claude` CLI path resolution needed a 3rd candidate, found by checking THIS machine.** The
+   design assumed `GitHubCLIClient`'s Homebrew-only path list (`/opt/homebrew/bin`,
+   `/usr/local/bin`) would generalize to `claude` the same way it does for `gh`. It doesn't — on
+   this machine `claude` installs to `~/.local/bin/claude` (curl-installer default), which is
+   also outside the launchd-daemon's inherited `PATH`, so the `which` fallback wouldn't have
+   caught it either. Added `~/.local/bin/claude` as the first candidate.
 
 ### Server Logic
-- [ ] New WS message pair: `{"aiSuggest":{"commandBuffer","cwd"}}` →
+- [x] New WS message pair: `{"aiSuggest":{"commandBuffer","cwd"}}` →
       `{"aiSuggestion":{"suggestion"}}` / `{"error":...}` (reuses existing `ErrorAck` shape)
-- [ ] `claude` CLI path resolution — mirror `GitHubCLIClient.cachedGhPath`'s cached-lookup +
-      `which` fallback shape (`Packages/KouenCore/Sources/KouenCore/GitHub/GitHubCLIClient.swift`)
-- [ ] Subprocess invocation wrapped in a fixed prompt template (design.md's exact wording) —
-      never pass `commandBuffer` to the CLI unwrapped
-- [ ] **Must run off the connection-handling queue** — dedicated background dispatch, async
-      response back to the originating WS connection; a synchronous `waitUntilExit()` inline in
-      `handleControlMessage` is a correctness bug here, not a style preference (see design.md's
-      Strategic Design R3 note)
-- [ ] Timeout (~20s) — kill the subprocess and return an error past that bound
-- [ ] ✅ Run test scripts — new `MobileBridgeAISuggestTests.swift`: path-resolution fallback logic,
-      prompt-template construction (pure function, testable without spawning a real process),
-      timeout-triggers-error path. Full `swift test --filter MobileBridge`, `Tests/robot/run.sh`
+- [x] `claude` CLI path resolution — `~/.local/bin/claude` → Homebrew paths → `which` fallback
+      (see deviation #2 above)
+- [x] Subprocess invocation wrapped in a fixed prompt template (`buildSuggestPrompt`, extracted as
+      a pure function specifically so it's unit-testable without spawning a process) — never
+      passes `commandBuffer` to the CLI unwrapped
+- [x] Runs synchronously on `state.controlQueue`, matching every sibling handler (see deviation #1
+      above — no separate background dispatch queue, that would've been new complexity this
+      codebase doesn't use anywhere else for comparably slow operations)
+- [x] Timeout 20s — polls `process.isRunning` against a deadline, `process.terminate()` past it
+- [x] ✅ Run test scripts — new `MobileBridgeAISuggestTests.swift` (3 tests: prompt template wraps
+      commandBuffer+cwd, doesn't choke on an empty commandBuffer, cwd-guard fails fast on a
+      missing directory *before* even touching `cachedClaudePath` — deliberately ordered so this
+      guard is testable regardless of whether `claude` happens to be installed on the machine
+      running the test). Full `swift test --filter MobileBridge` 38/38 (3 skipped, as before),
+      `Tests/robot/run.sh` 23/23. **Not unit-tested** (would need a real or faked `claude` binary,
+      out of scope for a fast test): successful subprocess output parsing, the timeout-kills-path.
 
 ### Client Application
-- [ ] Explicit trigger button (kbd-toolbar or adjacent) — never auto-suggest while typing
-- [ ] Reuse G2's suggestion-strip component for rendering (same tap-to-insert mechanism)
-- [ ] Loading/pending state while the subprocess round-trip is in flight (multi-second — needs a
-      visible "thinking" state, not a silent multi-second gap)
-- [ ] ✅ Run test scripts — build clean, full suite green
-- [ ] Live check: real Chrome + isolated daemon, real `claude` CLI installed and authenticated on
-      the test machine — confirm a real suggestion round-trips and inserts correctly; confirm the
-      timeout path (kill/hang the subprocess artificially) surfaces a clean error, not a hang
+- [x] Explicit trigger button ("AI" in the kbd-toolbar) — never auto-suggests while typing
+- [x] Reuses G2's `.suggest-strip`/`renderCompletionStrip` for the result (same tap-to-insert)
+- [x] Loading state: new `renderLoadingStrip()` — same visual slot, but a non-interactive `<span>`
+      instead of buttons, so a stray tap during the multi-second wait can't send literal
+      placeholder text ("Asking claude…") into the shell
+- [x] `currentLineText()` reads the currently-rendered cursor row as the best available
+      approximation of "what's typed so far" — xterm.js has no actual input-line-buffer concept
+      (the shell's own readline/zle owns that); documented as a known noise source on custom
+      prompt themes rather than assumed clean
+- [x] ✅ Run test scripts — build clean, full suite green (38/38, 23/23 robot)
+- [x] Live check: real Chrome + isolated `make mobile-web` daemon, real installed+authenticated
+      `claude` CLI (fixed path resolution first — see deviation #2). Typed "find all python files
+      here", tapped AI, "Asking claude…" showed immediately (non-interactive, confirmed a tap on
+      it does nothing), ~8s later a real suggestion arrived: `find . -name "*.py"` — genuinely
+      correct for the prompt. Tapped it → inserted correctly, strip cleared. **Same known
+      concatenation caveat as G2** (inserts onto whatever was already typed, no separator —
+      `find all python files here` + tap → `find all python files herefind . -name "*.py" `,
+      needs manual cleanup): inherent to "insert as literal terminal input," not a bug.
+      **Not tested**: the timeout-kills-subprocess path (would need artificially hanging `claude`,
+      not attempted this session — flagging rather than assuming it works).
 
 ## Integration
-- [ ] End-to-end wiring — G1/G2/G3 all reachable from one attached session, no reconnect needed
-      between them
-- [ ] ✅ Run all test scripts (verify GREEN) — `swift build`, `swift test`, `Tests/robot/run.sh`
-- [ ] Live check against a real daemon — build-green alone is NOT done (`MEMORY.md` 2026-07-07
-      lesson, governs every phase in this project)
+- [x] End-to-end wiring — verified live: one continuous WS connection (no reconnect), same
+      attached `Shell` session, exercised G2 (Tab → real completion strip) → G1 (`@` → picker →
+      insert `.DS_Store` path) → G3 (AI button → real `claude` suggestion using that inserted path
+      as context — genuinely suggested `rm ~/.DS_Store`, showing the AI picked up the actual
+      terminal state) in sequence, no reconnect needed between any of them
+- [x] ✅ Run all test scripts (verify GREEN) — `swift build`, `swift test` 38/38, `Tests/robot/run.sh` 23/23
+- [x] Live check against a real daemon — satisfied by every phase's own live-check above (all
+      three ran against real isolated `make mobile-web` daemons + real Chrome, not just
+      build-green), plus the combined Integration check just above
 - [ ] Code review — `review-personas`, then the standing lesson: review against
       `agent-memory/knowledge/rl-lessons.md` + `cases/*.md` before calling multi-file new-feature
       work done

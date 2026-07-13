@@ -431,6 +431,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
         cursor: pointer; flex-shrink: 0; line-height: 1;
       }
       body.tablet-unattached .suggest-strip { display: none !important; }
+      .suggest-loading { padding: 0.35rem 0.7rem; font-size: 0.78rem; color: var(--muted); font-family: var(--code-font); }
 
       .sheet-backdrop {
         position: fixed; inset: 0; background: rgba(0,0,0,0.45); opacity: 0; pointer-events: none;
@@ -609,6 +610,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
             <button onclick="sendKeySeq('\x1b[D')" aria-label="Left arrow">&larr;</button>
             <button onclick="sendKeySeq('\x1b[C')" aria-label="Right arrow">&rarr;</button>
             <button onclick="openFilesPicker()" aria-label="Insert file path">@</button>
+            <button onclick="requestAISuggestion()" aria-label="Suggest a command">AI</button>
           </div>
         </div>
 
@@ -875,6 +877,44 @@ public final class MobileBridgeServer: @unchecked Sendable {
         if (el) { el.classList.remove('show'); el.innerHTML = ''; }
       }
 
+      // P37 Phase G3: non-interactive variant of the strip, used only for the "thinking"
+      // placeholder while the subprocess round trip is in flight — a stray tap during that
+      // window must not send literal placeholder text into the shell (renderCompletionStrip's
+      // buttons would do exactly that).
+      function renderLoadingStrip(text) {
+        const el = document.getElementById('completion-strip');
+        el.innerHTML = '';
+        const span = document.createElement('span');
+        span.textContent = text;
+        span.className = 'suggest-loading';
+        el.appendChild(span);
+        el.classList.add('show');
+      }
+
+      // Best-effort read of "what the user has typed so far" — xterm.js has no concept of an
+      // input-line buffer (the shell's own readline/zle owns that), so this reads the currently
+      // rendered cursor row instead. On custom prompt themes this may include prompt decoration
+      // alongside the typed command; the AI prompt template is written to tolerate that rather
+      // than assuming a clean extraction is possible client-side.
+      function currentLineText() {
+        if (!term) return '';
+        const buf = term.buffer.active;
+        const line = buf.getLine(buf.baseY + buf.cursorY);
+        return line ? line.translateToString(true).trim() : '';
+      }
+
+      let aiSuggestPending = false;
+      function requestAISuggestion() {
+        if (aiSuggestPending || !ws || ws.readyState !== WebSocket.OPEN) return;
+        const commandBuffer = currentLineText();
+        if (!commandBuffer) { showError('Type something first, then tap AI.'); return; }
+        const meta = sessionsCache.find(s => s.surfaceID === currentSurfaceID);
+        const cwd = (meta && meta.cwd) || '/';
+        aiSuggestPending = true;
+        renderLoadingStrip('Asking claude…');
+        ws.send(JSON.stringify({ aiSuggest: { commandBuffer, cwd } }));
+      }
+
       function mountTerminal(surfaceID) {
         if (term) { term.dispose(); term = null; }
         currentSurfaceID = surfaceID;
@@ -1041,7 +1081,11 @@ public final class MobileBridgeServer: @unchecked Sendable {
               // Auto-refresh the element list after anything that could have changed the page —
               // one fewer tap than making the user hit "Refresh elements" every time.
               ws.send(JSON.stringify({ browserSnapshot: true }));
+            } else if (msg.suggestion) {
+              aiSuggestPending = false;
+              renderCompletionStrip([msg.suggestion]);
             } else if (msg.error) {
+              aiSuggestPending = false;
               sawServerError = true;
               showError(msg.error);
             }
@@ -1680,6 +1724,10 @@ public final class MobileBridgeServer: @unchecked Sendable {
         /// locked "1 browser tab per connection" scope) browser tab, so the Mac-side pane doesn't
         /// linger until the whole connection tears down.
         var browserClose: Bool?
+        /// P37 Phase G3: `{"aiSuggest":{"commandBuffer":"...","cwd":"..."}}` — explicit-trigger
+        /// only (client never auto-sends this while typing). `cwd` comes from the client's own
+        /// already-tracked session metadata, not a server-side lookup.
+        var aiSuggest: AISuggestRequest?
         struct SpawnPayload: Decodable { var cwd: String? }
         struct ResizePayload: Decodable { var cols: Int; var rows: Int }
         struct FileReadRequest: Decodable { var path: String }
@@ -1687,6 +1735,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
         struct AttachFileRequest: Decodable { var name: String; var mimeType: String?; var content: String }
         struct BrowserNavigateRequest: Decodable { var url: String }
         struct BrowserInteractRequest: Decodable { var ref: String; var action: String; var text: String? }
+        struct AISuggestRequest: Decodable { var commandBuffer: String; var cwd: String }
     }
 
     // MARK: - Server -> client payloads (TEXT/JSON)
@@ -1733,6 +1782,8 @@ public final class MobileBridgeServer: @unchecked Sendable {
     /// string this file already inlines elsewhere) needs real JSON encoding for safe quoting —
     /// unlike the static `#"{"error":"..."}"#` literals used throughout this file.
     private struct ErrorAck: Encodable { var error: String }
+    /// P37 Phase G3.
+    private struct AISuggestionAck: Encodable { var suggestion: String }
     /// `BrowserSnapshot`/`BrowserElement` are already `Codable` in `KouenIPC` (the exact type
     /// `kouenBrowserSnapshot`, the MCP tool, already returns) — forwarded through verbatim, not
     /// re-modeled, so the phone gets the identical ref/bounds/text shape an agent would.
@@ -2404,6 +2455,123 @@ public final class MobileBridgeServer: @unchecked Sendable {
         sendJSON(DirectoryListResponse(directory: .init(path: path, entries: entries)), on: connection)
     }
 
+    /// P37 Phase G3: reuses the user's own already-authenticated `claude` CLI via subprocess —
+    /// deliberately not a direct Anthropic API integration (no API key management to build,
+    /// reuses auth the user already has). Runs synchronously on `state.controlQueue` like every
+    /// other handler in this file (e.g. `handleBrowserNavigate`'s 31s-timeout blocking IPC call
+    /// right above it) rather than hopping to a separate dispatch queue — `controlQueue` is
+    /// already per-connection, so a slow call here only delays this one connection's next
+    /// message, never other connections' PTY relay. (design.md originally called for a separate
+    /// background queue on the assumption everything ran on one shared queue; reading the actual
+    /// per-connection `controlQueue` architecture before implementing showed that assumption was
+    /// wrong — corrected here rather than adding queueing complexity the codebase doesn't use
+    /// anywhere else for comparably slow operations.)
+    private func handleAISuggest(commandBuffer: String, cwd: String, connection: NWConnection) {
+        switch Self.runClaudeSuggest(commandBuffer: commandBuffer, cwd: cwd) {
+        case let .success(suggestion):
+            sendJSON(AISuggestionAck(suggestion: suggestion), on: connection)
+        case let .failure(error):
+            sendJSON(ErrorAck(error: error.text), on: connection)
+        }
+    }
+
+    /// Minimal `Error` wrapper so `runClaudeSuggest` can return a plain message — `String` itself
+    /// doesn't conform to `Error`. `ExpressibleByStringLiteral` keeps every `.failure("...")`
+    /// call site below unchanged.
+    struct StringError: Error, ExpressibleByStringLiteral, Equatable {
+        let text: String
+        init(stringLiteral value: String) { text = value }
+        init(_ text: String) { self.text = text }
+    }
+
+    /// Cached `claude` CLI path resolution — mirrors `GitHubCLIClient.cachedGhPath`'s shape
+    /// (`Packages/KouenCore/Sources/KouenCore/GitHub/GitHubCLIClient.swift`): common install
+    /// locations first, `which` fallback for non-standard installs.
+    private static let cachedClaudePath: String? = {
+        // Found via live-testing on this machine: unlike `gh` (which installs via Homebrew),
+        // the `claude` CLI commonly installs to `~/.local/bin` (curl-installer default) — the
+        // launchd-spawned daemon's PATH doesn't include that, so the `which` fallback below
+        // wouldn't have found it either. Check it explicitly rather than assuming Homebrew-only.
+        let paths = [
+            NSHomeDirectory() + "/.local/bin/claude",
+            "/opt/homebrew/bin/claude",
+            "/usr/local/bin/claude",
+        ]
+        if let found = paths.first(where: { FileManager.default.fileExists(atPath: $0) }) {
+            return found
+        }
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/which")
+        process.arguments = ["claude"]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        do {
+            try process.run()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0,
+                  let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !path.isEmpty, FileManager.default.fileExists(atPath: path)
+            else { return nil }
+            return path
+        } catch {
+            return nil
+        }
+    }()
+
+    /// Pure — no I/O, directly testable without spawning a process. Wraps `commandBuffer` in a
+    /// fixed template rather than passing it to the CLI unwrapped, so `claude -p`'s free-form
+    /// chat behavior doesn't leak into what should be a single suggested command.
+    static func buildSuggestPrompt(commandBuffer: String, cwd: String) -> String {
+        "Suggest a single shell command for: \(commandBuffer). Context: cwd=\(cwd). Reply with ONLY the command, no explanation, no markdown formatting."
+    }
+
+    /// 20s hard timeout — kills a hung subprocess rather than pinning this connection's
+    /// suggestion slot forever. `cwd` is checked before `cachedClaudePath` so that guard is
+    /// exercisable in tests regardless of whether `claude` happens to be installed on the
+    /// machine running them.
+    static func runClaudeSuggest(commandBuffer: String, cwd: String, timeoutSeconds: TimeInterval = 20) -> Result<String, StringError> {
+        guard FileManager.default.fileExists(atPath: cwd) else {
+            return .failure("working directory not found")
+        }
+        guard let claudePath = cachedClaudePath else {
+            return .failure("claude CLI not found")
+        }
+        let prompt = buildSuggestPrompt(commandBuffer: commandBuffer, cwd: cwd)
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: claudePath)
+        process.arguments = ["-p", prompt]
+        process.currentDirectoryURL = URL(fileURLWithPath: cwd)
+        let outPipe = Pipe()
+        let errPipe = Pipe()
+        process.standardOutput = outPipe
+        process.standardError = errPipe
+        do {
+            try process.run()
+        } catch {
+            return .failure(StringError(error.localizedDescription))
+        }
+
+        let deadline = Date().addingTimeInterval(timeoutSeconds)
+        while process.isRunning && Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.1)
+        }
+        if process.isRunning {
+            process.terminate()
+            return .failure("claude CLI timed out")
+        }
+        process.waitUntilExit()
+        if process.terminationStatus == 0 {
+            let data = outPipe.fileHandleForReading.readDataToEndOfFile()
+            let text = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return text.isEmpty ? .failure("claude CLI returned no suggestion") : .success(text)
+        }
+        let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
+        let message = String(data: errData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return .failure(StringError((message?.isEmpty ?? true) ? "claude CLI failed" : message!))
+    }
+
     private func handleControlMessage(_ text: String, connection: NWConnection, state: ConnectionState) {
         guard let data = text.data(using: .utf8),
               let message = try? JSONDecoder().decode(ControlMessage.self, from: data)
@@ -2469,6 +2637,10 @@ public final class MobileBridgeServer: @unchecked Sendable {
         } else if message.browserClose == true {
             state.controlQueue.async { [weak self] in
                 self?.handleBrowserClose(connection: connection, state: state)
+            }
+        } else if let aiSuggest = message.aiSuggest {
+            state.controlQueue.async { [weak self] in
+                self?.handleAISuggest(commandBuffer: aiSuggest.commandBuffer, cwd: aiSuggest.cwd, connection: connection)
             }
         } else {
             sendText(#"{"error":"unrecognized control message"}"#, on: connection)
