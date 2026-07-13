@@ -37,7 +37,9 @@ final class SidebarPlacementSyncTests: XCTestCase {
         let vc = MainSplitViewController()
         vc.view.setFrameSize(NSSize(width: width, height: 600))
         vc.view.layoutSubtreeIfNeeded()
-        vc.viewDidLayout() // guarantees applyInitialSidebarState() runs even off-window
+        // Off-window, so viewDidLayout()'s isVisible guard no-ops applyInitialSidebarState() —
+        // the two tests below use setSidebarVisible() directly instead, which doesn't need it.
+        vc.viewDidLayout()
         return vc
     }
 
@@ -71,6 +73,38 @@ final class SidebarPlacementSyncTests: XCTestCase {
             vc.setSidebarVisible(true, animated: false)
 
             // Correct view resized: content pane stays wide, sidebar gets the fixed width.
+            XCTAssertEqual(
+                vc.contentVC.view.frame.width, 1000 - KouenDesign.sidebarWidth, accuracy: 1)
+        }
+    }
+
+    /// Regression test for a second, distinct Cmd+\ "black panel" bug: AppKit runs
+    /// several `viewDidLayout()` passes on window construction before the window is
+    /// ever shown — at that point it's still pinned to `minSize` (480x400), not its
+    /// real launch frame, which lands a few passes later once the window is actually
+    /// visible. Applying the initial sidebar state against that transient size raced
+    /// the window's own resize-to-real-size and could leave the divider at a stale
+    /// width. `viewDidLayout()` now gates on `view.window?.isVisible`, so with no
+    /// window at all (`view.window == nil`, `isVisible` is nil, never `== true`) it
+    /// must no-op instead of auto-applying state against a not-yet-real size.
+    func testViewDidLayoutDoesNotAutoApplyStateWithoutAWindow() {
+        withTemporaryKouenHome {
+            SessionCoordinator.shared.settings.sidebarOnRight = true
+            SessionCoordinator.shared.settings.sidebarVisible = true
+            let vc = MainSplitViewController()
+            vc.view.setFrameSize(NSSize(width: 1000, height: 600))
+            vc.view.layoutSubtreeIfNeeded()
+
+            XCTAssertNil(vc.view.window)
+            vc.viewDidLayout()
+
+            // No window → the guard returns early → applyInitialSidebarState() never
+            // ran, so the content pane must NOT already be at the correct post-expand
+            // width (the real code path, tested below, is otherwise correct).
+            XCTAssertNotEqual(
+                vc.contentVC.view.frame.width, 1000 - KouenDesign.sidebarWidth, accuracy: 1)
+
+            vc.setSidebarVisible(true, animated: false)
             XCTAssertEqual(
                 vc.contentVC.view.frame.width, 1000 - KouenDesign.sidebarWidth, accuracy: 1)
         }

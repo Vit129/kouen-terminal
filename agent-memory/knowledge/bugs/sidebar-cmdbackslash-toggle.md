@@ -142,3 +142,61 @@ leftover width with no chrome applied at that size.
 
 **Regression test:** `Tests/KouenAppTests/SidebarPlacementSyncTests.swift` —
 reproduces the squeeze without the notification, verifies correct widths with it.
+
+---
+
+## Bug #3 — Same squeeze/black symptom, but from a launch-time layout race, not Settings (2026-07-13)
+
+Same visual signature as Bug #2 (terminal squeezed to ~sidebar width, other side
+black) but confirmed reproducible on a **fresh app launch with no Settings
+interaction at all** — user reported "just pressing Cmd+\ once already does it."
+Bug #2's fix (posting `KouenSidebarPlacementChanged`) did not address this case,
+since no Settings change was involved.
+
+**Root cause:** AppKit runs several `viewDidLayout()` passes on window construction
+*before the window is ever shown*. During those passes the window is still pinned
+to `NSWindow.minSize` (480×400 — set in `MainWindowController.swift`), not its real
+launch frame; the real frame (e.g. `screen.visibleFrame`, ~1440×786) lands a few
+passes later, once the window actually becomes visible/key. `viewDidLayout()`'s
+guard (`!didApplyInitialSidebarState && split.bounds.width > 0`) doesn't check
+visibility, so `applyInitialSidebarState()` — and by extension the very first
+Cmd+\ toggle, if it lands in this window — can run against the transient 480pt
+size. The sidebar's own per-frame math (`setSidebarWidth`) is correct at every
+single step (confirmed via direct instrumentation of a real preview build: content
+width tracked `totalWidth - width` exactly, frame by frame), but if the toggle's
+animation straddles the window's own async resize-to-real-size, the two divider
+writers (our manual `CADisplayLink`-driven `setPosition` calls vs. NSSplitView's
+own resize-triggered repositioning) can race, leaving the divider at a stale width
+even though every logged frame showed the right numbers.
+
+Confirmed via a debug preview build (`Scripts/preview.sh` + temporary `fputs`
+instrumentation in `viewDidLayout()`/`setSidebarWidth()`, since neither
+`osascript`-driven keystrokes nor screen capture were available in this session —
+both blocked by missing Accessibility/Screen-Recording TCC grants): one recorded
+run showed `totalWidth` jump from 480→1440 between the initial layout and the
+toggle firing 2s later, with every animation frame computing the correct position
+relative to 1440 (ending at `position=1220.0`), yet the content pane measured
+**479** one second after the toggle completed — reverted to the pre-resize width
+despite the animation's own math being right throughout.
+
+This is why it's inconsistently reproducible in a debug preview build but reliably
+reproducible on the real (release, `-c release`) production app: release-vs-debug
+timing shifts exactly how wide the race window is and how likely a human's Cmd+\
+press is to land inside it — narrower/differently-timed in debug, apparently wide
+enough in release to hit consistently.
+
+**Fix:** `viewDidLayout()` now gates on `view.window?.isVisible == true` before
+ever calling `applyInitialSidebarState()`. Since a keypress cannot fire before the
+window is key/visible anyway, this closes the only window during which the race
+could start.
+
+**Regression test:** `Tests/KouenAppTests/SidebarPlacementSyncTests.swift` —
+`testViewDidLayoutDoesNotAutoApplyStateWithoutAWindow` confirms the guard no-ops
+with no window attached. A full real-window-visibility variant was attempted but
+dropped: `NSWindow.makeKeyAndOrderFront` in this session's `swift test` CLI host
+clamps windows to a tiny, unrelated size (no working WindowServer/display in this
+sandboxed environment — the same limitation class as `CADisplayLink` never firing
+and `bundleProxyForCurrentProcess` being nil in other tests), making frame-based
+assertions unreliable. The guard's *effect* (no window → no auto-apply) is what's
+tested; the full live race was verified via the instrumented preview build instead,
+not via an automated test.
