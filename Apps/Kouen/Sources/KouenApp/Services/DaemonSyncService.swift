@@ -83,11 +83,16 @@ final class DaemonSyncService {
     private func handleBrowserRequest(id: UUID, req: BrowserRequestPayload) async {
         switch req {
         case let .open(url, direction, originSurfaceID):
-            let newPaneID = UUID()
-            coord.splitPaneCoordinator.openBrowserPane(
-                url: url, direction: direction ?? .horizontal, paneID: newPaneID, originSurfaceID: originSurfaceID
-            )
-            _ = await request(.browserResponse(id: id, response: .open(paneID: newPaneID)))
+            if let existing = BrowserPaneRegistry.shared.anyPane() {
+                existing.createTab(url: url)
+                _ = await request(.browserResponse(id: id, response: .open(paneID: existing.paneID)))
+            } else {
+                let newPaneID = UUID()
+                coord.splitPaneCoordinator.openBrowserPane(
+                    url: url, direction: direction ?? .horizontal, paneID: newPaneID, originSurfaceID: originSurfaceID
+                )
+                _ = await request(.browserResponse(id: id, response: .open(paneID: newPaneID)))
+            }
 
         case let .navigate(paneID, url):
             guard let view = BrowserPaneRegistry.shared.get(paneID) else {
