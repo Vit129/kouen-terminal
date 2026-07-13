@@ -62,6 +62,8 @@ dist/
 **/graphify-out/wiki/
 # Per-run hook log, overwritten every commit — not useful in history.
 **/graphify-out/.last-refresh.log
+# Transient rebuild-in-progress lock (PID file), toggled by graphify itself.
+**/graphify-out/.rebuild.lock
 .robot-output/
 # Robot Framework's own default output location/names (run from the repo root or Tests/)
 /log.html
