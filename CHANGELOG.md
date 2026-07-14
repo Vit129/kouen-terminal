@@ -7,8 +7,8 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
 ## [4.4.4] - 2026-07-14
 
-### Added
-- Release version bump to v4.4.4.
+### Fixed
+- Switch panel view + tag worktreePath on click-to-worktree navigation (release v4.4.4) ([`c405a3a`](https://github.com/Vit129/kouen-terminal/commit/c405a3a19042e47188e7bb3cafdbac95ef0565aa))
 
 ## [4.4.3] - 2026-07-14
 
