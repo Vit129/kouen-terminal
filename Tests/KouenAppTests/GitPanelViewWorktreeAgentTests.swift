@@ -57,4 +57,33 @@ final class GitPanelViewWorktreeNavigationTests: XCTestCase {
         let workspace = Workspace(sessions: [SessionGroup(tabs: [Tab(cwd: "/repo/other")])])
         XCTAssertNil(GitPanelView.matchingTab(forPath: "/repo/feature", workspaces: [workspace]))
     }
+
+    func testGetParentRepoPathFromWorktreeGitFile() throws {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("kouen-test-wt-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        
+        let gitFile = tempDir.appendingPathComponent(".git")
+        let gitdirContent = "gitdir: /Users/supavit.cho/Git/Personal/kouen-terminal/.git/worktrees/temp-wt-name\n"
+        try gitdirContent.write(to: gitFile, atomically: true, encoding: .utf8)
+        
+        let result = GitPanelView.getParentRepoPath(forWorktreePath: tempDir.path)
+        XCTAssertEqual(result, "/Users/supavit.cho/Git/Personal/kouen-terminal")
+    }
+
+    func testGetParentRepoPathInvalidReturnsNil() throws {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("kouen-test-wt-invalid-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        
+        // No .git file
+        XCTAssertNil(GitPanelView.getParentRepoPath(forWorktreePath: tempDir.path))
+        
+        // Non-gitdir content
+        let gitFile = tempDir.appendingPathComponent(".git")
+        try "invalid content".write(to: gitFile, atomically: true, encoding: .utf8)
+        XCTAssertNil(GitPanelView.getParentRepoPath(forWorktreePath: tempDir.path))
+    }
 }
