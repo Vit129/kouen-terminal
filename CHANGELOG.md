@@ -8,7 +8,26 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [4.4.3] - 2026-07-14
 
 ### Added
-- Release version bump to v4.4.3.
+- Mobile terminal keyboard toolbar (Esc/Tab/Ctrl-C/Ctrl-D/arrows) ([`9c4706f`](https://github.com/Vit129/kouen-terminal/commit/9c4706f36bd8fa6101180a0aab4c1f979b23a8d5))
+- Mobile terminal @ file-path autocomplete (P37 Phase G1) ([`3fcd94d`](https://github.com/Vit129/kouen-terminal/commit/3fcd94d1b82e32078393a493cfb765ebf91d3673))
+- Mobile terminal shell tab-completion suggestion strip (P37 Phase G2) ([`26ab0d5`](https://github.com/Vit129/kouen-terminal/commit/26ab0d5e9ad9ec3830022d4edffd56b88ecfcc81))
+- Mobile terminal AI command suggestion via claude CLI (P37 Phase G3) ([`ebc4e77`](https://github.com/Vit129/kouen-terminal/commit/ebc4e77be88e2d8765798c93277291c43dd3c424))
+- Capture creating session's cwd on Kouen Task create ([`308f7df`](https://github.com/Vit129/kouen-terminal/commit/308f7df0da4269eaadd51aca0d1d1816ec5783e5))
+- Add cross-repo Agents review dashboard + merge flow, fix worktree card navigation (release v4.4.3) ([`8ce31e3`](https://github.com/Vit129/kouen-terminal/commit/8ce31e3e92bf69857b4d24d6ef786df974236400))
+
+### Documentation
+- Record F2 keyboard toolbar shipped + F3 already-true in Phase F ([`de71279`](https://github.com/Vit129/kouen-terminal/commit/de71279aa61ee7196f7d6fbb8a05c40d96765115))
+- Design + task breakdown for P37 Phase G (autocomplete) ([`b911803`](https://github.com/Vit129/kouen-terminal/commit/b9118032ad1a7f3ea27f87ec7b7fce4a285a9fa3))
+- Defer P37 F5 (share-sheet upload) pending web-based mobile bridge completion ([`4909fad`](https://github.com/Vit129/kouen-terminal/commit/4909fad2509f077240eb879105819f5438b22841))
+- Caveman-compress CLAUDE.md to cut input tokens ([`bdbe80c`](https://github.com/Vit129/kouen-terminal/commit/bdbe80c4104154c0ff037886861f86d03d958344))
+- Record today's P39/P40 verification pass, refresh graphify ([`46e7508`](https://github.com/Vit129/kouen-terminal/commit/46e75083c82d216f560a72252fbb3db87b20b8fa))
+
+### Fixed
+- G3 newline auto-execute, pipe deadlock risk, stale AI suggestion state ([`a98c94a`](https://github.com/Vit129/kouen-terminal/commit/a98c94a86383967d9e34224163dbbbe4b0093ede))
+- Cmd+\ sidebar toggle raced window's launch-time resize-to-real-size, causing stuck squeeze/black panel ([`3a047d0`](https://github.com/Vit129/kouen-terminal/commit/3a047d09e647821d1dcf2427af796f0cb884c883))
+- Browser open reuses existing pane as new tab instead of splitting a second pane ([`0a421c8`](https://github.com/Vit129/kouen-terminal/commit/0a421c8bf93da44e022b12ba705d3dbf83bfaa7c))
+- Mobile bridge terminal double-wrap on real phone width, upload picker no-op, add copy-path ([`1c24562`](https://github.com/Vit129/kouen-terminal/commit/1c2456209bda92e989dbbe99bcebd93a0b7902fc))
+- Mobile bridge reconnect trusts a stale readyState and never retries an active drop (P37 F4) ([`54c5df8`](https://github.com/Vit129/kouen-terminal/commit/54c5df82cba5bddb13cd57b1227fb1c3e503f65d))
 
 ## [4.4.2] - 2026-07-13
 
