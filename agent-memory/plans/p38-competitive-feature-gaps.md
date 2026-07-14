@@ -37,7 +37,7 @@ TerminalEmulator → TerminalBlock (engine-side, line-range only)
 
 ## Phases
 
-### Phase A — Cross-agent diff/review dashboard (biggest gap vs Superset/Supacode)
+### Phase A — Cross-agent diff/review dashboard (biggest gap vs Superset/Supacode) — ✅ DONE 2026-07-13, see p38-phase-a-diff-dashboard/{design.md,dev-task-progress.md}
 Superset and Supacode's core pitch is: agent runs in isolated worktree → single dashboard
 shows every agent's diff → review/merge/handoff without leaving the app. We have the worktree
 isolation; we have no aggregate view.
