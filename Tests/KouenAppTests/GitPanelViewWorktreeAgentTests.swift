@@ -32,3 +32,29 @@ final class GitPanelViewWorktreeAgentTests: XCTestCase {
         XCTAssertNil(GitPanelView.agentInfo(forWorktreePath: "/repo/feature", tabs: [tab]))
     }
 }
+
+/// Clicking a worktree card used to blind-sendKeys `cd <path>` to whatever surface happened to
+/// be focused instead of navigating to the tab already tracking that worktree — this covers the
+/// find-existing-tab matching `cdToWorktree` now uses (see GitPanelView.matchingTab).
+final class GitPanelViewWorktreeNavigationTests: XCTestCase {
+    func testMatchesTabByExactCwdAcrossWorkspaces() {
+        let tab = Tab(cwd: "/repo/feature")
+        let workspace = Workspace(sessions: [SessionGroup(tabs: [tab])])
+        let result = GitPanelView.matchingTab(forPath: "/repo/feature", workspaces: [workspace])
+        XCTAssertEqual(result?.workspaceID, workspace.id)
+        XCTAssertEqual(result?.tabID, tab.id)
+    }
+
+    func testMatchesTabByTrackedWorktreePath() {
+        var tab = Tab(cwd: "/repo/feature/subdir")
+        tab.worktreePath = "/repo/feature"
+        let workspace = Workspace(sessions: [SessionGroup(tabs: [tab])])
+        let result = GitPanelView.matchingTab(forPath: "/repo/feature", workspaces: [workspace])
+        XCTAssertEqual(result?.tabID, tab.id)
+    }
+
+    func testNoMatchingTabReturnsNil() {
+        let workspace = Workspace(sessions: [SessionGroup(tabs: [Tab(cwd: "/repo/other")])])
+        XCTAssertNil(GitPanelView.matchingTab(forPath: "/repo/feature", workspaces: [workspace]))
+    }
+}
