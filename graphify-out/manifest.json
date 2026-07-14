@@ -395,8 +395,8 @@
     "semantic_hash": ""
   },
   "agent-memory/knowledge/cases/appkit-ui.md": {
-    "mtime": 1782973050.7401457,
-    "ast_hash": "336d00c9e41ca55f851e96df6b07ba1f",
+    "mtime": 1784028542.8882039,
+    "ast_hash": "dfa58c641e56e9dbb41f644b1310a1c9",
     "semantic_hash": ""
   },
   "agent-memory/knowledge/cases/cwd-worktree-bleed.md": {
@@ -470,8 +470,8 @@
     "semantic_hash": ""
   },
   "agent-memory/knowledge/rl-lessons.md": {
-    "mtime": 1783149562.284744,
-    "ast_hash": "149bab2c1afce4f80c3e778cf32a2d6d",
+    "mtime": 1784028556.5129316,
+    "ast_hash": "478b5789c59e6f1d1160f3b8d7dd1bee",
     "semantic_hash": ""
   },
   "agent-memory/knowledge/sidebar-swiftui-migration.md": {
@@ -510,8 +510,8 @@
     "semantic_hash": ""
   },
   "agent-memory/plans/INDEX.md": {
-    "mtime": 1783954477.32308,
-    "ast_hash": "c3c9cc8f15d08da623acfb432c557013",
+    "mtime": 1783957618.673591,
+    "ast_hash": "5288d22375a950a05c75e19cf81bb61b",
     "semantic_hash": ""
   },
   "agent-memory/plans/completed-archive.md": {
@@ -1030,8 +1030,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/CommandPalette/CommandPaletteController.swift": {
-    "mtime": 1783306380.7466605,
-    "ast_hash": "9b0feb3c06ca54a7fa1be4963687c943",
+    "mtime": 1783956169.9529028,
+    "ast_hash": "e158b8ad3274040fa59c24f3d3cc7f94",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/CommandPalette/CommandPromptController.swift": {
@@ -1115,8 +1115,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Git/GitPanelView.swift": {
-    "mtime": 1783771728.8288345,
-    "ast_hash": "474793336363a5bb74116a9523e8070c",
+    "mtime": 1784026594.311477,
+    "ast_hash": "5239bbea17266e9da8c21c65d40d081b",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Inline/InlineAICompletionController.swift": {
@@ -1290,8 +1290,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Sidebar/KouenSidebarPanelViewController.swift": {
-    "mtime": 1783842052.371847,
-    "ast_hash": "6dbde28dedfb857764a16df506549ce6",
+    "mtime": 1783956199.9052885,
+    "ast_hash": "82fd7f837838448bc68167401ae19b1d",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Sidebar/SidebarListModel.swift": {
@@ -1590,8 +1590,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/KouenVersion.swift": {
-    "mtime": 1783909375.7619781,
-    "ast_hash": "ac7babebc38f4741a33e8976c0b02f2d",
+    "mtime": 1784028706.330033,
+    "ast_hash": "443d060f19e46b1d30b44b41168267fd",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Layouts/LayoutTemplate.swift": {
@@ -1680,8 +1680,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/GeneratedReleaseNotes.swift": {
-    "mtime": 1783909376.454141,
-    "ast_hash": "4cc43f8e095001850b1bd7ea77d5d90b",
+    "mtime": 1784028709.2882218,
+    "ast_hash": "a33f3cf370894691575bc09c61eca3dd",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/ReleaseNotes.swift": {
@@ -2510,8 +2510,8 @@
     "semantic_hash": ""
   },
   "Tests/KouenAppTests/GitPanelViewWorktreeAgentTests.swift": {
-    "mtime": 1783306380.879182,
-    "ast_hash": "8f6d26af4f68a63dc5c8b43401f2b89a",
+    "mtime": 1784026672.069026,
+    "ast_hash": "413eb837a501ac95a8c194aaaaf72dbf",
     "semantic_hash": ""
   },
   "Tests/KouenAppTests/KeyRecorderViewTests.swift": {
@@ -3770,8 +3770,8 @@
     "semantic_hash": ""
   },
   "agent-memory/plans/p38-competitive-feature-gaps.md": {
-    "mtime": 1783771728.7774053,
-    "ast_hash": "225fca374783ca20bdbad3f1d565ac66",
+    "mtime": 1783957625.674013,
+    "ast_hash": "b6fa87279204f979cddd83cc24c42b42",
     "semantic_hash": ""
   },
   "LANGUAGE.md": {
@@ -3907,6 +3907,26 @@
   "Tests/KouenDaemonTests/MobileBridgeAISuggestTests.swift": {
     "mtime": 1783917035.3093693,
     "ast_hash": "3c93f4076f4da99c320d81759cf2c7b7",
+    "semantic_hash": ""
+  },
+  "Tests/KouenAppTests/GitPanelViewWorktreeParsingTests.swift": {
+    "mtime": 1783955689.7853055,
+    "ast_hash": "9b372711e04edeec03f3a23f4f119473",
+    "semantic_hash": ""
+  },
+  "Tests/robot/worktree_review_dashboard.robot": {
+    "mtime": 1783956669.9138544,
+    "ast_hash": "1ea4af8093f45294d63638b47313ebf9",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/p38-phase-a-diff-dashboard/design.md": {
+    "mtime": 1783955689.7864814,
+    "ast_hash": "56e35712019bbcda9c6180e99e3d3a80",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/p38-phase-a-diff-dashboard/dev-task-progress.md": {
+    "mtime": 1783957601.044229,
+    "ast_hash": "85b5c2cd889ab1b0ee80fbd29c151624",
     "semantic_hash": ""
   }
 }
