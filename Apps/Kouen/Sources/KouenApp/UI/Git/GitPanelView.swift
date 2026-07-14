@@ -662,6 +662,16 @@ final class GitPanelView: NSView {
         return nil
     }
 
+    nonisolated static func getParentRepoPath(forWorktreePath path: String) -> String? {
+        let gitFileURL = URL(fileURLWithPath: path).appendingPathComponent(".git")
+        guard let content = try? String(contentsOf: gitFileURL, encoding: .utf8) else { return nil }
+        guard content.hasPrefix("gitdir: ") else { return nil }
+        let gitDir = content.dropFirst("gitdir: ".count).trimmingCharacters(in: .whitespacesAndNewlines)
+        let gitDirURL = URL(fileURLWithPath: gitDir)
+        let parentRepoURL = gitDirURL.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        return parentRepoURL.path
+    }
+
     private func cdToWorktree(_ path: String) {
         let coordinator = SessionCoordinator.shared
         // Switch to an existing tab already cd'd into this worktree — sending `cd <path>`
@@ -671,10 +681,22 @@ final class GitPanelView: NSView {
         if let match = Self.matchingTab(forPath: path, workspaces: coordinator.snapshot.workspaces) {
             coordinator.selectWorkspace(match.workspaceID)
             coordinator.selectTab(workspaceID: match.workspaceID, tabID: match.tabID)
+            tabSelector.selectedSegment = 0
+            tabChanged()
             return
         }
         guard let workspaceID = coordinator.snapshot.activeWorkspaceID else { return }
-        coordinator.addSession(to: workspaceID, cwd: path, name: (path as NSString).lastPathComponent)
+        
+        let parentRepo = Self.getParentRepoPath(forWorktreePath: path)
+        coordinator.addSession(
+            to: workspaceID,
+            cwd: path,
+            name: (path as NSString).lastPathComponent,
+            worktreePath: path,
+            parentRepoPath: parentRepo
+        )
+        tabSelector.selectedSegment = 0
+        tabChanged()
     }
 
     private func removeWorktreeAction(path worktreePath: String) {

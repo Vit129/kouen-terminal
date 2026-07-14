@@ -184,8 +184,22 @@ final class SessionCoordinator: NSObject {
     // MARK: - Session lifecycle (facade → SessionLifecycleService)
 
     func addWorkspace(name: String) { sessionLifecycleService.addWorkspace(name: name) }
-    func addSession(to workspaceID: WorkspaceID, cwd: String? = nil, name: String? = nil) {
-        sessionLifecycleService.addSession(to: workspaceID, cwd: cwd, name: name)
+    func addSession(
+        to workspaceID: WorkspaceID,
+        cwd: String? = nil,
+        name: String? = nil,
+        worktreePath: String? = nil,
+        parentRepoPath: String? = nil,
+        taskName: String? = nil
+    ) {
+        sessionLifecycleService.addSession(
+            to: workspaceID,
+            cwd: cwd,
+            name: name,
+            worktreePath: worktreePath,
+            parentRepoPath: parentRepoPath,
+            taskName: taskName
+        )
     }
     func addTab(to workspaceID: WorkspaceID, cwd: String? = nil) { sessionLifecycleService.addTab(to: workspaceID, cwd: cwd) }
     @discardableResult
