@@ -81,23 +81,37 @@ a live check that selecting a history item actually jumps to its output.
 - Verify this doesn't regress the F1-F4 P34 deliverables (see completed-archive.md P34 entry)
   before touching `TerminalBlock`.
 
-### Phase D — Terminal image protocol (Kitty Graphics) — vs WezTerm
-Already scoped and explicitly deferred once in P30 ("Otty Feature Parity") alongside WASM
-plugins. Re-raising because agent CLIs increasingly emit inline images/charts (some MCP tool
-output, some agent screenshots-in-terminal workflows) that Kouen's engine currently cannot
-render inline.
-- **D1** confirm still deferred / not partially built since P30 (`grep` engine source for any
-  Kitty/Sixel escape handling before assuming zero).
-- **D2** if truly greenfield: scope as its own plan, don't fold into P38 — this is an engine-level
-  escape-sequence + Metal-texture-upload change, orthogonal to the agent-workflow gaps above.
+### Phase D — Terminal image protocol (Kitty Graphics) — vs WezTerm — ✅ D1 DONE 2026-07-14 (finding: NOT deferred), D3 conformance slice built
+**Correction (2026-07-14, Fable-consulted D1 investigation):** this phase's own premise was
+stale. Kitty Graphics (APC `\x1b_G`), Sixel (DCS), and iTerm2 OSC 1337 image protocols were NOT
+deferred from P30 — they shipped 2026-05-30 (`0fc22101`/`1a07a4aa`): full multi-chunk Kitty
+transmit+display (f=24/32/100), a Sixel decoder, iTerm2 inline images, placement model with
+scroll/reflow/eviction handling, Metal texture-upload render pass (`ImageTextureCache`,
+`TerminalMetalRenderer.drawImages`), and 14 engine tests. `INDEX.md`'s P30 entry and this
+section's own "deferred" framing were simply out of date — no code was ever missing at the
+transmit+display level.
+- **D1** ~~confirm still deferred~~ — DONE, finding: not deferred, see above.
+- **D2** ~~if truly greenfield, scope as its own plan~~ — moot, not greenfield.
+- **D3 conformance slice (built)**: the real gap was narrower — `handleKittyGraphics` dropped
+  `a=q` (query), `a=t`+`a=p` (transmit-then-place-by-id), and `a=d` (delete). Added all three
+  (see `agent-memory/plans/p38-phase-d-kitty-conformance/`), PNG/RGB/RGBA + direct base64 only,
+  matching the existing v1 format support. Deferred further (documented, not silently dropped):
+  animation, Unicode placeholders/tmux passthrough, `t=f`/`t=s`/`t=t` mediums, `o=z` compression,
+  cropping/offsets/placement-ids beyond simple id-based place.
 
-### Phase E — Scripting hook parity (JS vs WezTerm's Lua) — low priority
+### Phase E — Scripting hook parity (JS vs WezTerm's Lua) — low priority — ✅ DONE 2026-07-14
 - **E1** audit which WezTerm-style lifecycle hooks (window-resized, new-tab, pane-focus-changed)
   the JavaScriptCore layer already exposes vs not, before deciding this is worth doing. Don't
   build blind — likely small delta, possibly already covered.
+- **Finding**: capability parity already existed (21 daemon `HookRegistry` lifecycle hooks + JS
+  can run any command those hooks can) — the plan's own suspicion was correct, no hook-parity
+  build needed. One real defect found and fixed: `paneCreated`/`paneRemoved` were documented in
+  `ScriptAPI.swift`'s `kouen.plugin.on` comment but never dispatched. See
+  `agent-memory/plans/p38-phase-e-scripting-hooks/`.
 
 ## Verification gates (every phase)
-- `swift build` + `swift test` green, `Tests/robot/run.sh` 10/10
+- `swift build` + `swift test` green, `Tests/robot/run.sh` green (26/26 as of Phase E, grew from
+  the 10 baseline as each phase added structural guards)
 - Phase A/B: live check with a real multi-worktree workspace (not just unit tests) — spawn 2+
   tabs on different branches, confirm dashboard reflects real `git diff` output
 - Phase C: confirm scrollback search and P34 block MCP tools still pass their existing tests

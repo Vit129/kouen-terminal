@@ -109,6 +109,19 @@ public final class TerminalEmulator: VTParserHandler {
     /// count of concurrently-reassembling images so the dictionary can't grow without bound.
     private let maxKittyPendingImages = 64
 
+    /// Kitty `a=t` transmit-only images, keyed by the client's `i=` id, awaiting a later `a=p`
+    /// place-by-id — decoded pixels, not yet displayed. Distinct from `TerminalScreen`'s own
+    /// `nextImageID`, which is a renderer/eviction handle with no protocol meaning.
+    private var kittyTransmittedImages: [Int: DecodedImage] = [:]
+    /// Maps a client image id to the internal placement ids it has produced (via `a=T` or `a=p`),
+    /// so `a=d` can delete them. ponytail: assumes all placements for one image id live on the
+    /// SAME screen (`current` at delete time) — a placement created on the alternate screen then
+    /// deleted after switching back to primary won't be found. Real kitty ties image storage to
+    /// the terminal, not a specific screen buffer; fixing this fully means threading screen
+    /// identity through the map, deferred until a real client hits it.
+    private var kittyPlacementIDsByImageID: [Int: [Int]] = [:]
+    private let maxKittyTransmittedImages = 64
+
     public init(cols: Int, rows: Int) {
         let c = max(1, cols)
         let r = max(1, rows)
@@ -398,7 +411,8 @@ public final class TerminalEmulator: VTParserHandler {
         }
     }
 
-    private func placeImage(_ image: DecodedImage, cols: Int = 0, rows: Int = 0, z: Int = 0) {
+    @discardableResult
+    private func placeImage(_ image: DecodedImage, cols: Int = 0, rows: Int = 0, z: Int = 0) -> Int {
         current.placeImage(image, cols: cols, rows: rows, z: z)
     }
 
@@ -434,10 +448,65 @@ public final class TerminalEmulator: VTParserHandler {
             base = cmd
             payload = cmd.payload
         }
-        // Only transmit+display / put actions place an image; deletes/queries are ignored.
-        guard base.action == "T" || base.action == "p" else { return }
-        guard let image = base.decode(base64Payload: payload) else { return }
-        placeImage(image, cols: base.cols, rows: base.rows, z: base.z)
+
+        switch base.action {
+        case "T": // transmit + display
+            guard let image = base.decode(base64Payload: payload) else {
+                respondKitty(base, message: "EINVAL:could not decode image", isError: true)
+                return
+            }
+            let placedID = placeImage(image, cols: base.cols, rows: base.rows, z: base.z)
+            if base.keys["i"] != nil { kittyPlacementIDsByImageID[base.imageID, default: []].append(placedID) }
+            respondKitty(base, message: "OK", isError: false)
+        case "t": // transmit only — store for a later `a=p` place-by-id, don't display yet
+            guard let image = base.decode(base64Payload: payload) else {
+                respondKitty(base, message: "EINVAL:could not decode image", isError: true)
+                return
+            }
+            guard base.keys["i"] != nil else {
+                // No id given — nothing a later `a=p` could reference; per spec this is allowed
+                // but pointless, so just acknowledge without storing.
+                respondKitty(base, message: "OK", isError: false)
+                return
+            }
+            if kittyTransmittedImages.count >= maxKittyTransmittedImages {
+                kittyTransmittedImages.removeAll() // same flood guard as kittyPending
+            }
+            kittyTransmittedImages[base.imageID] = image
+            respondKitty(base, message: "OK", isError: false)
+        case "p": // place-by-id — no payload, look up a previously transmitted image
+            guard base.keys["i"] != nil, let image = kittyTransmittedImages[base.imageID] else {
+                respondKitty(base, message: "ENOENT:no image with that id", isError: true)
+                return
+            }
+            let placedID = placeImage(image, cols: base.cols, rows: base.rows, z: base.z)
+            kittyPlacementIDsByImageID[base.imageID, default: []].append(placedID)
+            respondKitty(base, message: "OK", isError: false)
+        case "d": // delete placements for an image id (not the full a/c/f/p/q/r/x/y/z deletion-mode matrix)
+            guard base.keys["i"] != nil, let placementIDs = kittyPlacementIDsByImageID.removeValue(forKey: base.imageID) else { return }
+            for id in placementIDs { current.deleteImage(id: id) }
+        case "q": // query — validate without storing or displaying anything
+            if base.decode(base64Payload: payload) != nil {
+                respondKitty(base, message: "OK", isError: false)
+            } else {
+                respondKitty(base, message: "EINVAL:could not decode image", isError: true)
+            }
+        default:
+            break
+        }
+    }
+
+    /// Kitty graphics response: `<ESC>_G<control>;<message><ESC>\`. Honors the client's `q`
+    /// (quiet) flag: `q=1` suppresses OK responses (errors still sent), `q=2` suppresses both —
+    /// getting this wrong is worse than saying nothing for some clients (real kitty semantics).
+    private func respondKitty(_ cmd: KittyGraphicsCommand, message: String, isError: Bool) {
+        let quiet = cmd.keys["q"].flatMap { Int($0) } ?? 0
+        if isError, quiet >= 2 { return }
+        if !isError, quiet >= 1 { return }
+        var parts: [String] = []
+        if let i = cmd.keys["i"] { parts.append("i=\(i)") }
+        if let p = cmd.keys["p"] { parts.append("p=\(p)") }
+        respond("\u{1b}_G\(parts.joined(separator: ","));\(message)\u{1b}\\")
     }
 
     /// iTerm2 inline image (`OSC 1337 ; File=…:<base64>`). width/height args may be cells (`N`),
@@ -857,6 +926,8 @@ public final class TerminalEmulator: VTParserHandler {
         g1 = .ascii
         glUsesG1 = false
         kittyPending.removeAll()
+        kittyTransmittedImages.removeAll()
+        kittyPlacementIDsByImageID.removeAll()
         pointerShape = nil
         hyperlinks.removeAll()
         hyperlinkKeys.removeAll()
