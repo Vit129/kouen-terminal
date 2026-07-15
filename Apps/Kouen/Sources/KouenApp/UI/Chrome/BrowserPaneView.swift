@@ -1055,12 +1055,6 @@ public final class BrowserPaneRegistry {
     public func get(_ paneID: PaneID) -> BrowserPaneView? {
         return panes[paneID]?.view
     }
-
-    /// Any currently-live browser pane, regardless of ID — used to reuse an already-open
-    /// browser (new tab) instead of splitting a second pane when one already exists.
-    public func anyPane() -> BrowserPaneView? {
-        panes.values.compactMap(\.view).first
-    }
 }
 
 private final class LoadCompletionState: @unchecked Sendable {
