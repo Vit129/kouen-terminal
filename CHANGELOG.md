@@ -7,8 +7,8 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
 ## [4.5.1] - 2026-07-15
 
-### Added
-- Release version bump to v4.5.1.
+### Fixed
+- Actually call WorktreeAutoIsolateService.shared.start() ([`6a3ebf9`](https://github.com/Vit129/kouen-terminal/commit/6a3ebf9c2aa7f49a6bd5467663362feb1412f776))
 
 ## [4.5.0] - 2026-07-15
 
