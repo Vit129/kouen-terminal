@@ -17,15 +17,28 @@ final class WorktreeAutoIsolateService {
         observation = NotificationCenter.default.addObserver(
             forName: Notification.Name("KouenActiveTabGitBranchDidChange"),
             object: nil, queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.handleBranchChange() }
+        ) { [weak self] note in
+            let tabIDs = note.userInfo?["tabIDs"] as? [TabID] ?? []
+            MainActor.assumeIsolated { self?.handleBranchChange(tabIDs: tabIDs) }
         }
     }
 
-    private func handleBranchChange() {
+    /// Isolates every tab whose branch changed this poll, not just the focused one — a
+    /// background tab (an agent session not currently in view) that switches branch must still
+    /// get its own worktree, or its cwd/worktreePath stay pinned to the repo root forever.
+    private func handleBranchChange(tabIDs: [TabID]) {
         let coord = SessionCoordinator.shared
-        guard let workspace = coord.snapshot.activeWorkspace,
-              let tab = workspace.activeTab else { return }
+        for workspace in coord.snapshot.workspaces {
+            for session in workspace.sessions {
+                for tab in session.tabs where tabIDs.contains(tab.id) {
+                    isolate(tab: tab, workspace: workspace)
+                }
+            }
+        }
+    }
+
+    private func isolate(tab: Tab, workspace: Workspace) {
+        let coord = SessionCoordinator.shared
         guard let branch = tab.gitBranch, !branch.isEmpty else { return }
         guard !Self.defaultBranches.contains(branch) else { return }
 
