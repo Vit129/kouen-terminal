@@ -21,12 +21,18 @@ final class PaneDragController {
     func beginDrag(paneID: PaneID, from view: NSView) {
         guard sourcePaneID == nil else { return }
         sourcePaneID = paneID
+        let paneCount = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.rootPane.allPaneIDs().count ?? -1
+        let agentCount = SessionCoordinator.shared.snapshot.activeWorkspace?.sessions
+            .flatMap(\.tabs).compactMap(\.agent).count ?? -1
+        DragDiagnostics.log("beginDrag paneID=\(paneID) paneCount=\(paneCount) agentCount=\(agentCount)")
+        DragDiagnostics.startStallMonitor()
         installOverlays(excluding: paneID)
         installMonitor()
         NSCursor.closedHand.push()
     }
 
     func cancel() {
+        DragDiagnostics.log("cancel (escape or explicit)")
         cleanup()
     }
 
@@ -96,12 +102,19 @@ final class PaneDragController {
                 break
             }
         }
+        DragDiagnostics.log("handleDrop targetPaneID=\(targetPaneID.map(String.init(describing:)) ?? "nil") zone=\(zone) overlaysWithActiveZone=\(overlays.values.filter { $0.activeZone != .none }.count)")
         cleanup()
-        guard let dstID = targetPaneID, zone != .none else { return }
+        guard let dstID = targetPaneID, zone != .none else {
+            DragDiagnostics.log("handleDrop: no target zone active — drop landed nowhere")
+            return
+        }
         commit(srcID: srcID, dstID: dstID, zone: zone)
     }
 
     private func commit(srcID: PaneID, dstID: PaneID, zone: PaneDropZoneOverlay.Zone) {
+        let start = Date()
+        DragDiagnostics.log("commit start srcID=\(srcID) dstID=\(dstID) zone=\(zone)")
+        defer { DragDiagnostics.log("commit dispatched in \(Int(Date().timeIntervalSince(start) * 1000))ms (async daemon round-trip continues)") }
         let coordinator = SessionCoordinator.shared.splitPaneCoordinator
         switch zone {
         case .center:
@@ -120,6 +133,7 @@ final class PaneDragController {
     }
 
     private func cleanup() {
+        DragDiagnostics.stopStallMonitor()
         sourcePaneID = nil
         for (_, overlay) in overlays {
             overlay.removeFromSuperview()
