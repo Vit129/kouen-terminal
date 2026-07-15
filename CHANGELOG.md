@@ -8,7 +8,16 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [4.5.0] - 2026-07-15
 
 ### Added
-- Release version bump to v4.5.0.
+- Subagent visibility badge on tab/sidebar (P38 Phase B) ([`1ff21c9`](https://github.com/Vit129/kouen-terminal/commit/1ff21c9c532e7942c4144285e2b5327c723740e6))
+- Merge command-history into the Recipes picker (P38 Phase C) ([`463e161`](https://github.com/Vit129/kouen-terminal/commit/463e16115bb3b49c27457f6bc8e73852eb413679))
+- Kitty Graphics protocol conformance slice (P38 Phase D) ([`b56cbe3`](https://github.com/Vit129/kouen-terminal/commit/b56cbe307941e1147f2d6e5b7ec1dabe3451603e))
+
+### Documentation
+- Update P38 status across all phases in plans index ([`6c61169`](https://github.com/Vit129/kouen-terminal/commit/6c61169529a208375c161dd490111fb38432fb4a))
+
+### Fixed
+- Dispatch paneCreated/paneRemoved lifecycle hooks (P38 Phase E) ([`e4c72cc`](https://github.com/Vit129/kouen-terminal/commit/e4c72cc0759453aa59552c75358aa54773353ed5))
+- Auto-isolate background tabs, not just the focused one ([`da3a988`](https://github.com/Vit129/kouen-terminal/commit/da3a988c2ffd550f0906f3dc1a56eedb6b8766e3))
 
 ## [4.4.4] - 2026-07-14
 
