@@ -36,6 +36,13 @@ enum AgentHookStrategy {
     /// by hand rather than risk a duplicate-key corruption. Hermes, OpenClaw.
     case regionEdit(filename: String, body: String, commentToken: String, insertAtTop: Bool, conflictKey: String)
 
+    /// Deep-merge a single Kouen-owned key at the JSON root — `{"<groupKey>": {Event: [...]}}`.
+    /// Antigravity's shape: unlike Claude/Codex/Cursor there's no shared `hooks` wrapper key —
+    /// every tool's hook group is its own top-level key in `~/.gemini/config/hooks.json`. Since
+    /// `groupKey` is unique to Kouen, `JSONMerge.deepMerge`'s array-union-with-dedup already makes
+    /// re-installs converge (identical entries merge away) without a dedicated prune step.
+    case namedGroupJSON(filename: String, payload: [String: Any])
+
     /// The config file's path relative to the user's home directory.
     var filename: String {
         switch self {
@@ -43,7 +50,8 @@ enum AgentHookStrategy {
              let .eventArrayJSON(filename, _, _),
              let .ownJSONFile(filename, _),
              let .ownTextFile(filename, _),
-             let .regionEdit(filename, _, _, _, _):
+             let .regionEdit(filename, _, _, _, _),
+             let .namedGroupJSON(filename, _):
             return filename
         }
     }

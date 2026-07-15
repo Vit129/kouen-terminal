@@ -104,6 +104,8 @@ public enum AgentHookInstaller {
             (backedUp, replacedInvalidJSON, needsManualMerge) = try upsertRegion(
                 at: url, commentToken: commentToken, body: body,
                 insertAtTop: insertAtTop, conflictKey: conflictKey)
+        case let .namedGroupJSON(_, payload):
+            (backedUp, replacedInvalidJSON) = try mergeJSON(at: url, payload: payload) { $0 }
         }
 
         // Don't migrate-away the old file while the new one wasn't written (manual-merge case) —
@@ -208,7 +210,15 @@ public enum AgentHookInstaller {
             // OpenClaw reads a JSON5 config; edit as text to preserve comments/trailing commas.
             return .regionEdit(filename: ".openclaw/openclaw.json", body: openClawHookBody,
                                commentToken: "//", insertAtTop: true, conflictKey: "hooks")
-        case .aider, .gemini, .goose, .antigravity, .kiro, .generic:
+        case .antigravity:
+            // Confirmed events (agy changelog + docs): PreToolUse/PostToolUse/PreInvocation/
+            // PostInvocation/Stop — no Notification. Stop-only for now: it's non-gating
+            // (fire-and-forget on agent completion), unlike PreToolUse which a malformed hook
+            // can fail closed and block every tool call (see cmux#4768). Canonical global path
+            // moved from `.gemini/antigravity-cli/hooks.json` to `.gemini/config/hooks.json` in
+            // 1.0.15 (changelog: "hooks remain synchronized between the TUI and the backend").
+            return .namedGroupJSON(filename: ".gemini/config/hooks.json", payload: antigravityPayload)
+        case .aider, .gemini, .goose, .kiro, .generic:
             return nil
         }
     }
@@ -579,6 +589,17 @@ public enum AgentHookInstaller {
         [
             "on-complete": osc26AndNotify(identity: .grok, status: "idle", title: "Grok", body: "Done"),
             "on-error": osc26AndNotify(identity: .grok, status: "errored", title: "Grok", body: "Error"),
+        ]
+    }
+
+    /// Stop only — see `strategy(for:)`'s `.antigravity` case for why Notification is skipped
+    /// and PreToolUse is avoided. `Stop`'s handlers are a flat list (no `matcher` wrapper);
+    /// unlike PreToolUse/PostToolUse, Antigravity ignores matcher for this event.
+    private static var antigravityPayload: [String: Any] {
+        [
+            "kouen-notify": [
+                "Stop": [["type": "command", "command": osc26AndNotify(identity: .antigravity, status: "idle", title: "Antigravity", body: "Done")]],
+            ],
         ]
     }
 
