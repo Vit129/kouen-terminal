@@ -222,6 +222,61 @@ final class ScriptingTests: XCTestCase {
         #endif
     }
 
+    /// P38 Phase E: `paneCreated`/`paneRemoved` were documented in `ScriptAPI.swift`'s
+    /// `kouen.plugin.on` comment but never actually dispatched anywhere — this is the bridge-level
+    /// contract test (payload shape), mirroring `testEventsOnDispatchesHandlerWithPayload`.
+    @MainActor
+    func testPaneCreatedAndRemovedDispatchWithPaneIDPayload() throws {
+        let runtime = ScriptRuntime()
+
+        #if canImport(JavaScriptCore)
+        var createdPaneID: String?
+        var removedPaneID: String?
+        let captureCreated: @convention(block) (String) -> Void = { createdPaneID = $0 }
+        let captureRemoved: @convention(block) (String) -> Void = { removedPaneID = $0 }
+        runtime.context.setObject(captureCreated, forKeyedSubscript: "__testCaptureCreated" as NSString)
+        runtime.context.setObject(captureRemoved, forKeyedSubscript: "__testCaptureRemoved" as NSString)
+
+        try runtime.evaluate(script: """
+        kouen.events.on("paneCreated", function(e) { __testCaptureCreated(e.paneID); });
+        kouen.events.on("paneRemoved", function(e) { __testCaptureRemoved(e.paneID); });
+        """, sourceURL: URL(fileURLWithPath: "/tmp/events-pane-diff.js"))
+
+        runtime.dispatchEvent("paneCreated", payload: ["paneID": "abc-123"])
+        runtime.dispatchEvent("paneRemoved", payload: ["paneID": "def-456"])
+
+        XCTAssertEqual(createdPaneID, "abc-123")
+        XCTAssertEqual(removedPaneID, "def-456")
+        #endif
+    }
+
+    /// Regression guard for the fix in `registerNotificationBridge` — the pane-diff baseline
+    /// must be seeded from whatever panes already exist at `ScriptRuntime` init, NOT an empty
+    /// set. Without that seed, the very first diff after script load would fire a spurious
+    /// `paneCreated` for every pane already open. Calls `dispatchPaneDiff()` directly rather
+    /// than posting through `NotificationBus` — a real post fans out to `NotificationCoordinator`,
+    /// which crashes outside a real app process (RL-065, `UNUserNotificationCenter` needs a
+    /// bundle context bare `swift test` doesn't have).
+    @MainActor
+    func testNoSpuriousPaneCreatedOnFirstDiffAfterInit() throws {
+        let runtime = ScriptRuntime()
+
+        #if canImport(JavaScriptCore)
+        var fireCount = 0
+        let captureBlock: @convention(block) () -> Void = { fireCount += 1 }
+        runtime.context.setObject(captureBlock, forKeyedSubscript: "__testCapture" as NSString)
+
+        try runtime.evaluate(script: """
+        kouen.events.on("paneCreated", function() { __testCapture(); });
+        """, sourceURL: URL(fileURLWithPath: "/tmp/events-pane-no-spurious.js"))
+
+        // The pane set hasn't changed since init — this must be a no-op for paneCreated.
+        runtime.dispatchPaneDiff()
+
+        XCTAssertEqual(fireCount, 0, "no real pane change occurred — paneCreated must not fire")
+        #endif
+    }
+
     @MainActor
     func testEventsOffRemovesHandler() throws {
         let runtime = ScriptRuntime()

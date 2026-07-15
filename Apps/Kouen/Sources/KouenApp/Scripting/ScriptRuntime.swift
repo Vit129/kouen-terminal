@@ -16,6 +16,11 @@ final class ScriptRuntime: NSObject {
     var eventHandlers: [String: [JSValue]] = [:]
     private var hasReportedEventError = false
 
+    /// Pane IDs seen as of the last `snapshotChanged` — diffed on each new snapshot to derive
+    /// `paneCreated`/`paneRemoved` (P38 Phase E; these events were documented in `ScriptAPI.swift`
+    /// but never actually dispatched — see RL-067's sibling case, caught while auditing this file).
+    private var lastKnownPaneIDs: Set<PaneID> = []
+
     override init() {
         #if canImport(JavaScriptCore)
         self.context = JSContext()!
@@ -76,6 +81,14 @@ final class ScriptRuntime: NSObject {
 
     /// Bridges `NotificationBus` signals to `kouen.events.on(name, handler)` listeners.
     private func registerNotificationBridge() {
+        // Seed the baseline from whatever panes already exist — otherwise the FIRST
+        // `snapshotChanged` after script load would diff against an empty set and fire a
+        // spurious `paneCreated` for every pane already open before the script ever ran.
+        lastKnownPaneIDs = Set(
+            SessionCoordinator.shared.snapshot.workspaces
+                .flatMap { $0.sessions.flatMap { $0.tabs } }
+                .flatMap { $0.rootPane.allPaneIDs() }
+        )
         NotificationCenter.default.addObserver(
             self, selector: #selector(handleSnapshotChanged(_:)),
             name: NotificationBus.shared.snapshotChanged, object: nil
@@ -99,6 +112,37 @@ final class ScriptRuntime: NSObject {
     @objc private func handleSnapshotChanged(_ note: Notification) {
         let revision = note.userInfo?["revision"] as? Int ?? 0
         dispatchEvent("snapshotChanged", payload: ["revision": revision])
+        dispatchPaneDiff()
+    }
+
+    /// Diffs the current pane-ID set against the last known one and fires `paneCreated`/
+    /// `paneRemoved` for whatever changed. Skips the diff entirely (but still updates the
+    /// baseline) when no JS handler is listening for either event — no reason to walk every
+    /// workspace/session/tab on every snapshot change if nothing reads the result.
+    /// `internal` (not `private`) so tests can call it directly without posting through the real
+    /// `NotificationBus` — that fans out to `NotificationCoordinator`, which hits RL-065's
+    /// UNUserNotificationCenter bundle-context crash outside a real app process.
+    func dispatchPaneDiff() {
+        let hasCreatedHandler = !(eventHandlers["paneCreated"]?.isEmpty ?? true)
+        let hasRemovedHandler = !(eventHandlers["paneRemoved"]?.isEmpty ?? true)
+        let currentPaneIDs = Set(
+            SessionCoordinator.shared.snapshot.workspaces
+                .flatMap { $0.sessions.flatMap { $0.tabs } }
+                .flatMap { $0.rootPane.allPaneIDs() }
+        )
+        defer { lastKnownPaneIDs = currentPaneIDs }
+        guard hasCreatedHandler || hasRemovedHandler else { return }
+
+        if hasCreatedHandler {
+            for paneID in currentPaneIDs.subtracting(lastKnownPaneIDs) {
+                dispatchEvent("paneCreated", payload: ["paneID": paneID.uuidString])
+            }
+        }
+        if hasRemovedHandler {
+            for paneID in lastKnownPaneIDs.subtracting(currentPaneIDs) {
+                dispatchEvent("paneRemoved", payload: ["paneID": paneID.uuidString])
+            }
+        }
     }
 
     @objc private func handleConfigReloaded(_ note: Notification) {
