@@ -2,6 +2,16 @@
 
 Older releases. See [CHANGELOG.md](../CHANGELOG.md) for recent versions.
 
+## [4.3.1] - 2026-07-10
+
+### Fixed
+- Stop worktree branch cache clobbering, silent terminal file-link failures, and uncapped git panel history (release v4.3.1) ([`a60766d`](https://github.com/Vit129/kouen-terminal/commit/a60766dc6e1a5822ff8dd954a0fc6d9ee30ec745))
+
+## [4.3.0] - 2026-07-10
+
+### Added
+- Mobile bridge Settings toggle no longer restarts daemon + P37 Phase C real terminal client (release v4.3.0) ([`36d09db`](https://github.com/Vit129/kouen-terminal/commit/36d09db783b1bebdd633481a09849aab84313117))
+
 ## [4.2.0] - 2026-07-09
 
 ### Added
