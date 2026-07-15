@@ -80,10 +80,29 @@ final class DaemonSyncService {
         }
     }
 
+    /// Resolves which tab a `kouenBrowserOpen` request targets: the origin surface's own tab
+    /// when known, falling back to whatever tab is currently active (menu/keyboard-triggered
+    /// opens have no originating agent surface).
+    nonisolated static func targetTab(originSurfaceID: SurfaceID?, surfaceIndex: [SurfaceID: (tab: Tab, tabID: TabID)], activeTab: Tab?) -> Tab? {
+        originSurfaceID.flatMap { surfaceIndex[$0]?.tab } ?? activeTab
+    }
+
+    /// The pane id of a browser pane already open in `tab`, if any — reuse must be scoped to
+    /// the request's own target tab, not any browser pane open anywhere in the app (that used
+    /// to hijack an agent's kouenBrowserOpen into whatever tab happened to have one already,
+    /// defeating the origin-tab routing above entirely).
+    nonisolated static func existingBrowserPaneID(inTab tab: Tab?) -> PaneID? {
+        tab?.rootPane.allBrowserLeaves().first?.id
+    }
+
     private func handleBrowserRequest(id: UUID, req: BrowserRequestPayload) async {
         switch req {
         case let .open(url, direction, originSurfaceID):
-            if let existing = BrowserPaneRegistry.shared.anyPane() {
+            let targetTab = Self.targetTab(
+                originSurfaceID: originSurfaceID, surfaceIndex: coord.surfaceIndex, activeTab: coord.snapshot.activeWorkspace?.activeTab
+            )
+            if let existingPaneID = Self.existingBrowserPaneID(inTab: targetTab),
+               let existing = BrowserPaneRegistry.shared.get(existingPaneID) {
                 existing.createTab(url: url)
                 _ = await request(.browserResponse(id: id, response: .open(paneID: existing.paneID)))
             } else {
