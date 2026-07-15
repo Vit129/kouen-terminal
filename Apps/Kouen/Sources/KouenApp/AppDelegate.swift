@@ -48,6 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         QuickTerminalController.shared.install()
 FloatingPaneController.shared.install()
         AppIdleThrottle.shared.install()
+        WorktreeAutoIsolateService.shared.start()
         BrowserPaneRegistry.shared.prewarm()
 
         // Fix #8 (RL-040): Swallow key/mouse events targeting views that lost their window.
