@@ -11,6 +11,10 @@ public struct Tab: Codable, Sendable, Identifiable, Equatable {
     public var rootPane: PaneNode
     public var sortOrder: Int
     public var agent: AgentSnapshot?
+    /// Other agent-kind processes detected deeper in this tab's process tree than `agent`
+    /// (e.g. a Task-tool subagent), or hook-pushed for the in-process case proc-scan can't
+    /// see. Presence/kind/age only — see `AgentDetector.AgentDetection`. nil/empty = none.
+    public var subagents: [AgentSnapshot]?
     public var zoomedPaneID: PaneID?
     /// The focused pane in this tab. Server-authoritative (schema v3): target-less
     /// commands (`kill-pane`, `split-window`, …) act on it, and every client (GUI +
@@ -63,6 +67,7 @@ public struct Tab: Codable, Sendable, Identifiable, Equatable {
         rootPane: PaneNode? = nil,
         sortOrder: Int = 0,
         agent: AgentSnapshot? = nil,
+        subagents: [AgentSnapshot]? = nil,
         zoomedPaneID: PaneID? = nil,
         activePaneID: PaneID? = nil,
         lastActivePaneID: PaneID? = nil,
@@ -88,6 +93,7 @@ public struct Tab: Codable, Sendable, Identifiable, Equatable {
         self.rootPane = resolvedRoot
         self.sortOrder = sortOrder
         self.agent = agent
+        self.subagents = subagents
         self.zoomedPaneID = zoomedPaneID
         self.activePaneID = activePaneID ?? resolvedRoot.allPaneIDs().first
         self.lastActivePaneID = lastActivePaneID
@@ -133,6 +139,8 @@ public struct Tab: Codable, Sendable, Identifiable, Equatable {
         rootPane = try container.decode(PaneNode.self, forKey: .rootPane)
         sortOrder = try container.decodeIfPresent(Int.self, forKey: .sortOrder) ?? 0
         agent = try container.decodeIfPresent(AgentSnapshot.self, forKey: .agent)
+        // Subagent visibility (P38 Phase B) — absent in older layout.json/snapshots; nil = none detected.
+        subagents = try container.decodeIfPresent([AgentSnapshot].self, forKey: .subagents)
         zoomedPaneID = try container.decodeIfPresent(PaneID.self, forKey: .zoomedPaneID)
         // v3 fields — absent in v2 layout.json; backfilled to the first leaf so older
         // files load cleanly with a valid focus.
@@ -169,6 +177,7 @@ extension Tab {
         gitBranch == other.gitBranch &&
         status == other.status &&
         agent == other.agent &&
+        subagents == other.subagents &&
         sortOrder == other.sortOrder &&
         exitStatus == other.exitStatus &&
         persistent == other.persistent &&

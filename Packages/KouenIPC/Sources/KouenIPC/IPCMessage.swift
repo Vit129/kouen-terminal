@@ -82,6 +82,10 @@ public enum IPCRequest: Codable, Sendable {
     /// keep-on-quit sessions are left running.
     case closeEphemeralSessions
     case notify(surfaceID: String, title: String, body: String)
+    /// Claude Code's `PreToolUse`(Task)/`SubagentStop` hook push (P38 Phase B) — signals a
+    /// Task-tool subagent starting/stopping, which proc-scan can't see (it runs in-process,
+    /// no child PID). `active` true = start, false = stop.
+    case setSubagentHint(surfaceID: String, kind: AgentKind, active: Bool)
     case clearNotification(surfaceID: String)
     case updateTabTitle(surfaceID: String, title: String)
     /// Sets a durable, agent/human-set purpose label on one pane surface (e.g. "build",

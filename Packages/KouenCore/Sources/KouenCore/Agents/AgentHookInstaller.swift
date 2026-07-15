@@ -179,7 +179,8 @@ public enum AgentHookInstaller {
         switch agent {
         case .claudeCode:
             return .eventMatcherJSON(filename: ".claude/settings.json",
-                                     payload: claudePayload, managedEvents: ["Notification", "Stop"])
+                                     payload: claudePayload,
+                                     managedEvents: ["Notification", "Stop", "PreToolUse", "SubagentStop"])
         case .codex:
             // Codex reads the same event/matcher shape as Claude Code from `~/.codex/hooks.json`,
             // and hooks are enabled by default now (the old `[features] hooks = true` flag only
@@ -513,6 +514,14 @@ public enum AgentHookInstaller {
         "\(osc26Emit(identity: identity, status: status)); \(notifyFromHookCommand(title: title))"
     }
 
+    /// P38 Phase B — signals a Task-tool subagent starting/stopping. Deliberately NOT routed
+    /// through `osc26Emit`/`AgentActivity`: a subagent start/stop is not an activity-state
+    /// transition for the pane's PRIMARY agent, and must not be misparsed as one by anything
+    /// that switches on that enum (`AgentNotchPeekDecider`, `AgentApprovalBar`, etc.).
+    private static func subagentHintCommand(active: Bool) -> String {
+        "\(notifyPrefix) --surface \"$KOUEN_SURFACE\" --subagent \(active ? "start" : "stop")"
+    }
+
     // MARK: - Per-agent payloads
 
     private static var claudePayload: [String: Any] {
@@ -525,6 +534,14 @@ public enum AgentHookInstaller {
                 "Stop": [[
                     "matcher": "*",
                     "hooks": [["type": "command", "command": osc26AndNotify(identity: .claudeCode, status: "idle", title: "Claude Code", body: "Done")]],
+                ]],
+                "PreToolUse": [[
+                    "matcher": "Task",
+                    "hooks": [["type": "command", "command": subagentHintCommand(active: true)]],
+                ]],
+                "SubagentStop": [[
+                    "matcher": "*",
+                    "hooks": [["type": "command", "command": subagentHintCommand(active: false)]],
                 ]],
             ],
         ]

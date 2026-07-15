@@ -1240,6 +1240,15 @@ public struct SessionEditor: Sendable {
         bumpRevision()
     }
 
+    /// Separate from `setAgent` so hint/OSC-26-driven activity updates (which know nothing
+    /// about subagents) never clobber a tab's detected subagent list to nil.
+    public mutating func setSubagents(_ subagents: [AgentSnapshot], forSurfaceKey key: String) {
+        guard let match = tabIndex(surfaceKey: key) else { return }
+        let resolved = subagents.isEmpty ? nil : subagents
+        snapshot.workspaces[match.workspaceIndex].sessions[match.sessionIndex].tabs[match.tabIndex].subagents = resolved
+        bumpRevision()
+    }
+
     public func listSurfaces() -> [SurfaceSummary] {
         var result: [SurfaceSummary] = []
         for workspace in snapshot.workspaces {

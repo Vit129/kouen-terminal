@@ -27,6 +27,21 @@ public enum AgentDetector {
     nonisolated(unsafe) private static var lastOutputAt: [String: Date] = [:]
     private static let outputLock = NSLock()
 
+    /// Subagents detected in the last scan per surface, proc-scan and hook-pushed alike.
+    /// Kept separate from `lastSurfaceSnapshots` so single-snapshot consumers (`snapshot(forSurfaceKey:)`,
+    /// hints, the `agentInfo` IPC response) are untouched by this addition.
+    nonisolated(unsafe) private static var lastSubagents: [String: [AgentSnapshot]] = [:]
+    private static let subagentsLock = NSLock()
+
+    /// Claude Code `PreToolUse`(Task)/`SubagentStop` hook push — the in-process case proc-scan
+    /// structurally cannot see (no child PID exists). `pid: 0` sentinel — there is no real
+    /// process to report, only presence. One hint per surface per kind; a real proc-scan match
+    /// of the same kind takes precedence (see `mergedSubagents`).
+    /// ponytail: a second concurrent Task call of the same kind overwrites rather than counts —
+    /// acceptable for v1 (presence, not a precise count), would need a ref-count to fix.
+    nonisolated(unsafe) private static var subagentHints: [String: AgentSnapshot] = [:]
+    private static let subagentHintsLock = NSLock()
+
     public static func registerRootPID(_ pid: Int32, forSurfaceKey key: String) {
         rootsLock.lock()
         surfaceRoots[key] = pid
@@ -49,12 +64,53 @@ public enum AgentDetector {
         outputLock.lock()
         lastOutputAt.removeValue(forKey: key)
         outputLock.unlock()
+
+        subagentsLock.lock()
+        lastSubagents.removeValue(forKey: key)
+        subagentsLock.unlock()
+
+        subagentHintsLock.lock()
+        subagentHints.removeValue(forKey: key)
+        subagentHintsLock.unlock()
     }
 
     public static func registerHint(_ snapshot: AgentSnapshot, forSurfaceKey key: String) {
         hintsLock.lock()
         hints[key] = snapshot
         hintsLock.unlock()
+    }
+
+    /// Push from `kouen-cli notify --subagent start` (Claude Code's `PreToolUse`(Task) hook).
+    public static func registerSubagentHint(kind: AgentKind, forSurfaceKey key: String) {
+        subagentHintsLock.lock()
+        subagentHints[key] = AgentSnapshot(kind: kind, executable: kind.rawValue, pid: 0, activity: .idle)
+        subagentHintsLock.unlock()
+    }
+
+    /// Push from `kouen-cli notify --subagent stop` (Claude Code's `SubagentStop` hook).
+    public static func clearSubagentHint(forSurfaceKey key: String) {
+        subagentHintsLock.lock()
+        subagentHints.removeValue(forKey: key)
+        subagentHintsLock.unlock()
+    }
+
+    /// The current effective subagent list for `key`: the last proc-scanned set, plus the
+    /// hint entry if present and not already covered by a same-kind proc-scan match (a real
+    /// pid is more informative than the hint's `pid: 0` sentinel). Used both by `scan()` and
+    /// for the immediate apply on hint push (so the badge doesn't wait for the next scan tick).
+    public static func mergedSubagents(forSurfaceKey key: String) -> [AgentSnapshot] {
+        subagentsLock.lock()
+        var result = lastSubagents[key] ?? []
+        subagentsLock.unlock()
+
+        subagentHintsLock.lock()
+        let hint = subagentHints[key]
+        subagentHintsLock.unlock()
+
+        if let hint, !result.contains(where: { $0.kind == hint.kind }) {
+            result.append(hint)
+        }
+        return result
     }
 
     public static func snapshot(forSurfaceKey key: String) -> AgentSnapshot? {
@@ -117,14 +173,30 @@ public enum AgentDetector {
     /// (the UI treats a waiting tab as not-working regardless of this window).
     public static let workingWindow: TimeInterval = 15
 
-    /// Run a scan of every surface's child process tree. The daemon calls this
-    /// every ~1.5s. Returns the surfaces whose agent detection changed (so the
-    /// caller can post a single batched IPC update).
+    /// Result of one surface's detection: the pane's primary agent (shallowest match — the
+    /// user-launched process, never a nested Task-style subagent) plus any other agent-kind
+    /// processes found deeper in the tree. Subagent `activity` is always `.idle` — the shared
+    /// PTY makes attributing output bytes to a specific descendant impossible; presence/kind/age
+    /// is the only thing detection can honestly report.
+    public struct AgentDetection: Equatable, Sendable {
+        public var primary: AgentSnapshot?
+        public var subagents: [AgentSnapshot]
+
+        public init(primary: AgentSnapshot? = nil, subagents: [AgentSnapshot] = []) {
+            self.primary = primary
+            self.subagents = subagents
+        }
+    }
+
+    /// Run a scan of every surface's child process tree. The daemon calls this on an adaptive
+    /// cadence (30s idle baseline, ~5s while an agent is active — see `AgentScanner`). Returns
+    /// the surfaces whose agent detection changed (so the caller can post a single batched IPC
+    /// update).
     @discardableResult
     public static func scan(
         table: AgentTable = .default,
         workingWindow: TimeInterval = AgentDetector.workingWindow
-    ) -> [String: AgentSnapshot?] {
+    ) -> [String: AgentDetection] {
         rootsLock.lock()
         let roots = surfaceRoots
         rootsLock.unlock()
@@ -135,17 +207,17 @@ public enum AgentDetector {
         var parentMap: [Int32: Int32] = [:]
         parentMap.reserveCapacity(allPIDs.count)
         for pid in allPIDs { parentMap[pid] = ProcessScan.parentPID(pid) }
-        var changes: [String: AgentSnapshot?] = [:]
+        var changes: [String: AgentDetection] = [:]
         for (key, rootPID) in roots {
-            let detected = detect(pid: rootPID, table: table, allPIDs: allPIDs, parentMap: parentMap)
+            let detected = detectAll(pid: rootPID, table: table, allPIDs: allPIDs, parentMap: parentMap)
             outputLock.lock()
             let lastOutput = lastOutputAt[key]
             outputLock.unlock()
 
             snapshotsLock.lock()
             let prior = lastSurfaceSnapshots[key]
-            var resolved = detected
-            if var r = resolved {
+            var resolvedPrimary = detected.primary
+            if var r = resolvedPrimary {
                 if let lastOutput, Date().timeIntervalSince(lastOutput) <= workingWindow {
                     r.activity = .working
                     r.lastActivityAt = lastOutput
@@ -159,47 +231,142 @@ public enum AgentDetector {
                         r.lastActivityAt = prior.lastActivityAt
                     }
                 }
-                resolved = r
+                resolvedPrimary = r
             }
-            if resolved != prior {
+
+            subagentsLock.lock()
+            let priorSubagents = lastSubagents[key] ?? []
+            var resolvedSubagents = detected.subagents.map { sub -> AgentSnapshot in
+                var r = sub
+                if let match = priorSubagents.first(where: { $0.pid == sub.pid && $0.kind == sub.kind }) {
+                    r.lastActivityAt = match.lastActivityAt
+                }
+                return r
+            }
+            // Merge in the hook-pushed hint (if any) not already covered by a real proc-scan
+            // match of the same kind — a real pid is more informative than the hint's sentinel.
+            subagentHintsLock.lock()
+            if let hint = subagentHints[key], !resolvedSubagents.contains(where: { $0.kind == hint.kind }) {
+                resolvedSubagents.append(hint)
+            }
+            subagentHintsLock.unlock()
+            lastSubagents[key] = resolvedSubagents
+            subagentsLock.unlock()
+
+            let resolved = AgentDetection(primary: resolvedPrimary, subagents: resolvedSubagents)
+            let priorDetection = AgentDetection(primary: prior, subagents: priorSubagents)
+            if resolved != priorDetection {
                 changes[key] = resolved
             }
-            lastSurfaceSnapshots[key] = resolved
+            lastSurfaceSnapshots[key] = resolvedPrimary
             snapshotsLock.unlock()
         }
         return changes
     }
 
-    /// Walks descendants of `pid` looking for a process whose resolved binary,
-    /// argv[0], or wrapper-launched executable matches any agent in `table`.
-    /// Returns the deepest match so a real child agent wins over its shell.
+    /// Walks descendants of `pid` looking for processes whose resolved binary, argv[0], or
+    /// wrapper-launched executable matches any agent in `table`. The shallowest match becomes
+    /// `primary` (the user-launched agent always wins over a nested Task-style subagent);
+    /// everything else becomes `subagents`, tagged with the nearest matched ancestor's pid.
     public static func detect(pid: Int32, table: AgentTable) -> AgentSnapshot? {
         let allPIDs = ProcessScan.livePIDs()
         var parentMap: [Int32: Int32] = [:]
         parentMap.reserveCapacity(allPIDs.count)
         for p in allPIDs { parentMap[p] = ProcessScan.parentPID(p) }
-        return detect(pid: pid, table: table, allPIDs: allPIDs, parentMap: parentMap)
+        return detectAll(pid: pid, table: table, allPIDs: allPIDs, parentMap: parentMap).primary
+    }
+
+    struct RawMatch {
+        let pid: Int32
+        let depth: Int
+        let kind: AgentKind
+        let executable: String
+        let source: MatchSource
     }
 
     /// Fast variant used by `scan()` — reuses a pre-built parent map so the
     /// process table is only fetched once per scan cycle across all surfaces.
-    private static func detect(pid: Int32, table: AgentTable,
-                               allPIDs: [Int32], parentMap: [Int32: Int32]) -> AgentSnapshot? {
-        var best: AgentSnapshot?
-        for descendant in descendantPIDs(of: pid, allPIDs: allPIDs, parentMap: parentMap) {
+    private static func detectAll(pid: Int32, table: AgentTable,
+                                  allPIDs: [Int32], parentMap: [Int32: Int32]) -> AgentDetection {
+        var matches: [RawMatch] = []
+        for (descendant, depth) in descendantPIDsWithDepth(of: pid, allPIDs: allPIDs, parentMap: parentMap) {
             guard let path = pidPath(descendant) else { continue }
             let arguments = processArguments(descendant) ?? []
-            for entry in table.entries where entry.matchesProcess(resolvedExecutable: path, arguments: arguments) {
-                best = AgentSnapshot(
-                    kind: entry.kind,
-                    executable: path,
-                    pid: descendant,
-                    activity: .idle,
-                    lastActivityAt: best?.lastActivityAt ?? .now
-                )
+            for entry in table.entries {
+                guard let source = entry.matchSource(resolvedExecutable: path, arguments: arguments) else { continue }
+                matches.append(RawMatch(pid: descendant, depth: depth, kind: entry.kind, executable: path, source: source))
             }
         }
-        return best
+        return resolveDetection(from: matches, parentMap: parentMap)
+    }
+
+    /// Pure grouping logic, split out from the real-process walk above so it's testable with
+    /// synthetic `RawMatch`/`parentMap` data — no real subprocess tree required. Applies the
+    /// wrapper-collapse rule, then picks the shallowest surviving match as `primary` (the
+    /// user-launched agent, never a nested Task-style subagent) and tags every other survivor
+    /// with its nearest matched ancestor as `parentPID`.
+    static func resolveDetection(from matches: [RawMatch], parentMap: [Int32: Int32]) -> AgentDetection {
+        guard !matches.isEmpty else { return AgentDetection() }
+
+        // Wrapper collapse: a wrapper process (e.g. `bun` in `bun run claude`) isn't a second
+        // agent when its own launch target is among the matches — drop it so `bun run claude`
+        // reports one agent, not a phantom parent+child pair.
+        var survivors: [RawMatch] = []
+        for match in matches {
+            if match.source == .wrapperLaunch {
+                let launchesAMatch = matches.contains { other in
+                    other.pid != match.pid && other.kind == match.kind
+                        && isAncestor(match.pid, of: other.pid, parentMap: parentMap)
+                }
+                if launchesAMatch { continue }
+            }
+            survivors.append(match)
+        }
+        guard !survivors.isEmpty else { return AgentDetection() }
+
+        // Primary = shallowest surviving match (the user-launched agent), deterministic tie-break
+        // on lower pid so repeated scans of an unchanged tree never flap between two matches.
+        let primaryMatch = survivors.min { a, b in
+            a.depth != b.depth ? a.depth < b.depth : a.pid < b.pid
+        }!
+        let primary = AgentSnapshot(kind: primaryMatch.kind, executable: primaryMatch.executable,
+                                    pid: primaryMatch.pid, activity: .idle)
+
+        let survivorPIDs = Set(survivors.map { $0.pid })
+        let subagents = survivors
+            .filter { $0.pid != primaryMatch.pid }
+            .map { match -> AgentSnapshot in
+                let parent = nearestAncestor(of: match.pid, in: survivorPIDs, parentMap: parentMap) ?? primaryMatch.pid
+                return AgentSnapshot(kind: match.kind, executable: match.executable, pid: match.pid,
+                                     activity: .idle, parentPID: parent)
+            }
+        return AgentDetection(primary: primary, subagents: subagents)
+    }
+
+    /// True if `ancestor` is a proper ancestor of `pid` in the process tree (depth-capped at 32,
+    /// matching every other tree walk in this file).
+    private static func isAncestor(_ ancestor: Int32, of pid: Int32, parentMap: [Int32: Int32]) -> Bool {
+        var cursor = pid
+        var depth = 0
+        while let parent = parentMap[cursor], parent != 0, depth < 32 {
+            if parent == ancestor { return true }
+            cursor = parent
+            depth += 1
+        }
+        return false
+    }
+
+    /// Nearest ancestor of `pid` that is itself in `candidates` — used to attach a subagent's
+    /// `parentPID` to the closest OTHER matched agent process above it, not necessarily the root.
+    private static func nearestAncestor(of pid: Int32, in candidates: Set<Int32>, parentMap: [Int32: Int32]) -> Int32? {
+        var cursor = pid
+        var depth = 0
+        while let parent = parentMap[cursor], parent != 0, depth < 32 {
+            if candidates.contains(parent) { return parent }
+            cursor = parent
+            depth += 1
+        }
+        return nil
     }
 
     private static func descendantPIDs(of pid: Int32) -> [Int32] {
@@ -216,14 +383,23 @@ public enum AgentDetector {
     static func descendantPIDs(of pid: Int32,
                                        allPIDs: [Int32],
                                        parentMap: [Int32: Int32]) -> [Int32] {
+        descendantPIDsWithDepth(of: pid, allPIDs: allPIDs, parentMap: parentMap).map { $0.pid }
+    }
+
+    /// Same walk as `descendantPIDs`, but also returns each descendant's hop-count from `pid`
+    /// (0 = direct child) so callers can pick the shallowest match deterministically instead of
+    /// relying on `proc_listpids`' arbitrary iteration order.
+    private static func descendantPIDsWithDepth(of pid: Int32,
+                                                 allPIDs: [Int32],
+                                                 parentMap: [Int32: Int32]) -> [(pid: Int32, depth: Int)] {
         guard !allPIDs.isEmpty else { return [] }
-        var result: [Int32] = []
+        var result: [(pid: Int32, depth: Int)] = []
         for candidate in allPIDs where candidate != pid {
             var cursor: Int32 = candidate
             var depth = 0
             while let parent = parentMap[cursor], parent != 0, depth < 32 {
                 if parent == pid {
-                    result.append(candidate)
+                    result.append((pid: candidate, depth: depth))
                     break
                 }
                 cursor = parent
@@ -293,6 +469,13 @@ public enum AgentDetector {
     }
 }
 
+/// Whether a matched process IS the agent, or merely launched it (a wrapper like `bun`/`node`/
+/// `python3`). See `AgentTableEntry.matchSource`.
+enum MatchSource: Equatable {
+    case ownProcess
+    case wrapperLaunch
+}
+
 public struct AgentTableEntry: Codable, Sendable {
     public let kind: AgentKind
     public let executables: [String]
@@ -312,7 +495,19 @@ public struct AgentTableEntry: Codable, Sendable {
     }
 
     public func matchesProcess(resolvedExecutable: String, arguments: [String]) -> Bool {
-        matchesAny(Self.matchableProcessNames(resolvedExecutable: resolvedExecutable, arguments: arguments))
+        matchSource(resolvedExecutable: resolvedExecutable, arguments: arguments) != nil
+    }
+
+    /// Whether a match came from the process's own identity (resolved binary / argv[0]) or
+    /// only from a wrapper's launch target (e.g. `bun run claude` — the wrapper itself isn't
+    /// the agent, its launched target is). Lets `AgentDetector.resolveDetection` tell a wrapper
+    /// process apart from the agent it launched, so the wrapper doesn't get double-counted
+    /// as a second (phantom) agent alongside its own target.
+    func matchSource(resolvedExecutable: String, arguments: [String]) -> MatchSource? {
+        let (ownNames, wrapperNames) = Self.matchableProcessNames(resolvedExecutable: resolvedExecutable, arguments: arguments)
+        if executables.contains(where: ownNames.contains) { return .ownProcess }
+        if executables.contains(where: wrapperNames.contains) { return .wrapperLaunch }
+        return nil
     }
 
     /// Builds every basename that can identify a process as an agent: resolved
@@ -321,12 +516,15 @@ public struct AgentTableEntry: Codable, Sendable {
     /// `vim hermes-notes.txt` cannot become a false Hermes match. `env` gets
     /// one nested-wrapper pass (`env FOO=1 python3 hermes --tui`) to cover the
     /// common env→runtime shape without turning this into an unbounded parser.
-    private static func matchableProcessNames(resolvedExecutable: String, arguments: [String]) -> Set<String> {
-        var names: Set<String> = []
-        insertProcessName(resolvedExecutable, into: &names)
+    /// Returns (ownNames, wrapperLaunchNames) separately so callers can distinguish
+    /// "this process IS the agent" from "this process launched the agent".
+    private static func matchableProcessNames(resolvedExecutable: String, arguments: [String]) -> (own: Set<String>, wrapperLaunch: Set<String>) {
+        var ownNames: Set<String> = []
+        var wrapperNames: Set<String> = []
+        insertProcessName(resolvedExecutable, into: &ownNames)
         let invokedName: String?
         if let invoked = arguments.first {
-            insertProcessName(invoked, into: &names)
+            insertProcessName(invoked, into: &ownNames)
             invokedName = processName(invoked)
         } else {
             invokedName = nil
@@ -337,17 +535,17 @@ public struct AgentTableEntry: Codable, Sendable {
            let launchSearchStart = launchArgumentSearchStart(arguments: arguments, wrapperName: wrapperName),
            let launchIndex = firstLaunchArgumentIndex(in: arguments, startIndex: launchSearchStart, wrapperName: wrapperName)
         {
-            insertProcessName(arguments[launchIndex], into: &names)
+            insertProcessName(arguments[launchIndex], into: &wrapperNames)
             if wrapperName == "env",
                let nestedName = processName(arguments[launchIndex]),
                isWrapperExecutable(nestedName),
                let nestedIndex = firstLaunchArgumentIndex(in: arguments, startIndex: launchIndex + 1, wrapperName: nestedName)
             {
-                insertProcessName(arguments[nestedIndex], into: &names)
+                insertProcessName(arguments[nestedIndex], into: &wrapperNames)
             }
         }
 
-        return names
+        return (ownNames, wrapperNames)
     }
 
     /// Returns where wrapper-target scanning should begin. When argv[0] is the

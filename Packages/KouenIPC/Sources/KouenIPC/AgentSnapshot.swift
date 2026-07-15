@@ -140,18 +140,23 @@ public struct AgentSnapshot: Codable, Sendable, Equatable {
     public var pid: Int32
     public var activity: AgentActivity
     public var lastActivityAt: Date
+    /// Set on subagent entries only — the nearest ancestor pid (in `AgentDetector`'s matched
+    /// process set) that spawned this one. `nil` for a surface's primary agent.
+    public var parentPID: Int32?
 
     public init(
         kind: AgentKind,
         executable: String,
         pid: Int32,
         activity: AgentActivity = .idle,
-        lastActivityAt: Date = .now
+        lastActivityAt: Date = .now,
+        parentPID: Int32? = nil
     ) {
         self.kind = kind
         self.executable = executable
         self.pid = pid
         self.activity = activity
         self.lastActivityAt = lastActivityAt
+        self.parentPID = parentPID
     }
 }

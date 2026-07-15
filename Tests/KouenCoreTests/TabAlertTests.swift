@@ -69,4 +69,25 @@ final class TabAlertTests: XCTestCase {
         XCTAssertFalse(decoded.bell)
         XCTAssertNil(decoded.exitStatus)
     }
+
+    /// P38 Phase B: older layout.json/snapshots predate `subagents` entirely — must decode
+    /// cleanly to nil, not throw.
+    func testToleratesOldJSONWithoutSubagentsField() throws {
+        let original = Tab(title: "t")
+        let data = try JSONEncoder().encode(original)
+        var obj = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+        obj.removeValue(forKey: "subagents")
+        let stripped = try JSONSerialization.data(withJSONObject: obj)
+        let decoded = try JSONDecoder().decode(Tab.self, from: stripped)
+        XCTAssertNil(decoded.subagents)
+    }
+
+    func testSubagentsRoundTripsThroughCodable() throws {
+        let sub = AgentSnapshot(kind: .claudeCode, executable: "/usr/bin/claude", pid: 42, parentPID: 7)
+        let original = Tab(title: "t", subagents: [sub])
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(Tab.self, from: data)
+        XCTAssertEqual(decoded.subagents?.first?.pid, 42)
+        XCTAssertEqual(decoded.subagents?.first?.parentPID, 7)
+    }
 }

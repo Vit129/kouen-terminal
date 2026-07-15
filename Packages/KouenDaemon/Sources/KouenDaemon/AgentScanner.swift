@@ -18,6 +18,14 @@ public final class AgentScanner: @unchecked Sendable {
     private weak var registry: SurfaceRegistry?
     private let queue = DispatchQueue(label: "com.vit129.kouen.agent-scanner")
 
+    /// Adaptive agent-scan cadence (P38 Phase B): 30s idle baseline, ~5s while any surface has
+    /// a detected primary agent — subagent child processes are often short-lived, so the slow
+    /// baseline would miss most of them. Tracked so `scanAgents()` only reschedules on an actual
+    /// change, not every tick.
+    private static let idleScanInterval: TimeInterval = 30
+    private static let activeScanInterval: TimeInterval = 5
+    private var isFastScanCadence = false
+
     public func start(registry: SurfaceRegistry) {
         self.registry = registry
         metadataTimer?.cancel()
@@ -73,7 +81,19 @@ public final class AgentScanner: @unchecked Sendable {
     private func scanAgents() {
         let table = AgentTable.loadFromDisk()
         let changes = AgentDetector.scan(table: table)
-        guard !changes.isEmpty, let registry else { return }
-        registry.applyAgentChanges(changes)
+        if !changes.isEmpty, let registry {
+            registry.applyAgentChanges(changes)
+        }
+        adjustScanCadence(hasActiveAgent: registry?.hasAnyPrimaryAgent() ?? false)
+    }
+
+    /// Reschedule `agentScanTimer` to the fast (~5s) interval while any surface has a detected
+    /// primary agent, or back to the 30s idle baseline once none remain. No-op if the cadence
+    /// hasn't actually changed since the last tick.
+    private func adjustScanCadence(hasActiveAgent: Bool) {
+        guard hasActiveAgent != isFastScanCadence else { return }
+        isFastScanCadence = hasActiveAgent
+        let interval = hasActiveAgent ? Self.activeScanInterval : Self.idleScanInterval
+        agentScanTimer?.schedule(deadline: .now() + interval, repeating: interval)
     }
 }
