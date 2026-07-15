@@ -495,6 +495,15 @@ final class DaemonSyncService {
 
     // MARK: - Metadata refresh
 
+    /// Tab IDs to report via `KouenActiveTabGitBranchDidChange` for a batch of git-branch
+    /// changes. Every changed tab is included — never filtered down to only the currently
+    /// focused one, or a background tab (an agent session not in view) that switches branch
+    /// never reaches `WorktreeAutoIsolateService` and stays pinned to the repo root forever
+    /// (P38 live-testing regression, 2026-07-15).
+    nonisolated static func tabIDsToNotify(forChanges updates: [(WorkspaceID, TabID, String?)]) -> [TabID] {
+        updates.map { $0.1 }
+    }
+
     func startMetadataRefresh() {
         metadataTask?.cancel()
         metadataTask = Task { [weak self] in
@@ -524,23 +533,20 @@ final class DaemonSyncService {
                 guard !updates.isEmpty else { continue }
                 await MainActor.run { [weak self] in
                     guard let self else { return }
-                    var activeTabGitBranchDidChange = false
                     for update in updates {
                         self.logIfFailed(.updateTabGitBranch(
                             workspaceID: update.0,
                             tabID: update.1,
                             branch: update.2
                         ))
-                        if self.snapshot.activeWorkspaceID == update.0,
-                           self.snapshot.activeWorkspace?.activeTab?.id == update.1 {
-                            activeTabGitBranchDidChange = true
-                        }
                     }
                     self.coord.syncFromDaemon(metadataOnly: true)
-                    if activeTabGitBranchDidChange {
+                    let changedTabIDs = Self.tabIDsToNotify(forChanges: updates)
+                    if !changedTabIDs.isEmpty {
                         NotificationCenter.default.post(
                             name: Notification.Name("KouenActiveTabGitBranchDidChange"),
-                            object: nil
+                            object: nil,
+                            userInfo: ["tabIDs": changedTabIDs]
                         )
                     }
                 }
