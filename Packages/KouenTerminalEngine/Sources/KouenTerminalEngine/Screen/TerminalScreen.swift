@@ -273,7 +273,11 @@ final class TerminalScreen {
 
     /// Place a decoded image at the cursor. `cols`/`rows`, when > 0, override the computed cell
     /// footprint (Kitty `c`/`r`, iTerm2 width/height). Advances the cursor below the image.
-    func placeImage(_ image: DecodedImage, cols: Int = 0, rows: Int = 0, z: Int = 0) {
+    /// Returns the internal placement id (renderer/eviction handle — NOT the Kitty protocol's
+    /// client-supplied `i=` image id, which has no meaning at this layer; `a=t`/`a=p`/`a=d`
+    /// by-id semantics are handled one level up, in `TerminalEmulator`).
+    @discardableResult
+    func placeImage(_ image: DecodedImage, cols: Int = 0, rows: Int = 0, z: Int = 0) -> Int {
         let fCols = cols > 0 ? cols : max(1, Int((Double(image.pixelWidth) / Double(max(1, cellPixelWidth))).rounded(.up)))
         let fRows = rows > 0 ? rows : max(1, Int((Double(image.pixelHeight) / Double(max(1, cellPixelHeight))).rounded(.up)))
         let id = nextImageID; nextImageID += 1
@@ -286,6 +290,22 @@ final class TerminalScreen {
         // Move the cursor below the image so following output doesn't overlap it (the placement
         // rides along if these line feeds scroll the screen).
         for _ in 0 ..< fRows { lineFeed() }
+        return id
+    }
+
+    /// Remove one placement by its internal id (from `placeImage`'s return value) — Kitty `a=d`
+    /// delete-by-image-id support. Drops the pixel data too: each `placeImage` call mints a
+    /// fresh internal id, so no other placement can reference the same `imageStore` entry.
+    /// ponytail: marks the whole screen dirty rather than computing the placement's current
+    /// viewport-relative row (which can drift after scrolling since placement time) — deletion
+    /// is rare enough that the extra redraw cost is a non-issue; upgrade path is tracking each
+    /// placement's live row the same way `shiftPlacements`/reflow already do, if this ever needs
+    /// to be cheaper.
+    func deleteImage(id: Int) {
+        guard let idx = placements.firstIndex(where: { $0.id == id }) else { return }
+        let removed = placements.remove(at: idx)
+        if let bytes = imageStore.removeValue(forKey: removed.id)?.byteCount { imageByteTotal -= bytes }
+        markRowsDirty(0 ..< rows)
     }
 
     /// Enforce the per-screen image byte budget by dropping the oldest placements (LRU by age).
