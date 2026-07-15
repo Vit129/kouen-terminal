@@ -304,9 +304,9 @@ private struct AgentRow: View {
 
     private var hookButtonTitle: String {
         switch hookState {
-        case .idle: return AgentHookInstaller.isInstalled(agent: kind) ? "Reinstall Hooks" : "Install Hooks"
+        case .idle: return AgentHookInstaller.isInstalled(agent: kind) ? "✓ Hooks Installed" : "Install Hooks"
         case .installing: return "Installing…"
-        case .installed: return "Reinstall Hooks"
+        case .installed: return "✓ Hooks Installed"
         case .failed: return "Install Hooks"
         }
     }
