@@ -295,6 +295,33 @@ final class AgentHookInstallerTests: XCTestCase {
         XCTAssertEqual(commands.filter { $0.contains("kouen-cli notify") }.count, 1)
     }
 
+    func testAntigravityMergesNamedGroupAtRootAndConverges() throws {
+        // Seed another tool's own top-level hook group to prove it survives the merge —
+        // Antigravity's `hooks.json` has no shared `hooks` wrapper key like Claude/Codex/Cursor;
+        // every tool owns its own named key at the root.
+        let url = try XCTUnwrap(AgentHookInstaller.hookConfigURL(for: .antigravity, homeOverride: home))
+        XCTAssertTrue(url.path.hasSuffix(".gemini/config/hooks.json"))
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try #"{ "other-tool": { "Stop": [ { "type": "command", "command": "echo mine" } ] } }"#
+            .write(to: url, atomically: true, encoding: .utf8)
+
+        func stopCommands(_ groupKey: String) throws -> [String] {
+            let json = try XCTUnwrap(JSONSerialization.jsonObject(with: try Data(contentsOf: url)) as? [String: Any])
+            let stop = try XCTUnwrap((json[groupKey] as? [String: Any])?["Stop"] as? [Any])
+            return stop.compactMap { ($0 as? [String: Any])?["command"] as? String }
+        }
+
+        _ = try AgentHookInstaller.install(agent: .antigravity, homeOverride: home)
+        XCTAssertEqual(try stopCommands("other-tool"), ["echo mine"], "sibling tool's own group must survive")
+        XCTAssertEqual(try stopCommands("kouen-notify").filter { $0.contains("kouen-cli notify") }.count, 1)
+        XCTAssertTrue(AgentHookInstaller.isInstalled(agent: .antigravity, homeOverride: home))
+
+        // Reinstall converges to exactly one Kouen entry (array-union dedup), sibling untouched.
+        _ = try AgentHookInstaller.install(agent: .antigravity, homeOverride: home)
+        XCTAssertEqual(try stopCommands("other-tool"), ["echo mine"])
+        XCTAssertEqual(try stopCommands("kouen-notify").filter { $0.contains("kouen-cli notify") }.count, 1)
+    }
+
     func testGrokWritesOwnFlatFileAndLeavesSiblingsAlone() throws {
         let result = try AgentHookInstaller.install(agent: .grok, homeOverride: home)
         XCTAssertTrue(result.path.path.hasSuffix(".grok/hooks/kouen.json"))
