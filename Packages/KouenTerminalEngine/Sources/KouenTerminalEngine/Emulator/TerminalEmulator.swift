@@ -225,6 +225,13 @@ public final class TerminalEmulator: VTParserHandler {
     /// A specific block by id (`TerminalBlock.id`, stable for the pane's lifetime).
     public func block(id: Int) -> TerminalBlock? { blockStore.block(id: id) }
 
+    /// Every captured block for this pane, oldest first (P38 Phase C thread view). Includes the
+    /// current unfinished block if one is open (`outputEndLine == nil`). Note: `promptLine`/output
+    /// ranges are physical-row indices that are NOT rebased after scrollback history eviction —
+    /// a block far enough back may point at a row that's since scrolled out; callers jumping to
+    /// a block must clamp (see `KouenTerminalSurfaceView.jumpToBlock`).
+    public var blocks: [TerminalBlock] { blockStore.blocks }
+
     /// The full buffer as plain-text lines for `capture-pane`. `joinWrapped` (tmux `-J`)
     /// joins soft-wrapped physical rows into their logical line.
     public func captureLines(joinWrapped: Bool) -> [String] { current.captureLines(joinWrapped: joinWrapped) }

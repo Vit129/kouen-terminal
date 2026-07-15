@@ -1,12 +1,36 @@
 import AppKit
 import SwiftUI
 import KouenCore
+import KouenTerminalEngine
 import KouenTerminalKit
 
 /// Borderless panel that can still take key focus.
 @MainActor
 private final class RecipePanel: NSPanel {
     override var canBecomeKey: Bool { true }
+}
+
+/// One entry in the unified picker (P38 Phase C) — a saved `Recipe` (a command you might want to
+/// run) or a `TerminalBlock` from the active pane's captured command history (a command you
+/// already ran). Merged into one flat, searchable list rather than two separate UIs — Recipes
+/// (⌘⇧R) and the original standalone thread-view overlay (⌘⇧L) were consolidated here.
+enum PickerItem: Identifiable {
+    case recipe(Recipe)
+    case historyBlock(TerminalBlock)
+
+    var id: String {
+        switch self {
+        case .recipe(let r): return "recipe-\(r.id.uuidString)"
+        case .historyBlock(let b): return "block-\(b.id)"
+        }
+    }
+
+    var searchableText: String {
+        switch self {
+        case .recipe(let r): return "\(r.name) \(r.command)"
+        case .historyBlock(let b): return b.command
+        }
+    }
 }
 
 @MainActor
@@ -23,7 +47,12 @@ public enum RecipePickerController {
         panel?.close()
 
         let recipes = RecipesStore.shared.recipes
-        let model = RecipePickerModel(recipes: recipes, parentWindow: parent)
+        // Most-recent-first — `TerminalBlock`s come oldest-first from the engine's capture order.
+        let coordinator = SessionCoordinator.shared
+        let historyBlocks: [TerminalBlock] = coordinator.activeSurfaceID
+            .flatMap { coordinator.terminalHostIfExists(for: $0) }
+            .map { Array($0.surfaceView.blocks.reversed()) } ?? []
+        let model = RecipePickerModel(recipes: recipes, historyBlocks: historyBlocks, parentWindow: parent)
         let controller = NSHostingController(rootView: RecipePickerView(model: model))
 
         let panel = RecipePanel(
@@ -78,14 +107,17 @@ public enum RecipePickerController {
 final class RecipePickerModel {
     var query: String = ""
     var selectedIndex: Int = 0
-    var filteredRecipes: [Recipe] = []
+    var filteredItems: [PickerItem] = []
 
-    let allRecipes: [Recipe]
+    let allItems: [PickerItem]
     weak var parentWindow: NSWindow?
     weak var panel: NSPanel?
 
-    init(recipes: [Recipe], parentWindow: NSWindow?) {
-        self.allRecipes = recipes
+    init(recipes: [Recipe], historyBlocks: [TerminalBlock], parentWindow: NSWindow?) {
+        // History first (most-recent-first, already reversed by the caller) — "what you just
+        // ran" is the more likely thing you're looking for than a saved recipe when the list is
+        // unfiltered; search still reaches recipes regardless of position.
+        self.allItems = historyBlocks.map(PickerItem.historyBlock) + recipes.map(PickerItem.recipe)
         self.parentWindow = parentWindow
         rebuildFiltered()
     }
@@ -96,23 +128,31 @@ final class RecipePickerModel {
     }
 
     func moveSelection(by offset: Int) {
-        guard !filteredRecipes.isEmpty else { return }
-        selectedIndex = (selectedIndex + offset + filteredRecipes.count) % filteredRecipes.count
+        guard !filteredItems.isEmpty else { return }
+        selectedIndex = (selectedIndex + offset + filteredItems.count) % filteredItems.count
     }
 
     func activateSelected() {
-        guard filteredRecipes.indices.contains(selectedIndex) else { return }
-        let recipe = filteredRecipes[selectedIndex]
+        guard filteredItems.indices.contains(selectedIndex) else { return }
+        let item = filteredItems[selectedIndex]
         panel?.close()
 
         let coordinator = SessionCoordinator.shared
-        if recipe.runImmediately {
+        switch item {
+        case .recipe(let recipe):
+            if recipe.runImmediately {
+                if let surfaceID = coordinator.activeSurfaceID,
+                   let host = coordinator.terminalHostIfExists(for: surfaceID) {
+                    host.sendInput((recipe.command + "\n").data(using: .utf8) ?? Data())
+                }
+            } else {
+                coordinator.openComposer(withInitialText: recipe.command)
+            }
+        case .historyBlock(let block):
             if let surfaceID = coordinator.activeSurfaceID,
                let host = coordinator.terminalHostIfExists(for: surfaceID) {
-                host.sendInput((recipe.command + "\n").data(using: .utf8) ?? Data())
+                host.jumpToBlock(promptLine: block.promptLine)
             }
-        } else {
-            coordinator.openComposer(withInitialText: recipe.command)
         }
     }
 
@@ -122,16 +162,11 @@ final class RecipePickerModel {
 
     private func rebuildFiltered() {
         let trimmed = query.trimmingCharacters(in: .whitespaces)
-        if trimmed.isEmpty {
-            filteredRecipes = allRecipes
-        } else {
-            filteredRecipes = allRecipes.filter { recipe in
-                recipe.name.localizedCaseInsensitiveContains(trimmed) ||
-                recipe.command.localizedCaseInsensitiveContains(trimmed)
-            }
-        }
-        if selectedIndex >= filteredRecipes.count {
-            selectedIndex = max(0, filteredRecipes.count - 1)
+        filteredItems = trimmed.isEmpty
+            ? allItems
+            : allItems.filter { $0.searchableText.localizedCaseInsensitiveContains(trimmed) }
+        if selectedIndex >= filteredItems.count {
+            selectedIndex = max(0, filteredItems.count - 1)
         }
     }
 }
@@ -144,7 +179,7 @@ private struct RecipePickerView: View {
     var body: some View {
         let c = KouenChrome.current
         VStack(spacing: 0) {
-            TextField(text: $model.query, prompt: Text("Search recipes...").foregroundStyle(Color(nsColor: c.textTertiary))) {
+            TextField(text: $model.query, prompt: Text("Search recipes & history...").foregroundStyle(Color(nsColor: c.textTertiary))) {
                 EmptyView()
             }
             .textFieldStyle(.plain)
@@ -164,9 +199,9 @@ private struct RecipePickerView: View {
             ScrollViewReader { proxy in
                 ScrollView(.vertical, showsIndicators: true) {
                     LazyVStack(spacing: 0) {
-                        ForEach(Array(model.filteredRecipes.enumerated()), id: \.element.id) { index, recipe in
-                            RecipeItemRow(
-                                recipe: recipe,
+                        ForEach(Array(model.filteredItems.enumerated()), id: \.element.id) { index, item in
+                            PickerItemRow(
+                                item: item,
                                 query: model.query,
                                 isSelected: index == model.selectedIndex
                             )
@@ -182,8 +217,8 @@ private struct RecipePickerView: View {
                     .padding(.vertical, 4)
                 }
                 .overlay {
-                    if model.filteredRecipes.isEmpty {
-                        Text("No matching recipes")
+                    if model.filteredItems.isEmpty {
+                        Text("No matches")
                             .font(.system(size: 13))
                             .foregroundStyle(Color(nsColor: c.textTertiary))
                     }
@@ -219,8 +254,8 @@ private struct RecipePickerView: View {
 }
 
 @MainActor
-private struct RecipeItemRow: View {
-    let recipe: Recipe
+private struct PickerItemRow: View {
+    let item: PickerItem
     let query: String
     let isSelected: Bool
 
@@ -230,9 +265,9 @@ private struct RecipeItemRow: View {
             ZStack {
                 RoundedRectangle(cornerRadius: KouenDesign.Radius.control, style: .continuous)
                     .fill(Color(nsColor: c.textPrimary.withAlphaComponent(c.isDark ? 0.06 : 0.07)))
-                Image(systemName: recipe.runImmediately ? "play.fill" : "square.and.pencil")
+                Image(systemName: iconName)
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(Color(nsColor: c.textSecondary))
+                    .foregroundStyle(iconColor(c))
             }
             .frame(width: 30, height: 30)
 
@@ -242,7 +277,7 @@ private struct RecipeItemRow: View {
                     .foregroundStyle(Color(nsColor: c.textPrimary))
                     .lineLimit(1)
                     .truncationMode(.tail)
-                Text(recipe.command)
+                Text(subtitle)
                     .font(.system(size: 11.5, weight: .regular))
                     .foregroundStyle(Color(nsColor: c.textTertiary))
                     .lineLimit(1)
@@ -251,9 +286,9 @@ private struct RecipeItemRow: View {
 
             Spacer(minLength: KouenDesign.Spacing.md)
 
-            Text(recipe.runImmediately ? "Run" : "Composer")
+            Text(badgeText)
                 .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(Color(nsColor: c.textTertiary))
+                .foregroundStyle(badgeColor(c))
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
                 .background(
@@ -272,10 +307,51 @@ private struct RecipeItemRow: View {
         }
     }
 
+    private var titleText: String {
+        switch item {
+        case .recipe(let recipe): return recipe.name
+        case .historyBlock(let block): return block.command
+        }
+    }
+
+    private var subtitle: String {
+        switch item {
+        case .recipe(let recipe): return recipe.command
+        case .historyBlock(let block):
+            guard let exitCode = block.exitCode else { return "running…" }
+            return exitCode == 0 ? "done" : "exit \(exitCode)"
+        }
+    }
+
+    private var iconName: String {
+        switch item {
+        case .recipe(let recipe): return recipe.runImmediately ? "play.fill" : "square.and.pencil"
+        case .historyBlock: return "clock.arrow.circlepath"
+        }
+    }
+
+    private func iconColor(_ c: KouenChromePalette) -> Color {
+        if case .historyBlock(let block) = item, let exitCode = block.exitCode, exitCode != 0 {
+            return .red
+        }
+        return Color(nsColor: c.textSecondary)
+    }
+
+    private var badgeText: String {
+        switch item {
+        case .recipe(let recipe): return recipe.runImmediately ? "Run" : "Composer"
+        case .historyBlock: return "Jump"
+        }
+    }
+
+    private func badgeColor(_ c: KouenChromePalette) -> Color {
+        Color(nsColor: c.textTertiary)
+    }
+
     private func highlightedTitle(primary: NSColor, accent: NSColor) -> AttributedString {
-        var result = AttributedString(recipe.name)
+        var result = AttributedString(titleText)
         guard !query.isEmpty else { return result }
-        let lowerTitle = recipe.name.lowercased()
+        let lowerTitle = titleText.lowercased()
         let lowerQuery = query.lowercased()
         var searchStart = lowerTitle.startIndex
         for char in lowerQuery {

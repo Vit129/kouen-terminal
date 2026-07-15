@@ -638,6 +638,12 @@ public final class TerminalHostView: NSView {
         focusTerminal()
     }
 
+    /// Scroll so the block whose prompt started at buffer line `promptLine` sits at the top
+    /// (P38 Phase C — used by the unified Recipes/History picker, `RecipePickerController`).
+    public func jumpToBlock(promptLine: Int) {
+        nativeView.jumpToBlock(promptLine: promptLine)
+    }
+
     // MARK: - Copy mode (in-pane overlay)
 
     public var isInCopyMode: Bool { nativeView.isInCopyMode }

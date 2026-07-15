@@ -58,6 +58,24 @@ final class TerminalBlockStoreTests: XCTestCase {
         XCTAssertNotNil(block?.outputEndLine)
     }
 
+    /// P38 Phase C: `TerminalEmulator.blocks` is the full-list accessor the thread view reads —
+    /// order (oldest first) and the running/finished mix (an open block has `outputEndLine == nil`).
+    func testBlocksReturnsFullListOldestFirstIncludingUnfinished() {
+        let term = TerminalEmulator(cols: 40, rows: 20)
+        term.feed(osc133("A") + "$ ")
+        term.feed(osc133("C;\(b64("swift build"))") + "\r\noutput one\r\n")
+        term.feed(osc133("D;0"))
+        term.feed(osc133("A") + "$ ")
+        term.feed(osc133("C;\(b64("swift test"))") + "\r\nstill going\r\n")
+
+        let all = term.blocks
+        XCTAssertEqual(all.count, 2)
+        XCTAssertEqual(all[0].command, "swift build")
+        XCTAssertNotNil(all[0].outputEndLine, "first block finished")
+        XCTAssertEqual(all[1].command, "swift test")
+        XCTAssertNil(all[1].outputEndLine, "second block still running, no D boundary yet")
+    }
+
     func testLastBlockOnlyReturnsFinishedBlocks() {
         let term = TerminalEmulator(cols: 40, rows: 10)
         term.feed(osc133("A") + "$ ")

@@ -64,10 +64,16 @@ agent work is never a hidden background process.
   is one PTY per pane, not per-process). Flag as the likely hard part; may require design
   discussion before implementation.
 
-### Phase C — Agent "thread" UX on top of existing block capture (vs Zed Terminal Threads)
+### Phase C — Agent "thread" UX on top of existing block capture (vs Zed Terminal Threads) — ⚠️ pivoted 2026-07-15, see p38-phase-c-thread-overlay/{design.md,dev-task-progress.md}
 Zed's Terminal Threads treats each agent CLI session as a searchable thread with turn-level
 structure. We already capture command blocks (P34); missing piece is presenting them as a
 navigable thread rather than raw scrollback.
+
+**Built as a standalone `TerminalThreadOverlay` (⇧⌘L) first, gated green, then deleted during live
+testing** — double-click/filter never worked, and the user asked to merge it with Recipes instead
+of debugging it separately. Current implementation: merged into `RecipePickerController` (⌘⇧R
+only, single flat list of recipes + history). Still missing: a unit test for the merge logic, and
+a live check that selecting a history item actually jumps to its output.
 - **C1** reuse `TerminalBlock`/`BlockSummary` to render a per-pane "thread view" (block list,
   jump-to-block) as an alternate view mode on the existing pane, not a new surface.
 - **C2** cmd-F search should search block boundaries/commands first, fall back to raw scrollback
