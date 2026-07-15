@@ -222,19 +222,31 @@ private struct SidebarSessionItemRow: View {
                 )
 
             HStack(spacing: 0) {
-                Group {
-                    if let kind = tab?.effectiveAgentKind {
-                        Image(nsImage: AgentIconRenderer.templateOrMonogramImage(for: kind, size: 12))
-                            .resizable()
-                            .renderingMode(.template)
-                            .foregroundStyle(agentColor(for: kind))
-                    } else {
-                        Image(systemName: "arrow.triangle.branch")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(Color(nsColor: c.textSecondary))
+                ZStack(alignment: .bottomTrailing) {
+                    Group {
+                        if let kind = tab?.effectiveAgentKind {
+                            Image(nsImage: AgentIconRenderer.templateOrMonogramImage(for: kind, size: 12))
+                                .resizable()
+                                .renderingMode(.template)
+                                .foregroundStyle(agentColor(for: kind))
+                        } else {
+                            Image(systemName: "arrow.triangle.branch")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(Color(nsColor: c.textSecondary))
+                        }
+                    }
+                    .frame(width: 12, height: 12)
+
+                    if let subagents = tab?.subagents, !subagents.isEmpty {
+                        Text("+\(subagents.count)")
+                            .font(.system(size: 6, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(1)
+                            .background(Circle().fill(Color(nsColor: c.accent)))
+                            .offset(x: 3, y: 2)
                     }
                 }
-                .frame(width: 12, height: 12)
+                .help(tab?.effectiveAgentKind.map { subagentTooltip(kind: $0, subagents: tab?.subagents ?? []) } ?? "")
                 .padding(.leading, 8)
 
                 VStack(alignment: .leading, spacing: 1) {
@@ -528,6 +540,18 @@ private struct SidebarSessionItemRow: View {
 
     private func agentColor(for kind: AgentKind) -> Color {
         Color(nsColor: NSColor.fromHex(SessionCoordinator.shared.settings.agentColorHex(for: kind)) ?? KouenDesign.chrome.textSecondary)
+    }
+
+    /// P38 Phase B: presence/kind/age only — the shared PTY makes attributing output bytes to
+    /// a specific subagent impossible, so this deliberately doesn't claim activity state.
+    private func subagentTooltip(kind: AgentKind, subagents: [AgentSnapshot]) -> String {
+        guard !subagents.isEmpty else { return kind.displayName }
+        let lines = subagents.map { sub -> String in
+            let source = sub.pid == 0 ? "hook" : "pid \(sub.pid)"
+            let elapsed = Int(Date().timeIntervalSince(sub.lastActivityAt))
+            return "\(sub.kind.displayName) (\(source), \(elapsed)s)"
+        }
+        return ([kind.displayName] + lines).joined(separator: "\n")
     }
 
     private func checksStatusColor(_ status: GitHubCLIClient.ChecksStatus?) -> Color? {

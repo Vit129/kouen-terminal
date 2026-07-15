@@ -22,6 +22,7 @@ Grep target: `grep -n "RL-<number>\|<keyword>" knowledge/rl-lessons.md`
 - RL-050: Retain cycles in NSEvent local monitors prevent deinit. Use `[weak self]`.
 - RL-051: `NSTableView.view(atColumn:row:makeIfNecessary:)` throws NSRangeException if row ≥ count. Call `reloadData()` BEFORE iterating rows. Guard with `min(rows.count, sessionTable.numberOfRows)`.
 - RL-054: Toggling `isHidden` on NSSplitView subview — always call `split.adjustSubviews()` explicitly to force other subviews to resize.
+- RL-067: A file/line reference from an earlier design pass (even your own, from a since-lost session) can point at DEAD code — this app has both an AppKit component (`AgentChipView` in `KouenDesign.swift`) and the actual live SwiftUI render path (`TerminalTabBarView.swift`/`SidebarSessionListView.swift` render the agent icon inline via `Image(nsImage:)`, never touching `AgentChipView`) for the same visual element, and only one is reachable. Grep for real callers (`grep -rln "ClassName"`) before extending a class a design doc names — "the design said this file" is not the same as "this file is on the render path." Caught during P38 Phase B (2026-07-14) after editing `AgentChipView` for a badge that would never have rendered.
 
 ## Swift 6 / Concurrency
 

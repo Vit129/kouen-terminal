@@ -153,22 +153,38 @@ struct KouenCLI {
                 _ = try checkedRequest(client, .send(surfaceID: surface, text: text))
             case "notify":
                 guard let surface = flagValue(args, flag: "--surface") else {
-                    fputs("Usage: kouen-cli notify --surface <uuid> [--title t] [--body b] [--from-hook]\n", kouenStderr)
+                    fputs("Usage: kouen-cli notify --surface <uuid> [--title t] [--body b] [--from-hook] [--subagent start|stop]\n", kouenStderr)
                     exit(1)
                 }
-                let title = flagValue(args, flag: "--title") ?? "Agent"
-                let fallbackBody = flagValue(args, flag: "--body") ?? flagValue(args, flag: "--message")
-                // `--from-hook`: read the agent's notification payload (JSON) from stdin and use
-                // its `message` for the body. Gated behind the flag (like `set-buffer --stdin`)
-                // so an interactive `notify` never blocks on `readDataToEndOfFile`. Claude Code's
-                // `Notification` hook delivers the message this way — not via an env var.
-                // Both paths resolve through HookNotificationParser so the default body lives in
-                // one place; only `--from-hook` reads stdin, otherwise we resolve with no payload.
-                let parsed = args.contains("--from-hook")
-                    ? HookNotificationParser.parse(FileHandle.standardInput.readDataToEndOfFile())
-                    : nil
-                let body = HookNotificationParser.resolveBody(parsed: parsed, fallbackBody: fallbackBody)
-                _ = try checkedRequest(client, .notify(surfaceID: surface, title: title, body: body))
+                // `--subagent start|stop`: Claude Code's `PreToolUse`(Task)/`SubagentStop` hooks
+                // (P38 Phase B) — a Task-tool subagent starting/stopping. Distinct from the
+                // regular notify path below: no title/body/toast, just a presence signal that
+                // updates the tab's subagent badge.
+                if let subagentFlag = flagValue(args, flag: "--subagent") {
+                    switch subagentFlag {
+                    case "start":
+                        _ = try checkedRequest(client, .setSubagentHint(surfaceID: surface, kind: .claudeCode, active: true))
+                    case "stop":
+                        _ = try checkedRequest(client, .setSubagentHint(surfaceID: surface, kind: .claudeCode, active: false))
+                    default:
+                        fputs("Usage: kouen-cli notify --surface <uuid> --subagent start|stop\n", kouenStderr)
+                        exit(1)
+                    }
+                } else {
+                    let title = flagValue(args, flag: "--title") ?? "Agent"
+                    let fallbackBody = flagValue(args, flag: "--body") ?? flagValue(args, flag: "--message")
+                    // `--from-hook`: read the agent's notification payload (JSON) from stdin and use
+                    // its `message` for the body. Gated behind the flag (like `set-buffer --stdin`)
+                    // so an interactive `notify` never blocks on `readDataToEndOfFile`. Claude Code's
+                    // `Notification` hook delivers the message this way — not via an env var.
+                    // Both paths resolve through HookNotificationParser so the default body lives in
+                    // one place; only `--from-hook` reads stdin, otherwise we resolve with no payload.
+                    let parsed = args.contains("--from-hook")
+                        ? HookNotificationParser.parse(FileHandle.standardInput.readDataToEndOfFile())
+                        : nil
+                    let body = HookNotificationParser.resolveBody(parsed: parsed, fallbackBody: fallbackBody)
+                    _ = try checkedRequest(client, .notify(surfaceID: surface, title: title, body: body))
+                }
             case "install":
                 try installCLI()
             case "ping":

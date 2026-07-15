@@ -221,4 +221,75 @@ final class AgentDetectorTests: XCTestCase {
         XCTAssertNil(AgentTitleInference.kind(from: "   "))
         XCTAssertNil(AgentTitleInference.kind(from: "Shell"))
     }
+
+    // MARK: - resolveDetection (P38 Phase B — subagent grouping, pure logic, no real processes)
+
+    /// A parent Claude Code process spawns a nested child Claude Code process (e.g. a Task-tool
+    /// subprocess shell-out). Primary must be the shallower (user-launched) one; the deeper match
+    /// becomes a subagent tagged with the primary's pid as its parent.
+    func testResolveDetectionNestedSameKindPicksShallowerAsPrimary() {
+        let matches: [AgentDetector.RawMatch] = [
+            .init(pid: 200, depth: 1, kind: .claudeCode, executable: "/usr/bin/claude", source: .ownProcess),
+            .init(pid: 100, depth: 0, kind: .claudeCode, executable: "/usr/bin/claude", source: .ownProcess),
+        ]
+        let parentMap: [Int32: Int32] = [200: 100]
+        let result = AgentDetector.resolveDetection(from: matches, parentMap: parentMap)
+
+        XCTAssertEqual(result.primary?.pid, 100)
+        XCTAssertEqual(result.subagents.count, 1)
+        XCTAssertEqual(result.subagents.first?.pid, 200)
+        XCTAssertEqual(result.subagents.first?.parentPID, 100)
+    }
+
+    /// `bun run claude` — the wrapper (`bun`, depth 0) and its launch target (`claude`, depth 1,
+    /// a child of bun) both match the claudeCode entry. The wrapper must be collapsed away so this
+    /// reports ONE agent, not a phantom wrapper+target pair.
+    func testResolveDetectionCollapsesWrapperLaunchingItsOwnTarget() {
+        let matches: [AgentDetector.RawMatch] = [
+            .init(pid: 10, depth: 0, kind: .claudeCode, executable: "/usr/bin/bun", source: .wrapperLaunch),
+            .init(pid: 11, depth: 1, kind: .claudeCode, executable: "/usr/bin/claude", source: .ownProcess),
+        ]
+        let parentMap: [Int32: Int32] = [11: 10]
+        let result = AgentDetector.resolveDetection(from: matches, parentMap: parentMap)
+
+        XCTAssertEqual(result.primary?.pid, 11)
+        XCTAssertTrue(result.subagents.isEmpty)
+    }
+
+    /// Two same-depth matches must resolve deterministically regardless of input order — lower
+    /// pid wins the tie-break, so a re-scan of an unchanged tree never flaps between them.
+    func testResolveDetectionTieBreaksOnLowerPIDDeterministically() {
+        let ascending: [AgentDetector.RawMatch] = [
+            .init(pid: 50, depth: 0, kind: .claudeCode, executable: "/usr/bin/claude", source: .ownProcess),
+            .init(pid: 60, depth: 0, kind: .claudeCode, executable: "/usr/bin/claude", source: .ownProcess),
+        ]
+        let descending: [AgentDetector.RawMatch] = ascending.reversed()
+
+        XCTAssertEqual(AgentDetector.resolveDetection(from: ascending, parentMap: [:]).primary?.pid, 50)
+        XCTAssertEqual(AgentDetector.resolveDetection(from: descending, parentMap: [:]).primary?.pid, 50)
+    }
+
+    /// A subagent's `parentPID` should point at the nearest OTHER matched ancestor, not
+    /// necessarily the root primary — e.g. primary → subagent A → subagent B should tag B's
+    /// parent as A, not primary.
+    func testResolveDetectionTagsNearestMatchedAncestorNotRoot() {
+        let matches: [AgentDetector.RawMatch] = [
+            .init(pid: 1, depth: 0, kind: .claudeCode, executable: "/usr/bin/claude", source: .ownProcess),
+            .init(pid: 2, depth: 1, kind: .claudeCode, executable: "/usr/bin/claude", source: .ownProcess),
+            .init(pid: 3, depth: 2, kind: .claudeCode, executable: "/usr/bin/claude", source: .ownProcess),
+        ]
+        // Chain: 1 (unmatched intermediate shell) -> not present; 2's parent is 1, 3's parent is 2.
+        let parentMap: [Int32: Int32] = [2: 1, 3: 2]
+        let result = AgentDetector.resolveDetection(from: matches, parentMap: parentMap)
+
+        XCTAssertEqual(result.primary?.pid, 1)
+        let subagentB = result.subagents.first { $0.pid == 3 }
+        XCTAssertEqual(subagentB?.parentPID, 2)
+    }
+
+    func testResolveDetectionEmptyInputReturnsEmptyDetection() {
+        let result = AgentDetector.resolveDetection(from: [], parentMap: [:])
+        XCTAssertNil(result.primary)
+        XCTAssertTrue(result.subagents.isEmpty)
+    }
 }

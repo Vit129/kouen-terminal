@@ -633,6 +633,17 @@ public final class SurfaceRegistry: @unchecked Sendable {
             commit()
             fireHookLocked(.notificationPosted, surfaceKey: surfaceID)
             return .ok
+        case let .setSubagentHint(surfaceID, kind, active):
+            if active {
+                AgentDetector.registerSubagentHint(kind: kind, forSurfaceKey: surfaceID)
+            } else {
+                AgentDetector.clearSubagentHint(forSurfaceKey: surfaceID)
+            }
+            // Apply immediately rather than waiting for the next scan tick (up to 30s idle
+            // cadence) — a hook push should feel near-instant, unlike the proc-scan fallback.
+            editor.setSubagents(AgentDetector.mergedSubagents(forSurfaceKey: surfaceID), forSurfaceKey: surfaceID)
+            commit()
+            return .ok
         case let .clearNotification(surfaceID):
             if let uuid = UUID(uuidString: surfaceID) {
                 editor.clearTabNotification(surfaceID: uuid)
@@ -1209,15 +1220,17 @@ public final class SurfaceRegistry: @unchecked Sendable {
         session?.cancelSubscription(token: token)
     }
 
-    public func applyAgentChanges(_ changes: [String: AgentSnapshot?]) {
+    public func applyAgentChanges(_ changes: [String: AgentDetector.AgentDetection]) {
         lock.lock()
         defer { lock.unlock() }
         // Fire agent-state-changed only on an actual activity transition, so a steady
         // "working" stream of scans doesn't spam the hook.
         var transitioned: [String] = []
-        for (surfaceKey, snapshot) in changes {
+        for (surfaceKey, detection) in changes {
+            let snapshot = detection.primary
             let before = agentActivityString(forSurfaceKey: surfaceKey)
             editor.setAgent(snapshot, forSurfaceKey: surfaceKey)
+            editor.setSubagents(detection.subagents, forSurfaceKey: surfaceKey)
             if before != snapshot?.activity.rawValue { transitioned.append(surfaceKey) }
             // An agent that resumed producing output is no longer "waiting on the user" —
             // clear a stale `waiting` status (left by a notify/stop hook) on the transition
@@ -1229,6 +1242,16 @@ public final class SurfaceRegistry: @unchecked Sendable {
         }
         commit()
         for surfaceKey in transitioned { fireHookLocked(.agentStateChanged, surfaceKey: surfaceKey) }
+    }
+
+    /// True if any tab currently has a detected primary agent — drives `AgentScanner`'s
+    /// adaptive scan cadence (P38 Phase B).
+    public func hasAnyPrimaryAgent() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return editor.snapshot.workspaces.contains {
+            $0.sessions.contains { $0.tabs.contains { $0.agent != nil } }
+        }
     }
 
     /// Reset a `waiting` tab back to idle (clearing its notification text). No-op — and no
@@ -2024,6 +2047,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
             // without these clears, list-agents/the notch/tab chips keep showing the old agent
             // and any waiting-notification on a dead pane until respawn.
             editor.setAgent(nil, forSurfaceKey: surfaceID)
+            editor.setSubagents([], forSurfaceKey: surfaceID)
             if let sid = UUID(uuidString: surfaceID) {
                 editor.clearTabNotification(surfaceID: sid)
                 editor.setTabExitStatus(surfaceID: sid, status: exitStatus.map(Int.init))

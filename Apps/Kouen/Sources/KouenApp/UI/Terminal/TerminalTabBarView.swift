@@ -335,12 +335,23 @@ private struct TabPillView: View {
             workingDot
 
             if let kind = tab.effectiveAgentKind {
-                Image(nsImage: AgentIconRenderer.templateOrMonogramImage(for: kind, size: 12))
-                    .resizable()
-                    .renderingMode(.template)
-                    .foregroundStyle(agentColor(for: kind))
-                    .frame(width: 12, height: 12)
-                    .help(kind.displayName)
+                ZStack(alignment: .bottomTrailing) {
+                    Image(nsImage: AgentIconRenderer.templateOrMonogramImage(for: kind, size: 12))
+                        .resizable()
+                        .renderingMode(.template)
+                        .foregroundStyle(agentColor(for: kind))
+                        .frame(width: 12, height: 12)
+
+                    if let subagents = tab.subagents, !subagents.isEmpty {
+                        Text("+\(subagents.count)")
+                            .font(.system(size: 7, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 2)
+                            .background(Circle().fill(Color(c.accent)))
+                            .offset(x: 4, y: 3)
+                    }
+                }
+                .help(subagentTooltip(kind: kind, subagents: tab.subagents ?? []))
             }
 
             VStack(alignment: .leading, spacing: -1) {
@@ -549,6 +560,18 @@ private struct TabPillView: View {
 
     private func agentColor(for kind: AgentKind) -> Color {
         Color(nsColor: NSColor.fromHex(SessionCoordinator.shared.settings.agentColorHex(for: kind)) ?? KouenDesign.chrome.textSecondary)
+    }
+
+    /// P38 Phase B: presence/kind/age only — the shared PTY makes attributing output bytes to
+    /// a specific subagent impossible, so this deliberately doesn't claim activity state.
+    private func subagentTooltip(kind: AgentKind, subagents: [AgentSnapshot]) -> String {
+        guard !subagents.isEmpty else { return kind.displayName }
+        let lines = subagents.map { sub -> String in
+            let source = sub.pid == 0 ? "hook" : "pid \(sub.pid)"
+            let elapsed = Int(Date().timeIntervalSince(sub.lastActivityAt))
+            return "\(sub.kind.displayName) (\(source), \(elapsed)s)"
+        }
+        return ([kind.displayName] + lines).joined(separator: "\n")
     }
 }
 

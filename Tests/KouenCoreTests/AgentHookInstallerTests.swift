@@ -222,6 +222,52 @@ final class AgentHookInstallerTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: home.appendingPathComponent(".codex/config.toml").path))
     }
 
+    /// P38 Phase B: Claude Code's Task-subagent hooks — matcher must be scoped to `Task` (not
+    /// `*`, which would fire on every tool call), and correctly idempotent/pruned on reinstall.
+    func testClaudeInstallsSubagentHooksScopedToTaskMatcher() throws {
+        let result = try AgentHookInstaller.install(agent: .claudeCode, homeOverride: home)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: try Data(contentsOf: result.path)) as? [String: Any])
+        let hooks = try XCTUnwrap(json["hooks"] as? [String: Any])
+
+        let preToolUse = try XCTUnwrap(hooks["PreToolUse"] as? [[String: Any]])
+        XCTAssertEqual(preToolUse.count, 1)
+        XCTAssertEqual(preToolUse.first?["matcher"] as? String, "Task")
+        let preToolUseCommand = try XCTUnwrap(((preToolUse.first?["hooks"] as? [[String: Any]])?.first)?["command"] as? String)
+        XCTAssertTrue(preToolUseCommand.contains("--subagent start"))
+
+        let subagentStop = try XCTUnwrap(hooks["SubagentStop"] as? [[String: Any]])
+        let stopCommand = try XCTUnwrap(((subagentStop.first?["hooks"] as? [[String: Any]])?.first)?["command"] as? String)
+        XCTAssertTrue(stopCommand.contains("--subagent stop"))
+
+        // Reinstall converges to exactly one entry each (prune works), same as every other event.
+        _ = try AgentHookInstaller.install(agent: .claudeCode, homeOverride: home)
+        let reinstalled = try XCTUnwrap(JSONSerialization.jsonObject(with: try Data(contentsOf: result.path)) as? [String: Any])
+        let reinstalledHooks = try XCTUnwrap(reinstalled["hooks"] as? [String: Any])
+        XCTAssertEqual((reinstalledHooks["PreToolUse"] as? [Any])?.count, 1)
+        XCTAssertEqual((reinstalledHooks["SubagentStop"] as? [Any])?.count, 1)
+    }
+
+    /// A user's own unrelated `PreToolUse` hook (e.g. a `Bash` matcher) must survive install —
+    /// `managedEvents` now includes `PreToolUse` for prune purposes, but prune must only remove
+    /// Kouen-owned entries by content marker, not wipe the whole event array.
+    func testClaudeInstallPreservesUsersOwnPreToolUseHook() throws {
+        let url = try XCTUnwrap(AgentHookInstaller.hookConfigURL(for: .claudeCode, homeOverride: home))
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let existing = #"""
+        { "hooks": { "PreToolUse": [
+          { "matcher": "Bash", "hooks": [ { "type": "command", "command": "echo my-own-hook" } ] }
+        ] } }
+        """#
+        try existing.write(to: url, atomically: true, encoding: .utf8)
+
+        _ = try AgentHookInstaller.install(agent: .claudeCode, homeOverride: home)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: try Data(contentsOf: url)) as? [String: Any])
+        let preToolUse = try XCTUnwrap((json["hooks"] as? [String: Any])?["PreToolUse"] as? [[String: Any]])
+        let matchers = preToolUse.compactMap { $0["matcher"] as? String }
+        XCTAssertTrue(matchers.contains("Bash"), "user's own PreToolUse entry must survive")
+        XCTAssertTrue(matchers.contains("Task"), "Kouen's Task entry must be added")
+    }
+
     func testCursorInstallsStopHookArrayShape() throws {
         // Seed the user's own stop hook to prove it survives the merge.
         let url = try XCTUnwrap(AgentHookInstaller.hookConfigURL(for: .cursor, homeOverride: home))

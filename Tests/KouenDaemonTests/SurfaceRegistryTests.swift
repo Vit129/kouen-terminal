@@ -507,7 +507,8 @@ final class SurfaceRegistryTests: XCTestCase {
         }
         // Drive the same path the AgentScanner uses to write agent state into the snapshot.
         registry.applyAgentChanges([
-            target.surfaceID: AgentSnapshot(kind: .claudeCode, executable: "/bin/claude", pid: 99, activity: .working),
+            target.surfaceID: AgentDetector.AgentDetection(
+                primary: AgentSnapshot(kind: .claudeCode, executable: "/bin/claude", pid: 99, activity: .working)),
         ])
 
         guard case let .agents(agents) = registry.handle(.listAgents) else {
@@ -526,7 +527,8 @@ final class SurfaceRegistryTests: XCTestCase {
             return XCTFail("expected a default surface")
         }
         registry.applyAgentChanges([
-            target.surfaceID: AgentSnapshot(kind: .codex, executable: "/bin/codex", pid: 7, activity: .awaiting),
+            target.surfaceID: AgentDetector.AgentDetection(
+                primary: AgentSnapshot(kind: .codex, executable: "/bin/codex", pid: 7, activity: .awaiting)),
         ])
         guard case .ok = registry.handle(.notify(surfaceID: target.surfaceID, title: "Codex", body: "Approve?")) else {
             return XCTFail("expected ok")
@@ -547,7 +549,8 @@ final class SurfaceRegistryTests: XCTestCase {
         }
         // Agent stops and notifies → tab goes .waiting (the stop-hook path).
         registry.applyAgentChanges([
-            target.surfaceID: AgentSnapshot(kind: .codex, executable: "/bin/codex", pid: 7, activity: .idle),
+            target.surfaceID: AgentDetector.AgentDetection(
+                primary: AgentSnapshot(kind: .codex, executable: "/bin/codex", pid: 7, activity: .idle)),
         ])
         guard case .ok = registry.handle(.notify(surfaceID: target.surfaceID, title: "Codex", body: "Done")) else {
             return XCTFail("expected ok")
@@ -557,15 +560,52 @@ final class SurfaceRegistryTests: XCTestCase {
         // The agent starts a new turn (idle → working): the stale waiting must clear,
         // otherwise it suppresses the tab's working indicator for the whole turn.
         registry.applyAgentChanges([
-            target.surfaceID: AgentSnapshot(kind: .codex, executable: "/bin/codex", pid: 7, activity: .working),
+            target.surfaceID: AgentDetector.AgentDetection(
+                primary: AgentSnapshot(kind: .codex, executable: "/bin/codex", pid: 7, activity: .working)),
         ])
         XCTAssertEqual(statusOfTab(backing: target.surfaceID, in: registry), .idle)
 
         // A steady working stream must not keep rewriting the status.
         registry.applyAgentChanges([
-            target.surfaceID: AgentSnapshot(kind: .codex, executable: "/bin/codex", pid: 7, activity: .working),
+            target.surfaceID: AgentDetector.AgentDetection(
+                primary: AgentSnapshot(kind: .codex, executable: "/bin/codex", pid: 7, activity: .working)),
         ])
         XCTAssertEqual(statusOfTab(backing: target.surfaceID, in: registry), .idle)
+    }
+
+    /// P38 Phase B: `applyAgentChanges` must write subagents onto the tab snapshot alongside
+    /// the primary agent, and bump the revision so clients actually see the change.
+    func testApplyAgentChangesWritesSubagentsOntoTab() {
+        let registry = SurfaceRegistry()
+        guard case let .surfaces(surfaces) = registry.handle(.listSurfaces), let target = surfaces.first else {
+            return XCTFail("expected a default surface")
+        }
+        let revisionBefore = registry.snapshot.revision
+        let sub = AgentSnapshot(kind: .claudeCode, executable: "/bin/claude", pid: 200, parentPID: 99)
+        registry.applyAgentChanges([
+            target.surfaceID: AgentDetector.AgentDetection(
+                primary: AgentSnapshot(kind: .claudeCode, executable: "/bin/claude", pid: 99, activity: .working),
+                subagents: [sub]),
+        ])
+
+        let tab = registry.snapshot.workspaces
+            .flatMap { $0.sessions.flatMap(\.tabs) }
+            .first { $0.rootPane.allSurfaceIDs().contains(UUID(uuidString: target.surfaceID)!) }
+        XCTAssertEqual(tab?.subagents?.count, 1)
+        XCTAssertEqual(tab?.subagents?.first?.pid, 200)
+        XCTAssertEqual(tab?.subagents?.first?.parentPID, 99)
+        XCTAssertGreaterThan(registry.snapshot.revision, revisionBefore)
+
+        // Subagent list clearing (process exited) must also land.
+        registry.applyAgentChanges([
+            target.surfaceID: AgentDetector.AgentDetection(
+                primary: AgentSnapshot(kind: .claudeCode, executable: "/bin/claude", pid: 99, activity: .working),
+                subagents: []),
+        ])
+        let clearedTab = registry.snapshot.workspaces
+            .flatMap { $0.sessions.flatMap(\.tabs) }
+            .first { $0.rootPane.allSurfaceIDs().contains(UUID(uuidString: target.surfaceID)!) }
+        XCTAssertNil(clearedTab?.subagents)
     }
 
     private func statusOfTab(backing surfaceID: String, in registry: SurfaceRegistry) -> TabStatus? {
