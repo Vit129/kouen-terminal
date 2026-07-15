@@ -29,13 +29,36 @@ and replaced by a merge into the existing Recipes picker. Current architecture:
 - [x] 14. `Tests/KouenAppTests/RecipePickerModelMergeTests.swift` (11 tests) — `PickerItem` id/searchableText per kind, merge ordering (history before recipes, caller order preserved), query filtering across both kinds (case-insensitive, empty-query restore, no-match clears), `selectedIndex` clamp-on-shrink, `moveSelection` wrap-around both directions and no-op on empty. `TerminalBlock` fixtures built via real OSC 133 feed through `TerminalEmulator` (same pattern as `TerminalBlockStoreTests` — the struct's memberwise init is internal to `KouenTerminalEngine`, can't construct directly cross-module). Does not cover `activateSelected()`'s dispatch to `jumpToBlock`/send/composer — that needs a live `SessionCoordinator`/`TerminalHostView`, no meaningful way to assert it without one; left for the live check below.
 - [ ] 15. **Live check (required, not done)**: open ⌘⇧R, confirm the list shows both saved recipes and recent history in one flat list, search filters both, and selecting a history item (click / double-click / Enter) jumps the terminal viewport to that command's output correctly — this exact interaction was the one that never worked in the deleted overlay and has not been re-verified since the rewrite.
 
+## Thread grouping — Zed framing folded into the same picker (2026-07-15)
+
+User asked whether Zed's turn-by-turn "thread" framing (missing from the flat-list pivot above)
+could be added without a second shortcut. Clarified via `AskUserQuestion`: group by originating
+pane, rendered as inline headers in the existing list — not a separate UI or filter chip.
+
+- [x] 16. `PickerItem.historyBlock` now carries `surfaceID` and `paneLabel`, not just the bare
+  `TerminalBlock` — needed so `activateSelected()` can jump the pane a block actually came from
+  (`coord.setActiveSurface(surfaceID)` + `host.jumpToBlock`) instead of always assuming the
+  currently-active pane, now that history spans every pane in the tab.
+- [x] 17. `RecipePickerController.present`: gathers history from every leaf in the active tab's
+  `rootPane` (was: only `coordinator.activeSurfaceID`), tagging each block with its pane's
+  `PaneSurface.label` (falls back to `"Pane N"` by position if unset).
+- [x] 18. `PickerItem.groupLabel` (nil for recipes) + `GroupHeaderRow` — `RecipePickerView`'s
+  `ForEach` inserts a header whenever consecutive items' `groupLabel` differs, via a local
+  `Array.subscript(safe:)` helper (no cross-package dependency pulled in for one one-liner).
+- [x] 19. Tests: 3 new cases in `RecipePickerModelMergeTests.swift` — group label per kind,
+  multi-pane history stays grouped (not interleaved by time) when the caller concatenates panes
+  in order. 14/14 pass.
+- [x] 20. Gate: `swift build`/`Tests/robot/run.sh` green (27/27).
+
 ## Summary
 
-Completed: 14 (3 still-valid plumbing tasks + 6 overlay tasks now moot/reverted + 5 pivot tasks).
-Remaining: 1 — live check of the jump-to-block interaction in the new UI (15).
+Completed: 19 (3 still-valid plumbing tasks + 6 overlay tasks now moot/reverted + 5 pivot tasks +
+5 grouping tasks). Remaining: 1 — live check (15), now also covering thread-header rendering and
+cross-pane jump-to-block, neither of which has been seen live yet.
 
 ## Status: Implementation pivoted mid-phase from a standalone overlay to a merge into the existing
-Recipes picker, per explicit user direction during live testing. Build/test/robot green, including
-a new regression test for the merge/filter logic. Still missing the live check that would confirm
-whether the original double-click/jump bug survived the rewrite — `activateSelected()`'s dispatch
-to `jumpToBlock` is the one path the unit test above can't reach without a live coordinator.
+Recipes picker, per explicit user direction during live testing, then extended with per-pane
+"thread" grouping folded into the same single-shortcut picker. Build/test/robot green throughout.
+Still missing the live check — now the largest remaining risk, since cross-pane jump-to-block
+(`activateSelected()` targeting a non-active pane's surface) is new, untested-live behavior on top
+of the original double-click bug that motivated the whole pivot.

@@ -11,24 +11,36 @@ private final class RecipePanel: NSPanel {
 }
 
 /// One entry in the unified picker (P38 Phase C) — a saved `Recipe` (a command you might want to
-/// run) or a `TerminalBlock` from the active pane's captured command history (a command you
-/// already ran). Merged into one flat, searchable list rather than two separate UIs — Recipes
-/// (⌘⇧R) and the original standalone thread-view overlay (⌘⇧L) were consolidated here.
+/// run) or a `TerminalBlock` from a pane's captured command history (a command you already ran).
+/// Merged into one flat, searchable list rather than two separate UIs — Recipes (⌘⇧R) and the
+/// original standalone thread-view overlay (⌘⇧L) were consolidated here. A history block carries
+/// its own `surfaceID` (so activating it jumps the pane it actually came from, not whatever pane
+/// happens to be active) and a `paneLabel` (so the list can group history by originating pane —
+/// Zed's "thread" framing, folded into this same picker instead of a dedicated UI).
 enum PickerItem: Identifiable {
     case recipe(Recipe)
-    case historyBlock(TerminalBlock)
+    case historyBlock(TerminalBlock, surfaceID: SurfaceID, paneLabel: String)
 
     var id: String {
         switch self {
         case .recipe(let r): return "recipe-\(r.id.uuidString)"
-        case .historyBlock(let b): return "block-\(b.id)"
+        case .historyBlock(let b, _, _): return "block-\(b.id)"
         }
     }
 
     var searchableText: String {
         switch self {
         case .recipe(let r): return "\(r.name) \(r.command)"
-        case .historyBlock(let b): return b.command
+        case .historyBlock(let b, _, _): return b.command
+        }
+    }
+
+    /// The pane this item's history came from — nil for recipes (they aren't part of any
+    /// pane's thread). Consecutive items sharing a group label render one header between them.
+    var groupLabel: String? {
+        switch self {
+        case .recipe: return nil
+        case .historyBlock(_, _, let label): return label
         }
     }
 }
@@ -47,12 +59,20 @@ public enum RecipePickerController {
         panel?.close()
 
         let recipes = RecipesStore.shared.recipes
-        // Most-recent-first — `TerminalBlock`s come oldest-first from the engine's capture order.
         let coordinator = SessionCoordinator.shared
-        let historyBlocks: [TerminalBlock] = coordinator.activeSurfaceID
-            .flatMap { coordinator.terminalHostIfExists(for: $0) }
-            .map { Array($0.surfaceView.blocks.reversed()) } ?? []
-        let model = RecipePickerModel(recipes: recipes, historyBlocks: historyBlocks, parentWindow: parent)
+        // Every pane in the active tab is its own "thread" (Zed's framing, folded into this
+        // picker instead of a dedicated UI) — not just whichever pane happens to be focused.
+        let historyItems: [PickerItem] = (coordinator.snapshot.activeWorkspace?.activeTab?.rootPane.allLeaves() ?? [])
+            .enumerated()
+            .flatMap { index, leaf -> [PickerItem] in
+                guard let surfaceID = leaf.activeSurfaceID ?? leaf.surfaceIDs.first,
+                      let host = coordinator.terminalHostIfExists(for: surfaceID)
+                else { return [] }
+                let paneLabel = leaf.surfaces.first(where: { $0.id == surfaceID })?.label ?? "Pane \(index + 1)"
+                // Most-recent-first — `TerminalBlock`s come oldest-first from the engine's capture order.
+                return host.surfaceView.blocks.reversed().map { .historyBlock($0, surfaceID: surfaceID, paneLabel: paneLabel) }
+            }
+        let model = RecipePickerModel(recipes: recipes, historyItems: historyItems, parentWindow: parent)
         let controller = NSHostingController(rootView: RecipePickerView(model: model))
 
         let panel = RecipePanel(
@@ -113,11 +133,11 @@ final class RecipePickerModel {
     weak var parentWindow: NSWindow?
     weak var panel: NSPanel?
 
-    init(recipes: [Recipe], historyBlocks: [TerminalBlock], parentWindow: NSWindow?) {
+    init(recipes: [Recipe], historyItems: [PickerItem], parentWindow: NSWindow?) {
         // History first (most-recent-first, already reversed by the caller) — "what you just
         // ran" is the more likely thing you're looking for than a saved recipe when the list is
         // unfiltered; search still reaches recipes regardless of position.
-        self.allItems = historyBlocks.map(PickerItem.historyBlock) + recipes.map(PickerItem.recipe)
+        self.allItems = historyItems + recipes.map(PickerItem.recipe)
         self.parentWindow = parentWindow
         rebuildFiltered()
     }
@@ -148,9 +168,11 @@ final class RecipePickerModel {
             } else {
                 coordinator.openComposer(withInitialText: recipe.command)
             }
-        case .historyBlock(let block):
-            if let surfaceID = coordinator.activeSurfaceID,
-               let host = coordinator.terminalHostIfExists(for: surfaceID) {
+        case .historyBlock(let block, let surfaceID, _):
+            // Jump the pane the block actually came from — it may not be the one currently
+            // focused, now that history spans every pane in the tab, not just the active one.
+            if let host = coordinator.terminalHostIfExists(for: surfaceID) {
+                coordinator.setActiveSurface(surfaceID)
                 host.jumpToBlock(promptLine: block.promptLine)
             }
         }
@@ -198,8 +220,11 @@ private struct RecipePickerView: View {
 
             ScrollViewReader { proxy in
                 ScrollView(.vertical, showsIndicators: true) {
-                    LazyVStack(spacing: 0) {
+                    LazyVStack(spacing: 0, pinnedViews: []) {
                         ForEach(Array(model.filteredItems.enumerated()), id: \.element.id) { index, item in
+                            if let label = item.groupLabel, model.filteredItems[safe: index - 1]?.groupLabel != label {
+                                GroupHeaderRow(label: label)
+                            }
                             PickerItemRow(
                                 item: item,
                                 query: model.query,
@@ -250,6 +275,25 @@ private struct RecipePickerView: View {
             model.close()
             return .handled
         }
+    }
+}
+
+/// Marks where one pane's history ("thread") starts in the list — Zed's turn-by-turn framing,
+/// folded into this single flat list instead of a dedicated thread UI.
+@MainActor
+private struct GroupHeaderRow: View {
+    let label: String
+
+    var body: some View {
+        let c = KouenChrome.current
+        Text(label.uppercased())
+            .font(.system(size: 10, weight: .semibold))
+            .tracking(0.5)
+            .foregroundStyle(Color(nsColor: c.textTertiary))
+            .padding(.horizontal, KouenDesign.Spacing.xl)
+            .padding(.top, KouenDesign.Spacing.sm)
+            .padding(.bottom, 2)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -310,14 +354,14 @@ private struct PickerItemRow: View {
     private var titleText: String {
         switch item {
         case .recipe(let recipe): return recipe.name
-        case .historyBlock(let block): return block.command
+        case .historyBlock(let block, _, _): return block.command
         }
     }
 
     private var subtitle: String {
         switch item {
         case .recipe(let recipe): return recipe.command
-        case .historyBlock(let block):
+        case .historyBlock(let block, _, _):
             guard let exitCode = block.exitCode else { return "running…" }
             return exitCode == 0 ? "done" : "exit \(exitCode)"
         }
@@ -331,7 +375,7 @@ private struct PickerItemRow: View {
     }
 
     private func iconColor(_ c: KouenChromePalette) -> Color {
-        if case .historyBlock(let block) = item, let exitCode = block.exitCode, exitCode != 0 {
+        if case .historyBlock(let block, _, _) = item, let exitCode = block.exitCode, exitCode != 0 {
             return .red
         }
         return Color(nsColor: c.textSecondary)
@@ -397,6 +441,10 @@ private struct RecipePickerFooter: View {
                 .foregroundStyle(Color(nsColor: c.textTertiary))
         }
     }
+}
+
+private extension Array {
+    subscript(safe index: Int) -> Element? { indices.contains(index) ? self[index] : nil }
 }
 
 private struct OverlayBackground: NSViewRepresentable {
