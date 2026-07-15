@@ -115,6 +115,14 @@ extension KouenTerminalSurfaceView {
         onScrollChanged?(historyCount - scrollOffset, historyCount + rows, rows)
     }
 
+    /// Scroll so the block whose prompt started at buffer line `promptLine` sits at the top
+    /// (P38 Phase C thread view). `promptLine` is not rebased after scrollback history eviction —
+    /// `scrollToBufferLine` already clamps to `[0, historyCount]`, so a stale/evicted index lands
+    /// at the nearest valid edge rather than out of bounds.
+    public func jumpToBlock(promptLine: Int) {
+        scrollToBufferLine(max(0, promptLine))
+    }
+
     // MARK: - Jump to prompt (OSC 133)
 
     /// Scroll so the nearest shell-prompt row *above* the current top-of-viewport line sits at the

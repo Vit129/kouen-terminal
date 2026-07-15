@@ -7,6 +7,8 @@ extension KouenTerminalSurfaceView {
     /// The block (exact command, output line range, exit code) whose prompt is at `line`, or
     /// nil if that shell doesn't emit OSC 133 `C` yet (e.g. bash) or the block hasn't started.
     public func block(atPromptLine line: Int) -> TerminalBlock? { emulatorSync { $0.block(atPromptLine: line) } }
+    /// Every captured block, oldest first (P38 Phase C thread view).
+    public var blocks: [TerminalBlock] { emulatorSync { $0.blocks } }
     /// Plain-text lines for a physical-row range (inclusive) — a `TerminalBlock`'s
     /// `outputStartLine...outputEndLine`, for Copy Output Only.
     public func text(fromLine start: Int, toLine end: Int) -> String {

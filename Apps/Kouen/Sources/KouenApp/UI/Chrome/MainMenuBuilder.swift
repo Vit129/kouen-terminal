@@ -162,7 +162,7 @@ enum MainMenuBuilder {
         view.submenu?.addItem(hintItem)
         let composerItem = menuItem("Composer", action: #selector(MenuTarget.openComposer), binding: BannerShortcutRegistry.composer)
         view.submenu?.addItem(composerItem)
-        let recipesItem = menuItem("Recipes…", action: #selector(MenuTarget.recipes), binding: BannerShortcutRegistry.recipes)
+        let recipesItem = menuItem("Recipes & History…", action: #selector(MenuTarget.recipes), binding: BannerShortcutRegistry.recipes)
         view.submenu?.addItem(recipesItem)
         let jumpToDirItem = menuItem("Jump to Directory…", action: #selector(MenuTarget.jumpToDirectory), binding: BannerShortcutRegistry.jumpToDirectory)
         view.submenu?.addItem(jumpToDirItem)
