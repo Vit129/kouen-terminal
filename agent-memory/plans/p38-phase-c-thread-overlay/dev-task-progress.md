@@ -26,16 +26,16 @@ and replaced by a merge into the existing Recipes picker. Current architecture:
 - [x] 11. `RecipePickerView`/`PickerItemRow` (renamed from `RecipeItemRow`): renders both item kinds — history rows get a clock icon, red-tinted "exit N" subtitle on failure, "Jump" badge; recipe rows unchanged. Search placeholder updated to "Search recipes & history...".
 - [x] 12. Single shortcut: removed the duplicate `BannerShortcutRegistry.threadView` (⇧⌘L) and its "Recent Commands" menu item alias — ⌘⇧R is the only entry point, per explicit user request after confirming the merged picker worked. Menu item renamed "Recipes…" → "Recipes & History…".
 - [x] 13. Gate: `swift build --product Kouen` green, `Tests/robot/run.sh` green (26/26).
-- [ ] 14. **No unit test exists yet for the merged `PickerItem`/`RecipePickerModel` logic** — the deleted `ThreadOverlayTests.swift` was never replaced. Worth adding before this phase is called done: filtering across both item kinds, most-recent-history-first ordering, `activateSelected()` dispatching to `jumpToBlock` for a history item vs send/composer for a recipe.
+- [x] 14. `Tests/KouenAppTests/RecipePickerModelMergeTests.swift` (11 tests) — `PickerItem` id/searchableText per kind, merge ordering (history before recipes, caller order preserved), query filtering across both kinds (case-insensitive, empty-query restore, no-match clears), `selectedIndex` clamp-on-shrink, `moveSelection` wrap-around both directions and no-op on empty. `TerminalBlock` fixtures built via real OSC 133 feed through `TerminalEmulator` (same pattern as `TerminalBlockStoreTests` — the struct's memberwise init is internal to `KouenTerminalEngine`, can't construct directly cross-module). Does not cover `activateSelected()`'s dispatch to `jumpToBlock`/send/composer — that needs a live `SessionCoordinator`/`TerminalHostView`, no meaningful way to assert it without one; left for the live check below.
 - [ ] 15. **Live check (required, not done)**: open ⌘⇧R, confirm the list shows both saved recipes and recent history in one flat list, search filters both, and selecting a history item (click / double-click / Enter) jumps the terminal viewport to that command's output correctly — this exact interaction was the one that never worked in the deleted overlay and has not been re-verified since the rewrite.
 
 ## Summary
 
-Completed: 13 (3 still-valid plumbing tasks + 6 overlay tasks now moot/reverted + 4 pivot tasks).
-Remaining: 2 — regression test for the merged picker logic (14), live check of the jump-to-block
-interaction in the new UI (15).
+Completed: 14 (3 still-valid plumbing tasks + 6 overlay tasks now moot/reverted + 5 pivot tasks).
+Remaining: 1 — live check of the jump-to-block interaction in the new UI (15).
 
 ## Status: Implementation pivoted mid-phase from a standalone overlay to a merge into the existing
-Recipes picker, per explicit user direction during live testing. Build/robot green. Missing a unit
-test for the new merge logic and the live check that would have caught whether the original
-double-click bug survived the rewrite.
+Recipes picker, per explicit user direction during live testing. Build/test/robot green, including
+a new regression test for the merge/filter logic. Still missing the live check that would confirm
+whether the original double-click/jump bug survived the rewrite — `activateSelected()`'s dispatch
+to `jumpToBlock` is the one path the unit test above can't reach without a live coordinator.
