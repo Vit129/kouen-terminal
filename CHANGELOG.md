@@ -8,12 +8,15 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [4.5.3] - 2026-07-16
 
 ### Added
-- Release version bump to v4.5.3.
+- Group Recipes & History picker by originating pane ([`266b74c`](https://github.com/Vit129/kouen-terminal/commit/266b74c349ce5b1995ec08dda419971cd3fc02a1))
+- Add Codex MCP config support (config.toml, not JSON) ([`04a0e19`](https://github.com/Vit129/kouen-terminal/commit/04a0e197812f8e6b47dc4e6fdfc1f16724b6ff01))
+- Add Antigravity (agy) Stop hook support ([`886ab94`](https://github.com/Vit129/kouen-terminal/commit/886ab9476a4404825ee359c2571c6fc656ff5f5e))
+- Check for newer git-clone version at launch, confirm before pull ([#53](https://github.com/Vit129/kouen-terminal/pull/53)) ([`c23b715`](https://github.com/Vit129/kouen-terminal/commit/c23b7157610dd7fc2be0639ef2960fada7075d73))
+- Drag-and-drop file support (terminal open-preview, sidebar copy-in) (release v4.5.3) ([`4becc8b`](https://github.com/Vit129/kouen-terminal/commit/4becc8b98ab6f02629b8e92aa5d23b34fe3254c1))
 
-## [4.5.2] - 2026-07-15
-
-### Added
-- Release version bump to v4.5.2.
+### Fixed
+- Scope kouenBrowserOpen pane reuse to the target tab ([`7fbdd61`](https://github.com/Vit129/kouen-terminal/commit/7fbdd611edc1314f49b2990fcd4ee3e9e2df5ce6))
+- Show checkmark when agent hooks are installed ([`3952882`](https://github.com/Vit129/kouen-terminal/commit/39528824012684c97a9114fb73a40b00b2d78dff))
 
 ## [4.5.1] - 2026-07-15
 
