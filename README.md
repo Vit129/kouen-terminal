@@ -57,6 +57,8 @@ kouen-cli doctor
 kouen-cli ping
 ```
 
+Since Kouen is only ever built locally from this clone, launching the app also checks this repo's `version.json` on `main` once per launch and, on a clean working tree, asks whether to `git pull` when a newer version is available — never automatically. Decline and it won't ask again for that version; a dirty tree gets a notice instead of a prompt.
+
 ### Development Builds
 
 For an isolated dev/test app that does not touch production Kouen state:
