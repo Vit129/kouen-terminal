@@ -277,7 +277,7 @@ public final class KouenTerminalSurfaceView: NSView {
         .png,
     ]
 
-    static func droppedFileURLs(from pasteboard: NSPasteboard) -> [URL] {
+    public static func droppedFileURLs(from pasteboard: NSPasteboard) -> [URL] {
         var urls: [URL] = []
         let options: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
         let objects = pasteboard.readObjects(forClasses: [NSURL.self], options: options) ?? []

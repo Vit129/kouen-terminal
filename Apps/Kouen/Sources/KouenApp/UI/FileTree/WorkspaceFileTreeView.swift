@@ -3,6 +3,7 @@ import AppKit
 import Observation
 import SwiftUI
 import KouenCore
+import KouenTerminalKit
 
 /// Mutable context observed by `FileTreeSwiftUIView`.
 /// Mutating this is safe during a layout pass because SwiftUI will re-render
@@ -90,6 +91,7 @@ final class WorkspaceFileTreeView: NSView {
             }
         }
         setup()
+        registerForDraggedTypes([.fileURL, NSPasteboard.PasteboardType("NSFilenamesPboardType")])
     }
 
     @available(*, unavailable)
@@ -100,6 +102,56 @@ final class WorkspaceFileTreeView: NSView {
     override func keyDown(with event: NSEvent) {
         if keyboard.handle(event) { return }
         super.keyDown(with: event)
+    }
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        externalFileDropOperation(for: sender)
+    }
+
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+        externalFileDropOperation(for: sender)
+    }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        let urls = KouenTerminalSurfaceView.droppedFileURLs(from: sender.draggingPasteboard)
+        guard !urls.isEmpty else { return false }
+        var copiedAny = false
+        for url in urls {
+            let dest = Self.uniqueDestination(base: context.rootPath, name: url.lastPathComponent)
+            do {
+                try FileManager.default.copyItem(at: url, to: URL(fileURLWithPath: dest))
+                copiedAny = true
+            } catch {
+                NSSound.beep()
+            }
+        }
+        if copiedAny {
+            NotificationCenter.default.post(name: .fileTreeDidChange, object: nil)
+        }
+        return copiedAny
+    }
+
+    /// Rows in `FileTreeSwiftUIView` are drag *sources* only (`.onDrag`, to export to
+    /// Finder/other apps) — there's no in-tree drop target, so any drag landing here is
+    /// necessarily external (e.g. Finder).
+    private func externalFileDropOperation(for sender: NSDraggingInfo) -> NSDragOperation {
+        guard !sender.draggingSourceOperationMask.isEmpty else { return [] }
+        return KouenTerminalSurfaceView.droppedFileURLs(from: sender.draggingPasteboard).isEmpty ? [] : .copy
+    }
+
+    /// Appends " 2", " 3", ... before the extension until `name` doesn't already exist
+    /// under `base` — same collision-avoidance the tree's own New File/Folder use.
+    private static func uniqueDestination(base: String, name: String) -> String {
+        let ext = (name as NSString).pathExtension
+        let stem = (name as NSString).deletingPathExtension
+        let suffix = ext.isEmpty ? "" : ".\(ext)"
+        var path = (base as NSString).appendingPathComponent(name)
+        var i = 2
+        while FileManager.default.fileExists(atPath: path) {
+            path = (base as NSString).appendingPathComponent("\(stem) \(i)\(suffix)")
+            i += 1
+        }
+        return path
     }
 
     /// Expands all ancestor directories of `path`, highlights it in the keyboard navigator,

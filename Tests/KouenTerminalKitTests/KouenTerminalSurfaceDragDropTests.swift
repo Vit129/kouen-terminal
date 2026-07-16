@@ -49,6 +49,22 @@ final class KouenTerminalSurfaceDragDropTests: XCTestCase {
         )
     }
 
+    @MainActor
+    func testFileDropRoutingSendsPlainFilesToPreviewAndFoldersToInsert() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("KouenTerminalSurfaceDragDropTests-\(UUID().uuidString)", isDirectory: true)
+        let folder = root.appendingPathComponent("Folder", isDirectory: true)
+        let file = root.appendingPathComponent("notes.txt")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try Data("hi".utf8).write(to: file)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let routing = KouenTerminalSurfaceView.fileDropRouting(for: [folder, file])
+
+        XCTAssertEqual(routing.previewURLs.map(\.path), [file.path])
+        XCTAssertEqual(routing.insertURLs.map(\.path), [folder.path])
+    }
+
     // MARK: - Image paste (screenshot on the clipboard)
 
     @MainActor
