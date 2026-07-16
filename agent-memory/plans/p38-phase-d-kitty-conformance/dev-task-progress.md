@@ -9,10 +9,10 @@ Design: `design.md` (same folder).
 - [x] 5. `respondKitty(_:message:isError:)` — response writeback honoring `q=0/1/2` quiet flag.
 - [x] 6. Tests: `KittyGraphicsConformanceTests.swift` (9 new tests).
 - [x] 7. Gate: `swift build --product Kouen` + `swift test --filter "KittyGraphicsConformanceTests|ImageProtocolTests"` (22/22) + `Tests/robot/run.sh` (26/26) green.
-- [ ] 8. **Live check (required)**: real client (kitten icat / timg / ratatui-image) against `make preview` — query response unblocks probing, transmit+place-by-id works, delete actually clears the image. **Deferred to end of session** alongside Phase B/C/E.
+- [x] 8. ~~Live check (required)~~ — **SKIPPED, closed without live verification per explicit user decision 2026-07-16.** Never confirmed against a real client (kitten icat / timg / ratatui-image) — query-unblocks-probing, transmit+place-by-id, and delete-clears-image are all unverified in practice. Risk accepted by user, not verified by agent.
 
 ## Summary
 
-Completed: 7, Remaining: 1 (live check)
+Completed: 8, Remaining: 0 (live check closed unverified — see task 8 note)
 
-## Status: Implementation complete, build/test/robot green. Live check deferred to end-of-session batch.
+## Status: Implementation complete, build/test/robot green. Closed 2026-07-16 on user instruction, live check skipped.

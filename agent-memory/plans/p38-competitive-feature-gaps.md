@@ -51,7 +51,7 @@ isolation; we have no aggregate view.
   branch (shell out to `git merge`/`git rebase`, surface conflicts inline — do not auto-resolve).
 - Explicitly out of scope for v1: cross-agent conflict prediction, auto-merge, N-way diff UI.
 
-### Phase B — Subagent/teammate visibility as panes (vs cmux)
+### Phase B — Subagent/teammate visibility as panes (vs cmux) — ✅ CLOSED 2026-07-16 (build/test/robot green, live check skipped per user decision)
 cmux auto-splits a new pane whenever a running agent spawns a subagent/teammate, so nested
 agent work is never a hidden background process.
 - **B1 investigate detection surface**: does `AgentDetector`'s process-tree walk already see
@@ -64,7 +64,7 @@ agent work is never a hidden background process.
   is one PTY per pane, not per-process). Flag as the likely hard part; may require design
   discussion before implementation.
 
-### Phase C — Agent "thread" UX on top of existing block capture (vs Zed Terminal Threads) — ⚠️ pivoted 2026-07-15, see p38-phase-c-thread-overlay/{design.md,dev-task-progress.md}
+### Phase C — Agent "thread" UX on top of existing block capture (vs Zed Terminal Threads) — ⚠️ pivoted 2026-07-15, ✅ CLOSED 2026-07-16 (build/test/robot green, cross-pane jump-to-block live check skipped per user decision), see p38-phase-c-thread-overlay/{design.md,dev-task-progress.md}
 Zed's Terminal Threads treats each agent CLI session as a searchable thread with turn-level
 structure. We already capture command blocks (P34); missing piece is presenting them as a
 navigable thread rather than raw scrollback.
@@ -81,7 +81,7 @@ a live check that selecting a history item actually jumps to its output.
 - Verify this doesn't regress the F1-F4 P34 deliverables (see completed-archive.md P34 entry)
   before touching `TerminalBlock`.
 
-### Phase D — Terminal image protocol (Kitty Graphics) — vs WezTerm — ✅ D1 DONE 2026-07-14 (finding: NOT deferred), D3 conformance slice built
+### Phase D — Terminal image protocol (Kitty Graphics) — vs WezTerm — ✅ D1 DONE 2026-07-14 (finding: NOT deferred), D3 conformance slice built, ✅ CLOSED 2026-07-16 (build/test/robot green, real-client live check skipped per user decision)
 **Correction (2026-07-14, Fable-consulted D1 investigation):** this phase's own premise was
 stale. Kitty Graphics (APC `\x1b_G`), Sixel (DCS), and iTerm2 OSC 1337 image protocols were NOT
 deferred from P30 — they shipped 2026-05-30 (`0fc22101`/`1a07a4aa`): full multi-chunk Kitty
@@ -99,7 +99,7 @@ transmit+display level.
   animation, Unicode placeholders/tmux passthrough, `t=f`/`t=s`/`t=t` mediums, `o=z` compression,
   cropping/offsets/placement-ids beyond simple id-based place.
 
-### Phase E — Scripting hook parity (JS vs WezTerm's Lua) — low priority — ✅ DONE 2026-07-14
+### Phase E — Scripting hook parity (JS vs WezTerm's Lua) — low priority — ✅ DONE 2026-07-14, ✅ CLOSED 2026-07-16 (low-priority live check skipped per user decision)
 - **E1** audit which WezTerm-style lifecycle hooks (window-resized, new-tab, pane-focus-changed)
   the JavaScriptCore layer already exposes vs not, before deciding this is worth doing. Don't
   build blind — likely small delta, possibly already covered.

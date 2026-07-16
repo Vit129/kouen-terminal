@@ -27,7 +27,7 @@ and replaced by a merge into the existing Recipes picker. Current architecture:
 - [x] 12. Single shortcut: removed the duplicate `BannerShortcutRegistry.threadView` (⇧⌘L) and its "Recent Commands" menu item alias — ⌘⇧R is the only entry point, per explicit user request after confirming the merged picker worked. Menu item renamed "Recipes…" → "Recipes & History…".
 - [x] 13. Gate: `swift build --product Kouen` green, `Tests/robot/run.sh` green (26/26).
 - [x] 14. `Tests/KouenAppTests/RecipePickerModelMergeTests.swift` (11 tests) — `PickerItem` id/searchableText per kind, merge ordering (history before recipes, caller order preserved), query filtering across both kinds (case-insensitive, empty-query restore, no-match clears), `selectedIndex` clamp-on-shrink, `moveSelection` wrap-around both directions and no-op on empty. `TerminalBlock` fixtures built via real OSC 133 feed through `TerminalEmulator` (same pattern as `TerminalBlockStoreTests` — the struct's memberwise init is internal to `KouenTerminalEngine`, can't construct directly cross-module). Does not cover `activateSelected()`'s dispatch to `jumpToBlock`/send/composer — that needs a live `SessionCoordinator`/`TerminalHostView`, no meaningful way to assert it without one; left for the live check below.
-- [ ] 15. **Live check (required, not done)**: open ⌘⇧R, confirm the list shows both saved recipes and recent history in one flat list, search filters both, and selecting a history item (click / double-click / Enter) jumps the terminal viewport to that command's output correctly — this exact interaction was the one that never worked in the deleted overlay and has not been re-verified since the rewrite.
+- [x] 15. ~~Live check (required, not done)~~ — **SKIPPED, closed without live verification per explicit user decision 2026-07-16.** Cross-pane jump-to-block and the flat recipes+history list have NOT been confirmed working via ⌘⇧R against a real workspace; this was flagged as the largest remaining risk. Risk accepted by user, not verified by agent.
 
 ## Thread grouping — Zed framing folded into the same picker (2026-07-15)
 
@@ -52,13 +52,12 @@ pane, rendered as inline headers in the existing list — not a separate UI or f
 
 ## Summary
 
-Completed: 19 (3 still-valid plumbing tasks + 6 overlay tasks now moot/reverted + 5 pivot tasks +
-5 grouping tasks). Remaining: 1 — live check (15), now also covering thread-header rendering and
-cross-pane jump-to-block, neither of which has been seen live yet.
+Completed: 20 (3 still-valid plumbing tasks + 6 overlay tasks now moot/reverted + 5 pivot tasks +
+5 grouping tasks + task 15 closed unverified). Remaining: 0.
 
 ## Status: Implementation pivoted mid-phase from a standalone overlay to a merge into the existing
 Recipes picker, per explicit user direction during live testing, then extended with per-pane
 "thread" grouping folded into the same single-shortcut picker. Build/test/robot green throughout.
-Still missing the live check — now the largest remaining risk, since cross-pane jump-to-block
-(`activateSelected()` targeting a non-active pane's surface) is new, untested-live behavior on top
-of the original double-click bug that motivated the whole pivot.
+Closed 2026-07-16 on user instruction without the live check — cross-pane jump-to-block
+(`activateSelected()` targeting a non-active pane's surface) remains untested-live; risk accepted
+by user, not verified by agent.

@@ -38,10 +38,10 @@ Design: `design.md` (same folder). Source: `agent-memory/plans/p38-competitive-f
 - [x] 20. Badge built inline as a SwiftUI `ZStack(alignment: .bottomTrailing)` "+N" circle over the existing agent icon in both `TerminalTabBarView.swift` (tab bar chip, ~line 337) and `SidebarSessionListView.swift` (sidebar row icon, ~line 226).
 - [x] 21. Tooltip via `.help(...)`: kind + pid-or-"hook" (pid==0 sentinel) + elapsed seconds since first seen, one `subagentTooltip(kind:subagents:)` helper per file (matches the existing per-file `agentColor(for:)` precedent — not shared, small enough not to warrant a shared module).
 - [x] 22. Full gate: `swift build --product Kouen` green + `swift test --filter "AgentDetectorTests|AgentHookInstallerTests|TabAlertTests|SurfaceRegistryTests"` green (87/87, 3 skipped live-daemon) + `Tests/robot/run.sh` green (26/26, no regression on Phase A's guards).
-- [ ] 23. **Live check (required, not optional)**: real `make preview` workspace — proc-scan path (`claude` running a real Bash-tool subprocess spawn) shows badge within ~5s and clears on exit; hook path (real Task-tool call) shows badge near-instantly; `bun run claude`-style launch shows NO phantom subagent (wrapper-collapse regression check). **Deferred to end of session** alongside Phase C/D/E live checks.
+- [x] 23. ~~Live check (required, not optional)~~ — **SKIPPED, closed without live verification per explicit user decision 2026-07-16.** Build/test/robot green (87/87 / 26/26) stands as the only verification; proc-scan/hook/wrapper-collapse behavior has NOT been confirmed against a real `make preview` workspace. Risk accepted by user, not verified by agent.
 
 ## Summary
 
-Completed: 0, Remaining: 23
+Completed: 23, Remaining: 0 (live check closed unverified — see task 23 note)
 
-## Status: Rewritten 2026-07-14 after original implementation (tasks 1-5) was lost to a concurrent git operation before commit. Restarting from task 1.
+## Status: Rewritten 2026-07-14 after original implementation (tasks 1-5) was lost to a concurrent git operation before commit. Closed 2026-07-16 on user instruction, live check skipped.
