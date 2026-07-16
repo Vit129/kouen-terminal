@@ -7,8 +7,8 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
 ## [4.5.5] - 2026-07-16
 
-### Added
-- Release version bump to v4.5.5.
+### Fixed
+- Forward arrow keys through doCommandBy when input routes via marked-text/IME (release v4.5.5) ([`7b335c0`](https://github.com/Vit129/kouen-terminal/commit/7b335c05f79d1f9e176e9ada644205d4f1074bad))
 
 ## [4.5.4] - 2026-07-16
 
