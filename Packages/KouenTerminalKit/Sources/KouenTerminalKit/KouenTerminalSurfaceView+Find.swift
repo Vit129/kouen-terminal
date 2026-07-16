@@ -240,11 +240,23 @@ extension KouenTerminalSurfaceView {
 
     public override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
         let pasteboard = sender.draggingPasteboard
-        // File URLs (files, folders) → paste shell-quoted paths.
+        // File URLs: plain files open in file preview (same as ⌘-click on a terminal
+        // link / double-click in the sidebar); directories have nothing to preview, so
+        // their shell-quoted path is pasted instead.
         let urls = Self.droppedFileURLs(from: pasteboard)
         if !urls.isEmpty {
-            window?.makeFirstResponder(self)
-            pasteText(Self.droppedPathText(for: urls))
+            let (previewURLs, insertURLs) = Self.fileDropRouting(for: urls)
+            for url in previewURLs {
+                NotificationCenter.default.post(
+                    name: Notification.Name("KouenOpenFilePreview"),
+                    object: nil,
+                    userInfo: ["path": url.path]
+                )
+            }
+            if !insertURLs.isEmpty {
+                window?.makeFirstResponder(self)
+                pasteText(Self.droppedPathText(for: insertURLs))
+            }
             return true
         }
         // Image drag (browser screenshot, Photos, etc.) → write temp PNG, paste path.
@@ -254,6 +266,21 @@ extension KouenTerminalSurfaceView {
             return true
         }
         return false
+    }
+
+    static func fileDropRouting(for urls: [URL]) -> (previewURLs: [URL], insertURLs: [URL]) {
+        var previewURLs: [URL] = []
+        var insertURLs: [URL] = []
+        for url in urls {
+            var isDirectory: ObjCBool = false
+            let exists = FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory)
+            if exists, !isDirectory.boolValue {
+                previewURLs.append(url)
+            } else {
+                insertURLs.append(url)
+            }
+        }
+        return (previewURLs, insertURLs)
     }
 
     private func pathDropOperation(for sender: NSDraggingInfo) -> NSDragOperation {
