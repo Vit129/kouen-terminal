@@ -7,8 +7,8 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
 ## [4.5.4] - 2026-07-16
 
-### Added
-- Release version bump to v4.5.4.
+### Fixed
+- Restore path-insert as default terminal drop (⌥-drag opts into file preview) (release v4.5.4) ([`732491c`](https://github.com/Vit129/kouen-terminal/commit/732491ce8e3deb33667a1328134f9e7e3762c963))
 
 ## [4.5.3] - 2026-07-16
 
