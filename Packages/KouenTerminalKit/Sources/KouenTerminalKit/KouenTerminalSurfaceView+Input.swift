@@ -433,6 +433,27 @@ extension KouenTerminalSurfaceView: @preconcurrency NSTextInputClient {
         scheduleRender()
     }
 
+    /// AppKit routes keys through `interpretKeyEvents` (not the direct `specialKey` path in
+    /// `_keyDown`) while `hasMarkedText()` is true or an input context otherwise claims the
+    /// event. When that happens, unhandled navigation selectors reach here — and since this view
+    /// has no `moveLeft(_:)`/`moveRight(_:)` etc., NSResponder's default `doCommandBy(_:)` was a
+    /// silent no-op: the arrow never reached the PTY. Forward the same set `_keyDown` handles
+    /// directly, so navigation still works whenever a key gets diverted through this path.
+    public func doCommandBy(_ selector: Selector) {
+        let key: SpecialKey?
+        switch selector {
+        case #selector(NSResponder.moveLeft(_:)): key = .left
+        case #selector(NSResponder.moveRight(_:)): key = .right
+        case #selector(NSResponder.moveUp(_:)): key = .up
+        case #selector(NSResponder.moveDown(_:)): key = .down
+        default: key = nil
+        }
+        guard let key else { return }
+        snapToBottom()
+        clearSelection()
+        emit(inputEncoder.encode(key, modes: inputModes()))
+    }
+
     /// RL-040: `nonisolated` bypasses the Swift 6.3 `@objc` thunk actor-isolation check.
     nonisolated public func hasMarkedText() -> Bool {
         MainActor.assumeIsolated { !markedText.isEmpty }
