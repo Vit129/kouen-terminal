@@ -240,11 +240,17 @@ extension KouenTerminalSurfaceView {
 
     public override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
         let pasteboard = sender.draggingPasteboard
-        // File URLs: plain files open in file preview (same as ⌘-click on a terminal
-        // link / double-click in the sidebar); directories have nothing to preview, so
-        // their shell-quoted path is pasted instead.
+        // Plain drop pastes shell-quoted paths — the default, since this same surface
+        // also hosts AI agent CLIs (claude/codex/...), where dropping a file is how you
+        // feed it its path to read. ⌥-drag opts into opening plain files in file preview
+        // instead (same as double-click), for the "I just want to look at this" case.
         let urls = Self.droppedFileURLs(from: pasteboard)
         if !urls.isEmpty {
+            guard NSEvent.modifierFlags.contains(.option) else {
+                window?.makeFirstResponder(self)
+                pasteText(Self.droppedPathText(for: urls))
+                return true
+            }
             let (previewURLs, insertURLs) = Self.fileDropRouting(for: urls)
             for url in previewURLs {
                 NotificationCenter.default.post(
