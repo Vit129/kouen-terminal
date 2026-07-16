@@ -93,6 +93,7 @@ FloatingPaneController.shared.install()
                 self.mainWindowController?.applyChrome()
                 Self.reconcileSessionPersistenceWithMode()
                 OnboardingController.presentIfNeeded()
+                Task { await Self.checkForGitCloneUpdate() }
                 self.externalOpenReady = true
                 if synced {
                     self.drainQueuedExternalOpenURLs()
@@ -160,6 +161,49 @@ FloatingPaneController.shared.install()
         // keep-on-quit default — leaving a fresh Plain install wrongly persistent forever.
         guard SessionCoordinator.shared.requestDaemon(.setKeepSessionsOnQuit(keep)) != nil else { return }
         recordModePersistenceApplied(mode)
+    }
+
+    /// Best-effort, one-shot per launch: offers to pull a newer git-clone checkout. Fired as its
+    /// own unstructured Task (not awaited) so a slow fetch or a user sitting on the confirmation
+    /// alert never delays `externalOpenReady`/queued-open drain above. A fetch failure, a build
+    /// that isn't a git checkout, or an already-dismissed version is silently a no-op — see
+    /// `GitCloneUpdateChecker`'s doc comment.
+    private static func checkForGitCloneUpdate() async {
+        guard let result = await GitCloneUpdateChecker.check() else { return }
+
+        guard !result.dirty else {
+            let alert = NSAlert()
+            alert.messageText = "Kouen update available (v\(result.currentVersion) → v\(result.remoteVersion))"
+            alert.informativeText = "\(result.summary)\n\nYour checkout has uncommitted changes — commit or stash, then pull manually later."
+            alert.alertStyle = .informational
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
+            return
+        }
+
+        let alert = NSAlert()
+        alert.messageText = "Kouen update available (v\(result.currentVersion) → v\(result.remoteVersion))"
+        alert.informativeText = "\(result.updated): \(result.summary)\n\nPull the latest changes now?"
+        alert.alertStyle = .informational
+        let pullButton = alert.addButton(withTitle: "Pull Now")
+        let laterButton = alert.addButton(withTitle: "Not Now")
+        pullButton.keyEquivalent = ""
+        laterButton.keyEquivalent = ""
+
+        guard alert.runModal() == .alertFirstButtonReturn else {
+            GitCloneUpdateChecker.dismiss(version: result.remoteVersion)
+            return
+        }
+
+        let pull = await GitCloneUpdateChecker.pull(gitRoot: result.gitRoot)
+        let resultAlert = NSAlert()
+        resultAlert.messageText = pull.success ? "Update pulled" : "git pull failed"
+        resultAlert.informativeText = pull.success
+            ? (pull.output.isEmpty ? "Restart Kouen to pick up the update." : pull.output)
+            : (pull.output.isEmpty ? "Resolve the conflict manually." : pull.output)
+        resultAlert.alertStyle = pull.success ? .informational : .warning
+        resultAlert.addButton(withTitle: "OK")
+        resultAlert.runModal()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
