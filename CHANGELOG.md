@@ -8,7 +8,7 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [4.6.0] - 2026-07-17
 
 ### Added
-- Release version bump to v4.6.0.
+- Dedupe open-tab repo roots into kouenProjectsList MCP tool (release v4.6.0) ([`b3cffa6`](https://github.com/Vit129/kouen-terminal/commit/b3cffa65a9d4c001dae8ecf47016e39c9bb9a217))
 
 ## [4.5.5] - 2026-07-16
 

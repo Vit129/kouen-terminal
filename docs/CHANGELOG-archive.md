@@ -2,6 +2,75 @@
 
 Older releases. See [CHANGELOG.md](../CHANGELOG.md) for recent versions.
 
+## [4.4.4] - 2026-07-14
+
+### Fixed
+- Switch panel view + tag worktreePath on click-to-worktree navigation (release v4.4.4) ([`c405a3a`](https://github.com/Vit129/kouen-terminal/commit/c405a3a19042e47188e7bb3cafdbac95ef0565aa))
+
+## [4.4.3] - 2026-07-14
+
+### Added
+- Mobile terminal keyboard toolbar (Esc/Tab/Ctrl-C/Ctrl-D/arrows) ([`9c4706f`](https://github.com/Vit129/kouen-terminal/commit/9c4706f36bd8fa6101180a0aab4c1f979b23a8d5))
+- Mobile terminal @ file-path autocomplete (P37 Phase G1) ([`3fcd94d`](https://github.com/Vit129/kouen-terminal/commit/3fcd94d1b82e32078393a493cfb765ebf91d3673))
+- Mobile terminal shell tab-completion suggestion strip (P37 Phase G2) ([`26ab0d5`](https://github.com/Vit129/kouen-terminal/commit/26ab0d5e9ad9ec3830022d4edffd56b88ecfcc81))
+- Mobile terminal AI command suggestion via claude CLI (P37 Phase G3) ([`ebc4e77`](https://github.com/Vit129/kouen-terminal/commit/ebc4e77be88e2d8765798c93277291c43dd3c424))
+- Capture creating session's cwd on Kouen Task create ([`308f7df`](https://github.com/Vit129/kouen-terminal/commit/308f7df0da4269eaadd51aca0d1d1816ec5783e5))
+- Add cross-repo Agents review dashboard + merge flow, fix worktree card navigation (release v4.4.3) ([`8ce31e3`](https://github.com/Vit129/kouen-terminal/commit/8ce31e3e92bf69857b4d24d6ef786df974236400))
+
+### Documentation
+- Record F2 keyboard toolbar shipped + F3 already-true in Phase F ([`de71279`](https://github.com/Vit129/kouen-terminal/commit/de71279aa61ee7196f7d6fbb8a05c40d96765115))
+- Design + task breakdown for P37 Phase G (autocomplete) ([`b911803`](https://github.com/Vit129/kouen-terminal/commit/b9118032ad1a7f3ea27f87ec7b7fce4a285a9fa3))
+- Defer P37 F5 (share-sheet upload) pending web-based mobile bridge completion ([`4909fad`](https://github.com/Vit129/kouen-terminal/commit/4909fad2509f077240eb879105819f5438b22841))
+- Caveman-compress CLAUDE.md to cut input tokens ([`bdbe80c`](https://github.com/Vit129/kouen-terminal/commit/bdbe80c4104154c0ff037886861f86d03d958344))
+- Record today's P39/P40 verification pass, refresh graphify ([`46e7508`](https://github.com/Vit129/kouen-terminal/commit/46e75083c82d216f560a72252fbb3db87b20b8fa))
+
+### Fixed
+- G3 newline auto-execute, pipe deadlock risk, stale AI suggestion state ([`a98c94a`](https://github.com/Vit129/kouen-terminal/commit/a98c94a86383967d9e34224163dbbbe4b0093ede))
+- Cmd+\ sidebar toggle raced window's launch-time resize-to-real-size, causing stuck squeeze/black panel ([`3a047d0`](https://github.com/Vit129/kouen-terminal/commit/3a047d09e647821d1dcf2427af796f0cb884c883))
+- Browser open reuses existing pane as new tab instead of splitting a second pane ([`0a421c8`](https://github.com/Vit129/kouen-terminal/commit/0a421c8bf93da44e022b12ba705d3dbf83bfaa7c))
+- Mobile bridge terminal double-wrap on real phone width, upload picker no-op, add copy-path ([`1c24562`](https://github.com/Vit129/kouen-terminal/commit/1c2456209bda92e989dbbe99bcebd93a0b7902fc))
+- Mobile bridge reconnect trusts a stale readyState and never retries an active drop (P37 F4) ([`54c5df8`](https://github.com/Vit129/kouen-terminal/commit/54c5df82cba5bddb13cd57b1227fb1c3e503f65d))
+
+## [4.4.2] - 2026-07-13
+
+### Added
+- Mobile-triggered Mac window focus + protect native window from phone resize votes ([`43b8265`](https://github.com/Vit129/kouen-terminal/commit/43b826582b72dc1a52ddf150f2e65c06f3decadf))
+- Mobile bridge readFile/listDirectory for read-only file preview (P37 Phase D1, server-side) ([`338f898`](https://github.com/Vit129/kouen-terminal/commit/338f898405d92b112a1cf9e9e47a5adbeaa5e13f))
+- Mobile bridge file preview UI — files sheet + text/image preview view (P37 Phase D1, client-side) ([`2313885`](https://github.com/Vit129/kouen-terminal/commit/2313885e0a8de70d1e5b49d77e3929ad9513175d))
+- Mobile bridge file/image attach (upload) — server + client (P37 Phase D2) ([`b3c03f9`](https://github.com/Vit129/kouen-terminal/commit/b3c03f9c9aa71bb726818a24017a4bfbc4e1b284))
+- Mobile bridge browser mirror — navigate/snapshot/interact/screenshot (P37 Phase D3) ([`0c5cd26`](https://github.com/Vit129/kouen-terminal/commit/0c5cd2626f86ed4ad27538a9f47649efe0d15463))
+- Mobile bridge unified preview tab-strip + tablet layout (P37 Phase E) ([`2f516b4`](https://github.com/Vit129/kouen-terminal/commit/2f516b4f4f1328dd5a9021cecacbefb200e9bb5a))
+
+### Documentation
+- Record second Opus review pass + fixes in Phase E task doc ([`7e095bf`](https://github.com/Vit129/kouen-terminal/commit/7e095bffcb1ffb2a5bc44a42688318d7635415a2))
+
+### Fixed
+- Browser interact used a different element list than snapshot, could click the wrong element ([`bdfbb0b`](https://github.com/Vit129/kouen-terminal/commit/bdfbb0b636f0250e326ee034a6bab29ba2f2eed4))
+- Phase E's #term-empty leaked onto phone, browser back/forward/reload raced the page load ([`4a782d6`](https://github.com/Vit129/kouen-terminal/commit/4a782d699ceb9c20d973baac5546fea0f089db38))
+- Resync sidebar-side layout when Settings toggles Sidebar-on-right, preventing stuck black panel on next Cmd+\ (release v4.4.2) ([`6ca22d8`](https://github.com/Vit129/kouen-terminal/commit/6ca22d8a884a067fc04b7b13447e9f76921eec29))
+
+## [4.4.1] - 2026-07-12
+
+### Added
+- Reveal cat/view'd files in the sidebar file tree (OSC 7736) ([`4ae745a`](https://github.com/Vit129/kouen-terminal/commit/4ae745a57493f7f30017f7dfa969d06e1148de37))
+
+### Fixed
+- Copy-mode yank leaked kouen-cat line numbers past the SGR 73/74 exclude marker ([`4989bc0`](https://github.com/Vit129/kouen-terminal/commit/4989bc0ac5c664ba9326ff8aa6118dc0f60cb622))
+- Mobile-created sessions register as real tabs so they show and stay selectable; enable iOS predictive text in mobile terminal (release v4.4.1) ([`ea1568b`](https://github.com/Vit129/kouen-terminal/commit/ea1568b6c28df8ba64522a503bf5fd263be025b9))
+
+## [4.4.0] - 2026-07-11
+
+### Added
+- P39 competitive-gap closes — SSH agent forwarding, sidebar port badge, git hunk staging, in-app PR merge, fleet visibility badge ([`4e6549e`](https://github.com/Vit129/kouen-terminal/commit/4e6549e948b31bbc8589902da765d52c6fdd551a))
+- Add Tasks/Worktree/Hosts MCP tools and Automations scheduler (release v5.0.0) ([`97180fd`](https://github.com/Vit129/kouen-terminal/commit/97180fd03897b155eec66f1c33024db6dca0d265))
+
+### Fixed
+- Reload MCP tool policy on every check, not once at construction ([`7678351`](https://github.com/Vit129/kouen-terminal/commit/7678351f8e715667de72a3a05a0f167317673410))
+- Move Cmd+F find bar below pane's browser/split/close icon row ([`1d796a5`](https://github.com/Vit129/kouen-terminal/commit/1d796a5774ec5173fa4393ba2f72a5b89d6f815e))
+- Mobile pairing rejected every real device because the token rotated out before connect ([`c8bd2bc`](https://github.com/Vit129/kouen-terminal/commit/c8bd2bc2d272fbec2e8afc3f6bd23ef7141002f8))
+- Browser pane sends a real Safari UA so Google/Apple OAuth doesn't reject it ([`e955924`](https://github.com/Vit129/kouen-terminal/commit/e955924494f177336e1925ca17414e5c01c18e9f))
+- Correct release to v4.4.0 (was mistakenly major-bumped) and scope kouenBrowserOpen to the calling agent's own session ([`eed2a9f`](https://github.com/Vit129/kouen-terminal/commit/eed2a9fd972c0de3e01fc50c398afc6472501361))
+
 ## [4.3.1] - 2026-07-10
 
 ### Fixed
