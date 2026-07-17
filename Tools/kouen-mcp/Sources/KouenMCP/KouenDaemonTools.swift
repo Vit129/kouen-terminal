@@ -522,14 +522,20 @@ struct KouenDaemonTools: Sendable {
         return await okResponse(for: .taskDelete(id: uuid), expected: "taskDelete")
     }
 
+    private static func taskDateFormatter() -> ISO8601DateFormatter {
+        let formatter = ISO8601DateFormatter()
+        formatter.timeZone = TimeZone(secondsFromGMT: 7 * 3600)
+        return formatter
+    }
+
     private static func taskJSON(_ task: TaskSummary) -> AnyCodable {
         .object([
             "id": .string(task.id.uuidString),
             "sessionId": .string(task.sessionID.uuidString),
             "title": .string(task.title),
             "done": .bool(task.done),
-            "createdAt": .string(ISO8601DateFormatter().string(from: task.createdAt)),
-            "updatedAt": .string(ISO8601DateFormatter().string(from: task.updatedAt)),
+            "createdAt": .string(taskDateFormatter().string(from: task.createdAt)),
+            "updatedAt": .string(taskDateFormatter().string(from: task.updatedAt)),
             "cwd": task.cwd.map(AnyCodable.string) ?? .null,
         ])
     }
