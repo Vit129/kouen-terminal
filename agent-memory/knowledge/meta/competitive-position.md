@@ -296,7 +296,10 @@ non-decision here is a legitimate "we could, we chose not to" position, same cla
 the ACP non-adoption above — not a gap to revisit unless user reconsiders.
 
 **Where Kouen stands now, one line**: on the MCP-completeness axis specifically
-(the dimension Superset led on), Kouen is at parity or ahead for every resource type
-except Projects (`projects_list`, marginal value per earlier research, not built).
-Everything else from the original 5-item competitive list is closed, deferred by
-choice, or was never a real gap to begin with.
+(the dimension Superset led on), Kouen is at parity or ahead for every resource type,
+including Projects — closed 2026-07-17 as `kouenProjectsList`. Superset's Projects are
+explicitly registered (clone URL / local path); Kouen has no such registry, so this
+instead dedupes the repo roots of every currently-open tab — a deliberate scope choice,
+not a copy, same pattern as Tasks/Automations above. Everything else from the original
+5-item competitive list is closed, deferred by choice, or was never a real gap to
+begin with.

@@ -214,6 +214,7 @@ struct ToolRegistry: Sendable {
                 param("force", "boolean", "Discard uncommitted changes in the worktree (optional, default false — never silently discards work)"),
             ]),
             toolDef("kouenHostList", "List configured remote hosts (Settings > Remote) reachable by SSH. Read-only — creating/editing a host stays a Settings-UI-only action", []),
+            toolDef("kouenProjectsList", "List distinct git repo roots across every currently-open tab (name + path). Read-only, no registration step — reflects what's actually open, not a separately-maintained project list", []),
             toolDef("kouenAutomationList", "List Automations — scheduled agent launches", []),
             toolDef("kouenAutomationGet", "Get a single Automation by id", [
                 param("id", "string", "Automation UUID"),
@@ -306,6 +307,7 @@ struct ToolRegistry: Sendable {
         case "kouenWorktreeCreate": return await kouenWorktreeCreate(args)
         case "kouenWorktreeRemove": return await kouenWorktreeRemove(args)
         case "kouenHostList": return await daemonTools.hostList()
+        case "kouenProjectsList": return await daemonTools.projectsList()
         case "kouenAutomationList": return await daemonTools.automationList()
         case "kouenAutomationGet": return await kouenAutomationGet(args)
         case "kouenAutomationCreate": return await kouenAutomationCreate(args)
