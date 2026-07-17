@@ -147,6 +147,41 @@ final class KouenDaemonToolsTests: XCTestCase {
         }
     }
 
+    /// Mirrors `testHostListIsRegisteredReadOnlyAndHasNoWriteCounterpart` — kouenProjectsList
+    /// has no registration step (see KouenDaemonTools.projectsList doc comment), so there is
+    /// no create/update/delete counterpart to guard either.
+    func testProjectsListIsRegisteredReadOnlyAndHasNoWriteCounterpart() async {
+        let missingPolicyURL = temporaryDirectory().appendingPathComponent("missing-policy.json")
+        let policy = ToolPolicy.load(from: missingPolicyURL, environment: [:])
+        XCTAssertTrue(policy.isToolAllowed("kouenProjectsList"))
+
+        let registry = ToolRegistry(policy: { policy })
+        guard case let .object(root) = registry.listTools(),
+              case let .array(tools) = root["tools"]
+        else {
+            XCTFail("Expected listTools() to return { tools: [...] }")
+            return
+        }
+        let names: Set<String> = Set(tools.compactMap {
+            guard case let .object(tool) = $0, case let .string(name) = tool["name"] else { return nil }
+            return name
+        })
+        XCTAssertTrue(names.contains("kouenProjectsList"))
+        for forbidden in ["kouenProjectsCreate", "kouenProjectsUpdate", "kouenProjectsDelete", "kouenProjectsRemove"] {
+            XCTAssertFalse(names.contains(forbidden), "\(forbidden) must not exist — no registration store to write to")
+        }
+    }
+
+    /// Pure dedupe logic: same repo root from two tabs collapses to one entry, sorted by path.
+    func testDedupeProjectsCollapsesDuplicateRootsAndSortsByPath() {
+        let roots = [
+            "/Users/x/Git/beta", "/Users/x/Git/alpha", "/Users/x/Git/beta", "/Users/x/Git/alpha",
+        ]
+        let projects = KouenDaemonTools.dedupeProjects(roots: roots)
+        XCTAssertEqual(projects.map(\.path), ["/Users/x/Git/alpha", "/Users/x/Git/beta"])
+        XCTAssertEqual(projects.map(\.name), ["alpha", "beta"])
+    }
+
     /// P41: List/Get are read-only (never gated), Create/Update/Delete/Pause/Resume/RunNow
     /// mutate state (spawn a session on RunNow) and must be gated like sendPaneText/spawnSession.
     func testAutomationToolsAreRegisteredWithCorrectGating() async {

@@ -430,8 +430,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/FileEditor/FileEditorView.swift": {
-    "mtime": 1783306380.7569754,
-    "ast_hash": "2bbe8c3b41a764dfb18922a4a92eb4c3",
+    "mtime": 1784192445.7291894,
+    "ast_hash": "676d6c70e5a90558f7d3d56fc5ebad91",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/FileEditor/FileTabManager.swift": {
@@ -995,8 +995,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/KouenVersion.swift": {
-    "mtime": 1784189624.0543072,
-    "ast_hash": "f9a028f20f8385d83e22f5da745693b7",
+    "mtime": 1784216637.146513,
+    "ast_hash": "4cd62a03f875610ff1bfd50b0ce27a03",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Layouts/LayoutTemplate.swift": {
@@ -1085,8 +1085,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/GeneratedReleaseNotes.swift": {
-    "mtime": 1784189624.0546105,
-    "ast_hash": "6822821cae4f567c09d962a0014d51e1",
+    "mtime": 1784216637.869554,
+    "ast_hash": "7672955ab26ea2cc141e077551ebdc7c",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/ReleaseNotes.swift": {
@@ -1700,13 +1700,13 @@
     "semantic_hash": ""
   },
   "Packages/KouenTerminalKit/Sources/KouenTerminalKit/KouenTerminalSurfaceView+Find.swift": {
-    "mtime": 1784189624.0549765,
-    "ast_hash": "4833e02d3edeb5343a282308a5171e2d",
+    "mtime": 1784192809.4235294,
+    "ast_hash": "327db88f7d7a34ebe80ba38b4dec4540",
     "semantic_hash": ""
   },
   "Packages/KouenTerminalKit/Sources/KouenTerminalKit/KouenTerminalSurfaceView+Input.swift": {
-    "mtime": 1783306380.8414834,
-    "ast_hash": "8612a19e6e26b763d23bb577afeb8167",
+    "mtime": 1784214193.1431885,
+    "ast_hash": "cc8f7a222333a4fcc2bdcfa1b0c806eb",
     "semantic_hash": ""
   },
   "Packages/KouenTerminalKit/Sources/KouenTerminalKit/KouenTerminalSurfaceView+Scrollback.swift": {
@@ -3695,8 +3695,8 @@
     "semantic_hash": ""
   },
   "agent-memory/plans/INDEX.md": {
-    "mtime": 1784043053.5959482,
-    "ast_hash": "ca29e28c12ecbcd5d6e45b11cf425697",
+    "mtime": 1784210797.6121583,
+    "ast_hash": "54f121640605c2d6de308a0e0b216a38",
     "semantic_hash": ""
   },
   "agent-memory/plans/completed-archive.md": {
@@ -3730,8 +3730,8 @@
     "semantic_hash": ""
   },
   "agent-memory/plans/p38-competitive-feature-gaps.md": {
-    "mtime": 1784099595.6453154,
-    "ast_hash": "53af56f6f47d48c969d1b97c2c5349e4",
+    "mtime": 1784210823.1171129,
+    "ast_hash": "196da5db23e0784021e2689d3e66dea3",
     "semantic_hash": ""
   },
   "agent-memory/plans/p38-phase-a-diff-dashboard/design.md": {
@@ -3750,8 +3750,8 @@
     "semantic_hash": ""
   },
   "agent-memory/plans/p38-phase-b-subagent-visibility/dev-task-progress.md": {
-    "mtime": 1784041651.6099703,
-    "ast_hash": "13554448089ebc9ea4540e8022cde39e",
+    "mtime": 1784210746.4816988,
+    "ast_hash": "056ae6e29784b2258e02f7e751dc9a00",
     "semantic_hash": ""
   },
   "agent-memory/plans/p38-phase-c-thread-overlay/design.md": {
@@ -3760,8 +3760,8 @@
     "semantic_hash": ""
   },
   "agent-memory/plans/p38-phase-c-thread-overlay/dev-task-progress.md": {
-    "mtime": 1784122208.8920274,
-    "ast_hash": "7362ee8d589518f58e680b16eed74ca7",
+    "mtime": 1784210767.607961,
+    "ast_hash": "b9ce84bcafd028aa9cfd019745a55a13",
     "semantic_hash": ""
   },
   "agent-memory/plans/p38-phase-d-kitty-conformance/design.md": {
@@ -3770,8 +3770,8 @@
     "semantic_hash": ""
   },
   "agent-memory/plans/p38-phase-d-kitty-conformance/dev-task-progress.md": {
-    "mtime": 1784042672.4171257,
-    "ast_hash": "f35e1f685045aceac32e23c091de64ba",
+    "mtime": 1784210774.5131984,
+    "ast_hash": "50894216243d443a4a8adbaba059b847",
     "semantic_hash": ""
   },
   "agent-memory/plans/p38-phase-e-scripting-hooks/design.md": {
@@ -3780,8 +3780,8 @@
     "semantic_hash": ""
   },
   "agent-memory/plans/p38-phase-e-scripting-hooks/dev-task-progress.md": {
-    "mtime": 1784042992.6052961,
-    "ast_hash": "a11a0e1e070dfa9707cd42a872616ff5",
+    "mtime": 1784210780.3661797,
+    "ast_hash": "9361a8efaba38c9970f4682784bebd14",
     "semantic_hash": ""
   },
   "agent-memory/plans/p39-competitive-feature-gaps.md": {
@@ -4017,6 +4017,11 @@
   "version.json": {
     "mtime": 1784189624.0330658,
     "ast_hash": "89d36925d40930a78ced7b4861d494d0",
+    "semantic_hash": ""
+  },
+  "Tests/KouenTerminalKitTests/DoCommandByArrowForwardingTests.swift": {
+    "mtime": 1784214255.4216118,
+    "ast_hash": "2fd7ad5e4fc9fc24487f258c63e30013",
     "semantic_hash": ""
   }
 }

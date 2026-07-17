@@ -33,6 +33,29 @@ public struct GitMetadataProvider: MetadataProvider {
             return nil
         }
     }
+
+    /// The repo root for `path` (`git rev-parse --show-toplevel`), or `nil` outside a git repo.
+    /// Used by `kouenProjectsList` to dedupe open tabs down to the repos they actually belong to
+    /// — a tab's `cwd` may be a subdirectory or a worktree, not the root itself.
+    public static func topLevel(at path: String) -> String? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        process.arguments = ["-C", path, "rev-parse", "--show-toplevel"]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = Pipe()
+        do {
+            try process.run()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0 else { return nil }
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            let root = String(data: data, encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return root?.isEmpty == false ? root : nil
+        } catch {
+            return nil
+        }
+    }
 }
 
 public struct CwdMetadataProvider: MetadataProvider {

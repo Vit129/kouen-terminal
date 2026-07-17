@@ -608,6 +608,53 @@ struct KouenDaemonTools: Sendable {
         ])
     }
 
+    // MARK: - Projects
+
+    /// Superset's MCP has a `projects_list` resource ("checked-out repos in the active
+    /// organization") that Kouen had no equivalent for. Superset's are explicitly
+    /// registered (clone URL / local path); Kouen has no such registry, so this instead
+    /// dedupes the repo roots of every currently-open tab — "projects" you're actually
+    /// working on right now, not a separately-maintained list.
+    func projectsList() async -> (AnyCodable?, JSONRPCError?) {
+        guard let response = await send(.getSnapshot) else {
+            return (nil, Self.daemonUnavailableError)
+        }
+        guard case let .snapshot(snapshot) = response else {
+            return (nil, JSONRPCError(code: -32000, message: "Unexpected response to getSnapshot"))
+        }
+        let cwds = Self.allCwds(in: snapshot)
+        let roots = cwds.compactMap(GitMetadataProvider.topLevel(at:))
+        let projects = Self.dedupeProjects(roots: roots)
+        return (toolResult(json: .array(projects.map {
+            .object(["name": .string($0.name), "path": .string($0.path)])
+        })), nil)
+    }
+
+    private static func allCwds(in snapshot: SessionSnapshot) -> [String] {
+        snapshot.workspaces.flatMap { workspace in
+            workspace.sessions.flatMap { session in
+                session.tabs.flatMap { tab in
+                    tab.rootPane.allLeaves().map { leaf in
+                        let activeSurfaceID = leaf.activeSurfaceID ?? leaf.surfaceID
+                        return leaf.surfaces.first { $0.id == activeSurfaceID }?.cwd ?? tab.cwd
+                    }
+                }
+            }
+        }
+    }
+
+    /// Pure so it's testable without a real git repo or daemon round-trip. Order is
+    /// first-seen; `path` is the sort key so the same tabs always list in the same order.
+    static func dedupeProjects(roots: [String]) -> [(name: String, path: String)] {
+        var seen = Set<String>()
+        var result: [(name: String, path: String)] = []
+        for root in roots where !seen.contains(root) {
+            seen.insert(root)
+            result.append((name: (root as NSString).lastPathComponent, path: root))
+        }
+        return result.sorted { $0.path < $1.path }
+    }
+
     // MARK: - Automations (P41)
 
     func automationList() async -> (AnyCodable?, JSONRPCError?) {
