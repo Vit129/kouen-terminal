@@ -17,13 +17,31 @@ final class TaskStoreTests: XCTestCase {
         XCTAssertEqual(store.get(id: created.id)?.title, "write tests")
         XCTAssertEqual(store.list(sessionID: sessionID).count, 1)
 
-        let updated = store.update(id: created.id, title: "write tests (done)", done: true)
-        XCTAssertEqual(updated?.title, "write tests (done)")
-        XCTAssertEqual(updated?.done, true)
+        let renamed = store.update(id: created.id, title: "still writing tests")
+        XCTAssertEqual(renamed?.title, "still writing tests")
+        XCTAssertEqual(store.get(id: created.id)?.title, "still writing tests")
 
         XCTAssertTrue(store.delete(id: created.id))
         XCTAssertNil(store.get(id: created.id))
         XCTAssertFalse(store.delete(id: created.id))
+    }
+
+    /// Marking a Task done is a deletion trigger, not just a flag flip — see
+    /// `TaskStore.update`'s doc comment. The caller still gets `done: true` back (so a
+    /// `kouenTaskUpdate` call reads as success), but the store forgets it immediately.
+    func testMarkingDoneDeletesTheTaskImmediately() {
+        let url = tmpURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let store = TaskStore(url: url)
+        let sessionID = SessionID()
+        let created = store.create(sessionID: sessionID, title: "finish this")
+
+        let updated = store.update(id: created.id, done: true)
+        XCTAssertEqual(updated?.done, true, "caller still sees the completed state")
+
+        XCTAssertNil(store.get(id: created.id), "but the store no longer has it")
+        XCTAssertEqual(store.list(sessionID: sessionID).count, 0)
+        XCTAssertFalse(store.delete(id: created.id), "already gone — nothing left to explicitly delete")
     }
 
     func testListWithNilSessionIDReturnsAllSessions() {

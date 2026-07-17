@@ -43,18 +43,21 @@ final class TaskIPCDaemonTests: XCTestCase {
         }
         XCTAssertEqual(fetched.id, created.id)
 
+        // Marking done is itself a deletion trigger (see TaskStore.update's doc comment) —
+        // the response still reports done: true, but the Task is already gone afterward.
         guard case let .taskInfo(updated?) = registry.handle(.taskUpdate(id: created.id, title: nil, done: true)) else {
             return XCTFail("Expected .taskInfo from taskUpdate")
         }
         XCTAssertTrue(updated.done)
 
-        guard case .ok = registry.handle(.taskDelete(id: created.id)) else {
-            return XCTFail("Expected .ok from taskDelete")
-        }
         guard case let .taskInfo(gone) = registry.handle(.taskGet(id: created.id)) else {
-            return XCTFail("Expected .taskInfo from taskGet after delete")
+            return XCTFail("Expected .taskInfo from taskGet after done-delete")
         }
         XCTAssertNil(gone)
+
+        guard case .error = registry.handle(.taskDelete(id: created.id)) else {
+            return XCTFail("Expected .error from taskDelete — done already removed it")
+        }
     }
 
     func testTaskListNilSessionIDReturnsAcrossSessions() {
