@@ -33,10 +33,11 @@ public struct KouenTask: Codable, Sendable, Equatable, Identifiable {
 
 /// Daemon-owned Task storage so Tasks survive `Kouen.app` quitting, mirroring
 /// `PasteBufferStore`'s persistence shape. A session closing does NOT delete its
-/// Tasks — they remain listable (the Task Dashboard groups them under "closed
-/// sessions"); deletion is always an explicit user action, never an eviction side
-/// effect (see design.md's Tactical Design — data loss on routine tab-close would be
-/// surprising).
+/// Tasks — they remain listable; deletion is never a *session* eviction side effect
+/// (see design.md's Tactical Design — data loss on routine tab-close would be
+/// surprising). Marking a Task done is a separate, deliberate trigger: `update(done:
+/// true)` removes it immediately (see its doc comment) — completion, not closing a
+/// tab, is what makes a Task's presence stop being useful.
 public final class TaskStore: @unchecked Sendable {
     private var tasks: [KouenTask] = []
     private let lock = NSLock()
@@ -71,6 +72,9 @@ public final class TaskStore: @unchecked Sendable {
         return task
     }
 
+    /// Marking a Task done removes it right away — the caller still gets back the final
+    /// `done: true` snapshot (so a `kouenTaskUpdate`/UI checkbox call reads as success, not
+    /// "not found"), but it no longer appears in `list()`/`get()` afterward.
     @discardableResult
     public func update(id: UUID, title: String? = nil, done: Bool? = nil) -> KouenTask? {
         lock.lock()
@@ -82,6 +86,9 @@ public final class TaskStore: @unchecked Sendable {
         if let done { tasks[index].done = done }
         tasks[index].updatedAt = Date()
         let updated = tasks[index]
+        if updated.done {
+            tasks.remove(at: index)
+        }
         let toSave = tasks
         lock.unlock()
         save(toSave)

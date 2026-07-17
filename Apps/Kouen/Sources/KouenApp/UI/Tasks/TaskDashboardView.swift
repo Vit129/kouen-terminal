@@ -42,22 +42,20 @@ final class TaskDashboardView: NSView {
     required init?(coder: NSCoder) { fatalError() }
 }
 
-private struct TaskDashboardBody: View {
+/// `internal` (not `private`) so `groupByRoot`'s dedupe/grouping logic is unit-testable via
+/// `@testable import KouenApp` — mirrors `RecipePickerModel`'s visibility for the same reason.
+struct TaskDashboardBody: View {
     let onJumpToSession: (SessionID) -> Void
 
     @State private var tasks: [TaskSummary] = []
     @State private var newTaskTitle: String = ""
     @State private var isLoading = true
-
-    /// Sessions still present in the live snapshot vs. gone (closed) — read once per
-    /// render from `SessionCoordinator`'s already-synced local cache (same source
-    /// `agentsList()` uses), not a daemon round trip.
-    private var liveSessionIDs: Set<SessionID> {
-        Set(SessionCoordinator.shared.snapshot.workspaces.flatMap { $0.sessions.map(\.id) })
-    }
-
-    private var activeTasks: [TaskSummary] { tasks.filter { liveSessionIDs.contains($0.sessionID) } }
-    private var closedTasks: [TaskSummary] { tasks.filter { !liveSessionIDs.contains($0.sessionID) } }
+    /// Tasks grouped by project (git root of `task.cwd`), resolved once per `refresh()` —
+    /// not a computed property, since resolving each task's git root shells out to `git`
+    /// and must not re-run on every SwiftUI render. Sorted by display name for a stable
+    /// order across refreshes. Same heuristic as the sidebar's project grouping
+    /// (`SidebarListModel.repoRootForSession` / `KouenDesign.projectGroupDisplayName`).
+    @State private var groups: [(name: String, tasks: [TaskSummary])] = []
 
     var body: some View {
         VStack(spacing: 0) {
@@ -88,11 +86,8 @@ private struct TaskDashboardBody: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 10) {
-                        if !activeTasks.isEmpty {
-                            section(title: "Active sessions", tasks: activeTasks)
-                        }
-                        if !closedTasks.isEmpty {
-                            section(title: "Closed sessions", tasks: closedTasks)
+                        ForEach(groups, id: \.name) { group in
+                            section(title: group.name, tasks: group.tasks)
                         }
                     }
                     .padding(.horizontal, 6)
@@ -137,7 +132,34 @@ private struct TaskDashboardBody: View {
     private func refresh() async {
         isLoading = true
         tasks = await TaskDaemonBridge.list(sessionID: nil)
+        let byRoot = await Self.groupByRoot(tasks)
+        groups = byRoot.map { root, tasks in
+            (name: KouenDesign.projectGroupDisplayName(forRootPath: root), tasks: tasks)
+        }.sorted { $0.name < $1.name }
         isLoading = false
+    }
+
+    /// Groups by the git root of each task's `cwd` (nil/legacy tasks — see `KouenTask.cwd`'s
+    /// doc comment — group under `""`, which `projectGroupDisplayName` turns into "Sessions").
+    /// Off the main actor: `GitMetadataProvider.topLevel` shells out to `git` per unique cwd,
+    /// so this must not run on every SwiftUI render. `projectGroupDisplayName` itself stays on
+    /// the caller's (main) actor — it's `KouenDesign`-isolated, not because it touches UI state.
+    static func groupByRoot(_ tasks: [TaskSummary]) async -> [String: [TaskSummary]] {
+        await Task.detached(priority: .userInitiated) {
+            var rootCache: [String: String] = [:]
+            func root(for cwd: String?) -> String {
+                guard let cwd, !cwd.isEmpty else { return "" }
+                if let cached = rootCache[cwd] { return cached }
+                let resolved = GitMetadataProvider.topLevel(at: cwd) ?? cwd
+                rootCache[cwd] = resolved
+                return resolved
+            }
+            var byRoot: [String: [TaskSummary]] = [:]
+            for task in tasks {
+                byRoot[root(for: task.cwd), default: []].append(task)
+            }
+            return byRoot
+        }.value
     }
 
     private func addTask() async {
