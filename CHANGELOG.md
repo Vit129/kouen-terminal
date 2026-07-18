@@ -8,7 +8,11 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [4.6.1] - 2026-07-18
 
 ### Added
-- Release version bump to v4.6.1.
+- Group Task Dashboard by project, auto-delete tasks on done ([`9c3053b`](https://github.com/Vit129/kouen-terminal/commit/9c3053bbfd86c4caf101fa8cbfb19c8b76d7f2b2))
+
+### Fixed
+- Emit task createdAt/updatedAt in UTC+7 instead of UTC ([`ddc1cad`](https://github.com/Vit129/kouen-terminal/commit/ddc1cad252706e8c8f3409d657cd2e798e099c99))
+- Route markdown through syntax view, restore file preview copy/find (release v4.6.1) ([`f1d8dce`](https://github.com/Vit129/kouen-terminal/commit/f1d8dce7a08db32e55dffa0f5203a6d1541dbc13))
 
 ## [4.6.0] - 2026-07-17
 
