@@ -3,19 +3,19 @@ _Auto-generated from GRAPH_REPORT.md · do not edit manually_
 _Regen: `graphify update .`_
 
 ## Summary
-- 15198 nodes · 34199 edges · 3348 communities (946 shown, 2402 thin omitted)
-- Extraction: 89% EXTRACTED · 11% INFERRED · 0% AMBIGUOUS · INFERRED: 3797 edges (avg confidence: 0.8)
+- 15251 nodes · 34273 edges · 3360 communities (958 shown, 2402 thin omitted)
+- Extraction: 89% EXTRACTED · 11% INFERRED · 0% AMBIGUOUS · INFERRED: 3807 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 
 ## Graph Freshness
-- Built from commit: `9c3053bb`
+- Built from commit: `f1d8dce7`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 
 ## God Nodes (most connected - your core abstractions)
-1. `SurfaceRegistry` - 181 edges
+1. `SurfaceRegistry` - 182 edges
 2. `IPCRequest` - 176 edges
 3. `SessionEditor` - 172 edges
 4. `DaemonClient` - 164 edges
@@ -32,15 +32,15 @@ A high-degree node isn't always architecturally central - a widely-used
 utility/config file can rack up more edges than a real coupler while only
 ever touching one area. This ranks by how many DIFFERENT communities a
 node's neighbors span, not by raw edge count.
-1. `IPCRequest` - bridges 158 areas (176 edges)
+1. `IPCRequest` - bridges 160 areas (176 edges)
 2. `Command` - bridges 101 areas (107 edges)
-3. `IPCResponse` - bridges 63 areas (84 edges)
-4. `SessionCoordinator` - bridges 55 areas (124 edges)
-5. `SpecialKey` - bridges 52 areas (56 edges)
-6. `KouenPaths` - bridges 50 areas (111 edges)
-7. `AgentKind` - bridges 50 areas (97 edges)
-8. `EngineConformanceTests` - bridges 50 areas (76 edges)
-9. `MenuTarget` - bridges 50 areas (60 edges)
+3. `IPCResponse` - bridges 66 areas (84 edges)
+4. `SessionCoordinator` - bridges 54 areas (124 edges)
+5. `MenuTarget` - bridges 54 areas (61 edges)
+6. `SpecialKey` - bridges 52 areas (56 edges)
+7. `EngineConformanceTests` - bridges 50 areas (76 edges)
+8. `AgentKind` - bridges 49 areas (97 edges)
+9. `KouenPaths` - bridges 48 areas (111 edges)
 
 ## Surprising Connections (you probably didn't know these)
 - `SUI` --calls--> `Color`  [INFERRED]
