@@ -72,6 +72,9 @@ final class PrefixKeymap {
 
     /// Returns nil to swallow the event or the original event to forward it.
     private func handle(_ event: NSEvent) -> NSEvent? {
+        if event.modifierFlags.contains(.command), event.charactersIgnoringModifiers == "f" {
+            print("[DBG-cmdf] PrefixKeymap.handle() saw Cmd+F, armed=\(armed), suspendedForShortcutRecording=\(suspendedForShortcutRecording)")
+        }
         if suspendedForShortcutRecording { return event }
         // Any click disarms the prefix so it doesn't silently eat the next keypress.
         if event.type == .leftMouseDown || event.type == .rightMouseDown || event.type == .otherMouseDown {

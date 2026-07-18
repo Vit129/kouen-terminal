@@ -18,6 +18,10 @@ final class FileEditorView: NSView {
     private static let maxPreviewBytes = 5_000_000
     private(set) var filePath: String = ""
     var activeDiagnostics: [LSPDiagnostic] { syntaxView.activeDiagnostics }
+    /// True once `load(path:)` has routed the current file through the syntax-highlighted
+    /// text view (copy/find/vi-mode all work there) rather than Quick Look (a separate,
+    /// read-only renderer that doesn't wire into this app's Edit menu).
+    var isShowingSyntaxView: Bool { !syntaxView.isHidden }
     private let fileWatcher = FileChangeWatcher()
     private let symbolIndex = WorkspaceSymbolIndex()
 
@@ -61,7 +65,7 @@ final class FileEditorView: NSView {
         // Quick Look for images/PDFs
         let ext = (cleanPath as NSString).pathExtension.lowercased()
         let imageExts = Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "ico", "bmp", "tiff", "heic"])
-        let qlExts = imageExts.union(["pdf", "rtf", "rtfd", "doc", "docx", "pages", "key", "keynote", "numbers", "xlsx", "xls", "csv", "md", "markdown"])
+        let qlExts = imageExts.union(["pdf", "rtf", "rtfd", "doc", "docx", "pages", "key", "keynote", "numbers", "xlsx", "xls", "csv"])
         if qlExts.contains(ext) {
             showQuickLook(url: url)
             return
@@ -237,6 +241,13 @@ final class FileEditorView: NSView {
     }
 
     override var acceptsFirstResponder: Bool { true }
+
+    // FileEditorView (not syntaxView) is first responder here — see keyDown override
+    // above. NSView has no copy(_:), so Edit > Copy needs an explicit forward to the
+    // inner SyntaxTextView, which does the actual selection/clipboard work.
+    @objc func copy(_ sender: Any?) {
+        syntaxView.copy(sender)
+    }
 
     // MARK: - Display
 

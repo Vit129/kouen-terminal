@@ -114,6 +114,9 @@ final class FilePreviewCoordinator {
         guard let tab = fileTabManager.activeTab() else { return }
         fileEditorView?.load(path: tab.path)
         fileEditorTabBar?.reload(tabs: fileTabManager.openTabs, activeID: fileTabManager.activeFileTabID)
+        if let fileEditorView {
+            fileEditorView.window?.makeFirstResponder(fileEditorView)
+        }
     }
 
     // MARK: - Split Show/Hide

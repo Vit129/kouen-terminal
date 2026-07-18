@@ -386,8 +386,34 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
         SessionCoordinator.shared.reopenLastClosedTab()
     }
 
+    /// ⌘F contract (same "contextual, not a rewrite" principle as the thread-overlay
+    /// cmd-F contract in p38-phase-c-thread-overlay/design.md): a fixed-target menu item
+    /// always wins AppKit's key-equivalent dispatch before any focused view's own keyDown
+    /// gets a chance to run — confirmed via trace, this is why `SyntaxTextView`'s own
+    /// `if cmd && key == "f" { showFindBar() }` never fired even when the file preview
+    /// had focus. Route by first responder instead of hardcoding the terminal find bar.
     @objc func find() {
+        let responder = NSApp.keyWindow?.firstResponder
+        NSLog("[DBG-cmdf] find() called, firstResponder=\(String(describing: responder)) class=\(type(of: responder))")
+        if let syntaxView = Self.enclosingSyntaxTextView(of: responder) {
+            NSLog("[DBG-cmdf] routing to SyntaxTextView.showFindBar()")
+            syntaxView.showFindBar()
+            return
+        }
+        NSLog("[DBG-cmdf] no enclosing SyntaxTextView found, falling back to terminal toggleFindBar()")
         SessionCoordinator.shared.toggleFindBar()
+    }
+
+    /// The first responder may be `SyntaxTextView` itself (it accepts first responder and
+    /// handles `keyDown` directly) or its inner `NSTextView` — walk up either way.
+    private static func enclosingSyntaxTextView(of responder: NSResponder?) -> SyntaxTextView? {
+        var view = responder as? NSView
+        while let current = view {
+            NSLog("[DBG-cmdf] walk ancestor: \(type(of: current))")
+            if let syntaxView = current as? SyntaxTextView { return syntaxView }
+            view = current.superview
+        }
+        return nil
     }
 
     @objc func findInFiles() {

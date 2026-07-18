@@ -266,6 +266,13 @@ final class SyntaxTextView: NSView {
     // loop that captures drag and up events internally. Forwarding mouseUp from here
     // causes infinite recursion via the responder chain (stack overflow crash).
 
+    // SyntaxTextView (not textView) is usually first responder — it owns keyDown for
+    // vi-mode dispatch. NSView has no copy(_:), so Edit > Copy silently no-ops unless
+    // forwarded to the inner NSTextView, which does the actual selection/clipboard work.
+    @objc func copy(_ sender: Any?) {
+        textView.copy(sender)
+    }
+
     private func setup() {
         wantsLayer = true
         addTrackingArea(NSTrackingArea(

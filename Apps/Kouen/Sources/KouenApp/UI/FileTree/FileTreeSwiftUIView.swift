@@ -587,13 +587,11 @@ private struct NodeRow: View {
                 .contentShape(Rectangle())
                 .background(isFocused ? Color.accentColor.opacity(0.2) : Color.clear)
                 .cornerRadius(4)
-                .gesture(
-                    TapGesture(count: 2).onEnded { openFile() }
-                        .exclusively(before: TapGesture(count: 1).onEnded {
-                            keyboard.focusedPath = node.node.path
-                            onPreview(node.node)
-                        })
-                )
+                .onTapGesture(count: 2) { openFile() }
+                .onTapGesture {
+                    keyboard.focusedPath = node.node.path
+                    onPreview(node.node)
+                }
         }
     }
 

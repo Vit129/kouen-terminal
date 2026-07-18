@@ -178,6 +178,7 @@ final class FileViewerViewController: NSViewController {
         syntaxView.isHidden = false
         syntaxView.load(text: text, fileExtension: ext, resetScroll: resetScroll)
         lspSession.open(url: url, text: text, fileExtension: ext)
+        view.window?.makeFirstResponder(syntaxView)
     }
 
     private func showQuickLook(_ url: URL) {
