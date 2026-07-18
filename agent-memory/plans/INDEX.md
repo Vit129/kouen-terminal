@@ -4,6 +4,8 @@
 
 | File | Title | Status |
 |------|-------|--------|
+| [p43-add-repo-to-workspace/dev-task-progress.md](p43-add-repo-to-workspace/dev-task-progress.md) | P43 — Add Repo/Folder to Workspace (`Workspace.extraRepoRoots`, daemon-synced, picker on Files/Git tabs) | **REVERTED 2026-07-17** — built + live-verified (browse-only), a same-day "open session here" follow-up didn't work on first test, user chose to tear the whole feature down rather than keep debugging |
+| [p42-workspace-sidebar-panels/design.md](p42-workspace-sidebar-panels/design.md) | P42 — Workspace Sidebar Panels (stacked always-visible Sessions/Files/Git panes) | **CLOSED/SUPERSEDED 2026-07-17** — built + shipped (Tasks 1-2), reverted after real `make preview` use: too cramped in a narrow sidebar. Real ask was "Add to Workspace" (merge another repo's Files/Git in, tab-switch style) — continues as P43 |
 | [p37-phase-g-autocomplete/dev-task-progress.md](p37-phase-g-autocomplete/dev-task-progress.md) | P37 Phase G — Autocomplete (@ file-path, shell completion strip, AI suggestion via `claude` CLI) | Completed (28/28), Opus review passed |
 | [p37-phase-d-file-browser/dev-task-progress.md](p37-phase-d-file-browser/dev-task-progress.md) | P37 Phase D — File preview, file attach, browser mirror | Completed (15/15) + Phase E built + post-ship bug-fix pass (real-phone testing) |
 | [p41-automations/dev-task-progress.md](p41-automations/dev-task-progress.md) | P41 — Automations (scheduled agent launches, `kouen-mcp`) | All tasks built, build/test/robot green, live-check pending |
