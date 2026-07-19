@@ -44,7 +44,7 @@ public struct NotchRect: Sendable, Equatable {
 }
 
 public struct NotchLayoutMetrics: Sendable, Equatable {
-    public static let fallbackClosedWidth: Double = 118
+    public static let fallbackClosedWidth: Double = 80
     public static let fallbackClosedHeight: Double = 20
     public static let minimumOpenWidth: Double = 336
     public static let preferredOpenWidth: Double = 540
@@ -83,11 +83,14 @@ public struct NotchLayoutMetrics: Sendable, Equatable {
         let availableWidth = max(160, screen.width)
         let hasNotch = screen.safeAreaTop > 0
         let inferredNotchWidth = notchWidth(from: screen)
-        let closedWidth = clamp(
-            inferredNotchWidth ?? fallbackClosedWidth,
-            min: 100,
-            max: min(250, availableWidth - 24)
-        )
+        let closedWidthMax = min(250, availableWidth - 24)
+        let closedWidth: Double
+        if let inferredNotchWidth {
+            // Hardware-measured notch: floor at 100 as a sanity guard against a bad reading.
+            closedWidth = clamp(inferredNotchWidth, min: 100, max: closedWidthMax)
+        } else {
+            closedWidth = clamp(fallbackClosedWidth, min: 60, max: closedWidthMax)
+        }
         let closedHeight: Double
         if hasNotch {
             closedHeight = clamp(screen.safeAreaTop, min: 20, max: 28)
