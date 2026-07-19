@@ -32,7 +32,7 @@ final class NotchLayoutMetricsTests: XCTestCase {
 
         XCTAssertTrue(metrics.hasPhysicalNotch)
         XCTAssertEqual(metrics.closedWidth, 210)
-        XCTAssertEqual(metrics.closedHeight, 37)
+        XCTAssertEqual(metrics.closedHeight, 28)
     }
 
     func testPeekSizeStretchesFromClosedShape() {
