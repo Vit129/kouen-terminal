@@ -183,9 +183,21 @@ git commit -m "chore(release): update CHANGELOG for ${TAG}" || true
 git tag -f "$TAG" -m "$TAG"
 git push origin main
 git push origin "refs/tags/$TAG" --force
-gh release create "$TAG" --title "$TAG" --notes "$NOTES" 2>/dev/null \
-  || gh release edit "$TAG" --title "$TAG" --notes "$NOTES" 2>/dev/null \
-  || echo "⚠️  GitHub release skipped (gh CLI not configured or tag exists)"
+# Errors are NOT swallowed here (previously 2>/dev/null on both attempts hid every
+# failure — 20 releases went out with empty "Release vX.Y.Z" stub bodies over several
+# weeks before anyone noticed, because nothing ever printed why). A create/edit
+# failure is loud now but non-fatal: the tag/push already succeeded by this point, and
+# the release can be fixed after the fact with `gh release edit "$TAG" --notes "..."`.
+create_err="$(gh release create "$TAG" --title "$TAG" --notes "$NOTES" 2>&1 >/dev/null)"
+if [[ $? -ne 0 ]]; then
+  edit_err="$(gh release edit "$TAG" --title "$TAG" --notes "$NOTES" 2>&1 >/dev/null)"
+  if [[ $? -ne 0 ]]; then
+    echo "⚠️  GitHub release create AND edit both failed for $TAG:"
+    echo "   create: $create_err"
+    echo "   edit:   $edit_err"
+    echo "   Fix manually with: gh release edit \"$TAG\" --notes \"\$(git-cliff <prev>..$TAG --strip header)\""
+  fi
+fi
 
 echo ""
 echo "✅ Full cycle complete. Version: $TAG"
