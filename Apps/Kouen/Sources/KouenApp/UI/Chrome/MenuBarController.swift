@@ -249,10 +249,11 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         }
     }
 
-    // MARK: - Status-item mark (the Kouen two-squares logo, as a template)
+    // MARK: - Status-item mark (a minimal "K" glyph, as a template)
 
-    /// The Kouen mark — two rounded squares on a "\" diagonal — rendered as a
-    /// resolution-independent template so the menu bar tints it for light/dark.
+    /// A simplified Kouen "K" monogram, drawn as strokes so it stays legible at
+    /// menu-bar size — the full tree/leaves brand mark (`KouenLogo.png`) turns
+    /// into an illegible blob once scaled down to ~17pt.
     static func markImage(pointSize: CGFloat) -> NSImage {
         let image = NSImage(size: NSSize(width: pointSize, height: pointSize), flipped: false) { rect in
             guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
@@ -262,17 +263,22 @@ final class MenuBarController: NSObject, NSMenuDelegate {
                 translationX: rect.minX + (rect.width - viewBox * scale) / 2,
                 y: rect.minY + (rect.height - viewBox * scale) / 2
             ).scaledBy(x: scale, y: scale)
-            ctx.setFillColor(NSColor.black.cgColor)
-            // y-up: top-left square (high y) + bottom-right square (low y), overlapping
-            // at the centre so they read as one connected mark.
-            for shape in [CGRect(x: 9, y: 41, width: 50, height: 50),
-                          CGRect(x: 41, y: 9, width: 50, height: 50)] {
-                let path = CGPath(roundedRect: shape, cornerWidth: 16, cornerHeight: 16, transform: nil)
-                if let scaled = path.copy(using: &transform) {
-                    ctx.addPath(scaled)
-                    ctx.fillPath()
-                }
-            }
+
+            let path = CGMutablePath()
+            path.move(to: CGPoint(x: 26, y: 15))
+            path.addLine(to: CGPoint(x: 26, y: 85))
+            path.move(to: CGPoint(x: 26, y: 50))
+            path.addLine(to: CGPoint(x: 78, y: 85))
+            path.move(to: CGPoint(x: 26, y: 50))
+            path.addLine(to: CGPoint(x: 78, y: 15))
+
+            guard let scaled = path.copy(using: &transform) else { return false }
+            ctx.addPath(scaled)
+            ctx.setStrokeColor(NSColor.black.cgColor)
+            ctx.setLineWidth(16 * scale)
+            ctx.setLineCap(.round)
+            ctx.setLineJoin(.round)
+            ctx.strokePath()
             return true
         }
         image.isTemplate = true

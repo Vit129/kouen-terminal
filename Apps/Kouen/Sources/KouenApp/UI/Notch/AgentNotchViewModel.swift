@@ -32,7 +32,7 @@ final class AgentNotchViewModel: ObservableObject {
     /// 400 ms dwell (skill guidance 250–600 ms); tap still opens instantly.
     private let hoverOpenDelay: UInt64 = 400_000_000
     private let hoverCloseDelay: UInt64 = 190_000_000
-    private let peekDuration: Duration = .milliseconds(2_500)
+    private let peekDuration: Duration = .seconds(4)
     /// Per-row peek cooldown so a flapping detector can't strobe the notch.
     private let peekCooldown: TimeInterval = 10
     private var peekStates: [String: AgentNotchPeekDecider.RowState]?
@@ -170,10 +170,15 @@ final class AgentNotchViewModel: ObservableObject {
     }
 
     private func armPeekDismiss(after duration: Duration) {
-        // Persistent notification: don't auto-dismiss.
-        // User must click the notch (to open) or click elsewhere to dismiss.
         peekDismissTask?.cancel()
-        peekDismissTask = nil
+        peekDismissTask = Task { [weak self] in
+            try? await Task.sleep(for: duration)
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                guard let self, self.isPeeking else { return }
+                self.close()
+            }
+        }
     }
 
     // MARK: - Hover
@@ -194,8 +199,10 @@ final class AgentNotchViewModel: ObservableObject {
                 }
             }
         } else {
-            // Persistent peek: don't dismiss on hover exit. User clicks to interact or dismiss.
+            // Hover exit while peeking: resume the auto-dismiss countdown from full duration
+            // (hovering paused it — see the `isPeeking` branch above).
             if isPeeking {
+                armPeekDismiss(after: peekDuration)
                 return
             }
             hoverTask = Task { [weak self] in
