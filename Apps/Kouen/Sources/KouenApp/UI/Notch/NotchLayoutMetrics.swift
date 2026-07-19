@@ -47,7 +47,7 @@ public struct NotchLayoutMetrics: Sendable, Equatable {
     public static let fallbackClosedWidth: Double = 80
     public static let fallbackClosedHeight: Double = 20
     public static let minimumOpenWidth: Double = 336
-    public static let preferredOpenWidth: Double = 540
+    public static let preferredOpenWidth: Double = 420
     public static let preferredOpenHeight: Double = 286
     public static let shadowPadding: Double = 20
 
