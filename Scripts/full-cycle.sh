@@ -175,6 +175,14 @@ if [[ -n "$PREV_TAG" ]]; then
 else
   NOTES="$(git-cliff --tag "$TAG" --strip header 2>/dev/null)" || NOTES="Release ${TAG}"
 fi
+# GitHub release-notes body caps at 125000 chars — an empty/wrong PREV_TAG (e.g. a
+# broken tag lookup) would silently dump full project history past that limit and
+# 422 on every create/edit attempt below.
+NOTES_LEN=$(echo -n "$NOTES" | wc -c | tr -d ' ')
+if [[ $NOTES_LEN -gt 120000 ]]; then
+  echo "⚠️  generated notes are ${NOTES_LEN} chars, over the safe limit — truncating"
+  NOTES="$(echo "$NOTES" | head -c 119000)"$'\n\n'"...(truncated, see CHANGELOG.md for the rest)"
+fi
 
 # Commit the updated CHANGELOG
 git add CHANGELOG.md docs/CHANGELOG-archive.md 2>/dev/null || git add CHANGELOG.md
