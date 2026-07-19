@@ -57,17 +57,17 @@ struct AgentNotchRootView: View {
     // MARK: - Closed
 
     private var closedView: some View {
-        HStack(spacing: 7) {
+        HStack(spacing: 5) {
             Image(systemName: model.waitingCount > 0 ? "sparkles" : "terminal")
-                .font(.system(size: 11, weight: .semibold))
+                .font(.system(size: 9, weight: .semibold))
                 .foregroundStyle(model.waitingCount > 0 ? Color.orange : Color.white.opacity(0.72))
             agentDots(limit: 4)
             if model.waitingCount > 0 {
                 Text("\(model.waitingCount)")
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .font(.system(size: 9, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 2)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 1)
                     .background(Color.red.opacity(0.88), in: Capsule())
             }
         }
@@ -225,10 +225,10 @@ struct AgentNotchRootView: View {
     }
 
     private func agentDots(limit: Int) -> some View {
-        HStack(spacing: -3) {
+        HStack(spacing: -2) {
             ForEach(Array(model.agents.prefix(limit).enumerated()), id: \.element.id) { _, agent in
                 statusDot(kind: agent.kind, waiting: agent.waiting, working: agent.activity == .working)
-                    .overlay(Circle().stroke(Color.black, lineWidth: 1.5))
+                    .overlay(Circle().stroke(Color.black, lineWidth: 1))
             }
         }
         .accessibilityHidden(true)
@@ -483,19 +483,19 @@ private struct NotchStatusDot: View {
             Group {
                 if let chip {
                     Text(chip)
-                        .font(.system(size: 8, weight: .heavy, design: .rounded))
+                        .font(.system(size: 6, weight: .heavy, design: .rounded))
                         .foregroundStyle(.white)
-                        .frame(width: 20, height: 14)
-                        .background(color, in: RoundedRectangle(cornerRadius: 4, style: .continuous))
+                        .frame(width: 13, height: 9)
+                        .background(color, in: RoundedRectangle(cornerRadius: 3, style: .continuous))
                 } else {
                     Circle()
                         .fill(color)
-                        .frame(width: 9, height: 9)
+                        .frame(width: 6, height: 6)
                 }
             }
-            .shadow(color: color.opacity(waiting ? 0.6 : 0.25), radius: waiting ? 5 : 2)
+            .shadow(color: color.opacity(waiting ? 0.6 : 0.25), radius: waiting ? 4 : 1.5)
         }
-        .frame(width: chip != nil ? 20 : 9, height: chip != nil ? 14 : 9)
+        .frame(width: chip != nil ? 13 : 6, height: chip != nil ? 9 : 6)
     }
 }
 
