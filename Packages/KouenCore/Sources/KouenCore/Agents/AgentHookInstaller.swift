@@ -475,12 +475,9 @@ public enum AgentHookInstaller {
 
     // MARK: - Hook commands
 
-    /// Substrings present in hook commands this build (or a pre-rename Harness build) wrote —
-    /// the `isInstalled` marker. Keeping the old "harness-cli notify" marker lets `pruneHooks`
-    /// recognize and drop entries written before the Harness→Kouen rename, instead of treating
-    /// them as a foreign user entry and leaving them to fire alongside the new one forever.
-    private static let hookMarkers = ["kouen-cli notify", "harness-cli notify"]
-    /// True if `text` was written by this build (or a pre-rename build) — i.e. it's ours to prune/overwrite.
+    /// Substrings present in hook commands this build wrote — the `isInstalled` marker.
+    private static let hookMarkers = ["kouen-cli notify"]
+    /// True if `text` was written by this build — i.e. it's ours to prune/overwrite.
     private static func containsHookMarker(_ text: String) -> Bool {
         hookMarkers.contains { text.contains($0) }
     }

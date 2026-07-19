@@ -141,24 +141,6 @@ final class AgentHookInstallerTests: XCTestCase {
         XCTAssertTrue(try claudeNotificationCommand(at: url).contains("--from-hook"))
     }
 
-    func testInstallPrunesLegacyHarnessEntryInsteadOfDuplicating() throws {
-        let url = try XCTUnwrap(AgentHookInstaller.hookConfigURL(for: .codex, homeOverride: home))
-        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let legacy: [String: Any] = ["hooks": ["Stop": [
-            ["matcher": "*", "hooks": [["type": "command", "command": "harness-cli notify --surface \"$HARNESS_SURFACE\""]]]
-        ]]]
-        try JSONSerialization.data(withJSONObject: legacy).write(to: url)
-
-        _ = try AgentHookInstaller.install(agent: .codex, homeOverride: home)
-
-        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: try Data(contentsOf: url)) as? [String: Any])
-        let stop = try XCTUnwrap((json["hooks"] as? [String: Any])?["Stop"] as? [Any])
-        XCTAssertEqual(stop.count, 1, "the pre-rename harness-cli entry must be pruned, not left alongside the new one")
-        let command = try XCTUnwrap(((stop.first as? [String: Any])?["hooks"] as? [Any])?
-            .compactMap { ($0 as? [String: Any])?["command"] as? String }.first)
-        XCTAssertTrue(command.contains("kouen-cli notify"))
-    }
-
     func testDetectInstalledAgentsFindsAgentByConfigDir() throws {
         // Inject a table whose executables can't exist on PATH, so the result is driven purely
         // by config-dir presence — deterministic regardless of what's installed on the host.
