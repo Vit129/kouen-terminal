@@ -8,6 +8,7 @@ final class LSPFileSession {
     private var client: LSPClient?
     private var diagnosticsTask: Task<Void, Never>?
     private var fileURL: URL?
+    private var projectRootURL: URL?
 
     var onDiagnostics: (([LSPDiagnostic]) -> Void)?
 
@@ -23,6 +24,7 @@ final class LSPFileSession {
             onDiagnostics?([])
             return
         }
+        projectRootURL = configuration.rootURL
 
         let languageID = languageID(for: fileExtension, fallback: configuration.language)
         let newClient = LSPClient()
@@ -51,7 +53,24 @@ final class LSPFileSession {
 
     func hover(position: LSPPosition) async -> String? {
         guard let client, let fileURL else { return nil }
-        return try? await client.hover(url: fileURL, position: position)?.plainText
+        let text = try? await client.hover(url: fileURL, position: position)?.plainText
+        guard let graphLine = graphifyAnnotation() else { return text }
+        guard let text, !text.isEmpty else { return graphLine }
+        return "\(text)\n\n\(graphLine)"
+    }
+
+    /// One-line file-level graph signal (pagerank/community), appended to hover text when the
+    /// project has a `graphify-out/graph.json`. File-level only — `graph.json`'s nodes are
+    /// per-file, not per-symbol, so this is the same regardless of what's under the cursor.
+    private func graphifyAnnotation() -> String? {
+        guard let fileURL, let projectRootURL else { return nil }
+        let rootPath = projectRootURL.standardizedFileURL.path
+        let filePath = fileURL.standardizedFileURL.path
+        guard filePath.hasPrefix(rootPath + "/") else { return nil }
+        let relativePath = String(filePath.dropFirst(rootPath.count + 1))
+        guard let info = GraphifyLSPBridge.lookupFileInfo(sourceFile: relativePath, projectRoot: projectRootURL)
+        else { return nil }
+        return "Graphify: pagerank \(String(format: "%.5f", info.pagerank)) · community \(info.community)"
     }
 
     func definition(position: LSPPosition) async -> SyntaxDefinitionTarget? {

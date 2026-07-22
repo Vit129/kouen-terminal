@@ -185,5 +185,11 @@ private func agentDetail(_ agent: AgentSessionSummary) -> String {
     if !agent.sessionName.isEmpty, agent.sessionName != path {
         parts.append(agent.sessionName)
     }
+    // Fleet-at-a-glance parity with the sidebar's per-session port badge (P39 G1) —
+    // this popover previously showed agent status without the port a human would need
+    // to actually open the dev server it's running.
+    if let ports = agent.listeningPorts, !ports.isEmpty {
+        parts.append(":\(ports.sorted().map(String.init).joined(separator: ","))")
+    }
     return parts.joined(separator: " · ")
 }
