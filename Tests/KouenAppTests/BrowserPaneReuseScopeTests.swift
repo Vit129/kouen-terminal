@@ -38,13 +38,16 @@ final class BrowserPaneReuseScopeTests: XCTestCase {
         XCTAssertEqual(resolved?.id, activeTab.id, "menu/keyboard-triggered opens have no origin surface")
     }
 
-    func testTargetTabFallsBackToActiveWhenOriginSurfaceNotFound() {
+    func testTargetTabReturnsNilWhenOriginSurfacePresentButNotFound() {
         let staleSurfaceID = SurfaceID() // not present in surfaceIndex — e.g. a stale KOUEN_SURFACE
         let activeTab = makeTab(rootPane: .leaf(PaneLeaf()))
 
         let resolved = DaemonSyncService.targetTab(originSurfaceID: staleSurfaceID, surfaceIndex: [:], activeTab: activeTab)
 
-        XCTAssertEqual(resolved?.id, activeTab.id)
+        XCTAssertNil(
+            resolved,
+            "an agent call with a real origin surface that fails to resolve must never silently land on whatever tab is active"
+        )
     }
 
     // MARK: - existingBrowserPaneID scoping (the actual bug)
