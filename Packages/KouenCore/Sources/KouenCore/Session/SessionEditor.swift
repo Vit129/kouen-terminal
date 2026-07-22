@@ -1312,7 +1312,8 @@ public struct SessionEditor: Sendable {
                         lastActivityAt: agent.lastActivityAt,
                         notificationText: tab.notificationText,
                         cwd: tab.cwd,
-                        gitBranch: tab.gitBranch
+                        gitBranch: tab.gitBranch,
+                        listeningPorts: tab.listeningPorts.isEmpty ? nil : tab.listeningPorts
                     ))
                 }
             }

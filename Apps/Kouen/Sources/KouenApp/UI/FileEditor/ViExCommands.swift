@@ -168,6 +168,35 @@ extension ViEngine {
                 }
                 return
             }
+            // :graph explain <symbol> / :graph path <A> <B> — shell out to the `graphify` CLI
+            // against the current project's cwd, display raw output in the ex message area.
+            // (`graphify --help` has no `query` subcommand — that's MCP-only via `graphify-mcp`,
+            // not something a one-line CLI shell-out can reach.)
+            if cmd.hasPrefix("graph ") {
+                let rest = String(cmd.dropFirst(6)).trimmingCharacters(in: .whitespaces)
+                guard let cwdPath = onCurrentCWD?() else {
+                    displayExMessage("graph: no current project cwd")
+                    return
+                }
+                let cwd = URL(fileURLWithPath: cwdPath)
+                if rest.hasPrefix("explain ") {
+                    let symbol = String(rest.dropFirst(8)).trimmingCharacters(in: .whitespaces)
+                    let output = GraphifyLSPBridge.run("explain", arguments: [symbol], cwd: cwd)
+                    displayExMessage(output ?? "graph explain: no result (graphify not installed or symbol not found)")
+                } else if rest.hasPrefix("path ") {
+                    let parts = String(rest.dropFirst(5)).trimmingCharacters(in: .whitespaces)
+                        .split(separator: " ", maxSplits: 1).map(String.init)
+                    guard parts.count == 2 else {
+                        displayExMessage("Usage: :graph path <A> <B>")
+                        return
+                    }
+                    let output = GraphifyLSPBridge.run("path", arguments: parts, cwd: cwd)
+                    displayExMessage(output ?? "graph path: no result (graphify not installed or no path found)")
+                } else {
+                    displayExMessage("Usage: :graph explain <symbol> | :graph path <A> <B>")
+                }
+                return
+            }
             // :ack — dismiss current tab's Needs Attention card
             if cmd == "ack" {
                 if let tabID = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.id {
