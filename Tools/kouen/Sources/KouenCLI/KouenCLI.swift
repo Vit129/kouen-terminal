@@ -113,6 +113,8 @@ struct KouenCLI {
                 if case let .workspaceID(id) = response { print(id.uuidString) }
             case "new-session":
                 try handleNewSession(args, client: client)
+            case "wake":
+                try handleWake(args, client: client)
             case "new-tab":
                 try handleNewTab(args, client: client)
             case "new-split":

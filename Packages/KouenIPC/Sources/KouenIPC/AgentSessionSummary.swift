@@ -40,6 +40,10 @@ public struct AgentSessionSummary: Codable, Sendable, Equatable, Identifiable {
     public var cwd: String
     /// The tab's git branch at the time of the snapshot.
     public var gitBranch: String?
+    /// The tab's detected listening dev-server ports (P39 G1's `ListeningPortScanner`),
+    /// nil when there are none — kept optional (not `[]`) so an older daemon/CLI build
+    /// that predates this field decodes fine via Codable's lenient-optional synthesis.
+    public var listeningPorts: [Int]?
 
     /// Human-readable agent name, derived from `kind` (the single source of truth).
     /// Used by the text formatter and the GUI; JSON consumers read the canonical
@@ -60,7 +64,8 @@ public struct AgentSessionSummary: Codable, Sendable, Equatable, Identifiable {
         lastActivityAt: Date,
         notificationText: String? = nil,
         cwd: String = "",
-        gitBranch: String? = nil
+        gitBranch: String? = nil,
+        listeningPorts: [Int]? = nil
     ) {
         self.workspaceName = workspaceName
         self.sessionID = sessionID
@@ -76,5 +81,6 @@ public struct AgentSessionSummary: Codable, Sendable, Equatable, Identifiable {
         self.notificationText = notificationText
         self.cwd = cwd
         self.gitBranch = gitBranch
+        self.listeningPorts = listeningPorts
     }
 }

@@ -391,12 +391,21 @@ struct KouenDaemonTools: Sendable {
         _ = await send(.send(surfaceID: sid, text: agentCommand))
         await notifyMCPActivity(surfaceId: sid, tool: "kouenSpawnAgent")
 
-        return (toolResult(json: .object([
+        var result: [String: AnyCodable] = [
             "sessionId": .string(sessionID.uuidString),
             "surfaceId": .string(sid),
             "agent": .string(agent),
             "launched": .string(agentCommand.trimmingCharacters(in: .whitespacesAndNewlines)),
-        ])), nil)
+        ]
+        // Signal-file stack guess — the CLI just launched bare with no prompt typed, so this
+        // is surfaced for the caller (the orchestrator that requested the spawn) to fold into
+        // whatever it types next, not auto-typed into the pane itself.
+        if let cwd, let profile = SignalFileRouter.detectProfile(at: cwd) {
+            result["detectedStack"] = .string(profile.stack)
+            result["detectedHint"] = .string(profile.hint)
+        }
+
+        return (toolResult(json: .object(result)), nil)
     }
 
     // MARK: - waitForPaneOutput
