@@ -128,6 +128,44 @@ public struct GitHubCLIClient: Sendable {
         }
     }
 
+    // MARK: - Issues
+
+    public struct IssueInfo: Sendable, Equatable {
+        public let title: String
+        public let body: String
+    }
+
+    /// Fetch an issue's title/body from `repoSpec` (`org/repo`), for seeding a `wake`-launched
+    /// agent's initial prompt. No `repoPath` needed — `-R` lets `gh` resolve the repo remotely.
+    public func issue(repoSpec: String, number: Int) -> IssueInfo? {
+        guard let output = runGH(["issue", "view", "\(number)", "-R", repoSpec, "--json", "title,body"])
+        else { return nil }
+        guard let data = output.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let title = object["title"] as? String
+        else { return nil }
+        return IssueInfo(title: title, body: object["body"] as? String ?? "")
+    }
+
+    // MARK: - Clone
+
+    /// Clones `repoSpec` (`org/repo`) to `destination` via `gh repo clone`. `destination`'s parent
+    /// directory must already exist — `gh`/`git` won't create intermediate directories.
+    @discardableResult
+    public func cloneRepo(repoSpec: String, to destination: String) -> Bool {
+        guard let ghPath = Self.cachedGhPath else { return false }
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: ghPath)
+        process.arguments = ["repo", "clone", repoSpec, destination]
+        process.standardOutput = Pipe()
+        process.standardError = Pipe()
+        do {
+            try process.run()
+            process.waitUntilExit()
+            return process.terminationStatus == 0
+        } catch { return false }
+    }
+
     // MARK: - Private
 
     /// Resolve gh path: prefer the common Homebrew/system locations; fall back to `which gh`
