@@ -1,4 +1,4 @@
-.PHONY: run debug prod start install install-no-build install-graceful install-graceful-no-build build bench preview preview-stop preview-clean clean-state release release-notes package dmg smoke-dmg sign appcast finalize icon clean video-skills video-dev video-check video-render video-doctor mobile-web mobile-web-stop mobile-web-clean
+.PHONY: run debug prod start install-graceful install-graceful-no-build build bench preview preview-stop preview-clean clean-state release release-notes package dmg smoke-dmg sign appcast finalize icon clean video-skills video-dev video-check video-render video-doctor mobile-web mobile-web-stop mobile-web-clean
 
 run:
 	./Scripts/run.sh run
@@ -16,12 +16,6 @@ start:
 # never touches the production app's real session state).
 clean-state:
 	./Scripts/clean-state.sh
-
-install:
-	./Scripts/install-app.sh
-
-install-no-build:
-	./Scripts/install-app.sh --no-build
 
 install-graceful:
 	./Scripts/install-graceful.sh
