@@ -161,11 +161,17 @@ final class SplitPaneCoordinator {
     /// lives in (e.g. the MCP-calling agent's own pane, via its `KOUEN_SURFACE` env var)
     /// instead of whatever tab the human currently has focused — an agent working in
     /// session A shouldn't have its `kouenBrowserOpen` land in session B just because a
-    /// human happened to be looking at B. Falls back to the active tab when `nil` or not
-    /// found (menu/keyboard-triggered opens have no originating agent surface).
+    /// human happened to be looking at B. Falls back to the active tab only when there is
+    /// no origin surface at all (menu/keyboard-triggered opens have no originating agent
+    /// surface); a present-but-unresolvable origin surface no-ops instead of misrouting.
     func openBrowserPane(url: URL, direction: SplitDirection, paneID: PaneID = UUID(), originSurfaceID: SurfaceID? = nil) {
-        let originTab = originSurfaceID.flatMap { coord.surfaceIndex[$0]?.tab }
-        guard let tab = originTab ?? coord.snapshot.activeWorkspace?.activeTab else { return }
+        let tab: Tab?
+        if let originSurfaceID {
+            tab = coord.surfaceIndex[originSurfaceID]?.tab
+        } else {
+            tab = coord.snapshot.activeWorkspace?.activeTab
+        }
+        guard let tab else { return }
 
         let resolvedURL: URL
         if let savedURLString = UserDefaults.standard.string(forKey: "browserPane.\(paneID.uuidString).url"),

@@ -52,6 +52,9 @@ struct KouenBrowserTools: Sendable {
             if case let .open(paneID) = payload {
                 return (toolResult(json: .object(["paneId": .string(paneID.uuidString)])), nil)
             }
+            if case let .error(msg) = payload {
+                return (nil, JSONRPCError(code: -32000, message: msg))
+            }
             return (nil, JSONRPCError(code: -32000, message: "Unexpected browser open payload response"))
         case let .error(msg):
             return (nil, JSONRPCError(code: -32000, message: msg))
