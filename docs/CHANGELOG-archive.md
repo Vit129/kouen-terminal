@@ -2,6 +2,48 @@
 
 Older releases. See [CHANGELOG.md](../CHANGELOG.md) for recent versions.
 
+## [4.5.5] - 2026-07-16
+
+### Fixed
+- Forward arrow keys through doCommandBy when input routes via marked-text/IME (release v4.5.5) ([`7b335c0`](https://github.com/Vit129/kouen-terminal/commit/7b335c05f79d1f9e176e9ada644205d4f1074bad))
+
+## [4.5.4] - 2026-07-16
+
+### Fixed
+- Restore path-insert as default terminal drop (⌥-drag opts into file preview) (release v4.5.4) ([`732491c`](https://github.com/Vit129/kouen-terminal/commit/732491ce8e3deb33667a1328134f9e7e3762c963))
+
+## [4.5.3] - 2026-07-16
+
+### Added
+- Group Recipes & History picker by originating pane ([`266b74c`](https://github.com/Vit129/kouen-terminal/commit/266b74c349ce5b1995ec08dda419971cd3fc02a1))
+- Add Codex MCP config support (config.toml, not JSON) ([`04a0e19`](https://github.com/Vit129/kouen-terminal/commit/04a0e197812f8e6b47dc4e6fdfc1f16724b6ff01))
+- Add Antigravity (agy) Stop hook support ([`886ab94`](https://github.com/Vit129/kouen-terminal/commit/886ab9476a4404825ee359c2571c6fc656ff5f5e))
+- Check for newer git-clone version at launch, confirm before pull ([#53](https://github.com/Vit129/kouen-terminal/pull/53)) ([`c23b715`](https://github.com/Vit129/kouen-terminal/commit/c23b7157610dd7fc2be0639ef2960fada7075d73))
+- Drag-and-drop file support (terminal open-preview, sidebar copy-in) (release v4.5.3) ([`4becc8b`](https://github.com/Vit129/kouen-terminal/commit/4becc8b98ab6f02629b8e92aa5d23b34fe3254c1))
+
+### Fixed
+- Scope kouenBrowserOpen pane reuse to the target tab ([`7fbdd61`](https://github.com/Vit129/kouen-terminal/commit/7fbdd611edc1314f49b2990fcd4ee3e9e2df5ce6))
+- Show checkmark when agent hooks are installed ([`3952882`](https://github.com/Vit129/kouen-terminal/commit/39528824012684c97a9114fb73a40b00b2d78dff))
+
+## [4.5.1] - 2026-07-15
+
+### Fixed
+- Actually call WorktreeAutoIsolateService.shared.start() ([`6a3ebf9`](https://github.com/Vit129/kouen-terminal/commit/6a3ebf9c2aa7f49a6bd5467663362feb1412f776))
+
+## [4.5.0] - 2026-07-15
+
+### Added
+- Subagent visibility badge on tab/sidebar (P38 Phase B) ([`1ff21c9`](https://github.com/Vit129/kouen-terminal/commit/1ff21c9c532e7942c4144285e2b5327c723740e6))
+- Merge command-history into the Recipes picker (P38 Phase C) ([`463e161`](https://github.com/Vit129/kouen-terminal/commit/463e16115bb3b49c27457f6bc8e73852eb413679))
+- Kitty Graphics protocol conformance slice (P38 Phase D) ([`b56cbe3`](https://github.com/Vit129/kouen-terminal/commit/b56cbe307941e1147f2d6e5b7ec1dabe3451603e))
+
+### Documentation
+- Update P38 status across all phases in plans index ([`6c61169`](https://github.com/Vit129/kouen-terminal/commit/6c61169529a208375c161dd490111fb38432fb4a))
+
+### Fixed
+- Dispatch paneCreated/paneRemoved lifecycle hooks (P38 Phase E) ([`e4c72cc`](https://github.com/Vit129/kouen-terminal/commit/e4c72cc0759453aa59552c75358aa54773353ed5))
+- Auto-isolate background tabs, not just the focused one ([`da3a988`](https://github.com/Vit129/kouen-terminal/commit/da3a988c2ffd550f0906f3dc1a56eedb6b8766e3))
+
 ## [4.4.4] - 2026-07-14
 
 ### Fixed
