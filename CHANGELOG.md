@@ -8,12 +8,14 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [4.7.1] - 2026-07-22
 
 ### Added
-- Release version bump to v4.7.1.
+- Ghq-style wake command, signal-file agent routing, graphify LSP hover (release v4.7.0) ([`8280e1c`](https://github.com/Vit129/kouen-terminal/commit/8280e1cc3e9933a8b06e34ca2394ac2eff422e7c))
 
-## [4.7.0] - 2026-07-22
-
-### Added
-- Release version bump to v4.7.0.
+### Fixed
+- Replace Harness placeholder logo with Kouen brand mark ([`60b749d`](https://github.com/Vit129/kouen-terminal/commit/60b749d8e5f9404f3273343fa97e42edb9ff0cd3))
+- Closed notch pill no longer forced to a 100pt floor on non-notch Macs ([`a3cd3e3`](https://github.com/Vit129/kouen-terminal/commit/a3cd3e3916faaba9cf49c5fbb8a8f293571cff2f))
+- Stop swallowing gh release create/edit errors in full-cycle.sh ([`3e0f86d`](https://github.com/Vit129/kouen-terminal/commit/3e0f86de8e5c0e6974c237dd68aabcc9a4d42b31))
+- Guard release notes against GitHub's 125000-char body limit ([`33f4f7d`](https://github.com/Vit129/kouen-terminal/commit/33f4f7dca97b5f0600dceae4c117b2d21a6fa5ec))
+- Browser pane always opens in the requesting session's own tab, not whichever tab is focused (release v4.7.1) ([`d712328`](https://github.com/Vit129/kouen-terminal/commit/d712328be65c5365d9752107f629d07e87e61e88))
 
 ## [4.6.1] - 2026-07-18
 
