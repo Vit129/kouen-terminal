@@ -287,6 +287,269 @@ partially cover this but don't aggregate.
 - `swift build` + `swift test` green, `Tests/robot/run.sh` 10/10
 - Live check against a real daemon, not just build-green (see MEMORY.md 2026-07-07 lesson)
 
+## Addendum — MAW-pattern validate gate (2026-07-23)
+
+User asked to compare Kouen against GitHub `MAW`/`Multi-Agent-Workflow` repos
+(`bobisme/maw`, `Soul-Brews-Studio/maw-js`, `laris-co/multi-agent-workflow-kit`,
+`haoyu-haoyu/Multi-AI-Workflow` — researched via agy). All four use the same
+tmux/git-worktree agent-isolation pattern Kouen already has (`kouen-cli wake`,
+worktree-per-session). The one piece worth adapting: their deterministic
+merge step runs build/test validation before merging an agent's branch back.
+
+**Explicit constraint from user**: validate+test+merge must never run
+automatically — the existing `mergeWorktreeAction`/`performMerge` NSAlert
+confirm (git panel) is already the only thing that can trigger a merge, and
+that stays true. This only adds an automated *validate* step that runs before
+the confirm dialog is shown, so the user decides with pass/fail info already
+in hand — it does not add any new auto-merge path.
+
+- `SignalFileRouter.validationSteps(at:)` (`Packages/KouenCore/Sources/KouenCore/Routing/SignalFileRouter.swift`)
+  — reuses the existing stack-detection (`detectProfile`) to return ordered
+  build/test commands (swift: `swift build` + `swift test`; python: `pytest -q`;
+  node/nextjs/react/vue/node-backend: package-manager `test` script, detected
+  via lockfile, only if `package.json` actually defines one). Empty = skip,
+  never treated as failure.
+- `GitPanelView.validateWorktree(at:)` runs those steps via a new
+  `runShellCommand` (merges stdout+stderr into one pipe, 5-minute kill
+  ceiling — build/test output is much larger than the git diffs `runGit`/
+  `runGitDiff` already handle, so a two-pipe drain would risk the classic
+  `Process` deadlock).
+- `mergeWorktreeAction` now runs validate before calling `performMerge`;
+  `performMerge`'s NSAlert shows the pass/fail summary and switches to
+  `.warning` style on failure — Merge/Cancel buttons and the underlying
+  `git merge branch` call are unchanged.
+- Files: `Packages/KouenCore/Sources/KouenCore/Routing/SignalFileRouter.swift`,
+  `Apps/Kouen/Sources/KouenApp/UI/Git/GitPanelView.swift`.
+- Verified: `swift build --product Kouen` clean, `swift test --filter
+  "SignalFileRouterTests|GitPanelView"` 46/46, `Tests/robot/run.sh` 27/27
+  (including the pre-existing "never `--no-ff`" / "no auto-resolve" merge
+  guards — unaffected). New tests: `testSwiftValidationStepsAreBuildThenTest`,
+  `testPythonValidationStepsRunPytest`, `testNodeWithoutTestScriptSkipsValidation`,
+  `testNodeWithTestScriptPicksPackageManagerFromLockfile`,
+  `testEmptyDirectorySkipsValidation`.
+
+  **Advisor review caught 2 real gaps in the first pass, both fixed:**
+  1. `runShellCommand` used `/usr/bin/env <tool>`, which inherits the GUI
+     app's minimal launchd PATH (`/usr/bin:/bin:…`) — Homebrew-installed
+     npm/pnpm/yarn/bun/pytest would report "command not found" and read as a
+     false validate failure when Kouen.app is launched from Dock (not from a
+     terminal that leaks shell PATH). Fixed by adding
+     `resolveValidateExecutable(_:)`, mirroring the existing
+     `Process.zoxideQueryAll()` fix for the identical gap
+     (`CommandPaletteController.swift`) — checks
+     `/opt/homebrew/bin`/`/usr/local/bin`/`/usr/bin` before falling back to
+     bare-name-via-`env`.
+  2. Button had no re-entrancy guard — a second click on "Merge" while a
+     multi-minute validate was still running would spawn a second concurrent
+     validate+dialog for the same worktree. Fixed: `sender.isEnabled = false`
+     for the duration of the Task.
+
+  **Known, not fully closed:** a real validate run against a real dirty
+  worktree (with an actually-failing test) has not been exercised end to end
+  — build/unit-green only, same live-check caveat as every other phase in
+  this doc. Kouen's own worktrees specifically carry an extra known risk:
+  this session hit `SidebarPlacementSyncTests`' documented sandboxed-AppKit
+  crash while unit-testing (`agent-memory/knowledge/bugs/sidebar-cmdbackslash-toggle.md`)
+  — believed to be a no-real-WindowServer artifact of this dev session's
+  test-runner environment specifically, not something that should reproduce
+  when `swift test` is spawned from the real logged-in-desktop `Kouen.app`,
+  but that belief has not been checked against the real app.
+
+  **Scope note:** the original ask was "handoff doc + deterministic merge";
+  this addendum ships only the merge-validate half. The structured
+  handoff-doc piece (goals/artifacts/open-decisions passed between agents)
+  is still unbuilt — not silently dropped, flagging it back to the user
+  explicitly.
+
+  **2026-07-23 follow-up — handoff-note surfacing, human side only.**
+  `GitPanelView.handoffNote(at:)` reads the existing `handoff` skill's
+  `agent-memory/HANDOFF.md` (From/To/Suggested skills/Note) instead of
+  inventing a second handoff-doc format, and shows its `Note:` field in the
+  merge confirm dialog — reuse over new schema, per the skill-routing
+  precedent already established in this workspace. Files:
+  `Apps/Kouen/Sources/KouenApp/UI/Git/GitPanelView.swift`. New tests:
+  `Tests/KouenAppTests/GitPanelViewHandoffNoteTests.swift` (4/4), full suite
+  re-verified `swift build` clean, `swift test --filter
+  "GitPanelView|SignalFileRouterTests"` 50/50, `Tests/robot/run.sh` 27/27.
+
+  **This is the human-review half only — not the agent-to-agent half.**
+  The gap named earlier in this doc was specifically "agent-to-agent
+  handoff structured — `WaitForRegistry` is signal-only, doesn't pass
+  context between agents." What shipped here reads a prior agent's
+  HANDOFF.md and shows it to a *human* at merge time — useful, but it
+  doesn't close that gap. Closing it would mean the *spawn* side
+  (`kouen-cli wake`/`kouenSpawnAgent`) seeding a new agent's initial prompt
+  from a prior HANDOFF.md, symmetric to how `SignalFileRouter.detectProfile`
+  already seeds a stack hint on spawn — not built, flagged back to the user
+  rather than assumed.
+
+  **2026-07-23 follow-up #2 — agent-to-agent leg (`kouenSpawnAgent`).**
+  User confirmed: build it. `kouenSpawnAgent` (`Tools/kouen-mcp/Sources/KouenMCP/KouenDaemonTools.swift`)
+  now surfaces a prior worktree's handoff in its spawn-result data — same
+  non-auto-typed pattern `detectedStack`/`detectedHint` already established
+  there (the calling agent/orchestrator decides whether/how to fold it into
+  the new agent's first prompt; nothing is typed into the pane
+  automatically).
+
+  Advisor review caught the reused `handoffNote` (400-char truncated,
+  Note-field-only — right for a human glancing at an NSAlert) being wrong
+  for this caller: a continuing agent needs the full note, and
+  `Suggested skills:` is the one field the `handoff` skill wrote
+  specifically for the next agent, not for a human dialog. Fixed by
+  splitting into `SignalFileRouter.HandoffInfo` (full `note` +
+  `suggestedSkills`, untruncated) — `GitPanelView`'s merge dialog now
+  truncates at its own call site (display-only concern), `kouenSpawnAgent`
+  returns both fields as-is (`priorHandoff`, `priorHandoffSuggestedSkills`).
+  One shared reader in `KouenCore`, two callers with different needs.
+
+  Files: `Packages/KouenCore/Sources/KouenCore/Routing/SignalFileRouter.swift`,
+  `Tools/kouen-mcp/Sources/KouenMCP/KouenDaemonTools.swift`,
+  `Apps/Kouen/Sources/KouenApp/UI/Git/GitPanelView.swift`. Verified:
+  `swift build --product Kouen` and `--product kouen-mcp` clean, `swift test
+  --filter "SignalFileRouterTests|GitPanelView|KouenMCPTests"` 79/79,
+  `Tests/robot/run.sh` 27/27.
+
+  **Wired, not verified end to end.** All tests assert the parser against
+  synthetic temp files; nothing has exercised the real flow (agent A writes
+  `HANDOFF.md` in worktree A → `kouenSpawnAgent` called with `cwd` pointing
+  at worktree A → the returned `priorHandoff` actually reaches a new agent's
+  prompt). Same live-check-owed caveat as every other phase in this doc —
+  do not read the green build/test as "the handoff flow works," only as
+  "the parsing and wiring don't crash." All of this addendum's changes are
+  also still uncommitted/unshipped as of this writing.
+
+  **2026-07-23 follow-up #3 — ponytail/rl-lessons self-audit cleanup.**
+  Cross-checked the whole addendum against `agent-memory/knowledge/rl-lessons.md`
+  (Process/Task-actor-isolation lessons especially — RL-052, RL-063) and the
+  YAGNI/reuse ladder. No RL-052 violation (`runShellCommand` wraps `Process`
+  in `DispatchQueue.global().async` exactly like the pre-existing
+  `runGit`/`runGitDiff`, never blocks the Task's inherited actor). Two real
+  findings, both fixed:
+  - `GitPanelView`'s `resolveValidateExecutable` duplicated
+    `Process.zoxideQueryAll`'s Homebrew-path-search logic instead of reusing
+    it (both already lived in the `KouenApp` target). Extracted
+    `Process.resolveExecutablePath(_:)` (`CommandPaletteController.swift`,
+    visibility widened from `private extension` to `extension` since it now
+    has two callers); `GitPanelView` calls the shared one, its own copy
+    deleted.
+  - `mergeWorktreeAction` captures `sender: NSButton` across a
+    multi-minute-await Task, matching RL-063's shape (view captured across
+    an await with no post-await liveness check) — harmless in practice
+    (re-enabling a detached button's `isEnabled` is a no-op, not a crash),
+    but added `sender.window != nil` before the deferred re-enable anyway,
+    matching this file's own established defensive convention.
+  - Verified: `swift build --product Kouen` and `--product kouen-mcp`
+    clean, `swift test --filter "SignalFileRouterTests|GitPanelView|CommandPalette"`
+    51/51, `Tests/robot/run.sh` 27/27.
+
+  **2026-07-23 follow-up #4 — real live-test of the validate step (option
+  "A" from the live-test menu: real subprocesses, no GUI needed).** Found
+  2 genuine gaps empirically (not synthetic — actual state of this dev
+  machine's toolchain):
+  1. This machine's node toolchain is 100% Volta (`~/.volta/bin/npm`), zero
+     Homebrew node install. `resolveExecutablePath`'s original 3 candidates
+     (`/opt/homebrew/bin`, `/usr/local/bin`, `/usr/bin`) all missed it —
+     confirmed via `env -i PATH=/usr/bin:/bin env npm` → `env: npm: No such
+     file or directory`, exit 127, the exact false-validate-failure bug
+     already flagged, just via a different toolchain than assumed. Fixed:
+     added `~/.volta/bin/<name>` as a 4th candidate
+     (`CommandPaletteController.swift`). nvm/asdf/fnm remain a known,
+     documented gap (not silently claimed covered) — evidence-based fix,
+     not a guess at every possible version manager.
+  2. System `python3` (`/usr/bin/python3`, Xcode's bundled stub) has no
+     `pytest` module installed — a python-stack validate would report
+     "tests failed" for an environment gap, not a real code problem. Not
+     fixed (would need a process-spawning availability pre-check inside
+     `SignalFileRouter.validationSteps`, which is documented as
+     pure/no-process-spawn by design) — flagged as a known limitation
+     instead of silently patched.
+  3. Separately hardened: `validateWorktree`'s failure summary now
+     distinguishes "the tool wasn't found at all" (`env: <name>: No such
+     file or directory`, exit 127 signature) from "the tool ran and the
+     build/test genuinely failed" — phrased differently so a missing
+     toolchain doesn't read as a code-quality signal.
+
+  Verified with a throwaway smoke test (`_LiveMAWValidateSmokeTest.swift`,
+  written, run, then deleted — not meant to stay in the suite since it
+  asserts against this specific machine's installed toolchain): real
+  `Process.resolveExecutablePath("npm")` resolves to the actual Volta path
+  on disk; a real passing `npm test` (through that resolved binary) exits
+  0; a real failing one exits non-zero and is correctly detected, not
+  silently swallowed; the `env: <name>: No such file or directory` /
+  exit-127 signature is confirmed real. Re-verified after cleanup: `swift
+  build --product Kouen` clean, `swift test --filter
+  "SignalFileRouterTests|GitPanelView|CommandPalette|KouenMCPTests"` 79/79,
+  `Tests/robot/run.sh` 27/27.
+
+  **2026-07-23 follow-up #5 — leg C (`kouenSpawnAgent` priorHandoff) fully
+  live-verified end to end, against a real daemon.** User asked to test the
+  agent-to-agent leg; production Kouen.app had 6 live panes across 5
+  unrelated projects (all agents idle) — confirmed via `kouenList` — so
+  installing over production and restarting was ruled out. Used `make
+  preview` instead: an isolated preview build with its own bundle id
+  (`com.vit129.kouen.preview`), own daemon, own socket
+  (`/tmp/kouen-preview-<hash>/kouen.sock`), confirmed running standalone
+  without touching the production app or its 6 panes (`ps aux` showed both
+  running independently throughout).
+
+  With `KOUEN_HOME` pointed at the preview's isolated socket and
+  `KOUEN_MCP_ALLOW_CONTROL=1`, called `KouenDaemonTools().kouenSpawnAgent(
+  agent: "claude", cwd: <real temp dir with agent-memory/HANDOFF.md>)`
+  directly (Swift method call against the real running preview daemon — no
+  JSON-RPC hand-rolling needed, `KouenDaemonTools` is a plain struct).
+  **Real result, unedited:**
+  ```json
+  {"sessionId":"...","launched":"claude","priorHandoff":"LIVE TEST — this is
+  the real end-to-end handoff note agent B should receive.","agent":"claude",
+  "priorHandoffSuggestedSkills":"dev-architect","surfaceId":"..."}
+  ```
+  This is the full real chain: a real session spawned in a real (isolated)
+  daemon, a real `claude` CLI process launched in a real PTY, and
+  `priorHandoff`/`priorHandoffSuggestedSkills` both present with the exact
+  text from the real `HANDOFF.md` file on disk. Leg C's core claim —
+  "kouenSpawnAgent surfaces a prior agent's handoff for the caller to fold
+  into a new agent's context" — is no longer just wired, it's verified
+  against a real spawn.
+
+  Cleanup: `make preview-stop` killed the preview app+daemon (confirmed via
+  `ps aux` — no orphaned `claude` process tied to the test's temp
+  directory), preview state dir removed, throwaway test file
+  (`_LiveSpawnAgentHandoffSmokeTest.swift`, written/run/deleted, not
+  committed) removed. Production Kouen.app (73404) and its 6 panes
+  confirmed untouched throughout. Re-verified after cleanup: `swift build
+  --product Kouen` clean, `swift test --filter
+  "SignalFileRouterTests|GitPanelView|CommandPalette|KouenMCPTests"` 79/79,
+  `Tests/robot/run.sh` 27/27.
+
+  **2026-07-23 follow-up #6 — leg B confirmed by the user, real screenshot.**
+  Set up a throwaway scratch repo (`package.json` with a real passing
+  `npm test`, a real `agent-memory/HANDOFF.md`, an uncommitted change) as a
+  worktree, relaunched `make preview`, user opened it and clicked "Merge"
+  on the real NSAlert. Screenshot confirms all three pieces render exactly
+  as designed:
+  - `✓ npm test passed.` (validate ran for real, correct phrasing for a
+    genuine pass — not the "tool not found" branch)
+  - `📋 Handoff note left by this worktree's agent: Demo handoff for leg
+    B — implemented the login form; validation still needs a real backend
+    check.` (exact text from the real `HANDOFF.md` on disk)
+  - `⚠️ This worktree has uncommitted changes — they will NOT be included
+    in the merge.`
+  User clicked Merge for real (not just Cancel) — sidebar updated to
+  "merged · main", which only happens after the success path's
+  `Toast.show("✓ Merged …")` + `refresh()` both ran, so the follow-up toast
+  is confirmed to have fired too without needing a second screenshot.
+  Cleanup: demo repo/worktree deleted, `make preview-stop` run, production
+  Kouen.app (pid unchanged throughout) confirmed still running untouched.
+
+  **All 6 MAW legs are now genuinely live-verified, not just wired**:
+  isolation (pre-existing), handoff-doc format reuse, human-review-at-merge
+  (leg B, this entry), validate-gate with the real-machine PATH fix (leg A),
+  agent-to-agent handoff (leg C). Still not live-tested: the swift/python
+  validate branches specifically (lower risk — `/usr/bin/swift` is
+  standard-PATH; python's pytest-missing gap is already documented above
+  rather than silently passing). All changes remain uncommitted as of this
+  writing.
+
 ## Sources (2026-07-11 research)
 - cmux: https://github.com/manaflow-ai/cmux
 - Supacode: https://supacode.sh/ , https://github.com/supabitapp/supacode

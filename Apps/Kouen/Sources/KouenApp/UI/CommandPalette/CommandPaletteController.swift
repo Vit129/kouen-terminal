@@ -1094,13 +1094,28 @@ extension CommandPaletteController {
 
 // MARK: - Zoxide helper
 
-private extension Process {
+extension Process {
+    /// Resolves a CLI's absolute path by checking common install locations before relying on
+    /// PATH — a GUI-launched app inherits a minimal launchd PATH (`/usr/bin:/bin:…`) that
+    /// misses Homebrew *and* version-manager-installed tools (zoxide, npm, pnpm, yarn, bun,
+    /// pytest, …). `nil` means "not found anywhere obvious" — callers fall back to
+    /// bare-name-via-PATH as a last resort.
+    /// ponytail: this list is evidence-based (confirmed via a live PATH-stripped test, not
+    /// guessed) — Homebrew + Volta, since that's what was actually found installed. nvm/asdf/fnm
+    /// node installs are a known gap this doesn't cover; add their prefixes here if that ever
+    /// bites (same pattern, just another `NSHomeDirectory()`-relative candidate).
+    static func resolveExecutablePath(_ name: String) -> String? {
+        [
+            "/opt/homebrew/bin/\(name)", "/usr/local/bin/\(name)", "/usr/bin/\(name)",
+            (NSHomeDirectory() as NSString).appendingPathComponent(".volta/bin/\(name)"),
+        ]
+        .first(where: { FileManager.default.isExecutableFile(atPath: $0) })
+    }
+
     /// Run `zoxide query -l` synchronously and return stdout. Returns nil if zoxide is not found
-    /// or exits non-zero. Searches common Homebrew paths before relying on PATH.
+    /// or exits non-zero.
     static func zoxideQueryAll() throws -> String? {
-        let candidates = ["/opt/homebrew/bin/zoxide", "/usr/local/bin/zoxide", "/usr/bin/zoxide"]
-        let binary = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) })
-            ?? "zoxide"
+        let binary = resolveExecutablePath("zoxide") ?? "zoxide"
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: binary)
         proc.arguments = ["query", "-l"]

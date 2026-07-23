@@ -801,7 +801,14 @@ final class GitPanelView: NSView {
 
     @objc private func mergeWorktreeAction(_ sender: NSButton) {
         guard let sourcePath = sender.identifier?.rawValue else { return }
+        guard sender.isEnabled else { return } // validate already running for this row — ignore the extra click
+        sender.isEnabled = false
         Task {
+            // RL-063 shape: `sender` is captured across a multi-minute await (validate can run
+            // that long) — a worktree-list refresh could rebuild this row's button out from
+            // under us in the meantime. Re-enabling a still-attached button is the only real
+            // case; touching a detached one is harmless but the guard makes that explicit.
+            defer { if sender.window != nil { sender.isEnabled = true } }
             let output = await runGit(["worktree", "list", "--porcelain"], in: sourcePath)
             let entries = Self.parseWorktreePorcelain(output, mergedBranchOutput: "")
             guard let mainEntry = entries.first(where: { $0.isMain }),
@@ -809,7 +816,82 @@ final class GitPanelView: NSView {
                 Toast.show("✗ Couldn't resolve this worktree's repo — it may already be gone", in: self, hold: 4.0)
                 return
             }
-            await performMerge(branch: sourceEntry.branch, sourcePath: sourcePath, mainWorktreePath: mainEntry.path)
+            Toast.show("Validating \(sourceEntry.branch)…", in: self)
+            let validation = await validateWorktree(at: sourcePath)
+            await performMerge(
+                branch: sourceEntry.branch, sourcePath: sourcePath, mainWorktreePath: mainEntry.path, validation: validation
+            )
+        }
+    }
+
+    private struct ValidateOutcome { let ran: Bool; let success: Bool; let summary: String }
+
+    /// MAW-style handoff gate (P39): auto-detects the worktree's stack (`SignalFileRouter`,
+    /// reused as-is) and runs its build/test steps before the merge confirm dialog — but this
+    /// is validate-then-inform, never validate-then-auto-merge. The result only ever changes
+    /// what the NSAlert below says; `performMerge`'s own confirm click is still the only thing
+    /// that can trigger a merge, same as before this change.
+    private func validateWorktree(at path: String) async -> ValidateOutcome {
+        let steps = SignalFileRouter.validationSteps(at: path)
+        guard !steps.isEmpty else {
+            return ValidateOutcome(ran: false, success: true, summary: "No validate command detected for this stack — skipped.")
+        }
+        for step in steps {
+            let result = await runShellCommand(step[0], Array(step.dropFirst()), in: path)
+            guard result.success else {
+                // Live-tested (2026-07-23): `resolveExecutablePath`'s candidate list can still
+                // miss a real toolchain (e.g. a version manager other than Volta) and fall back
+                // to `env`, which fails with a `env: <name>: No such file or directory` line and
+                // nothing else — that's an environment gap, not the worktree's tests actually
+                // failing, and phrasing it as "failed" would read as a code-quality signal it
+                // isn't.
+                let missingTool = result.stderr.hasPrefix("env: ") && result.stderr.contains("No such file or directory")
+                return ValidateOutcome(
+                    ran: true, success: false,
+                    summary: missingTool
+                        ? "`\(step[0])` not found — validate couldn't run (not a code failure): \(Self.toastErrorSummary(result.stderr))"
+                        : "`\(step.joined(separator: " "))` failed: \(Self.toastErrorSummary(result.stderr))"
+                )
+            }
+        }
+        return ValidateOutcome(ran: true, success: true, summary: "\(steps.map { $0.joined(separator: " ") }.joined(separator: " && ")) passed.")
+    }
+
+    /// Like `runGit`, but for an arbitrary build/test command instead of git — used only by
+    /// `validateWorktree`. Merges stdout+stderr into one pipe (unlike `runGitDiff`'s separate
+    /// pipes) because build/test tools can write far more volume than a git diff, and draining
+    /// two pipes sequentially risks the classic `Process` deadlock if the unread one fills first.
+    /// ponytail: 5-minute ceiling — a hung/slow test suite (this repo's own full `swift test`
+    /// has a known crash, see `agent-memory/knowledge/bugs/sidebar-cmdbackslash-toggle.md`) kills
+    /// the process and reports failure rather than blocking the merge dialog forever.
+    private func runShellCommand(_ executable: String, _ args: [String], in directory: String) async -> GitResult {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let process = Process()
+                if let resolved = Process.resolveExecutablePath(executable) {
+                    process.executableURL = URL(fileURLWithPath: resolved)
+                    process.arguments = args
+                } else {
+                    process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+                    process.arguments = [executable] + args
+                }
+                process.currentDirectoryURL = URL(fileURLWithPath: directory)
+                let pipe = Pipe()
+                process.standardOutput = pipe
+                process.standardError = pipe
+                do {
+                    try process.run()
+                    let timeout = DispatchWorkItem { if process.isRunning { process.terminate() } }
+                    DispatchQueue.global().asyncAfter(deadline: .now() + 300, execute: timeout)
+                    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                    process.waitUntilExit()
+                    timeout.cancel()
+                    let combined = String(data: data, encoding: .utf8) ?? ""
+                    continuation.resume(returning: GitResult(output: combined, stderr: combined, success: process.terminationStatus == 0))
+                } catch {
+                    continuation.resume(returning: GitResult(output: "", stderr: error.localizedDescription, success: false))
+                }
+            }
         }
     }
 
@@ -819,19 +901,26 @@ final class GitPanelView: NSView {
     /// conflict, the merge is left paused in the main worktree exactly as `git merge` leaves
     /// it — no auto-resolve of any kind, ever; the user resolves via the existing Changes tab
     /// or aborts explicitly.
-    private func performMerge(branch: String, sourcePath: String, mainWorktreePath: String) async {
+    private func performMerge(branch: String, sourcePath: String, mainWorktreePath: String, validation: ValidateOutcome) async {
         let sourceStatus = await runGit(["status", "--porcelain"], in: sourcePath)
 
         let alert = NSAlert()
         alert.messageText = "Merge \"\(branch)\" into \(KouenDesign.shortenPath(mainWorktreePath))?"
         var info = "This runs `git merge \(branch)` in the main worktree. \(branch) itself is not modified."
+        info += validation.ran
+            ? "\n\n\(validation.success ? "✓" : "⚠️ Validate failed —") \(validation.summary)"
+            : "\n\n\(validation.summary)"
+        if let handoff = SignalFileRouter.handoffInfo(at: sourcePath) {
+            let preview = handoff.note.count > 400 ? String(handoff.note.prefix(400)) + "…" : handoff.note
+            info += "\n\n📋 Handoff note left by this worktree's agent:\n\(preview)"
+        }
         if !sourceStatus.isEmpty {
             info += "\n\n⚠️ This worktree has uncommitted changes — they will NOT be included in the merge."
         }
         alert.informativeText = info
         alert.addButton(withTitle: "Merge")
         alert.addButton(withTitle: "Cancel")
-        alert.alertStyle = .informational
+        alert.alertStyle = (validation.ran && !validation.success) ? .warning : .informational
         guard alert.runModal() == .alertFirstButtonReturn else { return }
 
         // Preflight: merging into a dirty target tree is the likeliest way to accidentally
