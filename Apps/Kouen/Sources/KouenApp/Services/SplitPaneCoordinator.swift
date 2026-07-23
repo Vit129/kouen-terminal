@@ -15,8 +15,11 @@ final class SplitPaneCoordinator {
     func splitActivePane(direction: SplitDirection, before: Bool = false) {
         guard let workspace = coord.snapshot.activeWorkspace,
               let tab = workspace.activeTab,
+              // Fall back to the last TERMINAL leaf, never a browser leaf — the daemon has no
+              // record of browser panes (local-only, see openBrowserPane), so targeting one here
+              // would fail server-side with "Pane not found".
               let paneID = coord.activeSurfaceID.flatMap({ paneID(for: $0, in: tab.rootPane) })
-                ?? tab.rootPane.allPaneIDs().last
+                ?? tab.rootPane.allLeaves().last?.id
         else { return }
         Task {
             await coord.requestDaemon(.newSplit(tabID: tab.id, paneID: paneID, direction: direction, shell: coord.settings.defaultShell, before: before))

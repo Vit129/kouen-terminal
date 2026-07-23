@@ -565,10 +565,11 @@ private struct NodeRow: View {
                     }
             }
             .onChange(of: node.isExpanded) { _, expanded in
+                // Keep loaded children in memory on collapse — DisclosureGroup already
+                // hides them visually. Wiping here used to reset any nested subfolder's
+                // own isExpanded state every time the parent was reopened.
                 if expanded {
                     Task { await loadChildren() }
-                } else {
-                    node.children = []
                 }
             }
             // h/l expand/collapse via keyboard navigator

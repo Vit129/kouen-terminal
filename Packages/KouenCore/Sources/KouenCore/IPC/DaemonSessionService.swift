@@ -113,7 +113,10 @@ public final class DaemonSessionService: @unchecked Sendable {
     }
 
     public func fetchSnapshot() throws -> SessionSnapshot {
-        let response = try request(.getSnapshot)
+        // Longer than the snappy 2s default: the snapshot payload grows with the number of
+        // active workspaces/sessions, and a busy daemon (heavy multi-session agent activity)
+        // can make even a local round trip miss 2s — same bug class as the git-timeout fix.
+        let response = try request(.getSnapshot, timeout: 10)
         guard case let .snapshot(snapshot) = response else {
             throw DaemonSessionError.unexpectedResponse
         }
@@ -143,7 +146,8 @@ public final class DaemonSessionService: @unchecked Sendable {
     }
 
     public func fetchSnapshot() async throws -> SessionSnapshot {
-        let response = try await request(.getSnapshot)
+        // See sync overload above: same 10s rationale.
+        let response = try await request(.getSnapshot, timeout: 10)
         guard case let .snapshot(snapshot) = response else {
             throw DaemonSessionError.unexpectedResponse
         }

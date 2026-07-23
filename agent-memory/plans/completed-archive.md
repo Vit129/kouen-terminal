@@ -77,6 +77,57 @@ All plans below are **done** and merged into main.
 - Direction: ACP = Kouen→agent (embedded chat). MCP (P12) = agent→Kouen (tool server). Both share `ACPMessage` framing from `KouenCore`.
 - Re-enable criteria: `brew install` for adapters, agent tool sandboxing at protocol level
 
+## P37 Phase D — File Browser (v4.x, Unreleased at close)
+- File preview, file attach, browser mirror — Completed 15/15
+- Phase E built on top same pass; post-ship bug-fix pass done via real-phone testing
+
+## P37 Phase G — Autocomplete (v4.x, Unreleased at close)
+- `@` file-path, shell completion strip, AI suggestion via `claude` CLI
+- Completed 28/28, Opus review passed
+
+## P38 — Competitive Feature Gaps (CLOSED 2026-07-16)
+Cross-agent diff dashboard / subagent pane visibility / thread-view / image protocol / scripting hook parity. All 5 phases built 2026-07-14, build/test/robot green throughout. Live interactive click-through skipped for B/C/D/E (user decision), A was live-verified.
+- **Phase A** — Cross-agent worktree diff/review dashboard (Agents segment in `GitPanelView` + merge/handoff action). Completed 10/10, code-reviewed + fixed, live-verified by user 2026-07-14 (merge/conflict flow tested in real `make preview`).
+- **Phase B** — Subagent visibility (badge indicator + proc-scan + Claude Code hook push, not a literal auto-split pane — see original `design.md` for why). Closed 23/23 — rewritten from scratch after original pass was lost to a concurrent git operation; build/test 87/87, robot 26/26; live check skipped unverified per user decision.
+- **Phase C** — Thread overlay (captured-command list on top of P34 block capture, ⇧⌘L). Closed 20/20 — build/test 17/17, robot 26/26, zero regression on P34's own suite; live check skipped (cross-pane jump-to-block untested) per user decision.
+- **Phase D** — Kitty graphics conformance slice (`a=q` query, `a=t`/`a=p` place-by-id, `a=d` delete). Closed 8/8 — finding: image protocols were NOT deferred, had already shipped 2026-05-30 (INDEX/plan-doc corrected then); conformance slice build/test 22/22, robot 26/26; live check against a real client skipped per user decision.
+- **Phase E** — Scripting hook parity audit (`paneCreated`/`paneRemoved` doc-vs-reality gap). Closed 6/6 — audit found capability parity already existed, no hook-parity build needed; build/test/robot green; low-priority live check skipped per user decision.
+
+## P39 — Competitive Feature Gaps (cmux / Supacode / Superset / WezTerm / Zed / tmux / MAW) — shipped v4.7.2/v4.7.3
+Phases A-D (remote workflow parity, sidebar dev-server visibility, git workflow depth, fleet visibility) done 2026-07-11, all 5 gaps code-reviewed. Re-opened 2026-07-23 to adapt the one thing worth taking from GitHub MAW repos (`bobisme/maw`, `Soul-Brews-Studio/maw-js`, `laris-co/multi-agent-workflow-kit`, `haoyu-haoyu/Multi-AI-Workflow`, researched via agy) — deterministic build/test validation before a worktree merge. All four MAW repos otherwise already match Kouen's existing tmux/git-worktree agent-isolation pattern.
+
+**MAW-pattern validate gate (shipped v4.7.2).** Explicit user constraint honored throughout: validate+merge must never run automatically — `mergeWorktreeAction`/`performMerge`'s NSAlert confirm remains the only path to an actual `git merge`; this only adds an automated validate step that runs *before* the confirm dialog, so the user decides with pass/fail already in hand.
+- `SignalFileRouter.validationSteps(at:)` — reuses existing stack-detection to return ordered build/test commands (swift: `swift build`+`swift test`; python: `pytest -q`; node family: package-manager `test` script via lockfile detection, only if `package.json` defines one). Empty = skip, never a failure.
+- `GitPanelView.validateWorktree(at:)` + `runShellCommand` (merged stdout+stderr pipe, 5-min kill ceiling) run those steps; `performMerge`'s NSAlert shows the pass/fail summary, `.warning` style on failure. Merge/Cancel and the underlying `git merge` call unchanged.
+- Structured handoff-doc surfacing: `GitPanelView` reads the existing `handoff` skill's `agent-memory/HANDOFF.md` (reuse over inventing a new schema) and shows its `Note:` in the merge dialog (human-review leg). `kouenSpawnAgent` (`Tools/kouen-mcp`) separately surfaces the full untruncated note + `Suggested skills:` as `priorHandoff`/`priorHandoffSuggestedSkills` spawn-result fields, non-auto-typed — same pattern as the pre-existing `detectedStack`/`detectedHint` (agent-to-agent leg). One shared reader (`SignalFileRouter.HandoffInfo`) in KouenCore, two callers with different truncation needs.
+- Two rounds of advisor-style self-review before shipping caught and fixed: PATH resolution (`runShellCommand` fallback missed Homebrew tools when launched from Dock — fixed via shared `Process.resolveExecutablePath(_:)`, later widened with a 4th candidate `~/.volta/bin/<name>` after live-testing found this machine's node toolchain is 100% Volta, zero Homebrew node; nvm/asdf/fnm remain a known, documented gap), a Merge-button re-entrancy guard, a truncation-wrong-for-agent-context bug (fixed via the `HandoffInfo` split above), and a `Process.zoxideQueryAll` DRY duplication.
+- **All 6 MAW legs live-verified for real, not just build/test-green**: isolation (pre-existing), validate-gate incl. the real-machine PATH fix, handoff-doc format reuse, human-review-at-merge (real screenshot: validate pass message + handoff note + uncommitted-changes warning all rendered correctly, user clicked Merge for real, toast+sidebar update confirmed), agent-to-agent handoff (`kouenSpawnAgent` called against a real isolated `make preview` daemon, real unedited JSON response with the real `HANDOFF.md` text). Known, not live-tested: the swift/python validate branches specifically; system `python3` has no `pytest` installed on this dev machine (would misreport a python-stack validate as "test failed" for an environment gap, not fixed — would require a process-spawn availability pre-check that conflicts with `validationSteps`'s pure/no-spawn design, documented as a known limitation instead).
+- Verification throughout: `swift build` clean for both `Kouen` and `kouen-mcp` products, `swift test` filtered suite reached 79/79, `Tests/robot/run.sh` 27/27 (including the pre-existing "never `--no-ff`"/"no auto-resolve" merge guards, unaffected) at every step.
+
+**Root-cause git-panel timeout bug (shipped v4.7.3, found immediately after v4.7.2 install).** User reported fetch/pull/commit/push all erroring in the Git panel. Debug-mantra repro: a throwaway direct-daemon-call test reproduced `DaemonClientError.timeout` on a real `git fetch --dry-run`; a real `git fetch --dry-run` in Bash measured 3.48s. Root cause: `DaemonClient.request()`'s default `timeout: TimeInterval = 2` was never overridden by `GitPanelView.runGitWithStatus` — any git op needing real network/SSH I/O would client-side-timeout even though the daemon's own git process (60s kill-ceiling) was still succeeding in the background. Pre-existing latent bug, unrelated to the MAW work above, coincidentally surfaced now by real network timing exceeding 2s (same bug class as RL-048's earlier WKWebView 2s→35s fix, never applied to git ops at the time). Fixed: `runGitWithStatus` now passes `timeout: 30`. Secondary display bug fixed alongside: `DaemonClientError` conforms to `CustomStringConvertible` not `LocalizedError`, so `error.localizedDescription` produced Foundation's generic NSError-bridged string (the confusing text in the user's screenshot) instead of the real message — fixed by preferring `(error as? DaemonClientError)?.description`. Verified: repro test re-run against real production daemon with the fix succeeded (3.49s); full filtered suite 79/79, robot 27/27.
+
+**Research discipline note:** two later agy research rounds (token/cost tracking + dashboard survey; tmux/cmux-native-agent + Supacode/Superset re-check) each returned "gaps" that, verified against real graphify+source reads, were already fully implemented in Kouen (OSC 133, Kitty/iTerm2 image protocol, sync-panes broadcast, per-pane border status, browser pane scriptable+MCP, composer, remote SSH persistence, tool-approval GUI). Token/cost tracking judged unnecessary — already fully covered by the separate `~/Git/Personal/codexbar` project. Conclusion after both rounds: no further competitive gaps remain worth building; Kouen is at/ahead of parity with tmux/cmux/WezTerm/Supacode/Superset/MAW.
+
+## P40 — MCP Surface Expansion (Tasks/Worktrees/Hosts) + Shader Presets
+- Completed + live-checked 2026-07-13: Task Dashboard + new `cwd` field verified via real `make preview`, Worktree/Host verified via real MCP calls
+- Shader UI reverted earlier (separate user call) — nothing to check there
+
+## P42 — Workspace Sidebar Panels (CLOSED/SUPERSEDED 2026-07-17)
+- Stacked always-visible Sessions/Files/Git panes in sidebar
+- Built + shipped (Tasks 1-2), reverted after real `make preview` use — too cramped in a narrow sidebar
+- Real ask was "Add to Workspace" (merge another repo's Files/Git in, tab-switch style) — continued as P43
+
+## P43 — Add Repo/Folder to Workspace (REVERTED 2026-07-17)
+- `Workspace.extraRepoRoots`, daemon-synced, picker on Files/Git tabs
+- Built + live-verified (browse-only); a same-day "open session here" follow-up didn't work on first test
+- User chose to tear the whole feature down rather than keep debugging
+
+## P25 — iOS/iPadOS Support (Parked 2026-07-23)
+- Native iPad app (Phase 0-6: shared renderer extraction, mobile IPC transport, UIKit terminal MVP, app shell, multiplexer parity, polish) — hard-blocked since 2026-07-04 on no paid Apple Developer Program account (required for TestFlight/App Store/APNs push)
+- Pivoted to Web/PWA MVP instead — continued as `p37-mobile-connect-v1.md` (W1 daemon bridge + multi-device pairing shipped + live-verified 2026-07-07; W2-W9 resize-sync/session-switcher frontend/file preview+attach/browser-open/command-palette/git-panel/LSP/notification-inbox folded into that doc's ongoing scope)
+- Closed 2026-07-23: checked whether a fresh Xcode "Apple Development" signing certificate changed the blocker — confirmed it's only the free Personal Team cert (auto-issued, no payment), not a paid Developer Program enrollment; TestFlight/App Store/APNs remain blocked. Cross-checked against this repo's own release scripts (`Scripts/finalize-release.sh`'s own comment: "this fork's releases are plain `git tag` + `gh release create`, no notarization" — ad-hoc signing only, no Developer ID in use here) and `codexbar`'s (its Developer ID cert belongs to that project's upstream author, not this user) — neither project is evidence of a paid account existing. Revisit only if a paid Apple Developer Program account is actually obtained.
+- Design mockup `agent-memory/plans/p25-mobile-session-switcher-design.html` stays in `plans/` (not archived) — still the live design reference for P37 Phase C, already shipped from it
+
 ## P7 — Sidebar UI Polish
 - Large-screen sidebar group header button visibility/alignment completed
 - Session card spacing and file editor tab bar overlap polish completed
