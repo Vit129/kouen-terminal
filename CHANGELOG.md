@@ -8,7 +8,7 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [4.7.2] - 2026-07-23
 
 ### Added
-- Release version bump to v4.7.2.
+- MAW-style merge validate gate + agent handoff surfacing (human review + agent-to-agent spawn seed) (release v4.7.2) ([`c788cf8`](https://github.com/Vit129/kouen-terminal/commit/c788cf8141cce3a64fe845ea3a9925c8813ad172))
 
 ## [4.7.1] - 2026-07-22
 
