@@ -7,8 +7,8 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
 ## [4.7.4] - 2026-07-23
 
-### Added
-- Release version bump to v4.7.4.
+### Fixed
+- Stop daemon-side pane changes from being silently discarded while a browser pane is open (release v4.7.4) ([`6c14a8a`](https://github.com/Vit129/kouen-terminal/commit/6c14a8a7e96a98bb7b8832c23dd8380db208a1fd))
 
 ## [4.7.3] - 2026-07-23
 
