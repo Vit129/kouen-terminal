@@ -404,6 +404,18 @@ struct KouenDaemonTools: Sendable {
             result["detectedStack"] = .string(profile.stack)
             result["detectedHint"] = .string(profile.hint)
         }
+        // MAW agent-to-agent handoff: if a prior agent left `agent-memory/HANDOFF.md` at this
+        // cwd (same `handoff` skill GitPanelView's merge dialog reads), surface its full note
+        // (untruncated — this is context for a continuing agent, not a human's dialog preview)
+        // plus its suggested-skills line here too — same non-auto-typed rule as
+        // detectedStack/detectedHint above: the caller decides whether/how to fold this into
+        // the new agent's first prompt, never typed automatically.
+        if let cwd, let handoff = SignalFileRouter.handoffInfo(at: cwd) {
+            result["priorHandoff"] = .string(handoff.note)
+            if let skills = handoff.suggestedSkills {
+                result["priorHandoffSuggestedSkills"] = .string(skills)
+            }
+        }
 
         return (toolResult(json: .object(result)), nil)
     }
