@@ -1410,11 +1410,20 @@ final class GitPanelView: NSView {
     /// NSView) blocks the main thread for the full IPC round-trip. Found via review while adding
     /// hunk staging (P39 C1) — fixed at the shared call site so the pre-existing Sync/Pull/Push
     /// button and worktree-remove get the same fix, not just the new caller (RL-052).
+    /// `DaemonClient.request()` defaults to a 2s timeout — fine for local ops (`status`, `log`)
+    /// but too short for anything touching the network. `fetch`/`pull`/`push` routinely take
+    /// 3+ seconds for the SSH handshake + GitHub round trip alone (measured directly: a plain
+    /// `git fetch` on this repo took 3.48s) — every caller here (Sync/Pull/Push button,
+    /// `doCommitAndPush`'s push half, worktree-remove) was silently timing out on ordinary
+    /// network latency, not a real failure. Same class of bug as RL-048 (WKWebView ops needing
+    /// `timeout:35` instead of the 2s default) — that fix never got applied to git. 30s matches
+    /// the daemon's own internal 60s kill-ceiling for a hung `git` process (`runGitCommandInDaemon`)
+    /// with room to spare, while still failing well before a truly stuck operation would hang the UI.
     private func runGitWithStatus(_ args: [String], in directory: String) async -> GitResult {
         await Task.detached(priority: .utility) {
             do {
                 let client = DaemonClient()
-                let response = try client.request(.runGit(args: args, cwd: directory))
+                let response = try client.request(.runGit(args: args, cwd: directory), timeout: 30)
                 if case let .gitResult(output, stderr, success) = response {
                     return GitResult(output: output, stderr: stderr, success: success)
                 } else if case let .error(err) = response {
@@ -1423,7 +1432,12 @@ final class GitPanelView: NSView {
                     return GitResult(output: "", stderr: "Unexpected daemon response", success: false)
                 }
             } catch {
-                return GitResult(output: "", stderr: error.localizedDescription, success: false)
+                // `DaemonClientError` is `CustomStringConvertible`, not `LocalizedError` — plain
+                // `.localizedDescription` falls back to Foundation's generic NSError bridging
+                // ("The operation couldn't be completed (KouenCore.DaemonClientError error 1.)"),
+                // which is what actually showed in the Git panel instead of a readable message.
+                let message = (error as? DaemonClientError)?.description ?? error.localizedDescription
+                return GitResult(output: "", stderr: message, success: false)
             }
         }.value
     }
