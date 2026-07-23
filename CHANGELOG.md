@@ -7,8 +7,8 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
 ## [4.7.3] - 2026-07-23
 
-### Added
-- Release version bump to v4.7.3.
+### Fixed
+- Raise daemon-routed git request timeout from 2s to 30s (fetch/pull/push were silently timing out on ordinary network latency) (release v4.7.3) ([`c6e8cf7`](https://github.com/Vit129/kouen-terminal/commit/c6e8cf72a71ada16249f3de8345766334930990c))
 
 ## [4.7.2] - 2026-07-23
 
