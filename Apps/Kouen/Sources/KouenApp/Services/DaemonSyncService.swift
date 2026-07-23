@@ -384,10 +384,24 @@ final class DaemonSyncService {
                             guard tIdx < merged.workspaces[wIdx].sessions[sIdx].tabs.count else { continue }
                             let browserLeaves = tab.rootPane.allBrowserLeaves()
                             guard !browserLeaves.isEmpty else { continue }
-                            let incomingBrowserLeaves = merged.workspaces[wIdx].sessions[sIdx].tabs[tIdx].rootPane.allBrowserLeaves()
-                            if incomingBrowserLeaves.isEmpty {
-                                merged.workspaces[wIdx].sessions[sIdx].tabs[tIdx].rootPane = tab.rootPane
+                            // Browser leaves are local-only (never pushed to the daemon), so the
+                            // incoming tree never contains them — that alone doesn't mean nothing
+                            // structural changed daemon-side. Compare the LOCAL tree with browser
+                            // leaves stripped out against the incoming terminal-only tree: only
+                            // keep the local tree wholesale when the terminal structure actually
+                            // matches (preserves ratios); otherwise a real daemon-side change (new
+                            // split, killed pane, ...) was happening to be silently discarded here.
+                            var localTerminalOnly = tab.rootPane
+                            for leaf in browserLeaves {
+                                coord.splitPaneCoordinator.removePaneNode(paneID: leaf.id, from: &localTerminalOnly)
                             }
+                            let incomingTree = merged.workspaces[wIdx].sessions[sIdx].tabs[tIdx].rootPane
+                            merged.workspaces[wIdx].sessions[sIdx].tabs[tIdx].rootPane = Self.mergedRootPane(
+                                localTree: tab.rootPane,
+                                localTerminalOnly: localTerminalOnly,
+                                incomingTree: incomingTree,
+                                browserLeaves: browserLeaves
+                            )
                         }
                     }
                 }
@@ -459,6 +473,28 @@ final class DaemonSyncService {
             }
         }
         return index
+    }
+
+    /// Decides whether a tab's incoming (daemon) pane tree reflects a real structural change or
+    /// just the absence of local-only browser leaves the daemon never learns about (RL-068).
+    /// Comparing `incomingTree` against `localTerminalOnly` (the local tree with browser leaves
+    /// already stripped) — not against "does incoming have any browser leaves" — is what makes
+    /// this correct: the latter is unconditionally true and would silently discard every real
+    /// daemon-side change (new split, killed pane, ...) for as long as a browser pane is open.
+    nonisolated static func mergedRootPane(
+        localTree: PaneNode,
+        localTerminalOnly: PaneNode,
+        incomingTree: PaneNode,
+        browserLeaves: [BrowserLeaf]
+    ) -> PaneNode {
+        guard Set(localTerminalOnly.allPaneIDs()) != Set(incomingTree.allPaneIDs()) else {
+            return localTree
+        }
+        var rebuilt = incomingTree
+        for leaf in browserLeaves {
+            rebuilt = .branch(direction: .horizontal, ratio: 0.6, first: rebuilt, second: .browser(leaf))
+        }
+        return rebuilt
     }
 
     static func structureFingerprint(_ snap: SessionSnapshot) -> String {

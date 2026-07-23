@@ -935,6 +935,11 @@ public final class BrowserPaneView: NSView {
             self.window?.makeFirstResponder(urlTextField)
             return true
         }
+        if cmd && characters.lowercased() == "d" {
+            // Don't let WKWebView (via super) silently swallow ⌘D/⌘⇧D — let it
+            // propagate up so Kouen's Split Right / Split Down menu shortcuts fire.
+            return false
+        }
         return super.performKeyEquivalent(with: event)
     }
 }

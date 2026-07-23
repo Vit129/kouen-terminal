@@ -350,6 +350,16 @@ final class SessionCoordinator: NSObject {
     }
 
     func setSplitRatio(tabID: TabID, firstPaneID: PaneID, secondPaneID: PaneID, ratio: Double) {
+        // Browser panes are local-only (SplitPaneCoordinator.openBrowserPane inserts them via
+        // applyLocalSnapshot, deliberately bypassing daemon sync) — the daemon's own pane tree
+        // never learns about them, so persisting a ratio for a divider touching one always
+        // fails with "Split not found" and fires the daemon-error toast. Skip the round trip.
+        if let tab = snapshot.workspaces.flatMap(\.sessions).flatMap(\.tabs).first(where: { $0.id == tabID }) {
+            let browserPaneIDs = Set(tab.rootPane.allBrowserLeaves().map(\.id))
+            if browserPaneIDs.contains(firstPaneID) || browserPaneIDs.contains(secondPaneID) {
+                return
+            }
+        }
         requestDaemon(.resizePaneRatio(tabID: tabID, firstPaneID: firstPaneID, secondPaneID: secondPaneID, ratio: ratio))
         syncFromDaemon(metadataOnly: true)
     }
