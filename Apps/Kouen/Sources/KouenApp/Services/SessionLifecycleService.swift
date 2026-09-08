@@ -101,6 +101,13 @@ final class SessionLifecycleService {
         }
 
         let baseRef = ProjectConfig.load(from: repoPath)?.baseRef
+        // ── DISABLED: worktree auto/explicit creation turned off by request ──────────────
+        // Kouen no longer creates git worktrees. The task-worktree creation below is commented
+        // out (kept intact for easy re-enable). To restore: uncomment the create + addSession
+        // block and delete the early `return` note line.
+        _ = baseRef
+        return "Worktree creation is disabled in this build."
+        /*
         guard let worktreePath = manager.create(
             repoPath: repoPath,
             sessionID: sanitized,
@@ -119,6 +126,7 @@ final class SessionLifecycleService {
             taskName: taskName
         )
         return nil
+        */
     }
 
     func addTab(to workspaceID: WorkspaceID, cwd: String? = nil) {

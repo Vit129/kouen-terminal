@@ -38,13 +38,26 @@ final class WorktreeAutoIsolateService {
     }
 
     private func isolate(tab: Tab, workspace: Workspace) {
-        let coord = SessionCoordinator.shared
+        // NOTE: `coord`/`workspace` are only used by the DISABLED worktree-creation body below.
+        // Kept as `_ =` so the (commented-out) block can be restored without re-plumbing them.
+        _ = SessionCoordinator.shared
+        _ = workspace
         guard let branch = tab.gitBranch, !branch.isEmpty else { return }
         guard !Self.defaultBranches.contains(branch) else { return }
 
         // Already in a worktree? Skip.
         if tab.worktreePath != nil { return }
 
+        // ── DISABLED: auto-isolation worktree creation turned off by request ─────────────
+        // Kouen no longer auto-creates a git worktree when a tab switches to a non-default
+        // branch. The entire create-or-reuse + `cd` + tab-tag body below is commented out
+        // (kept intact for easy re-enable). To restore: delete this `return`, uncomment the
+        // block, AND restore the `let coord = SessionCoordinator.shared` binding at the top of
+        // this method (currently `_ = SessionCoordinator.shared` to avoid an unused warning).
+        // Effect while disabled: a tab on a feature branch just stays in the main repo
+        // checkout — no `.kouen-worktrees/<branch>` dir, no auto `cd`.
+        return
+        /*
         let cwd = tab.cwd
         // Check if cwd is the PARENT repo root (not already inside a worktree).
         // git rev-parse --show-toplevel returns the worktree root if inside one,
@@ -65,10 +78,16 @@ final class WorktreeAutoIsolateService {
 
         let wtPath: String
         if let available = availableWorktree, available.path != cwd {
+            // Reuse an existing worktree for this branch that no other tab has claimed —
+            // avoids spawning a duplicate `.kouen-worktrees/<branch>` for the same branch.
             wtPath = available.path
         } else {
-            // All existing worktrees for this branch are occupied (or only the repo root itself).
-            // Create a new one with a unique suffix.
+            // No free worktree for this branch → create a fresh one via WorktreeManager.create.
+            // sessionID = branch name with '/' → '-'; a numeric suffix ("-1", "-2", ...) is added
+            // when other worktrees for this branch already exist, so folder names stay unique
+            // (this is why the auto-created dir looks like `feat-x-1`). We pass branch: nil so the
+            // worktree is DETACHED at baseRef — auto-isolate must never try to re-create a branch
+            // that already exists (that would fail); it just needs an isolated checkout at the tip.
             let baseName = branch.replacingOccurrences(of: "/", with: "-")
             let suffix = existingWorktrees.isEmpty ? "" : "-\(existingWorktrees.count)"
             let sessionID = baseName + suffix
@@ -78,7 +97,9 @@ final class WorktreeAutoIsolateService {
             wtPath = created
         }
 
-        // Move shell to the worktree path
+        // Move shell to the worktree path — this is the `cd <wtPath>` that appears in the tab's
+        // terminal (and, for agent sessions, arrives as an injected steering command) the moment
+        // a branch switch is detected.
         if let surfaceID = tab.rootPane.allSurfaceIDs().first {
             coord.requestDaemon(.sendData(
                 surfaceID: surfaceID.uuidString,
@@ -89,6 +110,7 @@ final class WorktreeAutoIsolateService {
         // Tag the tab so sidebar grouping/`isStableEqual` and the "already isolated" guard above
         // (`tab.worktreePath != nil`) see this tab as isolated, same as an explicit task tab.
         coord.requestDaemon(.setTabWorktree(tabID: tab.id, worktreePath: wtPath, parentRepoPath: cwd, taskName: nil))
+        */
     }
 
     /// Returns true if the path is inside a git linked worktree (not the main working tree).
