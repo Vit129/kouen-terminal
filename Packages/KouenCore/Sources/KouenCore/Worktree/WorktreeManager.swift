@@ -18,30 +18,61 @@ public struct WorktreeManager: Sendable {
 
     // MARK: - Create
 
-    /// Creates an isolated worktree for a session.
+    /// Creates an isolated git worktree for a session — the single primitive behind every
+    /// worktree Kouen creates. All worktrees land in `<repoPath>/.kouen-worktrees/<sessionID>/`.
+    ///
+    /// ## Why Kouen creates worktrees
+    /// Each isolated session needs an independent HEAD/branch so that concurrent agent sessions
+    /// (or a session working on a feature branch) don't fight over the main working tree's
+    /// checkout. A git worktree gives each session its own checked-out directory sharing the
+    /// same `.git` object store — cheap isolation without a full clone.
+    ///
+    /// ## Three callers trigger this (search for `.create(`):
+    /// 1. `WorktreeAutoIsolateService.isolate(...)` — REACTIVE. Fires when a tab's git branch
+    ///    changes to a non-default branch (not main/master/develop). Passes `branch: nil` →
+    ///    a `--detach` worktree pinned to `baseRef` (the branch tip), then `cd`s the tab's
+    ///    shell into it. This is what silently moves an agent into `.kouen-worktrees/<branch>-N`
+    ///    mid-session; the `-N` suffix is appended when a worktree for that branch already exists.
+    /// 2. `SessionLifecycleService.addAgentTask(...)` — EXPLICIT. User creates a named task;
+    ///    passes `branch: <sanitized-task-name>` → a `-b <branch>` worktree (creates the branch).
+    /// 3. `SurfaceRegistry` `.worktreeCreate` IPC — passthrough for daemon clients, forwarding
+    ///    whatever `branch`/`baseRef` the caller supplied.
+    ///
+    /// ## Branch vs detached
+    /// - `branch != nil` → `git worktree add -b <branch> <path> [baseRef]` — creates & checks out
+    ///   a NEW branch. Fails if the branch already exists (caller surfaces that as an error).
+    /// - `branch == nil` → `git worktree add --detach <path> [baseRef]` — detached HEAD at
+    ///   `baseRef`. Used by auto-isolate so it never collides with an existing branch name.
+    ///
     /// - Parameters:
-    ///   - repoPath: The parent repository root (contains `.git`).
-    ///   - sessionID: Short identifier used as the worktree folder name.
-    ///   - branch: Branch name to create/checkout. If nil, creates detached HEAD.
-    ///   - baseRef: The ref to branch from (e.g. "origin/main"). Defaults to HEAD.
-    /// - Returns: The absolute path to the new worktree, or nil on failure.
+    ///   - repoPath: The parent repository root (contains `.git`). Worktree is nested under it.
+    ///   - sessionID: Short identifier used verbatim as the worktree folder name.
+    ///   - branch: Branch to create+checkout. If nil, detached HEAD (no new branch).
+    ///   - baseRef: The ref to branch/detach from (e.g. "origin/main"). Defaults to current HEAD.
+    /// - Returns: The absolute path to the new worktree, or nil if `git worktree add` failed.
     public func create(
         repoPath: String,
         sessionID: String,
         branch: String? = nil,
         baseRef: String? = nil
     ) -> String? {
+        // Worktree dir is always <repoPath>/.kouen-worktrees/<sessionID> — kept inside the repo
+        // (gitignored) so it's discoverable via `worktree list` and cleaned up with the repo.
         let worktreePath = (repoPath as NSString)
             .appendingPathComponent(Self.worktreeDir)
             .appending("/\(sessionID)")
 
+        // Build `git worktree add ...`. Order matters: [-b branch | --detach] <path> [baseRef].
         var args = ["worktree", "add"]
         if let branch {
+            // New branch mode: `git worktree add -b <branch> <path>` — errors if branch exists.
             args += ["-b", branch, worktreePath]
         } else {
+            // Detached mode: `git worktree add --detach <path>` — no branch, HEAD floats at baseRef.
             args += ["--detach", worktreePath]
         }
         if let baseRef {
+            // Trailing positional commit-ish the new worktree starts from (branch tip / origin/main).
             args.append(baseRef)
         }
 
