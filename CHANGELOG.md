@@ -8,12 +8,7 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [4.15.6] - 2026-09-08
 
 ### Added
-- Release version bump to v4.15.6.
-
-## [4.15.5] - 2026-09-08
-
-### Added
-- Release version bump to v4.15.5.
+- Comment kouen create branch (release v4.15.6) ([`9dde22a`](https://github.com/Vit129/kouen-terminal/commit/9dde22a3c73d0a3c1a8db397920ab47a4fa46eb3))
 
 ## [4.15.4] - 2026-09-06
 
