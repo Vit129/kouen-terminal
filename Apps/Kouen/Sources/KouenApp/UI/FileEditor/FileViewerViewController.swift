@@ -14,12 +14,18 @@ final class FileViewerViewController: NSViewController {
     private let header = NSView()
     private let backButton = KouenDesign.softIconButton(symbol: "chevron.left", tooltip: "Back to file tree")
     private let pathLabel = NSTextField(labelWithString: "")
+    private let modeButton = KouenDesign.softIconButton(symbol: "pencil", tooltip: "Edit / View Source (⌘E)", size: 24)
     private let syntaxView = SyntaxTextView()
+    private let markdownPreviewView = MarkdownPreviewView(frame: .zero)
     private let quickLookView = QLPreviewView(frame: .zero, style: .normal)
     private let messageLabel = NSTextField(labelWithString: "")
     private let fileWatcher = FileChangeWatcher()
     // LSP integration (hover, go-to-definition, diagnostics) enabled.
     private let lspSession = LSPFileSession()
+
+    private var isMarkdownFile = false
+    private var isMarkdownEditMode = false
+    private var currentMarkdownRaw = ""
 
     /// Invoked when the user taps the back button.
     var onBack: (() -> Void)?
@@ -74,6 +80,24 @@ final class FileViewerViewController: NSViewController {
             showMessage("Unable to preview this file (binary or unsupported encoding).")
             return
         }
+
+        let isMD = ["md", "markdown"].contains(ext)
+        if isMD {
+            isMarkdownFile = true
+            currentMarkdownRaw = contents
+            if !isMarkdownEditMode {
+                showMarkdownPreview(contents, url: url, resetScroll: !isReloadingSamePath)
+            } else {
+                showText(contents, url: url, fileExtension: ext, resetScroll: !isReloadingSamePath)
+                updateModeButtonUI()
+            }
+            return
+        }
+
+        isMarkdownFile = false
+        isMarkdownEditMode = false
+        modeButton.isHidden = true
+        markdownPreviewView.isHidden = true
         showText(contents, url: url, fileExtension: ext, resetScroll: !isReloadingSamePath)
     }
 
@@ -94,6 +118,12 @@ final class FileViewerViewController: NSViewController {
         pathLabel.lineBreakMode = .byTruncatingMiddle
         header.addSubview(pathLabel)
 
+        modeButton.translatesAutoresizingMaskIntoConstraints = false
+        modeButton.target = self
+        modeButton.action = #selector(toggleMarkdownMode)
+        modeButton.isHidden = true
+        header.addSubview(modeButton)
+
         NSLayoutConstraint.activate([
             header.topAnchor.constraint(equalTo: view.topAnchor),
             header.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -103,8 +133,11 @@ final class FileViewerViewController: NSViewController {
             backButton.leadingAnchor.constraint(equalTo: header.leadingAnchor, constant: KouenDesign.Spacing.sm),
             backButton.centerYAnchor.constraint(equalTo: header.centerYAnchor),
 
+            modeButton.trailingAnchor.constraint(equalTo: header.trailingAnchor, constant: -KouenDesign.Spacing.sm),
+            modeButton.centerYAnchor.constraint(equalTo: header.centerYAnchor),
+
             pathLabel.leadingAnchor.constraint(equalTo: backButton.trailingAnchor, constant: KouenDesign.Spacing.xs),
-            pathLabel.trailingAnchor.constraint(equalTo: header.trailingAnchor, constant: -KouenDesign.Spacing.sm),
+            pathLabel.trailingAnchor.constraint(equalTo: modeButton.leadingAnchor, constant: -KouenDesign.Spacing.xs),
             pathLabel.centerYAnchor.constraint(equalTo: header.centerYAnchor),
         ])
     }
@@ -115,6 +148,8 @@ final class FileViewerViewController: NSViewController {
             guard let path = self?.pathLabel.toolTip, !path.isEmpty else { return }
             let expanded = (path as NSString).expandingTildeInPath
             try? text.write(toFile: expanded, atomically: true, encoding: .utf8)
+            self?.currentMarkdownRaw = text
+            self?.markdownPreviewView.update(markdown: text)
             DisplayMessage.show("Saved \((path as NSString).lastPathComponent)")
         }
         // LSP hooks
@@ -124,6 +159,13 @@ final class FileViewerViewController: NSViewController {
             self?.load(path: target.url.path)
         }
         view.addSubview(syntaxView)
+
+        markdownPreviewView.translatesAutoresizingMaskIntoConstraints = false
+        markdownPreviewView.isHidden = true
+        markdownPreviewView.onOpenFile = { [weak self] path in
+            self?.load(path: path)
+        }
+        view.addSubview(markdownPreviewView)
 
         if let quickLookView {
             quickLookView.translatesAutoresizingMaskIntoConstraints = false
@@ -142,6 +184,11 @@ final class FileViewerViewController: NSViewController {
             syntaxView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             syntaxView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             syntaxView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+
+            markdownPreviewView.topAnchor.constraint(equalTo: header.bottomAnchor),
+            markdownPreviewView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            markdownPreviewView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            markdownPreviewView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ]
         if let quickLookView {
             constraints.append(contentsOf: [
@@ -172,9 +219,60 @@ final class FileViewerViewController: NSViewController {
 
     // MARK: - Display state
 
+    private func showMarkdownPreview(_ text: String, url: URL, resetScroll: Bool) {
+        lspSession.close()
+        messageLabel.isHidden = true
+        syntaxView.isHidden = true
+        quickLookView?.isHidden = true
+        markdownPreviewView.isHidden = false
+        modeButton.isHidden = false
+        updateModeButtonUI()
+
+        if resetScroll {
+            markdownPreviewView.load(markdown: text, fileURL: url)
+        } else {
+            markdownPreviewView.update(markdown: text)
+        }
+        view.window?.makeFirstResponder(markdownPreviewView)
+    }
+
+    @objc func toggleMarkdownMode() {
+        guard isMarkdownFile else { return }
+        isMarkdownEditMode.toggle()
+        updateModeButtonUI()
+
+        guard let path = pathLabel.toolTip, !path.isEmpty else { return }
+        let expanded = (path as NSString).expandingTildeInPath
+        let url = URL(fileURLWithPath: expanded).resolvingSymlinksInPath()
+
+        if isMarkdownEditMode {
+            markdownPreviewView.isHidden = true
+            showText(currentMarkdownRaw, url: url, fileExtension: "md", resetScroll: false)
+            view.window?.makeFirstResponder(syntaxView)
+        } else {
+            let text = syntaxView.string
+            currentMarkdownRaw = text
+            syntaxView.isHidden = true
+            markdownPreviewView.isHidden = false
+            markdownPreviewView.update(markdown: text)
+            view.window?.makeFirstResponder(markdownPreviewView)
+        }
+    }
+
+    private func updateModeButtonUI() {
+        if isMarkdownEditMode {
+            modeButton.setSymbol("eye", accessibilityDescription: "Preview Markdown (⌘E)", pointSize: 11, weight: .medium)
+            modeButton.toolTip = "Preview Markdown (⌘E)"
+        } else {
+            modeButton.setSymbol("pencil", accessibilityDescription: "Edit / View Source (⌘E)", pointSize: 11, weight: .medium)
+            modeButton.toolTip = "Edit / View Source (⌘E)"
+        }
+    }
+
     private func showText(_ text: String, url: URL, fileExtension ext: String, resetScroll: Bool) {
         messageLabel.isHidden = true
         quickLookView?.isHidden = true
+        markdownPreviewView.isHidden = true
         syntaxView.isHidden = false
         syntaxView.load(text: text, fileExtension: ext, resetScroll: resetScroll)
         if ["diff", "patch"].contains(ext) {
@@ -206,6 +304,8 @@ final class FileViewerViewController: NSViewController {
             showMessage("Unable to start Quick Look preview.")
             return
         }
+        modeButton.isHidden = true
+        markdownPreviewView.isHidden = true
         messageLabel.isHidden = true
         syntaxView.isHidden = true
         if quickLookView.previewItem?.previewItemURL == url {
@@ -218,6 +318,8 @@ final class FileViewerViewController: NSViewController {
 
     private func showMessage(_ message: String) {
         lspSession.close()
+        modeButton.isHidden = true
+        markdownPreviewView.isHidden = true
         syntaxView.isHidden = true
         quickLookView?.isHidden = true
         messageLabel.isHidden = false
@@ -228,7 +330,24 @@ final class FileViewerViewController: NSViewController {
         onBack?()
     }
 
+    @objc func copy(_ sender: Any?) {
+        if isMarkdownFile && !isMarkdownEditMode {
+            markdownPreviewView.copy(sender)
+        } else {
+            syntaxView.copy(sender)
+        }
+    }
+
     override func keyDown(with event: NSEvent) {
+        let cmd = event.modifierFlags.contains(.command)
+        let shift = event.modifierFlags.contains(.shift)
+        let key = event.charactersIgnoringModifiers?.lowercased() ?? ""
+
+        if cmd && (key == "e" || (shift && key == "v")) && isMarkdownFile {
+            toggleMarkdownMode()
+            return
+        }
+
         if event.keyCode == 53 {
             onBack?()
             return

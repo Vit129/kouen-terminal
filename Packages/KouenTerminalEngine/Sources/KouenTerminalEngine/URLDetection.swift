@@ -61,8 +61,52 @@ public enum URLDetection {
         #endif
     }
 
-    /// Detects if the text at `column` in `line` is a file path (absolute or relative).
-    /// Handles single-quoted or double-quoted paths with spaces, and unquoted paths containing `/`.
+    /// Known file extensions recognized for standalone filenames without directory slashes.
+    public static let knownFileExtensions: Set<String> = [
+        // Docs & Markdown
+        "md", "markdown", "mdown", "mkd", "txt", "text", "rst", "adoc", "pdf", "rtf",
+        // Code & Scripts
+        "swift", "c", "h", "cpp", "hpp", "cc", "cxx", "m", "mm", "rs", "go", "py",
+        "js", "mjs", "cjs", "jsx", "ts", "mts", "cts", "tsx", "rb", "php", "sh",
+        "bash", "zsh", "fish", "pl", "lua", "r", "dart", "cs", "fs", "zig", "nim",
+        "vue", "svelte", "java", "kt", "kts", "scala", "asm", "s", "wasm",
+        // Config, Data & Web
+        "json", "jsonc", "json5", "yaml", "yml", "toml", "xml", "plist", "csv", "tsv",
+        "sql", "graphql", "gql", "ini", "conf", "config", "env", "properties", "lock", "log",
+        "html", "htm", "css", "scss", "sass", "less",
+        // Diagrams & Media
+        "mermaid", "mmd", "svg", "png", "jpg", "jpeg", "gif", "webp", "ico",
+        // Build & Package
+        "diff", "patch", "podspec", "dockerfile", "cmake", "gradle", "proto", "mod", "sum"
+    ]
+
+    /// Determines whether a token looks like a file path:
+    /// - Contains `/` or starts with `~`
+    /// - Starts with `.` as a hidden file (e.g. `.gitignore`, `.env`, `.zshrc`)
+    /// - Ends with a recognized file extension (e.g. `README.md`, `diagram.mermaid`, `spec.markdown:14:2`)
+    public static func isLikelyFilePath(_ token: String) -> Bool {
+        if token.contains("://") { return false }
+        if token.contains("/") || token.hasPrefix("~") { return true }
+
+        // Strip line:col suffix if present (e.g. "README.md:14:2" or "notes.txt:5")
+        let clean = token.replacingOccurrences(of: #":\d+(?::\d+)?$"#, with: "", options: .regularExpression)
+
+        // Hidden files like .gitignore, .env, .zshrc
+        if clean.hasPrefix(".") && clean.count > 1 {
+            let rest = clean.dropFirst()
+            if rest.allSatisfy({ $0.isLetter || $0.isNumber || $0 == "_" || $0 == "-" }) {
+                return true
+            }
+        }
+
+        // Files with recognized extensions
+        guard let dotIndex = clean.lastIndex(of: "."), dotIndex > clean.startIndex else { return false }
+        let ext = clean[clean.index(after: dotIndex)...].lowercased()
+        return knownFileExtensions.contains(ext)
+    }
+
+    /// Detects if the text at `column` in `line` is a file path (absolute, relative, or recognized filename).
+    /// Handles single-quoted or double-quoted paths with spaces, and unquoted delimited tokens.
     public static func detectFilePath(in line: String, at column: Int) -> (url: String, columns: Range<Int>)? {
         let chars = Array(line)
         guard !line.isEmpty, column >= 0, column < chars.count else { return nil }
@@ -74,7 +118,8 @@ public enum URLDetection {
         while hi < chars.count - 1, chars[hi] != "'" { hi += 1 }
         if lo < hi, chars[lo] == "'", chars[hi] == "'" {
             let token = String(chars[lo...hi])
-            if token.contains("/") {
+            let inner = String(token.dropFirst().dropLast())
+            if isLikelyFilePath(inner) {
                 return (token, lo ..< (hi + 1))
             }
         }
@@ -86,16 +131,19 @@ public enum URLDetection {
         while hi < chars.count - 1, chars[hi] != "\"" { hi += 1 }
         if lo < hi, chars[lo] == "\"", chars[hi] == "\"" {
             let token = String(chars[lo...hi])
-            if token.contains("/") {
+            let inner = String(token.dropFirst().dropLast())
+            if isLikelyFilePath(inner) {
                 return (token, lo ..< (hi + 1))
             }
         }
 
-        // 3. Fallback: Check for unquoted whitespace-delimited token containing "/".
-        // "(" / ")" are boundaries too, not just whitespace/quotes — coding-agent CLIs
-        // (Claude Code, Codex) print tool-call summaries like "Update(path/to/file.swift)"
-        // with no space before the path, so the paren itself has to stop the token scan.
-        func isBoundary(_ c: Character) -> Bool { c == " " || c == "\t" || c == "'" || c == "\"" || c == "(" || c == ")" }
+        // 3. Fallback: Check for unquoted delimited token.
+        // Delimiters (quotes, parens, brackets, backticks, < >) stop the token scan.
+        func isBoundary(_ c: Character) -> Bool {
+            c == " " || c == "\t" || c == "'" || c == "\"" ||
+            c == "(" || c == ")" || c == "[" || c == "]" ||
+            c == "`" || c == "<" || c == ">"
+        }
         if !isBoundary(chars[column]) {
             lo = column
             hi = column
@@ -105,12 +153,29 @@ public enum URLDetection {
             while let last = token.last, ").,;:!?'\\\"]>".contains(last) {
                 token.removeLast()
             }
-            if !token.isEmpty && token.contains("/") {
+            if !token.isEmpty, column < lo + token.count, isLikelyFilePath(token) {
                 return (token, lo ..< (lo + token.count))
             }
         }
 
         return nil
+    }
+
+    /// All file path matches in `line`, ordered by start column.
+    public static func allFileMatches(in line: String) -> [(url: String, columns: Range<Int>)] {
+        guard !line.isEmpty else { return [] }
+        var results: [(url: String, columns: Range<Int>)] = []
+        var col = 0
+        let chars = Array(line)
+        while col < chars.count {
+            if let match = detectFilePath(in: line, at: col) {
+                results.append(match)
+                col = max(col + 1, match.columns.upperBound)
+            } else {
+                col += 1
+            }
+        }
+        return results
     }
 
     /// True if `host` is an IPv4 literal in a private (RFC 1918) range — 10.0.0.0/8,

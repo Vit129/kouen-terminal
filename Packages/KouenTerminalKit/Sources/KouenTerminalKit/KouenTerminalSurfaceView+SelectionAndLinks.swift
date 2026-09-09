@@ -174,15 +174,15 @@ extension KouenTerminalSurfaceView {
         scheduleRender()
     }
 
-    /// The clickable URL at a grid cell (OSC 8 hyperlink first, else an auto-detected URL).
-    private func linkURL(atRow row: Int, column col: Int) -> String? {
+    /// The clickable URL at a grid cell (OSC 8 hyperlink first, else an auto-detected URL or file path).
+    func linkURL(atRow row: Int, column col: Int) -> String? {
         linkRange(atRow: row, column: col)?.url
     }
 
     /// The clickable link at a grid cell *and* its column span — an OSC 8 hyperlink (the run of
-    /// adjacent cells sharing its id) first, else an auto-detected URL in the row text. The row is
+    /// adjacent cells sharing its id) first, else an auto-detected URL or file path in the row text. The row is
     /// built one character per cell so `column`/the returned range map directly to grid columns.
-    private func linkRange(atRow row: Int, column col: Int) -> (url: String, columns: Range<Int>)? {
+    func linkRange(atRow row: Int, column col: Int) -> (url: String, columns: Range<Int>)? {
         emulatorSync { emulator in
             let grid = scrollOffset > 0 ? emulator.readGrid(scrollbackOffset: scrollOffset) : emulator.readGrid()
             guard row >= 0, row < grid.rows, col >= 0, col < grid.cols else { return nil }
@@ -214,7 +214,7 @@ extension KouenTerminalSurfaceView {
     /// authoritative workbench cwd (this surface's own OSC-7 `currentCwd` can be nil or
     /// stale — e.g. a non-interactive agent subprocess that never emits OSC 7) and opens
     /// them in Kouen's file preview — never via NSWorkspace.
-    private func openLink(_ string: String) {
+    func openLink(_ string: String) {
         if let scheme = URL(string: string)?.scheme?.lowercased(), scheme != "file" {
             // Every http/https link opens in the in-app Browser Pane instead of switching to
             // the system browser. mailto/ftp/ftps still hand off — there's no in-app handler
@@ -238,7 +238,7 @@ extension KouenTerminalSurfaceView {
         )
     }
 
-    private func resolveFilePath(_ string: String) -> String? {
+    func resolveFilePath(_ string: String) -> String? {
         var cleanString = string.trimmingCharacters(in: .whitespacesAndNewlines)
         
         // Handle file:// scheme
@@ -262,10 +262,14 @@ extension KouenTerminalSurfaceView {
         if stripped.hasPrefix("/") {
             return stripped
         }
-        // Relative path — resolve against terminal's cwd
-        guard let cwd = currentCwd, !cwd.isEmpty else { return nil }
-        let resolved = (cwd as NSString).appendingPathComponent(stripped)
-        return resolved
+        if stripped.hasPrefix("~") {
+            return (stripped as NSString).expandingTildeInPath
+        }
+        // Relative path — resolve against terminal's cwd if available, else return stripped for host resolution
+        if let cwd = currentCwd, !cwd.isEmpty {
+            return (cwd as NSString).appendingPathComponent(stripped)
+        }
+        return stripped
     }
 
     public override func mouseDragged(with event: NSEvent) {
@@ -509,6 +513,10 @@ extension KouenTerminalSurfaceView {
                     line.unicodeScalars.append(cell.codepoint == 0 ? " " : (Unicode.Scalar(cell.codepoint) ?? " "))
                 }
                 for match in URLDetection.allMatches(in: line) {
+                    let key = row * 10000 + match.columns.lowerBound
+                    if seen.insert(key).inserted { found.append(RawLink(url: match.url, row: row, columns: match.columns)) }
+                }
+                for match in URLDetection.allFileMatches(in: line) {
                     let key = row * 10000 + match.columns.lowerBound
                     if seen.insert(key).inserted { found.append(RawLink(url: match.url, row: row, columns: match.columns)) }
                 }

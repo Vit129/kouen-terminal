@@ -296,6 +296,63 @@ final class EngineConformanceTests: XCTestCase {
         XCTAssertEqual(match?.url, "Apps/Kouen/Sources/KouenApp/UI/FileEditor/SyntaxTextView.swift")
     }
 
+    func testDetectFilePathStandaloneMarkdown() {
+        let line = "See README.md for details"
+        let col = line.distance(from: line.startIndex, to: line.range(of: "README")!.lowerBound)
+        let match = URLDetection.detectFilePath(in: line, at: col)
+        XCTAssertEqual(match?.url, "README.md")
+        XCTAssertEqual(match?.columns, 4 ..< 13)
+    }
+
+    func testDetectFilePathWithLineAndColumn() {
+        let line = "Error in notes.markdown:14:2"
+        let col = line.distance(from: line.startIndex, to: line.range(of: "notes")!.lowerBound)
+        let match = URLDetection.detectFilePath(in: line, at: col)
+        XCTAssertEqual(match?.url, "notes.markdown:14:2")
+    }
+
+    func testDetectFilePathBackticksAndBrackets() {
+        let line = "Check `spec.md` and [docs/setup.md] now"
+        let col1 = line.distance(from: line.startIndex, to: line.range(of: "spec")!.lowerBound)
+        let match1 = URLDetection.detectFilePath(in: line, at: col1)
+        XCTAssertEqual(match1?.url, "spec.md")
+
+        let col2 = line.distance(from: line.startIndex, to: line.range(of: "setup")!.lowerBound)
+        let match2 = URLDetection.detectFilePath(in: line, at: col2)
+        XCTAssertEqual(match2?.url, "docs/setup.md")
+    }
+
+    func testDetectFilePathQuoted() {
+        let line = "open 'my diagram.mermaid' or \"plan.md\""
+        let col1 = line.distance(from: line.startIndex, to: line.range(of: "diagram")!.lowerBound)
+        let match1 = URLDetection.detectFilePath(in: line, at: col1)
+        XCTAssertEqual(match1?.url, "'my diagram.mermaid'")
+
+        let col2 = line.distance(from: line.startIndex, to: line.range(of: "plan")!.lowerBound)
+        let match2 = URLDetection.detectFilePath(in: line, at: col2)
+        XCTAssertEqual(match2?.url, "\"plan.md\"")
+    }
+
+    func testDetectFilePathRejectsNonFiles() {
+        let line = "let count = self.count + 3.14 and v1.0.0"
+        let col1 = line.distance(from: line.startIndex, to: line.range(of: "count")!.lowerBound)
+        XCTAssertNil(URLDetection.detectFilePath(in: line, at: col1))
+
+        let col2 = line.distance(from: line.startIndex, to: line.range(of: "3.14")!.lowerBound)
+        XCTAssertNil(URLDetection.detectFilePath(in: line, at: col2))
+
+        let col3 = line.distance(from: line.startIndex, to: line.range(of: "v1.0.0")!.lowerBound)
+        XCTAssertNil(URLDetection.detectFilePath(in: line, at: col3))
+    }
+
+    func testAllFileMatches() {
+        let line = "See README.md and spec.markdown for guide"
+        let matches = URLDetection.allFileMatches(in: line)
+        XCTAssertEqual(matches.count, 2)
+        XCTAssertEqual(matches[0].url, "README.md")
+        XCTAssertEqual(matches[1].url, "spec.markdown")
+    }
+
     func testDetectLocalhostBarePortPrependsHTTPScheme() {
         let line = "Local:   http://localhost:3000"
         let col = line.distance(from: line.startIndex, to: line.range(of: "localhost")!.lowerBound)
