@@ -327,6 +327,19 @@ extension KouenTerminalSurfaceView {
         guard !isMouseReporting(event) else { return nil }
         let menu = NSMenu()
 
+        if let pos = cell(at: event.locationInWindow),
+           let target = linkURL(atRow: pos.row, column: pos.column) {
+            let isWeb = target.lowercased().hasPrefix("http://") ||
+                        target.lowercased().hasPrefix("https://") ||
+                        target.lowercased().hasPrefix("mailto:")
+            let title = isWeb ? "Open Link" : "Open File"
+            let openItem = NSMenuItem(title: title, action: #selector(openContextLink(_:)), keyEquivalent: "")
+            openItem.target = self
+            openItem.representedObject = target
+            menu.addItem(openItem)
+            menu.addItem(.separator())
+        }
+
         if let pos = cell(at: event.locationInWindow) {
             let clickedLine = selectionTopLine + pos.row
             let prompts = emulatorSync { $0.promptRows }
@@ -354,6 +367,11 @@ extension KouenTerminalSurfaceView {
         selectAllItem.target = self
         menu.addItem(selectAllItem)
         return menu
+    }
+
+    @objc private func openContextLink(_ sender: NSMenuItem) {
+        guard let target = sender.representedObject as? String else { return }
+        openLink(target)
     }
 
     // MARK: - Block actions (right-click on an OSC 133 command block)

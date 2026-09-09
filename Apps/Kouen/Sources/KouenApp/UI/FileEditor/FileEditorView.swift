@@ -11,17 +11,25 @@ typealias FileTabID = UUID
 @MainActor
 final class FileEditorView: NSView {
     private let syntaxView = SyntaxTextView()
+    private let markdownPreviewView = MarkdownPreviewView(frame: .zero)
+    private let modeToggleButton = KouenDesign.softIconButton(symbol: "pencil", tooltip: "Edit Markdown (⌘E)", size: 26)
     private let messageLabel = NSTextField(labelWithString: "")
     private let quickLookContainer = NSView()
     private let lspSession = LSPFileSession()
 
     private static let maxPreviewBytes = 5_000_000
     private(set) var filePath: String = ""
+    private var isMarkdownFile = false
+    private var isMarkdownEditMode = false
+    private var currentMarkdownRaw: String = ""
+
     var activeDiagnostics: [LSPDiagnostic] { syntaxView.activeDiagnostics }
     /// True once `load(path:)` has routed the current file through the syntax-highlighted
     /// text view (copy/find/vi-mode all work there) rather than Quick Look (a separate,
     /// read-only renderer that doesn't wire into this app's Edit menu).
     var isShowingSyntaxView: Bool { !syntaxView.isHidden }
+    var isShowingMarkdownPreview: Bool { !markdownPreviewView.isHidden }
+    var isShowingQuickLook: Bool { !quickLookContainer.isHidden }
     private let fileWatcher = FileChangeWatcher()
     private let symbolIndex = WorkspaceSymbolIndex()
 
@@ -84,6 +92,24 @@ final class FileEditorView: NSView {
             showMessage("Binary file — cannot preview.")
             return
         }
+
+        let isMD = ["md", "markdown", "mermaid", "mmd"].contains(ext)
+        if isMD {
+            isMarkdownFile = true
+            currentMarkdownRaw = contents
+            if !isMarkdownEditMode {
+                showMarkdownPreview(contents, url: url, resetScroll: !isReloadingSamePath)
+            } else {
+                showText(contents, fileExtension: ext, resetScroll: !isReloadingSamePath)
+                updateModeButtonUI()
+            }
+            return
+        }
+
+        isMarkdownFile = false
+        isMarkdownEditMode = false
+        modeToggleButton.isHidden = true
+        markdownPreviewView.isHidden = true
         showText(contents, fileExtension: ext, resetScroll: !isReloadingSamePath)
     }
 
@@ -101,6 +127,8 @@ final class FileEditorView: NSView {
         syntaxView.onSave = { [weak self] text in
             guard let self, !self.filePath.isEmpty else { return }
             try? text.write(toFile: self.filePath, atomically: true, encoding: .utf8)
+            self.currentMarkdownRaw = text
+            self.markdownPreviewView.update(markdown: text)
             DisplayMessage.show("Saved \((self.filePath as NSString).lastPathComponent)")
         }
         // LSP hooks
@@ -111,6 +139,19 @@ final class FileEditorView: NSView {
             self?.syntaxView.navigateTo(line: target.line, column: target.column)
         }
         addSubview(syntaxView)
+
+        markdownPreviewView.translatesAutoresizingMaskIntoConstraints = false
+        markdownPreviewView.isHidden = true
+        markdownPreviewView.onOpenFile = { [weak self] targetPath in
+            self?.load(path: targetPath)
+        }
+        addSubview(markdownPreviewView)
+
+        modeToggleButton.translatesAutoresizingMaskIntoConstraints = false
+        modeToggleButton.isHidden = true
+        modeToggleButton.target = self
+        modeToggleButton.action = #selector(toggleMarkdownMode)
+        addSubview(modeToggleButton)
 
         messageLabel.translatesAutoresizingMaskIntoConstraints = false
         messageLabel.font = KouenDesign.Typography.sidebarLabel
@@ -128,6 +169,14 @@ final class FileEditorView: NSView {
             syntaxView.leadingAnchor.constraint(equalTo: leadingAnchor),
             syntaxView.trailingAnchor.constraint(equalTo: trailingAnchor),
             syntaxView.bottomAnchor.constraint(equalTo: bottomAnchor),
+
+            markdownPreviewView.topAnchor.constraint(equalTo: topAnchor),
+            markdownPreviewView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            markdownPreviewView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            markdownPreviewView.bottomAnchor.constraint(equalTo: bottomAnchor),
+
+            modeToggleButton.topAnchor.constraint(equalTo: topAnchor, constant: KouenDesign.Spacing.xs),
+            modeToggleButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -KouenDesign.Spacing.md),
 
             messageLabel.centerXAnchor.constraint(equalTo: centerXAnchor),
             messageLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
@@ -155,9 +204,14 @@ final class FileEditorView: NSView {
 
     override func keyDown(with event: NSEvent) {
         let cmd = event.modifierFlags.contains(.command)
-        let key = event.charactersIgnoringModifiers ?? ""
+        let shift = event.modifierFlags.contains(.shift)
+        let key = event.charactersIgnoringModifiers?.lowercased() ?? ""
 
         if cmd {
+            if (key == "e" || (shift && key == "v")) && isMarkdownFile {
+                toggleMarkdownMode()
+                return
+            }
             switch key {
             case "s": NSSound.beep()
             case "f":
@@ -173,17 +227,66 @@ final class FileEditorView: NSView {
 
     // FileEditorView (not syntaxView) is first responder here — see keyDown override
     // above. NSView has no copy(_:), so Edit > Copy needs an explicit forward to the
-    // inner SyntaxTextView, which does the actual selection/clipboard work.
+    // inner view, which does the actual selection/clipboard work.
     @objc func copy(_ sender: Any?) {
-        syntaxView.copy(sender)
+        if isMarkdownFile && !isMarkdownEditMode {
+            markdownPreviewView.copy(sender)
+        } else {
+            syntaxView.copy(sender)
+        }
     }
 
     // MARK: - Display
+
+    private func showMarkdownPreview(_ text: String, url: URL, resetScroll: Bool) {
+        messageLabel.isHidden = true
+        syntaxView.isHidden = true
+        quickLookContainer.isHidden = true
+        markdownPreviewView.isHidden = false
+        modeToggleButton.isHidden = false
+        updateModeButtonUI()
+
+        if resetScroll {
+            markdownPreviewView.load(markdown: text, fileURL: url)
+        } else {
+            markdownPreviewView.update(markdown: text)
+        }
+    }
+
+    @objc func toggleMarkdownMode() {
+        guard isMarkdownFile else { return }
+        isMarkdownEditMode.toggle()
+        updateModeButtonUI()
+
+        if isMarkdownEditMode {
+            markdownPreviewView.isHidden = true
+            showText(currentMarkdownRaw, fileExtension: "md", resetScroll: false)
+            window?.makeFirstResponder(syntaxView)
+        } else {
+            let text = syntaxView.string
+            currentMarkdownRaw = text
+            syntaxView.isHidden = true
+            markdownPreviewView.isHidden = false
+            markdownPreviewView.update(markdown: text)
+            window?.makeFirstResponder(markdownPreviewView)
+        }
+    }
+
+    private func updateModeButtonUI() {
+        if isMarkdownEditMode {
+            modeToggleButton.setSymbol("eye", accessibilityDescription: "Preview Markdown (⌘E)", pointSize: 12, weight: .medium)
+            modeToggleButton.toolTip = "Preview Markdown (⌘E)"
+        } else {
+            modeToggleButton.setSymbol("pencil", accessibilityDescription: "Edit Markdown (⌘E)", pointSize: 12, weight: .medium)
+            modeToggleButton.toolTip = "Edit Markdown (⌘E)"
+        }
+    }
 
     private func showText(_ text: String, fileExtension ext: String, resetScroll: Bool) {
         messageLabel.isHidden = true
         syntaxView.isHidden = false
         quickLookContainer.isHidden = true
+        markdownPreviewView.isHidden = true
 
         syntaxView.load(text: text, fileExtension: ext, resetScroll: resetScroll)
         if ["diff", "patch"].contains(ext) {
@@ -221,6 +324,8 @@ final class FileEditorView: NSView {
     private func showMessage(_ message: String) {
         lspSession.close()
         syntaxView.isHidden = true
+        markdownPreviewView.isHidden = true
+        modeToggleButton.isHidden = true
         quickLookContainer.isHidden = true
         messageLabel.isHidden = false
         messageLabel.stringValue = message
@@ -229,6 +334,8 @@ final class FileEditorView: NSView {
     private func showQuickLook(url: URL) {
         lspSession.close()
         syntaxView.isHidden = true
+        markdownPreviewView.isHidden = true
+        modeToggleButton.isHidden = true
         messageLabel.isHidden = true
         quickLookContainer.isHidden = false
 

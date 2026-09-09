@@ -247,7 +247,10 @@ let package = Package(
         .target(
             name: "KouenSyntaxResources",
             path: "Packages/KouenSyntaxResources",
-            resources: [.copy("Resources/TreeSitterGrammars")]
+            resources: [
+                .copy("Resources/TreeSitterGrammars"),
+                .copy("Resources/Markdown"),
+            ]
         ),
         // Tiny C shim wrapping the variadic `ioctl` (unavailable to Swift on Linux) into
         // non-variadic terminal helpers used by the PTY layer and the CLI attach client.

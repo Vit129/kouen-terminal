@@ -26,10 +26,21 @@ final class FileEditorViewQuickLookRoutingTests: XCTestCase {
         return url.path
     }
 
-    func testMarkdownUsesSyntaxViewNotQuickLook() {
+    func testMarkdownUsesMarkdownPreviewAndCanToggleToSyntaxView() {
         let view = FileEditorView(frame: NSRect(x: 0, y: 0, width: 400, height: 400))
-        view.load(path: writeFile(named: "notes.md"))
-        XCTAssertTrue(view.isShowingSyntaxView, ".md must use the syntax text view, not Quick Look")
+        view.load(path: writeFile(named: "notes.md", contents: "# Test\n```mermaid\ngraph TD\nA-->B\n```"))
+        XCTAssertTrue(view.isShowingMarkdownPreview, ".md must use MarkdownPreviewView by default")
+        XCTAssertFalse(view.isShowingQuickLook, ".md must not use Quick Look")
+
+        // Toggle to edit mode
+        view.toggleMarkdownMode()
+        XCTAssertTrue(view.isShowingSyntaxView, "In edit mode, .md must use syntax text view")
+        XCTAssertFalse(view.isShowingMarkdownPreview, "In edit mode, markdown preview is hidden")
+
+        // Toggle back to preview mode
+        view.toggleMarkdownMode()
+        XCTAssertTrue(view.isShowingMarkdownPreview, "Toggling back returns to markdown preview")
+        XCTAssertFalse(view.isShowingSyntaxView, "Syntax text view is hidden in preview mode")
     }
 
     func testSwiftUsesSyntaxView() {
