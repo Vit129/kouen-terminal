@@ -64,4 +64,36 @@ final class MarkdownPreviewTests: XCTestCase {
         // Toggle back
         vc.toggleMarkdownMode()
     }
+
+    func testCodeExtensionsRecognition() {
+        XCTAssertTrue(MarkdownPreviewView.isSupportedCodeExtension("swift"))
+        XCTAssertTrue(MarkdownPreviewView.isSupportedCodeExtension("py"))
+        XCTAssertTrue(MarkdownPreviewView.isSupportedCodeExtension("ts"))
+        XCTAssertTrue(MarkdownPreviewView.isSupportedCodeExtension("json"))
+        XCTAssertTrue(MarkdownPreviewView.isSupportedCodeExtension("yaml"))
+        XCTAssertFalse(MarkdownPreviewView.isSupportedCodeExtension("unknown_ext"))
+
+        XCTAssertTrue(MarkdownPreviewView.isRichPreviewExtension("md"))
+        XCTAssertTrue(MarkdownPreviewView.isRichPreviewExtension("markdown"))
+        XCTAssertTrue(MarkdownPreviewView.isRichPreviewExtension("mermaid"))
+        XCTAssertTrue(MarkdownPreviewView.isRichPreviewExtension("mmd"))
+        XCTAssertFalse(MarkdownPreviewView.isRichPreviewExtension("swift"))
+        XCTAssertFalse(MarkdownPreviewView.isRichPreviewExtension("py"))
+        XCTAssertFalse(MarkdownPreviewView.isRichPreviewExtension("pdf"))
+        XCTAssertFalse(MarkdownPreviewView.isRichPreviewExtension("png"))
+    }
+
+    func testLoadCodeFileInMarkdownPreview() {
+        let view = MarkdownPreviewView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        let code = """
+        import Foundation
+
+        struct User: Codable {
+            let id: Int
+            let name: String
+        }
+        """
+        view.load(markdown: code, fileURL: URL(fileURLWithPath: "/tmp/User.swift"))
+        view.update(markdown: code + "\n// updated")
+    }
 }
