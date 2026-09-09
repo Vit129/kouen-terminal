@@ -81,8 +81,8 @@ final class FileViewerViewController: NSViewController {
             return
         }
 
-        let isMD = ["md", "markdown"].contains(ext)
-        if isMD {
+        let isRich = MarkdownPreviewView.isRichPreviewExtension(ext)
+        if isRich {
             isMarkdownFile = true
             currentMarkdownRaw = contents
             if !isMarkdownEditMode {
@@ -244,10 +244,11 @@ final class FileViewerViewController: NSViewController {
         guard let path = pathLabel.toolTip, !path.isEmpty else { return }
         let expanded = (path as NSString).expandingTildeInPath
         let url = URL(fileURLWithPath: expanded).resolvingSymlinksInPath()
+        let ext = url.pathExtension.lowercased()
 
         if isMarkdownEditMode {
             markdownPreviewView.isHidden = true
-            showText(currentMarkdownRaw, url: url, fileExtension: "md", resetScroll: false)
+            showText(currentMarkdownRaw, url: url, fileExtension: ext, resetScroll: false)
             view.window?.makeFirstResponder(syntaxView)
         } else {
             let text = syntaxView.string
@@ -260,9 +261,12 @@ final class FileViewerViewController: NSViewController {
     }
 
     private func updateModeButtonUI() {
+        let ext = (pathLabel.toolTip as NSString?)?.pathExtension.lowercased() ?? ""
+        let isMermaid = ["mermaid", "mmd"].contains(ext)
+        let typeName = isMermaid ? "Mermaid" : "Markdown"
         if isMarkdownEditMode {
-            modeButton.setSymbol("eye", accessibilityDescription: "Preview Markdown (⌘E)", pointSize: 11, weight: .medium)
-            modeButton.toolTip = "Preview Markdown (⌘E)"
+            modeButton.setSymbol("eye", accessibilityDescription: "Preview \(typeName) (⌘E)", pointSize: 11, weight: .medium)
+            modeButton.toolTip = "Preview \(typeName) (⌘E)"
         } else {
             modeButton.setSymbol("pencil", accessibilityDescription: "Edit / View Source (⌘E)", pointSize: 11, weight: .medium)
             modeButton.toolTip = "Edit / View Source (⌘E)"

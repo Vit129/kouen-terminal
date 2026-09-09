@@ -64,16 +64,55 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
         ])
     }
 
+    public static let codeExtensionToLanguage: [String: String] = [
+        // Swift / Apple
+        "swift": "swift", "m": "objectivec", "mm": "objectivec",
+        // Web & Script
+        "js": "javascript", "mjs": "javascript", "cjs": "javascript", "jsx": "javascript",
+        "ts": "typescript", "mts": "typescript", "cts": "typescript", "tsx": "typescript",
+        "html": "xml", "htm": "xml", "xml": "xml", "svg": "xml", "plist": "xml",
+        "css": "css", "scss": "scss", "sass": "scss", "less": "less",
+        // Systems & Compiled
+        "c": "c", "h": "c", "cpp": "cpp", "hpp": "cpp", "cc": "cpp", "cxx": "cpp",
+        "rs": "rust", "go": "go", "cs": "csharp", "java": "java", "kt": "kotlin", "kts": "kotlin",
+        "wasm": "wasm",
+        // Scripting & Data
+        "py": "python", "pyw": "python", "rb": "ruby", "php": "php", "lua": "lua",
+        "pl": "perl", "r": "r", "sh": "bash", "bash": "bash", "zsh": "bash", "fish": "bash",
+        // Config & Query
+        "json": "json", "jsonc": "json", "json5": "json",
+        "yaml": "yaml", "yml": "yaml", "toml": "ini", "ini": "ini", "conf": "ini", "env": "ini",
+        "sql": "sql", "graphql": "graphql", "gql": "graphql",
+        "makefile": "makefile", "make": "makefile", "mk": "makefile",
+        "diff": "diff", "patch": "diff"
+    ]
+
+    public static func isSupportedCodeExtension(_ ext: String) -> Bool {
+        codeExtensionToLanguage[ext.lowercased()] != nil
+    }
+
+    public static func isRichPreviewExtension(_ ext: String) -> Bool {
+        let lower = ext.lowercased()
+        return ["md", "markdown", "mermaid", "mmd"].contains(lower)
+    }
+
     // MARK: - API
 
-    func load(markdown: String, fileURL: URL?) {
-        let effectiveMarkdown: String
-        let ext = fileURL?.pathExtension.lowercased() ?? ""
-        if (ext == "mermaid" || ext == "mmd"), !markdown.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("```") {
-            effectiveMarkdown = "```mermaid\n" + markdown + "\n```"
-        } else {
-            effectiveMarkdown = markdown
+    private func wrapContentIfNeeded(_ raw: String, fileURL: URL?) -> String {
+        guard let ext = fileURL?.pathExtension.lowercased(), !ext.isEmpty else {
+            return raw
         }
+        if ext == "mermaid" || ext == "mmd" {
+            let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.hasPrefix("```") {
+                return "```mermaid\n\(raw)\n```"
+            }
+        }
+        return raw
+    }
+
+    func load(markdown: String, fileURL: URL?) {
+        let effectiveMarkdown = wrapContentIfNeeded(markdown, fileURL: fileURL)
         currentMarkdown = effectiveMarkdown
         currentFileURL = fileURL
         isWebViewReady = false
@@ -86,13 +125,14 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
     }
 
     func update(markdown: String) {
-        currentMarkdown = markdown
+        let effectiveMarkdown = wrapContentIfNeeded(markdown, fileURL: currentFileURL)
+        currentMarkdown = effectiveMarkdown
         guard isWebViewReady else {
-            pendingMarkdown = markdown
+            pendingMarkdown = effectiveMarkdown
             return
         }
 
-        guard let encoded = try? JSONEncoder().encode(markdown),
+        guard let encoded = try? JSONEncoder().encode(effectiveMarkdown),
               let jsonString = String(data: encoded, encoding: .utf8) else { return }
 
         let js = "window.renderMarkdown && window.renderMarkdown(\(jsonString));"
@@ -123,9 +163,13 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         isWebViewReady = true
-        if let pending = pendingMarkdown {
-            pendingMarkdown = nil
-            update(markdown: pending)
+        let textToRender = pendingMarkdown ?? currentMarkdown
+        pendingMarkdown = nil
+        if !textToRender.isEmpty {
+            guard let encoded = try? JSONEncoder().encode(textToRender),
+                  let jsonString = String(data: encoded, encoding: .utf8) else { return }
+            let js = "if (window.renderMarkdown) { window.renderMarkdown(\(jsonString)); }"
+            webView.evaluateJavaScript(js, completionHandler: nil)
         }
     }
 
@@ -339,7 +383,7 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
               display: flex;
               justify-content: space-between;
               align-items: center;
-              padding: 5px 12px;
+              padding: 6px 14px;
               background-color: var(--code-header-bg);
               border-bottom: 1px solid var(--border-color);
               font-family: var(--font-mono);
@@ -360,6 +404,44 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
             .copy-btn:hover {
               background: var(--border-color);
               color: var(--text-primary);
+            }
+            .code-with-lines {
+              display: flex;
+              align-items: stretch;
+              background-color: var(--code-bg);
+            }
+            .line-numbers-pre {
+              margin: 0;
+              padding: 12px 10px 12px 14px;
+              font-family: var(--font-mono);
+              font-size: 12.5px;
+              line-height: 1.5;
+              color: var(--text-muted);
+              user-select: none;
+              -webkit-user-select: none;
+              text-align: right;
+              border-right: 1px solid var(--border-color);
+              background-color: var(--code-header-bg);
+              opacity: 0.55;
+              white-space: pre;
+              flex-shrink: 0;
+            }
+            .code-with-lines pre.code-pre {
+              flex: 1;
+              margin: 0;
+              padding: 12px 14px;
+              overflow-x: auto;
+              font-family: var(--font-mono);
+              font-size: 12.5px;
+              line-height: 1.5;
+              white-space: pre;
+            }
+            .code-with-lines pre.code-pre code {
+              background: transparent;
+              border: none;
+              padding: 0;
+              font-size: inherit;
+              white-space: pre;
             }
             pre {
               margin: 0;
@@ -453,7 +535,9 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
               return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
             }
 
+            let librariesConfigured = false;
             function setupLibraries() {
+              if (librariesConfigured) return;
               if (typeof mermaid !== 'undefined') {
                 mermaid.initialize({
                   startOnLoad: false,
@@ -491,10 +575,20 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
                         highlighted = escapeHtml(text);
                       }
                       const langLabel = lang || 'text';
-                      return `<div class="code-container"><div class="code-header"><span class="code-lang">${escapeHtml(langLabel)}</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="hljs ${lang ? 'language-' + escapeHtml(lang) : ''}">${highlighted}</code></pre></div>`;
+                      const rawLines = text.split('\n');
+                      if (rawLines.length > 1 && rawLines[rawLines.length - 1] === '') rawLines.pop();
+                      let codeBodyHtml = '';
+                      if (rawLines.length > 1) {
+                        const lineNums = rawLines.map((_, i) => i + 1).join('\n');
+                        codeBodyHtml = `<div class="code-with-lines"><pre class="line-numbers-pre">${lineNums}</pre><pre class="code-pre"><code class="hljs ${lang ? 'language-' + escapeHtml(lang) : ''}">${highlighted}</code></pre></div>`;
+                      } else {
+                        codeBodyHtml = `<div class="code-with-lines"><pre class="code-pre"><code class="hljs ${lang ? 'language-' + escapeHtml(lang) : ''}">${highlighted}</code></pre></div>`;
+                      }
+                      return `<div class="code-container"><div class="code-header"><span class="code-lang">${escapeHtml(langLabel)}</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>${codeBodyHtml}</div>`;
                     }
                   }
                 });
+                librariesConfigured = true;
               }
             }
 
@@ -527,7 +621,7 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
 
             window.copyCode = function(button) {
               const container = button.closest('.code-container');
-              const codeEl = container.querySelector('code');
+              const codeEl = container.querySelector('pre.code-pre code') || container.querySelector('code');
               if (codeEl) {
                 const text = codeEl.innerText || codeEl.textContent;
                 navigator.clipboard.writeText(text).then(() => {
@@ -550,23 +644,41 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
             };
 
             window.renderMarkdown = async function(rawMarkdown) {
-              if (typeof marked === 'undefined') {
-                document.getElementById('content').textContent = rawMarkdown;
+              setupLibraries();
+              const contentEl = document.getElementById('content');
+              if (!contentEl) return;
+              if (!rawMarkdown) {
+                contentEl.innerHTML = '';
                 return;
               }
-              let html = marked.parse(rawMarkdown);
-              html = processAlerts(html);
-              document.getElementById('content').innerHTML = html;
-              await renderMermaidDiagrams();
+              if (typeof marked === 'undefined') {
+                contentEl.innerHTML = '<pre style="padding:16px;white-space:pre-wrap;font-family:var(--font-mono);font-size:13px;color:var(--text-primary);">' + escapeHtml(rawMarkdown) + '</pre>';
+                return;
+              }
+              try {
+                let html = marked.parse(rawMarkdown);
+                html = processAlerts(html);
+                contentEl.innerHTML = html;
+                await renderMermaidDiagrams();
+              } catch (e) {
+                console.error('renderMarkdown error:', e);
+                contentEl.innerHTML = '<pre style="padding:16px;white-space:pre-wrap;font-family:var(--font-mono);font-size:13px;color:var(--text-primary);">' + escapeHtml(rawMarkdown) + '</pre>';
+              }
             };
 
-            document.addEventListener('DOMContentLoaded', () => {
+            function init() {
               setupLibraries();
               const initial = \(encodedMarkdown);
-              if (initial) {
+              if (initial !== undefined && initial !== null) {
                 window.renderMarkdown(initial);
               }
-            });
+            }
+
+            if (document.readyState === 'loading') {
+              document.addEventListener('DOMContentLoaded', init);
+            } else {
+              init();
+            }
           </script>
         </body>
         </html>

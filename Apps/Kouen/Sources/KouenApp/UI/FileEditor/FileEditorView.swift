@@ -93,8 +93,8 @@ final class FileEditorView: NSView {
             return
         }
 
-        let isMD = ["md", "markdown", "mermaid", "mmd"].contains(ext)
-        if isMD {
+        let isRich = MarkdownPreviewView.isRichPreviewExtension(ext)
+        if isRich {
             isMarkdownFile = true
             currentMarkdownRaw = contents
             if !isMarkdownEditMode {
@@ -258,9 +258,10 @@ final class FileEditorView: NSView {
         isMarkdownEditMode.toggle()
         updateModeButtonUI()
 
+        let ext = (filePath as NSString).pathExtension.lowercased()
         if isMarkdownEditMode {
             markdownPreviewView.isHidden = true
-            showText(currentMarkdownRaw, fileExtension: "md", resetScroll: false)
+            showText(currentMarkdownRaw, fileExtension: ext, resetScroll: false)
             window?.makeFirstResponder(syntaxView)
         } else {
             let text = syntaxView.string
@@ -273,12 +274,15 @@ final class FileEditorView: NSView {
     }
 
     private func updateModeButtonUI() {
+        let ext = (filePath as NSString).pathExtension.lowercased()
+        let isMermaid = ["mermaid", "mmd"].contains(ext)
+        let typeName = isMermaid ? "Mermaid" : "Markdown"
         if isMarkdownEditMode {
-            modeToggleButton.setSymbol("eye", accessibilityDescription: "Preview Markdown (⌘E)", pointSize: 12, weight: .medium)
-            modeToggleButton.toolTip = "Preview Markdown (⌘E)"
+            modeToggleButton.setSymbol("eye", accessibilityDescription: "Preview \(typeName) (⌘E)", pointSize: 12, weight: .medium)
+            modeToggleButton.toolTip = "Preview \(typeName) (⌘E)"
         } else {
-            modeToggleButton.setSymbol("pencil", accessibilityDescription: "Edit Markdown (⌘E)", pointSize: 12, weight: .medium)
-            modeToggleButton.toolTip = "Edit Markdown (⌘E)"
+            modeToggleButton.setSymbol("pencil", accessibilityDescription: "Edit \(typeName) (⌘E)", pointSize: 12, weight: .medium)
+            modeToggleButton.toolTip = "Edit \(typeName) (⌘E)"
         }
     }
 

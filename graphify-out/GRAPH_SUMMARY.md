@@ -3,13 +3,13 @@ _Auto-generated from GRAPH_REPORT.md · do not edit manually_
 _Regen: `graphify update .`_
 
 ## Summary
-- 19209 nodes · 50810 edges · 2221 communities (613 shown, 1608 thin omitted)
-- Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 7491 edges (avg confidence: 0.73)
+- 19206 nodes · 50829 edges · 2205 communities (600 shown, 1605 thin omitted)
+- Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 7494 edges (avg confidence: 0.73)
 - Token cost: 0 input · 0 output
 
 
 ## Graph Freshness
-- Built from commit: `cbcf7fa0`
+- Built from commit: `25a8b829`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -32,15 +32,15 @@ A high-degree node isn't always architecturally central - a widely-used
 utility/config file can rack up more edges than a real coupler while only
 ever touching one area. This ranks by how many DIFFERENT communities a
 node's neighbors span, not by raw edge count.
-1. `KouenPaths` - bridges 60 areas (135 edges)
-2. `SessionCoordinator` - bridges 56 areas (231 edges)
-3. `SessionSnapshot` - bridges 45 areas (167 edges)
-4. `SurfaceRegistry` - bridges 42 areas (200 edges)
-5. `i()` - bridges 41 areas (321 edges)
-6. `Process` - bridges 41 areas (89 edges)
-7. `AgentKind` - bridges 38 areas (112 edges)
-8. `KouenTerminalSurfaceView` - bridges 37 areas (343 edges)
-9. `Notification` - bridges 37 areas (63 edges)
+1. `SessionCoordinator` - bridges 53 areas (231 edges)
+2. `KouenPaths` - bridges 53 areas (135 edges)
+3. `SessionSnapshot` - bridges 42 areas (167 edges)
+4. `Process` - bridges 42 areas (89 edges)
+5. `AgentKind` - bridges 41 areas (112 edges)
+6. `SurfaceRegistry` - bridges 40 areas (200 edges)
+7. `Notification` - bridges 37 areas (63 edges)
+8. `TerminalEmulator` - bridges 36 areas (229 edges)
+9. `t()` - bridges 34 areas (253 edges)
 
 ## Surprising Connections (you probably didn't know these)
 - `.selectedHost` --references--> `RemoteHost`  [INFERRED]

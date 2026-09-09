@@ -43,10 +43,12 @@ final class FileEditorViewQuickLookRoutingTests: XCTestCase {
         XCTAssertFalse(view.isShowingSyntaxView, "Syntax text view is hidden in preview mode")
     }
 
-    func testSwiftUsesSyntaxView() {
+    func testSwiftUsesSyntaxViewDirectly() {
         let view = FileEditorView(frame: NSRect(x: 0, y: 0, width: 400, height: 400))
-        view.load(path: writeFile(named: "main.swift"))
-        XCTAssertTrue(view.isShowingSyntaxView)
+        view.load(path: writeFile(named: "main.swift", contents: "import Foundation\nprint(\"Hello Kouen\")"))
+        XCTAssertTrue(view.isShowingSyntaxView, ".swift must use syntax text view directly")
+        XCTAssertFalse(view.isShowingMarkdownPreview, ".swift must not use MarkdownPreviewView")
+        XCTAssertFalse(view.isShowingQuickLook, ".swift must not use Quick Look")
     }
 
     func testPDFStillUsesQuickLook() {
