@@ -7,8 +7,8 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
 ## [4.15.7] - 2026-09-09
 
-### Added
-- Release version bump to v4.15.7.
+### Fixed
+- Display markdown and mermaid format and able to click fromterminal (release v4.15.7) ([`c56411c`](https://github.com/Vit129/kouen-terminal/commit/c56411ca0cb580302b6a80d3c434876ce8e02990))
 
 ## [4.15.6] - 2026-09-08
 
