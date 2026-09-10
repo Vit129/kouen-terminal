@@ -7,7 +7,7 @@ import KouenSyntaxResources
 /// Uses bundled offline Marked.js, Highlight.js, and Mermaid.js.
 @MainActor
 final class MarkdownPreviewView: NSView, WKNavigationDelegate {
-    private let webView: WKWebView
+    let webView: WKWebView
     private var isWebViewReady = false
     private var pendingMarkdown: String?
     private var currentFileURL: URL?
@@ -53,6 +53,9 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
         webView.setValue(false, forKey: "drawsBackground")
         if #available(macOS 12.0, *) {
             webView.underPageBackgroundColor = .clear
+        }
+        if #available(macOS 13.3, *) {
+            webView.isInspectable = true
         }
 
         addSubview(webView)
@@ -529,6 +532,14 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
           <div id="content" class="markdown-body"></div>
 
           <script>
+            window.__errors = [];
+            window.addEventListener('error', function(e) {
+              window.__errors.push({ msg: e.message, src: e.filename, line: e.lineno, col: e.colno, error: String(e.error) });
+            });
+            window.addEventListener('unhandledrejection', function(e) {
+              window.__errors.push({ msg: 'unhandledrejection: ' + String(e.reason) });
+            });
+
             window.isDarkMode = \(isDark ? "true" : "false");
 
             function escapeHtml(str) {
@@ -575,11 +586,11 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
                         highlighted = escapeHtml(text);
                       }
                       const langLabel = lang || 'text';
-                      const rawLines = text.split('\n');
+                      const rawLines = text.split('\\n');
                       if (rawLines.length > 1 && rawLines[rawLines.length - 1] === '') rawLines.pop();
                       let codeBodyHtml = '';
                       if (rawLines.length > 1) {
-                        const lineNums = rawLines.map((_, i) => i + 1).join('\n');
+                        const lineNums = rawLines.map((_, i) => i + 1).join('\\n');
                         codeBodyHtml = `<div class="code-with-lines"><pre class="line-numbers-pre">${lineNums}</pre><pre class="code-pre"><code class="hljs ${lang ? 'language-' + escapeHtml(lang) : ''}">${highlighted}</code></pre></div>`;
                       } else {
                         codeBodyHtml = `<div class="code-with-lines"><pre class="code-pre"><code class="hljs ${lang ? 'language-' + escapeHtml(lang) : ''}">${highlighted}</code></pre></div>`;
@@ -646,7 +657,9 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
             window.renderMarkdown = async function(rawMarkdown) {
               setupLibraries();
               const contentEl = document.getElementById('content');
-              if (!contentEl) return;
+              if (!contentEl) {
+                return;
+              }
               if (!rawMarkdown) {
                 contentEl.innerHTML = '';
                 return;
