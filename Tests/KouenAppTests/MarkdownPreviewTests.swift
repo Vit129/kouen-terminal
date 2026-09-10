@@ -96,4 +96,31 @@ final class MarkdownPreviewTests: XCTestCase {
         view.load(markdown: code, fileURL: URL(fileURLWithPath: "/tmp/User.swift"))
         view.update(markdown: code + "\n// updated")
     }
+
+    func testMarkdownPreviewRendersContent() async throws {
+        let view = MarkdownPreviewView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        let sampleMarkdown = """
+        # New Machine Setup
+        First-time installation checklist.
+        ```bash
+        brew install git
+        ```
+        """
+        view.load(markdown: sampleMarkdown, fileURL: URL(fileURLWithPath: "/tmp/sample.md"))
+
+        var renderedHTML: String?
+        for _ in 0..<30 {
+            try await Task.sleep(nanoseconds: 100_000_000)
+            if let content = try? await view.webView.evaluateJavaScript("document.getElementById('content')?.innerHTML") as? String, !content.isEmpty {
+                renderedHTML = content
+                break
+            }
+        }
+
+        let errorsCount = try? await view.webView.evaluateJavaScript("window.__errors ? window.__errors.length : 0") as? Int
+        XCTAssertEqual(errorsCount, 0, "Expected no JavaScript runtime errors")
+        XCTAssertNotNil(renderedHTML, "Expected rendered content but it was nil/empty")
+        XCTAssertTrue(renderedHTML?.contains("New Machine Setup") == true)
+        XCTAssertTrue(renderedHTML?.contains("language-bash") == true)
+    }
 }
