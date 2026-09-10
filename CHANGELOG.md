@@ -7,8 +7,9 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
 ## [4.15.9] - 2026-09-10
 
-### Added
-- Release version bump to v4.15.9.
+### Fixed
+- Double-escape newline literals in markdown preview template JS ([`32017cd`](https://github.com/Vit129/kouen-terminal/commit/32017cd49d72358f1f78ed6c6294e45a5abd242b))
+- Preview markdown file (release v4.15.9) ([`0757dbd`](https://github.com/Vit129/kouen-terminal/commit/0757dbd9e9f5a140ef1bc46c32777645c6ca9b2b))
 
 ## [4.15.8] - 2026-09-09
 
