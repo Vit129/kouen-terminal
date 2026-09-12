@@ -990,8 +990,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/KouenVersion.swift": {
-    "mtime": 1788916076.5622127,
-    "ast_hash": "633b9dc3fd77bade65496b6d4916ee1d",
+    "mtime": 1789006212.5608592,
+    "ast_hash": "31f7ae5064a65e8ce18f6027b5dc97c7",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Layouts/LayoutTemplate.swift": {
@@ -1080,8 +1080,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/GeneratedReleaseNotes.swift": {
-    "mtime": 1788916077.302899,
-    "ast_hash": "2e1760add39706757a0b1c265fdd6396",
+    "mtime": 1789006213.2434797,
+    "ast_hash": "8105cbc3d9a3187678ce97c66f35bb96",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/ReleaseNotes.swift": {
@@ -3390,8 +3390,8 @@
     "semantic_hash": ""
   },
   "CLAUDE.md": {
-    "mtime": 1787120089.7431471,
-    "ast_hash": "3c6ff30240591e701dce4721e07c0612",
+    "mtime": 1789218968.6232004,
+    "ast_hash": "7f1b196bacbba40d0f84d3030eccabd3",
     "semantic_hash": ""
   },
   "GEMINI.md": {
@@ -3714,11 +3714,6 @@
     "ast_hash": "1d05d318abf67cd37cd31b2ea8612b64",
     "semantic_hash": ""
   },
-  "GLOSSARY.md": {
-    "mtime": 1788183794.223328,
-    "ast_hash": "9599ccf4647fca2dc893658139862cdb",
-    "semantic_hash": ""
-  },
   "Apps/Kouen/Sources/KouenApp/Services/ActivityAssertionManager.swift": {
     "mtime": 1785510867.5014808,
     "ast_hash": "ee8794ca7ace68b325b33bd78bd265f7",
@@ -4020,8 +4015,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/FileEditor/MarkdownPreviewView.swift": {
-    "mtime": 1788917798.2031026,
-    "ast_hash": "7ec18bcb1c68b8997c89d7492d4aa0e4",
+    "mtime": 1789005378.6018772,
+    "ast_hash": "93c23e532c5f8ea0f1bf9c73f2fd718a",
     "semantic_hash": ""
   },
   "Packages/KouenSyntaxResources/Resources/Markdown/highlight.min.js": {
@@ -4045,8 +4040,38 @@
     "semantic_hash": ""
   },
   "Tests/KouenAppTests/MarkdownPreviewTests.swift": {
-    "mtime": 1788917812.539108,
-    "ast_hash": "f0440f6006d6fca4a3b6013574ca535f",
+    "mtime": 1789005385.7079039,
+    "ast_hash": "6dd052e2e1260acf55a38be31988822d",
+    "semantic_hash": ""
+  },
+  "ARCHITECTURE.md": {
+    "mtime": 1789218956.075298,
+    "ast_hash": "e1b333de8b5ae0f04ffdd40d8cf920c0",
+    "semantic_hash": ""
+  },
+  "CONTEXT.md": {
+    "mtime": 1789218950.3497193,
+    "ast_hash": "0aadae03ed319fa63c1c9092225af24d",
+    "semantic_hash": ""
+  },
+  "docs/adr/README.md": {
+    "mtime": 1789218957.5872602,
+    "ast_hash": "9950a74f8dd05fa50507228e4f12147d",
+    "semantic_hash": ""
+  },
+  "docs/agents/domain.md": {
+    "mtime": 1789218960.3284535,
+    "ast_hash": "ad638ae3d3f6d6e5f984be83430da398",
+    "semantic_hash": ""
+  },
+  "docs/agents/issue-tracker.md": {
+    "mtime": 1789218962.6698368,
+    "ast_hash": "eeff3e153dfdd43b3a6c2a134cd601dc",
+    "semantic_hash": ""
+  },
+  "docs/agents/triage-labels.md": {
+    "mtime": 1789218964.5085268,
+    "ast_hash": "ce6a06ad53eab2f0bc55838ecef86fbe",
     "semantic_hash": ""
   }
 }
