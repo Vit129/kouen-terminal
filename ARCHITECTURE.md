@@ -59,3 +59,16 @@ Kouen does not build a proprietary agent brain; it exposes an MCP server for exi
 
 - **Stores:** `SurfaceRegistry`, `RecipesStore`, `RemoteHostStore`, `OutputTriggerStore`.
 - **Atomic Release:** Versioning requires atomic synchronization across `Info.plist`, `KouenVersion.swift`, `GeneratedReleaseNotes.swift`, and `CHANGELOG.md` via `prepare-release.sh`.
+
+## Dev & QA Verification Architecture
+
+Kouen enforces strict multi-tiered quality gates across compiler, unit tests, and terminal regression suites:
+
+| Quality Gate | Tool / Suite | Verification Invariant |
+|---|---|---|
+| **Strict Concurrency** | Swift 6 `-warnings-as-errors` | Zero concurrency, deprecation, or data-race warnings allowed on `KouenCore` and `KouenTerminalEngine`. |
+| **Pty & FIFO Ordering** | `TerminalHostViewTests` | Asserts terminal byte sequence arrives without packet reordering under bursty output. |
+| **Daemon & IPC Tests** | `DaemonClientTests` | Tests lock ownership, disconnect resilience, and 16 MiB payload boundaries. |
+| **Regression Invariants** | `Tests/robot/run.sh` | Mandatory Robot Framework test suite executed before every release build to assert terminal behavior invariants. |
+| **Theme Embedding Gate** | `ThemeCatalogEmbedTests` | Ensures `BundledThemesData.swift` stays binary-identical with `themes.json`. |
+
