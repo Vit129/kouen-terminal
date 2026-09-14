@@ -74,8 +74,6 @@ final class BlockTintOverlay: NSView {
             let rawEnd = collapsed ? startLine : (nextPrompt - 1)  // collapsed = only prompt row visible
             let vEnd   = min(rawEnd - topLine, visibleRows - 1)
             guard vStart < visibleRows, vEnd >= 0, vEnd >= vStart else {
-                // Block entirely off-screen — still draw triangle if prompt is visible
-                drawTriangle(row: startLine - topLine, rowH: rowH, collapsed: collapsed)
                 continue
             }
 
@@ -109,66 +107,17 @@ final class BlockTintOverlay: NSView {
                     label.draw(at: NSPoint(x: Self.collapseW + 4, y: coverY + 6), withAttributes: attrs)
                 }
             }
-
-            // Collapse triangle on prompt row
-            drawTriangle(row: vStart, rowH: rowH, collapsed: collapsed)
         }
     }
 
-    private func drawTriangle(row: Int, rowH: CGFloat, collapsed: Bool) {
-        guard row >= 0, row < visibleRows else { return }
-        let cy = CGFloat(row) * rowH + rowH / 2
-        let cx: CGFloat = 8
-        let path = NSBezierPath()
-        if collapsed {
-            // ▶ right-pointing
-            path.move(to: NSPoint(x: cx - 3, y: cy - 4))
-            path.line(to: NSPoint(x: cx + 4, y: cy))
-            path.line(to: NSPoint(x: cx - 3, y: cy + 4))
-        } else {
-            // ▼ down-pointing
-            path.move(to: NSPoint(x: cx - 4, y: cy - 2))
-            path.line(to: NSPoint(x: cx + 4, y: cy - 2))
-            path.line(to: NSPoint(x: cx, y: cy + 3))
-        }
-        path.close()
-        NSColor.white.withAlphaComponent(0.35).setFill()
-        path.fill()
-    }
-
-    // MARK: - Hit testing (pass-through except triangle gutter + action bar)
+    // MARK: - Hit testing (pass-through)
 
     override func hitTest(_ point: NSPoint) -> NSView? {
         for sub in subviews.reversed() {
             let local = sub.convert(point, from: self)
             if let hit = sub.hitTest(local) { return hit }
         }
-        guard visibleRows > 0 else { return nil }
-        let rowH = bounds.height / CGFloat(visibleRows)
-        for startLine in cachedPromptRows {
-            let vRow = startLine - topLine
-            guard vRow >= 0, vRow < visibleRows else { continue }
-            if NSRect(x: 0, y: CGFloat(vRow) * rowH, width: Self.collapseW, height: rowH).contains(point) {
-                return self
-            }
-        }
         return nil
-    }
-
-    override func mouseDown(with event: NSEvent) {
-        let pt = convert(event.locationInWindow, from: nil)
-        guard visibleRows > 0 else { return }
-        let rowH = bounds.height / CGFloat(visibleRows)
-        for startLine in cachedPromptRows {
-            let vRow = startLine - topLine
-            guard vRow >= 0, vRow < visibleRows else { continue }
-            if NSRect(x: 0, y: CGFloat(vRow) * rowH, width: Self.collapseW, height: rowH).contains(pt) {
-                if collapsedBlocks.contains(startLine) { collapsedBlocks.remove(startLine) }
-                else { collapsedBlocks.insert(startLine) }
-                needsDisplay = true
-                return
-            }
-        }
     }
 
 }
