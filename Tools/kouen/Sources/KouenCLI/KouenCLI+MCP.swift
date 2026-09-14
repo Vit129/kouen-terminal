@@ -14,12 +14,15 @@ extension KouenCLI {
         case "setup":   mcpSetup()
         case "status":  mcpStatus()
         case "remove":  mcpRemove()
+        case "serve":   mcpServe(Array(args.dropFirst(2)))
         default:
             fputs("""
             Usage: kouen-cli mcp <subcommand>
               setup   Write kouen-mcp into each agent's MCP config
               status  Show which agents have kouen configured
               remove  Remove kouen-mcp from all agent configs
+              serve   Launch kouen-mcp as a Remote HTTP/SSE server
+
             """, kouenStderr)
             exit(1)
         }
@@ -65,7 +68,8 @@ extension KouenCLI {
 
     private static func mcpStatus() {
         let binaryPath = resolveMCPBinaryPath() ?? "(not found)"
-        print("kouen-mcp: \(binaryPath)\n")
+        print("kouen-mcp: \(binaryPath)")
+        print("Remote SSE: http://0.0.0.0:8765/sse (run `kouen-cli mcp serve` to start)\n")
         print(String(repeating: "-", count: 50))
         print(col("Agent", 20) + col("Installed", 12) + "MCP")
         print(String(repeating: "-", count: 50))
@@ -76,6 +80,25 @@ extension KouenCLI {
         }
         print("")
         print("Note: Codex uses its plugin marketplace — mcpServers not supported in config.toml")
+    }
+
+    private static func mcpServe(_ extraArgs: [String]) {
+        guard let binaryPath = resolveMCPBinaryPath() else {
+            fputs(
+                "kouen-cli mcp serve: kouen-mcp binary not found.\n" +
+                "Run `make build` or install Kouen.app first.\n",
+                kouenStderr
+            )
+            exit(1)
+        }
+        var commandArgs = [binaryPath, "--http"]
+        commandArgs.append(contentsOf: extraArgs)
+
+        let cArgs = commandArgs.map { strdup($0) } + [nil]
+        execv(binaryPath, cArgs)
+
+        fputs("kouen-cli mcp serve: failed to exec \(binaryPath): \(String(cString: strerror(errno)))\n", kouenStderr)
+        exit(1)
     }
 
     private static func col(_ s: String, _ width: Int) -> String {

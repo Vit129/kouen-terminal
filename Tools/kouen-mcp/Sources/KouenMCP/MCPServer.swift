@@ -5,10 +5,18 @@ import KouenCore
 /// stdin/stdout so AI agents (Claude Code, Codex, Kiro) can use Kouen as a
 /// tool provider — reading files, running commands, querying git.
 actor MCPServer {
-    private let transport = StdioTransport()
-    private let tools = ToolRegistry()
+    private let tools: ToolRegistry
+
+    init(tools: ToolRegistry = ToolRegistry()) {
+        self.tools = tools
+    }
 
     func run() async {
+        await runStdio()
+    }
+
+    func runStdio() async {
+        let transport = StdioTransport()
         for await message in transport.incoming {
             let response = await handle(message)
             if let response {
@@ -17,7 +25,7 @@ actor MCPServer {
         }
     }
 
-    private func handle(_ message: JSONRPCMessage) async -> JSONRPCMessage? {
+    func handle(_ message: JSONRPCMessage) async -> JSONRPCMessage? {
         switch message {
         case let .request(id, method, params):
             let (result, error) = await dispatch(method: method, params: params)
