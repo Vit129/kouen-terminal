@@ -36,13 +36,15 @@ private final class CallRecorder: @unchecked Sendable {
     var harnessCalls: [(id: UUID, prompt: String, cwd: String)] { lock.lock(); defer { lock.unlock() }; return _harnessCalls }
     var surfaceCalls: [(surfaceID: String, text: String)] { lock.lock(); defer { lock.unlock() }; return _surfaceCalls }
     var closeCalls: [String] { lock.lock(); defer { lock.unlock() }; return _closeCalls }
+    var cancelCalls: [UUID] { lock.lock(); defer { lock.unlock() }; return _cancelCalls }
 }
 
 final class SwarmWorkerManagerTests: XCTestCase {
     private func makeManager(
         recorder: CallRecorder,
         surfaceID: String? = "fakeSurfaceID",
-        cancelResult: Bool = true
+        cancelResult: Bool = true,
+        harnessRunTimeout: Duration = .seconds(180)
     ) -> SwarmWorkerManager {
         SwarmWorkerManager(
             dagStore: SwarmDAGStore(),
@@ -59,7 +61,8 @@ final class SwarmWorkerManagerTests: XCTestCase {
             },
             getHarnessRun: { id in
                 recorder.harnessSummary(id)
-            }
+            },
+            harnessRunTimeout: harnessRunTimeout
         )
     }
 
@@ -201,5 +204,26 @@ final class SwarmWorkerManagerTests: XCTestCase {
         let updated = snapshot.nodes.first { $0.id == node.id }
         XCTAssertEqual(updated?.status, .succeeded)
         XCTAssertEqual(updated?.summary, "the answer")
+    }
+
+    /// Regression test for a real bug found live (2026-09-14): a real headless `copilot`
+    /// invocation hung indefinitely with no response (reproduced independently of Kouen,
+    /// an external-CLI flakiness issue) — a fleet node stayed `.working` forever with no way
+    /// to notice. `pollForCompletion` now has a hard wall-clock ceiling; verified here with a
+    /// tiny injected timeout instead of waiting on the real 180s default.
+    func testStructuredWorkerTimesOutAndCancelsWhenHarnessRunNeverCompletes() async {
+        let recorder = CallRecorder()
+        let manager = makeManager(recorder: recorder, cancelResult: true, harnessRunTimeout: .milliseconds(600))
+        let node = await manager.spawn(SwarmSpawnSpec(lane: .structured, agentKind: .claudeCode, cwd: "/tmp", initialCommand: "hello"))
+        // Stays `.running` forever from the fake harness's point of view — simulates the real hang.
+        recorder.setHarnessSummary(node.id, ClaudeCodeHarness.RunSummary(id: node.id, state: .running, cwd: "/tmp", startedAt: Date()))
+
+        try? await Task.sleep(for: .milliseconds(1600))
+
+        XCTAssertEqual(recorder.cancelCalls, [node.id])
+        let snapshot = await manager.snapshot()
+        let updated = snapshot.nodes.first { $0.id == node.id }
+        XCTAssertEqual(updated?.status, .failed)
+        XCTAssertTrue(updated?.summary?.contains("timed out") ?? false, "summary was: \(String(describing: updated?.summary))")
     }
 }

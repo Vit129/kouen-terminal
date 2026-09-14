@@ -34,6 +34,57 @@ final class HeadlessCLIAdapterTests: XCTestCase {
         }
     }
 
+    /// Real degraded/legacy envelope captured live (2026-09-14): an unrecoverable failure
+    /// (model requiring a newer Codex CLI than was installed) emits `{"id","msg":{...}}`
+    /// lines instead of `{"type":"item.completed","item":{...}}` — and Codex still exits 0
+    /// on this path, so this terminal error line is the ONLY signal that distinguishes a
+    /// real failure from success. See `CodexAdapter`'s doc comment for the full transcript.
+    func testCodexParsesLegacyTerminalErrorAsFailedResult() {
+        let adapter = CodexAdapter()
+        let line = """
+        {"id":"0","msg":{"type":"error","message":"unexpected status 400 Bad Request: {\\"detail\\":\\"The 'gpt-5.6-terra' model requires a newer version of Codex. Please upgrade to the latest app or CLI and try again.\\"}"}}
+        """
+        let events = adapter.parseLine(Data(line.utf8))
+        XCTAssertEqual(events.count, 1)
+        guard case let .result(text, costUSD, isError) = events.first else {
+            return XCTFail("expected a .result event, got \(events)")
+        }
+        XCTAssertTrue(isError)
+        XCTAssertNil(costUSD)
+        XCTAssertTrue(text?.contains("gpt-5.6-terra") ?? false)
+    }
+
+    /// Regression test for a real bug found live (2026-09-14) in the FIRST version of the
+    /// legacy-error fix: an empty-`id` error (a session-level notice not tied to any task,
+    /// e.g. an unrelated optional MCP tool failing to start) was being treated as terminal
+    /// too, flipping the run to `.failed` within the first second — long before the real
+    /// outcome (several retries later) was known, and with the wrong message. Must be ignored.
+    func testCodexIgnoresErrorWithEmptyTaskID() {
+        let adapter = CodexAdapter()
+        let line = """
+        {"id":"","msg":{"type":"error","message":"MCP client for `computer-use` failed to start: No such file or directory (os error 2)"}}
+        """
+        XCTAssertEqual(adapter.parseLine(Data(line.utf8)), [])
+    }
+
+    /// `stream_error` is a retry-in-progress notice, not a terminal failure — Codex retries
+    /// automatically and may still succeed, so this must NOT be reported as a `.result`.
+    func testCodexIgnoresNonTerminalStreamError() {
+        let adapter = CodexAdapter()
+        let line = """
+        {"id":"0","msg":{"type":"stream_error","message":"stream error: unexpected status 400 Bad Request; retrying 1/5 in 180ms…"}}
+        """
+        XCTAssertEqual(adapter.parseLine(Data(line.utf8)), [])
+    }
+
+    /// The legacy envelope's lifecycle lines (`task_started`, no top-level `type`/`item`)
+    /// must not accidentally match either decoder and produce a spurious event.
+    func testCodexIgnoresLegacyLifecycleLines() {
+        let adapter = CodexAdapter()
+        let line = #"{"id":"0","msg":{"type":"task_started","model_context_window":null}}"#
+        XCTAssertEqual(adapter.parseLine(Data(line.utf8)), [])
+    }
+
     func testCodexBuildArgumentsMapsProfileToSandboxMode() {
         let adapter = CodexAdapter()
         let readonly = adapter.buildArguments(
