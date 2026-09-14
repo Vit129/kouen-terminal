@@ -131,6 +131,9 @@ public final class DaemonServer: @unchecked Sendable {
             },
             cancelHarnessRun: { id in
                 await harness.cancel(id: id)
+            },
+            getHarnessRun: { id in
+                await harness.get(id: id)
             }
         )
 

@@ -329,12 +329,10 @@ struct SidebarFooterView: View {
             #if false
             FooterIconButton(symbol: "checklist", tooltip: "Tasks", chromeEpoch: epoch, action: onTasks)
             #endif
-            // Agent Swarm Core Slice 5: sketch-tier dashboard, off by default until the
-            // feature has real usage — same "keep the code, gate the entry point" precedent
-            // as the Tasks icon above (see design.md's Slice 5 framing).
-            #if false
+            // Agent Swarm Core Slice 5: flipped on 2026-09-14 for the first live-check pass
+            // (real daemon, real spawned agents, real scale test — see
+            // agent-memory/plans/agent-swarm-core/ai-sdlc-task-progress.md).
             FooterIconButton(symbol: "square.grid.3x3", tooltip: "Agent Fleet", chromeEpoch: epoch, action: onSwarmFleet)
-            #endif
             FooterIconButton(symbol: "sparkles", tooltip: "Agents", chromeEpoch: epoch, badgeCount: needsAttention, action: onAgents)
             RecentProjectsMenuButton(chromeEpoch: epoch, provider: recentProjectsProvider, onSelect: onOpenRecent)
             FooterIconButton(symbol: "plus", tooltip: "New session", chromeEpoch: epoch, action: onNewSession)

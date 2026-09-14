@@ -36,6 +36,13 @@ public actor SwarmWorkerManager {
     public typealias CloseSurface = @Sendable (_ surfaceID: String) -> Void
     public typealias StartHarnessRun = @Sendable (_ id: UUID, _ agentKind: AgentKind, _ prompt: String, _ cwd: String) async -> ClaudeCodeHarness.RunSummary
     public typealias CancelHarnessRun = @Sendable (_ id: UUID) async -> Bool
+    /// Polled after a Lane A spawn to sync the DAG node's status once the run actually
+    /// finishes — `startHarnessRun`/`ClaudeCodeHarness.start()` return as soon as the process
+    /// *launches*, not when it completes (that contract is shared with `kouenCCRun`/
+    /// `kouenCCStatus`'s own poll-based usage, so it can't change here). Without this, a fleet
+    /// node sits at `.working` forever even after the real subprocess exits — a real bug found
+    /// during this feature's first live-daemon check (2026-09-14), not a hypothetical.
+    public typealias GetHarnessRun = @Sendable (_ id: UUID) async -> ClaudeCodeHarness.RunSummary?
 
     private let dagStore: SwarmDAGStore
     private let createPTYSurface: CreatePTYSurface
@@ -43,6 +50,7 @@ public actor SwarmWorkerManager {
     private let closeSurface: CloseSurface
     private let startHarnessRun: StartHarnessRun
     private let cancelHarnessRun: CancelHarnessRun
+    private let getHarnessRun: GetHarnessRun
     /// Lane B only: which surface a task id is bound to. Lane A has no equivalent (its
     /// identity lives entirely in `ClaudeCodeHarness`'s own run table, keyed by the same id).
     private var surfaceByTask: [UUID: String] = [:]
@@ -53,7 +61,8 @@ public actor SwarmWorkerManager {
         sendToSurface: @escaping SendToSurface,
         closeSurface: @escaping CloseSurface,
         startHarnessRun: @escaping StartHarnessRun,
-        cancelHarnessRun: @escaping CancelHarnessRun
+        cancelHarnessRun: @escaping CancelHarnessRun,
+        getHarnessRun: @escaping GetHarnessRun
     ) {
         self.dagStore = dagStore
         self.createPTYSurface = createPTYSurface
@@ -61,6 +70,7 @@ public actor SwarmWorkerManager {
         self.closeSurface = closeSurface
         self.startHarnessRun = startHarnessRun
         self.cancelHarnessRun = cancelHarnessRun
+        self.getHarnessRun = getHarnessRun
     }
 
     /// Spawns a new fleet worker and records it in the DAG store. `id` is a fresh UUID
@@ -74,6 +84,7 @@ public actor SwarmWorkerManager {
             let node = SwarmTaskNode(id: id, lane: .structured, agentKind: spec.agentKind, role: spec.role, status: .working)
             await dagStore.recordSpawn(node)
             _ = await startHarnessRun(id, spec.agentKind, spec.initialCommand, spec.cwd ?? FileManager.default.currentDirectoryPath)
+            pollForCompletion(id)
             return node
         case .pty:
             guard let surfaceID = createPTYSurface(spec.cwd) else {
@@ -130,5 +141,32 @@ public actor SwarmWorkerManager {
 
     public func snapshot() async -> SwarmFleetSnapshot {
         await dagStore.snapshot()
+    }
+
+    /// Fire-and-forget: not `await`ed by `spawn()` (a 50-worker fleet spawning must return
+    /// each `spawn()` call quickly, not block on every worker's eventual completion). Detached
+    /// rather than structured under this actor because it must keep running after `spawn()`
+    /// returns and long outlives any single method call — same shape as
+    /// `RealPty`'s termination-handler `Task { await self?... }` hops elsewhere in this daemon,
+    /// just started explicitly instead of from a C callback.
+    private func pollForCompletion(_ id: UUID) {
+        let dagStore = dagStore
+        let getHarnessRun = getHarnessRun
+        Task.detached {
+            while true {
+                try? await Task.sleep(for: .milliseconds(500))
+                guard let summary = await getHarnessRun(id) else { return }
+                guard summary.state != .running else { continue }
+                let status: SwarmTaskStatus
+                switch summary.state {
+                case .succeeded: status = .succeeded
+                case .failed: status = .failed
+                case .cancelled: status = .cancelled
+                case .running: status = .working // unreachable, guarded above
+                }
+                await dagStore.updateStatus(id, status: status, summary: summary.resultText)
+                return
+            }
+        }
     }
 }
