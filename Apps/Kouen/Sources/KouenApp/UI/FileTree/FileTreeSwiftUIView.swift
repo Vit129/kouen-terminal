@@ -375,6 +375,10 @@ struct FileTreeSwiftUIView: View {
                 do {
                     try process.run()
                     process.waitUntilExit()
+                    guard process.terminationStatus == 0 else {
+                        continuation.resume(returning: nil)
+                        return
+                    }
                     let data = pipe.fileHandleForReading.readDataToEndOfFile()
                     let output = String(data: data, encoding: .utf8) ?? ""
                     let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -387,7 +391,12 @@ struct FileTreeSwiftUIView: View {
     }
 
     private func refreshGitBranch() {
-        gitBranch = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.gitBranch
+        Task {
+            let branch = await getCurrentBranch()
+            if gitBranch != branch {
+                gitBranch = branch
+            }
+        }
     }
 
     /// Build a flat ordered list of visible node paths for keyboard navigation.

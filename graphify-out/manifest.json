@@ -170,8 +170,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/Services/SessionCoordinator+HostDelegate.swift": {
-    "mtime": 1785510867.5047777,
-    "ast_hash": "f3d6d7876772f383ac6b8932394f667e",
+    "mtime": 1789353664.2341528,
+    "ast_hash": "d20fdb7de1bb194b44d77d52b4048d0c",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/Services/SessionCoordinator.swift": {
@@ -990,8 +990,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/KouenVersion.swift": {
-    "mtime": 1788916076.5622127,
-    "ast_hash": "633b9dc3fd77bade65496b6d4916ee1d",
+    "mtime": 1789354577.2838743,
+    "ast_hash": "31f7ae5064a65e8ce18f6027b5dc97c7",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Layouts/LayoutTemplate.swift": {
@@ -1080,8 +1080,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/GeneratedReleaseNotes.swift": {
-    "mtime": 1788916077.302899,
-    "ast_hash": "2e1760add39706757a0b1c265fdd6396",
+    "mtime": 1789354580.2104306,
+    "ast_hash": "1d33cb2a11d36ce3965ee08206a30175",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/ReleaseNotes.swift": {
@@ -3390,7 +3390,7 @@
     "semantic_hash": ""
   },
   "CLAUDE.md": {
-    "mtime": 1787120089.7431471,
+    "mtime": 1789351552.1118152,
     "ast_hash": "3c6ff30240591e701dce4721e07c0612",
     "semantic_hash": ""
   },
@@ -3715,7 +3715,7 @@
     "semantic_hash": ""
   },
   "GLOSSARY.md": {
-    "mtime": 1788183794.223328,
+    "mtime": 1789351552.1121786,
     "ast_hash": "9599ccf4647fca2dc893658139862cdb",
     "semantic_hash": ""
   },
@@ -4020,7 +4020,7 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/FileEditor/MarkdownPreviewView.swift": {
-    "mtime": 1788917798.2031026,
+    "mtime": 1789351552.108309,
     "ast_hash": "7ec18bcb1c68b8997c89d7492d4aa0e4",
     "semantic_hash": ""
   },
@@ -4045,7 +4045,7 @@
     "semantic_hash": ""
   },
   "Tests/KouenAppTests/MarkdownPreviewTests.swift": {
-    "mtime": 1788917812.539108,
+    "mtime": 1789351552.1132455,
     "ast_hash": "f0440f6006d6fca4a3b6013574ca535f",
     "semantic_hash": ""
   }
