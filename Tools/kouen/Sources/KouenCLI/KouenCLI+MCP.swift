@@ -69,7 +69,7 @@ extension KouenCLI {
     private static func mcpStatus() {
         let binaryPath = resolveMCPBinaryPath() ?? "(not found)"
         print("kouen-mcp: \(binaryPath)")
-        print("Remote SSE: http://0.0.0.0:8765/sse (run `kouen-cli mcp serve` to start)\n")
+        print("Remote SSE: http://127.0.0.1:8765/sse (loopback by default — run `kouen-cli mcp serve --host <tailscale-ip>` for remote access)\n")
         print(String(repeating: "-", count: 50))
         print(col("Agent", 20) + col("Installed", 12) + "MCP")
         print(String(repeating: "-", count: 50))
