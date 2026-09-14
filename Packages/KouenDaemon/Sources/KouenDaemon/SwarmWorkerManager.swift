@@ -51,6 +51,16 @@ public actor SwarmWorkerManager {
     private let startHarnessRun: StartHarnessRun
     private let cancelHarnessRun: CancelHarnessRun
     private let getHarnessRun: GetHarnessRun
+    /// Hard ceiling on a Lane A run's wall-clock time before it's treated as dead. Found
+    /// necessary live (2026-09-14): a real headless `copilot` invocation hung indefinitely
+    /// mid-run — reproduced 3× outside Kouen entirely (with/without `--session-id`,
+    /// with/without stdin redirected), so this is the external CLI's own flakiness, not a
+    /// Kouen bug — but a fleet has no way to notice or recover from it without a timeout
+    /// here. Generous on purpose (180s default): a real multi-tool agent turn can
+    /// legitimately run for minutes; this is a dead-process backstop, not a responsiveness
+    /// target. Injectable (not a hardcoded constant) so tests can verify the timeout path
+    /// itself without a real 180s wait.
+    private let harnessRunTimeout: Duration
     /// Lane B only: which surface a task id is bound to. Lane A has no equivalent (its
     /// identity lives entirely in `ClaudeCodeHarness`'s own run table, keyed by the same id).
     private var surfaceByTask: [UUID: String] = [:]
@@ -62,7 +72,8 @@ public actor SwarmWorkerManager {
         closeSurface: @escaping CloseSurface,
         startHarnessRun: @escaping StartHarnessRun,
         cancelHarnessRun: @escaping CancelHarnessRun,
-        getHarnessRun: @escaping GetHarnessRun
+        getHarnessRun: @escaping GetHarnessRun,
+        harnessRunTimeout: Duration = .seconds(180)
     ) {
         self.dagStore = dagStore
         self.createPTYSurface = createPTYSurface
@@ -71,6 +82,7 @@ public actor SwarmWorkerManager {
         self.startHarnessRun = startHarnessRun
         self.cancelHarnessRun = cancelHarnessRun
         self.getHarnessRun = getHarnessRun
+        self.harnessRunTimeout = harnessRunTimeout
     }
 
     /// Spawns a new fleet worker and records it in the DAG store. `id` is a fresh UUID
@@ -152,11 +164,25 @@ public actor SwarmWorkerManager {
     private func pollForCompletion(_ id: UUID) {
         let dagStore = dagStore
         let getHarnessRun = getHarnessRun
+        let cancelHarnessRun = cancelHarnessRun
+        let harnessRunTimeout = harnessRunTimeout
         Task.detached {
+            var elapsed: Duration = .zero
             while true {
                 try? await Task.sleep(for: .milliseconds(500))
+                elapsed += .milliseconds(500)
                 guard let summary = await getHarnessRun(id) else { return }
-                guard summary.state != .running else { continue }
+                if summary.state == .running {
+                    guard elapsed < harnessRunTimeout else {
+                        _ = await cancelHarnessRun(id)
+                        await dagStore.updateStatus(
+                            id, status: .failed,
+                            summary: "timed out after \(Int(harnessRunTimeout.components.seconds))s with no response"
+                        )
+                        return
+                    }
+                    continue
+                }
                 let status: SwarmTaskStatus
                 switch summary.state {
                 case .succeeded: status = .succeeded

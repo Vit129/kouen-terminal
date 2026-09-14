@@ -20,11 +20,28 @@ import KouenCore
 /// `resumeSessionID` is accepted but ignored, same scope boundary already established for
 /// Lane A follow-up turns generally.
 ///
-/// `turn.completed` carries no final-text/success field of its own — `parseLine` only ever
-/// emits `.assistantText` (from `agent_message` items) and never `.result`; success/failure and
-/// the final `resultText` both come from the engine's own exit-code/last-assistant-text
-/// fallbacks in `ClaudeCodeHarness.finish(id:exitCode:)`. No cost-in-USD is exposed by Codex,
-/// only token counts, so `totalCostUSD` stays nil for every Codex run.
+/// `turn.completed` carries no final-text/success field of its own on a normal run —
+/// `parseLine` emits `.assistantText` (from `agent_message` items) and lets the engine's
+/// exit-code/last-assistant-text fallback in `ClaudeCodeHarness.finish(id:exitCode:)` decide
+/// success/failure and fill `resultText`. No cost-in-USD is exposed by Codex, only token
+/// counts, so `totalCostUSD` stays nil for every Codex run.
+///
+/// **Legacy/degraded error shape (found live, 2026-09-14):** an unrecoverable failure (in the
+/// captured case, a model requiring a newer Codex CLI than was installed) emits an entirely
+/// different envelope — `{"id":"0","msg":{"type":"stream_error"|"error","message":"..."}}` —
+/// not `{"type":"item.completed","item":{...}}` at all. Worse, Codex still exits 0 on this
+/// path, so the exit-code fallback alone reported a false "succeeded" with no summary.
+///
+/// A first attempt at handling this shape treated ANY `msg.type == "error"` line as terminal
+/// — wrong, and caught live in the same session: a real transcript also had an *earlier*,
+/// non-fatal `{"id":"","msg":{"type":"error","message":"MCP client for `computer-use` failed
+/// to start..."}}` line (an unrelated optional tool being unavailable, not a task failure).
+/// Because `.result` flips `RunState` to `.failed` immediately on processing — not just at
+/// process exit — that early non-fatal error alone was enough to make the fleet report the
+/// run as failed (with the wrong message) within the first second, long before the real
+/// outcome was known. The fix: only an error line carrying a **non-empty task `id`** (tied to
+/// an actual turn — `"0"` in the real transcript, not `""`) is treated as terminal.
+/// `stream_error` (a retry-in-progress notice, not final either way) stays unhandled.
 public struct CodexAdapter: HeadlessCLIAdapter {
     public let agentKind: AgentKind = .codex
     public let binaryName: String = "codex"
@@ -64,11 +81,26 @@ public struct CodexAdapter: HeadlessCLIAdapter {
         var item: Item
     }
 
+    /// The degraded/legacy envelope — see the type's doc comment. `id` is the task/turn id
+    /// this event belongs to; empty for session-level notices not tied to any turn.
+    private struct LegacyMsgLine: Decodable {
+        struct Msg: Decodable { var type: String; var message: String? }
+        var id: String
+        var msg: Msg
+    }
+
     public func parseLine(_ lineData: Data) -> [HeadlessRunEvent] {
-        guard let line = try? JSONDecoder().decode(ItemCompletedLine.self, from: lineData),
-              line.type == "item.completed", line.item.type == "agent_message",
-              let text = line.item.text
-        else { return [] }
-        return [.assistantText(text)]
+        if let line = try? JSONDecoder().decode(ItemCompletedLine.self, from: lineData),
+           line.type == "item.completed", line.item.type == "agent_message",
+           let text = line.item.text
+        {
+            return [.assistantText(text)]
+        }
+        if let line = try? JSONDecoder().decode(LegacyMsgLine.self, from: lineData),
+           line.msg.type == "error", !line.id.isEmpty
+        {
+            return [.result(text: line.msg.message, costUSD: nil, isError: true)]
+        }
+        return []
     }
 }

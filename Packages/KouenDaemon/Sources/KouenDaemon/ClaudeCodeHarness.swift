@@ -45,6 +45,17 @@ public actor ClaudeCodeHarness {
         let process: Process
         let agentKind: AgentKind
         var stdoutBuffer = Data()
+        /// `readabilityHandler` (stdout draining) and `terminationHandler` (process exit) are
+        /// two independently-scheduled GCD callbacks with no ordering guarantee relative to
+        /// each other — a real race found live (2026-09-14, Agent Swarm Core Codex testing):
+        /// the process's very last stdout chunk (often the one that matters most — a terminal
+        /// error line) could still be mid-flight in its own `consume()` Task when
+        /// `terminationHandler`'s `finish()` Task won the race and ran first, silently locking
+        /// in a stale/earlier `resultText`. `finish()` now only actually runs once BOTH the
+        /// process has exited AND the stdout pipe has reached EOF (`stdoutDrained`) — see
+        /// `markProcessExited`/`markStdoutDrained`/`maybeFinish` below.
+        var exitCode: Int32?
+        var stdoutDrained = false
     }
 
     private let adapters: [AgentKind: any HeadlessCLIAdapter]
@@ -116,15 +127,21 @@ public actor ClaudeCodeHarness {
 
         stdoutPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let chunk = handle.availableData
-            guard !chunk.isEmpty else { return }
+            if chunk.isEmpty {
+                // EOF: the pipe is now fully drained, so every real chunk has already been
+                // handed to `consume()` above (GCD delivers a readabilityHandler's own
+                // callbacks in order). Only now is it safe to let `finish()` run.
+                handle.readabilityHandler = nil
+                Task { await self?.markStdoutDrained(id: id) }
+                return
+            }
             transcriptHandle?.write(chunk)
             Task { await self?.consume(chunk, forRun: id) }
         }
 
         process.terminationHandler = { [weak self] proc in
-            stdoutPipe.fileHandleForReading.readabilityHandler = nil
             try? transcriptHandle?.close()
-            Task { await self?.finish(id: id, exitCode: proc.terminationStatus) }
+            Task { await self?.markProcessExited(id: id, exitCode: proc.terminationStatus) }
         }
 
         do {
@@ -185,6 +202,27 @@ public actor ClaudeCodeHarness {
                 summary.state = isError ? .failed : .succeeded
             }
         }
+    }
+
+    private func markProcessExited(id: UUID, exitCode: Int32) {
+        guard runs[id] != nil else { return }
+        runs[id]!.exitCode = exitCode
+        maybeFinish(id: id)
+    }
+
+    private func markStdoutDrained(id: UUID) {
+        guard runs[id] != nil else { return }
+        runs[id]!.stdoutDrained = true
+        maybeFinish(id: id)
+    }
+
+    /// Runs `finish()` exactly once, only once both the process has exited and its stdout is
+    /// fully drained — see `Run.exitCode`/`stdoutDrained`'s doc comment for why both are
+    /// required. Whichever of `markProcessExited`/`markStdoutDrained` observes the run
+    /// already satisfying both is the one that actually triggers it; the other is a no-op.
+    private func maybeFinish(id: UUID) {
+        guard let run = runs[id], run.stdoutDrained, let exitCode = run.exitCode else { return }
+        finish(id: id, exitCode: exitCode)
     }
 
     private func finish(id: UUID, exitCode: Int32) {
