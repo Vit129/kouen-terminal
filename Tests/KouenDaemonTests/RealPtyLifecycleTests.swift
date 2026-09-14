@@ -280,4 +280,58 @@ final class RealPtyLifecycleTests: XCTestCase {
         }
         XCTAssertEqual(group.wait(timeout: .now() + 8), .success)
     }
+
+    /// Agent Swarm Core Slice 3: OSC 26 is only parsed client-side today
+    /// (`TerminalEmulator.handleAgentStatus`, driving the GUI's approval-bar UI) — a headless
+    /// surface has no GUI to run that parse in. This proves the daemon-side scan added to
+    /// `RealPty.handleOutput` updates `AgentDetector`'s daemon-process copy on its own, with
+    /// nothing subscribed and no GUI in the picture.
+    func testOSC26AgentStatusUpdatesAgentDetectorWithoutAnyGUIAttachment() throws {
+        let pty = try makePty()
+        defer {
+            pty.close()
+            AgentDetector.unregisterRootPID(forSurfaceKey: pty.id)
+        }
+
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.2) {
+            pty.write("printf '\\033]26;identity=claude-code;status=working\\007'\n")
+        }
+
+        let deadline = Date().addingTimeInterval(8)
+        var snapshot: AgentSnapshot?
+        while Date() < deadline {
+            snapshot = AgentDetector.snapshot(forSurfaceKey: pty.id)
+            if snapshot?.activity == .working { break }
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+        XCTAssertEqual(snapshot?.activity, .working)
+        XCTAssertEqual(snapshot?.kind, .claudeCode)
+    }
+
+    /// A sequence split across two separate PTY read chunks must still be detected — the
+    /// scan buffer has to survive across `handleOutput` calls, not just within one. One shell
+    /// command with a `sleep` between its two `printf`s (rather than two separate commands)
+    /// keeps everything else about the byte stream identical apart from the read-timing gap —
+    /// no intervening echo/prompt noise to corrupt the payload.
+    func testOSC26AgentStatusSplitAcrossWritesIsStillDetected() throws {
+        let pty = try makePty()
+        defer {
+            pty.close()
+            AgentDetector.unregisterRootPID(forSurfaceKey: pty.id)
+        }
+
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.2) {
+            pty.write("printf '\\033]26;identity=codex;stat'; sleep 0.3; printf 'us=awaiting\\007'\n")
+        }
+
+        let deadline = Date().addingTimeInterval(8)
+        var snapshot: AgentSnapshot?
+        while Date() < deadline {
+            snapshot = AgentDetector.snapshot(forSurfaceKey: pty.id)
+            if snapshot?.activity == .awaiting { break }
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+        XCTAssertEqual(snapshot?.activity, .awaiting)
+        XCTAssertEqual(snapshot?.kind, .codex)
+    }
 }

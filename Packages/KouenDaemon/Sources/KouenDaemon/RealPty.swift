@@ -102,6 +102,12 @@ public final class RealPty: @unchecked Sendable {
     private var readBuffer = [UInt8](repeating: 0, count: 64 * 1024)
     /// `readQueue`-confined throttle for `AgentDetector.recordActivity` (see `handleOutput`).
     private var lastActivityRecordUptime: UInt64 = 0
+    /// `readQueue`-confined accumulator for the OSC 26 byte-scan (see `scanForAgentStatusOSC`).
+    /// Capped at `oscScanBufferCap` — an OSC 26 payload is always short, so anything beyond
+    /// the cap with no complete sequence is ordinary output, not a stalled escape sequence.
+    private var oscScanBuffer = Data()
+    private static let oscScanBufferCap = 4096
+    private static let oscAgentStatusMarker = Data("\u{1b}]26;".utf8)
     /// Subscriber fan-out runs here, NOT on `readQueue`: a slow or misbehaving subscriber handler
     /// must not stall PTY reads (which would back-pressure the shell and every other subscriber of
     /// this surface). Output is enqueued in read order onto this *serial* queue, so each subscriber
@@ -1144,6 +1150,7 @@ public final class RealPty: @unchecked Sendable {
             lastActivityRecordUptime = nowUptime
             AgentDetector.recordActivity(forSurfaceKey: id)
         }
+        scanForAgentStatusOSC(data)
         onOutput?(data)
 
         // Fan out on the delivery queue (off the read loop). `data`/`sequence` are values; capture
@@ -1162,6 +1169,83 @@ public final class RealPty: @unchecked Sendable {
             self.subscribersLock.unlock()
             for handler in handlers { handler(data, sequence) }
         }
+    }
+
+    /// Detects Kouen's OSC 26 agent-status sequence (`ESC ] 26 ; <payload> (BEL|ESC \)`)
+    /// directly in the daemon, independent of any GUI attachment. Today this sequence is only
+    /// parsed client-side (`TerminalEmulator.handleAgentStatus`, driving the GUI's own
+    /// approval-bar UI) — a headless/ghost surface (Agent Swarm Core, `.createSurface` with no
+    /// Workspace/Tab) has no `TerminalHostView` to run that parse in, so without this the
+    /// daemon's own `AgentDetector` state (what `.listAgents`/fleet tooling reads) would never
+    /// reflect an OSC-26-reported status for a headless worker. `readQueue`-confined, like
+    /// `handleOutput` itself.
+    ///
+    /// Only `identity`/`status` are applied here. The payload's `task_id`/`summary` fields
+    /// (see `agent-memory/plans/agent-swarm-core/design.md`) are intentionally NOT parsed yet:
+    /// there is no `SwarmWorkerManager` binding a task_id to this surface until a later slice,
+    /// so validating a `task_id` here would be dead security theater with nothing real to check
+    /// against. Add that once the binding exists — don't trust a bare `task_id` from a worker's
+    /// own stdout as authoritative even then (see the design doc's Lane B security rules).
+    private func scanForAgentStatusOSC(_ chunk: Data) {
+        oscScanBuffer.append(chunk)
+        if oscScanBuffer.count > Self.oscScanBufferCap {
+            oscScanBuffer.removeFirst(oscScanBuffer.count - Self.oscScanBufferCap)
+        }
+        while let markerRange = oscScanBuffer.range(of: Self.oscAgentStatusMarker) {
+            guard let terminatorIndex = Self.findOSCTerminator(in: oscScanBuffer, from: markerRange.upperBound) else {
+                // Incomplete sequence (split across PTY read chunks) — drop everything before
+                // the marker (already scanned) and wait for more bytes.
+                oscScanBuffer.removeSubrange(oscScanBuffer.startIndex..<markerRange.lowerBound)
+                return
+            }
+            let payload = oscScanBuffer.subdata(in: markerRange.upperBound..<terminatorIndex.payloadEnd)
+            if let payloadString = String(data: payload, encoding: .utf8) {
+                applyAgentStatusPayload(payloadString)
+            }
+            oscScanBuffer.removeSubrange(oscScanBuffer.startIndex..<terminatorIndex.consumedEnd)
+        }
+    }
+
+    private struct OSCTerminatorMatch { let payloadEnd: Data.Index; let consumedEnd: Data.Index }
+
+    /// Finds the end of an OSC sequence starting at `start`: `BEL` (0x07) or `ESC \` (0x1b 0x5c).
+    private static func findOSCTerminator(in buffer: Data, from start: Data.Index) -> OSCTerminatorMatch? {
+        var i = start
+        while i < buffer.endIndex {
+            if buffer[i] == 0x07 {
+                return OSCTerminatorMatch(payloadEnd: i, consumedEnd: buffer.index(after: i))
+            }
+            let next = buffer.index(after: i)
+            if buffer[i] == 0x1b, next < buffer.endIndex, buffer[next] == 0x5c {
+                return OSCTerminatorMatch(payloadEnd: i, consumedEnd: buffer.index(after: next))
+            }
+            i = next
+        }
+        return nil
+    }
+
+    /// Same `identity=<kind>;status=<activity>` grammar as `TerminalEmulator.handleAgentStatus`
+    /// (the GUI-side parser) — kept as an independent implementation rather than shared code
+    /// because this one runs on raw pre-emulation `Data` and writes straight into this daemon
+    /// process's own `AgentDetector` copy, whereas the GUI's parse only drives its own local
+    /// approval-bar UI in a separate process (see `AgentDetector`'s doc comment on why the two
+    /// processes each hold an independent copy of that static state).
+    private func applyAgentStatusPayload(_ payload: String) {
+        var identityRaw: String?
+        var status: String?
+        for pair in payload.split(separator: ";") {
+            let kv = pair.split(separator: "=", maxSplits: 1).map(String.init)
+            guard kv.count == 2 else { continue }
+            switch kv[0] {
+            case "identity": identityRaw = kv[1]
+            case "status": status = kv[1]
+            default: break
+            }
+        }
+        guard let status else { return }
+        let resolvedActivity = AgentActivity(rawValue: status == "waiting_input" ? "awaiting" : status) ?? .idle
+        let kind = identityRaw.flatMap { AgentKind(rawValue: $0) }
+        AgentDetector.setActivity(resolvedActivity, kind: kind, forSurfaceKey: id)
     }
 
     private func watchForExit(pid: pid_t, generation gen: UInt64) {

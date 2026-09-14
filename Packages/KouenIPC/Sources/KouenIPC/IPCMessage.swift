@@ -49,7 +49,12 @@ import Foundation
 /// the Agent Notch show Reply/Deny/Allow approval controls after every ordinary turn, not just
 /// real permission prompts. Same functional-addition rule as M2/M5/M10 above — bump so
 /// `install-graceful.sh` restarts into a daemon binary that actually has the new handler.
-public let ipcProtocolVersion: Int = 9
+///
+/// Bumped 2026-09-14: added `.swarmSpawn`/`.swarmSend`/`.swarmTerminate`/`.swarmList` to
+/// `IPCRequest` and `.swarmTaskNode`/`.swarmFleetSnapshot`/`.swarmActionResult` to
+/// `IPCResponse` for Agent Swarm Core's `SwarmWorkerManager` (fleet spawn/send/terminate,
+/// `kouenSwarm*` MCP tools). Same functional-addition rule as M2/M5/M10 above.
+public let ipcProtocolVersion: Int = 10
 
 public enum IPCRequest: Codable, Sendable {
     case ping
@@ -329,6 +334,18 @@ public enum IPCRequest: Codable, Sendable {
     case ccRunList
     case ccRunCancel(id: UUID)
 
+    /// Agent Swarm Core (P44 follow-on): spawns a fleet worker on either lane — `.structured`
+    /// (`ClaudeCodeHarness`, `initialCommand` is the actual prompt) or `.pty` (a headless
+    /// `RealPty` surface via `.createSurface`, `initialCommand` is the shell command that
+    /// launches the agent CLI, e.g. `"codex\n"`). `lane`/`agentKindRaw` cross the wire as raw
+    /// strings — see `SwarmTaskNodeWire`'s doc comment for why.
+    case swarmSpawn(lane: String, agentKindRaw: String, cwd: String?, initialCommand: String, role: String?)
+    /// Types `text` into a Lane B worker's surface. No-op (returns `false`) for a Lane A id —
+    /// see `SwarmWorkerManager.send`'s doc comment.
+    case swarmSend(taskID: UUID, text: String)
+    case swarmTerminate(taskID: UUID)
+    case swarmList
+
     /// Forces an immediate, synchronous `layout.json` write (bypasses the normal 0.5s
     /// debounce). `install-graceful.sh`'s protocol-changed restart path sends this and waits
     /// for `.ok` before killing the daemon, instead of a blind `sleep` racing the debounce —
@@ -517,6 +534,13 @@ public enum IPCResponse: Codable, Sendable {
     // Claude Code Harness (M10)
     case ccRunInfo(ClaudeRunSummary?)
     case ccRuns([ClaudeRunSummary])
+
+    // Agent Swarm Core
+    case swarmTaskNode(SwarmTaskNodeWire)
+    case swarmFleetSnapshot(SwarmFleetSnapshotWire)
+    /// Result of `.swarmSend`/`.swarmTerminate` — both return a plain success/failure bool
+    /// (see `SwarmWorkerManager.send`/`.terminate`'s doc comments for what `false` means).
+    case swarmActionResult(Bool)
 }
 
 public struct OptionEntry: Codable, Sendable, Equatable {

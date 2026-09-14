@@ -343,6 +343,8 @@ final class KouenSidebarPanelViewController: NSViewController {
 
     private var taskDashboard: TaskDashboardView?
     private nonisolated(unsafe) var taskDashboardMonitor: Any?
+    private var swarmFleetDashboard: SwarmFleetView?
+    private nonisolated(unsafe) var swarmFleetDashboardMonitor: Any?
 
     /// P40 F1-H: float the Task Dashboard over the window's content view, same
     /// anchor-above-footer presentation as `showAgentsInbox`.
@@ -386,6 +388,55 @@ final class KouenSidebarPanelViewController: NSViewController {
         if let monitor = taskDashboardMonitor {
             NSEvent.removeMonitor(monitor)
             taskDashboardMonitor = nil
+        }
+    }
+
+    /// Agent Swarm Core Slice 5: same anchor-above-footer float as `showTaskDashboard`.
+    private func showSwarmFleet() {
+        if swarmFleetDashboard != nil {
+            dismissSwarmFleet()
+            return
+        }
+        let dashboard = SwarmFleetView()
+        dashboard.alphaValue = 0
+        dashboard.translatesAutoresizingMaskIntoConstraints = true
+        dashboard.layer?.zPosition = 100
+
+        let host = view.window?.contentView ?? view
+        let width: CGFloat = 320
+        let height = dashboard.preferredHeight
+        let footerInHost = host.convert(footerHostingView.bounds, from: footerHostingView)
+        let originX: CGFloat = 8
+        let originY = footerInHost.maxY + 6
+        dashboard.frame = NSRect(x: originX, y: originY, width: width, height: height)
+        host.addSubview(dashboard)
+        swarmFleetDashboard = dashboard
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.12
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            dashboard.animator().alphaValue = 1
+        }
+        installSwarmFleetMonitor()
+    }
+
+    private func dismissSwarmFleet() {
+        swarmFleetDashboard?.removeFromSuperview()
+        swarmFleetDashboard = nil
+        if let monitor = swarmFleetDashboardMonitor {
+            NSEvent.removeMonitor(monitor)
+            swarmFleetDashboardMonitor = nil
+        }
+    }
+
+    private func installSwarmFleetMonitor() {
+        swarmFleetDashboardMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            guard let self, let dashboard = self.swarmFleetDashboard else { return event }
+            let dashboardPoint = dashboard.convert(event.locationInWindow, from: nil)
+            if dashboard.bounds.contains(dashboardPoint) { return event }
+            let footerPoint = self.footerHostingView.convert(event.locationInWindow, from: nil)
+            if self.footerHostingView.bounds.contains(footerPoint) { return event }
+            self.dismissSwarmFleet()
+            return event
         }
     }
 
@@ -703,6 +754,7 @@ final class KouenSidebarPanelViewController: NSViewController {
             onSettings: { [weak self] in self?.openSettings() },
             onAgents: { [weak self] in self?.showAgentsInbox() },
             onTasks: { [weak self] in self?.showTaskDashboard() },
+            onSwarmFleet: { [weak self] in self?.showSwarmFleet() },
             onOpenRecent: { [weak self] path in self?.openRecentPath(path) },
             onNewSession: { [weak self] in self?.addSession() },
             onPalette: { [weak self] in self?.openPalette() },

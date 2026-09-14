@@ -290,6 +290,8 @@ public final class SurfaceRegistry: @unchecked Sendable {
             return .ok // intercepted at connection layer; never reaches here
         case .ccRunStart, .ccRunGet, .ccRunList, .ccRunCancel:
             return .ok // intercepted at connection layer; never reaches here
+        case .swarmSpawn, .swarmSend, .swarmTerminate, .swarmList:
+            return .ok // intercepted at connection layer; never reaches here
         case .ping:
             return .pong
         case .listWorkspaces:
