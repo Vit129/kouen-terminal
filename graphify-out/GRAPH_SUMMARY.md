@@ -3,13 +3,13 @@ _Auto-generated from GRAPH_REPORT.md · do not edit manually_
 _Regen: `graphify update .`_
 
 ## Summary
-- 19191 nodes · 50818 edges · 2172 communities (577 shown, 1595 thin omitted)
-- Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 7494 edges (avg confidence: 0.73)
+- 19426 nodes · 51589 edges · 2197 communities (610 shown, 1587 thin omitted)
+- Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 7610 edges (avg confidence: 0.73)
 - Token cost: 0 input · 0 output
 
 
 ## Graph Freshness
-- Built from commit: `a06a9e3f`
+- Built from commit: `991f37a7`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -23,7 +23,7 @@ _Regen: `graphify update .`_
 6. `TerminalEmulator` - 229 edges
 7. `u()` - 219 edges
 8. `SurfaceRegistry` - 200 edges
-9. `IPCRequest` - 193 edges
+9. `IPCRequest` - 197 edges
 10. `SessionEditor` - 180 edges
 
 
@@ -32,15 +32,15 @@ A high-degree node isn't always architecturally central - a widely-used
 utility/config file can rack up more edges than a real coupler while only
 ever touching one area. This ranks by how many DIFFERENT communities a
 node's neighbors span, not by raw edge count.
-1. `KouenPaths` - bridges 56 areas (135 edges)
-2. `SessionCoordinator` - bridges 53 areas (231 edges)
-3. `Process` - bridges 41 areas (89 edges)
-4. `AgentKind` - bridges 39 areas (112 edges)
-5. `SurfaceRegistry` - bridges 36 areas (200 edges)
-6. `SessionSnapshot` - bridges 36 areas (167 edges)
-7. `MenuTarget` - bridges 35 areas (68 edges)
-8. `Notification` - bridges 35 areas (63 edges)
-9. `KouenTerminalSurfaceView` - bridges 33 areas (343 edges)
+1. `KouenPaths` - bridges 58 areas (135 edges)
+2. `SessionCoordinator` - bridges 55 areas (231 edges)
+3. `AgentKind` - bridges 51 areas (129 edges)
+4. `Process` - bridges 42 areas (89 edges)
+5. `SessionSnapshot` - bridges 41 areas (167 edges)
+6. `SurfaceRegistry` - bridges 38 areas (200 edges)
+7. `Notification` - bridges 37 areas (63 edges)
+8. `KouenTerminalSurfaceView` - bridges 35 areas (343 edges)
+9. `t()` - bridges 35 areas (253 edges)
 
 ## Surprising Connections (you probably didn't know these)
 - `.selectedHost` --references--> `RemoteHost`  [INFERRED]
