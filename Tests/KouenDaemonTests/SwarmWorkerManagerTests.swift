@@ -10,9 +10,18 @@ private final class CallRecorder: @unchecked Sendable {
     private var _surfaceCalls: [(surfaceID: String, text: String)] = []
     private var _closeCalls: [String] = []
     private var _cancelCalls: [UUID] = []
+    private var _harnessSummaries: [UUID: ClaudeCodeHarness.RunSummary] = [:]
 
     func recordHarness(id: UUID, prompt: String, cwd: String) {
         lock.lock(); _harnessCalls.append((id, prompt, cwd)); lock.unlock()
+    }
+    /// Lets a test control what `getHarnessRun(id)` reports, to exercise
+    /// `SwarmWorkerManager`'s completion-poll loop deterministically.
+    func setHarnessSummary(_ id: UUID, _ summary: ClaudeCodeHarness.RunSummary) {
+        lock.lock(); _harnessSummaries[id] = summary; lock.unlock()
+    }
+    func harnessSummary(_ id: UUID) -> ClaudeCodeHarness.RunSummary? {
+        lock.lock(); defer { lock.unlock() }; return _harnessSummaries[id]
     }
     func recordSurface(_ surfaceID: String, _ text: String) {
         lock.lock(); _surfaceCalls.append((surfaceID, text)); lock.unlock()
@@ -47,6 +56,9 @@ final class SwarmWorkerManagerTests: XCTestCase {
             cancelHarnessRun: { id in
                 recorder.recordCancel(id)
                 return cancelResult
+            },
+            getHarnessRun: { id in
+                recorder.harnessSummary(id)
             }
         )
     }
@@ -166,5 +178,28 @@ final class SwarmWorkerManagerTests: XCTestCase {
         let manager = makeManager(recorder: recorder, cancelResult: false)
         let result = await manager.terminate(taskID: UUID())
         XCTAssertFalse(result)
+    }
+
+    /// Regression test for a real bug found during this feature's first live-daemon check
+    /// (2026-09-14): a Lane A node sat at `.working` forever because nothing ever synced the
+    /// DAG store once the underlying harness run actually finished. `spawn()` fires a
+    /// background poll (`pollForCompletion`) that must pick up a terminal state and write it
+    /// (plus the run's `resultText`) back into the snapshot.
+    func testStructuredWorkerSyncsToSucceededOnceHarnessRunCompletes() async {
+        let recorder = CallRecorder()
+        let manager = makeManager(recorder: recorder)
+        let node = await manager.spawn(SwarmSpawnSpec(lane: .structured, agentKind: .claudeCode, cwd: "/tmp", initialCommand: "hello"))
+        recorder.setHarnessSummary(node.id, ClaudeCodeHarness.RunSummary(
+            id: node.id, state: .succeeded, cwd: "/tmp", startedAt: Date(), resultText: "the answer"
+        ))
+
+        // The poll loop ticks every 500ms; give it two ticks of headroom rather than pinning
+        // to the exact interval.
+        try? await Task.sleep(for: .milliseconds(1100))
+
+        let snapshot = await manager.snapshot()
+        let updated = snapshot.nodes.first { $0.id == node.id }
+        XCTAssertEqual(updated?.status, .succeeded)
+        XCTAssertEqual(updated?.summary, "the answer")
     }
 }

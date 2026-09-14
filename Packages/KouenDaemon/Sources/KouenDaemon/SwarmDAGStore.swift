@@ -27,11 +27,14 @@ public actor SwarmDAGStore {
         generation += 1
     }
 
-    /// No-op if `id` isn't a known node.
-    public func updateStatus(_ id: UUID, status: SwarmTaskStatus, tokens: Int? = nil) {
+    /// No-op if `id` isn't a known node. `summary` (added for Lane A completion sync — see
+    /// `SwarmWorkerManager`'s harness-completion poll) overwrites the node's existing summary
+    /// only when non-nil, same "don't clobber with absence" rule `recordEdge` already uses.
+    public func updateStatus(_ id: UUID, status: SwarmTaskStatus, tokens: Int? = nil, summary: String? = nil) {
         guard var node = nodes[id] else { return }
         node.status = status
         if let tokens { node.tokens = tokens }
+        if let summary { node.summary = summary }
         node.lastActivityAt = Date()
         nodes[id] = node
         generation += 1
