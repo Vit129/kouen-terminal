@@ -485,8 +485,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/FileTree/FileTreeSwiftUIView.swift": {
-    "mtime": 1788427082.4264753,
-    "ast_hash": "774067491192e847f8170ef22bc0e4a1",
+    "mtime": 1789355977.1586027,
+    "ast_hash": "52f238995764c33b24e5edc5bc8aa788",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/FileTree/WorkspaceFileTreeView.swift": {
@@ -585,8 +585,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Shared/BlockTintOverlay.swift": {
-    "mtime": 1785510867.5308254,
-    "ast_hash": "66a96fa4fd4828deb980739c5f258078",
+    "mtime": 1789355061.4653776,
+    "ast_hash": "6e31bd4b1966592591a8ed8133eae6ed",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Shared/ComposerPanel.swift": {
@@ -990,8 +990,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/KouenVersion.swift": {
-    "mtime": 1789354577.2838743,
-    "ast_hash": "31f7ae5064a65e8ce18f6027b5dc97c7",
+    "mtime": 1789356399.27309,
+    "ast_hash": "86fc76fa80ae259aa176154541161c6d",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Layouts/LayoutTemplate.swift": {
@@ -1080,8 +1080,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/GeneratedReleaseNotes.swift": {
-    "mtime": 1789354580.2104306,
-    "ast_hash": "1d33cb2a11d36ce3965ee08206a30175",
+    "mtime": 1789356400.4569912,
+    "ast_hash": "cad7d5c0b9d0bc621f7ffbb8639fdd7d",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/ReleaseNotes.swift": {
