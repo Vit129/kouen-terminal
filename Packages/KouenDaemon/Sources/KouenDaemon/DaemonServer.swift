@@ -14,6 +14,12 @@ public final class DaemonServer: @unchecked Sendable {
     /// automation runs. Dispatched directly (see `.ccRunStart` etc. in `handle`), off the
     /// `registry` lock — same reasoning as `handleWaitFor`, its work is genuinely async.
     public let claudeCodeHarness = ClaudeCodeHarness()
+    /// Agent Swarm Core: shared fleet DAG both worker lanes report into.
+    public let swarmDAGStore = SwarmDAGStore()
+    /// Agent Swarm Core: fleet spawn/send/terminate, dispatched via `.swarm*` (see `handle`).
+    /// Wired in `init` (not a property initializer) because its closures need `registry`/
+    /// `claudeCodeHarness`, which must already exist.
+    public let swarmWorkerManager: SwarmWorkerManager
     /// P25 F3: paired mobile-device table, shared with `MobileBridgeServer` by whichever
     /// caller starts it (`KouenDaemonMain/main.swift`) so IPC (`mobile list-clients`/
     /// `mobile revoke`) and the WS bridge see the same devices.
@@ -100,6 +106,34 @@ public final class DaemonServer: @unchecked Sendable {
     /// test registry should emit into freshly spawned PTYs.
     public init(enableVersionBanner: Bool = false) {
         registry = SurfaceRegistry(enableVersionBanner: enableVersionBanner)
+
+        // Built before `registry.onSnapshotCommitted` below: that closure captures `self`
+        // (even weakly), which a class initializer cannot allow until every stored property —
+        // `swarmWorkerManager` included — already has a value. Local aliases (not
+        // `self.registry`/`self.claudeCodeHarness`) so these particular closures don't need to
+        // capture `self` at all — both are reference types, so the alias is the same instance.
+        let registryRef = registry
+        let harness = claudeCodeHarness
+        swarmWorkerManager = SwarmWorkerManager(
+            dagStore: swarmDAGStore,
+            createPTYSurface: { cwd in
+                guard case let .surfaceID(surfaceID) = registryRef.handle(.createSurface(cwd: cwd, shell: nil)) else { return nil }
+                return surfaceID
+            },
+            sendToSurface: { surfaceID, text in
+                _ = registryRef.handle(.send(surfaceID: surfaceID, text: text))
+            },
+            closeSurface: { surfaceID in
+                _ = registryRef.handle(.closeSurface(surfaceID: surfaceID))
+            },
+            startHarnessRun: { id, agentKind, prompt, cwd in
+                await harness.start(id: id, agentKind: agentKind, prompt: prompt, cwd: cwd, profile: .edit, model: nil, effort: nil, resumeSessionID: nil)
+            },
+            cancelHarnessRun: { id in
+                await harness.cancel(id: id)
+            }
+        )
+
         // Push layout changes to snapshot subscribers (the attach-window compositor),
         // replacing its old 0.5s poll. Hop onto the serial queue for FD-safe sends.
         registry.onSnapshotCommitted = { [weak self] revision in
@@ -511,6 +545,39 @@ public final class DaemonServer: @unchecked Sendable {
                     self.queue.async { self.send(cancelled ? .ok : .error("run not found or already finished"), to: fd) }
                 }
                 continue
+            case let .swarmSpawn(lane, agentKindRaw, cwd, initialCommand, role):
+                Task { [weak self] in
+                    guard let self else { return }
+                    let resolvedLane: SwarmLane = lane == "pty" ? .pty : .structured
+                    let agentKind = AgentKind(rawValue: agentKindRaw) ?? .generic
+                    let node = await self.swarmWorkerManager.spawn(SwarmSpawnSpec(
+                        lane: resolvedLane, agentKind: agentKind, cwd: cwd,
+                        initialCommand: initialCommand, role: role
+                    ))
+                    self.queue.async { self.send(.swarmTaskNode(DaemonServer.wireSwarmNode(node)), to: fd) }
+                }
+                continue
+            case let .swarmSend(taskID, text):
+                Task { [weak self] in
+                    guard let self else { return }
+                    let result = await self.swarmWorkerManager.send(taskID: taskID, text: text)
+                    self.queue.async { self.send(.swarmActionResult(result), to: fd) }
+                }
+                continue
+            case let .swarmTerminate(taskID):
+                Task { [weak self] in
+                    guard let self else { return }
+                    let result = await self.swarmWorkerManager.terminate(taskID: taskID)
+                    self.queue.async { self.send(.swarmActionResult(result), to: fd) }
+                }
+                continue
+            case .swarmList:
+                Task { [weak self] in
+                    guard let self else { return }
+                    let snapshot = await self.swarmWorkerManager.snapshot()
+                    self.queue.async { self.send(.swarmFleetSnapshot(DaemonServer.wireSwarmSnapshot(snapshot)), to: fd) }
+                }
+                continue
             default:
                 break
             }
@@ -616,6 +683,20 @@ public final class DaemonServer: @unchecked Sendable {
             lastAssistantText: summary.lastAssistantText, resultText: summary.resultText,
             totalCostUSD: summary.totalCostUSD, exitCode: summary.exitCode
         )
+    }
+
+    /// Same cross-module conversion reason as `wireSummary` above.
+    private static func wireSwarmNode(_ node: SwarmTaskNode) -> SwarmTaskNodeWire {
+        SwarmTaskNodeWire(
+            id: node.id, parentID: node.parentID, lane: node.lane.rawValue, agentKind: node.agentKind,
+            role: node.role, status: node.status.rawValue, summary: node.summary, tokens: node.tokens,
+            totalCostUSD: node.totalCostUSD, worktreePath: node.worktreePath, surfaceID: node.surfaceID,
+            startedAt: node.startedAt, lastActivityAt: node.lastActivityAt
+        )
+    }
+
+    private static func wireSwarmSnapshot(_ snapshot: SwarmFleetSnapshot) -> SwarmFleetSnapshotWire {
+        SwarmFleetSnapshotWire(nodes: snapshot.nodes.map(wireSwarmNode), generation: snapshot.generation)
     }
 
     private enum WriteOutcome { case complete, wouldBlock, failed }

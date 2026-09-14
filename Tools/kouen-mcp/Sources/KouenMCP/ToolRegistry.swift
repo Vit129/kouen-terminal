@@ -195,6 +195,15 @@ struct ToolRegistry: Sendable {
                 param("parentRepoPath", "string", "The worktree's parent repo path (optional, paired with worktreePath)"),
                 param("taskName", "string", "Display-name override for the tab, e.g. the Task title it's working on (optional)"),
                 param("prompt", "string", "The prompt to type into the agent once it's ready"),
+                param("headless", "boolean", "Agent Swarm Core: spawn with no Tab/Pane instead of a visible session (optional, default false). Supported headless agents: 'claude', 'codex', 'antigravity', 'copilot' — see kouenSwarmList/Input/Terminate for managing headless workers"),
+            ]),
+            toolDef("kouenSwarmList", "List Agent Swarm Core fleet workers (both headless-Claude and pty-backed lanes) and their status", []),
+            toolDef("kouenSwarmInput", "Type text into a headless Lane B (pty-backed) fleet worker's surface. No effect on a Lane A (structured/claude) worker — see tool description of kouenSpawnWorker's headless flag. Requires MCP policy allowlist or KOUEN_MCP_ALLOW_CONTROL=1", [
+                param("taskId", "string", "Task id returned by kouenSpawnWorker(headless: true)"),
+                param("text", "string", "Text to type into the worker"),
+            ]),
+            toolDef("kouenSwarmTerminate", "Terminate a fleet worker: closes its surface (Lane B) or cancels its run (Lane A). Requires MCP policy allowlist or KOUEN_MCP_ALLOW_CONTROL=1", [
+                param("taskId", "string", "Task id returned by kouenSpawnWorker(headless: true)"),
             ]),
             toolDef("kouenTaskList", "List Tasks — checklist items scoped to a session. Omit sessionId to list across every session (powers the Task Dashboard)", [
                 param("sessionId", "string", "Session UUID to filter by (optional, omit for all sessions)"),
@@ -350,6 +359,9 @@ struct ToolRegistry: Sendable {
         case "kouenBrowserReload": return await kouenBrowserReload(args)
         case "kouenSpawnAgent": return await kouenSpawnAgent(args)
         case "kouenSpawnWorker": return await kouenSpawnWorker(args)
+        case "kouenSwarmList": return await daemonTools.kouenSwarmList()
+        case "kouenSwarmInput": return await kouenSwarmInput(args)
+        case "kouenSwarmTerminate": return await kouenSwarmTerminate(args)
         case "kouenTaskList": return await kouenTaskList(args)
         case "kouenTaskGet": return await kouenTaskGet(args)
         case "kouenTaskCreate": return await kouenTaskCreate(args)
@@ -1001,8 +1013,25 @@ struct ToolRegistry: Sendable {
             worktreePath: optionalStringArg(args["worktreePath"]),
             parentRepoPath: optionalStringArg(args["parentRepoPath"]),
             taskName: optionalStringArg(args["taskName"]),
-            prompt: prompt
+            prompt: prompt, headless: boolArg(args["headless"], default: false)
         )
+    }
+
+    private func kouenSwarmInput(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        guard case let .string(taskId)? = args["taskId"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'taskId' parameter"))
+        }
+        guard case let .string(text)? = args["text"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'text' parameter"))
+        }
+        return await daemonTools.kouenSwarmInput(taskId: taskId, text: text)
+    }
+
+    private func kouenSwarmTerminate(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        guard case let .string(taskId)? = args["taskId"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'taskId' parameter"))
+        }
+        return await daemonTools.kouenSwarmTerminate(taskId: taskId)
     }
 
     private func kouenCCRun(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {

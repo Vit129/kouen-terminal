@@ -43,6 +43,8 @@ struct ToolPolicy: Sendable {
         "kouenRoutingRuleReorder",
         "kouenCCRun",
         "kouenCCStatus",
+        "kouenSwarmInput",
+        "kouenSwarmTerminate",
     ]
 
     private let allowControl: Bool

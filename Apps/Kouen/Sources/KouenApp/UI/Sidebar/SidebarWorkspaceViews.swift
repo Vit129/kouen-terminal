@@ -308,6 +308,7 @@ struct SidebarFooterView: View {
     let onSettings: () -> Void
     let onAgents: () -> Void
     let onTasks: () -> Void
+    let onSwarmFleet: () -> Void
     let onOpenRecent: (String) -> Void
     let onNewSession: () -> Void
     let onPalette: () -> Void
@@ -327,6 +328,12 @@ struct SidebarFooterView: View {
             // (tab bar / sidebar / git panel). Keep code for potential future reuse.
             #if false
             FooterIconButton(symbol: "checklist", tooltip: "Tasks", chromeEpoch: epoch, action: onTasks)
+            #endif
+            // Agent Swarm Core Slice 5: sketch-tier dashboard, off by default until the
+            // feature has real usage — same "keep the code, gate the entry point" precedent
+            // as the Tasks icon above (see design.md's Slice 5 framing).
+            #if false
+            FooterIconButton(symbol: "square.grid.3x3", tooltip: "Agent Fleet", chromeEpoch: epoch, action: onSwarmFleet)
             #endif
             FooterIconButton(symbol: "sparkles", tooltip: "Agents", chromeEpoch: epoch, badgeCount: needsAttention, action: onAgents)
             RecentProjectsMenuButton(chromeEpoch: epoch, provider: recentProjectsProvider, onSelect: onOpenRecent)

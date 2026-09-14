@@ -501,9 +501,47 @@ struct KouenDaemonTools: Sendable {
     func kouenSpawnWorker(
         agent: String, workspaceId: String?, cwd: String?,
         worktreePath: String?, parentRepoPath: String?, taskName: String?,
-        prompt: String
+        prompt: String, headless: Bool = false
     ) async -> (AnyCodable?, JSONRPCError?) {
         guard isToolAllowed("kouenSpawnWorker") else { return (nil, disabledError("kouenSpawnWorker")) }
+
+        // Agent Swarm Core: no Tab/Pane, dispatched through `SwarmWorkerManager` instead of
+        // `.newSession` — never spawns via `spawnAgentSurface` at all, so 'cursor' (and every
+        // agent with no Lane A adapter) is checked up front here rather than reusing the
+        // interactive path's post-spawn cursor guard below. Lane A only — an agent kind with
+        // no registered `HeadlessCLIAdapter` (`ClaudeCodeHarness`'s registry: claude, codex,
+        // antigravity, copilot) fails with a clear daemon-side error rather than silently doing
+        // nothing; kiro/gemini/cursor have no headless adapter at all and stay pty-only.
+        if headless {
+            let agentKindRaw: String
+            switch agent.lowercased() {
+            case "claude", "claude-code": agentKindRaw = "claude-code"
+            case "codex": agentKindRaw = "codex"
+            case "antigravity", "agy": agentKindRaw = "antigravity"
+            case "copilot": agentKindRaw = "copilot"
+            default:
+                return (nil, JSONRPCError(
+                    code: -32602,
+                    message: "headless: true has no adapter for '\(agent)' — supported: claude, codex, "
+                        + "antigravity, copilot. Pass headless: false (or omit it) to use the interactive pty path."
+                ))
+            }
+            guard let response = await send(.swarmSpawn(
+                lane: "structured", agentKindRaw: agentKindRaw, cwd: cwd, initialCommand: prompt, role: nil
+            )) else {
+                return (nil, JSONRPCError(code: -32000, message: "daemon unavailable"))
+            }
+            guard case let .swarmTaskNode(node) = response else {
+                return (nil, JSONRPCError(code: -32000, message: "unexpected response to swarmSpawn"))
+            }
+            return (toolResult(json: .object([
+                "taskId": .string(node.id.uuidString),
+                "lane": .string(node.lane),
+                "agent": .string(node.agentKind.rawValue),
+                "status": .string(node.status),
+                "promptSent": .string(prompt),
+            ])), nil)
+        }
 
         let spawned: SpawnedAgentSurface
         switch await spawnAgentSurface(
@@ -539,6 +577,70 @@ struct KouenDaemonTools: Sendable {
             "launched": .string(spawned.agentCommand.trimmingCharacters(in: .whitespacesAndNewlines)),
             "promptSent": .string(prompt),
         ])), nil)
+    }
+
+    // MARK: - Agent Swarm Core
+
+    private static func swarmNodeJSON(_ node: SwarmTaskNodeWire) -> AnyCodable {
+        .object([
+            "taskId": .string(node.id.uuidString),
+            "parentId": node.parentID.map { .string($0.uuidString) } ?? .null,
+            "lane": .string(node.lane),
+            "agent": .string(node.agentKind.rawValue),
+            "role": node.role.map { .string($0) } ?? .null,
+            "status": .string(node.status),
+            "summary": node.summary.map { .string($0) } ?? .null,
+            "surfaceId": node.surfaceID.map { .string($0) } ?? .null,
+        ])
+    }
+
+    func kouenSwarmList() async -> (AnyCodable?, JSONRPCError?) {
+        guard isToolAllowed("kouenSwarmList") else { return (nil, disabledError("kouenSwarmList")) }
+        guard let response = await send(.swarmList) else {
+            return (nil, JSONRPCError(code: -32000, message: "daemon unavailable"))
+        }
+        guard case let .swarmFleetSnapshot(snapshot) = response else {
+            return (nil, JSONRPCError(code: -32000, message: "unexpected response to swarmList"))
+        }
+        return (toolResult(json: .object([
+            "generation": .int(snapshot.generation),
+            "nodes": .array(snapshot.nodes.map(Self.swarmNodeJSON)),
+        ])), nil)
+    }
+
+    func kouenSwarmInput(taskId: String, text: String) async -> (AnyCodable?, JSONRPCError?) {
+        guard isToolAllowed("kouenSwarmInput") else { return (nil, disabledError("kouenSwarmInput")) }
+        guard let uuid = UUID(uuidString: taskId) else {
+            return (nil, JSONRPCError(code: -32602, message: "'taskId' must be a UUID"))
+        }
+        guard let response = await send(.swarmSend(taskID: uuid, text: text)) else {
+            return (nil, JSONRPCError(code: -32000, message: "daemon unavailable"))
+        }
+        guard case let .swarmActionResult(ok) = response else {
+            return (nil, JSONRPCError(code: -32000, message: "unexpected response to swarmSend"))
+        }
+        guard ok else {
+            return (nil, JSONRPCError(
+                code: -32000,
+                message: "no PTY worker bound to task \(taskId) — either it's unknown, or it's a Lane A "
+                    + "(structured) worker, which has no follow-up-turn support yet"
+            ))
+        }
+        return (toolResult(json: .object(["taskId": .string(taskId), "sent": .bool(true)])), nil)
+    }
+
+    func kouenSwarmTerminate(taskId: String) async -> (AnyCodable?, JSONRPCError?) {
+        guard isToolAllowed("kouenSwarmTerminate") else { return (nil, disabledError("kouenSwarmTerminate")) }
+        guard let uuid = UUID(uuidString: taskId) else {
+            return (nil, JSONRPCError(code: -32602, message: "'taskId' must be a UUID"))
+        }
+        guard let response = await send(.swarmTerminate(taskID: uuid)) else {
+            return (nil, JSONRPCError(code: -32000, message: "daemon unavailable"))
+        }
+        guard case let .swarmActionResult(ok) = response else {
+            return (nil, JSONRPCError(code: -32000, message: "unexpected response to swarmTerminate"))
+        }
+        return (toolResult(json: .object(["taskId": .string(taskId), "terminated": .bool(ok)])), nil)
     }
 
     // MARK: - waitForPaneOutput

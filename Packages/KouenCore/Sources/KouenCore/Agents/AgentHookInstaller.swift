@@ -218,7 +218,7 @@ public enum AgentHookInstaller {
             // moved from `.gemini/antigravity-cli/hooks.json` to `.gemini/config/hooks.json` in
             // 1.0.15 (changelog: "hooks remain synchronized between the TUI and the backend").
             return .namedGroupJSON(filename: ".gemini/config/hooks.json", payload: antigravityPayload)
-        case .aider, .gemini, .goose, .kiro, .generic:
+        case .aider, .gemini, .goose, .kiro, .copilot, .generic:
             return nil
         }
     }
