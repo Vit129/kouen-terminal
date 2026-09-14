@@ -109,7 +109,8 @@ extension SessionCoordinator {
         let knownBranch = matchedBranch
 
         Task.detached(priority: .utility) { [weak self] in
-            guard let branch = Self.readGitHead(at: cwd), branch != knownBranch else { return }
+            let branch = Self.readGitHead(at: cwd)
+            guard branch != knownBranch else { return }
             await MainActor.run { [weak self] in
                 guard let self else { return }
                 Task {
