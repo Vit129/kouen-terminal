@@ -425,8 +425,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/FileEditor/FileEditorView.swift": {
-    "mtime": 1788917802.377254,
-    "ast_hash": "31eda35efad4b934ee1cb7db541dc241",
+    "mtime": 1789444505.6352468,
+    "ast_hash": "af5557b2349d5b719ab6950766ec0d53",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/FileEditor/FileTabManager.swift": {
@@ -435,8 +435,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/FileEditor/FileViewerViewController.swift": {
-    "mtime": 1788917806.768454,
-    "ast_hash": "0053182a890b4b9c2be4878fc2ea680e",
+    "mtime": 1789444505.6356437,
+    "ast_hash": "e930ab01026e47a8192aa246e4b26f3f",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/FileEditor/FuzzyPathResolver.swift": {
@@ -485,8 +485,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/FileTree/FileTreeSwiftUIView.swift": {
-    "mtime": 1789355977.1586027,
-    "ast_hash": "52f238995764c33b24e5edc5bc8aa788",
+    "mtime": 1789444505.6364522,
+    "ast_hash": "6582e2966534bee56000f5f6ede6eb4c",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/FileTree/WorkspaceFileTreeView.swift": {
@@ -670,7 +670,7 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Sidebar/KouenSidebarPanelViewController.swift": {
-    "mtime": 1789370652.0932984,
+    "mtime": 1789379170.7417717,
     "ast_hash": "17dfb88f3744e561286e6d88c1a8dc7e",
     "semantic_hash": ""
   },
@@ -990,8 +990,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/KouenVersion.swift": {
-    "mtime": 1789356399.27309,
-    "ast_hash": "86fc76fa80ae259aa176154541161c6d",
+    "mtime": 1789444555.6995447,
+    "ast_hash": "96a76a855ce19b45548e54bb2a997db1",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Layouts/LayoutTemplate.swift": {
@@ -1080,8 +1080,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/GeneratedReleaseNotes.swift": {
-    "mtime": 1789356400.4569912,
-    "ast_hash": "cad7d5c0b9d0bc621f7ffbb8639fdd7d",
+    "mtime": 1789444556.4233408,
+    "ast_hash": "aaf396034b3d87ac673d5ca6a7620634",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/ReleaseNotes.swift": {
@@ -4020,13 +4020,13 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/FileEditor/MarkdownPreviewView.swift": {
-    "mtime": 1789351552.108309,
-    "ast_hash": "7ec18bcb1c68b8997c89d7492d4aa0e4",
+    "mtime": 1789444505.6360204,
+    "ast_hash": "a302e20d4933dd992a4b80b56c7a6e49",
     "semantic_hash": ""
   },
   "Packages/KouenSyntaxResources/Resources/Markdown/highlight.min.js": {
-    "mtime": 1788882207.2668805,
-    "ast_hash": "1ba1ea897d65b202b5450f6e55d043ef",
+    "mtime": 1789444505.6371064,
+    "ast_hash": "7fca042bfbbf223be5b2a2027d834fde",
     "semantic_hash": ""
   },
   "Packages/KouenSyntaxResources/Resources/Markdown/marked.min.js": {
@@ -4045,8 +4045,8 @@
     "semantic_hash": ""
   },
   "Tests/KouenAppTests/MarkdownPreviewTests.swift": {
-    "mtime": 1789351552.1132455,
-    "ast_hash": "f0440f6006d6fca4a3b6013574ca535f",
+    "mtime": 1789444505.6375,
+    "ast_hash": "a749496964fc858b03d7d9c77ad0dae2",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/Services/SwarmDaemonBridge.swift": {
@@ -4130,12 +4130,12 @@
     "semantic_hash": ""
   },
   "plans/p44-mobile-agent-inbox-design.html": {
-    "mtime": 1789368636.9177434,
+    "mtime": 1789444734.2548428,
     "ast_hash": "5c16c7249460e76fde73d8f802a54aeb",
     "semantic_hash": ""
   },
   "plans/p44-mobile-agent-inbox.md": {
-    "mtime": 1789368647.9206703,
+    "mtime": 1789444734.255094,
     "ast_hash": "fde97e72bb084dfc37cd3c1719dcc1b9",
     "semantic_hash": ""
   }
