@@ -146,4 +146,36 @@ final class MarkdownPreviewTests: XCTestCase {
             code, fileURL: URL(fileURLWithPath: "/tmp/main.py"))
         XCTAssertEqual(wrapped, "````python\n\(code)\n````")
     }
+
+    /// Regression guard for the 2026-09-15 blank-preview bug: a Swift `\n` (single backslash)
+    /// inside the generateHTML `"""` template compiles to a real newline character, not the
+    /// two-character JS escape — landing a raw line break inside a single-quoted JS string
+    /// literal (`text.split('\n')`) breaks the whole inline `<script>` with a parse error, so
+    /// `window.renderMarkdown` never gets defined and the pane silently renders nothing, with
+    /// no error banner, no matter what markdown content is loaded. Swift-side visibility checks
+    /// (`isShowingMarkdownPreview` etc.) stay green through this failure — only evaluating JS in
+    /// the live webview catches it.
+    func testRenderMarkdownIsDefinedAndActuallyRendersContent() throws {
+        let view = MarkdownPreviewView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        view.load(markdown: "# Hello\n\nSome **bold** text.", fileURL: nil)
+
+        let expectation = expectation(description: "renderMarkdown produced content")
+        // Poll briefly for the async WKWebView navigation to finish rather than a fixed sleep.
+        func check(attemptsLeft: Int) {
+            view.debugEvaluateJS(
+                "JSON.stringify({fn: typeof window.renderMarkdown, len: (document.getElementById('content')||{}).innerHTML.length})"
+            ) { result, _ in
+                if let json = result as? String, json.contains("\"fn\":\"function\""), !json.contains("\"len\":0") {
+                    expectation.fulfill()
+                } else if attemptsLeft > 0 {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { check(attemptsLeft: attemptsLeft - 1) }
+                } else {
+                    XCTFail("window.renderMarkdown never became defined / #content stayed empty; last diag: \(result ?? "nil")")
+                    expectation.fulfill()
+                }
+            }
+        }
+        check(attemptsLeft: 25)
+        wait(for: [expectation], timeout: 10)
+    }
 }
