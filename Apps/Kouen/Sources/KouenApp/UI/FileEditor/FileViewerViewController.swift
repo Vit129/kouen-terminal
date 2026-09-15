@@ -82,9 +82,17 @@ final class FileViewerViewController: NSViewController {
         }
 
         let isRich = MarkdownPreviewView.isRichPreviewExtension(ext)
-        if isRich {
+        let isCode = MarkdownPreviewView.isSupportedCodeFile(url)
+        if isRich || isCode {
             isMarkdownFile = true
             currentMarkdownRaw = contents
+            modeButton.isHidden = false
+            // Code files default to the syntax editor (keeps LSP/save/diff gutter as the primary
+            // view) unless the user already toggled to preview for this same file — markdown/mermaid
+            // keep defaulting to the rendered preview, unchanged.
+            if isCode && !isReloadingSamePath {
+                isMarkdownEditMode = true
+            }
             if !isMarkdownEditMode {
                 showMarkdownPreview(contents, url: url, resetScroll: !isReloadingSamePath)
             } else {
@@ -261,9 +269,8 @@ final class FileViewerViewController: NSViewController {
     }
 
     private func updateModeButtonUI() {
-        let ext = (pathLabel.toolTip as NSString?)?.pathExtension.lowercased() ?? ""
-        let isMermaid = ["mermaid", "mmd"].contains(ext)
-        let typeName = isMermaid ? "Mermaid" : "Markdown"
+        let path = pathLabel.toolTip ?? ""
+        let typeName = Self.previewTypeName(forPath: path)
         if isMarkdownEditMode {
             modeButton.setSymbol("eye", accessibilityDescription: "Preview \(typeName) (⌘E)", pointSize: 11, weight: .medium)
             modeButton.toolTip = "Preview \(typeName) (⌘E)"
@@ -360,6 +367,14 @@ final class FileViewerViewController: NSViewController {
     }
 
     override var acceptsFirstResponder: Bool { true }
+
+    static func previewTypeName(forPath path: String) -> String {
+        let url = URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
+        let ext = url.pathExtension.lowercased()
+        if ["mermaid", "mmd"].contains(ext) { return "Mermaid" }
+        if let lang = MarkdownPreviewView.language(forFile: url) { return lang.capitalized }
+        return "Markdown"
+    }
 
     private static let quickLookExtensions: Set<String> = loadQuickLookExtensions()
 
