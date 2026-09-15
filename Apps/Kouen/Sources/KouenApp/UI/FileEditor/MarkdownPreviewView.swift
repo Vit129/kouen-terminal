@@ -16,8 +16,24 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
     /// Callback when user clicks a relative file link inside markdown
     var onOpenFile: ((String) -> Void)?
 
+    /// Injected before marked/highlight/mermaid so a load-time syntax or runtime error in any
+    /// of those bundles — which would otherwise abort silently before our own inline `<script>`
+    /// (at the end of the document) ever runs — is captured instead of leaving the preview pane
+    /// permanently blank with no diagnostic.
+    private static let bootstrapErrorScript = WKUserScript(
+        source: """
+        window.__kouenBootErrors = [];
+        window.onerror = function(msg, src, line, col) {
+          window.__kouenBootErrors.push(String(msg) + ' (' + (src || 'inline') + ':' + line + ')');
+          return false;
+        };
+        """,
+        injectionTime: .atDocumentStart,
+        forMainFrameOnly: true
+    )
+
     private static let cachedUserScripts: [WKUserScript] = {
-        var scripts: [WKUserScript] = []
+        var scripts: [WKUserScript] = [bootstrapErrorScript]
         for name in ["marked.min.js", "highlight.min.js", "mermaid.min.js"] {
             if let code = MarkdownBundle.scriptString(filename: name) {
                 scripts.append(WKUserScript(source: code, injectionTime: .atDocumentStart, forMainFrameOnly: true))
@@ -684,31 +700,39 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
               }
             };
 
+            function renderPlainFallback(contentEl, rawMarkdown, errorMessage) {
+              const bootErrors = (window.__kouenBootErrors || []);
+              const allErrors = errorMessage ? bootErrors.concat([errorMessage]) : bootErrors;
+              const banner = allErrors.length
+                ? '<div style="padding:10px 16px;background:rgba(224,108,117,0.12);border-bottom:1px solid #e06c75;color:#e06c75;font-family:var(--font-mono);font-size:11px;white-space:pre-wrap;">⚠️ Preview renderer error — showing raw text.\n' + escapeHtml(allErrors.join('\n')) + '</div>'
+                : '';
+              contentEl.innerHTML = banner + '<pre style="padding:16px;white-space:pre-wrap;font-family:var(--font-mono);font-size:13px;color:var(--text-primary);">' + escapeHtml(rawMarkdown) + '</pre>';
+            }
+
             window.renderMarkdown = async function(rawMarkdown) {
-              setupLibraries();
               const contentEl = document.getElementById('content');
               if (!contentEl) return;
               if (!rawMarkdown) {
                 contentEl.innerHTML = '';
                 return;
               }
-              if (typeof marked === 'undefined') {
-                contentEl.innerHTML = '<pre style="padding:16px;white-space:pre-wrap;font-family:var(--font-mono);font-size:13px;color:var(--text-primary);">' + escapeHtml(rawMarkdown) + '</pre>';
-                return;
-              }
               try {
+                setupLibraries();
+                if (typeof marked === 'undefined') {
+                  renderPlainFallback(contentEl, rawMarkdown, 'marked.js did not load');
+                  return;
+                }
                 let html = marked.parse(rawMarkdown);
                 html = processAlerts(html);
                 contentEl.innerHTML = html;
                 await renderMermaidDiagrams();
               } catch (e) {
                 console.error('renderMarkdown error:', e);
-                contentEl.innerHTML = '<pre style="padding:16px;white-space:pre-wrap;font-family:var(--font-mono);font-size:13px;color:var(--text-primary);">' + escapeHtml(rawMarkdown) + '</pre>';
+                renderPlainFallback(contentEl, rawMarkdown, String((e && e.message) || e));
               }
             };
 
             function init() {
-              setupLibraries();
               const initial = \(encodedMarkdown);
               if (initial !== undefined && initial !== null) {
                 window.renderMarkdown(initial);
