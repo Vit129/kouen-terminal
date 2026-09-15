@@ -71,6 +71,10 @@ final class MarkdownPreviewTests: XCTestCase {
         XCTAssertTrue(MarkdownPreviewView.isSupportedCodeExtension("ts"))
         XCTAssertTrue(MarkdownPreviewView.isSupportedCodeExtension("json"))
         XCTAssertTrue(MarkdownPreviewView.isSupportedCodeExtension("yaml"))
+        XCTAssertTrue(MarkdownPreviewView.isSupportedCodeExtension("dart"))
+        for sqlDialectExt in ["sql", "pgsql", "psql", "mysql", "plsql", "pls"] {
+            XCTAssertEqual(MarkdownPreviewView.codeExtensionToLanguage[sqlDialectExt], "sql", sqlDialectExt)
+        }
         XCTAssertFalse(MarkdownPreviewView.isSupportedCodeExtension("unknown_ext"))
 
         XCTAssertTrue(MarkdownPreviewView.isRichPreviewExtension("md"))
@@ -95,5 +99,51 @@ final class MarkdownPreviewTests: XCTestCase {
         """
         view.load(markdown: code, fileURL: URL(fileURLWithPath: "/tmp/User.swift"))
         view.update(markdown: code + "\n// updated")
+    }
+
+    func testWrapContentIfNeededFencesSupportedCodeExtensionsWithLanguage() {
+        let wrapped = MarkdownPreviewView.wrapContentIfNeeded(
+            "let x = 1", fileURL: URL(fileURLWithPath: "/tmp/main.swift"))
+        XCTAssertEqual(wrapped, "```swift\nlet x = 1\n```")
+    }
+
+    func testWrapContentIfNeededFencesDartFiles() {
+        let wrapped = MarkdownPreviewView.wrapContentIfNeeded(
+            "void main() {}", fileURL: URL(fileURLWithPath: "/tmp/main.dart"))
+        XCTAssertEqual(wrapped, "```dart\nvoid main() {}\n```")
+    }
+
+    func testWrapContentIfNeededFencesBareDockerfileByName() {
+        // "Dockerfile" has no extension — must be recognized by filename, not `pathExtension`.
+        let wrapped = MarkdownPreviewView.wrapContentIfNeeded(
+            "FROM alpine", fileURL: URL(fileURLWithPath: "/tmp/Dockerfile"))
+        XCTAssertEqual(wrapped, "```dockerfile\nFROM alpine\n```")
+    }
+
+    func testWrapContentIfNeededFencesDockerfileVariants() {
+        let wrapped = MarkdownPreviewView.wrapContentIfNeeded(
+            "FROM alpine", fileURL: URL(fileURLWithPath: "/tmp/Dockerfile.prod"))
+        XCTAssertEqual(wrapped, "```dockerfile\nFROM alpine\n```")
+    }
+
+    func testLanguageForFileRecognizesBareDockerfileCaseInsensitively() {
+        XCTAssertEqual(MarkdownPreviewView.language(forFile: URL(fileURLWithPath: "/tmp/dockerfile")), "dockerfile")
+        XCTAssertEqual(MarkdownPreviewView.language(forFile: URL(fileURLWithPath: "/tmp/DOCKERFILE")), "dockerfile")
+        XCTAssertTrue(MarkdownPreviewView.isSupportedCodeFile(URL(fileURLWithPath: "/tmp/Dockerfile")))
+        XCTAssertTrue(MarkdownPreviewView.isSupportedCodeFile(URL(fileURLWithPath: "/tmp/app.dart")))
+    }
+
+    func testWrapContentIfNeededLeavesUnsupportedExtensionsUnwrapped() {
+        let raw = "some binary-ish content"
+        let wrapped = MarkdownPreviewView.wrapContentIfNeeded(
+            raw, fileURL: URL(fileURLWithPath: "/tmp/file.unknown_ext"))
+        XCTAssertEqual(wrapped, raw)
+    }
+
+    func testWrapContentIfNeededWidensFenceAroundEmbeddedBackticks() {
+        let code = "print(\"```\")"
+        let wrapped = MarkdownPreviewView.wrapContentIfNeeded(
+            code, fileURL: URL(fileURLWithPath: "/tmp/main.py"))
+        XCTAssertEqual(wrapped, "````python\n\(code)\n````")
     }
 }

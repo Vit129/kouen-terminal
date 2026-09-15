@@ -10,6 +10,9 @@ final class FileTreeNode: Identifiable {
     let node: FileNode
     var children: [FileTreeNode]?
     var isExpanded: Bool = false
+    /// Inline preview expand/collapse state for a file row — independent of `isExpanded`,
+    /// which is directory-only (DisclosureGroup).
+    var isPreviewExpanded: Bool = false
 
     init(node: FileNode) {
         self.id = node.id
@@ -629,15 +632,29 @@ private struct NodeRow: View {
                 }
             }
         } else {
-            rowLabel(systemImage: "doc")
-                .contentShape(Rectangle())
-                .background(isFocused ? Color.accentColor.opacity(0.2) : Color.clear)
-                .cornerRadius(4)
-                .onTapGesture(count: 2) { openFile() }
-                .onTapGesture {
-                    keyboard.focusedPath = node.node.path
-                    onPreview(node.node)
+            VStack(alignment: .leading, spacing: 0) {
+                rowLabel(systemImage: "doc")
+                    .contentShape(Rectangle())
+                    .background(isFocused ? Color.accentColor.opacity(0.2) : Color.clear)
+                    .cornerRadius(4)
+                    .onTapGesture(count: 2) { openFile() }
+                    .onTapGesture {
+                        keyboard.focusedPath = node.node.path
+                        node.isPreviewExpanded.toggle()
+                        onPreview(node.node)
+                    }
+                if node.isPreviewExpanded {
+                    InlineFilePreview(path: node.node.path)
+                        .frame(height: 220)
+                        .clipShape(RoundedRectangle(cornerRadius: KouenDesign.Radius.badge, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: KouenDesign.Radius.badge, style: .continuous)
+                                .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+                        )
+                        .padding(.leading, 20)
+                        .padding(.vertical, 4)
                 }
+            }
         }
     }
 
@@ -893,6 +910,31 @@ private struct NodeRow: View {
             }
             coordinator.requestDaemon(.sendData(surfaceID: surfaceID.uuidString, data: Data(cmd.utf8)))
         }
+    }
+}
+
+/// Inline expand/collapse preview for a file-tree row, auto-toggled by a single click on the
+/// row (`node.isPreviewExpanded`) — reads the file directly and renders it through
+/// `MarkdownPreviewView` (rich preview for markdown/mermaid, syntax-highlighted fenced code for
+/// supported source extensions, plain text otherwise).
+private struct InlineFilePreview: NSViewRepresentable {
+    let path: String
+    private static let maxPreviewBytes = 1_000_000
+
+    func makeNSView(context: Context) -> MarkdownPreviewView {
+        MarkdownPreviewView(frame: .zero)
+    }
+
+    func updateNSView(_ view: MarkdownPreviewView, context: Context) {
+        let url = URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let size = attributes[.size] as? Int, size <= Self.maxPreviewBytes,
+              let data = try? Data(contentsOf: url),
+              let contents = String(data: data, encoding: .utf8) else {
+            view.load(markdown: "_Unable to preview this file (binary, unsupported encoding, or too large)._", fileURL: nil)
+            return
+        }
+        view.load(markdown: contents, fileURL: url)
     }
 }
 
