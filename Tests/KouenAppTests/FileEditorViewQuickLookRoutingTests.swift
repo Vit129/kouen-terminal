@@ -56,4 +56,18 @@ final class FileEditorViewQuickLookRoutingTests: XCTestCase {
         view.load(path: writeFile(named: "doc.pdf"))
         XCTAssertFalse(view.isShowingSyntaxView, ".pdf is binary — Quick Look is still correct here")
     }
+
+    /// Regression guard: the same panel/tab is reused across every open file, so the syntax
+    /// editor's edit-mode flag must not leak from one file into the next. Viewing a code file
+    /// (which defaults to the syntax editor) must not leave a later markdown file stuck in
+    /// edit mode instead of its rendered preview.
+    func testMarkdownStillDefaultsToPreviewAfterViewingACodeFileInTheSamePanel() {
+        let view = FileEditorView(frame: NSRect(x: 0, y: 0, width: 400, height: 400))
+        view.load(path: writeFile(named: "main.swift", contents: "print(\"hi\")"))
+        XCTAssertTrue(view.isShowingSyntaxView, ".swift defaults to the syntax editor")
+
+        view.load(path: writeFile(named: "notes.md", contents: "# Test"))
+        XCTAssertTrue(view.isShowingMarkdownPreview, ".md must still default to preview, not inherit .swift's edit mode")
+        XCTAssertFalse(view.isShowingSyntaxView)
+    }
 }
