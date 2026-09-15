@@ -94,9 +94,17 @@ final class FileEditorView: NSView {
         }
 
         let isRich = MarkdownPreviewView.isRichPreviewExtension(ext)
-        if isRich {
+        let isCode = MarkdownPreviewView.isSupportedCodeFile(url)
+        if isRich || isCode {
             isMarkdownFile = true
             currentMarkdownRaw = contents
+            modeToggleButton.isHidden = false
+            // Code files default to the syntax editor (keeps LSP/save/diff gutter as the primary
+            // view) unless the user already toggled to preview for this same file — markdown/mermaid
+            // keep defaulting to the rendered preview, unchanged.
+            if isCode && !isReloadingSamePath {
+                isMarkdownEditMode = true
+            }
             if !isMarkdownEditMode {
                 showMarkdownPreview(contents, url: url, resetScroll: !isReloadingSamePath)
             } else {
@@ -274,9 +282,7 @@ final class FileEditorView: NSView {
     }
 
     private func updateModeButtonUI() {
-        let ext = (filePath as NSString).pathExtension.lowercased()
-        let isMermaid = ["mermaid", "mmd"].contains(ext)
-        let typeName = isMermaid ? "Mermaid" : "Markdown"
+        let typeName = FileViewerViewController.previewTypeName(forPath: filePath)
         if isMarkdownEditMode {
             modeToggleButton.setSymbol("eye", accessibilityDescription: "Preview \(typeName) (⌘E)", pointSize: 12, weight: .medium)
             modeToggleButton.toolTip = "Preview \(typeName) (⌘E)"
