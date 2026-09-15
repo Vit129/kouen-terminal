@@ -2,6 +2,11 @@
 
 Older releases. See [CHANGELOG.md](../CHANGELOG.md) for recent versions.
 
+## [4.14.0] - 2026-08-31
+
+### Added
+- P44 autonomous orchestrator (MCP tools, inline task badges, orchestrator contract) + git diff gutter extraction (release v4.14.0) ([`80bee3a`](https://github.com/Vit129/kouen-terminal/commit/80bee3a1aae2bb04343a6ac66af732e337105eb2))
+
 ## [4.13.1] - 2026-08-24
 
 ### Fixed
