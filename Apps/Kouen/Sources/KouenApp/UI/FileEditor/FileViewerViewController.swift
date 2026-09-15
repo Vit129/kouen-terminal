@@ -88,10 +88,12 @@ final class FileViewerViewController: NSViewController {
             currentMarkdownRaw = contents
             modeButton.isHidden = false
             // Code files default to the syntax editor (keeps LSP/save/diff gutter as the primary
-            // view) unless the user already toggled to preview for this same file — markdown/mermaid
-            // keep defaulting to the rendered preview, unchanged.
-            if isCode && !isReloadingSamePath {
-                isMarkdownEditMode = true
+            // view); markdown/mermaid default to the rendered preview. Reset on every new path so
+            // a mode left over from a previously viewed file in this same panel doesn't leak into
+            // the next one — reloading the same path (file watcher, tab re-select) keeps whatever
+            // mode the user is currently in.
+            if !isReloadingSamePath {
+                isMarkdownEditMode = isCode
             }
             if !isMarkdownEditMode {
                 showMarkdownPreview(contents, url: url, resetScroll: !isReloadingSamePath)
