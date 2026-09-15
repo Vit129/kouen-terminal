@@ -82,9 +82,12 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
         // Config & Query
         "json": "json", "jsonc": "json", "json5": "json",
         "yaml": "yaml", "yml": "yaml", "toml": "ini", "ini": "ini", "conf": "ini", "env": "ini",
-        "sql": "sql", "graphql": "graphql", "gql": "graphql",
+        "sql": "sql", "pgsql": "sql", "psql": "sql", "mysql": "sql", "plsql": "sql", "pls": "sql",
+        "graphql": "graphql", "gql": "graphql",
         "makefile": "makefile", "make": "makefile", "mk": "makefile",
-        "diff": "diff", "patch": "diff"
+        "diff": "diff", "patch": "diff",
+        // Mobile & containers
+        "dart": "dart", "dockerfile": "dockerfile"
     ]
 
     public static func isSupportedCodeExtension(_ ext: String) -> Bool {
@@ -96,23 +99,61 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
         return ["md", "markdown", "mermaid", "mmd"].contains(lower)
     }
 
+    /// `Dockerfile`, `Dockerfile.dev`, `Dockerfile.prod`, etc. carry the language in the bare
+    /// filename, not a `.dockerfile` extension — `pathExtension` alone misses them.
+    private static func filenameLanguage(_ fileName: String) -> String? {
+        let lower = fileName.lowercased()
+        return (lower == "dockerfile" || lower.hasPrefix("dockerfile.")) ? "dockerfile" : nil
+    }
+
+    /// The highlight.js language for `url`, checking filename-based conventions (Dockerfile)
+    /// before falling back to `codeExtensionToLanguage`. Public API for callers that only have
+    /// a file URL — `isSupportedCodeExtension`/`codeExtensionToLanguage` stay extension-only.
+    public static func language(forFile url: URL) -> String? {
+        filenameLanguage(url.lastPathComponent) ?? codeExtensionToLanguage[url.pathExtension.lowercased()]
+    }
+
+    public static func isSupportedCodeFile(_ url: URL) -> Bool {
+        language(forFile: url) != nil
+    }
+
     // MARK: - API
 
-    private func wrapContentIfNeeded(_ raw: String, fileURL: URL?) -> String {
-        guard let ext = fileURL?.pathExtension.lowercased(), !ext.isEmpty else {
-            return raw
-        }
+    static func wrapContentIfNeeded(_ raw: String, fileURL: URL?) -> String {
+        guard let fileURL else { return raw }
+        let ext = fileURL.pathExtension.lowercased()
         if ext == "mermaid" || ext == "mmd" {
             let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
             if !trimmed.hasPrefix("```") {
                 return "```mermaid\n\(raw)\n```"
             }
         }
+        if let lang = Self.language(forFile: fileURL) {
+            let fence = String(repeating: "`", count: Self.fenceLength(for: raw))
+            return "\(fence)\(lang)\n\(raw)\n\(fence)"
+        }
         return raw
     }
 
+    /// A fenced code block only closes at a run of backticks >= the opener's length (CommonMark).
+    /// A hardcoded ``` breaks on any source file containing its own ``` run (docstrings,
+    /// markdown-in-comments, heredocs) — use one longer than the longest run already in `raw`.
+    private static func fenceLength(for raw: String) -> Int {
+        var longestRun = 0
+        var currentRun = 0
+        for char in raw {
+            if char == "`" {
+                currentRun += 1
+                longestRun = max(longestRun, currentRun)
+            } else {
+                currentRun = 0
+            }
+        }
+        return max(3, longestRun + 1)
+    }
+
     func load(markdown: String, fileURL: URL?) {
-        let effectiveMarkdown = wrapContentIfNeeded(markdown, fileURL: fileURL)
+        let effectiveMarkdown = Self.wrapContentIfNeeded(markdown, fileURL: fileURL)
         currentMarkdown = effectiveMarkdown
         currentFileURL = fileURL
         isWebViewReady = false
@@ -125,7 +166,7 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
     }
 
     func update(markdown: String) {
-        let effectiveMarkdown = wrapContentIfNeeded(markdown, fileURL: currentFileURL)
+        let effectiveMarkdown = Self.wrapContentIfNeeded(markdown, fileURL: currentFileURL)
         currentMarkdown = effectiveMarkdown
         guard isWebViewReady else {
             pendingMarkdown = effectiveMarkdown
