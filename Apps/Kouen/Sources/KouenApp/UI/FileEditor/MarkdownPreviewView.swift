@@ -16,6 +16,14 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
     /// Callback when user clicks a relative file link inside markdown
     var onOpenFile: ((String) -> Void)?
 
+    /// Test-only seam: evaluates arbitrary JS in the live webview so tests can assert the
+    /// actual rendered state (e.g. that `window.renderMarkdown` is really defined) instead of
+    /// only checking Swift-side view visibility flags, which stay green even when the inline
+    /// `<script>` fails to parse — see the 2026-09-15 blank-preview regression this guards.
+    func debugEvaluateJS(_ js: String, completion: @escaping (Any?, Error?) -> Void) {
+        webView.evaluateJavaScript(js, completionHandler: completion)
+    }
+
     /// Injected before marked/highlight/mermaid so a load-time syntax or runtime error in any
     /// of those bundles — which would otherwise abort silently before our own inline `<script>`
     /// (at the end of the document) ever runs — is captured instead of leaving the preview pane
@@ -632,11 +640,11 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
                         highlighted = escapeHtml(text);
                       }
                       const langLabel = lang || 'text';
-                      const rawLines = text.split('\n');
+                      const rawLines = text.split('\\n');
                       if (rawLines.length > 1 && rawLines[rawLines.length - 1] === '') rawLines.pop();
                       let codeBodyHtml = '';
                       if (rawLines.length > 1) {
-                        const lineNums = rawLines.map((_, i) => i + 1).join('\n');
+                        const lineNums = rawLines.map((_, i) => i + 1).join('\\n');
                         codeBodyHtml = `<div class="code-with-lines"><pre class="line-numbers-pre">${lineNums}</pre><pre class="code-pre"><code class="hljs ${lang ? 'language-' + escapeHtml(lang) : ''}">${highlighted}</code></pre></div>`;
                       } else {
                         codeBodyHtml = `<div class="code-with-lines"><pre class="code-pre"><code class="hljs ${lang ? 'language-' + escapeHtml(lang) : ''}">${highlighted}</code></pre></div>`;
@@ -704,7 +712,7 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
               const bootErrors = (window.__kouenBootErrors || []);
               const allErrors = errorMessage ? bootErrors.concat([errorMessage]) : bootErrors;
               const banner = allErrors.length
-                ? '<div style="padding:10px 16px;background:rgba(224,108,117,0.12);border-bottom:1px solid #e06c75;color:#e06c75;font-family:var(--font-mono);font-size:11px;white-space:pre-wrap;">⚠️ Preview renderer error — showing raw text.\n' + escapeHtml(allErrors.join('\n')) + '</div>'
+                ? '<div style="padding:10px 16px;background:rgba(224,108,117,0.12);border-bottom:1px solid #e06c75;color:#e06c75;font-family:var(--font-mono);font-size:11px;white-space:pre-wrap;">⚠️ Preview renderer error — showing raw text.\\n' + escapeHtml(allErrors.join('\\n')) + '</div>'
                 : '';
               contentEl.innerHTML = banner + '<pre style="padding:16px;white-space:pre-wrap;font-family:var(--font-mono);font-size:13px;color:var(--text-primary);">' + escapeHtml(rawMarkdown) + '</pre>';
             }
