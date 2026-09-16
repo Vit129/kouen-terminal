@@ -6,13 +6,13 @@
 
 ## Session Start
 
-- Continuation → read `agent-memory/CONTEXT.md` → invoke `macos-swiftui` skill
+- Continuation → read `CONTEXT.md` → invoke `macos-swiftui` skill
 - Code navigation → `graphify-out/GRAPH_SUMMARY.md`
 - Bug/pattern → `grep -rn "<keyword>" agent-memory/knowledge/cases/ agent-memory/MEMORY.md`
 
 ## Skills
 
-AppKit/SwiftUI/macOS → `macos-swiftui` | debugging → `debug-mantra` | review → `review-personas`
+AppKit/SwiftUI/macOS → `macos-swiftui` | debugging → `9arm-skills:debug-mantra` | review → `mattpocock-skills:code-review` + `9arm-skills:scrutinize`
 
 ## Build / Test / Run
 
