@@ -2,6 +2,50 @@
 
 Older releases. See [CHANGELOG.md](../CHANGELOG.md) for recent versions.
 
+## [4.15.10] - 2026-09-14
+
+### Fixed
+- Clear stale git branch label when cwd leaves a git repo (release v4.15.9) ([`d2d3c25`](https://github.com/Vit129/kouen-terminal/commit/d2d3c257e435a4437543eb695b7cd4f50136c6b2))
+- Hide gutter triangles and check non-git folders in file tree (release v4.15.10) ([`f9758fb`](https://github.com/Vit129/kouen-terminal/commit/f9758fb31b766ae76c38b472ba44234d9c5f660b))
+
+## [4.15.8] - 2026-09-09
+
+### Fixed
+- Editor file preview (release v4.15.8) ([`17ccef2`](https://github.com/Vit129/kouen-terminal/commit/17ccef29c94917f617080607905bedbf5b0b566f))
+
+## [4.15.7] - 2026-09-09
+
+### Fixed
+- Display markdown and mermaid format and able to click fromterminal (release v4.15.7) ([`c56411c`](https://github.com/Vit129/kouen-terminal/commit/c56411ca0cb580302b6a80d3c434876ce8e02990))
+
+## [4.15.6] - 2026-09-08
+
+### Added
+- Comment kouen create branch (release v4.15.6) ([`9dde22a`](https://github.com/Vit129/kouen-terminal/commit/9dde22a3c73d0a3c1a8db397920ab47a4fa46eb3))
+
+## [4.15.4] - 2026-09-06
+
+### Fixed
+- Keep transient notch peek notification independent of the persistent HUD toggle (release v4.15.4) ([`9457638`](https://github.com/Vit129/kouen-terminal/commit/9457638dc30e649bf6f60ed5a81c40d888e2a7bc))
+
+## [4.15.3] - 2026-09-06
+
+### Fixed
+- Stop trusting NSSplitView.setPosition, assign sidebar/content frames directly ([`f3e0cba`](https://github.com/Vit129/kouen-terminal/commit/f3e0cba9bfabecfb457c55d604f84c1add939d65))
+- Turn off Agent Notch HUD by default, merge menu-bar sessions list, fix Close toggle (release v4.15.3) ([`36220c9`](https://github.com/Vit129/kouen-terminal/commit/36220c944e4942281c7e76964ac198219091b8c9))
+
+## [4.15.2] - 2026-09-06
+
+### Fixed
+- Keep collapsed sidebar hidden across screen/window resize (release v4.15.2) ([`2f370d8`](https://github.com/Vit129/kouen-terminal/commit/2f370d887912d34c0ab8bc3bd2e8832928ae0740))
+
+## [4.15.1] - 2026-09-04
+
+### Fixed
+- Don't wipe scrollback on ESC[3J (erase saved lines) ([`d1860af`](https://github.com/Vit129/kouen-terminal/commit/d1860afd3310d11e3f0adba5185a84f3b2c73c63))
+- Support drag-to-scroll on terminal and file view scrollbars ([`86acdf7`](https://github.com/Vit129/kouen-terminal/commit/86acdf71266351e8fe0e3fb2d53284c245eb68ed))
+- Fire scrollbar update immediately on pane split + register hover tracking area reliably (release v4.15.1) ([`fb9e095`](https://github.com/Vit129/kouen-terminal/commit/fb9e0953ff54f6be9677fecdad5c3ff2272fe17e))
+
 ## [4.14.0] - 2026-08-31
 
 ### Added
