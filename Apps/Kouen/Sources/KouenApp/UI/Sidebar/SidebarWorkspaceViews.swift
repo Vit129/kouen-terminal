@@ -258,12 +258,11 @@ struct SidebarTabBarView: View {
                 Image(systemName: "terminal").tag(0).help("Sessions")
                 Image(systemName: "folder").tag(1).help("Files")
                 Image(systemName: "bolt.badge.clock").tag(2).help("Jobs")
-                // TODO: Issues tab — re-enable when Jira domain config UI + Azure DevOps impl are complete
-                // Image(systemName: "checklist").tag(3).help("Issues")
+                Image(systemName: "clock.arrow.circlepath").tag(3).help("Session History")
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            .frame(width: 135)
+            .frame(width: 172)
 
             Spacer()
         }
@@ -294,6 +293,10 @@ struct SidebarSectionLabelView: View {
                     .foregroundStyle(Color(nsColor: c.textTertiary))
             } else if model.selectedTab == 2 {
                 Text("JOBS")
+                    .font(.system(size: 10.5, weight: .bold))
+                    .foregroundStyle(Color(nsColor: c.textTertiary))
+            } else if model.selectedTab == 3 {
+                Text("SESSION HISTORY")
                     .font(.system(size: 10.5, weight: .bold))
                     .foregroundStyle(Color(nsColor: c.textTertiary))
             }
