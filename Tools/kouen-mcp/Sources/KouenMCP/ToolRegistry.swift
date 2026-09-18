@@ -230,6 +230,34 @@ struct ToolRegistry: Sendable {
             toolDef("kouenTaskDelete", "Delete a Task", [
                 param("id", "string", "Task UUID"),
             ]),
+            toolDef("kouenFeatureCreate", "Create or register a Feature in Kouen with embedded AI-SDLC tracking and worktree binding. Automatically creates plan and architecture markdown files", [
+                param("slug", "string", "Feature slug (e.g. p46-agentic-dev)"),
+                param("repoPath", "string", "Repository root path (optional, defaults to active session cwd)"),
+                param("branch", "string", "Git feature branch name (optional)"),
+                param("baseBranch", "string", "Git base branch name, e.g. main (optional, default 'main')"),
+                param("worktreePath", "string", "Explicit worktree path (optional)"),
+                param("phase", "string", "Initial phase: interview, architect, qa-design, dev, qa-verify, completed (optional, default 'interview')"),
+            ]),
+            toolDef("kouenFeatureGet", "Get details of a Feature including current AI-SDLC phase, gate approvals, and worktree binding", [
+                param("slug", "string", "Feature slug"),
+            ]),
+            toolDef("kouenFeatureList", "List all features tracked in Kouen with their phase, gate status, and worktrees", [
+                param("repoPath", "string", "Filter by repository path (optional)"),
+            ]),
+            toolDef("kouenFeatureApproveGate", "Approve an AI-SDLC workflow gate (1..3) for a Feature. Automatically updates the checkbox in ai-sdlc-task-progress.md", [
+                param("slug", "string", "Feature slug"),
+                param("gate", "number", "Gate number: 1 (Architect design), 2 (Scenario list), or 3 (Seam agreement)"),
+                param("approver", "string", "Approver username/identifier"),
+                param("notes", "string", "Approval notes or conditions (optional)"),
+            ]),
+            toolDef("kouenFeatureUpdatePhase", "Update the AI-SDLC phase of a Feature (interview, architect, qa-design, dev, qa-verify, completed)", [
+                param("slug", "string", "Feature slug"),
+                param("phase", "string", "New phase: interview, architect, qa-design, dev, qa-verify, completed"),
+            ]),
+            toolDef("kouenFeaturePreview", "Open rich Markdown and Mermaid architecture/task preview in Kouen GUI sidebar", [
+                param("slug", "string", "Feature slug"),
+                param("file", "string", "File to preview: 'progress' (ai-sdlc-task-progress.md) or 'architecture' (<slug>-architecture.md) (optional, default 'progress')"),
+            ]),
             toolDef("kouenWorktreeList", "List git worktrees for a repository (Kouen's worktree-per-branch-per-agent isolation)", [
                 param("repoPath", "string", "Repository root path (contains .git)"),
             ]),
@@ -371,6 +399,12 @@ struct ToolRegistry: Sendable {
         case "kouenTaskCreate": return await kouenTaskCreate(args)
         case "kouenTaskUpdate": return await kouenTaskUpdate(args)
         case "kouenTaskDelete": return await kouenTaskDelete(args)
+        case "kouenFeatureList": return await daemonTools.featureList(repoPath: optionalStringArg(args["repoPath"]))
+        case "kouenFeatureGet": return await kouenFeatureGet(args)
+        case "kouenFeatureCreate": return await kouenFeatureCreate(args)
+        case "kouenFeatureApproveGate": return await kouenFeatureApproveGate(args)
+        case "kouenFeatureUpdatePhase": return await kouenFeatureUpdatePhase(args)
+        case "kouenFeaturePreview": return await kouenFeaturePreview(args)
         case "kouenWorktreeList": return await kouenWorktreeList(args)
         case "kouenWorktreeCreate": return await kouenWorktreeCreate(args)
         case "kouenWorktreeRemove": return await kouenWorktreeRemove(args)
@@ -510,6 +544,62 @@ struct ToolRegistry: Sendable {
             return (nil, JSONRPCError(code: -32602, message: "Missing 'id' parameter"))
         }
         return await daemonTools.taskDelete(id: id)
+    }
+
+    // MARK: - Feature tools (AI-SDLC, P46)
+
+    private func kouenFeatureGet(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        guard case let .string(slug)? = args["slug"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'slug' parameter"))
+        }
+        return await daemonTools.featureGet(slug: slug)
+    }
+
+    private func kouenFeatureCreate(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        guard case let .string(slug)? = args["slug"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'slug' parameter"))
+        }
+        return await daemonTools.featureCreate(
+            slug: slug,
+            repoPath: optionalStringArg(args["repoPath"]),
+            branch: optionalStringArg(args["branch"]),
+            baseBranch: optionalStringArg(args["baseBranch"]),
+            worktreePath: optionalStringArg(args["worktreePath"]),
+            phase: optionalStringArg(args["phase"])
+        )
+    }
+
+    private func kouenFeatureApproveGate(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        guard case let .string(slug)? = args["slug"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'slug' parameter"))
+        }
+        let gate: Int
+        if case let .int(g)? = args["gate"] {
+            gate = g
+        } else if case let .double(d)? = args["gate"] {
+            gate = Int(d)
+        } else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing or invalid 'gate' parameter (must be 1, 2, or 3)"))
+        }
+        let approver = optionalStringArg(args["approver"]) ?? NSUserName()
+        let notes = optionalStringArg(args["notes"])
+        return await daemonTools.featureApproveGate(slug: slug, gate: gate, approver: approver, notes: notes)
+    }
+
+    private func kouenFeatureUpdatePhase(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        guard case let .string(slug)? = args["slug"],
+              case let .string(phase)? = args["phase"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'slug' or 'phase' parameter"))
+        }
+        return await daemonTools.featureUpdatePhase(slug: slug, phase: phase)
+    }
+
+    private func kouenFeaturePreview(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        guard case let .string(slug)? = args["slug"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'slug' parameter"))
+        }
+        let file = optionalStringArg(args["file"])
+        return await daemonTools.featurePreview(slug: slug, fileType: file)
     }
 
     // MARK: - Worktree tools

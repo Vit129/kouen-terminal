@@ -31,10 +31,17 @@ final class WorktreeMCPIPCDaemonTests: XCTestCase {
     func testCreateListRemoveRoundTripViaIPC() throws {
         let registry = SurfaceRegistry()
 
-        guard case let .worktreePath(path?) = registry.handle(.worktreeCreate(
+        guard case let .error(msg) = registry.handle(.worktreeCreate(
             repoPath: repoPath, sessionID: "mcp-test", branch: "feat-mcp", baseRef: nil
         )) else {
-            return XCTFail("Expected .worktreePath from worktreeCreate")
+            return XCTFail("Expected .error from disabled worktreeCreate")
+        }
+        XCTAssertTrue(msg.contains("disabled"))
+
+        guard let path = WorktreeManager().create(
+            repoPath: repoPath, sessionID: "mcp-test", branch: "feat-mcp", baseRef: nil
+        ) else {
+            return XCTFail("Expected WorktreeManager().create to succeed")
         }
         XCTAssertTrue(FileManager.default.fileExists(atPath: path))
 

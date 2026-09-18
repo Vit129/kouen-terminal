@@ -1,5 +1,6 @@
 import Foundation
 import KouenCore
+import KouenIPC
 
 /// Zero-requirement marker conformance so `Result<_, JSONRPCError>` is usable
 /// (`spawnAgentSurface` below, P44a) — `JSONRPCError` already carries everything an
@@ -793,6 +794,145 @@ struct KouenDaemonTools: Sendable {
             "createdAt": .string(taskDateFormatter().string(from: task.createdAt)),
             "updatedAt": .string(taskDateFormatter().string(from: task.updatedAt)),
             "cwd": task.cwd.map(AnyCodable.string) ?? .null,
+        ])
+    }
+
+    // MARK: - Features / AI-SDLC (P46)
+
+    func featureList(repoPath: String?) async -> (AnyCodable?, JSONRPCError?) {
+        guard let response = await send(.featureList(repoPath: repoPath)) else {
+            return (nil, Self.daemonUnavailableError)
+        }
+        guard case let .features(features) = response else {
+            return (nil, JSONRPCError(code: -32000, message: "Unexpected response to featureList"))
+        }
+        return (toolResult(json: .array(features.map(Self.featureJSON))), nil)
+    }
+
+    func featureGet(slug: String) async -> (AnyCodable?, JSONRPCError?) {
+        guard let response = await send(.featureGet(slug: slug)) else {
+            return (nil, Self.daemonUnavailableError)
+        }
+        guard case let .featureInfo(feat) = response else {
+            return (nil, JSONRPCError(code: -32000, message: "Unexpected response to featureGet"))
+        }
+        guard let feat else {
+            return (nil, JSONRPCError(code: -32000, message: "Feature '\(slug)' not found"))
+        }
+        return (toolResult(json: Self.featureJSON(feat)), nil)
+    }
+
+    func featureCreate(
+        slug: String, repoPath: String?, branch: String?, baseBranch: String?,
+        worktreePath: String?, phase: String?
+    ) async -> (AnyCodable?, JSONRPCError?) {
+        let activeCWD = await getActiveCWD()
+        let repo = repoPath ?? activeCWD ?? FileManager.default.currentDirectoryPath
+        guard let response = await send(.featureCreate(
+            slug: slug, repoPath: repo, branch: branch, baseBranch: baseBranch,
+            worktreePath: worktreePath, phase: phase
+        )) else {
+            return (nil, Self.daemonUnavailableError)
+        }
+        guard case let .featureInfo(feat) = response, let feat else {
+            return (nil, JSONRPCError(code: -32000, message: "Unexpected response to featureCreate"))
+        }
+        let progressPath = KouenFeatureMarkdownSync.progressFileURL(for: feat.slug, repoPath: feat.repoPath).path
+        var res = Self.featureJSON(feat)
+        if case var .object(dict) = res {
+            dict["planMarkdownPath"] = .string(progressPath)
+            res = .object(dict)
+        }
+        return (toolResult(json: res), nil)
+    }
+
+    func featureApproveGate(
+        slug: String, gate: Int, approver: String, notes: String?
+    ) async -> (AnyCodable?, JSONRPCError?) {
+        guard let response = await send(.featureApproveGate(
+            slug: slug, gate: gate, approver: approver, notes: notes
+        )) else {
+            return (nil, Self.daemonUnavailableError)
+        }
+        guard case let .featureInfo(feat) = response, let feat else {
+            return (nil, JSONRPCError(code: -32000, message: "Feature '\(slug)' not found or approval failed"))
+        }
+        let progressPath = KouenFeatureMarkdownSync.progressFileURL(for: feat.slug, repoPath: feat.repoPath).path
+        var res = Self.featureJSON(feat)
+        if case var .object(dict) = res {
+            dict["updatedMarkdownPath"] = .string(progressPath)
+            res = .object(dict)
+        }
+        return (toolResult(json: res), nil)
+    }
+
+    func featureUpdatePhase(slug: String, phase: String) async -> (AnyCodable?, JSONRPCError?) {
+        guard let response = await send(.featureUpdatePhase(slug: slug, phase: phase)) else {
+            return (nil, Self.daemonUnavailableError)
+        }
+        guard case let .featureInfo(feat) = response, let feat else {
+            return (nil, JSONRPCError(code: -32000, message: "Feature '\(slug)' not found"))
+        }
+        return (toolResult(json: Self.featureJSON(feat)), nil)
+    }
+
+    func featurePreview(slug: String, fileType: String?) async -> (AnyCodable?, JSONRPCError?) {
+        guard let response = await send(.featureGet(slug: slug)) else {
+            return (nil, Self.daemonUnavailableError)
+        }
+        guard case let .featureInfo(feat) = response, let feat else {
+            return (nil, JSONRPCError(code: -32000, message: "Feature '\(slug)' not found"))
+        }
+        let fileURL: URL
+        if fileType == "architecture" {
+            fileURL = KouenFeatureMarkdownSync.architectureFileURL(for: feat.slug, repoPath: feat.repoPath)
+        } else {
+            fileURL = KouenFeatureMarkdownSync.progressFileURL(for: feat.slug, repoPath: feat.repoPath)
+        }
+        if FileManager.default.fileExists(atPath: fileURL.path) {
+            #if canImport(Darwin)
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+            process.arguments = [fileURL.path]
+            try? process.run()
+            #endif
+            return (toolResult(json: .object([
+                "status": .string("opened"),
+                "feature": .string(slug),
+                "path": .string(fileURL.path)
+            ])), nil)
+        } else {
+            return (nil, JSONRPCError(code: -32000, message: "File not found: \(fileURL.path)"))
+        }
+    }
+
+    private static func featureJSON(_ feat: FeatureSummary) -> AnyCodable {
+        .object([
+            "id": .string(feat.id.uuidString),
+            "slug": .string(feat.slug),
+            "repoPath": .string(feat.repoPath),
+            "phase": .string(feat.phase),
+            "branch": feat.branch.map(AnyCodable.string) ?? .null,
+            "baseBranch": feat.baseBranch.map(AnyCodable.string) ?? .null,
+            "worktreePath": feat.worktreePath.map(AnyCodable.string) ?? .null,
+            "supersededBy": feat.supersededBy.map(AnyCodable.string) ?? .null,
+            "gates": .array(feat.gates.map { g in
+                .object([
+                    "gate": .int(g.gate),
+                    "approver": .string(g.approver),
+                    "approved": .bool(g.approved),
+                    "notes": g.notes.map(AnyCodable.string) ?? .null,
+                    "timestamp": .string(taskDateFormatter().string(from: g.timestamp)),
+                ])
+            }),
+            "tasks": .array(feat.tasks.map { t in
+                .object([
+                    "id": .string(t.id.uuidString),
+                    "label": .string(t.label),
+                    "done": .bool(t.done),
+                    "artifacts": .array(t.artifacts.map(AnyCodable.string)),
+                ])
+            }),
         ])
     }
 

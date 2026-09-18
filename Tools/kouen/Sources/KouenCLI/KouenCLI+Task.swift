@@ -39,6 +39,8 @@ extension KouenCLI {
             try handleTaskDelete(Array(args.dropFirst()), client: client)
         case "sweep":
             try handleTaskSweep(Array(args.dropFirst()), client: client)
+        case "preview":
+            try handleTaskPreview(Array(args.dropFirst()), client: client)
         default:
             printTaskUsage()
             exit(1)
@@ -48,14 +50,15 @@ extension KouenCLI {
     private static func printTaskUsage() {
         fputs("""
         Usage:
-          kouen task new <slug> [--repo <path>] [--branch <name>] [--base <name>] [--worktree <path>] [--phase <phase>]
+          kouen task new <slug> [--repo <path>] [--branch <name>] [--base <name>] [--worktree <path>] [--phase <phase>] [--preview]
           kouen task status [<slug>] [--json]
           kouen task list [--repo <path>] [--json]
-          kouen task gate approve <slug> <1|2|3> [--approver <name>] [--notes <text>]
+          kouen task gate approve <slug> <1|2|3> [--approver <name>] [--notes <text>] [--preview]
           kouen task phase <slug> <interview|architect|qa-design|dev|qa-verify|completed>
           kouen task supersede <slug> <new-slug>
           kouen task delete <slug>
           kouen task sweep [--repo <path>]
+          kouen task preview [<slug>] [--file architecture|progress]
         \n
         """, kouenStderr)
     }
@@ -84,6 +87,12 @@ extension KouenCLI {
             print("Feature created: \(summary.slug) [\(summary.phase)]")
             if let b = summary.branch { print("  Branch: \(b) (base: \(summary.baseBranch ?? "main"))") }
             if let wt = summary.worktreePath { print("  Worktree: \(wt)") }
+            let progressFile = KouenFeatureMarkdownSync.progressFileURL(for: summary.slug, repoPath: summary.repoPath)
+            print("  Plan Markdown: \(progressFile.path)")
+            if args.contains("--preview") {
+                openMarkdownPreview(path: progressFile.path)
+                print("  Preview GUI: Opened in Kouen sidebar")
+            }
         } else {
             print("Feature created: \(slug)")
         }
@@ -202,6 +211,12 @@ extension KouenCLI {
         let resp = try checkedRequest(client, .featureApproveGate(slug: slug, gate: gateNum, approver: approver, notes: notes))
         if case let .featureInfo(summary) = resp, let feat = summary {
             print("Approved Gate \(gateNum) for '\(feat.slug)' by \(approver)")
+            let progressFile = KouenFeatureMarkdownSync.progressFileURL(for: feat.slug, repoPath: feat.repoPath)
+            print("  Updated: \(progressFile.path)")
+            if args.contains("--preview") {
+                openMarkdownPreview(path: progressFile.path)
+                print("  Preview GUI: Opened in Kouen sidebar")
+            }
         } else {
             print("Approved Gate \(gateNum) for '\(slug)'")
         }
@@ -252,5 +267,61 @@ extension KouenCLI {
         let repo = flagValue(args, flag: "--repo")
         _ = try checkedRequest(client, .featureSweepMerged(repoPath: repo))
         print("Merged-branch sweep completed.")
+    }
+
+    private static func handleTaskPreview(_ args: [String], client: DaemonClient) throws {
+        let slugArg = args.first(where: { !$0.hasPrefix("--") })
+        let fileType = flagValue(args, flag: "--file") ?? "progress" // "progress" or "architecture"
+
+        let targetSlug: String
+        let repoPath: String
+        if let slugArg {
+            targetSlug = slugArg
+            let resp = try checkedRequest(client, .featureGet(slug: targetSlug))
+            if case let .featureInfo(summary) = resp, let feat = summary {
+                repoPath = feat.repoPath
+            } else {
+                repoPath = FileManager.default.currentDirectoryPath
+            }
+        } else {
+            let cwd = FileManager.default.currentDirectoryPath
+            let resp = try checkedRequest(client, .featureList(repoPath: cwd))
+            if case let .features(list) = resp, let first = list.first {
+                targetSlug = first.slug
+                repoPath = first.repoPath
+            } else {
+                fputs("Usage: kouen task preview [<slug>] [--file architecture|progress]\n", kouenStderr)
+                exit(1)
+            }
+        }
+
+        let targetURL: URL
+        if fileType == "architecture" {
+            targetURL = KouenFeatureMarkdownSync.architectureFileURL(for: targetSlug, repoPath: repoPath)
+        } else {
+            targetURL = KouenFeatureMarkdownSync.progressFileURL(for: targetSlug, repoPath: repoPath)
+        }
+
+        guard FileManager.default.fileExists(atPath: targetURL.path) else {
+            fputs("Markdown file not found at: \(targetURL.path)\n", kouenStderr)
+            exit(1)
+        }
+
+        openMarkdownPreview(path: targetURL.path)
+        print("Opened Preview GUI for \(targetSlug) (\(targetURL.lastPathComponent))")
+    }
+
+    static func openMarkdownPreview(path: String) {
+        if ProcessInfo.processInfo.environment["KOUEN_SURFACE_ID"] != nil {
+            print("\u{1B}]7735;\(path)\u{07}", terminator: "")
+            fflush(stdout)
+        } else {
+            #if canImport(Darwin)
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+            process.arguments = [path]
+            try? process.run()
+            #endif
+        }
     }
 }
