@@ -181,6 +181,30 @@ final class FeatureStoreTests: XCTestCase {
         XCTAssertEqual(store.get(slug: "p46-sweep")?.phase, .completed)
     }
 
+    func testMarkdownSyncAndGateCheckboxUpdate() throws {
+        let repoDir = tempDir.appendingPathComponent("test-repo", isDirectory: true)
+        try FileManager.default.createDirectory(at: repoDir, withIntermediateDirectories: true)
+        let store = FeatureStore(url: storeURL)
+
+        let feat = store.create(slug: "feat-md-sync", repoPath: repoDir.path, phase: .architect)
+        let archURL = KouenFeatureMarkdownSync.architectureFileURL(for: feat.slug, repoPath: repoDir.path)
+        let progURL = KouenFeatureMarkdownSync.progressFileURL(for: feat.slug, repoPath: repoDir.path)
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: archURL.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: progURL.path))
+
+        let archContent = try String(contentsOf: archURL, encoding: .utf8)
+        XCTAssertTrue(archContent.contains("Architecture Design — feat-md-sync"))
+
+        var progContent = try String(contentsOf: progURL, encoding: .utf8)
+        XCTAssertTrue(progContent.contains("- [ ] Gate 1 (Architect design)"))
+
+        // Approve Gate 1
+        _ = store.approveGate(slug: "feat-md-sync", gate: 1, approver: "supavit.cho", notes: "LGTM")
+        progContent = try String(contentsOf: progURL, encoding: .utf8)
+        XCTAssertTrue(progContent.contains("- [x] Gate 1 (Architect design) — approver: supavit.cho"))
+    }
+
     @discardableResult
     private func shell(_ command: String, in dir: String) -> String? {
         let process = Process()

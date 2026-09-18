@@ -3,13 +3,13 @@ _Auto-generated from GRAPH_REPORT.md · do not edit manually_
 _Regen: `graphify update .`_
 
 ## Summary
-- 19797 nodes · 52945 edges · 2148 communities (617 shown, 1531 thin omitted)
-- Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 7797 edges (avg confidence: 0.74)
+- 19820 nodes · 53088 edges · 2157 communities (626 shown, 1531 thin omitted)
+- Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 7812 edges (avg confidence: 0.74)
 - Token cost: 0 input · 0 output
 
 
 ## Graph Freshness
-- Built from commit: `ed9f1acd`
+- Built from commit: `6b043ee8`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -24,7 +24,7 @@ _Regen: `graphify update .`_
 7. `u()` - 219 edges
 8. `IPCRequest` - 206 edges
 9. `SurfaceRegistry` - 203 edges
-10. `DaemonClient` - 188 edges
+10. `DaemonClient` - 189 edges
 
 
 ## Cross-Cutting Nodes (span the most distinct areas of the codebase)
@@ -33,14 +33,14 @@ utility/config file can rack up more edges than a real coupler while only
 ever touching one area. This ranks by how many DIFFERENT communities a
 node's neighbors span, not by raw edge count.
 1. `KouenPaths` - bridges 62 areas (139 edges)
-2. `SessionCoordinator` - bridges 56 areas (232 edges)
-3. `AgentKind` - bridges 54 areas (139 edges)
-4. `Process` - bridges 44 areas (92 edges)
-5. `SurfaceRegistry` - bridges 42 areas (203 edges)
-6. `SessionSnapshot` - bridges 42 areas (167 edges)
-7. `KouenTerminalSurfaceView` - bridges 37 areas (343 edges)
-8. `Notification` - bridges 37 areas (66 edges)
-9. `IPCResponse` - bridges 34 areas (102 edges)
+2. `SessionCoordinator` - bridges 57 areas (232 edges)
+3. `AgentKind` - bridges 47 areas (139 edges)
+4. `Process` - bridges 47 areas (94 edges)
+5. `SessionSnapshot` - bridges 39 areas (167 edges)
+6. `Notification` - bridges 38 areas (66 edges)
+7. `SurfaceRegistry` - bridges 37 areas (203 edges)
+8. `KouenTerminalSurfaceView` - bridges 36 areas (343 edges)
+9. `DaemonClient` - bridges 36 areas (189 edges)
 
 ## Surprising Connections (you probably didn't know these)
 - `.selectedHost` --references--> `RemoteHost`  [INFERRED]

@@ -62,6 +62,7 @@ public final class FeatureStore: @unchecked Sendable {
             let toSave = features
             lock.unlock()
             save(toSave)
+            KouenFeatureMarkdownSync.ensurePlanFilesExist(for: existing)
             return existing
         }
 
@@ -77,6 +78,7 @@ public final class FeatureStore: @unchecked Sendable {
         let toSave = features
         lock.unlock()
         save(toSave)
+        KouenFeatureMarkdownSync.ensurePlanFilesExist(for: feature)
         return feature
     }
 
@@ -93,6 +95,7 @@ public final class FeatureStore: @unchecked Sendable {
         let toSave = features
         lock.unlock()
         save(toSave)
+        KouenFeatureMarkdownSync.syncPhase(slug: slug, repoPath: updated.repoPath, phase: phase)
         return updated
     }
 
@@ -113,6 +116,7 @@ public final class FeatureStore: @unchecked Sendable {
         let toSave = features
         lock.unlock()
         save(toSave)
+        KouenFeatureMarkdownSync.syncGateApproval(slug: slug, repoPath: feature.repoPath, gate: gate, approver: approver, notes: notes)
         return feature
     }
 

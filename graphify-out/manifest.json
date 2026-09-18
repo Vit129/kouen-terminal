@@ -2765,8 +2765,8 @@
     "semantic_hash": ""
   },
   "Tests/KouenDaemonTests/WorktreeMCPIPCDaemonTests.swift": {
-    "mtime": 1785510867.647891,
-    "ast_hash": "c6b1445d6f227bbbd779d5b214e9b445",
+    "mtime": 1789717683.0543976,
+    "ast_hash": "ce359c2bad34774296df8e0dfdf19e2c",
     "semantic_hash": ""
   },
   "Tests/KouenMCPTests/KouenBrowserToolsTests.swift": {
@@ -3155,8 +3155,8 @@
     "semantic_hash": ""
   },
   "Tools/kouen-mcp/Sources/KouenMCP/KouenDaemonTools.swift": {
-    "mtime": 1789634601.0741904,
-    "ast_hash": "6e6e0c095dd6f8c907833071f9fa8573",
+    "mtime": 1789716715.1294658,
+    "ast_hash": "f9d65d297b86e8fde38ad13852855851",
     "semantic_hash": ""
   },
   "Tools/kouen-mcp/Sources/KouenMCP/MCPServer.swift": {
@@ -3180,8 +3180,8 @@
     "semantic_hash": ""
   },
   "Tools/kouen-mcp/Sources/KouenMCP/ToolRegistry.swift": {
-    "mtime": 1789636551.652625,
-    "ast_hash": "a7bd742465978278eed91570feb3d6f4",
+    "mtime": 1789716477.7720032,
+    "ast_hash": "73b1429913ea8d097211aba659919129",
     "semantic_hash": ""
   },
   "Tools/kouen/Sources/KouenCLI/AgentHookInstaller.swift": {
@@ -4215,8 +4215,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Features/FeatureStore.swift": {
-    "mtime": 1789713620.503997,
-    "ast_hash": "faca1c7d3dee349e4652f20e58033ec1",
+    "mtime": 1789715942.7775931,
+    "ast_hash": "57b262f67558dd2b2708354e0c1bc6b2",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Features/KouenFeature.swift": {
@@ -4235,13 +4235,18 @@
     "semantic_hash": ""
   },
   "Tests/KouenCoreTests/FeatureStoreTests.swift": {
-    "mtime": 1789714069.242944,
-    "ast_hash": "3dc252c84e5ebec47520ec62dbd4f3c1",
+    "mtime": 1789717261.4650593,
+    "ast_hash": "b6dfc66eb3e714823b1b497998215377",
     "semantic_hash": ""
   },
   "Tools/kouen/Sources/KouenCLI/KouenCLI+Task.swift": {
-    "mtime": 1789713867.7472298,
-    "ast_hash": "d8aad10e7f8facbce037b626b1ca7812",
+    "mtime": 1789716104.9007962,
+    "ast_hash": "39d8f7377d78b0f1e066de8d76fc74bc",
+    "semantic_hash": ""
+  },
+  "Packages/KouenCore/Sources/KouenCore/Features/KouenFeatureMarkdownSync.swift": {
+    "mtime": 1789715899.906507,
+    "ast_hash": "b25b98cbd336121e9fd4f2732ed7ff09",
     "semantic_hash": ""
   }
 }
