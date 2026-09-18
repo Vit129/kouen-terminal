@@ -35,6 +35,8 @@ final class KouenSidebarPanelViewController: NSViewController {
     private var sessionHostingView: NSView?
     private var jobsHostingView: NSView?
     private let jobsModel = AutomationsFleetModel()
+    private var sessionHistoryHostingView: NSView?
+    let sessionHistoryModel = AgentSessionHistoryModel()
     private var issueTrackerHostingView: NSView?
     // Project & Workspace Storage (Orca Session == Project)
     let projectStore = ProjectStore()
@@ -78,6 +80,7 @@ final class KouenSidebarPanelViewController: NSViewController {
         setupFileTree()
         setupFileViewer()
         setupJobsView()
+        setupSessionHistoryView()
         // TODO: Issues tab disabled — re-enable with setupIssuesView() once Jira domain config UI + Azure impl are complete
         // setupIssuesView()
         selectSidebarTab(index: 0)
@@ -597,6 +600,39 @@ final class KouenSidebarPanelViewController: NSViewController {
         ])
     }
 
+    private func setupSessionHistoryView() {
+        let historyView = AgentSessionHistoryView(
+            model: sessionHistoryModel,
+            onResume: { [weak self] record in
+                self?.resumeAgentSession(record)
+            },
+            onViewLog: { [weak self] record in
+                self?.previewFile(path: record.transcriptPath)
+            }
+        )
+        let hosting = NSHostingView(rootView: historyView)
+        hosting.translatesAutoresizingMaskIntoConstraints = false
+        hosting.isHidden = true
+        sessionHistoryHostingView = hosting
+        view.addSubview(hosting)
+        NSLayoutConstraint.activate([
+            hosting.topAnchor.constraint(equalTo: sectionLabelHostingView.bottomAnchor),
+            hosting.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            hosting.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            hosting.bottomAnchor.constraint(equalTo: footerHostingView.topAnchor),
+        ])
+    }
+
+    private func resumeAgentSession(_ record: AgentSessionRecord) {
+        let cmd = record.agentKind.resumeCommand(sessionID: record.id)
+        let req = DefaultTerminalLaunchRequest(
+            command: cmd,
+            cwd: record.projectPath,
+            title: "\(record.agentKind.displayName): \(record.projectName)"
+        )
+        SessionCoordinator.shared.sessionLifecycleService.openDefaultTerminalLaunch(req)
+    }
+
     private func setupIssuesView() {
         let hosting = NSHostingView(rootView: IssueTrackerPanelView())
         hosting.translatesAutoresizingMaskIntoConstraints = false
@@ -711,7 +747,7 @@ final class KouenSidebarPanelViewController: NSViewController {
             fileTreeView.isHidden = fileViewerVC.view.isHidden == false
         }
         jobsHostingView?.isHidden = index != 2
-        // issueTrackerHostingView?.isHidden = index != 3  // Issues tab disabled — see TODO in viewDidLoad
+        sessionHistoryHostingView?.isHidden = index != 3
         switch index {
         case 1:
             sidebarSectionModel.text = "FILES"
@@ -728,6 +764,10 @@ final class KouenSidebarPanelViewController: NSViewController {
             Task { @MainActor in
                 await self.jobsModel.load()
             }
+        case 3:
+            sidebarSectionModel.text = "SESSION HISTORY"
+            sidebarSectionModel.isRepoHeader = false
+            sessionHistoryModel.refresh(force: false)
         default:
             sidebarSectionModel.isRepoHeader = true
             updateRepoSectionHeader()

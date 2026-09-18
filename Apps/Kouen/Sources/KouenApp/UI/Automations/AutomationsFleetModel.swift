@@ -105,12 +105,13 @@ final class AutomationsFleetModel {
         }
 
         if !filterText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            let q = filterText.lowercased()
-            items = items.filter {
-                $0.name.lowercased().contains(q) ||
-                $0.prompt.lowercased().contains(q) ||
-                $0.repoPath.lowercased().contains(q) ||
-                $0.agentKind.displayName.lowercased().contains(q)
+            let matcher = SearchMatcher(query: filterText)
+            items = items.filter { item in
+                matcher.match(
+                    name: "\(item.name) \(item.agentKind.displayName)",
+                    relativePath: item.repoPath,
+                    content: item.prompt
+                ) != nil
             }
         }
 

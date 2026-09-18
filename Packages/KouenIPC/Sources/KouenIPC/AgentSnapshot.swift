@@ -81,6 +81,20 @@ public enum AgentKind: String, Codable, Sendable, CaseIterable {
         case .generic: return "9aa0a6"
         }
     }
+
+    /// Shell command to resume a session given its session ID.
+    public func resumeCommand(sessionID: String) -> String {
+        switch self {
+        case .claudeCode:
+            return "claude --resume \(sessionID)"
+        case .antigravity:
+            return "agy --conversation \(sessionID)"
+        case .codex:
+            return "codex resume \(sessionID)"
+        default:
+            return "claude --resume \(sessionID)"
+        }
+    }
 }
 
 public enum AgentActivity: String, Codable, Sendable {

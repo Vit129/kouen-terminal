@@ -2,6 +2,7 @@ import Foundation
 
 /// Thread-safe storage for `KouenFeature` instances, mirroring `AutomationStore`'s persistence architecture.
 public final class FeatureStore: @unchecked Sendable {
+    public static let shared = FeatureStore()
     private var features: [KouenFeature] = []
     private let lock = NSLock()
     private let url: URL

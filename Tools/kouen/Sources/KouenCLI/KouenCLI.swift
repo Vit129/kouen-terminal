@@ -9,7 +9,7 @@ import KouenTheme
 
 @main
 struct KouenCLI {
-    static func main() {
+    static func main() async {
         let args = Array(CommandLine.arguments.dropFirst())
         guard let command = args.first else {
             printUsage()
@@ -107,6 +107,8 @@ struct KouenCLI {
                 try Self.handleAgent(args, client: client)
             case "task":
                 try Self.handleTask(Array(args.dropFirst()), client: client)
+            case "context":
+                try await Self.handleContext(Array(args.dropFirst()), client: client)
             case "cc":
                 try Self.handleClaudeCode(Array(args.dropFirst()), client: client)
             case "board":
