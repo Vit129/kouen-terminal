@@ -150,7 +150,6 @@ extension KouenSidebarPanelViewController {
         SessionCoordinator.shared.selectSession(workspaceID: activeWorkspaceID, sessionID: session.id)
         if let cwd = session.activeTab?.cwd ?? session.tabs.first?.cwd {
             fileTreeView.updateRoot(path: cwd, sessionID: session.id)
-            gitPanelView.updateRoot(path: cwd)
             lastFileTreeSessionID = session.id
             lastFileTreeGitBranch = nil
         }

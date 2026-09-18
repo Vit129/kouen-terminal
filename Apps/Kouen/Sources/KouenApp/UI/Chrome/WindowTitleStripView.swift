@@ -121,23 +121,14 @@ final class WindowTitleStripView: NSView {
     }
 
     /// Show the active tab's directory as `· basename`, Ghostty-style. Empty cwd hides the readout
-    /// (the strip stays as a drag handle).
-    func setPath(_ cwd: String, gitBranch: String? = nil) {
+    /// (the strip stays as a drag handle). Branch is shown by the session row itself
+    /// (`SidebarSessionItemRow`) — dropped here to stop double-showing the same branch text.
+    func setPath(_ cwd: String) {
         let name = KouenDesign.pathDisplayName(cwd)
-        let hasBranch = !(gitBranch ?? "").isEmpty
         let hasPath = !name.isEmpty
-        let hasContent = hasPath || hasBranch
         folderIcon.isHidden = !hasPath
-        label.isHidden = !hasContent
-        if hasBranch && hasPath {
-            label.stringValue = "·  \(name)  (⎇ \(gitBranch!))"
-        } else if hasBranch {
-            label.stringValue = "·  ⎇ \(gitBranch!)"
-        } else if hasPath {
-            label.stringValue = "·  \(name)"
-        } else {
-            label.stringValue = ""
-        }
+        label.isHidden = !hasPath
+        label.stringValue = hasPath ? "·  \(name)" : ""
         toolTip = hasPath ? KouenDesign.shortenPath(cwd) : nil
     }
 

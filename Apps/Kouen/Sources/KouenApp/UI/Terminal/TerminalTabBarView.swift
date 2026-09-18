@@ -108,9 +108,19 @@ final class TerminalTabBarView: NSView {
         model.activeTabID = activeTabID
     }
 
+    private var heightConstraint: NSLayoutConstraint?
+
     func applyChrome() {
         KouenDesign.applyTabBarChrome(to: self)
+        updateTrafficLightClearance()
         model.chromeEpoch += 1
+    }
+
+    func updateTrafficLightClearance() {
+        let h = KouenDesign.tabBarHeight
+        if heightConstraint?.constant != h {
+            heightConstraint?.constant = h
+        }
     }
 
     func setLeadingInset(_ inset: CGFloat) {
@@ -127,6 +137,7 @@ final class TerminalTabBarView: NSView {
 
         let height = heightAnchor.constraint(equalToConstant: KouenDesign.tabBarHeight)
         height.priority = .defaultHigh
+        heightConstraint = height
 
         NSLayoutConstraint.activate([
             hostingView.leadingAnchor.constraint(equalTo: leadingAnchor),
@@ -163,8 +174,12 @@ private struct TerminalTabBarBody: View {
             let overflowTabs = overflowTabs(visibleRange: visibleRange)
 
             HStack(spacing: pillSpacing) {
+                // Mirrors the trailing Spacer below (`edgeInset + model.trailingInset`) — this
+                // was a fixed `edgeInset`-only frame that silently ignored `model.leadingInset`,
+                // so every caller setting it (sidebarToggle clearance, traffic-light inset) had
+                // zero visual effect on the leading side even though the value was set correctly.
                 Color.clear
-                    .frame(width: edgeInset)
+                    .frame(width: edgeInset + model.leadingInset)
 
                 ForEach(Array(visibleRange), id: \.self) { index in
                     let tab = model.tabs[index]
@@ -238,7 +253,7 @@ private struct TerminalTabBarBody: View {
                     .frame(height: 1)
             }
         }
-        .frame(height: KouenDesign.tabBarHeight)
+        .ignoresSafeArea()
     }
 
     private func layoutMetrics(availableWidth: CGFloat) -> TabBarLayoutMetrics {
@@ -344,24 +359,33 @@ private struct TabPillView: View {
         HStack(spacing: KouenDesign.Spacing.xs) {
             workingDot
 
-            if let kind = tab.effectiveAgentKind {
-                ZStack(alignment: .bottomTrailing) {
-                    Image(nsImage: AgentIconRenderer.templateOrMonogramImage(for: kind, size: 12))
-                        .resizable()
-                        .renderingMode(.template)
-                        .foregroundStyle(agentColor(for: kind))
-                        .frame(width: 12, height: 12)
-
+            let detected = tab.allDetectedAgents
+            if !detected.isEmpty {
+                HStack(spacing: 3) {
+                    ForEach(detected.prefix(3)) { snap in
+                        Image(nsImage: AgentIconRenderer.templateOrMonogramImage(for: snap.kind, size: 12))
+                            .resizable()
+                            .renderingMode(.template)
+                            .foregroundStyle(agentColor(for: snap.kind))
+                            .frame(width: 12, height: 12)
+                            .help(snap.kind.rawValue)
+                    }
                     if let subagents = tab.subagents, !subagents.isEmpty {
                         Text("+\(subagents.count)")
                             .font(.system(size: 7, weight: .bold))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 2)
                             .background(Circle().fill(Color(c.accent)))
-                            .offset(x: 4, y: 3)
+                            .offset(x: 2, y: 0)
                     }
                 }
-                .help(subagentTooltip(kind: kind, subagents: tab.subagents ?? []))
+            } else if let kind = tab.effectiveAgentKind {
+                Image(nsImage: AgentIconRenderer.templateOrMonogramImage(for: kind, size: 12))
+                    .resizable()
+                    .renderingMode(.template)
+                    .foregroundStyle(agentColor(for: kind))
+                    .frame(width: 12, height: 12)
+                    .help(kind.rawValue)
             }
 
             VStack(alignment: .leading, spacing: -1) {
@@ -492,6 +516,13 @@ private struct TabPillView: View {
             }
             Button("Split Down") {
                 model.delegate?.tabBarDidRequestSplit(tabID: tab.id, direction: .horizontal)
+            }
+            Divider()
+            Button("Open Lazygit on Right (⌘G)") {
+                SessionCoordinator.shared.openLazygit(direction: .horizontal)
+            }
+            Button("Open Lazygit on Bottom (⇧⌘G)") {
+                SessionCoordinator.shared.openLazygit(direction: .vertical)
             }
         }
         .gesture(dragGesture)

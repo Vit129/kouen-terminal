@@ -1,5 +1,6 @@
 import AppKit
 import KouenCore
+import os
 
 extension KouenSidebarPanelViewController {
     // MARK: - Session kebab menu
@@ -9,6 +10,7 @@ extension KouenSidebarPanelViewController {
     /// close via `closeSession`, and clipboard copies handled locally. Returned for
     /// AppKit to position at the cursor (no manual `popUp`).
     func sessionActionsMenu(for session: SessionGroup) -> NSMenu {
+        Logger(subsystem: "com.vit129.kouen", category: "sidebar").debug("sessionActionsMenu(for:) built for session \(session.id.uuidString, privacy: .public)")
         let menu = NSMenu()
 
         let rename = NSMenuItem(title: "Rename session…", action: #selector(renameSessionFromMenu(_:)), keyEquivalent: "")

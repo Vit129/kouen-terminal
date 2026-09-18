@@ -152,6 +152,9 @@ public struct SessionEditor: Sendable {
         guard selectSurface(in: &tab.rootPane, paneID: paneID, surfaceID: surfaceID) else { return false }
         tab.lastActivePaneID = tab.activePaneID
         tab.activePaneID = paneID
+        if let paneMap = tab.paneAgents, let activeAgent = paneMap[surfaceID.uuidString] {
+            tab.agent = activeAgent
+        }
         snapshot.workspaces[match.workspaceIndex].sessions[match.sessionIndex].tabs[match.tabIndex] = tab
         bumpRevision()
         return true
@@ -1007,9 +1010,26 @@ public struct SessionEditor: Sendable {
         if let last = tab.lastActivePaneID, last == paneID || !remaining.contains(last) {
             tab.lastActivePaneID = nil
         }
-        if let active = tab.activePaneID, active != paneID, remaining.contains(active) { return }
+        if let active = tab.activePaneID, active != paneID, remaining.contains(active) {
+            cleanPaneAgents(&tab)
+            return
+        }
         tab.activePaneID = tab.lastActivePaneID ?? remaining.first
         tab.lastActivePaneID = nil
+        cleanPaneAgents(&tab)
+    }
+
+    private func cleanPaneAgents(_ tab: inout Tab) {
+        guard var paneMap = tab.paneAgents else { return }
+        let activeSurfaces = Set(tab.rootPane.allSurfaceIDs().map(\.uuidString))
+        paneMap = paneMap.filter { activeSurfaces.contains($0.key) }
+        tab.paneAgents = paneMap.isEmpty ? nil : paneMap
+        let activeKey = tab.activePaneID.flatMap { surfaceID(forPaneID: $0, in: tab.rootPane)?.uuidString }
+        if let activeKey, let activeAgent = paneMap[activeKey] {
+            tab.agent = activeAgent
+        } else {
+            tab.agent = paneMap.values.first
+        }
     }
 
     private func removePane(_ node: inout PaneNode, target: PaneID) -> Bool {
@@ -1236,7 +1256,24 @@ public struct SessionEditor: Sendable {
 
     public mutating func setAgent(_ agent: AgentSnapshot?, forSurfaceKey key: String) {
         guard let match = tabIndex(surfaceKey: key) else { return }
-        snapshot.workspaces[match.workspaceIndex].sessions[match.sessionIndex].tabs[match.tabIndex].agent = agent
+        var tab = snapshot.workspaces[match.workspaceIndex].sessions[match.sessionIndex].tabs[match.tabIndex]
+        var paneMap = tab.paneAgents ?? [:]
+        if let agent {
+            paneMap[key] = agent
+        } else {
+            paneMap.removeValue(forKey: key)
+        }
+        tab.paneAgents = paneMap.isEmpty ? nil : paneMap
+
+        let activeKey = tab.activePaneID.flatMap { surfaceID(forPaneID: $0, in: tab.rootPane)?.uuidString }
+        if let activeKey, let activeAgent = paneMap[activeKey] {
+            tab.agent = activeAgent
+        } else if let agent {
+            tab.agent = agent
+        } else {
+            tab.agent = paneMap.values.first
+        }
+        snapshot.workspaces[match.workspaceIndex].sessions[match.sessionIndex].tabs[match.tabIndex] = tab
         bumpRevision()
     }
 

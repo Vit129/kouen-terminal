@@ -17,7 +17,7 @@ enum KouenDesign {
 
     static let sidebarWidth: CGFloat = 220
     static let titlebarChromeHeight: CGFloat = 44
-    static let tabBarHeight: CGFloat = 34
+    static let tabBarHeight: CGFloat = 38
     static let workspaceBarHeight: CGFloat = 42
     static let sessionRowHeight: CGFloat = 54
     static let footerHeight: CGFloat = 40
@@ -297,6 +297,12 @@ enum KouenDesign {
     static func projectGroupRootPath(for path: String) -> String {
         let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return "Sessions" }
+
+        // If path is inside Kouen's worktree dir, group under the parent repo root
+        if let range = trimmed.range(of: "/.kouen-worktrees") {
+            let parentRoot = String(trimmed[..<range.lowerBound])
+            if !parentRoot.isEmpty { return parentRoot }
+        }
 
         let manager = FileManager.default
         var isDirectory: ObjCBool = false

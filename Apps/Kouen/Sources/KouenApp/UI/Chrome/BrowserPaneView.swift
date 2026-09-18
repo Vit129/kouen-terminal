@@ -43,6 +43,7 @@ public final class BrowserPaneView: NSView {
     /// "Copy CSS", kept in sync as the user edits each field.
     private var designModeCurrentStyles: [String: String] = [:]
     private var designModeCurrentSelector = ""
+    public static var lastDesignModeInfo: [String: Any]?
     /// Called when user taps the close (×) button in the toolbar.
     public var onClosePaneRequested: (() -> Void)?
     /// Called when user taps "View Source" while showing a local .html/.htm file:// URL.
@@ -938,6 +939,13 @@ public final class BrowserPaneView: NSView {
     private func showDesignModePopover(for info: DesignModeElementInfo) {
         designModeCurrentStyles = info.styles
         designModeCurrentSelector = Self.cssSelector(for: info)
+        Self.lastDesignModeInfo = [
+            "selector": designModeCurrentSelector,
+            "tag": info.tag,
+            "id": info.id,
+            "className": info.className,
+            "styles": info.styles
+        ]
         designModePopover?.close()
 
         var title = info.tag
@@ -949,7 +957,8 @@ public final class BrowserPaneView: NSView {
         popover.contentViewController = DesignModePopoverViewController(
             title: title, properties: Self.designModeStyleProps, styles: info.styles,
             onStyleChanged: { [weak self] prop, value in self?.applyLiveStyle(prop: prop, value: value) },
-            onCopyCSS: { [weak self] in self?.copyDesignModeCSS() }
+            onCopyCSS: { [weak self] in self?.copyDesignModeCSS() },
+            onPromptAgent: { [weak self] in self?.promptAgentWithDesignModeCSS() }
         )
         popover.show(relativeTo: designModeButton.bounds, of: designModeButton, preferredEdge: .maxY)
         designModePopover = popover
@@ -980,6 +989,37 @@ public final class BrowserPaneView: NSView {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(block, forType: .string)
         Toast.show("CSS copied", in: self)
+    }
+
+    private func promptAgentWithDesignModeCSS() {
+        let body = Self.designModeStyleProps
+            .compactMap { prop -> String? in
+                guard let value = designModeCurrentStyles[prop] else { return nil }
+                return "  \(Self.cssPropertyName(prop)): \(value);"
+            }
+            .joined(separator: "\n")
+        let selector = designModeCurrentSelector.isEmpty ? ".selected-element" : designModeCurrentSelector
+        let prompt = """
+        [Design Mode Style Update]
+        Target Element: `\(selector)`
+        Updated CSS:
+        ```css
+        \(selector) {
+        \(body)
+        }
+        ```
+        Please update the styles in the project to apply these design changes.
+        
+        """
+        guard let surfaceID = SessionCoordinator.shared.activeSurfaceID else {
+            copyDesignModeCSS()
+            Toast.show("No active terminal — CSS copied", in: self)
+            return
+        }
+        Task {
+            await SessionCoordinator.shared.requestDaemon(.sendData(surfaceID: surfaceID.uuidString, data: Data(prompt.utf8)))
+            Toast.show("✓ Sent style prompt to active agent", in: self)
+        }
     }
 
     /// Real selector for the clicked element — `#id` wins outright (IDs are unique, no tag
@@ -1604,14 +1644,18 @@ private final class DesignModePopoverViewController: NSViewController {
     private let properties: [String]
     private let onStyleChanged: (String, String) -> Void
     private let onCopyCSS: () -> Void
+    private let onPromptAgent: () -> Void
 
     init(
         title: String, properties: [String], styles: [String: String],
-        onStyleChanged: @escaping (String, String) -> Void, onCopyCSS: @escaping () -> Void
+        onStyleChanged: @escaping (String, String) -> Void,
+        onCopyCSS: @escaping () -> Void,
+        onPromptAgent: @escaping () -> Void
     ) {
         self.properties = properties
         self.onStyleChanged = onStyleChanged
         self.onCopyCSS = onCopyCSS
+        self.onPromptAgent = onPromptAgent
         self.styles = styles
         super.init(nibName: nil, bundle: nil)
         self.title = title
@@ -1657,7 +1701,15 @@ private final class DesignModePopoverViewController: NSViewController {
 
         let copyButton = NSButton(title: "Copy CSS", target: self, action: #selector(copyClicked))
         copyButton.bezelStyle = .rounded
-        stack.addArrangedSubview(copyButton)
+
+        let promptButton = NSButton(title: "Prompt Agent to Apply", target: self, action: #selector(promptClicked))
+        promptButton.bezelStyle = .rounded
+        promptButton.contentTintColor = NSColor.systemBlue
+
+        let buttonRow = NSStackView(views: [copyButton, promptButton])
+        buttonRow.orientation = .horizontal
+        buttonRow.spacing = 8
+        stack.addArrangedSubview(buttonRow)
 
         view = stack
     }
@@ -1669,5 +1721,9 @@ private final class DesignModePopoverViewController: NSViewController {
 
     @objc private func copyClicked() {
         onCopyCSS()
+    }
+
+    @objc private func promptClicked() {
+        onPromptAgent()
     }
 }

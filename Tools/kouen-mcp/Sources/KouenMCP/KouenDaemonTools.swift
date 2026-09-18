@@ -844,6 +844,7 @@ struct KouenDaemonTools: Sendable {
             "branch": info.branch.map(AnyCodable.string) ?? .null,
             "head": .string(info.head),
             "bare": .bool(info.bare),
+            "baseBranch": info.baseBranch.map(AnyCodable.string) ?? .null,
         ])
     }
 

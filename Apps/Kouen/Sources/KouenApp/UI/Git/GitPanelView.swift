@@ -49,8 +49,9 @@ final class GitPanelView: NSView {
         }
     }
 
-    // Top tabs: Changes | History | Worktrees
-    private let tabSelector = NSSegmentedControl(labels: ["Changes", "History", "Worktrees"], trackingMode: .selectOne, target: nil, action: nil)
+    // Top tabs: Changes | History
+    // NOTE: Worktrees tab removed — worktrees are now surfaced in the Sessions sidebar (Phase 2 card view + worktree section).
+    private let tabSelector = NSSegmentedControl(labels: ["Changes", "History"], trackingMode: .selectOne, target: nil, action: nil)
     private let changesContainer = NSView()
     private let historyContainer = NSView()
     private let worktreesContainer = NSView()
@@ -428,8 +429,9 @@ final class GitPanelView: NSView {
         commitButton.isHidden = selected != 0
         stageAllButton.isHidden = selected != 0
         historyContainer.isHidden = selected != 1
-        worktreesContainer.isHidden = selected != 2
-        addWorktreeButton.isHidden = selected != 2
+        // worktreesContainer / addWorktreeButton always hidden — tab removed, see tabSelector comment above
+        worktreesContainer.isHidden = true
+        addWorktreeButton.isHidden = true
     }
 
     // MARK: - Actions
@@ -742,7 +744,12 @@ final class GitPanelView: NSView {
     /// against the merge-base, not just the latest commit. Matches `refreshWorktrees`' existing
     /// `git branch --merged main` base-branch assumption rather than introducing a second one.
     private func fetchWorktreeDiff(worktreePath: String) async -> String {
-        await Self.runGitDiff(["diff", "--stat", "--patch", "main...HEAD"], in: worktreePath)
+        let repo = currentPath ?? worktreePath
+        let branch = await runGit(["branch", "--show-current"], in: worktreePath).trimmingCharacters(in: .whitespacesAndNewlines)
+        let base = WorktreeManager().baseBranch(for: branch, in: repo) ?? "main"
+        let diff = await Self.runGitDiff(["diff", "--stat", "--patch", "\(base)...HEAD"], in: worktreePath)
+        if !diff.isEmpty { return diff }
+        return await Self.runGitDiff(["diff", "--stat", "--patch", "main...HEAD"], in: worktreePath)
     }
 
     @objc private func previewWorktreeDiffAction(_ sender: NSButton) {
@@ -750,11 +757,22 @@ final class GitPanelView: NSView {
         Task {
             let detail = await fetchWorktreeDiff(worktreePath: worktreePath)
             guard !detail.isEmpty else {
-                DisplayMessage.show("No changes vs main")
+                DisplayMessage.show("No changes vs base")
                 return
             }
             guard sender.window != nil else { return }
-            self.presentCommitDetail(detail, anchor: sender)
+            let branch = await runGit(["branch", "--show-current"], in: worktreePath).trimmingCharacters(in: .whitespacesAndNewlines)
+            let base = WorktreeManager().baseBranch(for: branch, in: worktreePath) ?? "main"
+            let safeName = "\(branch.replacingOccurrences(of: "/", with: "_"))_vs_\(base)"
+            let tmpDir = NSTemporaryDirectory() + "kouen-diff/"
+            try? FileManager.default.createDirectory(atPath: tmpDir, withIntermediateDirectories: true)
+            let tmpPath = tmpDir + "\(safeName).diff"
+            try? detail.write(toFile: tmpPath, atomically: true, encoding: .utf8)
+            if let split = self.window?.contentViewController as? MainSplitViewController {
+                split.contentVC.openFileTab(path: tmpPath)
+            } else {
+                self.presentCommitDetail(detail, anchor: sender)
+            }
         }
     }
 
@@ -1589,7 +1607,7 @@ final class GitPanelView: NSView {
     /// unit-testable without a live `SessionCoordinator`.
     /// Parses `git worktree list --porcelain` output (blank-line-separated blocks) plus
     /// `git branch --merged main --format=%(refname:short)` output into entries.
-    nonisolated static func parseWorktreePorcelain(_ output: String, mergedBranchOutput: String) -> [WorktreeEntry] {
+    nonisolated static func parseWorktreePorcelain(_ output: String, mergedBranchOutput: String = "") -> [WorktreeEntry] {
         let entries = output.components(separatedBy: "\n\n").enumerated().compactMap { index, block -> WorktreeEntry? in
             let lines = block.components(separatedBy: "\n").filter { !$0.isEmpty }
             guard let worktreeLine = lines.first(where: { $0.hasPrefix("worktree ") }),
@@ -1604,12 +1622,30 @@ final class GitPanelView: NSView {
             let isLocked = lines.contains { line in
                 line == "locked" || line.hasPrefix("locked ")
             }
-            return WorktreeEntry(path: worktreePath, head: head, branch: branch, isMain: index == 0, isLocked: isLocked, isMerged: false)
+            return WorktreeEntry(
+                path: worktreePath,
+                head: head,
+                branch: branch,
+                baseBranch: "main",
+                aheadBehind: nil,
+                isMain: index == 0,
+                isLocked: isLocked,
+                isMerged: false
+            )
         }
 
         let mergedBranches = Set(mergedBranchOutput.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty })
         return entries.map { entry in
-            WorktreeEntry(path: entry.path, head: entry.head, branch: entry.branch, isMain: entry.isMain, isLocked: entry.isLocked, isMerged: mergedBranches.contains(entry.branch))
+            WorktreeEntry(
+                path: entry.path,
+                head: entry.head,
+                branch: entry.branch,
+                baseBranch: entry.baseBranch,
+                aheadBehind: entry.aheadBehind,
+                isMain: entry.isMain,
+                isLocked: entry.isLocked,
+                isMerged: mergedBranches.contains(entry.branch)
+            )
         }
     }
 
@@ -1902,38 +1938,47 @@ final class GitPanelView: NSView {
         titleRow.spacing = 5
         titleRow.translatesAutoresizingMaskIntoConstraints = false
 
-        var metaText: String
-        let taskPart = task.map { " · Task: \($0.title) — \($0.status.rawValue)" } ?? ""
+        var metaParts: [String] = []
         if worktree.isMerged {
-            metaText = "✓ merged · \(worktree.branch)\(taskPart)"
-        } else if let agent {
-            metaText = "\(worktree.branch) · \(agent.kind.displayName) — \(agent.activity.rawValue)\(taskPart)"
-        } else if task != nil {
-            metaText = "\(worktree.branch)\(taskPart)"
-        } else {
-            metaText = worktree.branch
+            metaParts.append("✓ merged into \(worktree.baseBranch)")
+        } else if let div = worktree.aheadBehind {
+            if div.behind > 0 {
+                metaParts.append("⚠️ behind \(div.behind) vs \(worktree.baseBranch)")
+            }
+            if div.ahead > 0 {
+                metaParts.append("↑\(div.ahead) vs \(worktree.baseBranch)")
+            }
         }
+        metaParts.append(worktree.branch)
+        if let agent {
+            metaParts.append("\(agent.kind.displayName) — \(agent.activity.rawValue)")
+        }
+        if let task {
+            metaParts.append("Task: \(task.title) — \(task.status.rawValue)")
+        }
+        let metaText = metaParts.joined(separator: " · ")
         let meta = NSTextField(labelWithString: metaText)
         meta.font = .systemFont(ofSize: 10)
-        meta.textColor = worktree.isMerged ? NSColor.systemGreen : KouenDesign.chrome.textTertiary
+        meta.textColor = worktree.isMerged ? NSColor.systemGreen : (worktree.aheadBehind?.behind ?? 0 > 0 ? NSColor.systemOrange : KouenDesign.chrome.textTertiary)
         meta.lineBreakMode = .byTruncatingTail
         meta.translatesAutoresizingMaskIntoConstraints = false
 
         let removeButton = SoftIconButton(frame: NSRect(x: 0, y: 0, width: 20, height: 20))
-        removeButton.setSymbol("xmark", accessibilityDescription: "Remove worktree", pointSize: 9, weight: .semibold)
+        let removeSymbol = worktree.isMerged ? "trash" : "xmark"
+        removeButton.setSymbol(removeSymbol, accessibilityDescription: "Remove worktree", pointSize: 9, weight: .semibold)
         removeButton.target = self
         removeButton.action = #selector(removeWorktreeAction(_:))
         removeButton.identifier = NSUserInterfaceItemIdentifier(worktree.path)
-        removeButton.toolTip = worktree.isMerged ? "Remove (merged — safe)" : "Remove (unmerged)"
+        removeButton.toolTip = worktree.isMerged ? "Prune merged worktree (safe)" : "Remove (unmerged)"
         removeButton.isHidden = worktree.isMain
         removeButton.translatesAutoresizingMaskIntoConstraints = false
 
         let diffButton = SoftIconButton(frame: NSRect(x: 0, y: 0, width: 20, height: 20))
-        diffButton.setSymbol("magnifyingglass", accessibilityDescription: "Diff vs main", pointSize: 9, weight: .semibold)
+        diffButton.setSymbol("magnifyingglass", accessibilityDescription: "Diff vs \(worktree.baseBranch)", pointSize: 9, weight: .semibold)
         diffButton.target = self
         diffButton.action = #selector(previewWorktreeDiffAction(_:))
         diffButton.identifier = NSUserInterfaceItemIdentifier(worktree.path)
-        diffButton.toolTip = "Everything on \(worktree.branch) since it diverged from main"
+        diffButton.toolTip = "Everything on \(worktree.branch) since it diverged from \(worktree.baseBranch)"
         diffButton.isHidden = worktree.isMain
         diffButton.translatesAutoresizingMaskIntoConstraints = false
 
@@ -2104,8 +2149,26 @@ final class GitPanelView: NSView {
     /// read worktree state through one code path instead of two copies drifting apart.
     private func fetchWorktreeEntries(repoPath: String) async -> (entries: [WorktreeEntry], rawOutput: String) {
         let output = await runGit(["worktree", "list", "--porcelain"], in: repoPath)
-        let mergedOutput = await runGit(["branch", "--merged", "main", "--format=%(refname:short)"], in: repoPath)
-        return (Self.parseWorktreePorcelain(output, mergedBranchOutput: mergedOutput), output)
+        let parsed = Self.parseWorktreePorcelain(output)
+        let manager = WorktreeManager()
+        let enriched = parsed.map { entry -> WorktreeEntry in
+            if entry.isMain { return entry }
+            let base = manager.baseBranch(for: entry.branch, in: repoPath) ?? "main"
+            let div = manager.divergence(repoPath: repoPath, branch: entry.branch, base: base)
+            let aheadBehind = div.map { ($0.ahead, $0.behind) }
+            let isMerged = manager.isMergedOrSquashed(repoPath: repoPath, branch: entry.branch, base: base)
+            return WorktreeEntry(
+                path: entry.path,
+                head: entry.head,
+                branch: entry.branch,
+                baseBranch: base,
+                aheadBehind: aheadBehind,
+                isMain: entry.isMain,
+                isLocked: entry.isLocked,
+                isMerged: isMerged
+            )
+        }
+        return (enriched, output)
     }
 
     private func refreshWorktrees(generation: Int) async {
@@ -2246,6 +2309,8 @@ struct WorktreeEntry {
     let path: String
     let head: String
     let branch: String
+    let baseBranch: String
+    let aheadBehind: (ahead: Int, behind: Int)?
     let isMain: Bool
     let isLocked: Bool
     let isMerged: Bool

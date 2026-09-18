@@ -85,7 +85,7 @@ final class SessionLifecycleService {
     /// Returns an error message on failure so the caller can surface it to the user —
     /// every failure path here used to be a silent no-op.
     @discardableResult
-    func addAgentTask(to workspaceID: WorkspaceID, taskName: String) -> String? {
+    func addAgentTask(to workspaceID: WorkspaceID, taskName: String, baseBranch: String? = nil) -> String? {
         let repoCandidate = coord.activeTabCWD ?? coord.settings.defaultCWD
         let manager = WorktreeManager()
         guard let repoPath = manager.repoRoot(for: repoCandidate) else {
@@ -100,14 +100,7 @@ final class SessionLifecycleService {
             return "Task name must contain at least one letter or number."
         }
 
-        let baseRef = ProjectConfig.load(from: repoPath)?.baseRef
-        // ── DISABLED: worktree auto/explicit creation turned off by request ──────────────
-        // Kouen no longer creates git worktrees. The task-worktree creation below is commented
-        // out (kept intact for easy re-enable). To restore: uncomment the create + addSession
-        // block and delete the early `return` note line.
-        _ = baseRef
-        return "Worktree creation is disabled in this build."
-        /*
+        let baseRef = baseBranch ?? ProjectConfig.load(from: repoPath)?.baseRef
         guard let worktreePath = manager.create(
             repoPath: repoPath,
             sessionID: sanitized,
@@ -126,7 +119,6 @@ final class SessionLifecycleService {
             taskName: taskName
         )
         return nil
-        */
     }
 
     func addTab(to workspaceID: WorkspaceID, cwd: String? = nil) {

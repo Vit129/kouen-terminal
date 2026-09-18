@@ -2175,7 +2175,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
     }
 
     private static func worktreeInfoSummary(_ info: WorktreeManager.WorktreeInfo) -> WorktreeInfoSummary {
-        WorktreeInfoSummary(path: info.path, branch: info.branch, head: info.head, bare: info.bare)
+        WorktreeInfoSummary(path: info.path, branch: info.branch, head: info.head, bare: info.bare, baseBranch: info.baseBranch)
     }
 
     // MARK: - Automations (P41)

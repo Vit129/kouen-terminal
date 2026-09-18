@@ -22,6 +22,10 @@ final class MainSplitViewController: NSViewController {
     private var sidebarAnimToken = 0
     private var sidebarDisplayLink: CADisplayLink?
     private var sidebarWidthSaveWorkItem: DispatchWorkItem?
+    private let headerGroup = NSView()
+    private let appTitleLabel = NSTextField(labelWithString: "Kouen")
+    private let sidebarToggle = SoftIconButton(frame: NSRect(x: 0, y: 0, width: 24, height: 24))
+    private var headerGroupLeadingConstraint: NSLayoutConstraint?
     // params valid while sidebarDisplayLink is non-nil
     private var _sidebarStart: CGFloat = 0
     private var _sidebarTarget: CGFloat = 0
@@ -122,6 +126,14 @@ final class MainSplitViewController: NSViewController {
             edgeDivider.widthAnchor.constraint(equalToConstant: KouenDesign.Divider.thickness),
         ])
         updateEdgeDividerConstraints(sidebarContainer: sidebarContainer)
+        setupSidebarToggle()
+
+        let settings = SessionCoordinator.shared.settings
+        if settings.sidebarCollapsedOnLaunch || !settings.sidebarVisible {
+            sidebarContainer.isHidden = true
+            edgeDivider.isHidden = true
+        }
+        updateContentLeadingInset()
 
         edgeDivider.layer?.backgroundColor = resolvedDividerColor().cgColor
 
@@ -159,6 +171,12 @@ final class MainSplitViewController: NSViewController {
             self,
             selector: #selector(revealFileInTreeFromTerminal(_:)),
             name: Notification.Name("KouenRevealFileInTree"),
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleOpenDiffViewFromNotification(_:)),
+            name: .kouenOpenDiffView,
             object: nil
         )
         NotificationCenter.default.addObserver(
@@ -272,6 +290,23 @@ final class MainSplitViewController: NSViewController {
         SessionCoordinator.shared.splitPaneCoordinator.openBrowserPane(url: url, direction: .horizontal)
     }
 
+    @objc private func handleOpenDiffViewFromNotification(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let cwd = userInfo["cwd"] as? String else { return }
+        let branch = userInfo["branch"] as? String ?? "HEAD"
+        let base = userInfo["base"] as? String ?? "main"
+        Task {
+            let diff = await GitPanelView.runGitDiff(["diff", "--stat", "--patch", "\(base)...\(branch)"], in: cwd)
+            let content = diff.isEmpty ? await GitPanelView.runGitDiff(["diff", "--stat", "--patch", "HEAD"], in: cwd) : diff
+            let safeName = "\(branch.replacingOccurrences(of: "/", with: "_"))_vs_\(base)"
+            let tmpDir = NSTemporaryDirectory() + "kouen-diff/"
+            try? FileManager.default.createDirectory(atPath: tmpDir, withIntermediateDirectories: true)
+            let tmpPath = tmpDir + "\(safeName).diff"
+            try? content.write(toFile: tmpPath, atomically: true, encoding: .utf8)
+            self.contentVC.openFileTab(path: tmpPath)
+        }
+    }
+
     /// Resolve the divider line color: user override (`settings.dividerHex`) wins; otherwise
     /// a quiet near-background hairline — `#1E1E1E` on dark themes (the default look), and the
     /// theme's border on light themes (where a near-black line would read as a hard rule).
@@ -301,6 +336,7 @@ final class MainSplitViewController: NSViewController {
         // Tell the window controller to repaint the window bg with the (possibly
         // new) chrome color × opacity.
         (view.window?.windowController as? MainWindowController)?.applyTransparency()
+        appTitleLabel.textColor = KouenDesign.chrome.textSecondary
         sidebar.applyChromeColors()
         content.applyChrome()
         statusLine.applyChrome()
@@ -338,6 +374,10 @@ final class MainSplitViewController: NSViewController {
 
     override func viewDidAppear() {
         super.viewDidAppear()
+        if !didApplyInitialSidebarState {
+            didApplyInitialSidebarState = true
+            applyInitialSidebarState()
+        }
         updateContentLeadingInset()
     }
 
@@ -468,37 +508,41 @@ final class MainSplitViewController: NSViewController {
         animateSidebar(from: _sidebarStart, to: _sidebarTarget, t0: _sidebarT0, visible: _sidebarVisible, token: sidebarAnimToken)
     }
 
-    /// Leading inset the title strip's path readout needs to clear the macOS traffic lights
-    /// when the sidebar is fully collapsed (content shifts to x=0 under `.fullSizeContentView`).
-    /// The tab bar itself sits below the lights and never needs one.
-    private let trafficLightInset: CGFloat = 72
-
-    private var effectiveTrafficLightInset: CGFloat {
-        guard let window = view.window else { return 0 }
-        let settings = SessionCoordinator.shared.settings
-        guard settings.transparentTitlebar else { return 0 }
-        guard !window.styleMask.contains(.fullScreen) else { return 0 }
-        return trafficLightInset
+    private var isWindowFullScreen: Bool {
+        view.window?.styleMask.contains(.fullScreen) ?? false
     }
 
-    /// Inset the strip readout proportionally to how collapsed the sidebar is: full inset
-    /// at width 0, none once the sidebar is wide enough to cover the traffic lights.
+    private var effectiveHeaderLeading: CGFloat {
+        isWindowFullScreen ? 14 : 76
+    }
+
+    private var collapsedTabBarInset: CGFloat {
+        effectiveHeaderLeading + 72 + 12
+    }
+
+    /// Inset the tab bar proportionally to how collapsed the sidebar is: full inset
+    /// at width 0, none once the sidebar is wide enough to cover the top-left header group.
     private func setContentLeadingInset(forSidebarWidth width: CGFloat) {
         if SessionCoordinator.shared.settings.sidebarOnRight {
-            content.setTabBarLeadingInset(effectiveTrafficLightInset)
+            content.setTabBarLeadingInset(collapsedTabBarInset)
         } else {
-            let t = max(0, min(1, 1 - width / trafficLightInset))
-            content.setTabBarLeadingInset(effectiveTrafficLightInset * t)
+            let inset = collapsedTabBarInset
+            let t = max(0, min(1, 1 - width / inset))
+            content.setTabBarLeadingInset(inset * t)
         }
     }
 
     private func updateContentLeadingInset() {
+        headerGroupLeadingConstraint?.constant = effectiveHeaderLeading
+        let visible = SessionCoordinator.shared.settings.sidebarVisible && !(sidebarContainerView?.isHidden ?? true)
         if SessionCoordinator.shared.settings.sidebarOnRight {
-            content.setTabBarLeadingInset(effectiveTrafficLightInset)
+            content.setTabBarLeadingInset(collapsedTabBarInset)
         } else {
-            let visible = !(sidebarContainerView?.isHidden ?? true)
-            content.setTabBarLeadingInset(visible ? 0 : effectiveTrafficLightInset)
+            content.setTabBarLeadingInset(visible ? 0 : collapsedTabBarInset)
         }
+        sidebar.updateTrafficLightClearance()
+        content.updateTrafficLightClearance()
+        updateSidebarToggleIcon()
     }
 
     /// Pops up the notifications dropdown. Works regardless of sidebar visibility.
@@ -507,6 +551,78 @@ final class MainSplitViewController: NSViewController {
     }
 
     /// Toggles sidebar visibility (⌘\).
+    private func setupSidebarToggle() {
+        headerGroup.translatesAutoresizingMaskIntoConstraints = false
+        headerGroup.wantsLayer = true
+        headerGroup.layer?.zPosition = 1000
+
+        appTitleLabel.translatesAutoresizingMaskIntoConstraints = false
+        appTitleLabel.font = .systemFont(ofSize: 12, weight: .bold)
+        appTitleLabel.textColor = KouenDesign.chrome.textSecondary
+        appTitleLabel.isEditable = false
+        appTitleLabel.isSelectable = false
+        appTitleLabel.drawsBackground = false
+        appTitleLabel.isBezeled = false
+
+        sidebarToggle.target = self
+        sidebarToggle.action = #selector(toggleSidebarButtonClicked)
+        sidebarToggle.translatesAutoresizingMaskIntoConstraints = false
+
+        headerGroup.addSubview(appTitleLabel)
+        headerGroup.addSubview(sidebarToggle)
+
+        view.addSubview(headerGroup)
+
+        let leading = headerGroup.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: effectiveHeaderLeading)
+        headerGroupLeadingConstraint = leading
+
+        NSLayoutConstraint.activate([
+            leading,
+            headerGroup.topAnchor.constraint(equalTo: view.topAnchor, constant: 6),
+            headerGroup.heightAnchor.constraint(equalToConstant: 26),
+
+            appTitleLabel.leadingAnchor.constraint(equalTo: headerGroup.leadingAnchor),
+            appTitleLabel.centerYAnchor.constraint(equalTo: headerGroup.centerYAnchor),
+
+            sidebarToggle.leadingAnchor.constraint(equalTo: appTitleLabel.trailingAnchor, constant: 6),
+            sidebarToggle.centerYAnchor.constraint(equalTo: headerGroup.centerYAnchor),
+            sidebarToggle.widthAnchor.constraint(equalToConstant: 26),
+            sidebarToggle.heightAnchor.constraint(equalToConstant: 26),
+            sidebarToggle.trailingAnchor.constraint(equalTo: headerGroup.trailingAnchor),
+        ])
+        updateSidebarToggleIcon()
+    }
+
+    private func updateSidebarToggleIcon() {
+        let visible = SessionCoordinator.shared.settings.sidebarVisible
+        let right = SessionCoordinator.shared.settings.sidebarOnRight
+        sidebarToggle.setSymbol(right ? "sidebar.right" : "sidebar.left", accessibilityDescription: visible ? "Hide sidebar" : "Show sidebar", pointSize: 12, weight: .medium)
+        sidebarToggle.toolTip = visible ? "Hide sidebar (⌘\\)" : "Show sidebar (⌘\\)"
+        updateSidebarToggleMenu()
+    }
+
+    private func updateSidebarToggleMenu() {
+        let menu = NSMenu()
+        let right = SessionCoordinator.shared.settings.sidebarOnRight
+        let item = NSMenuItem(
+            title: right ? "Move Sidebar to Left" : "Move Sidebar to Right",
+            action: #selector(toggleSidebarPositionFromMenu),
+            keyEquivalent: ""
+        )
+        item.target = self
+        menu.addItem(item)
+        sidebarToggle.menu = menu
+        headerGroup.menu = menu
+    }
+
+    @objc private func toggleSidebarPositionFromMenu() {
+        toggleSidebarPosition()
+    }
+
+    @objc private func toggleSidebarButtonClicked() {
+        toggleSidebar()
+    }
+
     func toggleSidebar() {
         if !didApplyInitialSidebarState {
             didApplyInitialSidebarState = true
@@ -542,10 +658,15 @@ final class MainSplitViewController: NSViewController {
 
     func updateSidebarPlacement() {
         let right = SessionCoordinator.shared.settings.sidebarOnRight
-        guard split.subviews.count == 2, let sidebarContainer = sidebar.view.superview else { return }
+        sidebarLog.debug("updateSidebarPlacement called right=\(right) split.subviews.count=\(self.split.subviews.count) sidebarSuperview=\(self.sidebar.view.superview != nil)")
+        guard split.subviews.count == 2, let sidebarContainer = sidebar.view.superview else {
+            sidebarLog.debug("updateSidebarPlacement bailed on guard — nothing will move")
+            return
+        }
 
         let currentFirstIsSidebar = split.subviews[0] === sidebarContainer
         let needsSwap = (right && currentFirstIsSidebar) || (!right && !currentFirstIsSidebar)
+        sidebarLog.debug("updateSidebarPlacement currentFirstIsSidebar=\(currentFirstIsSidebar) needsSwap=\(needsSwap)")
         if needsSwap {
             // Swap by removing just the sidebar and reinserting at the other end.
             // This preserves the content view's frame/layer state.

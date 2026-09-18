@@ -2,13 +2,20 @@ import SwiftUI
 import KouenCore
 import KouenIPC
 
+@MainActor
+fileprivate func agentColor(for kind: AgentKind) -> Color {
+    Color(nsColor: NSColor.fromHex(SessionCoordinator.shared.settings.agentColorHex(for: kind)) ?? KouenDesign.chrome.textSecondary)
+}
+
 // MARK: - Main container
 
 struct SidebarSessionListView: View {
     var model: SidebarListModel
     var onSelect: (SessionID) -> Void
-    var onAddInGroup: (String) -> Void
+    var onOpenProject: (String) -> Void
+    var onAddInGroup: (String, String?) -> Void
     var onCloseSession: (SessionID) -> Void
+    var onRemoveProject: (String) -> Void
     var onPRClick: (String) -> Void
     var onWorktreeActivate: (SidebarWorktreeEntry, WorkspaceID?) -> Void
 
@@ -26,51 +33,65 @@ struct SidebarSessionListView: View {
     @ViewBuilder
     private func rowContent(_ row: SidebarSessionRow) -> some View {
         switch row {
-        case let .groupHeader(name, rootPath, count, isCollapsed, status):
+        case let .groupHeader(id, name, rootPath, count, isCollapsed, status):
             SidebarGroupHeaderRow(
+                id: id,
                 name: name,
                 rootPath: rootPath,
                 count: count,
                 isCollapsed: isCollapsed,
                 status: status,
                 model: model,
-                onToggleCollapse: { model.toggleCollapse(rootPath: rootPath) },
-                onAdd: { onAddInGroup(rootPath) }
+                onToggleCollapse: { model.toggleCollapse(id: id) },
+                onAdd: { onAddInGroup(name, id) }
             )
             .frame(height: 28)
 
-        case let .session(session):
-            SidebarSessionItemRow(
-                session: session,
-                isSelected: session.id == model.activeSessionID,
-                metadata: {
-                    let tab = session.activeTab ?? session.tabs.first
-                    let branch = tab?.gitBranch?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                    let cwd = tab?.cwd ?? ""
-                    return model.gitMetadata(forPath: cwd, branch: branch)
-                }(),
+        case let .projectHeader(item):
+            SidebarProjectHeaderRow(
+                item: item,
                 model: model,
-                onSelect: { onSelect(session.id) },
-                onClose: { onCloseSession(session.id) },
-                onPRClick: onPRClick
+                onAddSession: {
+                    if let wsID = model.activeWorkspaceID {
+                        SessionCoordinator.shared.addSession(to: wsID, cwd: item.path, name: item.name)
+                        model.scheduleRebuild()
+                    }
+                },
+                onRemoveProject: {
+                    onRemoveProject(item.path)
+                },
+                onToggleCollapse: {
+                    model.toggleProjectCollapse(path: item.path)
+                }
             )
-            .frame(height: 40)
+            .frame(height: 26)
 
-        case let .worktreeHeader(rootPath, count, isCollapsed):
-            SidebarWorktreeHeaderRow(
-                count: count,
-                isCollapsed: isCollapsed,
-                onToggleCollapse: { model.toggleWorktreeCollapse(rootPath: rootPath) }
+        case let .sessionItem(card):
+            SidebarSessionCardRow(
+                card: card,
+                model: model,
+                onSelect: {
+                    if let sid = card.sessionID {
+                        onSelect(sid)
+                    } else if let wtPath = card.worktreePath {
+                        if let wsID = model.activeWorkspaceID {
+                            SessionCoordinator.shared.addSession(to: wsID, cwd: wtPath, name: card.title)
+                            model.scheduleRebuild()
+                        }
+                    } else {
+                        if let wsID = model.activeWorkspaceID {
+                            SessionCoordinator.shared.addSession(to: wsID, cwd: card.projectPath, name: card.title)
+                            model.scheduleRebuild()
+                        }
+                    }
+                },
+                onClose: {
+                    if let sid = card.sessionID {
+                        onCloseSession(sid)
+                    }
+                }
             )
-            .frame(height: 24)
-
-        case let .worktree(entry, _):
-            SidebarWorktreeItemRow(
-                entry: entry,
-                metadata: model.gitMetadata(forPath: entry.path, branch: entry.branch),
-                onActivate: { onWorktreeActivate(entry, model.activeWorkspaceID) }
-            )
-            .frame(height: 40)
+            .frame(height: 34)
 
         case .divider:
             SidebarDividerRow()
@@ -82,8 +103,9 @@ struct SidebarSessionListView: View {
 // MARK: - Group header row
 
 private struct SidebarGroupHeaderRow: View {
+    let id: String
     let name: String
-    let rootPath: String
+    let rootPath: String?
     let count: Int
     let isCollapsed: Bool
     let status: BoardColumnKind
@@ -97,27 +119,25 @@ private struct SidebarGroupHeaderRow: View {
         let c = KouenDesign.chrome
         HStack(spacing: 6) {
             Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
-                .font(.system(size: 9, weight: .regular))
+                .font(.system(size: 9, weight: .semibold))
                 .foregroundStyle(isHovered
                     ? Color(nsColor: c.textPrimary)
                     : Color(nsColor: c.textSecondary))
                 .frame(width: 10, height: 10)
 
+            Image(systemName: "folder")
+                .font(.system(size: 11))
+                .foregroundStyle(Color(nsColor: c.textSecondary))
+
             Text(name)
-                .font(.system(size: 13, weight: .bold))
+                .font(.system(size: 12.5, weight: .bold))
                 .foregroundStyle(Color(nsColor: c.textPrimary))
                 .lineLimit(1)
                 .truncationMode(.tail)
 
-            Circle()
-                .fill(Color(nsColor: status.color))
-                .frame(width: 6, height: 6)
-
             Text("\(count)")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(isHovered
-                    ? Color(nsColor: c.textSecondary)
-                    : Color(nsColor: c.textTertiary))
+                .font(.system(size: 10.5, weight: .medium))
+                .foregroundStyle(Color(nsColor: c.textTertiary))
 
             Spacer()
 
@@ -129,16 +149,23 @@ private struct SidebarGroupHeaderRow: View {
                 }
                 .buttonStyle(.plain)
                 .frame(width: 20, height: 20)
-                .help("New session in group")
+                .help("Add repository to \(name)")
 
                 Menu {
-                    let isPinned = model.pinnedRepos.contains(rootPath)
-                    Button(isPinned ? "Unpin Repo" : "Pin Repo") {
-                        model.togglePinRepo(rootPath: rootPath)
-                    }
+                    Button("Add Repository to \(name)...") { onAdd() }
                     Divider()
-                    Button("Close all sessions in \(name)", role: .destructive) {
-                        closeAllSessions(name: name)
+                    Button("Delete Group", role: .destructive) {
+                        let alert = NSAlert()
+                        alert.messageText = "Delete Group '\(name)'?"
+                        let countText = count == 1 ? "1 repository" : "\(count) repositories"
+                        alert.informativeText = "Are you sure you want to delete this group? All \(countText) in this group will be removed from your project list.\n\n(Your files on disk will not be deleted.)"
+                        alert.alertStyle = .warning
+                        alert.addButton(withTitle: "Delete Group and Repositories")
+                        alert.addButton(withTitle: "Cancel")
+                        if alert.runModal() == .alertFirstButtonReturn {
+                            model.projectStore?.removeCategoryAndProjects(id)
+                            model.scheduleRebuild()
+                        }
                     }
                 } label: {
                     Image(systemName: "ellipsis")
@@ -155,63 +182,174 @@ private struct SidebarGroupHeaderRow: View {
         .contentShape(Rectangle())
         .onTapGesture { onToggleCollapse() }
         .onHover { isHovered = $0 }
-        .contextMenu {
-            let isPinned = model.pinnedRepos.contains(rootPath)
-            Button(isPinned ? "Unpin Repo" : "Pin Repo") {
-                model.togglePinRepo(rootPath: rootPath)
-            }
-            Divider()
-            Button("Close all sessions in \(name)", role: .destructive) {
-                closeAllSessions(name: name)
-            }
-        }
     }
-
-    private func closeAllSessions(name: String) {
-        let groupSessions = model.sessions.filter { model.repoRootForSession($0) == rootPath }
-        guard !groupSessions.isEmpty else { return }
-        let alert = NSAlert()
-        alert.messageText = "Close all sessions in \(name)?"
-        alert.informativeText = "This will close \(groupSessions.count) session\(groupSessions.count == 1 ? "" : "s") and all their tabs."
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: "Close All")
-        alert.addButton(withTitle: "Cancel")
-        alert.buttons[0].keyEquivalent = ""
-        alert.buttons[1].keyEquivalent = ""
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
-        for session in groupSessions {
-            SessionCoordinator.shared.closeSession(session)
-        }
-        SessionCoordinator.shared.syncFromDaemon()
-    }
-
 }
 
-// MARK: - Session card row
+// MARK: - Project Header row (Clean text, NO icon/logo in front!)
 
-private struct SidebarSessionItemRow: View {
-    let session: SessionGroup
-    let isSelected: Bool
-    let metadata: RepoGitMetadata?
+private struct SidebarProjectHeaderRow: View {
+    let item: SidebarProjectHeaderItem
     var model: SidebarListModel
-    var onSelect: () -> Void
-    var onClose: () -> Void
-    var onPRClick: (String) -> Void
+    var onAddSession: () -> Void
+    var onRemoveProject: () -> Void
+    var onToggleCollapse: () -> Void
 
     @State private var isHovered = false
-    @State private var tasks: [TaskSummary] = []
-    @State private var taskRefreshTask: Task<Void, Never>?
 
     var body: some View {
         let c = KouenDesign.chrome
-        let tab = session.activeTab ?? session.tabs.first
-        let branch = tab?.gitBranch?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let cwd = tab?.cwd ?? ""
-        let sessionTitle = session.name.isEmpty ? KouenDesign.pathDisplayName(cwd) : session.name
-        let displayTitle = tab?.taskName ?? (branch.isEmpty ? sessionTitle : branch)
-        let subtitle = KouenDesign.shortenPath(cwd)
+        let indent: CGFloat = item.categoryID != nil ? 10 : 0
+        HStack(spacing: 5) {
+            // Expand / collapse chevron (NO icon/logo in front!)
+            Image(systemName: item.isCollapsed ? "chevron.right" : "chevron.down")
+                .font(.system(size: 8.5, weight: .semibold))
+                .foregroundStyle(isHovered ? Color(nsColor: c.textPrimary) : Color(nsColor: c.textTertiary))
+                .frame(width: 10, height: 10)
 
-        let selectedFill = Color(nsColor: c.accent).opacity(c.isDark ? 0.13 : 0.10)
+            // Clean project name text
+            Text(item.name)
+                .font(.system(size: 12.5, weight: .semibold))
+                .foregroundStyle(Color(nsColor: c.textPrimary))
+                .lineLimit(1)
+                .truncationMode(.tail)
+
+            if item.sessionsCount > 1 || item.isCollapsed {
+                Text("• \(item.sessionsCount)")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Color(nsColor: c.textTertiary))
+            }
+
+            if item.hasWorktrees {
+                Image(systemName: "arrow.triangle.branch")
+                    .font(.system(size: 9.5, weight: .semibold))
+                    .foregroundStyle(Color(nsColor: c.textTertiary))
+            }
+
+            Spacer()
+
+            if isHovered {
+                HStack(spacing: 2) {
+                    Button(action: onAddSession) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(Color(nsColor: c.textSecondary))
+                            .frame(width: 20, height: 20)
+                    }
+                    .buttonStyle(.plain)
+                    .help("New session in \(item.name)")
+
+                    Menu {
+                        projectActionsMenuContent
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(Color(nsColor: c.textSecondary))
+                    }
+                    .menuStyle(.borderlessButton)
+                    .menuIndicator(.hidden)
+                    .frame(width: 20, height: 20)
+                    .help("Project options")
+
+                    Button(action: onRemoveProject) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 9.5, weight: .medium))
+                            .foregroundStyle(Color(nsColor: c.textSecondary))
+                            .frame(width: 20, height: 20)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Remove \(item.name) from workspace")
+                }
+                .padding(.trailing, 4)
+            }
+        }
+        .padding(.leading, KouenDesign.horizontalInset + indent)
+        .padding(.trailing, KouenDesign.horizontalInset)
+        .padding(.top, 4)
+        .contentShape(Rectangle())
+        .onTapGesture { onToggleCollapse() }
+        .onHover { isHovered = $0 }
+        .contextMenu {
+            projectActionsMenuContent
+        }
+    }
+
+    @ViewBuilder
+    private var projectActionsMenuContent: some View {
+        Button("New Session Here") { onAddSession() }
+        Divider()
+
+        // If categories exist, show "Move to Group >" with group list
+        if let categories = model.projectStore?.categories, !categories.isEmpty {
+            Menu("Move to Group") {
+                ForEach(categories) { cat in
+                    Button(cat.name) {
+                        model.projectStore?.moveProject(item.path, toCategory: cat.id)
+                        model.scheduleRebuild()
+                    }
+                    .disabled(item.categoryID == cat.id)
+                }
+            }
+        }
+
+        // "Add to Group…" creates a new group and moves this project into it
+        Button("Add to Group…") {
+            promptNewGroup(for: item.path)
+        }
+
+        if item.categoryID != nil {
+            Button("Remove from Group") {
+                model.projectStore?.moveProject(item.path, toCategory: nil)
+                model.scheduleRebuild()
+            }
+        }
+
+        Divider()
+        Button("Reveal in Finder") {
+            NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: item.path)
+        }
+        Divider()
+        Button("Remove from Workspace", role: .destructive) {
+            onRemoveProject()
+        }
+    }
+
+    private func promptNewGroup(for projectPath: String) {
+        let alert = NSAlert()
+        alert.messageText = "Add to Group"
+        alert.informativeText = "Enter a name for the new group:"
+        alert.alertStyle = .informational
+        let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 220, height: 24))
+        input.placeholderString = "e.g. Personal, Work, Open Source"
+        alert.accessoryView = input
+        alert.addButton(withTitle: "Create & Move")
+        alert.addButton(withTitle: "Cancel")
+        alert.window.initialFirstResponder = input
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        let name = input.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        if let store = model.projectStore {
+            let cat = store.addCategory(name: name)
+            store.moveProject(projectPath, toCategory: cat.id)
+            model.scheduleRebuild()
+        }
+    }
+}
+
+// MARK: - Session card row (Indented under project, exactly like prod)
+
+private struct SidebarSessionCardRow: View {
+    let card: SidebarSessionCardItem
+    var model: SidebarListModel
+    var onSelect: () -> Void
+    var onClose: () -> Void
+
+    @State private var isHovered = false
+
+    var body: some View {
+        let c = KouenDesign.chrome
+        let isSelected = card.isSelected
+
+        let selectedFill = Color(nsColor: c.accent).opacity(c.isDark ? 0.14 : 0.10)
         let selectedBorder = Color(nsColor: c.focusRing).opacity(c.isDark ? 0.48 : 0.52)
         let fillColor = isSelected ? selectedFill : (isHovered ? Color(nsColor: c.rowHoverFill) : Color.clear)
         let borderColor = isSelected ? selectedBorder : Color.clear
@@ -224,487 +362,112 @@ private struct SidebarSessionItemRow: View {
                         .stroke(borderColor, lineWidth: 1)
                 )
 
-            HStack(spacing: 0) {
-                ZStack(alignment: .bottomTrailing) {
-                    Group {
-                        if let kind = tab?.effectiveAgentKind {
-                            Image(nsImage: AgentIconRenderer.templateOrMonogramImage(for: kind, size: 12))
+            HStack(spacing: 6) {
+                // Leading: Agent icon(s) OR status dot OR branch symbol
+                if !card.detectedAgents.isEmpty {
+                    HStack(spacing: 3) {
+                        ForEach(card.detectedAgents.prefix(3)) { agent in
+                            Image(nsImage: AgentIconRenderer.templateOrMonogramImage(for: agent.kind, size: 12))
                                 .resizable()
                                 .renderingMode(.template)
-                                .foregroundStyle(agentColor(for: kind))
-                        } else {
-                            Image(systemName: "arrow.triangle.branch")
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundStyle(Color(nsColor: c.textSecondary))
+                                .foregroundStyle(agentColor(for: agent.kind))
+                                .frame(width: 12, height: 12)
+                                .help(agent.kind.rawValue)
                         }
                     }
-                    .frame(width: 12, height: 12)
-
-                    if let subagents = tab?.subagents, !subagents.isEmpty {
-                        Text("+\(subagents.count)")
-                            .font(.system(size: 6, weight: .bold))
-                            .foregroundStyle(.white)
-                            .padding(1)
-                            .background(Circle().fill(Color(nsColor: c.accent)))
-                            .offset(x: 3, y: 2)
-                    }
+                    .padding(.leading, 8)
+                } else if let kind = card.agentKind {
+                    Image(nsImage: AgentIconRenderer.templateOrMonogramImage(for: kind, size: 12))
+                        .resizable()
+                        .renderingMode(.template)
+                        .foregroundStyle(agentColor(for: kind))
+                        .frame(width: 12, height: 12)
+                        .padding(.leading, 8)
+                } else if card.worktreePath != nil {
+                    Image(systemName: "arrow.triangle.branch")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(Color(nsColor: c.textTertiary))
+                        .frame(width: 12, height: 12)
+                        .padding(.leading, 8)
+                } else {
+                    Circle()
+                        .fill(card.isRunning ? (card.isDirty ? Color.orange : Color.green) : Color.secondary.opacity(0.35))
+                        .frame(width: 6, height: 6)
+                        .padding(.leading, 8)
                 }
-                .help(tab?.effectiveAgentKind.map { subagentTooltip(kind: $0, subagents: tab?.subagents ?? []) } ?? "")
-                .padding(.leading, 8)
 
+                // Title + Subtitle
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(displayTitle)
-                        .font(.system(size: 12, weight: .semibold))
+                    Text(card.title)
+                        .font(.system(size: 12, weight: isSelected ? .semibold : .medium))
                         .foregroundStyle(isSelected
                             ? Color(nsColor: c.textPrimary)
-                            : Color(nsColor: c.textSecondary))
+                            : Color(nsColor: isHovered ? c.textPrimary : c.textSecondary))
                         .lineLimit(1)
                         .truncationMode(.tail)
 
-                    HStack(spacing: 3) {
-                        Text(subtitle)
-                            .font(.system(size: 10))
-                            .foregroundStyle(Color(nsColor: c.textSecondary).opacity(0.6))
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                        if let notification = waitingNotificationText {
-                            Text("·")
-                                .font(.system(size: 10))
-                                .foregroundStyle(Color(nsColor: c.textSecondary).opacity(0.4))
-                            Text(notification)
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(Color(nsColor: .systemBlue))
+                    HStack(spacing: 4) {
+                        if let sub = card.subtitle, !sub.isEmpty {
+                            Text(sub)
+                                .font(.system(size: 9.5))
+                                .foregroundStyle(Color(nsColor: c.textTertiary))
                                 .lineLimit(1)
                                 .truncationMode(.tail)
-                        } else if sessionBoardStatus != .idle {
-                            Text("·")
-                                .font(.system(size: 10))
-                                .foregroundStyle(Color(nsColor: c.textSecondary).opacity(0.4))
-                            Text(sessionBoardStatus.displayName)
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(Color(nsColor: sessionBoardStatus.color))
-                                .lineLimit(1)
+                        } else if card.isRunning {
+                            Text("Running")
+                                .font(.system(size: 9.5))
+                                .foregroundStyle(Color(nsColor: c.textTertiary))
                         }
                     }
                 }
-                .padding(.leading, 6)
 
                 Spacer()
 
-                HStack(spacing: 4) {
-                    // P39 G1: lowest listening port across every tab, so a background dev
-                    // server still shows up even when a different tab is active/selected.
-                    if let port = session.tabs.compactMap({ $0.listeningPorts.min() }).min() {
-                        Button(action: { openInBrowserPane(port: port) }) {
-                            SidebarBadgeLabel(text: ":\(port)", color: Color(nsColor: c.textSecondary).opacity(0.7))
+                // Localhost port badge (like :51683 in prod)
+                if let port = card.localhostPort {
+                    Button(action: {
+                        if let url = URL(string: "http://localhost:\(port)") {
+                            NotificationCenter.default.post(
+                                name: Notification.Name("KouenOpenInBrowserPaneURL"),
+                                object: nil,
+                                userInfo: ["url": url]
+                            )
                         }
-                        .buttonStyle(.plain)
-                        .help("Open localhost:\(port) in the browser pane")
+                    }) {
+                        Text(":\(port)")
+                            .font(.system(size: 9.5, weight: .medium, design: .monospaced))
+                            .foregroundStyle(Color(nsColor: c.textTertiary))
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(Color(nsColor: c.textTertiary).opacity(0.15), in: RoundedRectangle(cornerRadius: 3))
                     }
-                    if !tasks.isEmpty {
-                        let doneCount = tasks.filter(\.done).count
-                        let statusKind = tasks.aggregateBoardStatus
-                        let badgeColor = Color(nsColor: statusKind.color)
-                        SidebarBadgeLabel(text: "\(doneCount)/\(tasks.count)", color: badgeColor)
-                            .help(tasks.taskTooltipSummary)
-                    }
-                    if let pr = metadata?.prNumber {
-                        let prColor: Color = (metadata?.aheadCount ?? 0) > 0
-                            ? .green : Color(nsColor: c.accent)
-                        Button(action: {
-                            if let url = metadata?.prURL { onPRClick(url) }
-                        }) {
-                            HStack(spacing: 3) {
-                                if let dot = checksStatusColor(metadata?.prChecksStatus) {
-                                    Circle().fill(dot).frame(width: 6, height: 6)
-                                }
-                                SidebarBadgeLabel(text: "#\(pr)", color: prColor)
-                            }
-                        }
-                        .buttonStyle(.plain)
-                        .help(checksStatusHelp(metadata?.prChecksStatus))
-                    }
-                    if let ahead = metadata?.aheadCount, ahead > 0 {
-                        SidebarBadgeLabel(text: "+\(ahead)", color: .green)
-                    }
-                    if let behind = metadata?.behindCount, behind > 0 {
-                        SidebarBadgeLabel(text: "-\(behind)", color: .red)
-                    }
-                    if isHovered {
-                        Button(action: onClose) {
-                            Text("×")
-                                .font(.system(size: 15, weight: .regular))
-                                .foregroundStyle(Color(nsColor: c.textSecondary))
-                        }
-                        .buttonStyle(.plain)
-                        .frame(width: 18, height: 18)
-                        .help("Close session")
-                    }
+                    .buttonStyle(.plain)
+                    .help("Open http://localhost:\(port) in browser pane")
                 }
-                .padding(.trailing, 6)
+
+                // Close button on hover
+                if isHovered && card.isRunning {
+                    Button(action: onClose) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 8.5, weight: .medium))
+                            .foregroundStyle(Color(nsColor: c.textTertiary))
+                            .frame(width: 14, height: 14)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Close session")
+                    .padding(.trailing, 6)
+                }
             }
         }
-        .padding(.leading, KouenDesign.horizontalInset + 8)
-        .padding(.trailing, KouenDesign.horizontalInset - 4)
+        .padding(.leading, KouenDesign.horizontalInset + (card.categoryID != nil ? 18 : 8))
+        .padding(.trailing, KouenDesign.horizontalInset)
         .padding(.vertical, 1)
         .contentShape(Rectangle())
         .onTapGesture { onSelect() }
         .onHover { isHovered = $0 }
-        .task(id: session.id) {
-            tasks = await TaskDaemonBridge.list(sessionID: session.id)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NotificationBus.shared.snapshotChanged)) { _ in
-            // snapshotChanged can fire many times per second (see ScriptRuntime.swift's own
-            // doc comment on the same notification) — debounce the same way GitPanelView's
-            // FSEvent-driven refresh does (cancel-and-reschedule, 0.5s quiet period) so this
-            // doesn't fire a fresh TaskDaemonBridge IPC round-trip per row on every tick.
-            taskRefreshTask?.cancel()
-            taskRefreshTask = Task {
-                try? await Task.sleep(nanoseconds: 500_000_000)
-                guard !Task.isCancelled else { return }
-                tasks = await TaskDaemonBridge.list(sessionID: session.id)
-            }
-        }
-        .contextMenu {
-            sessionContextMenuItems(cwd: cwd, branch: branch, sessionTitle: sessionTitle)
-        }
-    }
-
-    @ViewBuilder
-    private func sessionContextMenuItems(cwd: String, branch: String, sessionTitle: String) -> some View {
-        Button("Rename session…") {
-            renameSession(currentTitle: sessionTitle)
-        }
-        Button("Copy working directory") {
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(cwd, forType: .string)
-        }
-        Button("Copy session title") {
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(sessionTitle, forType: .string)
-        }
-        Button("Copy Session ID") {
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(session.id.uuidString, forType: .string)
-        }
-        if let prNumber = metadata?.prNumber {
-            Divider()
-            Button("Merge PR #\(prNumber)…") {
-                mergePR(number: prNumber, cwd: cwd, checksWaived: metadata?.prChecksStatus != .pass)
-            }
-            .disabled(!Self.canOfferMerge(
-                checksStatus: metadata?.prChecksStatus, mergeable: metadata?.prMergeable, reviewDecision: metadata?.prReviewDecision
-            ))
-        }
-        Divider()
-        Button("Split session right") {
-            guard let wsID = model.activeWorkspaceID else { return }
-            SessionCoordinator.shared.splitSession(workspaceID: wsID, sessionID: session.id, direction: .horizontal)
-        }
-        Button("Split session down") {
-            guard let wsID = model.activeWorkspaceID else { return }
-            SessionCoordinator.shared.splitSession(workspaceID: wsID, sessionID: session.id, direction: .vertical)
-        }
-        Divider()
-        let globallyKept = SessionCoordinator.shared.snapshot.keepSessionsOnQuit
-        Button(globallyKept ? "Keep running after quit (all sessions kept)" : "Keep running after quit") {
-            SessionCoordinator.shared.requestDaemon(
-                .setSessionPersistent(sessionID: session.id, persistent: !session.persistent)
-            )
-            SessionCoordinator.shared.syncFromDaemon()
-        }
-        Divider()
-        Button("Close session", role: .destructive) {
-            confirmClose()
-        }
-        if model.sessions.count > 1 {
-            Button("Close other sessions", role: .destructive) {
-                closeOtherSessions()
-            }
-        }
-    }
-
-    /// P39 G3 — minimal-risk merge: no pre-selected method (the picker opens on the placeholder
-    /// item; leaving it there and hitting "Merge" is treated as cancel, not "pick one for me"),
-    /// confirmation shows PR#/title/target branch, and the caller already gated this action on
-    /// `checksStatus == .pass && mergeable == true` — `gh pr merge`'s own branch-protection
-    /// refusal is the only additional safety backstop, no app-side force option.
-    /// M8: normally requires checks-pass + mergeable (P39 G3's original gate, unchanged).
-    /// Waiver path — a maintainer-approved PR can merge with checks not yet green, but
-    /// `mergeable` (no conflicts) is never waived regardless of approval.
-    static func canOfferMerge(
-        checksStatus: GitHubCLIClient.ChecksStatus?, mergeable: Bool?, reviewDecision: String?
-    ) -> Bool {
-        guard mergeable == true else { return false }
-        return checksStatus == .pass || reviewDecision == "APPROVED"
-    }
-
-    private func mergePR(number: Int, cwd: String, checksWaived: Bool = false) {
-        let title = metadata?.prTitle ?? ""
-        let target = metadata?.prBaseBranch ?? "the default branch"
-
-        let alert = NSAlert()
-        alert.messageText = "Merge PR #\(number)?"
-        alert.informativeText = checksWaived
-            ? "\(title)\n\nInto \(target)\n\n⚠️ Checks haven't passed yet — merging on maintainer approval (waiver)."
-            : "\(title)\n\nInto \(target)"
-        alert.alertStyle = .warning
-        let mergeButton = alert.addButton(withTitle: checksWaived ? "Merge Anyway" : "Merge")
-        alert.addButton(withTitle: "Cancel")
-        mergeButton.keyEquivalent = ""
-
-        let popup = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 260, height: 24), pullsDown: false)
-        popup.addItem(withTitle: "Choose merge method…")
-        popup.addItem(withTitle: "Squash and merge")
-        popup.addItem(withTitle: "Rebase and merge")
-        popup.addItem(withTitle: "Merge commit")
-        popup.selectItem(at: 0)
-        alert.accessoryView = popup
-
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
-        let method: GitHubCLIClient.MergeMethod
-        switch popup.indexOfSelectedItem {
-        case 1: method = .squash
-        case 2: method = .rebase
-        case 3: method = .merge
-        default: return  // placeholder still selected — no method chosen, treat as cancel
-        }
-
-        Task {
-            let result = await Task.detached(priority: .utility) {
-                GitHubCLIClient().merge(repoPath: cwd, prNumber: number, method: method)
-            }.value
-            let resultAlert = NSAlert()
-            if result.success {
-                resultAlert.messageText = "Merged PR #\(number)"
-                resultAlert.alertStyle = .informational
-            } else {
-                resultAlert.messageText = "Merge failed"
-                resultAlert.informativeText = result.errorMessage ?? "Unknown error"
-                resultAlert.alertStyle = .critical
-            }
-            resultAlert.addButton(withTitle: "OK")
-            resultAlert.runModal()
-        }
-    }
-
-    private func renameSession(currentTitle: String) {
-        let alert = NSAlert()
-        alert.messageText = "Rename session"
-        alert.informativeText = "Enter a new name for this session."
-        alert.alertStyle = .informational
-        alert.addButton(withTitle: "Rename")
-        alert.addButton(withTitle: "Cancel")
-        let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 22))
-        input.stringValue = currentTitle
-        alert.accessoryView = input
-        alert.window.initialFirstResponder = input
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
-        let trimmed = input.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, trimmed != session.name else { return }
-        SessionCoordinator.shared.requestDaemon(.renameSession(sessionID: session.id, name: trimmed))
-        SessionCoordinator.shared.syncFromDaemon()
-    }
-
-    private func confirmClose() {
-        let alert = NSAlert()
-        alert.messageText = "Close session?"
-        alert.informativeText = session.tabs.count > 1
-            ? "This will close \(session.tabs.count) tabs and their running shells."
-            : "This will close the session and its running shell."
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: "Close Session")
-        alert.addButton(withTitle: "Cancel")
-        alert.buttons[0].keyEquivalent = ""
-        alert.buttons[1].keyEquivalent = ""
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
-        onClose()
-    }
-
-    private func closeOtherSessions() {
-        guard let wsID = model.activeWorkspaceID else { return }
-        let others = model.sessions.filter { $0.id != session.id }
-        guard !others.isEmpty else { return }
-        let alert = NSAlert()
-        alert.messageText = "Close \(others.count) other session\(others.count == 1 ? "" : "s")?"
-        alert.informativeText = "Their tabs and running shells will be closed."
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: "Close Others")
-        alert.addButton(withTitle: "Cancel")
-        alert.buttons[0].keyEquivalent = ""
-        alert.buttons[1].keyEquivalent = ""
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
-        for other in others {
-            SessionCoordinator.shared.closeSession(other)
-        }
-        SessionCoordinator.shared.selectSession(workspaceID: wsID, sessionID: session.id)
-        SessionCoordinator.shared.syncFromDaemon()
-    }
-
-    private var sessionBoardStatus: BoardColumnKind {
-        let kinds = session.tabs.map { BoardModel.columnKind(for: $0) }
-        for k in [BoardColumnKind.needsAttention, .error, .running, .done] {
-            if kinds.contains(k) { return k }
-        }
-        return .idle
-    }
-
-    /// The most specific attention signal for this row: an agent-hook-fired notification
-    /// (`tab.status == .waiting`, e.g. Claude Code's Notification/Stop hooks) carries an
-    /// actual message, unlike `sessionBoardStatus`'s coarse category label — surfaced here so
-    /// the always-visible sidebar (not just the terminal pane's glow ring or the opt-in Notch
-    /// panel) shows which session needs attention and why, without leaving the current tab.
-    /// Scans every tab (like `sessionBoardStatus` does), not just the active one — a
-    /// background tab's notification must still surface here, that's the whole point.
-    private var waitingNotificationText: String? {
-        for tab in session.tabs {
-            if tab.status == .waiting, let text = tab.notificationText, !text.isEmpty {
-                return text
-            }
-        }
-        return nil
-    }
-
-    /// Reuses the same notification `KouenTerminalSurfaceView`'s click-to-open localhost-link
-    /// handler posts — one browser-pane-opening path for both the passive text-detection route
-    /// and this proactive sidebar-badge route (P39 G1).
-    private func openInBrowserPane(port: Int) {
-        guard let url = URL(string: "http://localhost:\(port)") else { return }
-        NotificationCenter.default.post(
-            name: Notification.Name("KouenOpenInBrowserPaneURL"),
-            object: nil,
-            userInfo: ["url": url]
-        )
-    }
-
-    private func agentColor(for kind: AgentKind) -> Color {
-        Color(nsColor: NSColor.fromHex(SessionCoordinator.shared.settings.agentColorHex(for: kind)) ?? KouenDesign.chrome.textSecondary)
-    }
-
-    /// P38 Phase B: presence/kind/age only — the shared PTY makes attributing output bytes to
-    /// a specific subagent impossible, so this deliberately doesn't claim activity state.
-    private func subagentTooltip(kind: AgentKind, subagents: [AgentSnapshot]) -> String {
-        guard !subagents.isEmpty else { return kind.displayName }
-        let lines = subagents.map { sub -> String in
-            let source = sub.pid == 0 ? "hook" : "pid \(sub.pid)"
-            let elapsed = Int(Date().timeIntervalSince(sub.lastActivityAt))
-            return "\(sub.kind.displayName) (\(source), \(elapsed)s)"
-        }
-        return ([kind.displayName] + lines).joined(separator: "\n")
-    }
-
-    private func checksStatusColor(_ status: GitHubCLIClient.ChecksStatus?) -> Color? {
-        guard let status else { return nil }
-        switch status {
-        case .pass: return .green
-        case .fail: return .red
-        case .pending: return .yellow
-        case .none: return nil
-        }
-    }
-
-    private func checksStatusHelp(_ status: GitHubCLIClient.ChecksStatus?) -> String {
-        guard let status else { return "Open PR" }
-        switch status {
-        case .pass: return "Checks passing"
-        case .fail: return "Checks failing"
-        case .pending: return "Checks pending"
-        case .none: return "Open PR"
-        }
     }
 }
 
-// MARK: - Worktree header row
-
-private struct SidebarWorktreeHeaderRow: View {
-    let count: Int
-    let isCollapsed: Bool
-    var onToggleCollapse: () -> Void
-
-    var body: some View {
-        let c = KouenDesign.chrome
-        HStack(spacing: 6) {
-            Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
-                .font(.system(size: 8, weight: .regular))
-                .foregroundStyle(Color(nsColor: c.textTertiary))
-
-            Text("WORKTREES")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(Color(nsColor: c.textTertiary))
-                .kerning(0.5)
-
-            Text("\(count)")
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(Color(nsColor: c.textTertiary))
-
-            Spacer()
-        }
-        .padding(.horizontal, KouenDesign.horizontalInset + 12)
-        .contentShape(Rectangle())
-        .onTapGesture { onToggleCollapse() }
-    }
-}
-
-// MARK: - Worktree item row
-
-private struct SidebarWorktreeItemRow: View {
-    let entry: SidebarWorktreeEntry
-    let metadata: RepoGitMetadata?
-    var onActivate: () -> Void
-
-    @State private var isHovered = false
-
-    var body: some View {
-        let c = KouenDesign.chrome
-
-        ZStack {
-            RoundedRectangle(cornerRadius: KouenDesign.Radius.card, style: .continuous)
-                .fill(isHovered ? Color(nsColor: c.rowHoverFill) : Color.clear)
-
-            HStack(spacing: 0) {
-                Image(systemName: "arrow.triangle.branch")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(Color(nsColor: c.textTertiary))
-                    .frame(width: 12, height: 12)
-                    .padding(.leading, 8)
-
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(entry.branch)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color(nsColor: c.textSecondary))
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-
-                    Text(KouenDesign.shortenPath(entry.path))
-                        .font(.system(size: 10))
-                        .foregroundStyle(Color(nsColor: c.textSecondary).opacity(0.6))
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                }
-                .padding(.leading, 6)
-
-                Spacer()
-
-                HStack(spacing: 4) {
-                    if let pr = metadata?.prNumber {
-                        SidebarBadgeLabel(text: "#\(pr)", color: Color(nsColor: c.accent))
-                    }
-                    if let ahead = metadata?.aheadCount, ahead > 0 {
-                        SidebarBadgeLabel(text: "+\(ahead)", color: .green)
-                    }
-                }
-                .padding(.trailing, 6)
-            }
-        }
-        .padding(.leading, KouenDesign.horizontalInset + 16)
-        .padding(.trailing, KouenDesign.horizontalInset - 4)
-        .padding(.vertical, 1)
-        .contentShape(Rectangle())
-        .onTapGesture { onActivate() }
-        .onHover { isHovered = $0 }
-        .help("Open \(entry.branch) in new session")
-    }
-}
 
 // MARK: - Divider
 
@@ -731,4 +494,8 @@ private struct SidebarBadgeLabel: View {
             .padding(.vertical, 2)
             .background(color, in: RoundedRectangle(cornerRadius: 4, style: .continuous))
     }
+}
+
+extension Notification.Name {
+    static let kouenOpenDiffView = Notification.Name("KouenOpenDiffView")
 }

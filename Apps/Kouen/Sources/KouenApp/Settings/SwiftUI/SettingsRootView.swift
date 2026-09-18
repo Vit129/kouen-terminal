@@ -4,7 +4,7 @@ import KouenSettings
 
 struct SettingsRootView: View {
     enum Page: Int, CaseIterable {
-        case appearance = 0, colors, terminal, keys, agents, advanced, remote
+        case appearance = 0, colors, terminal, keys, agents, models, advanced, remote, automations
 
         var title: String {
             switch self {
@@ -13,8 +13,10 @@ struct SettingsRootView: View {
             case .terminal: return "Terminal"
             case .keys: return "Keys"
             case .agents: return "Agents"
+            case .models: return "Models"
             case .advanced: return "Advanced"
             case .remote: return "Remote"
+            case .automations: return "Automations"
             }
         }
 
@@ -25,8 +27,10 @@ struct SettingsRootView: View {
             case .terminal: return "terminal"
             case .keys: return "keyboard"
             case .agents: return "sparkles"
+            case .models: return "cpu"
             case .advanced: return "slider.horizontal.3"
             case .remote: return "network"
+            case .automations: return "bolt.badge.clock"
             }
         }
 
@@ -61,13 +65,15 @@ struct SettingsRootView: View {
     @ViewBuilder
     private var detailView: some View {
         switch selection {
-        case .appearance: SettingsAppearanceView(model: model)
-        case .colors:     SettingsColorsView(model: model)
-        case .terminal:   SettingsTerminalView(model: model)
-        case .keys:       SettingsKeysView(model: model)
-        case .agents:     SettingsAgentsView(model: model)
-        case .advanced:   SettingsAdvancedView(model: model)
-        case .remote:     SettingsRemoteView(model: model)
+        case .appearance:  SettingsAppearanceView(model: model)
+        case .colors:      SettingsColorsView(model: model)
+        case .terminal:    SettingsTerminalView(model: model)
+        case .keys:        SettingsKeysView(model: model)
+        case .agents:      SettingsAgentsView(model: model)
+        case .models:      SettingsModelsView(focusedProvider: SettingsModelsFocus.consume())
+        case .advanced:    SettingsAdvancedView(model: model)
+        case .remote:      SettingsRemoteView(model: model)
+        case .automations: AutomationsFleetView()
         }
     }
 }

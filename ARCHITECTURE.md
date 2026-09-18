@@ -11,6 +11,41 @@
   - GUI and Metal renderer (`KouenApp`, `KouenTerminalRenderer`, `KouenTerminalKit`, `KouenOnboarding`) are macOS-only.
   - Headless core (`KouenDaemon`, `KouenCLI`, `KouenTerminalEngine`, `KouenCore`, `KouenCopyMode`, `CKouenSys`) build and run cross-platform on Linux.
 
+## Product Identity Guardrail: Terminal, Not IDE
+
+Added 2026-09-17 while scoping `agent-memory/plans/p45-orca-worktree-sessions/` (Orca-inspired
+Worktree Lineage, Fleet Dashboard, History Hub, Diff Viewer, Issue Tracker Drawer, Browser
+Design Mode Bridge) — adopting UI/UX patterns from IDE-shaped competitors (Orca, onorca.dev)
+without letting Kouen's own identity drift from terminal-first to IDE.
+
+**Working definition, sharpened against real evidence (Orca forks VS Code's shell but strips
+this out; a stock VS Code + Copilot Chat window has it):**
+
+IDE = has tooling bound to source code **as something to run/debug**, as a first-class citizen:
+- A **Run** action/menu item
+- A **Debug Console** (breakpoints, call stack — distinct from a plain terminal)
+- A **Problems** panel (compiler/LSP diagnostics tied to specific file locations)
+- **Ports** management for dev servers the app itself supervises
+
+Orca has none of these despite being VS-Code-shaped — it's an agent-orchestrator wearing an
+IDE's window chrome (explorer tree, side panels, tabs), not an IDE. That chrome (sidebar
+tabs, file tree, split panes) is *not* the dividing line — Kouen already has sidebar tabs
+(Sessions/Files/Git/Issues) and that alone doesn't make it an IDE either.
+
+**The actual test for any new Kouen feature:** does it require a Run button, a
+breakpoint/Debug Console, or a Problems panel showing inline compiler/LSP errors bound to a
+file? If yes → that's IDE territory, out of scope. If it only reads/displays **process state**
+(PTY/agent session) or **git state** (diff, worktree, branch) and dispatches actions back into
+a real terminal pane — it stays terminal/orchestrator territory, in scope.
+
+Checked against the P45 plan (all pass): Worktree Lineage & Fleet Dashboard (git/process
+state only), History Hub — resuming a session always re-attaches a **real PTY** replaying
+real CLI scrollback (`claude --resume <id>` etc.), never a separate chat-bubble/document
+reader — Diff Viewer (reads git diff, no compile/lint), Issue Tracker Drawer (fetches
+tickets, spawns worktrees/sessions), Browser Design Mode Bridge (forwards a CSS string to an
+agent, never executes user code). `FileEditorView`/`DiffPaneView` do syntax highlighting only
+— no LSP diagnostics, no breakpoints.
+
 ## Subsystems & Package Map
 
 ```

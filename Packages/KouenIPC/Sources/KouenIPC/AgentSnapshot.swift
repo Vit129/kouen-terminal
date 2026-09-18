@@ -164,3 +164,7 @@ public struct AgentSnapshot: Codable, Sendable, Equatable {
         self.parentPID = parentPID
     }
 }
+
+extension AgentSnapshot: Identifiable {
+    public var id: String { "\(kind.rawValue)-\(pid)" }
+}

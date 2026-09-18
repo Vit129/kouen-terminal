@@ -1,4 +1,5 @@
 import XCTest
+import KouenIPC
 @testable import KouenCore
 
 final class SessionEditorTests: XCTestCase {
@@ -342,6 +343,51 @@ final class SessionEditorTests: XCTestCase {
 
         let after = try XCTUnwrap(editor.snapshot.activeWorkspace?.activeTab)
         XCTAssertEqual(after.rootPane.allPaneIDs(), [root])
+    }
+
+    func testSetAgentMultiPaneIsolation() throws {
+        var editor = SessionEditor()
+        let workspace = try XCTUnwrap(editor.snapshot.activeWorkspace)
+        let tab = try XCTUnwrap(workspace.activeTab)
+        let rootPaneID = try XCTUnwrap(tab.rootPane.paneID)
+        let surfA = try XCTUnwrap(editor.surfaceID(forPaneID: rootPaneID))
+
+        let newPaneID = try XCTUnwrap(editor.splitPane(in: workspace.id, tabID: tab.id, paneID: rootPaneID, direction: .horizontal))
+        let surfB = try XCTUnwrap(editor.surfaceID(forPaneID: newPaneID))
+
+        let agentA = AgentSnapshot(kind: .claudeCode, executable: "claude", pid: 1001, activity: .working)
+        let agentB = AgentSnapshot(kind: .codex, executable: "codex", pid: 1002, activity: .awaiting)
+
+        // Set agent on surface A
+        editor.setAgent(agentA, forSurfaceKey: surfA.uuidString)
+        // Set agent on surface B
+        editor.setAgent(agentB, forSurfaceKey: surfB.uuidString)
+
+        let currentTab = try XCTUnwrap(editor.snapshot.activeWorkspace?.activeTab)
+        // Verify both pane agents are stored
+        XCTAssertEqual(currentTab.paneAgents?[surfA.uuidString]?.kind, .claudeCode)
+        XCTAssertEqual(currentTab.paneAgents?[surfB.uuidString]?.kind, .codex)
+
+        // allDetectedAgents must include both
+        let detected = currentTab.allDetectedAgents
+        XCTAssertEqual(detected.count, 2)
+        XCTAssertTrue(detected.contains(where: { $0.kind == .claudeCode }))
+        XCTAssertTrue(detected.contains(where: { $0.kind == .codex }))
+
+        // Active pane is pane B (split focuses new pane), so tab.agent should reflect agentB
+        XCTAssertEqual(currentTab.agent?.kind, .codex)
+
+        // Switch focus back to surface A
+        XCTAssertTrue(editor.selectPaneSurface(tabID: tab.id, paneID: rootPaneID, surfaceID: surfA))
+        let tabA = try XCTUnwrap(editor.snapshot.activeWorkspace?.activeTab)
+        XCTAssertEqual(tabA.agent?.kind, .claudeCode)
+
+        // Kill pane B -> paneAgents cleans up surfB
+        XCTAssertTrue(editor.killPane(newPaneID))
+        let tabAfterKill = try XCTUnwrap(editor.snapshot.activeWorkspace?.activeTab)
+        XCTAssertNil(tabAfterKill.paneAgents?[surfB.uuidString])
+        XCTAssertEqual(tabAfterKill.paneAgents?[surfA.uuidString]?.kind, .claudeCode)
+        XCTAssertEqual(tabAfterKill.agent?.kind, .claudeCode)
     }
 }
 

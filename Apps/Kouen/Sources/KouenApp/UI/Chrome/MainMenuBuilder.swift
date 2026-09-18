@@ -97,6 +97,12 @@ enum MainMenuBuilder {
         let splitVItem = menuItem("Split Down", action: #selector(MenuTarget.splitV), binding: BannerShortcutRegistry.splitDown)
         view.submenu?.addItem(splitVItem)
 
+        let lazygitRightItem = menuItem("Open Lazygit on Right", action: #selector(MenuTarget.openLazygitRight), binding: BannerShortcutRegistry.lazygitRight)
+        view.submenu?.addItem(lazygitRightItem)
+
+        let lazygitDownItem = menuItem("Open Lazygit on Bottom", action: #selector(MenuTarget.openLazygitDown), binding: BannerShortcutRegistry.lazygitDown)
+        view.submenu?.addItem(lazygitDownItem)
+
         // M4: branch the active pane's running agent conversation into a new split, in the
         // same cwd, continuing from where it is now. Only enabled for agents with a real,
         // CLI-native fork mechanism (validateMenuItem below) — Kouen wraps opaque CLI
@@ -204,6 +210,9 @@ let exportLayoutItem = NSMenuItem(title: "Export Layout…", action: #selector(M
         view.submenu?.addItem(tabOverviewItem)
         let forkTabItem = menuItem("Fork Tab", action: #selector(MenuTarget.forkTab), binding: BannerShortcutRegistry.forkTab)
         view.submenu?.addItem(forkTabItem)
+        let automationsItem = NSMenuItem(title: "Automations Fleet Monitor…", action: #selector(MenuTarget.openAutomations), keyEquivalent: "")
+        automationsItem.target = MenuTarget.shared
+        view.submenu?.addItem(automationsItem)
         view.submenu?.addItem(.separator())
         let runItem = menuItem("Run Script", action: #selector(MenuTarget.runScript), binding: BannerShortcutRegistry.runScript)
         view.submenu?.addItem(runItem)
@@ -494,6 +503,14 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
         SessionCoordinator.shared.splitActivePane(direction: .vertical)
     }
 
+    @objc func openLazygitRight() {
+        SessionCoordinator.shared.openLazygit(direction: .horizontal)
+    }
+
+    @objc func openLazygitDown() {
+        SessionCoordinator.shared.openLazygit(direction: .vertical)
+    }
+
     /// M4: per-agent-kind CLI-native fork command. Verified against each CLI's own
     /// `--help` (2026-08-05) — `claude --continue --fork-session` continues the most recent
     /// conversation in the current directory as a new session; `codex fork --last` forks the
@@ -727,6 +744,10 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
 
     @objc func openSettings() {
         SettingsWindowController.show()
+    }
+
+    @objc func openAutomations() {
+        SettingsWindowController.show(page: SettingsRootView.Page.automations.rawValue)
     }
 
     @objc func hintMode() { SessionCoordinator.shared.showHintMode() }

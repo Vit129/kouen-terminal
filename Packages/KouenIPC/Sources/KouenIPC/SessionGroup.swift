@@ -64,6 +64,16 @@ public struct SessionGroup: Codable, Sendable, Identifiable, Equatable {
         if let current = activeTabID, current != tabID { lastActiveTabID = current }
         activeTabID = tabID
     }
+
+    /// Path to the git worktree backing this session, if any.
+    public var worktreePath: String? {
+        tabs.first(where: { $0.worktreePath != nil })?.worktreePath
+    }
+
+    /// True if this session is backed by an isolated git worktree.
+    public var isWorktreeSession: Bool {
+        worktreePath != nil
+    }
 }
 
 extension SessionSnapshot {

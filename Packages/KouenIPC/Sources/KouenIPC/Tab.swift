@@ -11,6 +11,11 @@ public struct Tab: Codable, Sendable, Identifiable, Equatable {
     public var rootPane: PaneNode
     public var sortOrder: Int
     public var agent: AgentSnapshot?
+    /// Per-surface/pane detected agents (P45 Phase 7).
+    /// Keyed by surfaceKey (`surfaceID.uuidString`).
+    /// Allows split panes in the same tab running different agents (e.g. Claude + Codex)
+    /// to co-exist without overwriting each other.
+    public var paneAgents: [String: AgentSnapshot]?
     /// Other agent-kind processes detected deeper in this tab's process tree than `agent`
     /// (e.g. a Task-tool subagent), or hook-pushed for the in-process case proc-scan can't
     /// see. Presence/kind/age only — see `AgentDetector.AgentDetection`. nil/empty = none.
@@ -67,6 +72,7 @@ public struct Tab: Codable, Sendable, Identifiable, Equatable {
         rootPane: PaneNode? = nil,
         sortOrder: Int = 0,
         agent: AgentSnapshot? = nil,
+        paneAgents: [String: AgentSnapshot]? = nil,
         subagents: [AgentSnapshot]? = nil,
         zoomedPaneID: PaneID? = nil,
         activePaneID: PaneID? = nil,
@@ -93,6 +99,7 @@ public struct Tab: Codable, Sendable, Identifiable, Equatable {
         self.rootPane = resolvedRoot
         self.sortOrder = sortOrder
         self.agent = agent
+        self.paneAgents = paneAgents
         self.subagents = subagents
         self.zoomedPaneID = zoomedPaneID
         self.activePaneID = activePaneID ?? resolvedRoot.allPaneIDs().first
@@ -107,6 +114,34 @@ public struct Tab: Codable, Sendable, Identifiable, Equatable {
         self.worktreePath = worktreePath
         self.parentRepoPath = parentRepoPath
         self.taskName = taskName
+    }
+
+    /// All unique agent snapshots detected in this tab across all panes and subagents (P45 Phase 7).
+    public var allDetectedAgents: [AgentSnapshot] {
+        var result: [AgentSnapshot] = []
+        var seenKinds = Set<AgentKind>()
+
+        if let primary = agent {
+            result.append(primary)
+            seenKinds.insert(primary.kind)
+        }
+        if let paneMap = paneAgents {
+            for (_, snap) in paneMap {
+                if !seenKinds.contains(snap.kind) {
+                    result.append(snap)
+                    seenKinds.insert(snap.kind)
+                }
+            }
+        }
+        if let subs = subagents {
+            for sub in subs {
+                if !seenKinds.contains(sub.kind) {
+                    result.append(sub)
+                    seenKinds.insert(sub.kind)
+                }
+            }
+        }
+        return result
     }
 
     /// Effective agent kind — daemon-detected first, then inferred from OSC title.
@@ -139,6 +174,7 @@ public struct Tab: Codable, Sendable, Identifiable, Equatable {
         rootPane = try container.decode(PaneNode.self, forKey: .rootPane)
         sortOrder = try container.decodeIfPresent(Int.self, forKey: .sortOrder) ?? 0
         agent = try container.decodeIfPresent(AgentSnapshot.self, forKey: .agent)
+        paneAgents = try container.decodeIfPresent([String: AgentSnapshot].self, forKey: .paneAgents)
         // Subagent visibility (P38 Phase B) — absent in older layout.json/snapshots; nil = none detected.
         subagents = try container.decodeIfPresent([AgentSnapshot].self, forKey: .subagents)
         zoomedPaneID = try container.decodeIfPresent(PaneID.self, forKey: .zoomedPaneID)
@@ -177,6 +213,7 @@ extension Tab {
         gitBranch == other.gitBranch &&
         status == other.status &&
         agent == other.agent &&
+        paneAgents == other.paneAgents &&
         subagents == other.subagents &&
         sortOrder == other.sortOrder &&
         exitStatus == other.exitStatus &&

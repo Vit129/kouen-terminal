@@ -1,6 +1,7 @@
 import AppKit
 import KouenCore
 import SwiftUI
+import os
 
 /// Left session rail — workspace pill, sessions list, and a quiet footer.
 @MainActor
@@ -17,21 +18,27 @@ final class KouenSidebarPanelViewController: NSViewController {
             }
         )
     )
-    /// Collapses the sidebar (⌘\). Lives at the sidebar's top-trailing edge, against
-    /// the divider; when the sidebar is collapsed it's gone with it (re-open via ⌘\).
-    /// Flat `.plain` style + 30×30 so it matches the neighbouring notification bell.
-    private let sidebarToggleButton = SoftIconButton(frame: NSRect(x: 0, y: 0, width: 30, height: 30))
+    // Traffic-light clearance for the icon tab bar row: only needed when this sidebar sits at
+    // the window's physical left edge (`!sidebarOnRight`) — the right edge never has traffic
+    // lights over it. See `updateTrafficLightClearance()`.
+    private var chromeHeaderHeightConstraint: NSLayoutConstraint?
+    private var tabBarTopConstraint: NSLayoutConstraint?
+    private var tabBarLeadingConstraint: NSLayoutConstraint?
     private var tabBarHostingView: NSView!
     let sidebarSectionModel = SidebarSectionModel()
     private var sectionLabelHostingView: NSView!
     let fileTreeView = WorkspaceFileTreeView()
     private let fileViewerVC = FileViewerViewController()
-    let gitPanelView = GitPanelView()
-    private lazy var boardVC = BoardViewController()
     let sidebarFooterModel = SidebarFooterModel()
     private var footerHostingView: NSView!
     let sidebarListModel = SidebarListModel()
     private var sessionHostingView: NSView?
+    private var jobsHostingView: NSView?
+    private let jobsModel = AutomationsFleetModel()
+    private var issueTrackerHostingView: NSView?
+    // Project & Workspace Storage (Orca Session == Project)
+    let projectStore = ProjectStore()
+    private var projectDropTarget: ProjectDropTarget?
     var workspaces: [Workspace] = []
     var sessions: [SessionGroup] = []
     var activeWorkspaceID: WorkspaceID?
@@ -60,21 +67,19 @@ final class KouenSidebarPanelViewController: NSViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        sidebarListModel.projectStore = projectStore
         setupChromeHeader()
         setupWorkspaceBar()
         setupSidebarTabs()
         setupSectionLabel()
         setupFooterView()
+        setupDropTarget()
         setupSessionList()
         setupFileTree()
         setupFileViewer()
-        setupGitPlaceholder()
-        setupBoardView()
-        sidebarSectionModel.onToggleBoardView = { [weak self] in
-            guard let self else { return }
-            sidebarSectionModel.showBoardView.toggle()
-            selectSidebarTab(index: sidebarSectionModel.selectedTab)
-        }
+        setupJobsView()
+        // TODO: Issues tab disabled — re-enable with setupIssuesView() once Jira domain config UI + Azure impl are complete
+        // setupIssuesView()
         selectSidebarTab(index: 0)
         reload()
         applyChromeColors()
@@ -102,15 +107,11 @@ final class KouenSidebarPanelViewController: NSViewController {
     func applyChromeColors() {
         KouenDesign.applySidebarChrome(to: view)
         KouenDesign.makeClear(chromeHeader)
-        KouenDesign.makeClear(gitPanelView)
         workspacePillModel.chromeEpoch += 1
         sidebarSectionModel.chromeEpoch += 1
         sidebarFooterModel.chromeEpoch += 1
 
-        let sidebarOnRight = SessionCoordinator.shared.settings.sidebarOnRight
-        let symbol = sidebarOnRight ? "sidebar.right" : "sidebar.left"
-        sidebarToggleButton.setSymbol(symbol, accessibilityDescription: "Toggle sidebar", pointSize: 13, weight: .medium)
-        sidebarToggleButton.applyChrome()
+        updateTrafficLightClearance()
 
         dismissWorkspaceDropdown()
     }
@@ -119,54 +120,35 @@ final class KouenSidebarPanelViewController: NSViewController {
         chromeHeader.translatesAutoresizingMaskIntoConstraints = false
         KouenDesign.makeClear(chromeHeader)
         view.addSubview(chromeHeader)
+        let height = chromeHeader.heightAnchor.constraint(equalToConstant: KouenDesign.tabBarHeight)
+        chromeHeaderHeightConstraint = height
         NSLayoutConstraint.activate([
             chromeHeader.topAnchor.constraint(equalTo: view.topAnchor),
             chromeHeader.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             chromeHeader.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            chromeHeader.heightAnchor.constraint(equalToConstant: WindowTitleStripView.height + KouenDesign.tabBarHeight),
+            height,
         ])
     }
 
-    /// The sidebar toggle lives in `chromeHeader` so it aligns with the window chrome.
-    /// Workspaces are deliberately not surfaced here (single active workspace);
-    /// the switcher machinery stays dormant so it can be re-enabled later.
-    private func setupWorkspaceBar() {
-        sidebarToggleButton.toolTip = "Hide sidebar (⌘\\)"
-        sidebarToggleButton.target = self
-        sidebarToggleButton.action = #selector(sidebarToggleClicked)
-        sidebarToggleButton.translatesAutoresizingMaskIntoConstraints = false
-        updateSidebarToggleMenu()
-
-        chromeHeader.addSubview(sidebarToggleButton)
-
-        NSLayoutConstraint.activate([
-            // Toggle pinned to the top chrome, against the divider; 30×30.
-            sidebarToggleButton.trailingAnchor.constraint(equalTo: chromeHeader.trailingAnchor, constant: -KouenDesign.horizontalInset),
-            sidebarToggleButton.centerYAnchor.constraint(
-                equalTo: chromeHeader.topAnchor,
-                constant: WindowTitleStripView.height + KouenDesign.tabBarHeight / 2
-            ),
-            sidebarToggleButton.widthAnchor.constraint(equalToConstant: 30),
-            sidebarToggleButton.heightAnchor.constraint(equalToConstant: 30),
-        ])
+    /// Provides top bar clearance so sidebar items sit cleanly underneath the window top bar / traffic lights.
+    func updateTrafficLightClearance() {
+        chromeHeaderHeightConstraint?.constant = KouenDesign.tabBarHeight
     }
 
-    @objc private func sidebarToggleClicked() {
-        (view.window?.contentViewController as? MainSplitViewController)?.toggleSidebar()
-    }
-
-    private func updateSidebarToggleMenu() {
-        let menu = NSMenu()
-        let right = SessionCoordinator.shared.settings.sidebarOnRight
-        let item = NSMenuItem(title: right ? "Move Sidebar to Left" : "Move Sidebar to Right", action: #selector(toggleSidebarPositionFromMenu), keyEquivalent: "")
-        item.target = self
-        menu.addItem(item)
-        sidebarToggleButton.menu = menu
-    }
+    /// Sidebar collapse/expand is handled by a single always-visible toggle living in
+    /// `ContentAreaViewController` now (Orca-reference behavior: one button, fixed corner,
+    /// regardless of open/closed state) — this sidebar no longer carries its own internal
+    /// toggle button, which used to duplicate it and only appear while the sidebar itself was
+    /// visible. "Move Sidebar to Left/Right" is still reachable via the session context menu
+    /// (`KouenSidebarPanelViewController+SessionMenu.swift`), which also calls
+    /// `toggleSidebarPositionFromMenu()` below.
+    private func setupWorkspaceBar() {}
 
     @objc func toggleSidebarPositionFromMenu() {
-        (view.window?.contentViewController as? MainSplitViewController)?.toggleSidebarPosition()
-        updateSidebarToggleMenu()
+        let split = view.window?.contentViewController as? MainSplitViewController
+        Logger(subsystem: "com.vit129.kouen", category: "sidebar")
+            .debug("toggleSidebarPositionFromMenu() fired — contentViewController is MainSplitViewController: \(split != nil)")
+        split?.toggleSidebarPosition()
     }
 
     private var notificationsDropdown: NotificationDropdownPanelView?
@@ -452,19 +434,6 @@ final class KouenSidebarPanelViewController: NSViewController {
         }
     }
 
-    private func setupSectionLabel() {
-        let hosting = NSHostingView(rootView: SidebarSectionLabelView(model: sidebarSectionModel))
-        hosting.translatesAutoresizingMaskIntoConstraints = false
-        sectionLabelHostingView = hosting
-        view.addSubview(hosting)
-        NSLayoutConstraint.activate([
-            hosting.topAnchor.constraint(equalTo: chromeHeader.bottomAnchor),
-            hosting.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            hosting.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            hosting.heightAnchor.constraint(equalToConstant: 24),
-        ])
-    }
-
     private func setupSidebarTabs() {
         let hosting = NSHostingView(rootView: SidebarTabBarView(
             model: sidebarSectionModel,
@@ -472,13 +441,37 @@ final class KouenSidebarPanelViewController: NSViewController {
         ))
         hosting.translatesAutoresizingMaskIntoConstraints = false
         tabBarHostingView = hosting
-        chromeHeader.addSubview(hosting)
+        view.addSubview(hosting)
         NSLayoutConstraint.activate([
-            hosting.leadingAnchor.constraint(equalTo: chromeHeader.leadingAnchor, constant: KouenDesign.horizontalInset),
-            hosting.trailingAnchor.constraint(equalTo: sidebarToggleButton.leadingAnchor, constant: -8),
-            hosting.topAnchor.constraint(equalTo: chromeHeader.topAnchor, constant: WindowTitleStripView.height + 4),
+            hosting.topAnchor.constraint(equalTo: chromeHeader.bottomAnchor, constant: 4),
+            hosting.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: KouenDesign.horizontalInset),
+            hosting.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -KouenDesign.horizontalInset),
             hosting.heightAnchor.constraint(equalToConstant: 26),
         ])
+    }
+
+    private func setupSectionLabel() {
+        sidebarSectionModel.onAddProject = { [weak self] in
+            self?.addSession()
+        }
+        sidebarSectionModel.onAddJob = { [weak self] in
+            self?.promptNewAutomation()
+        }
+        let hosting = NSHostingView(rootView: SidebarSectionLabelView(model: sidebarSectionModel))
+        hosting.translatesAutoresizingMaskIntoConstraints = false
+        sectionLabelHostingView = hosting
+        view.addSubview(hosting)
+        let top = tabBarHostingView?.bottomAnchor ?? chromeHeader.bottomAnchor
+        NSLayoutConstraint.activate([
+            hosting.topAnchor.constraint(equalTo: top, constant: 6),
+            hosting.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            hosting.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            hosting.heightAnchor.constraint(equalToConstant: 24),
+        ])
+    }
+
+    func setTrafficLightHorizontalInset(_ inset: CGFloat) {
+        // Tab bar sits directly below the top bar now with clean leading alignment.
     }
 
     private func setupSessionList() {
@@ -488,12 +481,20 @@ final class KouenSidebarPanelViewController: NSViewController {
                 guard let self, let wsID = self.activeWorkspaceID else { return }
                 SessionCoordinator.shared.selectSession(workspaceID: wsID, sessionID: id)
             },
-            onAddInGroup: { [weak self] rootPath in
-                self?.addSessionInGroup(rootPath: rootPath)
+            onOpenProject: { [weak self] path in
+                self?.openRecentPath(path)
+            },
+            onAddInGroup: { [weak self] name, catID in
+                self?.addProjectToGroup(name: name, categoryID: catID)
             },
             onCloseSession: { [weak self] id in
                 guard let self, let session = self.sessions.first(where: { $0.id == id }) else { return }
                 SessionCoordinator.shared.closeSession(session)
+            },
+            onRemoveProject: { [weak self] path in
+                guard let self else { return }
+                self.projectStore.removeProject(path)
+                self.sidebarListModel.update(from: SessionCoordinator.shared.snapshot)
             },
             onPRClick: { urlString in
                 guard let url = URL(string: urlString) else { return }
@@ -577,44 +578,46 @@ final class KouenSidebarPanelViewController: NSViewController {
         }
     }
 
-    private func setupGitPlaceholder() {
-        view.addSubview(gitPanelView)
+    private func setupJobsView() {
+        let jobsView = AutomationsFleetView(
+            model: jobsModel,
+            isSidebar: true,
+            onAddJob: { [weak self] in self?.promptNewAutomation() }
+        )
+        let hosting = NSHostingView(rootView: jobsView)
+        hosting.translatesAutoresizingMaskIntoConstraints = false
+        hosting.isHidden = true
+        jobsHostingView = hosting
+        view.addSubview(hosting)
         NSLayoutConstraint.activate([
-            gitPanelView.topAnchor.constraint(equalTo: sectionLabelHostingView.bottomAnchor),
-            gitPanelView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            gitPanelView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            gitPanelView.bottomAnchor.constraint(equalTo: footerHostingView.topAnchor),
+            hosting.topAnchor.constraint(equalTo: sectionLabelHostingView.bottomAnchor),
+            hosting.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            hosting.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            hosting.bottomAnchor.constraint(equalTo: footerHostingView.topAnchor),
         ])
     }
 
-    private func setupBoardView() {
-        addChild(boardVC)
-        boardVC.view.translatesAutoresizingMaskIntoConstraints = false
-        boardVC.view.isHidden = true
-        view.addSubview(boardVC.view)
+    private func setupIssuesView() {
+        let hosting = NSHostingView(rootView: IssueTrackerPanelView())
+        hosting.translatesAutoresizingMaskIntoConstraints = false
+        hosting.isHidden = true
+        issueTrackerHostingView = hosting
+        view.addSubview(hosting)
         NSLayoutConstraint.activate([
-            boardVC.view.topAnchor.constraint(equalTo: sectionLabelHostingView.bottomAnchor),
-            boardVC.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            boardVC.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            boardVC.view.bottomAnchor.constraint(equalTo: footerHostingView.topAnchor),
+            hosting.topAnchor.constraint(equalTo: sectionLabelHostingView.bottomAnchor),
+            hosting.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            hosting.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            hosting.bottomAnchor.constraint(equalTo: footerHostingView.topAnchor),
         ])
     }
 
     @objc private func handleOpenGitPanel(_ note: Notification) {
-        let repoPath = note.userInfo?["repoPath"] as? String
-        sidebarSectionModel.selectedTab = 2
-        selectSidebarTab(index: 2)
-        if let path = repoPath {
-            gitPanelView.updateRoot(path: path)
-        }
+        SessionCoordinator.shared.openLazygit(direction: .horizontal)
     }
 
-
-
-    /// Switches the sidebar to the Git tab (used by the "Show Git Panel" ⌘G shortcut).
+    /// Opens Lazygit in a split pane.
     func selectGitTab() {
-        sidebarSectionModel.selectedTab = 2
-        selectSidebarTab(index: 2)
+        SessionCoordinator.shared.openLazygit(direction: .horizontal)
     }
 
     /// Scrolls/highlights `path` in the file tree in the background — unlike
@@ -698,7 +701,7 @@ final class KouenSidebarPanelViewController: NSViewController {
     }
 
     private func selectSidebarTab(index: Int) {
-        sessionHostingView?.isHidden = index != 0 || sidebarSectionModel.showBoardView
+        sessionHostingView?.isHidden = index != 0
         if index != 1 {
             // Leaving the Files tab: collapse any open preview back to the tree
             // so returning to Files always starts from the file list.
@@ -707,23 +710,8 @@ final class KouenSidebarPanelViewController: NSViewController {
         } else {
             fileTreeView.isHidden = fileViewerVC.view.isHidden == false
         }
-        gitPanelView.isHidden = index != 2
-        let showBoard = index == 0 && sidebarSectionModel.showBoardView
-        // Unhide BEFORE forcing layout: AutoLayout skips a hidden view's subtree, so
-        // laying out while boardVC.view.isHidden was still true never resolved its
-        // internal scrollView/columnsStack frame — that's what squashed the first
-        // column header into a sliver on the Sessions → Board switch.
-        boardVC.view.isHidden = !showBoard
-        if showBoard {
-            // Force-rebuild columns before laying out. While hidden, the existing
-            // NSTextField column headers keep a stale cached intrinsicContentSize;
-            // force: true guarantees fresh label subviews so layoutSubtreeIfNeeded()
-            // below measures correct frames instead of the stale cropped ones.
-            boardVC.reload(force: true)
-            view.layoutSubtreeIfNeeded()
-            view.displayIfNeeded()
-            boardVC.scrollToTop()
-        }
+        jobsHostingView?.isHidden = index != 2
+        // issueTrackerHostingView?.isHidden = index != 3  // Issues tab disabled — see TODO in viewDidLoad
         switch index {
         case 1:
             sidebarSectionModel.text = "FILES"
@@ -735,12 +723,10 @@ final class KouenSidebarPanelViewController: NSViewController {
                 fileTreeView.revealFileInTree(path: cwd)
             }
         case 2:
-            sidebarSectionModel.text = "GIT"
+            sidebarSectionModel.text = "JOBS"
             sidebarSectionModel.isRepoHeader = false
-            if let cwd = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd {
-                gitPanelView.updateRoot(path: cwd)
-            } else {
-                gitPanelView.clearRoot()
+            Task { @MainActor in
+                await self.jobsModel.load()
             }
         default:
             sidebarSectionModel.isRepoHeader = true
@@ -748,17 +734,97 @@ final class KouenSidebarPanelViewController: NSViewController {
         }
     }
 
+    func promptNewAutomation() {
+        let alert = NSAlert()
+        alert.messageText = "New Scheduled Job"
+        alert.informativeText = "Run background agent tasks periodically or on demand."
+        alert.addButton(withTitle: "Create Job")
+        alert.addButton(withTitle: "Cancel")
+
+        let container = NSStackView()
+        container.orientation = .vertical
+        container.alignment = .leading
+        container.spacing = 8
+        container.frame = NSRect(x: 0, y: 0, width: 280, height: 115)
+
+        let promptLabel = NSTextField(labelWithString: "Task / Prompt:")
+        promptLabel.font = .systemFont(ofSize: 11, weight: .medium)
+        let promptInput = NSTextField(frame: NSRect(x: 0, y: 0, width: 280, height: 22))
+        promptInput.placeholderString = "e.g. Run test suite & report failures"
+
+        let agentHStack = NSStackView()
+        agentHStack.orientation = .horizontal
+        agentHStack.spacing = 8
+        let agentLabel = NSTextField(labelWithString: "AI Agent:")
+        agentLabel.font = .systemFont(ofSize: 11, weight: .medium)
+        let agentPopup = NSPopUpButton()
+        agentPopup.addItems(withTitles: ["Claude (claude)", "Codex (codex)", "Gemini (gemini)", "Auto-Routed (auto)"])
+
+        let intervalHStack = NSStackView()
+        intervalHStack.orientation = .horizontal
+        intervalHStack.spacing = 8
+        let intervalLabel = NSTextField(labelWithString: "Schedule:")
+        intervalLabel.font = .systemFont(ofSize: 11, weight: .medium)
+        let intervalPopup = NSPopUpButton()
+        intervalPopup.addItems(withTitles: [
+            "Manual (On-demand only)",
+            "Every 15 minutes",
+            "Every 30 minutes",
+            "Every 1 hour",
+            "Every 2 hours",
+            "Every 24 hours"
+        ])
+
+        agentHStack.addArrangedSubview(agentLabel)
+        agentHStack.addArrangedSubview(agentPopup)
+        intervalHStack.addArrangedSubview(intervalLabel)
+        intervalHStack.addArrangedSubview(intervalPopup)
+
+        container.addArrangedSubview(promptLabel)
+        container.addArrangedSubview(promptInput)
+        container.addArrangedSubview(agentHStack)
+        container.addArrangedSubview(intervalHStack)
+
+        alert.accessoryView = container
+        alert.window.initialFirstResponder = promptInput
+
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        let prompt = promptInput.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !prompt.isEmpty else { return }
+
+        let agentKinds = ["claude", "codex", "gemini", "auto"]
+        let chosenAgent = agentKinds[max(0, min(agentPopup.indexOfSelectedItem, agentKinds.count - 1))]
+
+        let intervals = [0, 15, 30, 60, 120, 1440]
+        let chosenInterval = intervals[max(0, min(intervalPopup.indexOfSelectedItem, intervals.count - 1))]
+
+        let coordinator = SessionCoordinator.shared
+        let cwd = coordinator.snapshot.activeWorkspace?.activeTab?.cwd ?? FileManager.default.currentDirectoryPath
+        let repo = WorktreeManager().repoRoot(for: cwd) ?? cwd
+        let wsID = coordinator.snapshot.activeWorkspaceID
+
+        Task { @MainActor in
+            await coordinator.requestDaemon(.automationCreate(
+                repoPath: repo,
+                workspaceID: wsID,
+                agent: chosenAgent,
+                prompt: prompt,
+                intervalMinutes: chosenInterval
+            ))
+            await self.jobsModel.load()
+        }
+    }
+
     private func setupFooterView() {
         let hosting = NSHostingView(rootView: SidebarFooterView(
             model: sidebarFooterModel,
-            onSettings: { [weak self] in self?.openSettings() },
-            onAgents: { [weak self] in self?.showAgentsInbox() },
             onTasks: { [weak self] in self?.showTaskDashboard() },
-            onSwarmFleet: { [weak self] in self?.showSwarmFleet() },
-            onOpenRecent: { [weak self] path in self?.openRecentPath(path) },
+            onAddAPIKey: {
+                SettingsModelsFocus.request(.anthropic)
+                SettingsWindowController.show(page: SettingsRootView.Page.models.rawValue)
+            },
             onNewSession: { [weak self] in self?.addSession() },
-            onPalette: { [weak self] in self?.openPalette() },
-            recentProjectsProvider: { KouenSidebarPanelViewController.recentProjectsList() }
+            onPalette: { [weak self] in self?.openPalette() }
         ))
         hosting.translatesAutoresizingMaskIntoConstraints = false
         footerHostingView = hosting
@@ -769,6 +835,53 @@ final class KouenSidebarPanelViewController: NSViewController {
             hosting.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             hosting.heightAnchor.constraint(equalToConstant: KouenDesign.footerHeight + 6),
         ])
+    }
+
+    // MARK: - Drop Target & Project Management (Orca Session == Project)
+
+    private func setupDropTarget() {
+        let dropTarget = ProjectDropTarget(frame: .zero)
+        dropTarget.translatesAutoresizingMaskIntoConstraints = false
+        dropTarget.layer?.zPosition = 1   // behind all interactive subviews
+        dropTarget.onDrop = { [weak self] path in
+            guard let self else { return }
+            let scan = FolderScanner.inspect(path: path)
+            if scan.isMultiRepo {
+                self.presentCategorySheet(for: path)
+            } else {
+                self.finalizeAddProject(paths: [path], categoryID: nil)
+            }
+        }
+        projectDropTarget = dropTarget
+        view.addSubview(dropTarget, positioned: .below, relativeTo: nil)
+        NSLayoutConstraint.activate([
+            dropTarget.topAnchor.constraint(equalTo: view.topAnchor),
+            dropTarget.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            dropTarget.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            dropTarget.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+        ])
+    }
+
+    private func addProjectToGroup(name: String, categoryID: String?) {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Add to \(name)"
+        panel.message = "Choose a project folder to add to \(name)"
+        panel.begin { [weak self] response in
+            guard response == .OK, let url = panel.url else { return }
+            DispatchQueue.main.async {
+                guard let self else { return }
+                let scan = FolderScanner.inspect(path: url.path)
+                if scan.isMultiRepo {
+                    self.presentCategorySheet(for: url.path)
+                } else {
+                    self.projectStore.addProject(url.path, categoryID: categoryID)
+                    self.sidebarListModel.update(from: SessionCoordinator.shared.snapshot)
+                }
+            }
+        }
     }
 
     private func openRecentPath(_ path: String) {
@@ -809,7 +922,6 @@ final class KouenSidebarPanelViewController: NSViewController {
                 fileTreeView.revealFileInTree(path: cwd)
                 lastFileTreeCWD = cwd
             }
-            gitPanelView.updateRoot(path: cwd)
             lastFileTreeSessionID = activeSessionID
             lastFileTreeGitBranch = gitBranch
             let home = NSHomeDirectory()
@@ -818,7 +930,6 @@ final class KouenSidebarPanelViewController: NSViewController {
             }
         } else {
             NSLog("[DBG-activestate] reload() no activeTab.cwd — clearing root")
-            gitPanelView.clearRoot()
         }
         updateRepoSectionHeader()
     }
@@ -858,11 +969,8 @@ final class KouenSidebarPanelViewController: NSViewController {
                 fileTreeView.revealFileInTree(path: cwd)
                 lastFileTreeCWD = cwd
             }
-            gitPanelView.updateRoot(path: cwd)
             lastFileTreeSessionID = activeSessionID
             lastFileTreeGitBranch = gitBranch
-        } else {
-            gitPanelView.clearRoot()
         }
         // Rebuild cache once; iterate the stored result — no redundant recomputation.
         // Skip entirely when session data hasn't changed (common on metadata-only ticks).
@@ -951,7 +1059,6 @@ final class KouenSidebarPanelViewController: NSViewController {
     }
 
     @objc private func addSession() {
-        guard let activeWorkspaceID else { return }
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
@@ -961,11 +1068,55 @@ final class KouenSidebarPanelViewController: NSViewController {
         panel.begin { [weak self] response in
             guard response == .OK, let url = panel.url else { return }
             DispatchQueue.main.async {
-                guard let self, let id = self.activeWorkspaceID ?? activeWorkspaceID as WorkspaceID? else { return }
-                Self.recordRecentProject(url.path)
-                SessionCoordinator.shared.addSession(to: id, cwd: url.path, name: url.lastPathComponent)
+                guard let self else { return }
+                let scan = FolderScanner.inspect(path: url.path)
+                if scan.isMultiRepo {
+                    self.presentCategorySheet(for: url.path)
+                } else {
+                    self.finalizeAddProject(paths: [url.path], categoryID: nil)
+                }
             }
         }
+    }
+
+    /// Shows the unified AddToWorkspaceSheet (auto-detecting group folder vs single project)
+    /// and adds all chosen projects to the tree and active workspace.
+    func presentCategorySheet(for path: String) {
+        let scan = FolderScanner.inspect(path: path)
+        guard scan.isMultiRepo else {
+            finalizeAddProject(paths: [path], categoryID: nil)
+            return
+        }
+        guard let window = view.window else {
+            finalizeAddProject(paths: [path], categoryID: nil)
+            return
+        }
+        let sheet = AddToWorkspaceSheet(
+            folderPath: path,
+            store: projectStore,
+            onConfirm: { [weak self] chosenPaths, categoryID in
+                window.endSheet(window.attachedSheet ?? window)
+                self?.finalizeAddProject(paths: chosenPaths, categoryID: categoryID)
+            },
+            onCancel: {
+                window.endSheet(window.attachedSheet ?? window)
+            }
+        )
+        let controller = NSHostingController(rootView: sheet)
+        let sheetWindow = NSWindow(contentViewController: controller)
+        sheetWindow.styleMask = [.titled, .closable]
+        window.beginSheet(sheetWindow) { _ in }
+    }
+
+    private func finalizeAddProject(paths: [String], categoryID: String?) {
+        guard let id = activeWorkspaceID else { return }
+        for (index, p) in paths.enumerated() {
+            projectStore.addProject(p, categoryID: categoryID)
+            if index == 0 && sessions.isEmpty {
+                SessionCoordinator.shared.addSession(to: id, cwd: p, name: (p as NSString).lastPathComponent)
+            }
+        }
+        sidebarListModel.update(from: SessionCoordinator.shared.snapshot)
     }
 
     private func addSessionInGroup(rootPath: String) {

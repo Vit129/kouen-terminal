@@ -395,12 +395,25 @@ final class WorktreeRowView: NSView {
         let (dotColor, dotTooltip) = agentDotAppearance(for: session)
         agentStatusDot.layer?.backgroundColor = dotColor.cgColor
         agentStatusDot.toolTip = dotTooltip
-        // Show agent brand icon when detected, hide plain dot
-        let agentKind = session.tabs.compactMap({ $0.effectiveAgentKind }).first
-        if let agentKind {
-            agentIconView.image = AgentIconRenderer.templateOrMonogramImage(for: agentKind, size: 14)
-            agentIconView.contentTintColor = NSColor.fromHex(SessionCoordinator.shared.settings.agentColorHex(for: agentKind))
+
+        // Show agent brand icon when detected across any pane/tab, hide plain dot
+        var detectedKinds: [AgentKind] = []
+        for t in session.tabs {
+            for agent in t.allDetectedAgents {
+                if !detectedKinds.contains(agent.kind) {
+                    detectedKinds.append(agent.kind)
+                }
+            }
+        }
+        if detectedKinds.isEmpty, let kind = session.tabs.compactMap({ $0.effectiveAgentKind }).first {
+            detectedKinds.append(kind)
+        }
+
+        if let firstKind = detectedKinds.first {
+            agentIconView.image = AgentIconRenderer.templateOrMonogramImage(for: firstKind, size: 14)
+            agentIconView.contentTintColor = NSColor.fromHex(SessionCoordinator.shared.settings.agentColorHex(for: firstKind))
                 ?? KouenDesign.chrome.textSecondary
+            agentIconView.toolTip = detectedKinds.map(\.rawValue).joined(separator: ", ")
             agentIconView.isHidden = false
             agentStatusDot.isHidden = true
         } else {
@@ -442,6 +455,20 @@ final class WorktreeRowView: NSView {
     }
 
     private func agentDotAppearance(for session: SessionGroup) -> (NSColor, String) {
+        let allAgents = session.tabs.flatMap { $0.allDetectedAgents }
+        if allAgents.contains(where: { $0.activity == .errored }) {
+            return (.systemRed, "Agent errored")
+        }
+        if allAgents.contains(where: { $0.activity == .awaiting }) {
+            return (.systemOrange, "Agent waiting for input")
+        }
+        if allAgents.contains(where: { $0.activity == .working }) {
+            return (.systemGreen, "Agent active")
+        }
+        if !allAgents.isEmpty {
+            return (.systemYellow, "Agent idle")
+        }
+
         let tabsWithAgents = session.tabs.filter { $0.effectiveAgentKind != nil }
         guard !tabsWithAgents.isEmpty else {
             return (KouenDesign.chrome.idleStatus, "No agent")
@@ -559,6 +586,24 @@ final class SidebarTitlebarHeaderView: NSView {
             return
         }
         super.mouseUp(with: event)
+    }
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        let menu = NSMenu()
+        let right = SessionCoordinator.shared.settings.sidebarOnRight
+        let item = NSMenuItem(
+            title: right ? "Move Sidebar to Left" : "Move Sidebar to Right",
+            action: #selector(toggleSidebarPositionFromMenu),
+            keyEquivalent: ""
+        )
+        item.target = self
+        menu.addItem(item)
+        return menu
+    }
+
+    @objc private func toggleSidebarPositionFromMenu() {
+        let split = window?.contentViewController as? MainSplitViewController
+        split?.toggleSidebarPosition()
     }
 }
 

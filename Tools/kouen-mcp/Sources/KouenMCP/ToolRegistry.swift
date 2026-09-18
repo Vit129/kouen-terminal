@@ -168,6 +168,9 @@ struct ToolRegistry: Sendable {
             toolDef("kouenBrowserReload", "Reload the current page in a browser pane (requires MCP policy allowlist or KOUEN_MCP_ALLOW_CONTROL=1)", [
                 param("paneId", "string", "Browser pane UUID"),
             ]),
+            toolDef("kouenBrowserDesignModeInfo", "Get inspected element information and computed styles from Design Mode in a browser pane", [
+                param("paneId", "string", "Browser pane UUID"),
+            ]),
             toolDef("kouenFind", "Fuzzy search for files in the active session's working directory", [
                 param("query", "string", "Query to filter files (optional)"),
             ]),
@@ -357,6 +360,7 @@ struct ToolRegistry: Sendable {
         case "kouenBrowserGoBack": return await kouenBrowserGoBack(args)
         case "kouenBrowserGoForward": return await kouenBrowserGoForward(args)
         case "kouenBrowserReload": return await kouenBrowserReload(args)
+        case "kouenBrowserDesignModeInfo": return await kouenBrowserDesignModeInfo(args)
         case "kouenSpawnAgent": return await kouenSpawnAgent(args)
         case "kouenSpawnWorker": return await kouenSpawnWorker(args)
         case "kouenSwarmList": return await daemonTools.kouenSwarmList()
@@ -984,6 +988,13 @@ struct ToolRegistry: Sendable {
             return (nil, JSONRPCError(code: -32602, message: "Missing 'paneId' parameter"))
         }
         return await browserTools.kouenBrowserReload(paneIdStr: paneId)
+    }
+
+    private func kouenBrowserDesignModeInfo(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        guard case let .string(paneId)? = args["paneId"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'paneId' parameter"))
+        }
+        return await browserTools.kouenBrowserDesignModeInfo(paneIdStr: paneId)
     }
 
     private func kouenSpawnAgent(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {

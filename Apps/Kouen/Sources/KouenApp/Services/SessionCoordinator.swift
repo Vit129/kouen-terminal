@@ -204,8 +204,8 @@ final class SessionCoordinator: NSObject {
     }
     func addTab(to workspaceID: WorkspaceID, cwd: String? = nil) { sessionLifecycleService.addTab(to: workspaceID, cwd: cwd) }
     @discardableResult
-    func addAgentTask(to workspaceID: WorkspaceID, taskName: String) -> String? {
-        sessionLifecycleService.addAgentTask(to: workspaceID, taskName: taskName)
+    func addAgentTask(to workspaceID: WorkspaceID, taskName: String, baseBranch: String? = nil) -> String? {
+        sessionLifecycleService.addAgentTask(to: workspaceID, taskName: taskName, baseBranch: baseBranch)
     }
     func forkTab() {
         guard let wsID = snapshot.activeWorkspace?.id else { return }
@@ -277,6 +277,10 @@ final class SessionCoordinator: NSObject {
     }
     func splitTab(workspaceID: WorkspaceID, tabID: TabID, direction: SplitDirection) { splitPaneCoordinator.splitTab(workspaceID: workspaceID, tabID: tabID, direction: direction) }
     func splitSession(workspaceID: WorkspaceID, sessionID: SessionID, direction: SplitDirection) { splitPaneCoordinator.splitSession(workspaceID: workspaceID, sessionID: sessionID, direction: direction) }
+
+    func openLazygit(direction: SplitDirection = .horizontal) {
+        splitActivePaneAndRun(direction: direction, command: "lazygit")
+    }
 
     // MARK: - Saved Layouts (M5, facade → SplitPaneCoordinator)
     func listSavedLayouts() async -> [SavedLayout] { await splitPaneCoordinator.listSavedLayouts() }

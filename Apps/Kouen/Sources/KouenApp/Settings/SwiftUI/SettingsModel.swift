@@ -30,6 +30,10 @@ final class SettingsModel {
                 self.currentThemeName = SessionCoordinator.shared.snapshot.themeName
             }
         }
+
+        ModelKeyStore.migrateLegacyClaudeKeyIfNeeded(legacyKey: settings.claudeAPIKey) { [weak self] cleared in
+            self?.update(\.claudeAPIKey, cleared)
+        }
     }
 
     deinit {
