@@ -7,8 +7,8 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
 ## [4.17.1] - 2026-09-18
 
-### Added
-- Release version bump to v4.17.1.
+### Fixed
+- Automation tab coding just show cron job only (release v4.17.1) ([`3d42f36`](https://github.com/Vit129/kouen-terminal/commit/3d42f36a2e8f35885d014531a6ff02a82ab1412a))
 
 ## [4.17.0] - 2026-09-18
 
