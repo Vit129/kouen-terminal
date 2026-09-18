@@ -8,7 +8,16 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [4.17.0] - 2026-09-18
 
 ### Added
-- Release version bump to v4.17.0.
+- Add jobs fleet view and multi-format result viewer replacing git panel (release v4.17.0) ([`786ee2a`](https://github.com/Vit129/kouen-terminal/commit/786ee2a93ecc74b7f113f8602307d12d91136208))
+
+### Documentation
+- Standardize ARCHITECTURE.md and CONTEXT.md per workspace rules ([`0a47025`](https://github.com/Vit129/kouen-terminal/commit/0a4702536af688b162da0dfa54fa5ae360d1bf5e))
+- Split CLAUDE.md into rules/, consolidate to AGENTS.md ([`99614f0`](https://github.com/Vit129/kouen-terminal/commit/99614f0c21f3ba7ea52445c998258b06142ae9be))
+
+### Fixed
+- Reset markdown/code edit-mode per file, not sticky across tabs ([`747bf50`](https://github.com/Vit129/kouen-terminal/commit/747bf50762f5f7e02b5b881e2810e3e08c6adae1))
+- Never leave markdown preview blank on a JS render failure ([`3aff6e9`](https://github.com/Vit129/kouen-terminal/commit/3aff6e96232435f0e3e6a06a6e12b32bfefd6188))
+- Markdown preview render completely broken since v4.15.8 ([`eb575b4`](https://github.com/Vit129/kouen-terminal/commit/eb575b453e6ef18d22f51eed00a172fc241d01be))
 
 ## [4.16.0] - 2026-09-15
 
