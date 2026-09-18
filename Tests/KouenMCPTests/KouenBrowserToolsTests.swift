@@ -48,8 +48,9 @@ final class KouenBrowserToolsTests: XCTestCase {
         let missingPolicyURL = temporaryDirectory().appendingPathComponent("missing-policy.json")
         let policy = ToolPolicy.load(from: missingPolicyURL, environment: [:])
         
-        // kouenBrowserSnapshot should be allowed since it's read-only
+        // kouenBrowserSnapshot and kouenBrowserDesignModeInfo should be allowed since they are read-only
         XCTAssertTrue(policy.isToolAllowed("kouenBrowserSnapshot"))
+        XCTAssertTrue(policy.isToolAllowed("kouenBrowserDesignModeInfo"))
         
         // Mutating tools should be blocked by default
         XCTAssertFalse(policy.isToolAllowed("kouenBrowserOpen"))

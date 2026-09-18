@@ -238,9 +238,8 @@ final class SidebarSectionModel {
     var isRepoHeader: Bool = true
     var chromeEpoch: Int = 0
     var selectedTab: Int = 0
-    var showBoardView: Bool = false
-    // ponytail: closure avoids bridging @Observable back to NSViewController for one action
-    var onToggleBoardView: (() -> Void)? = nil
+    var onAddProject: (() -> Void)? = nil
+    var onAddJob: (() -> Void)? = nil
 }
 
 struct SidebarTabBarView: View {
@@ -248,20 +247,33 @@ struct SidebarTabBarView: View {
     let onTabChange: (Int) -> Void
 
     var body: some View {
-        Picker("", selection: Binding(
-            get: { model.selectedTab },
-            set: { newValue in
-                model.selectedTab = newValue
-                onTabChange(newValue)
+        HStack(spacing: 0) {
+            Picker("", selection: Binding(
+                get: { model.selectedTab },
+                set: { newValue in
+                    model.selectedTab = newValue
+                    onTabChange(newValue)
+                }
+            )) {
+                Image(systemName: "terminal").tag(0).help("Sessions")
+                Image(systemName: "folder").tag(1).help("Files")
+                Image(systemName: "bolt.badge.clock").tag(2).help("Jobs")
+                // TODO: Issues tab — re-enable when Jira domain config UI + Azure DevOps impl are complete
+                // Image(systemName: "checklist").tag(3).help("Issues")
             }
-        )) {
-            Text("Sessions").tag(0)
-            Text("Files").tag(1)
-            Text("Git").tag(2)
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(width: 135)
+
+            Spacer()
         }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .frame(maxWidth: .infinity)
+        .contextMenu {
+            let right = SessionCoordinator.shared.settings.sidebarOnRight
+            Button(right ? "Move Sidebar to Left" : "Move Sidebar to Right") {
+                let split = NSApp.keyWindow?.contentViewController as? MainSplitViewController
+                split?.toggleSidebarPosition()
+            }
+        }
     }
 }
 
@@ -271,28 +283,47 @@ struct SidebarSectionLabelView: View {
     var body: some View {
         let _ = model.chromeEpoch
         let c = KouenDesign.chrome
-        HStack(alignment: .bottom) {
-            Text(model.selectedTab == 0 && model.showBoardView ? "BOARD" : model.text)
-                .font(model.isRepoHeader
-                    ? .system(size: 11.5, weight: .bold)
-                    : Font(KouenDesign.Typography.sectionLabel))
-                .foregroundColor(Color(nsColor: c.textTertiary))
+        HStack(alignment: .center, spacing: 4) {
+            if model.selectedTab == 0 {
+                Text("PROJECTS")
+                    .font(.system(size: 10.5, weight: .bold))
+                    .foregroundStyle(Color(nsColor: c.textTertiary))
+            } else if model.selectedTab == 1 {
+                Text("FILES")
+                    .font(.system(size: 10.5, weight: .bold))
+                    .foregroundStyle(Color(nsColor: c.textTertiary))
+            } else if model.selectedTab == 2 {
+                Text("JOBS")
+                    .font(.system(size: 10.5, weight: .bold))
+                    .foregroundStyle(Color(nsColor: c.textTertiary))
+            }
+
             Spacer()
+
             if model.selectedTab == 0 {
                 Button {
-                    model.onToggleBoardView?()
+                    model.onAddProject?()
                 } label: {
-                    Image(systemName: model.showBoardView ? "list.bullet" : "square.grid.2x2")
-                        .font(.system(size: 11))
-                        .foregroundColor(Color(nsColor: c.textTertiary))
+                    Image(systemName: "plus")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(Color(nsColor: c.textSecondary))
                 }
                 .buttonStyle(.plain)
-                .padding(.trailing, KouenDesign.horizontalInset)
+                .help("Add project or folder group")
+            } else if model.selectedTab == 2 {
+                Button {
+                    model.onAddJob?()
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(Color(nsColor: c.textSecondary))
+                }
+                .buttonStyle(.plain)
+                .help("New Scheduled Job")
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-        .padding(.leading, KouenDesign.horizontalInset)
-        .padding(.bottom, 4)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        .padding(.horizontal, KouenDesign.horizontalInset)
     }
 }
 
@@ -305,37 +336,29 @@ final class SidebarFooterModel {
 
 struct SidebarFooterView: View {
     let model: SidebarFooterModel
-    let onSettings: () -> Void
-    let onAgents: () -> Void
     let onTasks: () -> Void
-    let onSwarmFleet: () -> Void
-    let onOpenRecent: (String) -> Void
+    let onAddAPIKey: () -> Void
     let onNewSession: () -> Void
     let onPalette: () -> Void
-    let recentProjectsProvider: () -> [String]
 
     var body: some View {
         let _ = model.chromeEpoch
         let c = KouenDesign.chrome
         let epoch = model.chromeEpoch
-        // P39 G5: lightweight fleet-at-a-glance badge — piggybacks on the same
-        // chromeEpoch-driven re-render as everything else here, no new data plumbing.
-        let needsAttention = SessionCoordinator.shared.agentsList().filter(\.waiting).count
         HStack(spacing: 2) {
-            FooterIconButton(symbol: "gearshape", tooltip: "Settings (⌘,)", chromeEpoch: epoch, action: onSettings)
-            Spacer()
             // P44b: Task Dashboard board UI retired in favor of inline status indicators
             // (tab bar / sidebar / git panel). Keep code for potential future reuse.
             #if false
             FooterIconButton(symbol: "checklist", tooltip: "Tasks", chromeEpoch: epoch, action: onTasks)
             #endif
-            // Agent Swarm Core Slice 5: flipped on 2026-09-14 for the first live-check pass
-            // (real daemon, real spawned agents, real scale test — see
-            // agent-memory/plans/agent-swarm-core/ai-sdlc-task-progress.md).
-            FooterIconButton(symbol: "square.grid.3x3", tooltip: "Agent Fleet", chromeEpoch: epoch, action: onSwarmFleet)
-            FooterIconButton(symbol: "sparkles", tooltip: "Agents", chromeEpoch: epoch, badgeCount: needsAttention, action: onAgents)
-            RecentProjectsMenuButton(chromeEpoch: epoch, provider: recentProjectsProvider, onSelect: onOpenRecent)
-            FooterIconButton(symbol: "plus", tooltip: "New session", chromeEpoch: epoch, action: onNewSession)
+            // Settings (gearshape) and Agent Fleet/Agents (square.grid.3x3, sparkles) footer
+            // buttons removed 2026-09-17 (P45 chrome cleanup) — Settings stays reachable via
+            // ⌘, from the menu bar. Agent Fleet's `showSwarmFleet()` and Agents' `showAgentsInbox()`
+            // implementations are untouched, just no longer wired to a footer button here;
+            // `showSwarmFleet()` currently has no other entry point in the app.
+            FooterIconButton(symbol: "key", tooltip: "Add API Key", chromeEpoch: epoch, action: onAddAPIKey)
+            Spacer()
+            // RecentProjectsMenuButton replaced by persistent ProjectDirectoryTree (Phase 2.3)
             FooterIconButton(symbol: "command", tooltip: "Command palette (⌘K)", chromeEpoch: epoch, action: onPalette)
         }
         // Suppress unused warning — c is read via chromeEpoch-triggered body re-run in subviews

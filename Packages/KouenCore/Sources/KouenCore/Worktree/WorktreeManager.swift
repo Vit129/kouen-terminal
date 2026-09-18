@@ -12,6 +12,42 @@ public struct WorktreeManager: Sendable {
         public let branch: String?
         public let head: String  // commit SHA
         public let bare: Bool
+        public let baseBranch: String?
+
+        public init(path: String, branch: String?, head: String, bare: Bool, baseBranch: String? = nil) {
+            self.path = path
+            self.branch = branch
+            self.head = head
+            self.bare = bare
+            self.baseBranch = baseBranch
+        }
+    }
+
+    /// Divergence between a branch and its base branch.
+    public struct Divergence: Sendable, Equatable {
+        public let ahead: Int
+        public let behind: Int
+
+        public init(ahead: Int, behind: Int) {
+            self.ahead = ahead
+            self.behind = behind
+        }
+    }
+
+    nonisolated(unsafe) private static var _scanGeneration: Int = 0
+    private static let generationLock = NSLock()
+
+    /// Monotonic generation counter bumped whenever worktrees are created or removed.
+    public static var scanGeneration: Int {
+        generationLock.lock()
+        defer { generationLock.unlock() }
+        return _scanGeneration
+    }
+
+    public static func bumpScanGeneration() {
+        generationLock.lock()
+        defer { generationLock.unlock() }
+        _scanGeneration += 1
     }
 
     public init() {}
@@ -77,17 +113,43 @@ public struct WorktreeManager: Sendable {
         }
 
         guard runGit(args, in: repoPath) else { return nil }
+
+        // Lineage tracking (Orca pattern): record base branch in git config
+        if let branch {
+            let resolvedBase = baseRef ?? defaultBaseBranch(repoPath: repoPath)
+            if let resolvedBase {
+                _ = runGit(["config", "branch.\(branch).base", resolvedBase], in: repoPath)
+            }
+        }
+        Self.bumpScanGeneration()
         return worktreePath
     }
 
     // MARK: - Remove
 
     /// Removes a worktree. Uses `--force` if `force` is true (discards uncommitted changes).
+    /// Enforces home-directory and dirty-worktree guards for safety.
     @discardableResult
     public func remove(repoPath: String, worktreePath: String, force: Bool = false) -> Bool {
+        // Home directory & path traversal guard: never touch $HOME, root, or path outside worktree dir
+        let home = NSHomeDirectory()
+        let standardPath = (worktreePath as NSString).standardizingPath
+        if standardPath == home || standardPath == "/" || !standardPath.contains("/\(Self.worktreeDir)/") {
+            return false
+        }
+
+        // Dirty guard: refuse to delete uncommitted changes unless explicitly forced
+        if !force && isDirty(worktreePath: worktreePath) {
+            return false
+        }
+
         var args = ["worktree", "remove", worktreePath]
         if force { args.append("--force") }
-        return runGit(args, in: repoPath)
+        let ok = runGit(args, in: repoPath)
+        if ok {
+            Self.bumpScanGeneration()
+        }
+        return ok
     }
 
     // MARK: - Archive hook (P32 F3)
@@ -132,7 +194,95 @@ public struct WorktreeManager: Sendable {
         guard let output = runGitOutput(["worktree", "list", "--porcelain"], in: repoPath) else {
             return []
         }
-        return parseWorktreeList(output)
+        return parseWorktreeList(output, in: repoPath)
+    }
+
+    // MARK: - Lineage & Divergence
+
+    /// Resolves the base branch for a given branch in repoPath.
+    /// Reads `branch.<branch>.base` git config if present, falling back to `defaultBaseBranch`.
+    public func baseBranch(for branch: String, in repoPath: String) -> String? {
+        if let configBase = runGitOutput(["config", "--get", "branch.\(branch).base"], in: repoPath)?
+            .trimmingCharacters(in: .whitespacesAndNewlines), !configBase.isEmpty {
+            return configBase
+        }
+        return defaultBaseBranch(repoPath: repoPath)
+    }
+
+    /// Resolves the repository default branch (e.g. "main", "master", "develop").
+    public func defaultBaseBranch(repoPath: String) -> String? {
+        if let remoteHead = runGitOutput(["symbolic-ref", "--short", "refs/remotes/origin/HEAD"], in: repoPath)?
+            .trimmingCharacters(in: .whitespacesAndNewlines), !remoteHead.isEmpty {
+            return remoteHead.hasPrefix("origin/") ? String(remoteHead.dropFirst("origin/".count)) : remoteHead
+        }
+        for candidate in ["main", "master", "develop"] {
+            if runGit(["rev-parse", "--verify", "refs/heads/\(candidate)"], in: repoPath) {
+                return candidate
+            }
+        }
+        return runGitOutput(["branch", "--show-current"], in: repoPath)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Measures divergence between `branch` and its `base` branch.
+    /// `ahead`: commits on `branch` that `base` does not have.
+    /// `behind`: commits on `base` that `branch` does not have.
+    public func divergence(repoPath: String, branch: String, base: String) -> Divergence? {
+        guard let output = runGitOutput(["rev-list", "--left-right", "--count", "\(base)...\(branch)"], in: repoPath) else {
+            return nil
+        }
+        let parts = output.trimmingCharacters(in: .whitespacesAndNewlines)
+            .components(separatedBy: CharacterSet.whitespaces)
+            .filter { !$0.isEmpty }
+        guard parts.count >= 2, let behind = Int(parts[0]), let ahead = Int(parts[1]) else {
+            return nil
+        }
+        return Divergence(ahead: ahead, behind: behind)
+    }
+
+    /// Checks whether `branch` has already been merged or squash-merged into `base`.
+    public func isMergedOrSquashed(repoPath: String, branch: String, base: String) -> Bool {
+        // 1. Ancestor check: normal merge (fast-forward or merge commit)
+        if runGit(["merge-base", "--is-ancestor", branch, base], in: repoPath) {
+            return true
+        }
+
+        // 2. Squash-merge detection via git merge-tree --write-tree
+        guard let mergeBase = runGitOutput(["merge-base", base, branch], in: repoPath)?
+            .trimmingCharacters(in: .whitespacesAndNewlines), !mergeBase.isEmpty else {
+            return false
+        }
+
+        guard let branchHead = runGitOutput(["rev-parse", "--verify", branch], in: repoPath)?
+            .trimmingCharacters(in: .whitespacesAndNewlines), branchHead != mergeBase else {
+            return false
+        }
+
+        // Branch must have introduced tree changes relative to mergeBase
+        guard let branchTree = runGitOutput(["rev-parse", "\(branch)^{tree}"], in: repoPath)?
+            .trimmingCharacters(in: .whitespacesAndNewlines), !branchTree.isEmpty else {
+            return false
+        }
+        guard let mergeBaseTree = runGitOutput(["rev-parse", "\(mergeBase)^{tree}"], in: repoPath)?
+            .trimmingCharacters(in: .whitespacesAndNewlines), !mergeBaseTree.isEmpty else {
+            return false
+        }
+        guard branchTree != mergeBaseTree else {
+            return false
+        }
+
+        guard let baseTree = runGitOutput(["rev-parse", "\(base)^{tree}"], in: repoPath)?
+            .trimmingCharacters(in: .whitespacesAndNewlines), !baseTree.isEmpty else {
+            return false
+        }
+
+        guard let mergeOutput = runGitOutput(["merge-tree", "--write-tree", base, branch], in: repoPath) else {
+            return false
+        }
+
+        let mergedTree = mergeOutput.components(separatedBy: .newlines).first?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return mergedTree == baseTree
     }
 
     // MARK: - Query
@@ -154,7 +304,11 @@ public struct WorktreeManager: Sendable {
     /// Prunes stale worktree entries (e.g. after manual directory deletion).
     @discardableResult
     public func prune(repoPath: String) -> Bool {
-        runGit(["worktree", "prune"], in: repoPath)
+        let ok = runGit(["worktree", "prune"], in: repoPath)
+        if ok {
+            Self.bumpScanGeneration()
+        }
+        return ok
     }
 
     // MARK: - Private
@@ -191,7 +345,7 @@ public struct WorktreeManager: Sendable {
         } catch { return nil }
     }
 
-    private func parseWorktreeList(_ output: String) -> [WorktreeInfo] {
+    private func parseWorktreeList(_ output: String, in repoPath: String? = nil) -> [WorktreeInfo] {
         var results: [WorktreeInfo] = []
         var path: String?
         var head: String?
@@ -202,7 +356,8 @@ public struct WorktreeManager: Sendable {
             if line.hasPrefix("worktree ") {
                 // Flush previous entry
                 if let p = path, let h = head {
-                    results.append(WorktreeInfo(path: p, branch: branch, head: h, bare: bare))
+                    let base = (branch != nil && repoPath != nil) ? baseBranch(for: branch!, in: repoPath!) : nil
+                    results.append(WorktreeInfo(path: p, branch: branch, head: h, bare: bare, baseBranch: base))
                 }
                 path = String(line.dropFirst("worktree ".count))
                 head = nil; branch = nil; bare = false
@@ -217,7 +372,8 @@ public struct WorktreeManager: Sendable {
         }
         // Flush last entry
         if let p = path, let h = head {
-            results.append(WorktreeInfo(path: p, branch: branch, head: h, bare: bare))
+            let base = (branch != nil && repoPath != nil) ? baseBranch(for: branch!, in: repoPath!) : nil
+            results.append(WorktreeInfo(path: p, branch: branch, head: h, bare: bare, baseBranch: base))
         }
         return results
     }

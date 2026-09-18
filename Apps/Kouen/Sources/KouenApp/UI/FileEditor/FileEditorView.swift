@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import KouenCore
 import QuickLookUI
 import KouenLSP
@@ -22,6 +23,7 @@ final class FileEditorView: NSView {
     private var isMarkdownFile = false
     private var isMarkdownEditMode = false
     private var currentMarkdownRaw: String = ""
+    private var diffHostingView: NSHostingView<DiffPaneView>?
 
     var activeDiagnostics: [LSPDiagnostic] { syntaxView.activeDiagnostics }
     /// True once `load(path:)` has routed the current file through the syntax-highlighted
@@ -92,6 +94,37 @@ final class FileEditorView: NSView {
             showMessage("Binary file — cannot preview.")
             return
         }
+
+        if ext == "diff" || ext == "patch" {
+            isMarkdownFile = false
+            isMarkdownEditMode = false
+            modeToggleButton.isHidden = true
+            markdownPreviewView.isHidden = true
+            syntaxView.isHidden = true
+            quickLookContainer.isHidden = true
+            messageLabel.isHidden = true
+
+            let titleName = (cleanPath as NSString).lastPathComponent
+            let pane = DiffPaneView(diffText: contents, title: "Diff: \(titleName)")
+            if let existing = diffHostingView {
+                existing.rootView = pane
+                existing.isHidden = false
+            } else {
+                let hosting = NSHostingView(rootView: pane)
+                hosting.translatesAutoresizingMaskIntoConstraints = false
+                addSubview(hosting)
+                NSLayoutConstraint.activate([
+                    hosting.topAnchor.constraint(equalTo: topAnchor),
+                    hosting.leadingAnchor.constraint(equalTo: leadingAnchor),
+                    hosting.trailingAnchor.constraint(equalTo: trailingAnchor),
+                    hosting.bottomAnchor.constraint(equalTo: bottomAnchor),
+                ])
+                diffHostingView = hosting
+            }
+            return
+        }
+
+        diffHostingView?.isHidden = true
 
         let isRich = MarkdownPreviewView.isRichPreviewExtension(ext)
         let isCode = MarkdownPreviewView.isSupportedCodeFile(url)

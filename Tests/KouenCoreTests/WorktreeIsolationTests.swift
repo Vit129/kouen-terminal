@@ -12,6 +12,9 @@ final class WorktreeIsolationTests: XCTestCase {
         try FileManager.default.createDirectory(atPath: repoPath, withIntermediateDirectories: true)
         // Init a git repo with one commit so worktrees work
         shell("git init", in: repoPath)
+        shell("git branch -m main", in: repoPath)
+        shell("git config user.name 'Test Runner'", in: repoPath)
+        shell("git config user.email 'test@example.com'", in: repoPath)
         shell("git commit --allow-empty -m 'init'", in: repoPath)
     }
 
@@ -152,6 +155,114 @@ final class WorktreeIsolationTests: XCTestCase {
         mgr.remove(repoPath: repoPath, worktreePath: wt1)
         XCTAssertFalse(FileManager.default.fileExists(atPath: wt1))
         XCTAssertTrue(FileManager.default.fileExists(atPath: wt2))
+    }
+
+    // MARK: - Lineage & Divergence (Phase 1)
+
+    func testLineageTrackingAndBaseBranch() throws {
+        let wtPath = try XCTUnwrap(mgr.create(repoPath: repoPath, sessionID: "lin-1", branch: "feat-lin", baseRef: "main"))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: wtPath))
+
+        // Check base branch resolution
+        let base = mgr.baseBranch(for: "feat-lin", in: repoPath)
+        XCTAssertEqual(base, "main")
+
+        // Check git config directly
+        let configBase = shell("git config --get branch.feat-lin.base", in: repoPath)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        XCTAssertEqual(configBase, "main")
+
+        // Check list includes baseBranch
+        let list = mgr.list(repoPath: repoPath)
+        let entry = list.first { $0.branch == "feat-lin" }
+        XCTAssertEqual(entry?.baseBranch, "main")
+    }
+
+    func testDivergenceAheadBehind() throws {
+        let wtPath = try XCTUnwrap(mgr.create(repoPath: repoPath, sessionID: "div-1", branch: "feat-div", baseRef: "main"))
+
+        // Add 2 commits in worktree
+        shell("git commit --allow-empty -m 'wt commit 1'", in: wtPath)
+        shell("git commit --allow-empty -m 'wt commit 2'", in: wtPath)
+
+        // Add 1 commit in main repo
+        shell("git commit --allow-empty -m 'main commit 1'", in: repoPath)
+
+        let div = try XCTUnwrap(mgr.divergence(repoPath: repoPath, branch: "feat-div", base: "main"))
+        XCTAssertEqual(div.ahead, 2)
+        XCTAssertEqual(div.behind, 1)
+    }
+
+    func testIsMergedOrSquashedNormalMerge() throws {
+        let wtPath = try XCTUnwrap(mgr.create(repoPath: repoPath, sessionID: "norm-1", branch: "feat-norm", baseRef: "main"))
+        let filePath = wtPath + "/norm.txt"
+        FileManager.default.createFile(atPath: filePath, contents: "norm content".data(using: .utf8))
+        shell("git add norm.txt && git commit -m 'norm commit'", in: wtPath)
+
+        // Before merge: not merged
+        XCTAssertFalse(mgr.isMergedOrSquashed(repoPath: repoPath, branch: "feat-norm", base: "main"))
+
+        // Merge into main
+        shell("git merge --no-ff feat-norm -m 'merge feat-norm'", in: repoPath)
+
+        // After merge: merged
+        XCTAssertTrue(mgr.isMergedOrSquashed(repoPath: repoPath, branch: "feat-norm", base: "main"))
+    }
+
+    func testIsMergedOrSquashedSquashMerge() throws {
+        let wtPath = try XCTUnwrap(mgr.create(repoPath: repoPath, sessionID: "sq-1", branch: "feat-sq", baseRef: "main"))
+        let filePath = wtPath + "/feature.txt"
+        FileManager.default.createFile(atPath: filePath, contents: "feature content".data(using: .utf8))
+        shell("git add feature.txt && git commit -m 'add feature'", in: wtPath)
+
+        // Before squash: not merged
+        XCTAssertFalse(mgr.isMergedOrSquashed(repoPath: repoPath, branch: "feat-sq", base: "main"))
+
+        // Squash merge into main (does not create an ancestor relationship!)
+        shell("git merge --squash feat-sq && git commit -m 'squashed feat-sq'", in: repoPath)
+
+        // squash-merge check via merge-tree should detect tree equality
+        XCTAssertTrue(mgr.isMergedOrSquashed(repoPath: repoPath, branch: "feat-sq", base: "main"))
+
+        // An unmerged branch with different content should still be false
+        let unmergedPath = try XCTUnwrap(mgr.create(repoPath: repoPath, sessionID: "sq-2", branch: "feat-unmerged", baseRef: "main"))
+        let diffFile = unmergedPath + "/diff.txt"
+        FileManager.default.createFile(atPath: diffFile, contents: "different content".data(using: .utf8))
+        shell("git add diff.txt && git commit -m 'different'", in: unmergedPath)
+
+        XCTAssertFalse(mgr.isMergedOrSquashed(repoPath: repoPath, branch: "feat-unmerged", base: "main"))
+    }
+
+    func testRemoveGuardsSafety() throws {
+        // Attempting to remove home directory or root or arbitrary dir must fail
+        XCTAssertFalse(mgr.remove(repoPath: repoPath, worktreePath: NSHomeDirectory()))
+        XCTAssertFalse(mgr.remove(repoPath: repoPath, worktreePath: "/"))
+        XCTAssertFalse(mgr.remove(repoPath: repoPath, worktreePath: "/tmp/not-a-worktree"))
+    }
+
+    func testRemoveDirtyWorktreeGuards() throws {
+        let wtPath = try XCTUnwrap(mgr.create(repoPath: repoPath, sessionID: "dirty-1", branch: "feat-dirty"))
+        FileManager.default.createFile(atPath: wtPath + "/dirty.txt", contents: "uncommitted".data(using: .utf8))
+
+        // Without force: refuses to remove
+        XCTAssertFalse(mgr.remove(repoPath: repoPath, worktreePath: wtPath, force: false))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: wtPath))
+
+        // With force: successfully removes
+        XCTAssertTrue(mgr.remove(repoPath: repoPath, worktreePath: wtPath, force: true))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: wtPath))
+    }
+
+    func testScanGenerationIncrements() throws {
+        let gen0 = WorktreeManager.scanGeneration
+        let wtPath = try XCTUnwrap(mgr.create(repoPath: repoPath, sessionID: "gen-1", branch: "feat-gen"))
+        XCTAssertEqual(WorktreeManager.scanGeneration, gen0 + 1)
+
+        mgr.remove(repoPath: repoPath, worktreePath: wtPath)
+        XCTAssertEqual(WorktreeManager.scanGeneration, gen0 + 2)
+
+        mgr.prune(repoPath: repoPath)
+        XCTAssertEqual(WorktreeManager.scanGeneration, gen0 + 3)
     }
 
     // MARK: - Helpers

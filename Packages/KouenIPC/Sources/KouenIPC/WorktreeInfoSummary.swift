@@ -8,11 +8,13 @@ public struct WorktreeInfoSummary: Codable, Sendable, Equatable {
     public let branch: String?
     public let head: String
     public let bare: Bool
+    public let baseBranch: String?
 
-    public init(path: String, branch: String?, head: String, bare: Bool) {
+    public init(path: String, branch: String?, head: String, bare: Bool, baseBranch: String? = nil) {
         self.path = path
         self.branch = branch
         self.head = head
         self.bare = bare
+        self.baseBranch = baseBranch
     }
 }

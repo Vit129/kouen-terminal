@@ -397,6 +397,46 @@ struct KouenBrowserTools: Sendable {
         return (nil, JSONRPCError(code: -32000, message: "Unexpected response"))
     }
 
+    // MARK: - kouenBrowserDesignModeInfo
+
+    func kouenBrowserDesignModeInfo(paneIdStr: String) async -> (AnyCodable?, JSONRPCError?) {
+        guard let paneID = UUID(uuidString: paneIdStr) else {
+            return (nil, JSONRPCError(code: -32602, message: "Invalid paneId UUID: \(paneIdStr)"))
+        }
+        let script = """
+        (function() {
+            var el = document.querySelector('[data-kouen-design-ref]');
+            if (!el) {
+                return JSON.stringify({ active: false, message: "No element currently selected in Design Mode." });
+            }
+            var cs = getComputedStyle(el);
+            var props = ['color','backgroundColor','fontSize','fontWeight','padding','margin','border','width','height','display','flexDirection','gap'];
+            var styles = {};
+            props.forEach(function(p){ styles[p] = cs[p]; });
+            return JSON.stringify({
+                active: true,
+                tag: el.tagName.toLowerCase(),
+                id: el.id || '',
+                className: el.getAttribute('class') || '',
+                styles: styles
+            });
+        })()
+        """
+        guard let response = await send(.browserEvaluate(paneID: paneID, script: script)) else {
+            return (nil, JSONRPCError(code: -32000, message: "Daemon unavailable"))
+        }
+        switch response {
+        case let .browserSuccess(payload):
+            if case let .text(result) = payload {
+                return (toolResult(json: .object(["result": .string(result)])), nil)
+            }
+            if case let .error(msg) = payload { return (nil, JSONRPCError(code: -32000, message: msg)) }
+            return (nil, JSONRPCError(code: -32000, message: "Unexpected payload response"))
+        case let .error(msg): return (nil, JSONRPCError(code: -32000, message: msg))
+        default: return (nil, JSONRPCError(code: -32000, message: "Unexpected response from daemon"))
+        }
+    }
+
     private func toolResult(json value: AnyCodable) -> AnyCodable {
         let data = try? JSONEncoder().encode(value)
         let text = data.flatMap { String(data: $0, encoding: .utf8) } ?? "{}"

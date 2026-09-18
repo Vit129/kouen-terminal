@@ -5,12 +5,9 @@ import KouenLSP
 
 @MainActor
 final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate {
-    private let titleStrip = WindowTitleStripView()
     private let tabBar = TerminalTabBarView()
     private let terminalHost = NSView()
-    private let sidebarToggle = SoftIconButton(frame: NSRect(x: 0, y: 0, width: 24, height: 24))
     private let tabBarDivider = KouenDesign.divider()
-    private var sidebarToggleConstraint: NSLayoutConstraint?
 
     private nonisolated(unsafe) var copySelectionMonitor: Any?
     private var pasteboardCountAtMouseDown: Int = NSPasteboard.general.changeCount
@@ -51,20 +48,13 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         KouenDesign.makeClear(view)
         refreshTerminalHostFill()
         filePreview.refreshEditorPanelFill()
-        titleStrip.applyColors()
         tabBar.applyChrome()
         paneLifecycle.paneContainer?.applyChrome()
-        updateSidebarToggleConstraints()
+        updateTrafficLightClearance()
     }
 
-    private func updateTitleStripPath() {
-        let snap = SessionCoordinator.shared.snapshot
-        guard let tab = snap.activeWorkspace?.activeTab else {
-            titleStrip.setPath("")
-            return
-        }
-        let agentActive = tab.effectiveAgentKind != nil
-        titleStrip.setPath(agentActive ? "" : tab.cwd, gitBranch: tab.gitBranch)
+    func updateTrafficLightClearance() {
+        tabBar.updateTrafficLightClearance()
     }
 
     private func refreshTerminalHostFill() {
@@ -90,18 +80,11 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         refreshTerminalHostFill()
 
         view.addSubview(terminalHost)
-        view.addSubview(titleStrip)
         view.addSubview(tabBar)
         view.addSubview(tabBarDivider)
-        setupSidebarToggle()
 
         NSLayoutConstraint.activate([
-            titleStrip.topAnchor.constraint(equalTo: view.topAnchor),
-            titleStrip.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            titleStrip.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            titleStrip.heightAnchor.constraint(equalToConstant: WindowTitleStripView.height),
-
-            tabBar.topAnchor.constraint(equalTo: titleStrip.bottomAnchor),
+            tabBar.topAnchor.constraint(equalTo: view.topAnchor),
             tabBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             tabBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
 
@@ -113,6 +96,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
             terminalHost.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             terminalHost.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
+        updateTrafficLightClearance()
         filePreview.setupInitialLeadingConstraint()
 
         NotificationCenter.default.addObserver(
@@ -239,54 +223,16 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         }
         let activeTabID = workspace.activeSession?.activeTab?.id ?? workspace.activeSession?.tabs.first?.id
         tabBar.reload(tabs: sessionTabs, activeTabID: activeTabID)
-        updateTitleStripPath()
     }
 
+    /// The window-level sidebar toggle (`MainSplitViewController.sidebarToggle`) now lives in
+    /// the traffic-light row itself, not this tab bar's row — see that file's
+    /// `setupSidebarToggle` doc comment — so this tab bar no longer needs to reserve any
+    /// trailing space for it, and neither does `PaneSplitButtonsView`.
     func setTabBarLeadingInset(_ inset: CGFloat) {
-        let settings = SessionCoordinator.shared.settings
-        titleStrip.setLeadingInset(inset)
-        let sidebarVisible = settings.sidebarVisible
-        let sidebarOnRight = settings.sidebarOnRight
-        if sidebarOnRight {
-            tabBar.setLeadingInset(inset)
-            tabBar.trailingInset = sidebarVisible ? 0 : 28
-        } else {
-            tabBar.setLeadingInset(sidebarVisible ? 0 : inset)
-            tabBar.trailingInset = 0
-        }
-        sidebarToggle.isHidden = sidebarVisible
-    }
-
-    private func setupSidebarToggle() {
-        sidebarToggle.toolTip = "Show sidebar (⌘\\)"
-        sidebarToggle.target = self
-        sidebarToggle.action = #selector(toggleSidebarClicked)
-        sidebarToggle.translatesAutoresizingMaskIntoConstraints = false
-        sidebarToggle.isHidden = true
-        view.addSubview(sidebarToggle)
-        NSLayoutConstraint.activate([
-            sidebarToggle.centerYAnchor.constraint(equalTo: tabBar.centerYAnchor),
-            sidebarToggle.widthAnchor.constraint(equalToConstant: 24),
-            sidebarToggle.heightAnchor.constraint(equalToConstant: 24),
-        ])
-        updateSidebarToggleConstraints()
-    }
-
-    private func updateSidebarToggleConstraints() {
-        sidebarToggleConstraint?.isActive = false
-        let sidebarOnRight = SessionCoordinator.shared.settings.sidebarOnRight
-        if sidebarOnRight {
-            sidebarToggleConstraint = sidebarToggle.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -6)
-        } else {
-            sidebarToggleConstraint = sidebarToggle.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 6)
-        }
-        sidebarToggleConstraint?.isActive = true
-        let symbol = sidebarOnRight ? "sidebar.right" : "sidebar.left"
-        sidebarToggle.setSymbol(symbol, accessibilityDescription: "Show sidebar", pointSize: 12, weight: .medium)
-    }
-
-    @objc private func toggleSidebarClicked() {
-        (view.window?.contentViewController as? MainSplitViewController)?.toggleSidebar()
+        tabBar.setLeadingInset(inset)
+        tabBar.trailingInset = 0
+        PaneContainerView.splitButtonsTrailingInset = -8
     }
 
     func refreshTabBarMetadata() {
@@ -297,7 +243,6 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         }
         let activeTabID = workspace.activeSession?.activeTab?.id ?? workspace.activeSession?.tabs.first?.id
         tabBar.refreshMetadata(tabs: sessionTabs, activeTabID: activeTabID)
-        updateTitleStripPath()
     }
 
     // MARK: - TerminalTabBarDelegate
@@ -366,6 +311,14 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
 
 @MainActor
 final class PaneContainerView: NSView {
+    /// Trailing inset for each pane's `PaneSplitButtonsView` hover overlay (default `-8`).
+    /// `ContentAreaViewController.setTabBarLeadingInset` pushes this out further when the
+    /// sidebar is on the right and collapsed, so the overlay doesn't crowd `sidebarToggle`
+    /// in that same top-right corner. Read once per pane at build time — a pane built before
+    /// a sidebar-side change keeps its old inset until next split/rebuild, same tradeoff as
+    /// every other static-read-at-build-time layout constant in this file.
+    static var splitButtonsTrailingInset: CGFloat = -8
+
     private let coordinator = SessionCoordinator.shared
     private let tabID: TabID?
     private var existingHosts: [SurfaceID: TerminalHostView]
@@ -484,7 +437,7 @@ final class PaneContainerView: NSView {
                 splitButtons.layer?.zPosition = 1000
                 paneShell.addSubview(splitButtons)
                 NSLayoutConstraint.activate([
-                    splitButtons.trailingAnchor.constraint(equalTo: paneShell.trailingAnchor, constant: -8),
+                    splitButtons.trailingAnchor.constraint(equalTo: paneShell.trailingAnchor, constant: PaneContainerView.splitButtonsTrailingInset),
                     splitButtons.topAnchor.constraint(equalTo: paneShell.topAnchor, constant: 8),
                 ])
             }

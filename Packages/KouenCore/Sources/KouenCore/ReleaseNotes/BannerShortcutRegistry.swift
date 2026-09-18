@@ -123,6 +123,14 @@ public enum BannerShortcutRegistry {
         id: "splitDown", title: "Split Down",
         modifiers: [.command, .shift], keyChar: "d")
 
+    public static let lazygitRight = Keybinding(
+        id: "lazygitRight", title: "Open Lazygit on Right",
+        modifiers: .command, keyChar: "g")
+
+    public static let lazygitDown = Keybinding(
+        id: "lazygitDown", title: "Open Lazygit on Bottom",
+        modifiers: [.command, .shift], keyChar: "g")
+
     public static let previousPane = Keybinding(
         id: "previousPane", title: "Previous Pane",
         modifiers: .command, keyChar: "[")

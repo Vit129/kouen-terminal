@@ -223,6 +223,7 @@ private struct AgentRow: View {
     let hookState: SettingsAgentsView.HookState
     let onHookState: (SettingsAgentsView.HookState) -> Void
     @State private var mcpIsConfigured = false
+    @State private var availability: AgentAvailabilityChecker.Availability = .notInstalled
 
     private var executables: String {
         let execs = AgentTable.default.entries.first { $0.kind == kind }?.executables ?? []
@@ -276,8 +277,19 @@ private struct AgentRow: View {
             if MCPConfigWriter.canConfigure(kind) {
                 mcpButton
             }
+
+            if case .installedNeedsKey = availability, let provider = kind.suggestedModelProvider {
+                Button("Add API Key") {
+                    SettingsModelsFocus.request(provider)
+                    SettingsWindowController.show(page: SettingsRootView.Page.models.rawValue)
+                }
+                .buttonStyle(.bordered)
+            }
         }
-        .task { mcpIsConfigured = MCPConfigWriter.isConfigured(kind) }
+        .task {
+            mcpIsConfigured = MCPConfigWriter.isConfigured(kind)
+            availability = AgentAvailabilityChecker.check(kind: kind)
+        }
     }
 
     private var agentColor: Color {
