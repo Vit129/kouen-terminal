@@ -54,7 +54,11 @@ import Foundation
 /// `IPCRequest` and `.swarmTaskNode`/`.swarmFleetSnapshot`/`.swarmActionResult` to
 /// `IPCResponse` for Agent Swarm Core's `SwarmWorkerManager` (fleet spawn/send/terminate,
 /// `kouenSwarm*` MCP tools). Same functional-addition rule as M2/M5/M10 above.
-public let ipcProtocolVersion: Int = 10
+///
+/// Bumped 2026-09-18 (P46 Phase 0): added `.featureList`/`featureGet`/`featureCreate`/`featureUpdatePhase`/
+/// `featureApproveGate`/`featureSetWorktree`/`featureSupersede`/`featureDelete`/`featureSweepMerged` to `IPCRequest`
+/// and `.featureInfo`/`.features` to `IPCResponse` for AI-SDLC Embedded Workflow Engine.
+public let ipcProtocolVersion: Int = 11
 
 public enum IPCRequest: Codable, Sendable {
     case ping
@@ -346,6 +350,17 @@ public enum IPCRequest: Codable, Sendable {
     case swarmTerminate(taskID: UUID)
     case swarmList
 
+    // Features / AI-SDLC (P46): Embedded workflow engine & worktree discipline.
+    case featureList(repoPath: String?)
+    case featureGet(slug: String)
+    case featureCreate(slug: String, repoPath: String, branch: String?, baseBranch: String?, worktreePath: String?, phase: String?)
+    case featureUpdatePhase(slug: String, phase: String)
+    case featureApproveGate(slug: String, gate: Int, approver: String, notes: String?)
+    case featureSetWorktree(slug: String, worktreePath: String?)
+    case featureSupersede(slug: String, supersededBy: String)
+    case featureDelete(slug: String)
+    case featureSweepMerged(repoPath: String?)
+
     /// Forces an immediate, synchronous `layout.json` write (bypasses the normal 0.5s
     /// debounce). `install-graceful.sh`'s protocol-changed restart path sends this and waits
     /// for `.ok` before killing the daemon, instead of a blind `sleep` racing the debounce —
@@ -541,6 +556,10 @@ public enum IPCResponse: Codable, Sendable {
     /// Result of `.swarmSend`/`.swarmTerminate` — both return a plain success/failure bool
     /// (see `SwarmWorkerManager.send`/`.terminate`'s doc comments for what `false` means).
     case swarmActionResult(Bool)
+
+    // Features / AI-SDLC (P46)
+    case featureInfo(FeatureSummary?)
+    case features([FeatureSummary])
 }
 
 public struct OptionEntry: Codable, Sendable, Equatable {

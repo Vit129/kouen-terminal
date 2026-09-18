@@ -222,6 +222,7 @@ extension KouenCLI {
           list-windows [--session <name|uuid>] [--json] [--pretty]
           list-panes [--tab <uuid>] [--json] [--pretty]
           list-agents [--waiting] [--json] [--pretty] (running agents: state, age, surface)
+          task <new|status|list|gate|phase|supersede|delete|sweep> (AI-SDLC feature workflow & worktree discipline)
           has-session --session <name|uuid>           (exit 0 if it exists, else 1)
           list-commands
           get-snapshot

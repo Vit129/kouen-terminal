@@ -246,6 +246,10 @@ public enum KouenPaths {
         applicationSupport.appendingPathComponent("automations.json")
     }
 
+    public static var featuresURL: URL {
+        applicationSupport.appendingPathComponent("features.json")
+    }
+
     public static var agentRoutingRulesURL: URL {
         applicationSupport.appendingPathComponent("agent-routing-rules.json")
     }

@@ -12,6 +12,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
     private let bufferStore = PasteBufferStore()
     private let taskStore = TaskStore()
     private let automationStore = AutomationStore()
+    private let featureStore = FeatureStore()
     private let routingRuleStore = AgentRoutingRuleStore()
     private let savedLayoutStore = SavedLayoutStore()
     public let optionStore = OptionStore()
@@ -982,6 +983,52 @@ public final class SurfaceRegistry: @unchecked Sendable {
                 return .error("Automation not found")
             }
             return fireAutomationLocked(automation) ? .ok : .error("Automation spawn failed")
+        case let .featureList(repoPath):
+            return .features(featureStore.list(repoPath: repoPath).map { $0.toSummary() })
+        case let .featureGet(slug):
+            return .featureInfo(featureStore.get(slug: slug)?.toSummary())
+        case let .featureCreate(slug, repoPath, branch, baseBranch, worktreePath, phaseRaw):
+            let phase = phaseRaw.flatMap(FeaturePhase.init(rawValue:)) ?? .interview
+            let feat = featureStore.create(
+                slug: slug,
+                repoPath: repoPath,
+                branch: branch,
+                baseBranch: baseBranch,
+                worktreePath: worktreePath,
+                phase: phase
+            )
+            return .featureInfo(feat.toSummary())
+        case let .featureUpdatePhase(slug, phaseRaw):
+            guard let phase = FeaturePhase(rawValue: phaseRaw) else {
+                return .error("Invalid phase '\(phaseRaw)'")
+            }
+            guard let updated = featureStore.updatePhase(slug: slug, phase: phase) else {
+                return .error("Feature not found")
+            }
+            return .featureInfo(updated.toSummary())
+        case let .featureApproveGate(slug, gate, approver, notes):
+            guard (1...3).contains(gate) else {
+                return .error("Gate must be 1, 2, or 3")
+            }
+            guard let updated = featureStore.approveGate(slug: slug, gate: gate, approver: approver, notes: notes) else {
+                return .error("Feature not found")
+            }
+            return .featureInfo(updated.toSummary())
+        case let .featureSetWorktree(slug, worktreePath):
+            guard let updated = featureStore.setWorktree(slug: slug, worktreePath: worktreePath) else {
+                return .error("Feature not found")
+            }
+            return .featureInfo(updated.toSummary())
+        case let .featureSupersede(slug, supersededBy):
+            guard let updated = featureStore.setSuperseded(slug: slug, supersededBy: supersededBy) else {
+                return .error("Feature not found")
+            }
+            return .featureInfo(updated.toSummary())
+        case let .featureDelete(slug):
+            return featureStore.delete(slug: slug) ? .ok : .error("Feature not found")
+        case let .featureSweepMerged(repoPath):
+            tickFeatureWorktreeSweep(repoPath: repoPath)
+            return .ok
         case .routingRuleList:
             return .routingRules(routingRuleStore.list().map(Self.routingRuleSummary))
         case let .routingRuleGet(id):
@@ -2188,6 +2235,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
         for automation in due {
             _ = fireAutomationLocked(automation)
         }
+        tickFeatureWorktreeSweepLocked()
         lock.unlock()
     }
 
@@ -2266,5 +2314,45 @@ public final class SurfaceRegistry: @unchecked Sendable {
             id: rule.id, order: rule.order, kind: rule.kind.rawValue, pattern: rule.pattern,
             targetAgent: rule.targetAgent.rawValue, enabled: rule.enabled
         )
+    }
+
+    // MARK: - Features / Worktree Lifecycle Discipline (P46)
+
+    public func tickFeatureWorktreeSweep(repoPath: String? = nil) {
+        acquireRegistryLock()
+        tickFeatureWorktreeSweepLocked(repoPath: repoPath)
+        lock.unlock()
+    }
+
+    private func tickFeatureWorktreeSweepLocked(repoPath: String? = nil) {
+        let features = featureStore.list(repoPath: repoPath)
+        let manager = WorktreeManager()
+        for feature in features {
+            guard feature.phase != .completed else { continue }
+            guard let wtPath = feature.worktreePath, !wtPath.isEmpty,
+                  let branch = feature.branch, !branch.isEmpty,
+                  let base = feature.baseBranch, !base.isEmpty else {
+                continue
+            }
+            // 1. Ancestor / squash merge check
+            if manager.isMergedOrSquashed(repoPath: feature.repoPath, branch: branch, base: base) {
+                // 2. Safe removal guarded by uncommitted work check
+                if !manager.isDirty(worktreePath: wtPath) {
+                    if manager.remove(repoPath: feature.repoPath, worktreePath: wtPath, force: false) {
+                        featureStore.setWorktree(slug: feature.slug, worktreePath: nil)
+                        featureStore.updatePhase(slug: feature.slug, phase: .completed)
+                    }
+                }
+            }
+        }
+        // 3. Stale / superseded detection
+        if let repoPath {
+            _ = featureStore.detectStaleOrSuperseded(repoPath: repoPath)
+        } else {
+            let uniqueRepos = Set(features.map(\.repoPath))
+            for r in uniqueRepos {
+                _ = featureStore.detectStaleOrSuperseded(repoPath: r)
+            }
+        }
     }
 }
