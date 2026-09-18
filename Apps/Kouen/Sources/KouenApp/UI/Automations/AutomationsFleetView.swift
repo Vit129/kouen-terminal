@@ -70,18 +70,18 @@ struct AutomationsFleetView: View {
             JobResultSheetView(job: job)
         }
         .confirmationDialog(
-            "Delete Job?",
+            "Delete Automation?",
             isPresented: $showDeleteConfirmation,
             titleVisibility: .visible
         ) {
             Button("Delete", role: .destructive) {
                 if let target = deleteTarget {
-                    Task { await model.delete(id: target.id, isAutomation: target.isAutomation) }
+                    Task { await model.delete(target) }
                 }
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Are you sure you want to remove '\(deleteTarget?.name ?? "this job")'?")
+            Text("Are you sure you want to remove '\(deleteTarget?.name ?? "this automation")'?")
         }
     }
 
@@ -162,9 +162,9 @@ struct AutomationsFleetView: View {
         VStack(spacing: 12) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Jobs & Automations Fleet")
+                    Text("Automations Fleet")
                         .font(.system(size: 16, weight: .bold))
-                    Text("Multi-agent background jobs, scheduled tasks, and execution tracking")
+                    Text("Scheduled agent runs — interval, last status, and results")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
@@ -292,6 +292,7 @@ struct AutomationsFleetView: View {
                     .renderingMode(.template)
                     .foregroundStyle(agentColor(for: item.agentKind))
                     .frame(width: 12, height: 12)
+                    .help(item.agentKind.displayName)
 
                 Text(":")
                     .font(.system(size: 11, weight: .bold))
@@ -333,47 +334,47 @@ struct AutomationsFleetView: View {
 
                 Spacer(minLength: 4)
 
-                // ปุ่มเปิดดู result รองรับหลายแบบ เช่น html หรืออื่นๆ
-                resultControl(item)
+                // ผลรัน (run log/output) — แยกจากไฟล์ผลลัพธ์เสมอ ไม่ปนกัน
+                logControl(item)
 
-                // Terminal / Automation Action
-                if item.isAutomation {
-                    Button {
-                        Task { await model.runNow(id: item.id) }
-                    } label: {
-                        Image(systemName: "play.fill")
-                            .font(.system(size: 8))
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.mini)
-                    .help("Run automation now")
-                } else {
-                    Button {
-                        model.openJobSession(item: item)
-                    } label: {
-                        HStack(spacing: 2) {
-                            Image(systemName: "terminal")
-                                .font(.system(size: 7.5))
-                            Text("Open")
-                                .font(.system(size: 8.5, weight: .medium))
-                        }
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.mini)
-                    .help("Open terminal in \(KouenDesign.pathDisplayName(item.repoPath))")
-                }
+                // Result artifacts รูปธรรม (HTML/รูป/markdown/ไฟล์อื่นๆ)
+                artifactsControl(item)
 
-                // Delete button
+                // Run Now
                 Button {
-                    deleteTarget = item
-                    showDeleteConfirmation = true
+                    Task { await model.runNow(item) }
                 } label: {
-                    Image(systemName: "trash")
-                        .font(.system(size: 8.5))
-                        .foregroundStyle(.secondary.opacity(0.7))
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 8))
                 }
-                .buttonStyle(.plain)
-                .help("Delete job")
+                .buttonStyle(.bordered)
+                .controlSize(.mini)
+                .help("Run automation now")
+
+                // Toggle enable/disable
+                Toggle("", isOn: Binding(
+                    get: { item.isEnabled },
+                    set: { _ in Task { await model.toggleEnabled(item) } }
+                ))
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .labelsHidden()
+                .help(item.isEnabled ? "Disable automation" : "Enable automation")
+
+                // Delete button — daemon automations only; a LaunchAgent is the user's own
+                // scheduled job outside Kouen, so Toggle (disable) is the control for it, not delete.
+                if case .daemon = item.source {
+                    Button {
+                        deleteTarget = item
+                        showDeleteConfirmation = true
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.system(size: 8.5))
+                            .foregroundStyle(.secondary.opacity(0.7))
+                    }
+                    .buttonStyle(.plain)
+                    .help("Delete automation")
+                }
             }
         }
         .padding(8)
@@ -412,6 +413,20 @@ struct AutomationsFleetView: View {
                     .font(.system(size: 8.5, weight: .medium))
             }
             .foregroundStyle(.red)
+        } else if st == "scheduled" {
+            HStack(spacing: 3) {
+                Circle().fill(Color.secondary).frame(width: 5, height: 5)
+                Text("Scheduled")
+                    .font(.system(size: 8.5, weight: .medium))
+            }
+            .foregroundStyle(.secondary)
+        } else if st == "disabled" {
+            HStack(spacing: 3) {
+                Circle().fill(Color.secondary.opacity(0.5)).frame(width: 5, height: 5)
+                Text("Disabled")
+                    .font(.system(size: 8.5, weight: .medium))
+            }
+            .foregroundStyle(.secondary.opacity(0.7))
         } else {
             HStack(spacing: 3) {
                 Circle().fill(Color.green).frame(width: 5, height: 5)
@@ -451,97 +466,89 @@ struct AutomationsFleetView: View {
         }
     }
 
-    // MARK: - Result Control (Multi-Format: HTML, Screenshots, Output)
+    // MARK: - Result Controls (kept as 2 separate, unambiguous buttons — not one that
+    // sometimes means "log" and sometimes means "artifact file" depending on the data shape)
 
+    /// "ผลรัน" — the run's own text output/log, opened in `JobResultSheetView`. Never an artifact file.
     @ViewBuilder
-    private func resultControl(_ item: FleetJobItem) -> some View {
-        if !item.hasResults {
+    private func logControl(_ item: FleetJobItem) -> some View {
+        if (item.outputSummary?.isEmpty == false) || (item.detailText?.isEmpty == false) {
+            Button {
+                selectedResultJob = item
+            } label: {
+                HStack(spacing: 2) {
+                    Image(systemName: "doc.text")
+                        .font(.system(size: 7.5))
+                    Text("Log")
+                        .font(.system(size: 8.5, weight: .medium))
+                }
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.mini)
+            .help("View run output / log")
+        }
+    }
+
+    /// Concrete result files (HTML report, screenshot, markdown, ...). Never the run log text.
+    /// The model already ranks the most relevant one (e.g. an "all-team" summary over its
+    /// per-team breakdowns) first — that one opens with a single click; the rest sit behind
+    /// a small chevron instead of burying the one the user actually wants inside a dropdown.
+    @ViewBuilder
+    private func artifactsControl(_ item: FleetJobItem) -> some View {
+        if item.artifacts.isEmpty {
             EmptyView()
-        } else if let html = item.primaryHTMLArtifact, item.artifacts.count == 1 && item.outputSummary == nil {
-            // Single HTML report: 1-click open directly in browser!
-            Button {
-                openArtifact(html)
-            } label: {
-                HStack(spacing: 2.5) {
-                    Image(systemName: "globe")
-                        .font(.system(size: 7.5))
-                    Text("HTML")
-                        .font(.system(size: 8.5, weight: .semibold))
-                }
-                .foregroundStyle(.blue)
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.mini)
-            .help("Open HTML report in browser: \(html.name)")
-        } else if item.artifacts.count > 1 || (item.primaryHTMLArtifact != nil && item.outputSummary != nil) {
-            // Multi-format result (HTML, images, markdown, output text)
-            Menu {
-                if let html = item.primaryHTMLArtifact {
-                    Button {
-                        openArtifact(html)
-                    } label: {
-                        Label("Open HTML Report (\(html.name))", systemImage: "globe")
-                    }
-                }
-                if item.outputSummary != nil || item.detailText != nil {
-                    Button {
-                        selectedResultJob = item
-                    } label: {
-                        Label("View Output Summary", systemImage: "doc.text")
-                    }
-                }
-                ForEach(item.artifacts.filter { $0 != item.primaryHTMLArtifact }) { art in
-                    Button {
-                        openArtifact(art)
-                    } label: {
-                        Label("Open \(art.name)", systemImage: art.systemImage)
-                    }
-                }
-                Divider()
-                Button {
-                    selectedResultJob = item
-                } label: {
-                    Label("Inspect All Results…", systemImage: "magnifyingglass")
-                }
-            } label: {
-                HStack(spacing: 2) {
-                    Image(systemName: item.primaryHTMLArtifact != nil ? "globe" : "doc.text.magnifyingglass")
-                        .font(.system(size: 7.5))
-                    Text("Result")
-                        .font(.system(size: 8.5, weight: .medium))
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 6))
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .menuStyle(.borderlessButton)
-            .fixedSize()
-            .help("View results (HTML, screenshots, logs)")
         } else {
-            // Single text output or single file: opens Result Sheet or file
-            Button {
-                if let firstArt = item.artifacts.first {
-                    openArtifact(firstArt)
-                } else {
-                    selectedResultJob = item
+            let primary = item.artifacts[0]
+            let rest = item.artifacts.dropFirst()
+
+            HStack(spacing: 2) {
+                Button {
+                    openArtifact(primary)
+                } label: {
+                    HStack(spacing: 2.5) {
+                        Image(systemName: primary.systemImage)
+                            .font(.system(size: 7.5))
+                        Text(primary.kind == .html ? "HTML" : "File")
+                            .font(.system(size: 8.5, weight: .semibold))
+                    }
+                    .foregroundStyle(primary.kind == .html ? Color.blue : Color.secondary)
                 }
-            } label: {
-                HStack(spacing: 2) {
-                    Image(systemName: item.artifacts.first?.systemImage ?? "doc.text.magnifyingglass")
-                        .font(.system(size: 7.5))
-                    Text("Result")
-                        .font(.system(size: 8.5, weight: .medium))
+                .buttonStyle(.bordered)
+                .controlSize(.mini)
+                .help("Open \(primary.name)")
+
+                if !rest.isEmpty {
+                    Menu {
+                        ForEach(Array(rest)) { art in
+                            Button {
+                                openArtifact(art)
+                            } label: {
+                                Label(art.name, systemImage: art.systemImage)
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 6))
+                            .foregroundStyle(.secondary)
+                    }
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
+                    .help("\(rest.count) more result file(s)")
                 }
             }
-            .buttonStyle(.bordered)
-            .controlSize(.mini)
-            .help("View output result")
         }
     }
 
     private func openArtifact(_ artifact: JobResultArtifact) {
         let url = URL(fileURLWithPath: artifact.path)
-        NSWorkspace.shared.open(url)
+        if artifact.kind == .html {
+            // Open in Kouen's own Browser pane (same mechanism as Cmd+B), not the OS
+            // default browser — this is a result the user is inspecting alongside their
+            // agent session, not a page to hand off to Safari/Chrome.
+            SessionCoordinator.shared.splitPaneCoordinator.openBrowserPane(url: url, direction: .horizontal)
+        } else {
+            NSWorkspace.shared.open(url)
+        }
     }
 
     private var sidebarEmptyView: some View {

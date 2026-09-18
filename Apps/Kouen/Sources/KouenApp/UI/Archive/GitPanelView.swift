@@ -1,3 +1,10 @@
+// ARCHIVED (2026-09-18, P45 Phase 7): dropped from the sidebar when Cmd+G/Cmd+Shift+G
+// started opening native lazygit instead — zero call sites remain anywhere in the app
+// (confirmed via `grep -rn "GitPanelView("`). Kept, not deleted: the per-file row
+// actions and worktree Prune UI here have no lazygit equivalent yet, so this may come
+// back as a supplementary panel. Re-wiring means finding a new call site (it used to be
+// instantiated from KouenSidebarPanelViewController) — the class itself is unchanged.
+//
 // ponytail: intentionally AppKit — NSAttributedString diffstat rendering + per-file row menus need NSTableView; SwiftUI Table lacks row actions and custom cell editing as of macOS 26.
 import AppKit
 import KouenCore
