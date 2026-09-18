@@ -11,7 +11,15 @@ public enum ModelProvider: String, CaseIterable, Identifiable, Sendable, Codable
     case openAI = "OpenAI"
     case openRouter = "OpenRouter"
     case xai = "xAI"
-    case ollama = "Ollama"
+    case cursor = "Cursor"
+    case copilot = "GitHub Copilot"
+    case kiro = "Kiro"
+    case aider = "Aider"
+    case goose = "Goose"
+    case openCode = "OpenCode"
+    case openClaw = "OpenClaw"
+    case pi = "Pi"
+    case hermes = "Hermes"
 
     public var id: String { rawValue }
 
@@ -23,21 +31,42 @@ public enum ModelProvider: String, CaseIterable, Identifiable, Sendable, Codable
         case .openAI: return "sparkle"
         case .openRouter: return "point.3.connected.trianglepath.dotted"
         case .xai: return "xmark.circle"
-        case .ollama: return "cpu"
+        case .cursor: return "cursorarrow.click"
+        case .copilot: return "chevron.left.forwardslash.chevron.right"
+        case .kiro: return "cloud.fill"
+        case .aider: return "wrench.and.screwdriver"
+        case .goose: return "bird"
+        case .openCode: return "chevron.left.slash.chevron.right"
+        case .openClaw: return "pawprint"
+        case .pi: return "number"
+        case .hermes: return "bolt.horizontal"
         }
     }
 
     /// The `AgentKind` whose real logo (`AgentIconRenderer`, already used in Settings ▸ Agents)
     /// this provider should borrow instead of a generic SF Symbol — `nil` when no agent in
-    /// `AgentTable.default` maps naturally to this provider (Azure, OpenRouter, Ollama broker
-    /// several backends themselves, no single brand to borrow).
+    /// `AgentTable.default` maps naturally to this provider (Azure and OpenRouter broker several
+    /// backends themselves, no single brand to borrow). One entry per distinct agent brand in
+    /// `AgentTable.default`/Settings ▸ Agents — `.generic` has no identity to match, so it's
+    /// left out; wrapper CLIs that only ever consume an *existing* provider's key
+    /// (`.gemini`/`.antigravity` → Google, `.grok` → xAI, ...) don't get a second entry of
+    /// their own.
     public var agentKindForLogo: AgentKind? {
         switch self {
         case .anthropic: return .claudeCode
         case .openAI: return .codex
         case .google: return .gemini
         case .xai: return .grok
-        case .azure, .openRouter, .ollama: return nil
+        case .cursor: return .cursor
+        case .copilot: return .copilot
+        case .kiro: return .kiro
+        case .aider: return .aider
+        case .goose: return .goose
+        case .openCode: return .openCode
+        case .openClaw: return .openClaw
+        case .pi: return .pi
+        case .hermes: return .hermes
+        case .azure, .openRouter: return nil
         }
     }
 }
@@ -68,7 +97,16 @@ extension AgentKind {
         case .codex: return .openAI
         case .gemini, .antigravity: return .google
         case .grok: return .xai
-        default: return nil
+        case .cursor: return .cursor
+        case .copilot: return .copilot
+        case .kiro: return .kiro
+        case .aider: return .aider
+        case .goose: return .goose
+        case .openCode: return .openCode
+        case .openClaw: return .openClaw
+        case .pi: return .pi
+        case .hermes: return .hermes
+        case .generic: return nil
         }
     }
 }

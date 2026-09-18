@@ -1,8 +1,10 @@
 # Kouen
 
+*An Agent Development Environment built around a native macOS terminal.*
+
 > This is a personal fork of [robzilla1738/harness-terminal](https://github.com/robzilla1738/harness-terminal), maintained independently by [Vit129](https://github.com/Vit129). Not affiliated with the original project or its author. It's a hard fork, not a PR queue back upstream — see [What's different from upstream](#whats-different-from-upstream).
 
-Kouen is a native macOS terminal built for AI agent workflows. A first-party Swift terminal engine, a background session daemon, a scriptable CLI, embedded browser with MCP control, and multi-agent awareness — all in one app.
+Kouen is an Agent Development Environment built around a native macOS terminal — a first-party Swift terminal engine, a background session daemon, a scriptable CLI, embedded browser with MCP control, and multi-agent awareness, plus worktree-aware sessions, a diff viewer that feeds review comments straight back to the agent, an issue tracker that spins up an isolated worktree per ticket, and a fleet view for scheduled automations — all in one app.
 
 Run Claude Code, Codex, Gemini CLI, or any agent side-by-side. Sessions persist across app restarts, agents notify you when done, the embedded browser responds to MCP tool calls, and panes render on Metal.
 
