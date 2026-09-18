@@ -8,7 +8,12 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [4.17.2] - 2026-09-18
 
 ### Added
-- Release version bump to v4.17.2.
+- Implement Phase 0 AI-SDLC workflow engine and worktree discipline ([`6b043ee`](https://github.com/Vit129/kouen-terminal/commit/6b043ee84792f23a74c8dbd96fe583ed2904d48d))
+- Auto markdown sync, GUI preview, and MCP feature tools ([`61161d1`](https://github.com/Vit129/kouen-terminal/commit/61161d1318710edd9d986074693f1961643f09bc))
+- Add session history phase 1, centralize logic search, centralize logo and ai provider name, fast context and token guard phase 2 (release v4.17.2) ([`15900dd`](https://github.com/Vit129/kouen-terminal/commit/15900dd84ea48effc5dd8070f57002a629cb7936))
+
+### Fixed
+- Restore green test suite and update graphify index ([`ed9f1ac`](https://github.com/Vit129/kouen-terminal/commit/ed9f1acd6ac82c00046aabddc6deb623a9e1c570))
 
 ## [4.17.1] - 2026-09-18
 
