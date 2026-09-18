@@ -6,10 +6,10 @@
 extension ReleaseNotes {
     public static let current = ReleaseNotes(
         version: "4.17.1",
-        changelogDigest: "c19971305f3b6d4c",
+        changelogDigest: "2219338b523a1011",
         sections: [
-            Section(title: "Added", items: [
-                "Release version bump to v4.17.1",
+            Section(title: "Fixed", items: [
+                "Automation tab coding just show cron job only (release v4.17.1) (3d42f36)",
             ]),
         ]
     )

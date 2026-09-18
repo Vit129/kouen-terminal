@@ -7,7 +7,7 @@ Library          Process
 
 *** Variables ***
 ${ROOT}              ${CURDIR}/../..
-${GIT_PANEL_VIEW}    ${ROOT}/Apps/Kouen/Sources/KouenApp/UI/Git/GitPanelView.swift
+${GIT_PANEL_VIEW}    ${ROOT}/Apps/Kouen/Sources/KouenApp/UI/Archive/GitPanelView.swift
 
 *** Test Cases ***
 Bug 1 - Hunks Button Has Explicit Size Constraints

@@ -16,7 +16,7 @@ Library          OperatingSystem
 
 *** Variables ***
 ${ROOT}              ${CURDIR}/../..
-${GIT_PANEL}         ${ROOT}/Apps/Kouen/Sources/KouenApp/UI/Git/GitPanelView.swift
+${GIT_PANEL}         ${ROOT}/Apps/Kouen/Sources/KouenApp/UI/Archive/GitPanelView.swift
 
 *** Test Cases ***
 Guard A - Merge Call Site Never Passes --no-ff
