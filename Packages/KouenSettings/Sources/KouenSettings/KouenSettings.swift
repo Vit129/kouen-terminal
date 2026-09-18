@@ -299,7 +299,7 @@ public struct KouenSettings: Codable, Sendable, Equatable {
     /// copy and tests; the prefix and status line each resolve independently via the effective
     /// accessors below, so a preset can show one without the other.
     public var showsKouenControls: Bool {
-        effectivePrefixKeyEnabled || effectiveStatusLineEnabled
+        kouenControlsEnabled ?? experienceMode.showsKouenControlsByDefault
     }
 
     /// Whether the command prefix should be armed. Precedence: the per-component override wins,
