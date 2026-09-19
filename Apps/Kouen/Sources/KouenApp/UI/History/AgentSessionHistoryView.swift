@@ -14,11 +14,23 @@ public enum HistoryScope: String, CaseIterable, Identifiable {
 @MainActor
 public final class AgentSessionHistoryModel: ObservableObject {
     @Published public var records: [AgentSessionRecord] = []
-    @Published public var searchQuery: String = ""
-    @Published public var selectedScope: HistoryScope = .all
+    @Published public var searchQuery: String = "" {
+        didSet { extraRecordsShown = 0 }
+    }
+    @Published public var selectedScope: HistoryScope = .all {
+        didSet { extraRecordsShown = 0 }
+    }
     @Published public var expandedSessionIDs: Set<String> = []
     @Published public var collapsedProjects: Set<String> = []
     @Published public var isLoading: Bool = false
+
+    /// How many records beyond the default 14-day window are currently revealed via "Load More".
+    @Published public var extraRecordsShown: Int = 0
+
+    private let loadMoreBatchSize = 20
+    private var minimumWindowStart: Date {
+        Calendar.current.date(byAdding: .day, value: -14, to: Date()) ?? .distantPast
+    }
 
     public init() {}
 
@@ -92,8 +104,26 @@ public final class AgentSessionHistoryModel: ObservableObject {
         return result?.snippet
     }
 
-    public var groupedRecords: [(project: String, records: [AgentSessionRecord])] {
+    /// Records actually shown right now: always at least the last 14 days, plus whatever
+    /// extra batches "Load More" has revealed. `filteredRecords` is already sorted newest
+    /// first (the scanner sorts before caching), so a prefix cutoff is a straight slice.
+    public var windowedRecords: [AgentSessionRecord] {
         let list = filteredRecords
+        let withinMinimumWindow = list.prefix(while: { $0.updatedAt >= minimumWindowStart }).count
+        let visibleCount = max(withinMinimumWindow, extraRecordsShown)
+        return Array(list.prefix(visibleCount))
+    }
+
+    public var hasMoreToLoad: Bool {
+        windowedRecords.count < filteredRecords.count
+    }
+
+    public func loadMore() {
+        extraRecordsShown = windowedRecords.count + loadMoreBatchSize
+    }
+
+    public var groupedRecords: [(project: String, records: [AgentSessionRecord])] {
+        let list = windowedRecords
         var groups: [String: [AgentSessionRecord]] = [:]
         var order: [String] = []
 
@@ -209,6 +239,20 @@ public struct AgentSessionHistoryView: View {
                         ForEach(model.groupedRecords, id: \.project) { group in
                             projectSection(group: group)
                         }
+                        if model.hasMoreToLoad {
+                            Button {
+                                model.loadMore()
+                            } label: {
+                                Text("Load More")
+                                    .font(.system(size: 10.5, weight: .medium))
+                                    .foregroundStyle(Color(nsColor: c.textSecondary))
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 6)
+                                    .background(Color(nsColor: c.surfaceElevated))
+                                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
                     .padding(.horizontal, KouenDesign.Spacing.sm)
                     .padding(.vertical, KouenDesign.Spacing.sm)
@@ -231,7 +275,7 @@ public struct AgentSessionHistoryView: View {
                 Text("Agent Session History")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Color(nsColor: c.textPrimary))
-                Text("\(model.filteredRecords.count) shown · \(model.records.count) recent")
+                Text("\(model.windowedRecords.count) shown · \(model.records.count) recent")
                     .font(.system(size: 10))
                     .foregroundStyle(Color(nsColor: c.textTertiary))
             }
@@ -405,47 +449,68 @@ public struct AgentSessionHistoryView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
             }
 
+            // Action Buttons Row — always visible on the card itself, not hidden behind
+            // the expand toggle (previously only reachable after expanding, so the button
+            // was easy to miss entirely).
+            HStack(spacing: 6) {
+                Button {
+                    onResume?(record)
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 9))
+                        Text("Resume")
+                            .font(.system(size: 10, weight: .semibold))
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.accentColor.opacity(0.15))
+                    .foregroundStyle(Color.accentColor)
+                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .help("Resume this session in a new tab")
+
+                Button {
+                    copySessionSummary(record)
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "doc.on.doc")
+                            .font(.system(size: 8.5))
+                        Text("Copy")
+                            .font(.system(size: 10))
+                    }
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 4)
+                    .background(Color(nsColor: c.surfaceElevated))
+                    .foregroundStyle(Color(nsColor: c.textSecondary))
+                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .help("Copy title, prompt, and latest turns to clipboard")
+
+                Button {
+                    onViewLog?(record)
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "doc.text")
+                            .font(.system(size: 9))
+                        Text("View Log")
+                            .font(.system(size: 10))
+                    }
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 4)
+                    .background(Color(nsColor: c.surfaceElevated))
+                    .foregroundStyle(Color(nsColor: c.textSecondary))
+                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.top, 2)
+
             // Expanded Details
             if isExpanded {
                 VStack(alignment: .leading, spacing: 8) {
-                    // Action Buttons Row
-                    HStack(spacing: 6) {
-                        Button {
-                            onResume?(record)
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: "play.fill")
-                                    .font(.system(size: 9))
-                                Text("Resume in New Tab")
-                                    .font(.system(size: 10, weight: .semibold))
-                            }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color.accentColor.opacity(0.15))
-                            .foregroundStyle(Color.accentColor)
-                            .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
-                        }
-                        .buttonStyle(.plain)
-
-                        Button {
-                            onViewLog?(record)
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: "doc.text")
-                                    .font(.system(size: 9))
-                                Text("View Log")
-                                    .font(.system(size: 10))
-                            }
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 4)
-                            .background(Color(nsColor: c.surfaceElevated))
-                            .foregroundStyle(Color(nsColor: c.textSecondary))
-                            .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    .padding(.top, 2)
-
                     // First Prompt Box
                     if !record.firstPrompt.isEmpty {
                         VStack(alignment: .leading, spacing: 4) {
@@ -537,6 +602,31 @@ public struct AgentSessionHistoryView: View {
     }
 
 
+
+    /// Copies a plain-text summary of the whole session (title, project, agent, first
+    /// prompt, latest turns) — distinct from the "Copy" button inside the expanded First
+    /// Prompt box, which only copies that one prompt.
+    private func copySessionSummary(_ record: AgentSessionRecord) {
+        var lines: [String] = [
+            record.title,
+            "\(record.agentKind.displayName) · \(record.projectName) · \(record.messageCount) msgs",
+        ]
+        if let branch = record.gitBranch, !branch.isEmpty {
+            lines.append("Branch: \(branch)")
+        }
+        lines.append("Path: \(record.projectPath)")
+        if !record.firstPrompt.isEmpty {
+            lines.append("\nFirst prompt:\n\(record.firstPrompt)")
+        }
+        if !record.latestTurns.isEmpty {
+            lines.append("\nLatest turns:")
+            for turn in record.latestTurns {
+                lines.append("[\(turn.role)] \(turn.content)")
+            }
+        }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(lines.joined(separator: "\n"), forType: .string)
+    }
 
     private func relativeDate(_ date: Date) -> String {
         let interval = Date().timeIntervalSince(date)

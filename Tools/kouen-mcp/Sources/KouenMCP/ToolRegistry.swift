@@ -254,6 +254,10 @@ struct ToolRegistry: Sendable {
                 param("slug", "string", "Feature slug"),
                 param("phase", "string", "New phase: interview, architect, qa-design, dev, qa-verify, completed"),
             ]),
+            toolDef("kouenContextResolve", "Resolve @-mention context tokens (@diff, @diff:staged, @file:<path>, @last, @error, @graph:<symbol>, @issue) inside a prompt string into real context text — the same engine `kouen context inject` uses on the CLI, so an agent can pull its own context (git diff, file contents, recent terminal output, latest error, SDLC feature status) without asking the human to run a shell command first", [
+                param("prompt", "string", "Text containing one or more @-mention tokens to resolve, e.g. 'Fix this: @error in @file:Sources/App.swift'"),
+                param("cwd", "string", "Working directory for @diff/@file/@graph/@issue resolution (optional, defaults to the active session's cwd)"),
+            ]),
             toolDef("kouenFeaturePreview", "Open rich Markdown and Mermaid architecture/task preview in Kouen GUI sidebar", [
                 param("slug", "string", "Feature slug"),
                 param("file", "string", "File to preview: 'progress' (ai-sdlc-task-progress.md) or 'architecture' (<slug>-architecture.md) (optional, default 'progress')"),
@@ -401,6 +405,7 @@ struct ToolRegistry: Sendable {
         case "kouenTaskDelete": return await kouenTaskDelete(args)
         case "kouenFeatureList": return await daemonTools.featureList(repoPath: optionalStringArg(args["repoPath"]))
         case "kouenFeatureGet": return await kouenFeatureGet(args)
+        case "kouenContextResolve": return await kouenContextResolve(args)
         case "kouenFeatureCreate": return await kouenFeatureCreate(args)
         case "kouenFeatureApproveGate": return await kouenFeatureApproveGate(args)
         case "kouenFeatureUpdatePhase": return await kouenFeatureUpdatePhase(args)
@@ -553,6 +558,13 @@ struct ToolRegistry: Sendable {
             return (nil, JSONRPCError(code: -32602, message: "Missing 'slug' parameter"))
         }
         return await daemonTools.featureGet(slug: slug)
+    }
+
+    private func kouenContextResolve(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
+        guard case let .string(prompt)? = args["prompt"] else {
+            return (nil, JSONRPCError(code: -32602, message: "Missing 'prompt' parameter"))
+        }
+        return await daemonTools.contextResolve(prompt: prompt, cwd: optionalStringArg(args["cwd"]))
     }
 
     private func kouenFeatureCreate(_ args: [String: AnyCodable]) async -> (AnyCodable?, JSONRPCError?) {
@@ -1156,28 +1168,43 @@ struct ToolRegistry: Sendable {
 
     // MARK: - Helpers
 
-    private func shell(_ command: String, cwd: String?) async -> (String, String, Int32) {
-        await withCheckedContinuation { continuation in
+    /// Drains one pipe to EOF off-main via GCD (not `Task.detached`, which shares Swift's
+    /// fixed cooperative pool and can starve under bursty concurrent calls) — same pattern
+    /// as `GitStatusProvider.status(rootPath:)`.
+    private func drainPipe(_ pipe: Pipe) async -> Data {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Data, Never>) in
             DispatchQueue.global(qos: .userInitiated).async {
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: "/bin/sh")
-                process.arguments = ["-c", command]
-                if let cwd { process.currentDirectoryURL = URL(fileURLWithPath: cwd) }
-                let outPipe = Pipe(); let errPipe = Pipe()
-                process.standardOutput = outPipe; process.standardError = errPipe
-                do {
-                    try process.run()
-                    process.waitUntilExit()
-                    let out = String(data: outPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
-                        .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                    let err = String(data: errPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
-                        .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                    continuation.resume(returning: (out, err, process.terminationStatus))
-                } catch {
-                    continuation.resume(returning: ("", error.localizedDescription, -1))
-                }
+                continuation.resume(returning: pipe.fileHandleForReading.readDataToEndOfFile())
             }
         }
+    }
+
+    private func shell(_ command: String, cwd: String?) async -> (String, String, Int32) {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = ["-c", command]
+        if let cwd { process.currentDirectoryURL = URL(fileURLWithPath: cwd) }
+        let outPipe = Pipe(); let errPipe = Pipe()
+        process.standardOutput = outPipe; process.standardError = errPipe
+        do {
+            try process.run()
+        } catch {
+            return ("", error.localizedDescription, -1)
+        }
+        // Drain both pipes CONCURRENTLY, before waitUntilExit(): this helper runs arbitrary
+        // shell commands for MCP tools (git log, builds, etc.) whose output can exceed the
+        // pipe buffer on either stream — reading sequentially (or after waitUntilExit())
+        // deadlocks deterministically once it does. See
+        // agent-memory/knowledge/patterns/process-pipe-deadlock.md.
+        async let outDataTask = drainPipe(outPipe)
+        async let errDataTask = drainPipe(errPipe)
+        let (outData, errData) = await (outDataTask, errDataTask)
+        process.waitUntilExit()
+        let out = String(data: outData, encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let err = String(data: errData, encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return (out, err, process.terminationStatus)
     }
 
     private func toolResult(_ text: String) -> AnyCodable {

@@ -237,7 +237,7 @@ final class AutomationsFleetModel {
             // ONE compound string, so `programArgs.first(hasSuffix: ".sh")` never matches
             // (that whole element ends in "2>&1", not ".sh") — split on whitespace instead.
             let scriptPath = commandString.split(separator: " ").first(where: { $0.hasSuffix(".sh") }).map(String.init)
-            let repoPath = Self.resolveProjectRoot(from: scriptPath ?? home.path)
+            let repoPath = Self.resolveProjectRoot(from: scriptPath)
 
             let kind: AgentKind
             if label.hasPrefix("com.claude.") { kind = .claudeCode }
@@ -352,11 +352,20 @@ final class AutomationsFleetModel {
         return result
     }
 
-    nonisolated private static func resolveProjectRoot(from path: String) -> String {
-        var dir = ((path as NSString).isAbsolutePath ? path : FileManager.default.homeDirectoryForCurrentUser.path) as NSString
-        dir = dir.deletingLastPathComponent as NSString
+    /// Walks upward from `scriptPath`'s containing directory looking for `.git`. With no
+    /// script path (LaunchAgent command has no `.sh` element to anchor on), search starts
+    /// AT the home directory itself — not its parent, which `.deletingLastPathComponent`
+    /// would produce if applied to `home.path` the same way it's applied to a real file path.
+    nonisolated static func resolveProjectRoot(from scriptPath: String?) -> String {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let start: String
+        if let scriptPath, (scriptPath as NSString).isAbsolutePath {
+            start = (scriptPath as NSString).deletingLastPathComponent
+        } else {
+            start = home
+        }
         let fm = FileManager.default
-        var candidate = dir as String
+        var candidate = start
         while candidate.count > 1 {
             if fm.fileExists(atPath: (candidate as NSString).appendingPathComponent(".git")) {
                 return candidate
@@ -365,7 +374,7 @@ final class AutomationsFleetModel {
             if parent == candidate { break }
             candidate = parent
         }
-        return dir as String
+        return start
     }
 
     nonisolated private static func describeSchedule(plist: [String: Any]) -> String {
@@ -429,7 +438,7 @@ final class AutomationsFleetModel {
                 await load()
             }
         case .launchAgent(let label, _):
-            Self.runLaunchctl(["kickstart", "-k", "gui/\(getuid())/\(label)"])
+            await Task.detached { Self.runLaunchctl(["kickstart", "-k", "gui/\(getuid())/\(label)"]) }.value
             await load()
         }
     }
@@ -445,11 +454,14 @@ final class AutomationsFleetModel {
                 await load()
             }
         case .launchAgent(let label, let plistPath):
-            if item.isEnabled {
-                Self.runLaunchctl(["bootout", "gui/\(getuid())/\(label)"])
-            } else {
-                Self.runLaunchctl(["bootstrap", "gui/\(getuid())", plistPath])
-            }
+            let isEnabled = item.isEnabled
+            await Task.detached {
+                if isEnabled {
+                    Self.runLaunchctl(["bootout", "gui/\(getuid())/\(label)"])
+                } else {
+                    Self.runLaunchctl(["bootstrap", "gui/\(getuid())", plistPath])
+                }
+            }.value
             await load()
         }
     }

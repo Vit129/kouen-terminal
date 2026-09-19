@@ -9,10 +9,19 @@ import KouenCore
 /// SwiftUI `.task` closures (e.g. when switching sessions quickly).
 public actor GitStatusProvider {
 
+    /// Caps how long one `status(rootPath:)` call can block a `loadRoot()` — profiled
+    /// 2026-09-19: with several tabs' file trees each spawning their own `git status`
+    /// around the same moment (e.g. right when the sidebar becomes visible), `sample`
+    /// showed one of these subprocesses stuck in `waitUntilExit()` for the entire
+    /// sampling window, competing with the sidebar-toggle animation for CPU the whole
+    /// time. There was no bound on that wait before — one slow/contended call could
+    /// stall its tab's file tree (and starve other work) indefinitely.
+    nonisolated static let statusTimeout: Duration = .seconds(3)
+
     public init() {}
 
     /// Fetch git status for `rootPath`. Never throws — returns an empty dict on
-    /// any failure (non-git directory, git not found, process error).
+    /// any failure (non-git directory, git not found, process error, or timeout).
     public func status(rootPath: String) async -> [String: GitStatusType] {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
@@ -34,13 +43,33 @@ public actor GitStatusProvider {
         // pipe undrained — if that process then writes enough to fill the kernel pipe
         // buffer, its `write()` blocks forever and the process never exits. GCD's pool
         // auto-scales instead of sharing Swift concurrency's fixed thread budget.
-        let data = await withCheckedContinuation { (continuation: CheckedContinuation<Data, Never>) in
-            DispatchQueue.global(qos: .utility).async {
-                continuation.resume(returning: stdoutPipe.fileHandleForReading.readDataToEndOfFile())
+        //
+        // Raced against a timeout: if the read hasn't finished by then, `terminate()`
+        // the process so its pipe closes — the abandoned read-task closure then drains
+        // whatever partial output exists and exits quickly on its own GCD thread rather
+        // than blocking forever; we don't wait for it.
+        let data: Data? = await withTaskGroup(of: Data?.self) { group in
+            group.addTask {
+                await withCheckedContinuation { (continuation: CheckedContinuation<Data, Never>) in
+                    DispatchQueue.global(qos: .utility).async {
+                        continuation.resume(returning: stdoutPipe.fileHandleForReading.readDataToEndOfFile())
+                    }
+                }
             }
+            group.addTask {
+                try? await Task.sleep(for: Self.statusTimeout)
+                return nil
+            }
+            let first = await group.next() ?? nil
+            if first == nil {
+                process.terminate()
+            }
+            group.cancelAll()
+            return first
         }
-        process.waitUntilExit()
 
+        guard let data else { return [:] }
+        process.waitUntilExit()
         return parse(data)
     }
 

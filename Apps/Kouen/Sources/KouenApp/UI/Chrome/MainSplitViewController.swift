@@ -22,6 +22,8 @@ final class MainSplitViewController: NSViewController {
     private var sidebarAnimToken = 0
     private var sidebarDisplayLink: CADisplayLink?
     private var sidebarWidthSaveWorkItem: DispatchWorkItem?
+    private var sidebarWidthConstraint: NSLayoutConstraint?
+    private var sidebarHorizontalConstraint: NSLayoutConstraint?
     private let headerGroup = NSView()
     private let appTitleLabel = NSTextField(labelWithString: "Kouen")
     private let sidebarToggle = SoftIconButton(frame: NSRect(x: 0, y: 0, width: 24, height: 24))
@@ -66,26 +68,33 @@ final class MainSplitViewController: NSViewController {
         // strip even though both regions request the same theme color.
         let sidebarContainer = NSView()
         KouenDesign.makeClear(sidebarContainer)
+        sidebarContainer.layer?.masksToBounds = true
         splitDelegate.sidebarPanel = sidebarContainer
-        // Deliberately NOT translatesAutoresizingMaskIntoConstraints = false here (unlike
-        // `sidebar.view` below): `sidebarContainer` is an NSSplitView arranged subview —
-        // NSSplitView positions/sizes it via direct frame assignment (setPosition/adjustSubviews),
-        // the same autoresizing-mask-based mechanism `content.view` already relies on (never
-        // opted out). Opting `sidebarContainer` itself into pure Auto Layout with no constraint
-        // defining its own width/position left it ambiguous — any layoutSubtreeIfNeeded()/layout()
-        // pass could resolve it to 0 width, wiping out whatever frame NSSplitView had just set via
-        // setPosition. `sidebar.view`'s constraints (below) are relative to sidebarContainer's
-        // bounds, which stay well-defined as long as sidebarContainer itself stays frame-managed.
         sidebar.view.translatesAutoresizingMaskIntoConstraints = false
         sidebarContainer.addSubview(sidebar.view)
-        NSLayoutConstraint.activate([
-            sidebar.view.topAnchor.constraint(equalTo: sidebarContainer.topAnchor),
-            sidebar.view.leadingAnchor.constraint(equalTo: sidebarContainer.leadingAnchor),
-            sidebar.view.trailingAnchor.constraint(equalTo: sidebarContainer.trailingAnchor),
-            sidebar.view.bottomAnchor.constraint(equalTo: sidebarContainer.bottomAnchor),
-        ])
+
+        let initialPersistedWidth = max(
+            SplitChromeDelegate.sidebarMinWidth,
+            SessionCoordinator.shared.settings.sidebarWidth.map(CGFloat.init) ?? KouenDesign.sidebarWidth
+        )
+        let widthConstraint = sidebar.view.widthAnchor.constraint(equalToConstant: initialPersistedWidth)
+        self.sidebarWidthConstraint = widthConstraint
 
         let sidebarOnRight = SessionCoordinator.shared.settings.sidebarOnRight
+        let horizontalConstraint: NSLayoutConstraint
+        if sidebarOnRight {
+            horizontalConstraint = sidebar.view.leadingAnchor.constraint(equalTo: sidebarContainer.leadingAnchor)
+        } else {
+            horizontalConstraint = sidebar.view.trailingAnchor.constraint(equalTo: sidebarContainer.trailingAnchor)
+        }
+        self.sidebarHorizontalConstraint = horizontalConstraint
+
+        NSLayoutConstraint.activate([
+            sidebar.view.topAnchor.constraint(equalTo: sidebarContainer.topAnchor),
+            sidebar.view.bottomAnchor.constraint(equalTo: sidebarContainer.bottomAnchor),
+            widthConstraint,
+            horizontalConstraint,
+        ])
         if sidebarOnRight {
             split.addSubview(content.view)
             split.addSubview(sidebarContainer)
@@ -459,7 +468,10 @@ final class MainSplitViewController: NSViewController {
         _sidebarTarget = target
         _sidebarT0 = CACurrentMediaTime()
         _sidebarVisible = visible
+        sidebarWidthConstraint?.constant = persistedWidth
+        setContentLeadingInset(forSidebarWidth: start)
         let link = view.displayLink(target: self, selector: #selector(_sidebarLinkFired))
+        link.preferredFrameRateRange = CAFrameRateRange(minimum: 60, maximum: 60, preferred: 60)
         link.add(to: RunLoop.main, forMode: RunLoop.Mode.common)
         sidebarDisplayLink = link
     }
@@ -471,19 +483,13 @@ final class MainSplitViewController: NSViewController {
         // easeInOutQuad — smooth start and settle.
         let eased = raw < 0.5 ? 2 * raw * raw : 1 - pow(-2 * raw + 2, 2) / 2
         let width = start + (target - start) * CGFloat(eased)
-        // Drive the divider inside a transaction with implicit actions OFF and lay
-        // out synchronously each frame. Without this, the manual per-frame
-        // setPosition lets the sidebar's vibrancy/glass backdrop animate its bounds
-        // a frame behind the divider — it re-samples at the stale width and smears
-        // into the banding seen mid-collapse. Disabling actions + an immediate
-        // layout keeps the backdrop locked to the divider every step.
+        // Drive the divider inside a transaction with implicit actions OFF.
+        // Direct frame assignments in setSidebarWidth keep the divider and backdrop in sync.
+        // We deliberately avoid split.layout() here to prevent cascading NSHostingView layout
+        // passes on every animation frame.
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         setSidebarWidth(width)
-        // Interpolate the tab-strip inset against the live sidebar width so it slides
-        // in lockstep with the divider rather than snapping at the end.
-        setContentLeadingInset(forSidebarWidth: width)
-        split.layout()
         CATransaction.commit()
         if raw >= 1 {
             sidebarDisplayLink?.invalidate()
@@ -491,10 +497,8 @@ final class MainSplitViewController: NSViewController {
             if !visible {
                 panel.isHidden = true
             } else {
-                // split.layout() per-frame moves the divider but doesn't flush
-                // pending layouts inside the panel. NSHostingViews (SwiftUI) that
-                // started at zero width may not have had a valid layout pass — force
-                // one now so content is never blank after the panel opens.
+                // NSHostingViews (SwiftUI) that started at zero width may not have had a
+                // valid layout pass — force one once the panel is at its final open geometry.
                 panel.layoutSubtreeIfNeeded()
             }
             splitDelegate.allowFullCollapse = false   // restore the 200pt drag floor
@@ -686,6 +690,13 @@ final class MainSplitViewController: NSViewController {
                 sidebarContainer.frame = NSRect(x: 0, y: 0, width: sidebarFrame.width, height: sidebarFrame.height)
                 content.view.frame = NSRect(x: sidebarFrame.width, y: 0, width: contentFrame.width, height: contentFrame.height)
             }
+            sidebarHorizontalConstraint?.isActive = false
+            if right {
+                sidebarHorizontalConstraint = sidebar.view.leadingAnchor.constraint(equalTo: sidebarContainer.leadingAnchor)
+            } else {
+                sidebarHorizontalConstraint = sidebar.view.trailingAnchor.constraint(equalTo: sidebarContainer.trailingAnchor)
+            }
+            sidebarHorizontalConstraint?.isActive = true
             split.adjustSubviews()
         }
         updateEdgeDividerConstraints(sidebarContainer: sidebarContainer)
@@ -747,6 +758,7 @@ final class MainSplitViewController: NSViewController {
         // reach 0 here, which then bricks every future toggle (see
         // cmd-backslash-sidebar-zero-width: target computes to 0 in both directions).
         let width = max(Float(SplitChromeDelegate.sidebarMinWidth), Float(panel.frame.width))
+        sidebarWidthConstraint?.constant = CGFloat(width)
         sidebarLog.debug("handlePotentialUserSidebarResize persisting width=\(width) (raw panel.frame.width=\(panel.frame.width))")
         sidebarWidthSaveWorkItem?.cancel()
         let workItem = DispatchWorkItem { [sidebarLog] in

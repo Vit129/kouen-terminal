@@ -10,7 +10,11 @@ public struct IssueTrackerPanelView: View {
     @State private var isLoading = false
     @State private var showSettingsSheet = false
     @State private var patInput = ""
+    @State private var jiraDomainInput = ""
+    @State private var jiraEmailInput = ""
+    @State private var azureOrgInput = ""
     @State private var toastMessage: String?
+    @State private var fetchStatus: IssueFetchStatus = .notConfigured
 
     public init() {}
 
@@ -35,19 +39,33 @@ public struct IssueTrackerPanelView: View {
                 .buttonStyle(.plain)
                 .help("Refresh issues")
 
-                Button(action: {
-                    patInput = IssueKeychainStore.loadToken(for: selectedTracker) ?? ""
-                    showSettingsSheet = true
-                }) {
-                    Image(systemName: "key")
-                        .font(.system(size: 11))
-                        .foregroundStyle(Color(nsColor: c.textSecondary))
+                if !selectedTracker.usesGhCLI {
+                    Button(action: {
+                        patInput = IssueKeychainStore.loadToken(for: selectedTracker) ?? ""
+                        jiraDomainInput = UserDefaults.standard.string(forKey: "kouen.jira.domain") ?? ""
+                        jiraEmailInput = UserDefaults.standard.string(forKey: "kouen.jira.email") ?? ""
+                        azureOrgInput = UserDefaults.standard.string(forKey: "kouen.azure.organization") ?? ""
+                        showSettingsSheet = true
+                    }) {
+                        Image(systemName: "key")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color(nsColor: c.textSecondary))
+                    }
+                    .buttonStyle(.plain)
+                    .help("Configure API token in Keychain")
                 }
-                .buttonStyle(.plain)
-                .help("Configure API token in Keychain")
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
+
+            if let banner = statusBannerText {
+                Text(banner)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(Color(nsColor: c.textTertiary))
+                    .padding(.horizontal, 10)
+                    .padding(.bottom, 6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
 
             // Search Bar
             HStack {
@@ -115,6 +133,21 @@ public struct IssueTrackerPanelView: View {
                     .padding(.bottom, 16)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
+        }
+    }
+
+    /// Distinguishes "these are demo issues, nothing's configured yet" from "these are demo
+    /// issues because the real API call just failed" — both looked identical before.
+    private var statusBannerText: String? {
+        switch fetchStatus {
+        case .live:
+            return nil
+        case .notConfigured:
+            return selectedTracker.usesGhCLI
+                ? "⚠️ Showing demo issues — gh CLI isn't authenticated (run `gh auth login`)"
+                : "⚠️ Showing demo issues — configure a token via the key icon above"
+        case .apiError(let message):
+            return "⚠️ Showing demo issues — API call failed: \(message)"
         }
     }
 
@@ -218,6 +251,16 @@ public struct IssueTrackerPanelView: View {
             SecureField("Personal Access Token (PAT)", text: $patInput)
                 .textFieldStyle(.roundedBorder)
 
+            if selectedTracker == .jira {
+                TextField("Jira domain (yourcompany, from yourcompany.atlassian.net)", text: $jiraDomainInput)
+                    .textFieldStyle(.roundedBorder)
+                TextField("Jira account email", text: $jiraEmailInput)
+                    .textFieldStyle(.roundedBorder)
+            } else if selectedTracker == .azureDevOps {
+                TextField("Azure DevOps organization", text: $azureOrgInput)
+                    .textFieldStyle(.roundedBorder)
+            }
+
             HStack {
                 Button("Clear Token", role: .destructive) {
                     IssueKeychainStore.deleteToken(for: selectedTracker)
@@ -236,6 +279,15 @@ public struct IssueTrackerPanelView: View {
                         _ = IssueKeychainStore.saveToken(trimmed, for: selectedTracker)
                         showToast("✓ Token saved to Keychain")
                     }
+                    switch selectedTracker {
+                    case .jira:
+                        UserDefaults.standard.set(jiraDomainInput.trimmingCharacters(in: .whitespacesAndNewlines), forKey: "kouen.jira.domain")
+                        UserDefaults.standard.set(jiraEmailInput.trimmingCharacters(in: .whitespacesAndNewlines), forKey: "kouen.jira.email")
+                    case .azureDevOps:
+                        UserDefaults.standard.set(azureOrgInput.trimmingCharacters(in: .whitespacesAndNewlines), forKey: "kouen.azure.organization")
+                    case .linear, .github:
+                        break
+                    }
                     showSettingsSheet = false
                     refreshIssues()
                 }
@@ -248,10 +300,13 @@ public struct IssueTrackerPanelView: View {
 
     private func refreshIssues() {
         isLoading = true
+        let tracker = selectedTracker
         Task {
-            let fetched = await IssueTrackerService.shared.fetchAssignedIssues(tracker: selectedTracker)
+            let result = await IssueTrackerService.shared.fetchAssignedIssues(tracker: tracker)
             await MainActor.run {
-                self.issues = fetched
+                guard tracker == selectedTracker else { return }   // tracker switched mid-fetch
+                self.issues = result.issues
+                self.fetchStatus = result.status
                 self.isLoading = false
             }
         }

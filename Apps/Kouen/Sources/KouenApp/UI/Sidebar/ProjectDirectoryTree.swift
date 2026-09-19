@@ -152,11 +152,19 @@ func fetchGitStatus(for path: String) async -> ProjectGitStatus? {
             p.currentDirectoryURL = URL(fileURLWithPath: path)
             let pipe = Pipe()
             p.standardOutput = pipe
-            p.standardError = Pipe()
+            // stderr is never inspected here — route to the null device rather than an
+            // undrained Pipe(), which is itself a deadlock risk (see
+            // agent-memory/knowledge/patterns/process-pipe-deadlock.md).
+            p.standardError = FileHandle.nullDevice
             try? p.run()
+            // Read to EOF BEFORE waitUntilExit(): git status --porcelain on a repo with many
+            // changed/untracked files can exceed the pipe buffer, so waiting for exit first
+            // deadlocks deterministically (child blocks in write(), parent blocks in
+            // waitUntilExit() — same failure mode fixed at 7 other call sites 2026-08-19).
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
             p.waitUntilExit()
             guard p.terminationStatus == 0 else { return nil }
-            return String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
+            return String(data: data, encoding: .utf8)?
                 .trimmingCharacters(in: .whitespacesAndNewlines)
         }
         guard let branch = run(["-C", path, "branch", "--show-current"]), !branch.isEmpty else {

@@ -1392,10 +1392,43 @@ struct KouenDaemonTools: Sendable {
         return WorkbenchContextResolver.resolve(snapshot: snapshot)?.cwd
     }
 
+    /// Resolves `@`-mention tokens (`@diff`, `@file:<path>`, `@last`, `@error`, `@graph:<symbol>`,
+    /// `@issue`) in `prompt` into real context text — the same engine `kouen context inject`
+    /// (`Tools/kouen/Sources/KouenCLI/KouenCLI+Context.swift`) uses, exposed here so an AI agent
+    /// can pull its own context via MCP instead of only through a human-run CLI/shortcut.
+    func contextResolve(prompt: String, cwd: String?) async -> (AnyCodable?, JSONRPCError?) {
+        var activeSurfaceID: String?
+        var resolvedCWD = cwd
+        if resolvedCWD == nil || prompt.contains("@last") || prompt.contains("@error") || prompt.contains("@pane") {
+            if let response = await send(.getSnapshot), case let .snapshot(snapshot) = response,
+               let context = WorkbenchContextResolver.resolve(snapshot: snapshot) {
+                resolvedCWD = resolvedCWD ?? context.cwd
+                activeSurfaceID = context.surfaceID?.uuidString
+            }
+        }
+        let finalCWD = resolvedCWD ?? FileManager.default.currentDirectoryPath
+        let resolved = await ContextResolutionEngine().resolveTemplate(
+            prompt, cwd: finalCWD, daemonClient: subscriptionClient, activeSurfaceID: activeSurfaceID
+        )
+        return (toolResult(text: resolved), nil)
+    }
+
     private func toolResult(json value: AnyCodable) -> AnyCodable {
         let data = try? JSONEncoder().encode(value)
         let text = data.flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
         return .object([
+            "content": .array([.object([
+                "type": .string("text"),
+                "text": .string(text),
+            ])]),
+        ])
+    }
+
+    /// Plain-text variant of `toolResult(json:)` — for output that's already human/agent-readable
+    /// prose (resolved `@`-mention context), not a JSON payload that would otherwise get
+    /// double-encoded (escaped newlines/quotes) by the JSON variant.
+    private func toolResult(text: String) -> AnyCodable {
+        .object([
             "content": .array([.object([
                 "type": .string("text"),
                 "text": .string(text),

@@ -90,12 +90,16 @@ public struct ContextResolutionEngine: Sendable {
         process.currentDirectoryURL = URL(fileURLWithPath: cwd)
         process.arguments = staged ? ["diff", "--cached"] : ["diff"]
         process.standardOutput = pipe
-        process.standardError = Pipe()
+        process.standardError = FileHandle.nullDevice   // never read — an undrained Pipe() is its own deadlock risk
 
         do {
             try process.run()
-            process.waitUntilExit()
+            // Read to EOF BEFORE waitUntilExit(): a real diff (this function's whole purpose)
+            // can easily exceed the pipe buffer, so waiting for exit first deadlocks
+            // deterministically — same failure mode documented in
+            // agent-memory/knowledge/patterns/process-pipe-deadlock.md.
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
             let raw = String(data: data, encoding: .utf8) ?? ""
             if raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 return "[No uncommitted changes in \(cwd)]"
