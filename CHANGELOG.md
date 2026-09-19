@@ -8,7 +8,7 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [4.17.3] - 2026-09-19
 
 ### Added
-- Release version bump to v4.17.3.
+- Add context resolve MCP tool, fix process (release v4.17.3) ([`1f8b873`](https://github.com/Vit129/kouen-terminal/commit/1f8b873df611dda29aca7e4bb42432684256f9ec))
 
 ## [4.17.2] - 2026-09-18
 
