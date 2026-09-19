@@ -205,6 +205,37 @@ final class FeatureStoreTests: XCTestCase {
         XCTAssertTrue(progContent.contains("- [x] Gate 1 (Architect design) — approver: supavit.cho"))
     }
 
+    /// Regression: a file with more than one pre-existing "Gate 1" line (real-world case —
+    /// a feature re-scoped/extended multiple times, each getting its own dated Gate 1 entry)
+    /// must never have any of those distinct lines silently overwritten/collapsed — each one
+    /// carries its own "scope: ..." history that syncGateApproval doesn't know how to preserve
+    /// if it guesses which line to replace. The new approval should append instead.
+    func testMarkdownSyncAppendsWhenMultipleGateLinesAlreadyExist() throws {
+        let repoDir = tempDir.appendingPathComponent("test-repo-multi-gate", isDirectory: true)
+        try FileManager.default.createDirectory(at: repoDir, withIntermediateDirectories: true)
+        let store = FeatureStore(url: storeURL)
+        let feat = store.create(slug: "feat-multi-gate", repoPath: repoDir.path, phase: .architect)
+        let progURL = KouenFeatureMarkdownSync.progressFileURL(for: feat.slug, repoPath: repoDir.path)
+
+        let existingLine1 = "- [x] Gate 1 (Architect design) — approver: alice, scope: original plan, 2026-09-01"
+        let existingLine2 = "- [x] Gate 1 (scope extension) — approver: bob, scope: Phase 7 addition, 2026-09-15"
+        var progContent = try String(contentsOf: progURL, encoding: .utf8)
+        progContent = progContent.replacingOccurrences(
+            of: "- [ ] Gate 1 (Architect design) — approver: pending",
+            with: "\(existingLine1)\n\(existingLine2)"
+        )
+        try progContent.write(to: progURL, atomically: true, encoding: .utf8)
+
+        _ = store.approveGate(slug: "feat-multi-gate", gate: 1, approver: "carol")
+        let updated = try String(contentsOf: progURL, encoding: .utf8)
+
+        // Both pre-existing lines (and their scope history) survive untouched.
+        XCTAssertTrue(updated.contains(existingLine1))
+        XCTAssertTrue(updated.contains(existingLine2))
+        // The new approval was appended, not merged into either existing line.
+        XCTAssertTrue(updated.contains("- [x] Gate 1 (Architect design) — approver: carol"))
+    }
+
     @discardableResult
     private func shell(_ command: String, in dir: String) -> String? {
         let process = Process()

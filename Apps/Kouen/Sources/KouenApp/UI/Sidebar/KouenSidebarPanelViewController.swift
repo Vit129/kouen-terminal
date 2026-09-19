@@ -37,7 +37,7 @@ final class KouenSidebarPanelViewController: NSViewController {
     private let jobsModel = AutomationsFleetModel()
     private var sessionHistoryHostingView: NSView?
     let sessionHistoryModel = AgentSessionHistoryModel()
-    private var issueTrackerHostingView: NSView?
+    // private var issueTrackerHostingView: NSView?  // Issues tab disabled across the system
     // Project & Workspace Storage (Orca Session == Project)
     let projectStore = ProjectStore()
     private var projectDropTarget: ProjectDropTarget?
@@ -633,6 +633,8 @@ final class KouenSidebarPanelViewController: NSViewController {
         SessionCoordinator.shared.sessionLifecycleService.openDefaultTerminalLaunch(req)
     }
 
+    // Issues tab disabled across the system
+    /*
     private func setupIssuesView() {
         let hosting = NSHostingView(rootView: IssueTrackerPanelView())
         hosting.translatesAutoresizingMaskIntoConstraints = false
@@ -646,6 +648,7 @@ final class KouenSidebarPanelViewController: NSViewController {
             hosting.bottomAnchor.constraint(equalTo: footerHostingView.topAnchor),
         ])
     }
+    */
 
     @objc private func handleOpenGitPanel(_ note: Notification) {
         SessionCoordinator.shared.openLazygit(direction: .horizontal)
@@ -748,6 +751,7 @@ final class KouenSidebarPanelViewController: NSViewController {
         }
         jobsHostingView?.isHidden = index != 2
         sessionHistoryHostingView?.isHidden = index != 3
+        // issueTrackerHostingView?.isHidden = index != 4  // Issues tab disabled — see TODO in viewDidLoad
         switch index {
         case 1:
             sidebarSectionModel.text = "FILES"
@@ -768,6 +772,9 @@ final class KouenSidebarPanelViewController: NSViewController {
             sidebarSectionModel.text = "SESSION HISTORY"
             sidebarSectionModel.isRepoHeader = false
             sessionHistoryModel.refresh(force: false)
+        // case 4:
+        //     sidebarSectionModel.text = "ISSUES"
+        //     sidebarSectionModel.isRepoHeader = false
         default:
             sidebarSectionModel.isRepoHeader = true
             updateRepoSectionHeader()

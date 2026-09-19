@@ -114,38 +114,37 @@ public enum KouenFeatureMarkdownSync {
             noteSuffix = ", notes: \(notes)"
         }
 
-        let lines = content.components(separatedBy: "\n")
-        var updatedLines: [String] = []
-        var matched = false
+        let scope: String
+        switch gate {
+        case 1: scope = "Architect design"
+        case 2: scope = "Scenario list"
+        case 3: scope = "Seam agreement"
+        default: scope = "Gate \(gate)"
+        }
+        let newLine = "- [x] Gate \(gate) (\(scope)) — approver: \(approver), approved: \(dateStr)\(noteSuffix)"
 
-        for line in lines {
-            if line.contains("Gate \(gate)") && (line.contains("- [ ]") || line.contains("- [x]")) {
-                let scope: String
-                switch gate {
-                case 1: scope = "Architect design"
-                case 2: scope = "Scenario list"
-                case 3: scope = "Seam agreement"
-                default: scope = "Gate \(gate)"
-                }
-                updatedLines.append("- [x] Gate \(gate) (\(scope)) — approver: \(approver), approved: \(dateStr)\(noteSuffix)")
-                matched = true
-            } else {
-                updatedLines.append(line)
-            }
+        let lines = content.components(separatedBy: "\n")
+        let matchIndices = lines.indices.filter { idx in
+            lines[idx].contains("Gate \(gate)") && (lines[idx].contains("- [ ]") || lines[idx].contains("- [x]"))
         }
 
-        if !matched {
-            // If gate line was not found, add it under ## SDLC Workflow Gates
+        var updatedLines = lines
+        switch matchIndices.count {
+        case 1:
+            // Exactly one gate-N checkbox line — unambiguous, safe to update in place.
+            updatedLines[matchIndices[0]] = newLine
+        case 0:
+            // No existing gate line — add it under ## SDLC Workflow Gates.
             if let idx = updatedLines.firstIndex(where: { $0.contains("## SDLC Workflow Gates") }) {
-                let scope: String
-                switch gate {
-                case 1: scope = "Architect design"
-                case 2: scope = "Scenario list"
-                case 3: scope = "Seam agreement"
-                default: scope = "Gate \(gate)"
-                }
-                updatedLines.insert("- [x] Gate \(gate) (\(scope)) — approver: \(approver), approved: \(dateStr)\(noteSuffix)", at: idx + 1)
+                updatedLines.insert(newLine, at: idx + 1)
             }
+        default:
+            // More than one line already mentions "Gate N" (e.g. separate dated scope-extension
+            // approvals for the same gate number) — overwriting any single one would silently
+            // discard real approval history (their own "scope: ..." text, which this function
+            // never carries forward). Append this approval as a new dated entry right after the
+            // last one instead of guessing which existing line to destroy.
+            updatedLines.insert(newLine, at: matchIndices[matchIndices.count - 1] + 1)
         }
 
         let newContent = updatedLines.joined(separator: "\n")

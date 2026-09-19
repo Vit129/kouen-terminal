@@ -5,6 +5,7 @@ public enum IssueTrackerType: String, CaseIterable, Identifiable, Sendable, Coda
     case linear = "Linear"
     case jira = "Jira"
     case azureDevOps = "Azure DevOps"
+    case github = "GitHub"
 
     public var id: String { rawValue }
 
@@ -13,8 +14,13 @@ public enum IssueTrackerType: String, CaseIterable, Identifiable, Sendable, Coda
         case .linear: return "arrow.up.right.square"
         case .jira: return "square.stack.3d.forward.dottedline"
         case .azureDevOps: return "cloud"
+        case .github: return "chevron.left.forwardslash.chevron.right"
         }
     }
+
+    /// GitHub authenticates through the local `gh` CLI's own stored credentials — never a
+    /// Keychain PAT like the other three trackers, so its settings sheet has nothing to save.
+    public var usesGhCLI: Bool { self == .github }
 }
 
 public enum IssuePriority: String, CaseIterable, Sendable, Codable {
