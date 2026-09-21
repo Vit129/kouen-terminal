@@ -148,6 +148,24 @@ async function main() {
       choice = await selectWithArrows(options);
     }
 
+    // Refresh the knowledge graph before any option that actually commits/releases
+    // code — a stale graphify-out/ silently misleads AI-assisted work done right
+    // after. Skipped for 'preview' (just spins up a local test app, touches no git
+    // history). Reuses run.sh's own `graphify` subcommand rather than duplicating
+    // the update logic here. Best-effort: never blocks the actual command.
+    if (choice !== 'preview') {
+      try {
+        const fs = await import('fs');
+        if (fs.existsSync('graphify-out')) {
+          console.log('▶ Refreshing graphify index...');
+          await runCommand('./Scripts/run.sh', ['graphify']);
+          console.log('');
+        }
+      } catch (e) {
+        console.log(`⚠️  graphify refresh failed — continuing anyway (${e.message})\n`);
+      }
+    }
+
     if (choice === 'commit-push-merge') {
       await runCommand('Scripts/commit-push-merge.sh', []);
     } else if (choice === 'preview') {
