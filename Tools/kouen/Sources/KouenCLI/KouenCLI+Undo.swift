@@ -3,7 +3,7 @@ import KouenCore
 import KouenIPC
 
 extension KouenCLI {
-    /// `kouen undo [step | list] [--tab/--surface <id>]`
+    /// `kouen undo [step | list] [--tab/--surface/--feature <id>]`
     ///
     /// Reverts (or lists) the shadow checkpoints `CheckpointManager` snapshots automatically on
     /// every Stop-hook "turn finished" (P46 Phase 3) — a safety net for "the agent just wrote
@@ -13,13 +13,22 @@ extension KouenCLI {
         let sub = args.first.flatMap { knownSubs.contains($0) ? $0 : nil }
         let rest = sub != nil ? Array(args.dropFirst()) : args
         let target = flagValue(rest, flag: "--tab") ?? flagValue(rest, flag: "--surface")
+        let featureSlug = flagValue(rest, flag: "--feature")
 
         let snap = try snapshot(client)
-        guard let tab = resolveUndoTarget(in: snap, target: target) else {
-            if let target {
+        let tab: Tab?
+        if let featureSlug {
+            tab = try resolveTabForFeature(slug: featureSlug, in: snap, client: client)
+        } else {
+            tab = resolveUndoTarget(in: snap, target: target)
+        }
+        guard let tab else {
+            if let featureSlug {
+                fputs("undo: no tab bound to feature '\(featureSlug)' (no worktree, or nothing running there)\n", kouenStderr)
+            } else if let target {
                 fputs("undo: no tab matching '\(target)'\n", kouenStderr)
             } else {
-                fputs("undo: no active tab (pass --tab/--surface <id>)\n", kouenStderr)
+                fputs("undo: no active tab (pass --tab/--surface/--feature <id>)\n", kouenStderr)
             }
             exit(1)
         }

@@ -419,6 +419,7 @@ final class DaemonSyncService {
             coord.terminalHosts.prune(keeping: live)
         }
         coord.notificationCoordinator.pushNewRemoteNotifications(from: remote)
+        coord.notificationCoordinator.pushVerificationFailureNotifications(from: remote)
         coord.notificationCoordinator.pushAgentActivityNotifications(from: remote)
         ActivityAssertionManager.shared.update(from: remote)
         // Surface index only needs rebuild when pane tree changes.

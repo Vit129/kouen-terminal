@@ -77,6 +77,14 @@ public struct ContextResolutionEngine: Sendable {
             resolved = resolved.replacingOccurrences(of: "@issue", with: issueContent)
         }
 
+        // 8. @builderror — Tier 1 verification's full failure output (P46 Phase 4 follow-up),
+        // distinct from @error's terminal-scrollback heuristic scrape: this is the exact
+        // captured `swift build`/`tsc`/etc. output, not a guess from what's visible on screen.
+        if resolved.contains("@builderror") {
+            let content = await resolveBuildError(daemonClient: daemonClient, activeSurfaceID: activeSurfaceID)
+            resolved = resolved.replacingOccurrences(of: "@builderror", with: content)
+        }
+
         return resolved
     }
 
@@ -220,5 +228,19 @@ public struct ContextResolutionEngine: Sendable {
             return desc
         }
         return "[No active feature tracked for \(cwd)]"
+    }
+
+    /// Resolves the active surface's last Tier 1 verification failure — the full captured output
+    /// `CheckpointManager`/`VerificationRunner`'s daemon-side hook stored, not a scrollback guess.
+    public func resolveBuildError(daemonClient: DaemonClient?, activeSurfaceID: String?) async -> String {
+        guard let surfaceID = activeSurfaceID, let client = daemonClient else {
+            return "[No active terminal surface to fetch a build error for]"
+        }
+        guard let response = try? client.request(.getVerificationOutput(surfaceID: surfaceID)),
+              case let .text(output) = response, !output.isEmpty
+        else {
+            return "[No verification failure recorded for this surface]"
+        }
+        return "### Build/Verification Failure:\n```text\n\(output)\n```"
     }
 }

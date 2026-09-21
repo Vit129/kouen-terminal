@@ -3,7 +3,7 @@ import KouenCore
 import KouenIPC
 
 extension KouenCLI {
-    /// `kouen verify [tier1 | tier2] [--tab/--surface <id>]`
+    /// `kouen verify [tier1 | tier2] [--tab/--surface/--feature <id>]`
     ///
     /// On-demand Two-Tier Verification (P46 Phase 4) — `tier1` (fast syntax/build check) runs
     /// automatically after every turn when `verify-on-turn` is enabled (`set-option -g
@@ -15,12 +15,15 @@ extension KouenCLI {
         let sub = args.first.flatMap { knownSubs.contains($0) ? $0 : nil } ?? "tier1"
         let rest = sub == args.first ? Array(args.dropFirst()) : args
         let target = flagValue(rest, flag: "--tab") ?? flagValue(rest, flag: "--surface")
+        let featureSlug = flagValue(rest, flag: "--feature")
 
         let snap = try snapshot(client)
-        let allTabs = snap.workspaces.flatMap { $0.sessions.flatMap(\.tabs) }
         let tab: Tab?
-        if let target {
+        if let featureSlug {
+            tab = try resolveTabForFeature(slug: featureSlug, in: snap, client: client)
+        } else if let target {
             let lower = target.lowercased()
+            let allTabs = snap.workspaces.flatMap { $0.sessions.flatMap(\.tabs) }
             tab = allTabs.first {
                 $0.id.uuidString.lowercased().hasPrefix(lower)
                     || ($0.rootPane.surfaceID?.uuidString.lowercased().hasPrefix(lower) ?? false)
@@ -29,7 +32,11 @@ extension KouenCLI {
             tab = snap.activeWorkspace?.activeTab
         }
         guard let tab else {
-            fputs("verify: no active tab (pass --tab/--surface <id>)\n", kouenStderr)
+            if let featureSlug {
+                fputs("verify: no tab bound to feature '\(featureSlug)' (no worktree, or nothing running there)\n", kouenStderr)
+            } else {
+                fputs("verify: no active tab (pass --tab/--surface/--feature <id>)\n", kouenStderr)
+            }
             exit(1)
         }
 
