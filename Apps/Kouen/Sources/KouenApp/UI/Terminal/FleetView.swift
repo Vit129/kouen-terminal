@@ -26,9 +26,13 @@ public struct FleetView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List(model.filteredItems) { item in
-                    FleetRowView(item: item)
-                        .contentShape(Rectangle())
-                        .onTapGesture { onSelect?(item) }
+                    Button {
+                        onSelect?(item)
+                    } label: {
+                        FleetRowView(item: item)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                 }
                 .listStyle(.plain)
             }
