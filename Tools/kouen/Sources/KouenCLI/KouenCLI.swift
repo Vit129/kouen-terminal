@@ -108,9 +108,15 @@ struct KouenCLI {
             case "memo":
                 try Self.handleMemo(Array(args.dropFirst()), client: client)
             case "task":
-                try Self.handleTask(Array(args.dropFirst()), client: client)
+                try await Self.handleTask(Array(args.dropFirst()), client: client)
             case "context":
                 try await Self.handleContext(Array(args.dropFirst()), client: client)
+            case "history":
+                try await Self.handleHistory(Array(args.dropFirst()), client: client)
+            case "undo":
+                try Self.handleUndo(Array(args.dropFirst()), client: client)
+            case "verify":
+                try Self.handleVerify(Array(args.dropFirst()), client: client)
             case "cc":
                 try Self.handleClaudeCode(Array(args.dropFirst()), client: client)
             case "board":

@@ -18,7 +18,7 @@ extension KouenCLI {
     /// `kouen task merge <slug>` — Gate 4 (Merge Review): shows the diff stat, blocks until
     /// Gate 4 is approved, then merges `branch` into `baseBranch`
     /// `kouen task sweep [--repo <path>]`
-    static func handleTask(_ args: [String], client: DaemonClient) throws {
+    static func handleTask(_ args: [String], client: DaemonClient) async throws {
         guard let sub = args.first else {
             printTaskUsage()
             exit(1)
@@ -45,6 +45,8 @@ extension KouenCLI {
             try handleTaskSweep(Array(args.dropFirst()), client: client)
         case "preview":
             try handleTaskPreview(Array(args.dropFirst()), client: client)
+        case "pack-pr":
+            try await handleTaskPackPr(Array(args.dropFirst()), client: client)
         default:
             printTaskUsage()
             exit(1)
@@ -63,6 +65,9 @@ extension KouenCLI {
           kouen task delete <slug>
           kouen task merge <slug>            Gate 4 (Merge Review) — shows the diff, blocks
                                               until approved, then merges into the base branch
+          kouen task pack-pr [<slug>] [--out <file>]
+                                              Compiles a diff summary, gate approvals, task
+                                              checklist, and session summary into PR markdown
           kouen task sweep [--repo <path>]
           kouen task preview [<slug>] [--file architecture|progress]
         \n
@@ -376,6 +381,73 @@ extension KouenCLI {
 
         openMarkdownPreview(path: targetURL.path)
         print("Opened Preview GUI for \(targetSlug) (\(targetURL.lastPathComponent))")
+    }
+
+    /// P46 Phase 4: compiles what a PR description needs — the diff, which gates cleared, the
+    /// task checklist, and (best-effort) the agent session that did the work — so `gh pr create
+    /// --body "$(kouen task pack-pr <slug>)"` doesn't need it hand-assembled.
+    private static func handleTaskPackPr(_ args: [String], client: DaemonClient) async throws {
+        let slugArg = args.first(where: { !$0.hasPrefix("--") })
+        let outPath = flagValue(args, flag: "--out")
+
+        let targetSlug: String
+        if let slugArg {
+            targetSlug = slugArg
+        } else {
+            let cwd = FileManager.default.currentDirectoryPath
+            guard case let .features(list) = try checkedRequest(client, .featureList(repoPath: cwd)), let first = list.first else {
+                fputs("Usage: kouen task pack-pr [<slug>] [--out <file>]\n", kouenStderr)
+                exit(1)
+            }
+            targetSlug = first.slug
+        }
+
+        guard case let .featureInfo(summary) = try checkedRequest(client, .featureGet(slug: targetSlug)), let feat = summary else {
+            fputs("Task/Feature not found: '\(targetSlug)'\n", kouenStderr)
+            exit(1)
+        }
+
+        var md = "# \(feat.slug)\n\n"
+
+        if let branch = feat.branch, let base = feat.baseBranch {
+            let stat = WorktreeManager().diffStat(repoPath: feat.repoPath, branch: branch, base: base) ?? "(no diff)"
+            md += "## Changes (`\(base)...\(branch)`)\n\n```\n\(stat)\n```\n\n"
+        }
+
+        md += "## Gate Approvals\n\n"
+        let gateNames = [1: "Architect design", 2: "Scenario list", 3: "Seam agreement", 4: "Merge Review"]
+        for g in 1...4 {
+            let name = gateNames[g] ?? "Gate \(g)"
+            if let approval = feat.gates.first(where: { $0.gate == g && $0.approved }) {
+                md += "- [x] Gate \(g) (\(name)) — approved by \(approval.approver)\n"
+            } else {
+                md += "- [ ] Gate \(g) (\(name)) — pending\n"
+            }
+        }
+
+        if !feat.tasks.isEmpty {
+            md += "\n## Task Checklist\n\n"
+            for task in feat.tasks {
+                md += "- [\(task.done ? "x" : " ")] \(task.label)\n"
+            }
+        }
+
+        // Best-effort: the agent session whose transcript matches this feature's worktree.
+        if let worktreePath = feat.worktreePath {
+            let records = await AgentHistoryScanner.shared.getOrScan()
+            if let record = records.first(where: { $0.projectPath == worktreePath || $0.projectPath == feat.repoPath }) {
+                md += "\n## Session Summary\n\n"
+                md += "**Agent:** \(record.agentKind.displayName)\n\n"
+                md += "**First prompt:**\n> \(record.firstPrompt.replacingOccurrences(of: "\n", with: "\n> "))\n"
+            }
+        }
+
+        if let outPath {
+            try md.write(toFile: outPath, atomically: true, encoding: .utf8)
+            print("Wrote PR pack to \(outPath)")
+        } else {
+            print(md)
+        }
     }
 
     static func openMarkdownPreview(path: String) {

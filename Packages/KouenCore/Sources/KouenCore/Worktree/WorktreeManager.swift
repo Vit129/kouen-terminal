@@ -6,6 +6,13 @@ public struct WorktreeManager: Sendable {
     /// Directory name inside the repo root where Kouen-managed worktrees live.
     public static let worktreeDir = ".kouen-worktrees"
 
+    /// Branch names treated as "the shared trunk, not a feature branch" — a tab sitting directly
+    /// on one of these (no worktree isolation) is exactly the case `WorktreeAutoIsolateService`
+    /// auto-isolates away from, and the case `SurfaceRegistry`'s Main Branch Guard (P46 Phase 3)
+    /// blocks an automation write on. Shared here (`KouenCore`) since both callers live in
+    /// different targets (`KouenApp`, `KouenDaemon`) that can't see each other's constants.
+    public static let protectedBranches: Set<String> = ["main", "master", "develop"]
+
     /// Info about an existing worktree.
     public struct WorktreeInfo: Sendable, Equatable {
         public let path: String

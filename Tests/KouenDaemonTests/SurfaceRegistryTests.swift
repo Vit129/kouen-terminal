@@ -635,6 +635,41 @@ final class SurfaceRegistryTests: XCTestCase {
         }
     }
 
+    /// P46 Phase 3 (Main Branch & Dirty Tree Guard): an automation write must be refused when
+    /// the target tab sits directly on a protected branch (main/master/develop) with no worktree
+    /// isolation — but a human write to the exact same tab is never blocked (guarding automation
+    /// is the point; a human is always free to work on main directly if they choose to).
+    func testAutomationWriteRefusedOnProtectedBranchWithoutWorktree() {
+        let registry = SurfaceRegistry()
+        guard case let .surfaces(surfaces) = registry.handle(.listSurfaces), let target = surfaces.first else {
+            return XCTFail("expected a default surface")
+        }
+        guard let match = registry.snapshot.workspaces
+            .compactMap({ ws -> (workspaceID: UUID, sessionID: UUID, tabID: UUID)? in
+                for session in ws.sessions {
+                    for tab in session.tabs where tab.rootPane.allSurfaceIDs().contains(UUID(uuidString: target.surfaceID)!) {
+                        return (ws.id, session.id, tab.id)
+                    }
+                }
+                return nil
+            }).first
+        else { return XCTFail("expected to locate the default tab") }
+
+        guard case .ok = registry.handle(.updateTabGitBranch(workspaceID: match.workspaceID, tabID: match.tabID, branch: "main")) else {
+            return XCTFail("expected ok setting gitBranch")
+        }
+
+        guard case let .error(message) = registry.handle(.send(surfaceID: target.surfaceID, text: "rm -rf /\n", origin: .automation)) else {
+            return XCTFail("expected an automation write on unprotected 'main' to be refused")
+        }
+        XCTAssertTrue(message.lowercased().contains("protected branch"), "rejection must explain why: \(message)")
+
+        // The identical write succeeds when it's the human's own input.
+        guard case .ok = registry.handle(.send(surfaceID: target.surfaceID, text: "echo hi\n", origin: .human)) else {
+            return XCTFail("a human write on main must never be blocked by this guard")
+        }
+    }
+
     /// P38 Phase B: `applyAgentChanges` must write subagents onto the tab snapshot alongside
     /// the primary agent, and bump the revision so clients actually see the change.
     func testApplyAgentChangesWritesSubagentsOntoTab() {
