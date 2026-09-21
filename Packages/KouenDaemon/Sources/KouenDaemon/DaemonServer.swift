@@ -146,6 +146,20 @@ public final class DaemonServer: @unchecked Sendable {
         registry.attachedClientCountProvider = { [registeredClientCount] in
             registeredClientCount.read()
         }
+        // P46 Pillar 6 gap 4: wake any `kouen agent wait` blocked on this surface's channel the
+        // instant it reaches `.waiting`/`.done`, instead of it busy-polling. May fire from
+        // `hookQueue` (the prompt-detection path) as well as `queue` (`.notify`/`.notifyDone`) —
+        // hop onto `queue` unconditionally since `WaitForRegistry` isn't its own lock, only
+        // queue-confinement.
+        registry.onAgentStatusReachedTerminal = { [weak self] surfaceKey in
+            guard let self else { return }
+            self.queue.async { [weak self] in
+                guard let self else { return }
+                for waiter in self.waitForRegistry.signal(channel: agentWaitChannel(surfaceKey: surfaceKey)) {
+                    self.send(.ok, to: waiter)
+                }
+            }
+        }
     }
 
     private func pushSnapshotRevision(_ revision: Int) {
@@ -295,9 +309,13 @@ public final class DaemonServer: @unchecked Sendable {
             guard let frame else { break }
             clientBuffers[fd] = data
             // Binary input frame on a persistent (subscription) connection: write straight to the
-            // PTY, fire-and-forget — no reply (the echo comes back on the output stream).
+            // PTY, fire-and-forget — no reply (the echo comes back on the output stream). This IS
+            // the primary human-keystroke path (`SurfaceIO.send`'s fast path rides this, falling
+            // back to a plain `.sendData` request only before the subscription exists) — tagged
+            // explicitly so `lastHumanWriteAt` actually gets recorded from real typing, not just
+            // from the rarer JSON-request fallback.
             if case let .input(surfaceID, payload) = frame {
-                _ = registry.handle(.sendData(surfaceID: surfaceID, data: payload))
+                _ = registry.handle(.sendData(surfaceID: surfaceID, data: payload, origin: .human))
                 continue
             }
             guard case let .request(maybeRequest) = frame else { continue }

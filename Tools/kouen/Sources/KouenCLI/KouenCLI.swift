@@ -104,7 +104,9 @@ struct KouenCLI {
             case "get-snapshot":
                 try printSnapshot(client)
             case "agent":
-                try Self.handleAgent(args, client: client)
+                try Self.handleAgent(Array(args.dropFirst()), client: client)
+            case "memo":
+                try Self.handleMemo(Array(args.dropFirst()), client: client)
             case "task":
                 try Self.handleTask(Array(args.dropFirst()), client: client)
             case "context":

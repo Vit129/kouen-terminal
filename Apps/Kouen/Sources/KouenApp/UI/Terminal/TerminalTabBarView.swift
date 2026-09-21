@@ -239,6 +239,33 @@ private struct TerminalTabBarBody: View {
                     .help("More tabs")
                 }
 
+                let waitingTabs = model.tabs.filter { $0.status == .waiting }
+                if !waitingTabs.isEmpty {
+                    Button {
+                        cycleNextWaitingTab(waitingTabs: waitingTabs)
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "bolt.fill")
+                                .font(.system(size: 8, weight: .bold))
+                            Text("\(waitingTabs.count) waiting")
+                                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                        }
+                        .foregroundStyle(Color(nsColor: KouenDesign.chrome.waiting))
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(
+                            RoundedRectangle(cornerRadius: KouenDesign.Radius.badge, style: .continuous)
+                                .fill(Color(nsColor: KouenDesign.chrome.waiting).opacity(0.14))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: KouenDesign.Radius.badge, style: .continuous)
+                                .stroke(Color(nsColor: KouenDesign.chrome.waiting).opacity(0.35), lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .help("Jump to agent waiting for input (click to cycle)")
+                }
+
                 Spacer(minLength: max(0, edgeInset + model.trailingInset))
             }
             .frame(width: proxy.size.width, height: proxy.size.height, alignment: .leading)
@@ -254,6 +281,17 @@ private struct TerminalTabBarBody: View {
             }
         }
         .ignoresSafeArea()
+    }
+
+    private func cycleNextWaitingTab(waitingTabs: [Tab]) {
+        guard !waitingTabs.isEmpty else { return }
+        if let active = model.activeTabID,
+           let currentIndex = waitingTabs.firstIndex(where: { $0.id == active }) {
+            let nextIndex = (currentIndex + 1) % waitingTabs.count
+            model.delegate?.tabBarDidSelect(tabID: waitingTabs[nextIndex].id)
+        } else {
+            model.delegate?.tabBarDidSelect(tabID: waitingTabs[0].id)
+        }
     }
 
     private func layoutMetrics(availableWidth: CGFloat) -> TabBarLayoutMetrics {
@@ -418,10 +456,16 @@ private struct TabPillView: View {
                     )
             }
 
-            Circle()
-                .fill(Color(statusColor(for: tab.status)))
-                .frame(width: 6, height: 6)
-                .help(statusHelp(for: tab.status))
+            if tab.status == .waiting {
+                AttentionBeaconDotView(isWaiting: true, color: statusColor(for: tab.status))
+                    .frame(width: 6, height: 6)
+                    .help(tab.notificationText.map { "Waiting: \($0)" } ?? statusHelp(for: tab.status))
+            } else {
+                Circle()
+                    .fill(Color(statusColor(for: tab.status)))
+                    .frame(width: 6, height: 6)
+                    .help(statusHelp(for: tab.status))
+            }
 
             if !tasks.isEmpty {
                 let doneCount = tasks.filter(\.done).count
@@ -558,13 +602,23 @@ private struct TabPillView: View {
 
     private var pillBackground: some View {
         let c = KouenDesign.chrome
+        let isWaiting = tab.status == .waiting
         return RoundedRectangle(cornerRadius: KouenDesign.Radius.card, style: .continuous)
-            .fill(backgroundColor(chrome: c))
+            .fill(isWaiting ? Color(nsColor: c.waiting).opacity(c.isDark ? 0.08 : 0.05) : backgroundColor(chrome: c))
     }
 
     private var pillBorder: some View {
-        RoundedRectangle(cornerRadius: KouenDesign.Radius.card, style: .continuous)
-            .stroke(isActive ? Color(KouenDesign.chrome.focusRing).opacity(0.48) : .clear, lineWidth: 1)
+        let isWaiting = tab.status == .waiting
+        let strokeColor: Color
+        if isWaiting {
+            strokeColor = Color(nsColor: KouenDesign.chrome.waiting).opacity(0.65)
+        } else if isActive {
+            strokeColor = Color(nsColor: KouenDesign.chrome.focusRing).opacity(0.48)
+        } else {
+            strokeColor = .clear
+        }
+        return RoundedRectangle(cornerRadius: KouenDesign.Radius.card, style: .continuous)
+            .stroke(strokeColor, lineWidth: 1)
     }
 
     private var dragGesture: some Gesture {

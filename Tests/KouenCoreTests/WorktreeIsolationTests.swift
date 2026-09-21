@@ -193,6 +193,49 @@ final class WorktreeIsolationTests: XCTestCase {
         XCTAssertEqual(div.behind, 1)
     }
 
+    /// P46 Pillar 6 gap 5 (Gate 4, Merge Review): `kouen task merge` reads `diffStat` for the
+    /// human to review and `currentBranch` to refuse merging onto the wrong checkout.
+    func testDiffStatAndCurrentBranch() throws {
+        let wtPath = try XCTUnwrap(mgr.create(repoPath: repoPath, sessionID: "diff-1", branch: "feat-diffstat", baseRef: "main"))
+        FileManager.default.createFile(atPath: wtPath + "/new.txt", contents: "hello".data(using: .utf8))
+        shell("git add new.txt && git commit -m 'add new.txt'", in: wtPath)
+
+        let stat = try XCTUnwrap(mgr.diffStat(repoPath: repoPath, branch: "feat-diffstat", base: "main"))
+        XCTAssertTrue(stat.contains("new.txt"), "diffStat must name the changed file: \(stat)")
+
+        XCTAssertEqual(mgr.currentBranch(at: repoPath), "main")
+        XCTAssertEqual(mgr.currentBranch(at: wtPath), "feat-diffstat")
+
+        // Nonexistent branch/base must not crash — just report no usable diff.
+        XCTAssertNil(mgr.diffStat(repoPath: repoPath, branch: "no-such-branch", base: "main"))
+    }
+
+    /// `merge` always uses `--no-ff`, so a fast-forward that could silently move `base`'s ref
+    /// without a merge commit never happens — the commit itself is `git log`-verifiable evidence
+    /// a merge actually occurred here, not just that the branches converged.
+    func testMergeCreatesNoFFCommitAndFailsOnConflict() throws {
+        let wtPath = try XCTUnwrap(mgr.create(repoPath: repoPath, sessionID: "merge-1", branch: "feat-merge", baseRef: "main"))
+        FileManager.default.createFile(atPath: wtPath + "/merged.txt", contents: "content".data(using: .utf8))
+        shell("git add merged.txt && git commit -m 'add merged.txt'", in: wtPath)
+
+        XCTAssertTrue(mgr.merge(repoPath: repoPath, branch: "feat-merge", message: "Merge feat-merge (Gate 4 approved by test)"))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: repoPath + "/merged.txt"))
+        XCTAssertTrue(mgr.isMergedOrSquashed(repoPath: repoPath, branch: "feat-merge", base: "main"))
+        let log = shell("git log -1 --format=%s", in: repoPath)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        XCTAssertEqual(log, "Merge feat-merge (Gate 4 approved by test)", "--no-ff must leave a real merge commit, not fast-forward silently")
+
+        // A genuinely conflicting merge must fail cleanly (and not leave a broken half-merge the
+        // caller reports as success).
+        FileManager.default.createFile(atPath: repoPath + "/conflict.txt", contents: "main version".data(using: .utf8))
+        shell("git add conflict.txt && git commit -m 'main adds conflict.txt'", in: repoPath)
+        let conflictWt = try XCTUnwrap(mgr.create(repoPath: repoPath, sessionID: "merge-2", branch: "feat-conflict", baseRef: "main~1"))
+        FileManager.default.createFile(atPath: conflictWt + "/conflict.txt", contents: "conflicting version".data(using: .utf8))
+        shell("git add conflict.txt && git commit -m 'feat-conflict adds conflict.txt'", in: conflictWt)
+
+        XCTAssertFalse(mgr.merge(repoPath: repoPath, branch: "feat-conflict", message: "should fail"))
+        shell("git merge --abort", in: repoPath) // leave the repo clean for teardown
+    }
+
     func testIsMergedOrSquashedNormalMerge() throws {
         let wtPath = try XCTUnwrap(mgr.create(repoPath: repoPath, sessionID: "norm-1", branch: "feat-norm", baseRef: "main"))
         let filePath = wtPath + "/norm.txt"

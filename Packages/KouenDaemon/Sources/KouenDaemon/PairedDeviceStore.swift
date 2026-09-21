@@ -1,8 +1,3 @@
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
 import Foundation
 import KouenCore
 
@@ -63,7 +58,7 @@ public final class PairedDeviceStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         let hash = SHA256Mini.hexDigest(Array(secret.utf8))
-        withFileLock {
+        KouenPaths.withFileLock(KouenPaths.pairedDevicesLockURL) {
             devices[id] = PairedDeviceRecord(id: id, label: label, pairedAt: Date(), secretHash: hash)
             saveLocked()
         }
@@ -96,29 +91,13 @@ public final class PairedDeviceStore: @unchecked Sendable {
     public func revoke(id: String) -> Bool {
         lock.lock()
         var existed = false
-        withFileLock {
+        KouenPaths.withFileLock(KouenPaths.pairedDevicesLockURL) {
             existed = devices.removeValue(forKey: id) != nil
             if existed { saveLocked() }
         }
         lock.unlock()
         if existed { onRevoke?(id) }
         return existed
-    }
-
-    // MARK: - Inter-process locking (caller must already hold `lock`)
-
-    /// Degrades to running `body` unlocked if the lock file can't be opened/locked — same
-    /// tradeoff `RemoteHostStore.withFileLock` documents: a missing cross-process lock is
-    /// strictly less safe than skipping persistence entirely, never worse.
-    private func withFileLock(_ body: () -> Void) {
-        try? KouenPaths.ensureDirectories()
-        let lockPath = KouenPaths.pairedDevicesLockURL.path
-        let fd = open(lockPath, O_RDWR | O_CREAT | O_CLOEXEC, 0o600)
-        guard fd >= 0 else { body(); return }
-        defer { close(fd) }
-        guard flock(fd, LOCK_EX) == 0 else { body(); return }
-        defer { flock(fd, LOCK_UN) }
-        body()
     }
 
     // MARK: - Disk I/O
