@@ -102,6 +102,16 @@ public final class SurfaceRegistry: @unchecked Sendable {
     private let monitorLock = NSLock()
     private var monitorTimer: DispatchSourceTimer?
 
+    /// Per-cwd cache backing the Dirty Tree half of the write-origin guard (P46 Phase 3 follow-up)
+    /// — `monitorLock`-guarded alongside the other small per-surface caches.
+    private var dirtyTreeCache: [String: (dirty: Bool, checkedAt: Date)] = [:]
+
+    /// Full Tier 1 verification failure output per surface (P46 Phase 4 follow-up) —
+    /// `monitorLock`-guarded alongside the other small per-surface caches. `tab.notificationText`
+    /// only holds a one-line summary; this is the full text `.getVerificationOutput` serves to
+    /// `@builderror` and the "Feed to Agent" notification action.
+    private var lastVerificationOutput: [String: String] = [:]
+
     /// Last time a `.human`-origin write landed on each surface — `monitorLock`-guarded
     /// alongside `monitors`, same lock discipline, no new lock object. P46 Pillar 6 gap 3:
     /// arbitrates a human keystroke against a concurrent automation `send`/`sendKeys` on the
@@ -733,13 +743,15 @@ public final class SurfaceRegistry: @unchecked Sendable {
                     guard verifyOnTurn else { return }
                     if let result = VerificationRunner().tier1SyntaxCheck(cwd: cwd), !result.passed {
                         let summary = "Build/syntax check failed (\(result.command))"
+                        self.monitorLock.lock()
+                        self.lastVerificationOutput[surfaceID] = result.output
+                        self.monitorLock.unlock()
+                        // Setting `.error` (below) is what the GUI actually alerts on —
+                        // `NotificationCoordinator` cross-process-alerts by diffing snapshot
+                        // status, not by observing this daemon process's own in-process
+                        // `NotificationBus` (a separate singleton instance in a separate process,
+                        // can't observe this one). No separate notification call needed here.
                         self.markVerificationFailed(surfaceKey: surfaceID, summary: summary)
-                        NotificationBus.shared.post(AgentNotification(
-                            surfaceID: UUID(uuidString: surfaceID),
-                            daemonSurfaceID: surfaceID,
-                            title: "Build Failed",
-                            body: summary
-                        ))
                     }
                 }
             }
@@ -798,6 +810,11 @@ public final class SurfaceRegistry: @unchecked Sendable {
                 commit()
             }
             return .ok
+        case let .getVerificationOutput(surfaceID):
+            monitorLock.lock()
+            let output = lastVerificationOutput[surfaceID] ?? ""
+            monitorLock.unlock()
+            return .text(output)
         case .getSnapshot:
             return .snapshot(editor.snapshot)
         case let .createSurface(cwd, shell):
@@ -1515,17 +1532,42 @@ public final class SurfaceRegistry: @unchecked Sendable {
             // catches the tab that was already there (e.g. the very first turn, before any
             // switch fired) or one the human deliberately reused. Caller (`handle(_:)`) already
             // holds `lock`, so reading `editor` here is safe.
-            if let match = editor.tab(forSurfaceKey: surfaceID),
-               let tab = editor.snapshot.workspaces.first(where: { $0.id == match.workspaceID })?
-                   .sessions.flatMap(\.tabs).first(where: { $0.id == match.tabID }),
-               tab.worktreePath == nil,
-               let branch = tab.gitBranch,
-               WorktreeManager.protectedBranches.contains(branch)
-            {
+            guard let match = editor.tab(forSurfaceKey: surfaceID),
+                  let tab = editor.snapshot.workspaces.first(where: { $0.id == match.workspaceID })?
+                      .sessions.flatMap(\.tabs).first(where: { $0.id == match.tabID }),
+                  tab.worktreePath == nil // isolated tabs are exempt from both checks below
+            else { return nil }
+
+            if let branch = tab.gitBranch, WorktreeManager.protectedBranches.contains(branch) {
                 return .error("locked: automation write refused — this tab is on protected branch '\(branch)' with no worktree isolation")
+            }
+            // Dirty Tree half: even on a non-protected branch, writing into an unisolated
+            // checkout that already has uncommitted changes risks clobbering work the human
+            // (or another session) has in progress there. Cached (2s TTL) — this check runs on
+            // every automation write, and shelling out to `git status` per write would be a real
+            // latency/CPU cost on an automation-heavy session.
+            if isDirtyCached(cwd: tab.cwd) {
+                return .error("locked: automation write refused — '\(tab.cwd)' has uncommitted changes with no worktree isolation")
             }
             return nil
         }
+    }
+
+    /// `WorktreeManager.isDirty`, cached per cwd for `dirtyCheckTTL` — `monitorLock`-guarded
+    /// alongside the other small per-surface/per-path caches this file already keeps.
+    private static let dirtyCheckTTL: TimeInterval = 2
+    private func isDirtyCached(cwd: String) -> Bool {
+        monitorLock.lock()
+        if let cached = dirtyTreeCache[cwd], Date().timeIntervalSince(cached.checkedAt) < Self.dirtyCheckTTL {
+            monitorLock.unlock()
+            return cached.dirty
+        }
+        monitorLock.unlock()
+        let dirty = WorktreeManager().isDirty(worktreePath: cwd)
+        monitorLock.lock()
+        dirtyTreeCache[cwd] = (dirty, Date())
+        monitorLock.unlock()
+        return dirty
     }
 
     /// Reset a `waiting` tab back to idle (clearing its notification text). No-op — and no

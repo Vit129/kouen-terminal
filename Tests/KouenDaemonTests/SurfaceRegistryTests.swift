@@ -670,6 +670,71 @@ final class SurfaceRegistryTests: XCTestCase {
         }
     }
 
+    /// P46 Phase 3 follow-up (Dirty Tree half of the guard): an automation write must be refused
+    /// when the target tab's cwd has uncommitted changes and no worktree isolation, even on a
+    /// perfectly ordinary (non-protected) branch — clobbering in-progress uncommitted work is the
+    /// risk, not the branch name. A clean tree on the same setup must be allowed. Two separate
+    /// directories (not the same one checked twice) — the guard's dirty-check is TTL-cached, so
+    /// re-checking the SAME path immediately after dirtying it could still read the stale
+    /// "clean" result rather than proving anything about the guard itself.
+    func testAutomationWriteRefusedOnDirtyTreeWithoutWorktree() throws {
+        func makeRepo(dirty: Bool) throws -> String {
+            let dir = NSTemporaryDirectory() + "kouen-dirty-guard-\(UUID().uuidString.prefix(8))"
+            try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+            func shell(_ command: String) {
+                let p = Process()
+                p.executableURL = URL(fileURLWithPath: "/bin/bash")
+                p.arguments = ["-c", command]
+                p.currentDirectoryURL = URL(fileURLWithPath: dir)
+                p.standardOutput = Pipe(); p.standardError = Pipe()
+                try? p.run(); p.waitUntilExit()
+            }
+            shell("git init -q && git config user.email t@t.com && git config user.name T")
+            shell("echo v1 > f.txt && git add f.txt && git commit -q -m init")
+            if dirty { shell("echo v2 > f.txt") }
+            return dir
+        }
+
+        let cleanDir = try makeRepo(dirty: false)
+        let dirtyDir = try makeRepo(dirty: true)
+        defer {
+            try? FileManager.default.removeItem(atPath: cleanDir)
+            try? FileManager.default.removeItem(atPath: dirtyDir)
+        }
+
+        let registry = SurfaceRegistry()
+        guard case let .surfaces(surfaces) = registry.handle(.listSurfaces), let target = surfaces.first else {
+            return XCTFail("expected a default surface")
+        }
+        guard case .ok = registry.handle(.updateTabCwd(surfaceID: target.surfaceID, path: cleanDir)) else {
+            return XCTFail("expected ok setting cwd")
+        }
+        guard case .ok = registry.handle(.send(surfaceID: target.surfaceID, text: "echo clean\n", origin: .automation)) else {
+            return XCTFail("a clean, unisolated tree must not be blocked")
+        }
+
+        guard case let .snapshot(snap) = registry.handle(.getSnapshot),
+              let ws = snap.activeWorkspaceID
+        else { return XCTFail("expected a workspace") }
+        guard case let .tabID(newTabID) = registry.handle(.newTab(workspaceID: ws, cwd: dirtyDir, shell: nil)) else {
+            return XCTFail("expected a new tab")
+        }
+        guard let dirtySurfaceID = registry.snapshot.workspaces
+            .flatMap({ $0.sessions.flatMap(\.tabs) })
+            .first(where: { $0.id == newTabID })?
+            .rootPane.allSurfaceIDs().first?.uuidString
+        else { return XCTFail("expected the new tab's surface") }
+
+        guard case let .error(message) = registry.handle(.send(surfaceID: dirtySurfaceID, text: "echo dirty\n", origin: .automation)) else {
+            return XCTFail("expected an automation write on a dirty, unisolated tree to be refused")
+        }
+        XCTAssertTrue(message.lowercased().contains("uncommitted"), "rejection must explain why: \(message)")
+
+        guard case .ok = registry.handle(.send(surfaceID: dirtySurfaceID, text: "echo hi\n", origin: .human)) else {
+            return XCTFail("a human write must never be blocked by the dirty-tree guard")
+        }
+    }
+
     /// P38 Phase B: `applyAgentChanges` must write subagents onto the tab snapshot alongside
     /// the primary agent, and bump the revision so clients actually see the change.
     func testApplyAgentChangesWritesSubagentsOntoTab() {

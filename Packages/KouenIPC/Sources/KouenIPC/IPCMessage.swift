@@ -64,7 +64,11 @@ import Foundation
 /// functional-addition rule as M2/M5/M10 above: the origin-lock rejection this carries is
 /// dead weight unless the daemon binary actually implements it, so this forces
 /// `install-graceful.sh` to restart into one that does.
-public let ipcProtocolVersion: Int = 12
+///
+/// Bumped 2026-09-21 (P46 Phase 4 follow-up): added `.getVerificationOutput` to `IPCRequest`
+/// (full Tier 1 failure text, for `@builderror` and the notification's "Feed to Agent" action)
+/// — same functional-addition rule, the new handler is dead weight on an old daemon binary.
+public let ipcProtocolVersion: Int = 13
 
 /// Who initiated a write to a surface's PTY. Lets the daemon serialize concurrent writers
 /// instead of interleaving keystrokes into one broken command (P46 Pillar 6 gap 3) — a human
@@ -162,6 +166,11 @@ public enum IPCRequest: Codable, Sendable {
     /// Posted by kouen-mcp after a mutating tool succeeds, so the daemon can
     /// stamp `lastMCPControlAt` on the affected tab and the UI shows a badge.
     case notifyMCPActivity(surfaceID: String, toolName: String)
+    /// Full Tier 1 verification failure output for a surface (P46 Phase 4 follow-up) — the tab's
+    /// own `notificationText` only holds a one-line summary; this is what `@builderror` and a
+    /// notification's "Feed to Agent" action actually inject. Returns `.text("")` when nothing
+    /// is stored (never failed, or the daemon restarted since).
+    case getVerificationOutput(surfaceID: String)
     case send(surfaceID: String, text: String, origin: WriteOrigin = .human)
     case sendData(surfaceID: String, data: Data, origin: WriteOrigin = .human)
     case getSnapshot

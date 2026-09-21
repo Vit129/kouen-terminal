@@ -64,6 +64,22 @@ public struct VerificationRunner: Sendable {
 
     // MARK: - Execution
 
+    /// Ceiling on any single verification run — `.notifyDone`'s `hookQueue` is a shared serial
+    /// queue other daemon background work (automations, checkpoints) also runs on, so a runaway
+    /// `swift build`/`npm test` must never be allowed to hang it forever. Matches the same
+    /// kill-after-timeout pattern `runGitCommandInDaemon` already uses for its own subprocess.
+    private static let timeout: TimeInterval = 120
+
+    /// Boxes the "did our own timeout fire" flag so the `DispatchWorkItem` closure and `run(_:in:)`
+    /// can share it — `DispatchWorkItem.isCancelled` only reflects whether `.cancel()` was called,
+    /// never whether the work item had already run by that point, so it can't answer this.
+    private final class TimeoutFlag: @unchecked Sendable {
+        private let lock = NSLock()
+        private var fired = false
+        func markFired() { lock.lock(); fired = true; lock.unlock() }
+        var didFire: Bool { lock.lock(); defer { lock.unlock() }; return fired }
+    }
+
     private func run(_ command: [String], cwd: String) -> VerificationResult {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
@@ -72,13 +88,27 @@ public struct VerificationRunner: Sendable {
         let pipe = Pipe()
         process.standardOutput = pipe
         process.standardError = pipe
+
+        let timeoutFlag = TimeoutFlag()
+        let timeoutWork = DispatchWorkItem {
+            guard process.isRunning else { return }
+            timeoutFlag.markFired()
+            process.terminate()
+        }
+        DispatchQueue.global().asyncAfter(deadline: .now() + Self.timeout, execute: timeoutWork)
+
         do {
             try process.run()
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             process.waitUntilExit()
+            timeoutWork.cancel() // no-op if it already fired; prevents a late-firing no-op after a fast exit
             let output = String(data: data, encoding: .utf8) ?? ""
+            if timeoutFlag.didFire {
+                return VerificationResult(passed: false, output: output + "\n[killed: exceeded \(Int(Self.timeout))s timeout]", command: command.joined(separator: " "))
+            }
             return VerificationResult(passed: process.terminationStatus == 0, output: output, command: command.joined(separator: " "))
         } catch {
+            timeoutWork.cancel()
             return VerificationResult(passed: false, output: "\(error)", command: command.joined(separator: " "))
         }
     }
