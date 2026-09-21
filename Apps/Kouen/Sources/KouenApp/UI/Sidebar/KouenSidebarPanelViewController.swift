@@ -815,7 +815,7 @@ final class KouenSidebarPanelViewController: NSViewController {
         case 5:
             sidebarSectionModel.text = "FLEET"
             sidebarSectionModel.isRepoHeader = false
-            fleetModel.refresh(from: SessionCoordinator.shared.snapshot)
+            fleetModel.refresh(from: SessionCoordinator.shared.snapshot, activeSurfaceID: SessionCoordinator.shared.activeSurfaceID)
         default:
             sidebarSectionModel.isRepoHeader = true
             updateRepoSectionHeader()
@@ -1020,6 +1020,13 @@ final class KouenSidebarPanelViewController: NSViewController {
             NSLog("[DBG-activestate] reload() no activeTab.cwd — clearing root")
         }
         updateRepoSectionHeader()
+
+        // Fleet tab has no other refresh trigger — sessionHistory/jobs only refresh on
+        // tab-select, but a new/closed tab while Fleet is the visible tab should show up
+        // immediately, the same way the Sessions list itself does via this same reload().
+        if sidebarSectionModel.selectedTab == 5 {
+            fleetModel.refresh(from: snap, activeSurfaceID: SessionCoordinator.shared.activeSurfaceID)
+        }
     }
 
     /// Updates session card labels in place (title/cwd/branch/agent) without

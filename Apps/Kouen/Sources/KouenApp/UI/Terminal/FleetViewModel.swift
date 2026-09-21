@@ -20,8 +20,15 @@ public struct FleetSessionItem: Identifiable, Sendable, Equatable {
     public let gitBranch: String?
     public let taskName: String?
     public let notificationText: String?
+    /// True for the surface the user is looking at right now — two blank shell tabs opened in
+    /// the same session/cwd otherwise render identically, so this is the only way to tell them
+    /// apart (and to explain why clicking the one you're already on shows no visible change).
+    public let isActive: Bool
 
     public var isWaiting: Bool { status == .waiting }
+    /// Short, stable disambiguator shown in the row — the same 8-char prefix convention every
+    /// `kouen` CLI listing already uses for a surface/tab id.
+    public var shortID: String { String(id.prefix(8)) }
 }
 
 /// Pattern mirrors `AutomationsFleetModel` (`@Observable @MainActor`, list + text filter) — not
@@ -51,7 +58,9 @@ public final class FleetViewModel {
     /// Rebuild the flat list from the current cross-workspace snapshot. Cheap enough (plain
     /// array walk + sort, no I/O) to call on every `snapshotChanged` notification, the same
     /// cadence `AgentSessionHistoryModel.refresh` and the Attention Beacon already run at.
-    public func refresh(from snapshot: SessionSnapshot) {
+    /// `activeSurfaceID` marks whichever row is the one currently being viewed (see
+    /// `FleetSessionItem.isActive`) — pass `SessionCoordinator.shared.activeSurfaceID`.
+    public func refresh(from snapshot: SessionSnapshot, activeSurfaceID: UUID? = nil) {
         items = snapshot.workspaces.flatMap { ws in
             ws.sessions.flatMap { session in
                 session.tabs.map { tab -> FleetSessionItem in
@@ -68,7 +77,8 @@ public final class FleetViewModel {
                         cwd: tab.cwd,
                         gitBranch: tab.gitBranch,
                         taskName: tab.taskName,
-                        notificationText: tab.notificationText
+                        notificationText: tab.notificationText,
+                        isActive: activeSurfaceID != nil && surfaceID == activeSurfaceID?.uuidString
                     )
                 }
             }
@@ -78,7 +88,8 @@ public final class FleetViewModel {
             // scanning this list should see stuck agents before idle ones.
             if lhs.isWaiting != rhs.isWaiting { return lhs.isWaiting }
             if lhs.workspaceName != rhs.workspaceName { return lhs.workspaceName < rhs.workspaceName }
-            return lhs.title < rhs.title
+            if lhs.title != rhs.title { return lhs.title < rhs.title }
+            return lhs.id < rhs.id // stable order for otherwise-identical rows (same title/cwd)
         }
     }
 }

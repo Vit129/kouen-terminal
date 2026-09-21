@@ -28,6 +28,26 @@ final class FleetViewModelTests: XCTestCase {
         XCTAssertEqual(model.waitingCount, 1)
     }
 
+    /// Found live: two blank shell tabs in the same session/cwd render identically, so
+    /// `isActive` marking which one you're looking at is the only way to tell them apart.
+    @MainActor
+    func testRefreshMarksTheActiveSurfaceAndOnlyThatOne() {
+        let tabA = Tab(title: "Shell", cwd: "/tmp")
+        let tabB = Tab(title: "Shell", cwd: "/tmp")
+        let session = SessionGroup(id: UUID(), name: "s", tabs: [tabA, tabB], activeTabID: tabA.id, sortOrder: 0)
+        let ws = Workspace(id: UUID(), name: "W", sessions: [session], activeSessionID: session.id)
+        let snap = SessionSnapshot(workspaces: [ws], activeWorkspaceID: ws.id)
+
+        let activeSurfaceID = tabB.rootPane.allSurfaceIDs().first
+        let model = FleetViewModel()
+        model.refresh(from: snap, activeSurfaceID: activeSurfaceID)
+
+        XCTAssertEqual(model.items.count, 2)
+        let activeItems = model.items.filter(\.isActive)
+        XCTAssertEqual(activeItems.count, 1, "exactly one row must be marked active")
+        XCTAssertEqual(activeItems.first?.tabID, tabB.id.uuidString)
+    }
+
     @MainActor
     func testFilterTextMatchesTitleCwdAndAgentName() {
         let tab = Tab(

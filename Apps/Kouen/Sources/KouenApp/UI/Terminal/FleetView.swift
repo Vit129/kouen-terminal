@@ -88,6 +88,14 @@ private struct FleetRowView: View {
                     Text(item.title)
                         .font(.system(size: 12, weight: .medium))
                         .lineLimit(1)
+                    if item.isActive {
+                        Text("current")
+                            .font(.system(size: 9.5, weight: .semibold))
+                            .foregroundStyle(Color.accentColor)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(Color.accentColor.opacity(0.15), in: Capsule())
+                    }
                     if let agentName = item.agentName {
                         Text(agentName)
                             .font(.system(size: 9.5, weight: .semibold))
@@ -97,7 +105,9 @@ private struct FleetRowView: View {
                             .background(Color.secondary.opacity(0.12), in: Capsule())
                     }
                 }
-                Text(subtitle)
+                // Two blank shell tabs in the same session/cwd render identically otherwise —
+                // the short id is the only thing that actually tells them apart.
+                Text("\(item.shortID) · \(subtitle)")
                     .font(.system(size: 10.5))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
