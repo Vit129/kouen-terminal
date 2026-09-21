@@ -21,12 +21,13 @@ def main():
     rules = json.loads(rules_path.read_text())
 
     for rule in rules:
-        skill = rule["skill"]
+        skills = rule["skill"] if isinstance(rule["skill"], list) else [rule["skill"]]
         for kw in rule["keywords"]:
             if re.search(r"\b" + re.escape(kw.lower()) + r"\b", prompt):
+                invoke = ", ".join(f"Skill({s})" for s in skills)
                 message = (
                     f"Skill-trigger keyword detected: {kw} -> invoke "
-                    f"Skill({skill}) before responding, per "
+                    f"{invoke} before responding, per "
                     f".claude/hooks/skill-keywords.json."
                 )
                 print(json.dumps({
