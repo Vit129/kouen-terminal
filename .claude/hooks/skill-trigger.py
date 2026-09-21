@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """UserPromptSubmit hook: word-boundary keyword match against skill-keywords.json.
 
-Source of truth for the keyword -> skill table is skill-keywords.json
-(kept in sync with rules/skill-routing.md). Silent no-op on no match or
-any error, so a broken hook never blocks a prompt.
+skill-keywords.json is the sole source of truth for the keyword -> skill
+table (there is no separate rules/skill-routing.md in this project — skill
+names here must match a real invocable skill name exactly, e.g. a plugin
+must be prefixed like "9arm-skills:debug-mantra"). Silent no-op on no
+match or any error, so a broken hook never blocks a prompt.
 """
 import json
 import re
@@ -24,7 +26,8 @@ def main():
             if re.search(r"\b" + re.escape(kw.lower()) + r"\b", prompt):
                 message = (
                     f"Skill-trigger keyword detected: {kw} -> invoke "
-                    f"Skill({skill}) before responding, per rules/skill-routing.md."
+                    f"Skill({skill}) before responding, per "
+                    f".claude/hooks/skill-keywords.json."
                 )
                 print(json.dumps({
                     "hookSpecificOutput": {
