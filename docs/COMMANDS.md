@@ -306,3 +306,29 @@ Events: `after-new-tab`, `after-new-session`, `after-kill-tab`, `after-split-pan
 | `"literal text"` / `'literal text'` | Quoted arguments preserve whitespace and `;`. An unterminated quote is a parse error (it is **not** silently swallowed to end of line). |
 
 See `docs/KEYBINDINGS.md` for the default key tables and `Packages/KouenCore/Sources/KouenCore/Format/FormatString.swift` for the `FormatString` token list and operators.
+
+## Agent safety CLI (`kouen-cli`)
+
+Shell-only commands (no `:` prompt / keybinding form) backing the checkpoint/verification/undo
+safety net — see [README.md § Agent Safety Net](../README.md#agent-safety-net-checkpoints-verification-write-guards)
+for the concepts. Every subcommand also accepts `--tab <id>` / `--surface <id>` (prefix-matched)
+to target a tab other than the active one, or `--feature <slug>` to resolve the tab bound to a
+`kouen task` feature's worktree.
+
+| Command | Effect |
+|---|---|
+| `kouen-cli history [list] [--limit N] [--json]` | Recent agent sessions (Claude Code, Codex, Antigravity) across every workspace, newest first. |
+| `kouen-cli history search <keyword> [--limit N]` | Search prompts/output across all scanned transcripts. |
+| `kouen-cli history show <id>` | Show one session's full detail (agent, project, branch, model, transcript path, recent turns) — `<id>` is prefix-matched. |
+| `kouen-cli history resume <id>` | Open a new tab at that session's project path and replay the agent's own resume command into it. |
+| `kouen-cli undo [step] [--tab/--surface/--feature <id>]` | Revert the working tree in that tab's `cwd` to its last automatic checkpoint (a shadow git ref, not `git stash` — the real index is never touched). |
+| `kouen-cli undo list [--tab/--surface/--feature <id>]` | List that tab's checkpoints, oldest first, each with its diffstat summary line. |
+| `kouen-cli verify [tier1] [--tab/--surface/--feature <id>]` | Fast syntax/build check for the tab's project, auto-detecting the toolchain (same check `verify-on-turn` runs automatically). |
+| `kouen-cli verify tier2 [--tab/--surface/--feature <id>]` | The project's own full test command — deliberately manual-only, since running a full suite after every agent turn is too expensive a default. |
+| `kouen-cli task pack-pr [<slug>] [--out <file>]` | Assemble a PR description (diff stat, gate approvals, task checklist) from a `kouen task` feature's tracked state; defaults to the current directory's feature when `<slug>` is omitted. |
+
+Checkpoints are created automatically on every agent Stop hook (no command needed); `tier1`
+verification runs automatically after every turn only when enabled via `set-option -g
+verify-on-turn on` (see [§ Options](#options)) — a failing check surfaces as a desktop
+notification with a "feed error to agent" action, which resolves `@builderror` via the Quick
+Context Injector (⌘K) and sends it straight into that surface.
