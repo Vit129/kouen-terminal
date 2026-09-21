@@ -713,6 +713,36 @@ public final class SurfaceRegistry: @unchecked Sendable {
             markDone(surfaceKey: surfaceID, text: body)
             commit()
             fireHookLocked(.notificationPosted, surfaceKey: surfaceID)
+            // P46 Phase 3: a Stop-hook "turn finished normally" is the closest signal this daemon
+            // has to "one agent tool-execution cycle completed" — snapshot the working tree so
+            // `kouen undo` has something to revert to. Off the registry lock (hookQueue): `git
+            // add -A` over a large/dirty tree must never block other IPC while it runs.
+            let verifyOnTurn = optionStore.get("verify-on-turn")?.boolValue ?? false
+            if let match = editor.tab(forSurfaceKey: surfaceID),
+               let cwd = editor.snapshot.workspaces.first(where: { $0.id == match.workspaceID })?
+                   .sessions.flatMap(\.tabs).first(where: { $0.id == match.tabID })?.cwd {
+                hookQueue.async { [weak self] in
+                    guard let self else { return }
+                    _ = CheckpointManager().create(cwd: cwd, session: surfaceID)
+                    // P46 Phase 4, Tier 1: opt-in (`set-option -g verify-on-turn on`) — a fast
+                    // syntax/build command discovered from the project's own marker file (e.g.
+                    // `swift build`, `cargo check`) is still a real process with real cost, and
+                    // running one automatically after every single turn on every project is too
+                    // invasive a default. Nil (unrecognized project) is silently skipped either
+                    // way, never reported as a failure.
+                    guard verifyOnTurn else { return }
+                    if let result = VerificationRunner().tier1SyntaxCheck(cwd: cwd), !result.passed {
+                        let summary = "Build/syntax check failed (\(result.command))"
+                        self.markVerificationFailed(surfaceKey: surfaceID, summary: summary)
+                        NotificationBus.shared.post(AgentNotification(
+                            surfaceID: UUID(uuidString: surfaceID),
+                            daemonSurfaceID: surfaceID,
+                            title: "Build Failed",
+                            body: summary
+                        ))
+                    }
+                }
+            }
             return .ok
         case let .setSubagentHint(surfaceID, kind, active):
             if active {
@@ -1466,16 +1496,33 @@ public final class SurfaceRegistry: @unchecked Sendable {
     /// `humanWriteLockWindow` of the surface's last one. Returns the rejection response to
     /// short-circuit `handle(_:)` with, or nil to proceed with the write. Caller holds `lock`.
     private func checkWriteOriginLocked(surfaceID: String, origin: WriteOrigin) -> IPCResponse? {
-        monitorLock.lock()
-        defer { monitorLock.unlock() }
         switch origin {
         case .human:
+            monitorLock.lock()
             lastHumanWriteAt[surfaceID] = Date()
+            monitorLock.unlock()
             return nil
         case .automation:
-            if let last = lastHumanWriteAt[surfaceID],
-               Date().timeIntervalSince(last) < Self.humanWriteLockWindow {
+            monitorLock.lock()
+            let last = lastHumanWriteAt[surfaceID]
+            monitorLock.unlock()
+            if let last, Date().timeIntervalSince(last) < Self.humanWriteLockWindow {
                 return .error("locked: human active on this surface")
+            }
+            // Main Branch & Dirty Tree Guard (P46 Phase 3): an automation write landing on a tab
+            // that's sitting directly on a protected branch (no worktree isolation) is exactly
+            // the case `WorktreeAutoIsolateService` isolates branch *switches* away from — this
+            // catches the tab that was already there (e.g. the very first turn, before any
+            // switch fired) or one the human deliberately reused. Caller (`handle(_:)`) already
+            // holds `lock`, so reading `editor` here is safe.
+            if let match = editor.tab(forSurfaceKey: surfaceID),
+               let tab = editor.snapshot.workspaces.first(where: { $0.id == match.workspaceID })?
+                   .sessions.flatMap(\.tabs).first(where: { $0.id == match.tabID }),
+               tab.worktreePath == nil,
+               let branch = tab.gitBranch,
+               WorktreeManager.protectedBranches.contains(branch)
+            {
+                return .error("locked: automation write refused — this tab is on protected branch '\(branch)' with no worktree isolation")
             }
             return nil
         }
@@ -1841,6 +1888,25 @@ public final class SurfaceRegistry: @unchecked Sendable {
             status: .done,
             notificationText: text
         )
+        onAgentStatusReachedTerminal?(surfaceKey)
+    }
+
+    /// P46 Phase 4: Tier 1 verification failed after this turn — reuses `TabStatus.error`
+    /// (defined since the type's introduction, never actually set anywhere until now). Runs off
+    /// the registry lock (called from the same `hookQueue.async` checkpoint block `.notifyDone`
+    /// schedules), so — unlike `markWaiting`/`markDone`, which assume the caller already holds
+    /// `lock` — this acquires it itself.
+    private func markVerificationFailed(surfaceKey: String, summary: String) {
+        acquireRegistryLock()
+        defer { lock.unlock() }
+        guard let match = editor.tab(forSurfaceKey: surfaceKey) else { return }
+        editor.setTabStatus(
+            workspaceID: match.workspaceID,
+            tabID: match.tabID,
+            status: .error,
+            notificationText: summary
+        )
+        commit()
         onAgentStatusReachedTerminal?(surfaceKey)
     }
 
