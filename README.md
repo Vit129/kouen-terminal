@@ -85,7 +85,8 @@ See [USAGE.md](USAGE.md) for the full install, run, CLI, and remote/headless gui
 - Sidebar tools for sessions, file navigation, real-time Git workflows (one-step Commit & Push, per-hunk stage/unstage, PR merge with squash/rebase/merge picker), command palette, and editor/LSP flows across 21 languages — see [Editor & LSP](#editor--lsp).
 - Sidebar dev-server detection — live listening-port badge per session, click to open in the browser pane.
 - SSH agent forwarding for remote hosts, toggleable per host in Settings.
-- Fleet visibility — footer badge + Agent Inbox header show running/needs-attention counts across all active agent sessions.
+- Fleet visibility — footer badge + Agent Inbox header show running/needs-attention counts across all active agent sessions, plus a dedicated Fleet sidebar tab flattening every live session across every workspace.
+- Agent safety net — automatic per-turn checkpoints with `kouen undo`, two-tier build/test verification (`kouen verify`, `verify-on-turn`), and write-origin guards that refuse an automation write onto a protected branch, a dirty unisolated checkout, or a surface a human is actively typing in — see [Agent Safety Net](#agent-safety-net-checkpoints-verification-write-guards).
 - Stable under long sessions — per-pane controller trees and browser network buffers are bounded and released on pane close; memory stays flat across hours of use.
 
 ## Keyboard Shortcuts
@@ -103,6 +104,8 @@ The most-used ones. Full reference (Vi modal editing, prompt tools, navigation, 
 | ⌘F / ⌘⇧F | Scrollback search / find in files |
 | ⌥Space | Inline AI command suggestion overlay — sends recent pane output to Claude, suggests a next command |
 | ⌘⇧U | Hint mode — keyboard-driven link/path opening |
+| ⌘K | Quick Context Injector — inject `@diff`/`@file`/`@last`/`@error`/`@builderror` into the terminal |
+| ⌘⌥D | Turn Diff Reviewer — review the agent's last turn against its checkpoint (`y` accept, `r` revert) |
 
 ## How It Feels
 
@@ -197,6 +200,46 @@ kouen-cli cc cancel <runId>
 
 **Permission profiles** — `readonly` (Read/Glob/Grep only) or `edit` (default: Edit/Write + a git-readonly Bash allowlist; `rm`/`sudo`/`git push` always denied). Never `bypassPermissions`.
 
+## Agent Safety Net (Checkpoints, Verification, Write Guards)
+
+Every agent turn is automatically snapshotted and, optionally, verified — so a bad turn is a
+`kouen undo` away instead of a manual `git diff`/`git checkout` scramble, and a broken build
+surfaces as a desktop notification instead of silently compounding into the next turn.
+
+- **Checkpoints on every turn** — when an agent's Stop hook fires, the daemon snapshots the
+  working tree (tracked + untracked) into a `refs/kouen/checkpoints/<session>/<turn>` git ref via
+  a temporary index, never touching your real staging area or `git stash`.
+- **`kouen undo`** — revert the working tree in a tab's `cwd` to its last checkpoint, or list
+  checkpoints with their diffstat: `kouen undo`, `kouen undo list`, `kouen undo --tab <id>`,
+  `kouen undo --feature <slug>`.
+- **`kouen verify`** — run a two-tier check against a tab's project: `tier1` (fast syntax/build
+  check, auto-detected per toolchain) or `tier2` (the project's own full test command, manual-only
+  since running a full suite after every turn is too expensive a default). Enable tier1
+  automatically after every agent turn with `set-option -g verify-on-turn on`; a failing check
+  flips the tab to an error state with a desktop notification you can act on directly (see
+  Turn Diff Reviewer below).
+- **Write-origin guards** — every PTY write is tagged `human` or `automation`. An automation
+  write is refused (not silently accepted) when: a human typed in that surface within the last
+  1.5s (avoids stepping on a live human edit), the tab sits directly on a protected branch
+  (`main`/`master`/`develop`) with no worktree isolation, or the tab's checkout already has
+  uncommitted changes with no worktree isolation — each a guard against an agent clobbering work
+  that isn't its own. Worktree-isolated tabs are exempt from the branch/dirty-tree checks by design.
+- **Turn Diff Reviewer (⌘⌥D)** — review the diff since the last checkpoint in a floating panel;
+  `y` accepts, `r` reverts to the checkpoint, `esc` dismisses.
+- **Quick Context Injector (⌘K)** — a HUD that resolves `@`-mention tokens (`@diff`, `@file:<path>`,
+  `@last`, `@error`, `@builderror` for the last failed `verify-on-turn` output, `@pane:<id>`,
+  `@graph:<symbol>`, `@issue`) and sends the expanded text straight into the active surface.
+- **`kouen history`** — list, search, show, or resume past agent sessions (Claude Code, Codex,
+  Antigravity) across every workspace from the shell: `kouen history`, `kouen history search
+  <keyword>`, `kouen history show <id>`, `kouen history resume <id>`.
+- **`kouen task pack-pr [<slug>] [--out <file>]`** — assembles a PR description (diff stat, gate
+  approvals, task checklist) from a feature's tracked state, for `gh pr create --body "$(kouen
+  task pack-pr <slug>)"`.
+- **Fleet tab** — one sidebar view flattening every live tab across every workspace, sorted
+  needs-attention-first, with a filter box; the more useful entry point in day-to-day use is
+  still a notification's own "jump to this session" action — the tab itself is for scanning many
+  concurrent agents at once, not a screen you keep open.
+
 ## Editor & LSP
 
 Opening a file in the sidebar file editor auto-detects a language server from the file extension or a project marker (e.g. `package.json`, `Package.swift`) in an ancestor directory, and starts it if the binary is on `PATH`. Vi ex commands work against the live session: `gd` (go to definition, falls back to `gf` path resolution), `K` (hover), `:errors` (diagnostics). See [docs/COMMANDS.md](docs/COMMANDS.md#errors-and-lsp).
@@ -259,7 +302,7 @@ kouen-cli capture-pane --host devbox --surface <id>
 - [USAGE.md](USAGE.md) - install, run, CLI, remote/headless, IDE-like workflow, experience modes, migration, and troubleshooting
 - [docs/MODES.md](docs/MODES.md) - Plain, Persistent, Full, and Agent Workspace modes (detail)
 - [docs/MIGRATION.md](docs/MIGRATION.md) - migrating from tmux or another terminal setup
-- [docs/COMMANDS.md](docs/COMMANDS.md) - full command reference including workbench commands (`:find`, `:grep`, `:make`, `:errors`, `:recent`)
+- [docs/COMMANDS.md](docs/COMMANDS.md) - full command reference including workbench commands (`:find`, `:grep`, `:make`, `:errors`, `:recent`) and the agent-safety CLI (`kouen history`, `kouen undo`, `kouen verify`, `kouen task pack-pr`)
 - [docs/KEYBINDINGS.md](docs/KEYBINDINGS.md) - shortcuts, key bindings, and vi ex command quick reference (IDE-like navigation)
 - [sheet-cheat.html](sheet-cheat.html) - interactive cheat sheet (shell tools, unix, vim, Kouen) — regenerate with `make cheatsheet`
 - [docs/shell-integration/README.md](docs/shell-integration/README.md) - shell integration

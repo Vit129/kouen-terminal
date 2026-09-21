@@ -48,6 +48,8 @@ final class NotificationPresenter: NSObject, UNUserNotificationCenterDelegate, @
                     SessionCoordinator.shared.notificationCoordinator.rerunCommand(for: surfaceID)
                 case DesktopNotifier.Action.copyOutput:
                     SessionCoordinator.shared.notificationCoordinator.copyOutput(for: surfaceID)
+                case DesktopNotifier.Action.feedToAgent:
+                    SessionCoordinator.shared.notificationCoordinator.feedBuildErrorToAgent(for: surfaceID)
                 default:
                     SessionCoordinator.shared.notificationCoordinator.openSurface(surfaceID)
                 }
@@ -59,11 +61,15 @@ final class NotificationPresenter: NSObject, UNUserNotificationCenterDelegate, @
 
 enum DesktopNotifier {
     static let categoryIdentifier = "terminal-job"
+    /// P46 Phase 4 follow-up: a separate category so "Feed to Agent" only shows on a build-failure
+    /// alert, not on every waiting/done notification where it wouldn't make sense.
+    static let buildFailureCategoryIdentifier = "build-failure"
 
     enum Action {
         static let focusPane = "focus-pane"
         static let rerunCommand = "rerun-command"
         static let copyOutput = "copy-output"
+        static let feedToAgent = "feed-to-agent"
     }
 
     // UNUserNotificationCenter.current() crashes on some macOS 26 installs due to a corrupted
@@ -106,10 +112,21 @@ enum DesktopNotifier {
             intentIdentifiers: [],
             options: []
         )
+        let feedToAgentAction = UNNotificationAction(
+            identifier: Action.feedToAgent,
+            title: "Feed to Agent",
+            options: [.foreground]
+        )
+        let buildFailureCategory = UNNotificationCategory(
+            identifier: buildFailureCategoryIdentifier,
+            actions: [feedToAgentAction, focusAction],
+            intentIdentifiers: [],
+            options: []
+        )
 
         let center = UNUserNotificationCenter.current()
         center.delegate = NotificationPresenter.shared
-        center.setNotificationCategories([category])
+        center.setNotificationCategories([category, buildFailureCategory])
         center.requestAuthorization(options: [.alert, .sound]) { _, error in
             if let error {
                 NSLog("DesktopNotifier: requestAuthorization failed: %@", error.localizedDescription)
@@ -123,6 +140,7 @@ enum DesktopNotifier {
     ///   depending on caller context.
     static func show(
         title: String, body: String, withSound: Bool = true, surfaceID: String? = nil,
+        category: String = categoryIdentifier,
         completion: (@MainActor @Sendable (Bool) -> Void)? = nil
     ) {
         guard isUNNotificationCenterAvailable else {
@@ -148,7 +166,7 @@ enum DesktopNotifier {
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
-        content.categoryIdentifier = categoryIdentifier
+        content.categoryIdentifier = category
         if withSound { content.sound = .default }
         if let surfaceID { content.userInfo = ["surfaceID": surfaceID] }
         let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)

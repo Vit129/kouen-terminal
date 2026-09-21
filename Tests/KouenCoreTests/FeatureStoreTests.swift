@@ -62,8 +62,8 @@ final class FeatureStoreTests: XCTestCase {
         // Invalid gate
         let invalid = store.approveGate(slug: "p46-gate-test", gate: 0, approver: "supavit.cho")
         XCTAssertNil(invalid)
-        let invalidHigh = store.approveGate(slug: "p46-gate-test", gate: 4, approver: "supavit.cho")
-        XCTAssertNil(invalidHigh)
+        let invalidHigh = store.approveGate(slug: "p46-gate-test", gate: 5, approver: "supavit.cho")
+        XCTAssertNil(invalidHigh, "1-4 are the only valid gates (1-3 SDLC, 4 Merge Review)")
 
         // Valid Gate 1
         let g1 = store.approveGate(slug: "p46-gate-test", gate: 1, approver: "supavit.cho", notes: "Architecture approved")
@@ -77,6 +77,12 @@ final class FeatureStoreTests: XCTestCase {
         XCTAssertTrue(g2?.isGateApproved(1) == true)
         XCTAssertTrue(g2?.isGateApproved(2) == true)
         XCTAssertFalse(g2?.isGateApproved(3) == true)
+
+        // P46 Pillar 6 gap 5: Gate 4 (Merge Review) is approved independently of 1-3.
+        let g4 = store.approveGate(slug: "p46-gate-test", gate: 4, approver: "supavit.cho", notes: "Diff reviewed")
+        XCTAssertNotNil(g4)
+        XCTAssertTrue(g4?.isGateApproved(4) == true)
+        XCTAssertFalse(g4?.isGateApproved(3) == true, "gate 3 was never approved on this feature")
     }
 
     func testStaleOrSupersededDetection() throws {

@@ -64,7 +64,19 @@ struct AutomationsFleetView: View {
             }
         }
         .task {
-            await model.load()
+            // Initial load seeds the baseline (no auto-open of pre-launch results), then a
+            // lightweight poll loop picks up SCHEDULED runs that finish while the panel is
+            // open and auto-opens their result — matching Run-Now behavior. Cancelled
+            // automatically when the view goes away.
+            let fresh = await model.load(detectScheduledRuns: true)
+            for artifact in fresh { openArtifact(artifact) }
+
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 30_000_000_000) // 30s
+                if Task.isCancelled { break }
+                let freshlyCompleted = await model.load(detectScheduledRuns: true)
+                for artifact in freshlyCompleted { openArtifact(artifact) }
+            }
         }
         .sheet(item: $selectedResultJob) { job in
             JobResultSheetView(job: job)
@@ -342,14 +354,18 @@ struct AutomationsFleetView: View {
 
                 // Run Now
                 Button {
-                    Task { await model.runNow(item) }
+                    Task {
+                        if let artifact = await model.runNow(item) {
+                            openArtifact(artifact)
+                        }
+                    }
                 } label: {
                     Image(systemName: "play.fill")
                         .font(.system(size: 8))
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.mini)
-                .help("Run automation now")
+                .help("Run now — auto-opens the result when it's ready")
 
                 // Toggle enable/disable
                 Toggle("", isOn: Binding(
@@ -391,7 +407,10 @@ struct AutomationsFleetView: View {
     @ViewBuilder
     private func statusIndicator(_ item: FleetJobItem) -> some View {
         let st = item.state.lowercased()
-        if st == "running" {
+        // A Run-Now in flight (esp. a LaunchAgent, whose persisted state never flips to
+        // "running") shows the spinner immediately so the user sees it working while we
+        // wait for the result to be regenerated.
+        if st == "running" || model.runningJobIDs.contains(item.id) {
             HStack(spacing: 2.5) {
                 ProgressView()
                     .controlSize(.mini)

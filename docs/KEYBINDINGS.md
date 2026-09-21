@@ -88,6 +88,8 @@ These are fixed `NSMenuItem` bindings defined in `MainMenuBuilder` — not prefi
 | **Jump to Directory** | **`⌘⇧J`** — `↩` cd here · `⌘↩` open new tab · reads zoxide list |
 | **Recipes** | **`⌘⇧R`** — run or send a saved command to Composer |
 | Command prompt | `⌘;` |
+| Quick Context Injector (`@diff`/`@file`/`@last`/`@error`/`@builderror`) | `⌘K` |
+| Turn Diff Reviewer (`y` accept · `r` revert to checkpoint · `esc` dismiss) | `⌘⌥D` |
 | Search command history | `⌃R` |
 | Toggle sidebar | `⌘\` |
 | Show Git panel | `⌘G` |

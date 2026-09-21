@@ -76,13 +76,13 @@ extension KouenCLI {
             exit(1)
         }
 
-        _ = try checkedRequest(client, .send(surfaceID: surfaceID, text: agentLaunchCommand(for: agent)))
+        _ = try checkedRequest(client, .send(surfaceID: surfaceID, text: agentLaunchCommand(for: agent), origin: .automation))
         if let prompt {
             // ponytail: fixed 3s cold-start delay, same heuristic `fireAutomationLocked` uses for
             // its own prompt-typing step — not a readiness check. Ceiling: a slow/cold CLI start
             // could still lose the prompt to the shell.
             Thread.sleep(forTimeInterval: 3)
-            _ = try checkedRequest(client, .send(surfaceID: surfaceID, text: prompt + "\n"))
+            _ = try checkedRequest(client, .send(surfaceID: surfaceID, text: prompt + "\n", origin: .automation))
         }
         print(sessionID.uuidString)
     }

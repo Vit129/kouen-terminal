@@ -58,6 +58,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
         var lastOutput = Date()
         /// OSC-aware bell-scan state, carried across PTY chunks (a sequence can split over reads).
         var bellScan: SurfaceRegistry.BellScanState = .normal
+        var trailingOutput: Data = Data()
     }
 
     /// State for the lightweight bell scan in `noteSurfaceOutput`. A BEL (0x07) is a real terminal
@@ -100,6 +101,27 @@ public final class SurfaceRegistry: @unchecked Sendable {
     private var monitors: [String: SurfaceMonitor] = [:]
     private let monitorLock = NSLock()
     private var monitorTimer: DispatchSourceTimer?
+
+    /// Per-cwd cache backing the Dirty Tree half of the write-origin guard (P46 Phase 3 follow-up)
+    /// — `monitorLock`-guarded alongside the other small per-surface caches.
+    private var dirtyTreeCache: [String: (dirty: Bool, checkedAt: Date)] = [:]
+
+    /// Full Tier 1 verification failure output per surface (P46 Phase 4 follow-up) —
+    /// `monitorLock`-guarded alongside the other small per-surface caches. `tab.notificationText`
+    /// only holds a one-line summary; this is the full text `.getVerificationOutput` serves to
+    /// `@builderror` and the "Feed to Agent" notification action.
+    private var lastVerificationOutput: [String: String] = [:]
+
+    /// Last time a `.human`-origin write landed on each surface — `monitorLock`-guarded
+    /// alongside `monitors`, same lock discipline, no new lock object. P46 Pillar 6 gap 3:
+    /// arbitrates a human keystroke against a concurrent automation `send`/`sendKeys` on the
+    /// same surface, so they can't interleave into one broken command.
+    private var lastHumanWriteAt: [String: Date] = [:]
+
+    /// How long an automation write is rejected after the surface's last human keystroke —
+    /// long enough to cover natural gaps mid-burst of typing, short enough that automation
+    /// isn't locked out for long once the human actually stops.
+    private static let humanWriteLockWindow: TimeInterval = 1.5
 
     public init(enableVersionBanner: Bool = false) {
         self.hookExecutionHelper = HookExecutor(hookRegistry: hookRegistry, hookQueue: hookQueue)
@@ -167,8 +189,10 @@ public final class SurfaceRegistry: @unchecked Sendable {
     }
 
     /// Record output for a surface — runs on the PTY read thread, so it must stay cheap
-    /// (no `lock`, no snapshot walk): just flag output / bell and stamp the time.
-    private func noteSurfaceOutput(surfaceKey: String, data: Data) {
+    /// (no `lock`, no snapshot walk): just flag output / bell, stamp the time, and append to trailing buffer.
+    /// `internal` (not `private`) so tests can drive the prompt-detection path directly instead of
+    /// spinning a real PTY — same reasoning as `processMonitors` below.
+    func noteSurfaceOutput(surfaceKey: String, data: Data) {
         monitorLock.lock()
         var m = monitors[surfaceKey] ?? SurfaceMonitor()
         m.sawOutput = true
@@ -177,6 +201,13 @@ public final class SurfaceRegistry: @unchecked Sendable {
         // integration emits on every prompt (OSC 133) for a real terminal bell. The scan threads
         // its state through `m.bellScan` so a sequence spanning chunks is still handled correctly.
         if Self.scanForBell(data, state: &m.bellScan) { m.sawBell = true }
+        m.trailingOutput.append(data)
+        // P46 Pillar 6 gap 1: 1024 bytes was too small to reliably keep a full prompt signature
+        // (e.g. a boxed "Allow tool?" prompt with surrounding ANSI framing) in the tail once
+        // a wrapped CLI prints padding/borders around it — widened to 4096.
+        if m.trailingOutput.count > 4096 {
+            m.trailingOutput.removeFirst(m.trailingOutput.count - 4096)
+        }
         monitors[surfaceKey] = m
         monitorLock.unlock()
     }
@@ -184,12 +215,15 @@ public final class SurfaceRegistry: @unchecked Sendable {
     /// Drain the monitor state (timer) and raise activity/silence/bell alerts on non-current
     /// windows, gated on the matching option. Sets the tab flag (surfaced as `#`/`~`/`!` in
     /// `#{window_flags}`) and fires the hook — both only on a real transition.
-    private func processMonitors() {
+    /// Also scans trailing output for interactive prompt signatures to transition waiting agent tabs.
+    /// `internal` (not `private`) so `SurfaceRegistryTests` can invoke a tick directly instead of
+    /// waiting on the real 0.5s `DispatchSourceTimer`.
+    func processMonitors() {
         monitorLock.lock()
         let now = Date()
-        var drained: [String: (sawOutput: Bool, sawBell: Bool, idle: TimeInterval)] = [:]
+        var drained: [String: (sawOutput: Bool, sawBell: Bool, idle: TimeInterval, trailing: Data)] = [:]
         for (key, m) in monitors {
-            drained[key] = (m.sawOutput, m.sawBell, now.timeIntervalSince(m.lastOutput))
+            drained[key] = (m.sawOutput, m.sawBell, now.timeIntervalSince(m.lastOutput), m.trailingOutput)
             monitors[key]?.sawOutput = false
             monitors[key]?.sawBell = false
         }
@@ -215,6 +249,40 @@ public final class SurfaceRegistry: @unchecked Sendable {
                 orphans.append(key)
                 continue
             }
+
+            // Phase 5 Agent Attention Detection: if output has been quiet for >= 0.4s and trailing output matches a prompt
+            let tab = editor.snapshot.workspaces
+                .first(where: { $0.id == match.workspaceID })?
+                .sessions.flatMap(\.tabs)
+                .first(where: { $0.id == match.tabID })
+            if st.idle >= 0.4, !st.trailing.isEmpty,
+               let text = String(data: st.trailing, encoding: .utf8),
+               let prompt = AgentAttentionDetector.detectPrompt(in: text) {
+                if tab?.status != .waiting {
+                    markWaiting(surfaceKey: key, text: prompt.summary)
+                    // Reset the trailing buffer so it holds only what's happened SINCE this prompt
+                    // was flagged — otherwise the matched prompt text lingers in the tail and the
+                    // self-clear branch below would see it as "still prompting" forever, even once
+                    // the agent has moved on and produced fresh, unrelated output.
+                    resetTrailingOutputLocked(surfaceKey: key)
+                    changed = true
+                    let notif = AgentNotification(
+                        surfaceID: UUID(uuidString: key),
+                        daemonSurfaceID: key,
+                        title: "Agent Waiting",
+                        body: prompt.summary
+                    )
+                    NotificationBus.shared.post(notif)
+                    fired.append((.notificationPosted, key))
+                }
+            } else if tab?.status == .waiting, st.sawOutput {
+                // P46 Pillar 6 gap 1: the agent produced fresh output since the last tick and no
+                // prompt signature remains at the tail — it moved on by itself (no explicit "done"
+                // signal, e.g. no OSC 9;4) rather than the user answering it. Without this, a tab
+                // once marked `.waiting` stayed stuck for the rest of the turn.
+                if clearWaitingStatusLocked(surfaceKey: key) { changed = true }
+            }
+
             guard monitoring,
                   !editor.tabIsCurrent(workspaceID: match.workspaceID, tabID: match.tabID) else { continue }
             if wantActivity, st.sawOutput,
@@ -616,17 +684,21 @@ public final class SurfaceRegistry: @unchecked Sendable {
             ensureAllSnapshotSurfaces()
             commit()
             return .ok
-        case let .send(surfaceID, text):
+        case let .send(surfaceID, text, origin):
+            if let rejection = checkWriteOriginLocked(surfaceID: surfaceID, origin: origin) { return rejection }
             guard let session = sessions[surfaceID] else {
                 return .error("Surface not found")
             }
             session.write(text)
+            if clearWaitingStatusLocked(surfaceKey: surfaceID) { commit() }
             return .ok
-        case let .sendData(surfaceID, data):
+        case let .sendData(surfaceID, data, origin):
+            if let rejection = checkWriteOriginLocked(surfaceID: surfaceID, origin: origin) { return rejection }
             guard let session = sessions[surfaceID] else {
                 return .error("Surface not found")
             }
             session.write(data)
+            if clearWaitingStatusLocked(surfaceKey: surfaceID) { commit() }
             return .ok
         case let .notify(surfaceID, title, body):
             let notification = AgentNotification(
@@ -651,6 +723,38 @@ public final class SurfaceRegistry: @unchecked Sendable {
             markDone(surfaceKey: surfaceID, text: body)
             commit()
             fireHookLocked(.notificationPosted, surfaceKey: surfaceID)
+            // P46 Phase 3: a Stop-hook "turn finished normally" is the closest signal this daemon
+            // has to "one agent tool-execution cycle completed" — snapshot the working tree so
+            // `kouen undo` has something to revert to. Off the registry lock (hookQueue): `git
+            // add -A` over a large/dirty tree must never block other IPC while it runs.
+            let verifyOnTurn = optionStore.get("verify-on-turn")?.boolValue ?? false
+            if let match = editor.tab(forSurfaceKey: surfaceID),
+               let cwd = editor.snapshot.workspaces.first(where: { $0.id == match.workspaceID })?
+                   .sessions.flatMap(\.tabs).first(where: { $0.id == match.tabID })?.cwd {
+                hookQueue.async { [weak self] in
+                    guard let self else { return }
+                    _ = CheckpointManager().create(cwd: cwd, session: surfaceID)
+                    // P46 Phase 4, Tier 1: opt-in (`set-option -g verify-on-turn on`) — a fast
+                    // syntax/build command discovered from the project's own marker file (e.g.
+                    // `swift build`, `cargo check`) is still a real process with real cost, and
+                    // running one automatically after every single turn on every project is too
+                    // invasive a default. Nil (unrecognized project) is silently skipped either
+                    // way, never reported as a failure.
+                    guard verifyOnTurn else { return }
+                    if let result = VerificationRunner().tier1SyntaxCheck(cwd: cwd), !result.passed {
+                        let summary = "Build/syntax check failed (\(result.command))"
+                        self.monitorLock.lock()
+                        self.lastVerificationOutput[surfaceID] = result.output
+                        self.monitorLock.unlock()
+                        // Setting `.error` (below) is what the GUI actually alerts on —
+                        // `NotificationCoordinator` cross-process-alerts by diffing snapshot
+                        // status, not by observing this daemon process's own in-process
+                        // `NotificationBus` (a separate singleton instance in a separate process,
+                        // can't observe this one). No separate notification call needed here.
+                        self.markVerificationFailed(surfaceKey: surfaceID, summary: summary)
+                    }
+                }
+            }
             return .ok
         case let .setSubagentHint(surfaceID, kind, active):
             if active {
@@ -706,6 +810,11 @@ public final class SurfaceRegistry: @unchecked Sendable {
                 commit()
             }
             return .ok
+        case let .getVerificationOutput(surfaceID):
+            monitorLock.lock()
+            let output = lastVerificationOutput[surfaceID] ?? ""
+            monitorLock.unlock()
+            return .text(output)
         case .getSnapshot:
             return .snapshot(editor.snapshot)
         case let .createSurface(cwd, shell):
@@ -730,10 +839,12 @@ public final class SurfaceRegistry: @unchecked Sendable {
             ).map { _ in .ok } ?? .error("Failed to launch shell")
         case .attachSurface:
             return .ok
-        case let .sendKeys(surfaceID, keys):
+        case let .sendKeys(surfaceID, keys, origin):
+            if let rejection = checkWriteOriginLocked(surfaceID: surfaceID, origin: origin) { return rejection }
             let bytes = KeyTokenParser.encode(keys: keys)
             if let session = sessions[surfaceID] {
                 session.write(bytes)
+                if clearWaitingStatusLocked(surfaceKey: surfaceID) { commit() }
                 return .ok
             }
             return .error("Surface not found")
@@ -1363,12 +1474,16 @@ public final class SurfaceRegistry: @unchecked Sendable {
             editor.setAgent(snapshot, forSurfaceKey: surfaceKey)
             editor.setSubagents(detection.subagents, forSurfaceKey: surfaceKey)
             if before != snapshot?.activity.rawValue { transitioned.append(surfaceKey) }
+            // Phase 5: An agent that transitioned to .awaiting is waiting on the user
+            if snapshot?.activity == .awaiting {
+                markWaiting(surfaceKey: surfaceKey, text: "Waiting for user input")
+            }
             // An agent that resumed producing output is no longer "waiting on the user" —
             // clear a stale `waiting` status (left by a notify/stop hook) on the transition
             // into working. Without this, a tab once marked waiting suppressed the working
             // indicator for the whole next turn.
             if snapshot?.activity == .working, before != AgentActivity.working.rawValue {
-                clearWaitingStatusLocked(surfaceKey: surfaceKey)
+                _ = clearWaitingStatusLocked(surfaceKey: surfaceKey)
             }
         }
         commit()
@@ -1385,17 +1500,90 @@ public final class SurfaceRegistry: @unchecked Sendable {
         }
     }
 
+    /// Clear a surface's accumulated trailing-output buffer under `monitorLock` — shared by the
+    /// mark-waiting and clear-waiting transitions so neither leaves stale prompt text sitting in
+    /// the tail for the other to re-match against.
+    private func resetTrailingOutputLocked(surfaceKey: String) {
+        monitorLock.lock()
+        monitors[surfaceKey]?.trailingOutput = Data()
+        monitorLock.unlock()
+    }
+
+    /// Record a human write's timestamp, or reject an automation write that lands within
+    /// `humanWriteLockWindow` of the surface's last one. Returns the rejection response to
+    /// short-circuit `handle(_:)` with, or nil to proceed with the write. Caller holds `lock`.
+    private func checkWriteOriginLocked(surfaceID: String, origin: WriteOrigin) -> IPCResponse? {
+        switch origin {
+        case .human:
+            monitorLock.lock()
+            lastHumanWriteAt[surfaceID] = Date()
+            monitorLock.unlock()
+            return nil
+        case .automation:
+            monitorLock.lock()
+            let last = lastHumanWriteAt[surfaceID]
+            monitorLock.unlock()
+            if let last, Date().timeIntervalSince(last) < Self.humanWriteLockWindow {
+                return .error("locked: human active on this surface")
+            }
+            // Main Branch & Dirty Tree Guard (P46 Phase 3): an automation write landing on a tab
+            // that's sitting directly on a protected branch (no worktree isolation) is exactly
+            // the case `WorktreeAutoIsolateService` isolates branch *switches* away from — this
+            // catches the tab that was already there (e.g. the very first turn, before any
+            // switch fired) or one the human deliberately reused. Caller (`handle(_:)`) already
+            // holds `lock`, so reading `editor` here is safe.
+            guard let match = editor.tab(forSurfaceKey: surfaceID),
+                  let tab = editor.snapshot.workspaces.first(where: { $0.id == match.workspaceID })?
+                      .sessions.flatMap(\.tabs).first(where: { $0.id == match.tabID }),
+                  tab.worktreePath == nil // isolated tabs are exempt from both checks below
+            else { return nil }
+
+            if let branch = tab.gitBranch, WorktreeManager.protectedBranches.contains(branch) {
+                return .error("locked: automation write refused — this tab is on protected branch '\(branch)' with no worktree isolation")
+            }
+            // Dirty Tree half: even on a non-protected branch, writing into an unisolated
+            // checkout that already has uncommitted changes risks clobbering work the human
+            // (or another session) has in progress there. Cached (2s TTL) — this check runs on
+            // every automation write, and shelling out to `git status` per write would be a real
+            // latency/CPU cost on an automation-heavy session.
+            if isDirtyCached(cwd: tab.cwd) {
+                return .error("locked: automation write refused — '\(tab.cwd)' has uncommitted changes with no worktree isolation")
+            }
+            return nil
+        }
+    }
+
+    /// `WorktreeManager.isDirty`, cached per cwd for `dirtyCheckTTL` — `monitorLock`-guarded
+    /// alongside the other small per-surface/per-path caches this file already keeps.
+    private static let dirtyCheckTTL: TimeInterval = 2
+    private func isDirtyCached(cwd: String) -> Bool {
+        monitorLock.lock()
+        if let cached = dirtyTreeCache[cwd], Date().timeIntervalSince(cached.checkedAt) < Self.dirtyCheckTTL {
+            monitorLock.unlock()
+            return cached.dirty
+        }
+        monitorLock.unlock()
+        let dirty = WorktreeManager().isDirty(worktreePath: cwd)
+        monitorLock.lock()
+        dirtyTreeCache[cwd] = (dirty, Date())
+        monitorLock.unlock()
+        return dirty
+    }
+
     /// Reset a `waiting` tab back to idle (clearing its notification text). No-op — and no
     /// revision bump — when the tab isn't waiting. Caller must hold `lock`.
-    private func clearWaitingStatusLocked(surfaceKey: String) {
+    @discardableResult
+    private func clearWaitingStatusLocked(surfaceKey: String) -> Bool {
+        resetTrailingOutputLocked(surfaceKey: surfaceKey)
         guard let surfaceID = SurfaceID(uuidString: surfaceKey),
               let match = editor.tab(forSurfaceKey: surfaceKey),
               editor.snapshot.workspaces
                   .first(where: { $0.id == match.workspaceID })?
                   .sessions.flatMap(\.tabs)
                   .first(where: { $0.id == match.tabID })?.status == .waiting
-        else { return }
+        else { return false }
         editor.clearTabNotification(surfaceID: surfaceID)
+        return true
     }
 
     /// Current agent activity (raw) for the tab backing `surfaceKey`, or nil. Caller
@@ -1713,6 +1901,14 @@ public final class SurfaceRegistry: @unchecked Sendable {
         }
     }
 
+    /// Fired with a surface's key whenever its tab reaches `.waiting` or `.done` — lets
+    /// `DaemonServer` wake any `kouen agent wait` blocked on that surface's channel instead of
+    /// it busy-polling (P46 Pillar 6 gap 4). Same closure-hook shape as `PairedDeviceStore.onRevoke`.
+    /// May fire from a different queue than the caller's own (`processMonitors` runs on
+    /// `hookQueue`, `.notify`/`.notifyDone` run on `DaemonServer`'s `queue`) — the receiver must
+    /// hop to whatever queue it needs, not assume one.
+    public var onAgentStatusReachedTerminal: (@Sendable (String) -> Void)?
+
     private func markWaiting(surfaceKey: String, text: String) {
         guard let match = editor.tab(forSurfaceKey: surfaceKey) else { return }
         editor.setTabStatus(
@@ -1721,6 +1917,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
             status: .waiting,
             notificationText: text
         )
+        onAgentStatusReachedTerminal?(surfaceKey)
     }
 
     /// Stop-hook completion: the tab isn't blocking on the user, so `.done` (not `.waiting`) —
@@ -1733,6 +1930,26 @@ public final class SurfaceRegistry: @unchecked Sendable {
             status: .done,
             notificationText: text
         )
+        onAgentStatusReachedTerminal?(surfaceKey)
+    }
+
+    /// P46 Phase 4: Tier 1 verification failed after this turn — reuses `TabStatus.error`
+    /// (defined since the type's introduction, never actually set anywhere until now). Runs off
+    /// the registry lock (called from the same `hookQueue.async` checkpoint block `.notifyDone`
+    /// schedules), so — unlike `markWaiting`/`markDone`, which assume the caller already holds
+    /// `lock` — this acquires it itself.
+    private func markVerificationFailed(surfaceKey: String, summary: String) {
+        acquireRegistryLock()
+        defer { lock.unlock() }
+        guard let match = editor.tab(forSurfaceKey: surfaceKey) else { return }
+        editor.setTabStatus(
+            workspaceID: match.workspaceID,
+            tabID: match.tabID,
+            status: .error,
+            notificationText: summary
+        )
+        commit()
+        onAgentStatusReachedTerminal?(surfaceKey)
     }
 
     private func commit() {
@@ -2285,7 +2502,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
         let automationID = automation.id
         hookQueue.asyncAfter(deadline: .now() + 3) { [weak self] in
             guard let self else { return }
-            _ = self.handle(.send(surfaceID: surfaceID, text: prompt + "\n"))
+            _ = self.handle(.send(surfaceID: surfaceID, text: prompt + "\n", origin: .automation))
         }
         automationStore.recordRun(id: automationID, status: "ok")
         return true

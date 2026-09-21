@@ -21,7 +21,9 @@ final class MainSplitViewController: NSViewController {
     /// frame bails out — prevents two toggles from fighting over the divider position.
     private var sidebarAnimToken = 0
     private var sidebarDisplayLink: CADisplayLink?
+    private var sidebarDisplayLinkTarget: DisplayLinkTarget?
     private var sidebarWidthSaveWorkItem: DispatchWorkItem?
+    private var sidebarVisibilitySaveWorkItem: DispatchWorkItem?
     private var sidebarWidthConstraint: NSLayoutConstraint?
     private var sidebarHorizontalConstraint: NSLayoutConstraint?
     private let headerGroup = NSView()
@@ -401,7 +403,21 @@ final class MainSplitViewController: NSViewController {
 
     func setSidebarVisible(_ visible: Bool, animated: Bool) {
         SessionCoordinator.shared.settings.sidebarVisible = visible
-        try? SessionCoordinator.shared.settings.save()
+        sidebarVisibilitySaveWorkItem?.cancel()
+        let work = DispatchWorkItem { [sidebarLog] in
+            do {
+                try SessionCoordinator.shared.settings.save()
+            } catch {
+                sidebarLog.debug("setSidebarVisible save failed: \(String(describing: error))")
+            }
+        }
+        sidebarVisibilitySaveWorkItem = work
+        if animated {
+            // Save after animation settles so disk I/O does not contend with the slide animation
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: work)
+        } else {
+            DispatchQueue.main.async(execute: work)
+        }
         applySidebarVisibility(visible, animated: animated)
     }
 
@@ -447,6 +463,7 @@ final class MainSplitViewController: NSViewController {
         // collapse even when the user requested expand.
         sidebarDisplayLink?.invalidate()
         sidebarDisplayLink = nil
+        sidebarDisplayLinkTarget = nil
 
         // Unhide before the slide so the panel is visible as it shrinks/grows.
         panel.isHidden = false
@@ -462,26 +479,38 @@ final class MainSplitViewController: NSViewController {
             return
         }
         sidebarLog.debug("applySidebarVisibility starting animation start=\(start) target=\(target)")
-        // ponytail: presentsWithTransaction removed from animated path — was blocking main thread every frame.
-        // If black flash reappears during slide, restore only on the final frame (raw >= 1).
         _sidebarStart = start
         _sidebarTarget = target
-        _sidebarT0 = CACurrentMediaTime()
+        _sidebarT0 = 0 // Latches on the first display link callback so scheduling delay never eats duration
         _sidebarVisible = visible
         sidebarWidthConstraint?.constant = persistedWidth
         setContentLeadingInset(forSidebarWidth: start)
-        let link = view.displayLink(target: self, selector: #selector(_sidebarLinkFired))
-        link.preferredFrameRateRange = CAFrameRateRange(minimum: 60, maximum: 60, preferred: 60)
+
+        let capturedToken = sidebarAnimToken
+        let targetHelper = DisplayLinkTarget { [weak self] _ in
+            self?.animateSidebar(from: self?._sidebarStart ?? start,
+                                 to: self?._sidebarTarget ?? target,
+                                 visible: self?._sidebarVisible ?? visible,
+                                 token: capturedToken)
+        }
+        sidebarDisplayLinkTarget = targetHelper
+        let link = view.displayLink(target: targetHelper, selector: #selector(DisplayLinkTarget.fire(_:)))
+        let maxFPS = Float(view.window?.screen?.maximumFramesPerSecond ?? 120)
+        link.preferredFrameRateRange = CAFrameRateRange(minimum: 60, maximum: max(60, maxFPS), preferred: max(60, maxFPS))
         link.add(to: RunLoop.main, forMode: RunLoop.Mode.common)
         sidebarDisplayLink = link
     }
 
-    private func animateSidebar(from start: CGFloat, to target: CGFloat, t0: CFTimeInterval, visible: Bool, token: Int) {
+    private func animateSidebar(from start: CGFloat, to target: CGFloat, visible: Bool, token: Int) {
         guard token == sidebarAnimToken, let panel = sidebarContainerView else { return }
-        let duration = KouenDesign.Motion.standard
-        let raw = min(1, max(0, (CACurrentMediaTime() - t0) / duration))
-        // easeInOutQuad — smooth start and settle.
-        let eased = raw < 0.5 ? 2 * raw * raw : 1 - pow(-2 * raw + 2, 2) / 2
+        let now = CACurrentMediaTime()
+        if _sidebarT0 == 0 {
+            _sidebarT0 = now
+        }
+        let duration = KouenDesign.Motion.fast // Snappy 0.16s instead of sluggish 0.22s
+        let raw = min(1, max(0, (now - _sidebarT0) / duration))
+        // Ease-out cubic: instantaneous high velocity for zero perceived latency, smooth deceleration
+        let eased = 1 - pow(1 - raw, 3)
         let width = start + (target - start) * CGFloat(eased)
         // Drive the divider inside a transaction with implicit actions OFF.
         // Direct frame assignments in setSidebarWidth keep the divider and backdrop in sync.
@@ -489,11 +518,12 @@ final class MainSplitViewController: NSViewController {
         // passes on every animation frame.
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        setSidebarWidth(width)
+        setSidebarWidth(width, isAnimating: true)
         CATransaction.commit()
         if raw >= 1 {
             sidebarDisplayLink?.invalidate()
             sidebarDisplayLink = nil
+            sidebarDisplayLinkTarget = nil
             if !visible {
                 panel.isHidden = true
             } else {
@@ -502,14 +532,12 @@ final class MainSplitViewController: NSViewController {
                 panel.layoutSubtreeIfNeeded()
             }
             splitDelegate.allowFullCollapse = false   // restore the 200pt drag floor
+            split.needsDisplay = true
             updateContentLeadingInset()
+            sidebarLog.debug("animateSidebar completed width=\(target) visible=\(visible)")
             return
         }
         // Display link fires next frame — no asyncAfter needed.
-    }
-
-    @objc private func _sidebarLinkFired(_ link: CADisplayLink) {
-        animateSidebar(from: _sidebarStart, to: _sidebarTarget, t0: _sidebarT0, visible: _sidebarVisible, token: sidebarAnimToken)
     }
 
     private var isWindowFullScreen: Bool {
@@ -705,11 +733,11 @@ final class MainSplitViewController: NSViewController {
         content.applyChrome()
     }
 
-    private func setSidebarWidth(_ width: CGFloat) {
+    private func setSidebarWidth(_ width: CGFloat, isAnimating: Bool = false) {
         let totalWidth = split.bounds.width
         guard totalWidth > 0, let panel = sidebarContainerView else {
             sidebarLog.debug("setSidebarWidth totalWidth=0 or no panel, deferring to next runloop turn (width=\(width))")
-            DispatchQueue.main.async { [weak self] in self?.setSidebarWidth(width) }
+            DispatchQueue.main.async { [weak self] in self?.setSidebarWidth(width, isAnimating: isAnimating) }
             return
         }
         let sidebarOnRight = SessionCoordinator.shared.settings.sidebarOnRight
@@ -734,8 +762,10 @@ final class MainSplitViewController: NSViewController {
             panel.frame = NSRect(x: 0, y: 0, width: clampedWidth, height: height)
             content.view.frame = NSRect(x: clampedWidth + dividerThickness, y: 0, width: contentWidth, height: height)
         }
-        split.needsDisplay = true
-        sidebarLog.debug("setSidebarWidth width=\(width) totalWidth=\(totalWidth) sidebarOnRight=\(sidebarOnRight) -> panelWidth=\(clampedWidth) contentWidth=\(contentWidth)")
+        if !isAnimating {
+            split.needsDisplay = true
+            sidebarLog.debug("setSidebarWidth width=\(width) totalWidth=\(totalWidth) sidebarOnRight=\(sidebarOnRight) -> panelWidth=\(clampedWidth) contentWidth=\(contentWidth)")
+        }
     }
 
     /// Fired by `SplitChromeDelegate` on every split-view resize — animations, `viewDidLayout`,
@@ -775,10 +805,30 @@ final class MainSplitViewController: NSViewController {
 
     func toggleSidebarPosition() {
         SessionCoordinator.shared.settings.sidebarOnRight.toggle()
-        try? SessionCoordinator.shared.settings.save()
+        sidebarVisibilitySaveWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [sidebarLog] in
+            do {
+                try SessionCoordinator.shared.settings.save()
+            } catch {
+                sidebarLog.debug("toggleSidebarPosition save failed: \(String(describing: error))")
+            }
+        }
+        sidebarVisibilitySaveWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: workItem)
         updateSidebarPlacement()
     }
 
+}
+
+@MainActor
+private final class DisplayLinkTarget: NSObject {
+    private let action: (CADisplayLink) -> Void
+    init(action: @escaping (CADisplayLink) -> Void) {
+        self.action = action
+    }
+    @objc func fire(_ link: CADisplayLink) {
+        action(link)
+    }
 }
 
 @MainActor

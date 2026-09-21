@@ -24,7 +24,7 @@ public enum FeaturePhase: String, Codable, Sendable, CaseIterable {
 
 /// An approval gate record within the AI-SDLC workflow.
 public struct GateApproval: Codable, Sendable, Equatable {
-    public var gate: Int // 1 (Architect), 2 (Scenario list), 3 (Seam agreement)
+    public var gate: Int // 1 (Architect), 2 (Scenario list), 3 (Seam agreement), 4 (Merge Review)
     public var approver: String
     public var timestamp: Date
     public var approved: Bool
@@ -99,7 +99,7 @@ public struct KouenFeature: Codable, Sendable, Equatable, Identifiable {
         self.updatedAt = updatedAt
     }
 
-    /// Checks if a specific gate (1, 2, or 3) has been approved.
+    /// Checks if a specific gate (1, 2, 3, or 4) has been approved.
     public func isGateApproved(_ gateNumber: Int) -> Bool {
         gates.first { $0.gate == gateNumber && $0.approved } != nil
     }

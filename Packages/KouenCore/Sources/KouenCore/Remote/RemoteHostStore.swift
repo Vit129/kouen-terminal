@@ -1,9 +1,4 @@
 import Foundation
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
 
 /// A remote machine running `KouenDaemon`, reachable by forwarding its control socket over SSH.
 public struct RemoteHost: Codable, Sendable, Equatable, Identifiable {
@@ -64,7 +59,7 @@ public final class RemoteHostStore: @unchecked Sendable {
     public func upsert(_ host: RemoteHost) -> MutationResult {
         lock.lock()
         defer { lock.unlock() }
-        return withFileLock {
+        return KouenPaths.withFileLock(KouenPaths.remoteHostsLockURL) {
             var hosts = loadLocked()
             if let idx = hosts.firstIndex(where: { $0.name == host.name }) {
                 hosts[idx] = host
@@ -79,32 +74,11 @@ public final class RemoteHostStore: @unchecked Sendable {
     public func remove(name: String) -> MutationResult {
         lock.lock()
         defer { lock.unlock() }
-        return withFileLock {
+        return KouenPaths.withFileLock(KouenPaths.remoteHostsLockURL) {
             var hosts = loadLocked()
             hosts.removeAll { $0.name == name }
             return MutationResult(hosts: hosts, saved: saveLocked(hosts))
         }
-    }
-
-    // MARK: - Inter-process locking
-
-    /// Run `body` (a load-modify-save of remote-hosts.json) while holding an exclusive `flock` on a
-    /// sidecar `.lock` file next to the JSON, so two processes' read-modify-write cycles serialize
-    /// instead of clobbering each other. The in-process `NSLock` must already be held by the caller.
-    ///
-    /// Degrades to running `body` unlocked if the lock file can't be opened/locked — a missing
-    /// cross-process lock is strictly less safe than today's single-process behaviour, never worse,
-    /// so a lock failure must not brick `remote add`/`remove`.
-    private func withFileLock<T>(_ body: () -> T) -> T {
-        try? KouenPaths.ensureDirectories()
-        let lockPath = KouenPaths.remoteHostsLockURL.path
-        // O_CLOEXEC so a forked child (e.g. ssh) never inherits the lock fd; 0o600 keeps it owner-only.
-        let fd = open(lockPath, O_RDWR | O_CREAT | O_CLOEXEC, 0o600)
-        guard fd >= 0 else { return body() }
-        defer { close(fd) }  // closing the fd releases the flock
-        guard flock(fd, LOCK_EX) == 0 else { return body() }
-        defer { flock(fd, LOCK_UN) }
-        return body()
     }
 
     // MARK: - lock-held internals (caller holds `lock`)

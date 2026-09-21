@@ -1199,7 +1199,7 @@ private final class SurfaceIO: @unchecked Sendable {
             return // subscription recovered — delivered in order, buffer already cleared
         }
         do {
-            _ = try client.request(.sendData(surfaceID: surfaceID, data: batch), timeout: fallbackTimeout)
+            _ = try client.request(.sendData(surfaceID: surfaceID, data: batch, origin: .human), timeout: fallbackTimeout)
         } catch {
             // Still unreachable (e.g. daemon mid-restart): re-buffer this batch AHEAD of anything
             // that accumulated while the request was in flight, preserving byte order. We do NOT
@@ -1277,7 +1277,7 @@ private final class InputGate: @unchecked Sendable {
         guard !mirrors.isEmpty else { return }
         broadcastQueue.async { [broadcastClient] in
             for sid in mirrors {
-                _ = try? broadcastClient.request(.sendData(surfaceID: sid, data: data))
+                _ = try? broadcastClient.request(.sendData(surfaceID: sid, data: data, origin: .human))
             }
         }
     }

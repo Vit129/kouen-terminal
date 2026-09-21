@@ -11,12 +11,14 @@ extension KouenCLI {
     /// `kouen task new <slug> [--repo <path>] [--branch <name>] [--base <name>] [--worktree <path>] [--phase <phase>]`
     /// `kouen task status [<slug>] [--json]`
     /// `kouen task list [--repo <path>] [--json]`
-    /// `kouen task gate approve <slug> <1|2|3> [--approver <name>] [--notes <text>]`
+    /// `kouen task gate approve <slug> <1|2|3|4> [--approver <name>] [--notes <text>]`
     /// `kouen task phase <slug> <phase>`
     /// `kouen task supersede <slug> <new-slug>`
     /// `kouen task delete <slug>`
+    /// `kouen task merge <slug>` — Gate 4 (Merge Review): shows the diff stat, blocks until
+    /// Gate 4 is approved, then merges `branch` into `baseBranch`
     /// `kouen task sweep [--repo <path>]`
-    static func handleTask(_ args: [String], client: DaemonClient) throws {
+    static func handleTask(_ args: [String], client: DaemonClient) async throws {
         guard let sub = args.first else {
             printTaskUsage()
             exit(1)
@@ -37,10 +39,14 @@ extension KouenCLI {
             try handleTaskSupersede(Array(args.dropFirst()), client: client)
         case "delete":
             try handleTaskDelete(Array(args.dropFirst()), client: client)
+        case "merge":
+            try handleTaskMerge(Array(args.dropFirst()), client: client)
         case "sweep":
             try handleTaskSweep(Array(args.dropFirst()), client: client)
         case "preview":
             try handleTaskPreview(Array(args.dropFirst()), client: client)
+        case "pack-pr":
+            try await handleTaskPackPr(Array(args.dropFirst()), client: client)
         default:
             printTaskUsage()
             exit(1)
@@ -53,10 +59,15 @@ extension KouenCLI {
           kouen task new <slug> [--repo <path>] [--branch <name>] [--base <name>] [--worktree <path>] [--phase <phase>] [--preview]
           kouen task status [<slug>] [--json]
           kouen task list [--repo <path>] [--json]
-          kouen task gate approve <slug> <1|2|3> [--approver <name>] [--notes <text>] [--preview]
+          kouen task gate approve <slug> <1|2|3|4> [--approver <name>] [--notes <text>] [--preview]
           kouen task phase <slug> <interview|architect|qa-design|dev|qa-verify|completed>
           kouen task supersede <slug> <new-slug>
           kouen task delete <slug>
+          kouen task merge <slug>            Gate 4 (Merge Review) — shows the diff, blocks
+                                              until approved, then merges into the base branch
+          kouen task pack-pr [<slug>] [--out <file>]
+                                              Compiles a diff summary, gate approvals, task
+                                              checklist, and session summary into PR markdown
           kouen task sweep [--repo <path>]
           kouen task preview [<slug>] [--file architecture|progress]
         \n
@@ -141,7 +152,7 @@ extension KouenCLI {
         if let sup = feat.supersededBy { print("Superseded By: \(sup)") }
 
         print("Gates:")
-        for g in 1...3 {
+        for g in 1...4 {
             let approved = feat.gates.first { $0.gate == g && $0.approved }
             let check = approved != nil ? "✓" : " "
             let gateName: String
@@ -149,6 +160,7 @@ extension KouenCLI {
             case 1: gateName = "Gate 1 (Architect design)"
             case 2: gateName = "Gate 2 (Scenario list)"
             case 3: gateName = "Gate 3 (Seam agreement)"
+            case 4: gateName = "Gate 4 (Merge Review)"
             default: gateName = "Gate \(g)"
             }
             if let app = approved {
@@ -197,12 +209,12 @@ extension KouenCLI {
 
     private static func handleTaskGate(_ args: [String], client: DaemonClient) throws {
         guard let action = args.first, action == "approve", args.count >= 3 else {
-            fputs("Usage: kouen task gate approve <slug> <1|2|3> [--approver <name>] [--notes <text>]\n", kouenStderr)
+            fputs("Usage: kouen task gate approve <slug> <1|2|3|4> [--approver <name>] [--notes <text>]\n", kouenStderr)
             exit(1)
         }
         let slug = args[1]
-        guard let gateNum = Int(args[2]), (1...3).contains(gateNum) else {
-            fputs("Gate number must be 1, 2, or 3\n", kouenStderr)
+        guard let gateNum = Int(args[2]), (1...4).contains(gateNum) else {
+            fputs("Gate number must be 1, 2, 3, or 4\n", kouenStderr)
             exit(1)
         }
         let approver = flagValue(args, flag: "--approver") ?? NSUserName()
@@ -263,6 +275,66 @@ extension KouenCLI {
         print("Deleted feature: \(slug)")
     }
 
+    /// P46 Pillar 6 gap 5 (Gate 4, Merge Review): a feature could previously go green on tests
+    /// and merge straight to base with nobody having looked at the diff — gates 1-3 only cover
+    /// design/scenario/seam agreement, not "did a human actually see what's about to land."
+    /// Always shows the diff stat; merges only once Gate 4 is approved, and only if `repoPath`
+    /// is actually sitting on `baseBranch` already (never force-switches it out from under
+    /// whatever the human has checked out there).
+    private static func handleTaskMerge(_ args: [String], client: DaemonClient) throws {
+        guard let slug = args.first, !slug.hasPrefix("--") else {
+            fputs("Usage: kouen task merge <slug>\n", kouenStderr)
+            exit(1)
+        }
+
+        let resp = try checkedRequest(client, .featureGet(slug: slug))
+        guard case let .featureInfo(summary) = resp, let feat = summary else {
+            fputs("Task/Feature not found: '\(slug)'\n", kouenStderr)
+            exit(1)
+        }
+        guard let branch = feat.branch else {
+            fputs("Feature '\(slug)' has no bound branch — nothing to merge.\n", kouenStderr)
+            exit(1)
+        }
+        let base = feat.baseBranch ?? "main"
+
+        let worktrees = WorktreeManager()
+        print("Diff \(base)...\(branch):")
+        if let stat = worktrees.diffStat(repoPath: feat.repoPath, branch: branch, base: base), !stat.isEmpty {
+            print(stat)
+        } else {
+            print("  (no diff — branch is even with \(base), or one of the refs doesn't exist)")
+        }
+
+        guard feat.isGateApproved(4) else {
+            print("""
+
+            Gate 4 (Merge Review) not yet approved — review the diff above, then:
+              kouen task gate approve \(slug) 4 [--approver <name>] [--notes <text>]
+              kouen task merge \(slug)   # re-run once approved
+            """)
+            exit(1)
+        }
+
+        let current = worktrees.currentBranch(at: feat.repoPath)
+        guard current == base else {
+            fputs("""
+
+            '\(feat.repoPath)' is on '\(current ?? "unknown")', not '\(base)' — checkout \
+            '\(base)' there first, then re-run this command. Kouen won't switch it for you.
+
+            """, kouenStderr)
+            exit(1)
+        }
+
+        let approver = feat.gates.first { $0.gate == 4 }?.approver ?? NSUserName()
+        guard worktrees.merge(repoPath: feat.repoPath, branch: branch, message: "Merge '\(branch)' (Gate 4 approved by \(approver))") else {
+            fputs("\nmerge failed — check for conflicts in '\(feat.repoPath)'\n", kouenStderr)
+            exit(1)
+        }
+        print("\nMerged '\(branch)' into '\(base)'. Run `kouen task sweep` to clean up the worktree.")
+    }
+
     private static func handleTaskSweep(_ args: [String], client: DaemonClient) throws {
         let repo = flagValue(args, flag: "--repo")
         _ = try checkedRequest(client, .featureSweepMerged(repoPath: repo))
@@ -309,6 +381,73 @@ extension KouenCLI {
 
         openMarkdownPreview(path: targetURL.path)
         print("Opened Preview GUI for \(targetSlug) (\(targetURL.lastPathComponent))")
+    }
+
+    /// P46 Phase 4: compiles what a PR description needs — the diff, which gates cleared, the
+    /// task checklist, and (best-effort) the agent session that did the work — so `gh pr create
+    /// --body "$(kouen task pack-pr <slug>)"` doesn't need it hand-assembled.
+    private static func handleTaskPackPr(_ args: [String], client: DaemonClient) async throws {
+        let slugArg = args.first(where: { !$0.hasPrefix("--") })
+        let outPath = flagValue(args, flag: "--out")
+
+        let targetSlug: String
+        if let slugArg {
+            targetSlug = slugArg
+        } else {
+            let cwd = FileManager.default.currentDirectoryPath
+            guard case let .features(list) = try checkedRequest(client, .featureList(repoPath: cwd)), let first = list.first else {
+                fputs("Usage: kouen task pack-pr [<slug>] [--out <file>]\n", kouenStderr)
+                exit(1)
+            }
+            targetSlug = first.slug
+        }
+
+        guard case let .featureInfo(summary) = try checkedRequest(client, .featureGet(slug: targetSlug)), let feat = summary else {
+            fputs("Task/Feature not found: '\(targetSlug)'\n", kouenStderr)
+            exit(1)
+        }
+
+        var md = "# \(feat.slug)\n\n"
+
+        if let branch = feat.branch, let base = feat.baseBranch {
+            let stat = WorktreeManager().diffStat(repoPath: feat.repoPath, branch: branch, base: base) ?? "(no diff)"
+            md += "## Changes (`\(base)...\(branch)`)\n\n```\n\(stat)\n```\n\n"
+        }
+
+        md += "## Gate Approvals\n\n"
+        let gateNames = [1: "Architect design", 2: "Scenario list", 3: "Seam agreement", 4: "Merge Review"]
+        for g in 1...4 {
+            let name = gateNames[g] ?? "Gate \(g)"
+            if let approval = feat.gates.first(where: { $0.gate == g && $0.approved }) {
+                md += "- [x] Gate \(g) (\(name)) — approved by \(approval.approver)\n"
+            } else {
+                md += "- [ ] Gate \(g) (\(name)) — pending\n"
+            }
+        }
+
+        if !feat.tasks.isEmpty {
+            md += "\n## Task Checklist\n\n"
+            for task in feat.tasks {
+                md += "- [\(task.done ? "x" : " ")] \(task.label)\n"
+            }
+        }
+
+        // Best-effort: the agent session whose transcript matches this feature's worktree.
+        if let worktreePath = feat.worktreePath {
+            let records = await AgentHistoryScanner.shared.getOrScan()
+            if let record = records.first(where: { $0.projectPath == worktreePath || $0.projectPath == feat.repoPath }) {
+                md += "\n## Session Summary\n\n"
+                md += "**Agent:** \(record.agentKind.displayName)\n\n"
+                md += "**First prompt:**\n> \(record.firstPrompt.replacingOccurrences(of: "\n", with: "\n> "))\n"
+            }
+        }
+
+        if let outPath {
+            try md.write(toFile: outPath, atomically: true, encoding: .utf8)
+            print("Wrote PR pack to \(outPath)")
+        } else {
+            print(md)
+        }
     }
 
     static func openMarkdownPreview(path: String) {

@@ -175,6 +175,14 @@ public enum BannerShortcutRegistry {
         id: "commandPrompt", title: "Command Prompt",
         modifiers: .command, keyChar: ";")
 
+    public static let contextInjector = Keybinding(
+        id: "contextInjector", title: "Quick Context Injector",
+        modifiers: .command, keyChar: "k")
+
+    public static let turnDiffReviewer = Keybinding(
+        id: "turnDiffReviewer", title: "Turn Diff Reviewer",
+        modifiers: [.command, .option], keyChar: "d")
+
     public static let toggleSidebar = Keybinding(
         id: "toggleSidebar", title: "Toggle Sidebar",
         modifiers: .command, keyChar: "\\")
@@ -243,6 +251,8 @@ public enum BannerShortcutRegistry {
         .init(key: recipes.displayKey, description: "run a saved command recipe"),
         .init(key: findInFiles.displayKey, description: "find in files"),
         .init(key: "\(commandPrompt.displayKey)", description: "command prompt · try: find, grep, cd"),
+        .init(key: "\(contextInjector.displayKey)", description: "inject context (diff, file, last output) into the terminal"),
+        .init(key: "\(turnDiffReviewer.displayKey)", description: "review the agent's last turn"),
         .init(key: "", description: "Shell", showInBanner: true),
         .init(key: "z <dir>", description: "smart cd — same list as ⌘⇧J"),
         .init(key: "fd <pattern>", description: "find files by name"),
