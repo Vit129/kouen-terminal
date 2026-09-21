@@ -98,6 +98,7 @@ final class SessionCoordinator: NSObject {
     }
 
     @objc private func snapshotChangedNotification(_ note: Notification) {
+        updateDockAttentionBadge()
         let revision = note.snapshotPayload.revision
         guard revision != daemonSyncService.lastRevision,
               revision != daemonSyncService.pendingSnapshotRevision else { return }
@@ -111,8 +112,41 @@ final class SessionCoordinator: NSObject {
     }
 
     @objc private func notificationPosted(_ note: Notification) {
-        guard note.userInfo?["notification"] is AgentNotification else { return }
+        guard let notif = note.userInfo?["notification"] as? AgentNotification else { return }
         NotificationCenter.default.post(name: NotificationBus.shared.tabStatusChanged, object: nil)
+        handleAgentAttentionAlert(notif)
+    }
+
+    private func handleAgentAttentionAlert(_ notif: AgentNotification) {
+        let isAppActive = NSApp.isActive
+        let surfaceKey = notif.daemonSurfaceID ?? notif.surfaceID?.uuidString
+        let activeTab = snapshot.activeWorkspace?.activeTab
+        let activeSurfaceKey = activeTab?.rootPane.surfaceID?.uuidString
+
+        // Deliver system desktop alert if Kouen is in background OR notification is from another tab
+        if !isAppActive || (surfaceKey != nil && surfaceKey != activeSurfaceKey) {
+            let alertTitle = notif.title.isEmpty ? "Agent Attention Required" : notif.title
+            let alertBody = notif.body.isEmpty ? "Waiting for user approval" : notif.body
+            DesktopNotifier.show(
+                title: alertTitle,
+                body: alertBody,
+                surfaceID: surfaceKey
+            )
+        }
+        updateDockAttentionBadge()
+    }
+
+    func updateDockAttentionBadge() {
+        let allTabs = snapshot.workspaces
+            .flatMap { $0.sessions }
+            .flatMap { $0.tabs }
+        let waitingCount = allTabs.filter { $0.status == .waiting }.count
+        if waitingCount > 0 {
+            NSApp.dockTile.badgeLabel = "\(waitingCount)"
+        } else {
+            NSApp.dockTile.badgeLabel = nil
+        }
+        NSApp.dockTile.display()
     }
 
     // MARK: - Remote daemon

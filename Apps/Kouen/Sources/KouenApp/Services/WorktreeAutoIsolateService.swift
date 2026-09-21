@@ -10,7 +10,6 @@ final class WorktreeAutoIsolateService {
     static let shared = WorktreeAutoIsolateService()
     private let manager = WorktreeManager()
     private var observation: NSObjectProtocol?
-    private static let defaultBranches: Set<String> = ["main", "master", "develop"]
 
     private init() {}
 
@@ -41,7 +40,7 @@ final class WorktreeAutoIsolateService {
     private func isolate(tab: Tab, workspace: Workspace) {
         let coord = SessionCoordinator.shared
         guard let branch = tab.gitBranch, !branch.isEmpty else { return }
-        guard !Self.defaultBranches.contains(branch) else { return }
+        guard !WorktreeManager.protectedBranches.contains(branch) else { return }
 
         // Already in a worktree? Skip.
         if tab.worktreePath != nil { return }

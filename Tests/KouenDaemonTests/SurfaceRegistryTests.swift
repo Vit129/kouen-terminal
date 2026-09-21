@@ -573,6 +573,168 @@ final class SurfaceRegistryTests: XCTestCase {
         XCTAssertEqual(statusOfTab(backing: target.surfaceID, in: registry), .idle)
     }
 
+    /// P46 Pillar 6 gap 1: a tab marked `.waiting` by the raw-PTY prompt-detection path (not the
+    /// `applyAgentChanges`/OSC path `testTransitionToWorkingClearsStaleWaitingStatus` covers) must
+    /// self-clear once the agent resumes producing unrelated output on its own — otherwise the
+    /// amber beacon stays stuck for the rest of the turn. Drives `noteSurfaceOutput`/`processMonitors`
+    /// directly (both `internal` for exactly this reason) instead of a real PTY + timer.
+    func testSilentResumeAfterPromptClearsStaleWaitingStatus() {
+        let registry = SurfaceRegistry()
+        // Drive `processMonitors()` manually and deterministically — the real 0.5s background
+        // timer would otherwise race our own calls and consume `sawOutput`/`trailingOutput`
+        // between them.
+        registry.stopMonitoring()
+        guard case let .surfaces(surfaces) = registry.handle(.listSurfaces), let target = surfaces.first else {
+            return XCTFail("expected a default surface")
+        }
+        let key = target.surfaceID
+
+        // Agent prints a confirmation prompt, then falls silent for >= 0.4s.
+        registry.noteSurfaceOutput(surfaceKey: key, data: Data("Proceed? [y/N] ".utf8))
+        Thread.sleep(forTimeInterval: 0.45)
+        registry.processMonitors()
+        XCTAssertEqual(statusOfTab(backing: key, in: registry), .waiting, "prompt signature must mark the tab waiting")
+
+        // A steady stream of matching output must not re-fire / stay stuck re-matching.
+        registry.processMonitors()
+        XCTAssertEqual(statusOfTab(backing: key, in: registry), .waiting)
+
+        // The agent resumes on its own (no OSC 9;4, no human answered it) and prints unrelated
+        // output — the stale waiting badge must clear on the very next tick.
+        registry.noteSurfaceOutput(surfaceKey: key, data: Data("Running tests...\n".utf8))
+        registry.processMonitors()
+        XCTAssertNotEqual(statusOfTab(backing: key, in: registry), .waiting, "silent resume must self-clear the stale waiting status")
+    }
+
+    /// P46 Pillar 6 gap 3: an automation write landing right after a human keystroke on the same
+    /// surface must be rejected instead of interleaving with it, but a human write is never
+    /// blocked, and automation is free once the debounce window has actually elapsed.
+    func testAutomationWriteRejectedWithinHumanDebounceWindow() {
+        let registry = SurfaceRegistry()
+        guard case let .surfaces(surfaces) = registry.handle(.listSurfaces), let target = surfaces.first else {
+            return XCTFail("expected a default surface")
+        }
+        let key = target.surfaceID
+
+        // A human write is never rejected, regardless of prior state.
+        guard case .ok = registry.handle(.send(surfaceID: key, text: "human\n", origin: .human)) else {
+            return XCTFail("a human write must always be accepted")
+        }
+
+        // An automation write landing immediately after must be rejected — the human is
+        // presumed still active on this surface.
+        guard case let .error(message) = registry.handle(.send(surfaceID: key, text: "automation\n", origin: .automation)) else {
+            return XCTFail("an automation write inside the debounce window must be rejected")
+        }
+        XCTAssertTrue(message.lowercased().contains("locked"), "rejection must explain why: \(message)")
+
+        // Once the debounce window has elapsed, automation is free to write again.
+        Thread.sleep(forTimeInterval: 1.6)
+        guard case .ok = registry.handle(.send(surfaceID: key, text: "automation\n", origin: .automation)) else {
+            return XCTFail("automation must be allowed once the human debounce window has elapsed")
+        }
+    }
+
+    /// P46 Phase 3 (Main Branch & Dirty Tree Guard): an automation write must be refused when
+    /// the target tab sits directly on a protected branch (main/master/develop) with no worktree
+    /// isolation — but a human write to the exact same tab is never blocked (guarding automation
+    /// is the point; a human is always free to work on main directly if they choose to).
+    func testAutomationWriteRefusedOnProtectedBranchWithoutWorktree() {
+        let registry = SurfaceRegistry()
+        guard case let .surfaces(surfaces) = registry.handle(.listSurfaces), let target = surfaces.first else {
+            return XCTFail("expected a default surface")
+        }
+        guard let match = registry.snapshot.workspaces
+            .compactMap({ ws -> (workspaceID: UUID, sessionID: UUID, tabID: UUID)? in
+                for session in ws.sessions {
+                    for tab in session.tabs where tab.rootPane.allSurfaceIDs().contains(UUID(uuidString: target.surfaceID)!) {
+                        return (ws.id, session.id, tab.id)
+                    }
+                }
+                return nil
+            }).first
+        else { return XCTFail("expected to locate the default tab") }
+
+        guard case .ok = registry.handle(.updateTabGitBranch(workspaceID: match.workspaceID, tabID: match.tabID, branch: "main")) else {
+            return XCTFail("expected ok setting gitBranch")
+        }
+
+        guard case let .error(message) = registry.handle(.send(surfaceID: target.surfaceID, text: "rm -rf /\n", origin: .automation)) else {
+            return XCTFail("expected an automation write on unprotected 'main' to be refused")
+        }
+        XCTAssertTrue(message.lowercased().contains("protected branch"), "rejection must explain why: \(message)")
+
+        // The identical write succeeds when it's the human's own input.
+        guard case .ok = registry.handle(.send(surfaceID: target.surfaceID, text: "echo hi\n", origin: .human)) else {
+            return XCTFail("a human write on main must never be blocked by this guard")
+        }
+    }
+
+    /// P46 Phase 3 follow-up (Dirty Tree half of the guard): an automation write must be refused
+    /// when the target tab's cwd has uncommitted changes and no worktree isolation, even on a
+    /// perfectly ordinary (non-protected) branch — clobbering in-progress uncommitted work is the
+    /// risk, not the branch name. A clean tree on the same setup must be allowed. Two separate
+    /// directories (not the same one checked twice) — the guard's dirty-check is TTL-cached, so
+    /// re-checking the SAME path immediately after dirtying it could still read the stale
+    /// "clean" result rather than proving anything about the guard itself.
+    func testAutomationWriteRefusedOnDirtyTreeWithoutWorktree() throws {
+        func makeRepo(dirty: Bool) throws -> String {
+            let dir = NSTemporaryDirectory() + "kouen-dirty-guard-\(UUID().uuidString.prefix(8))"
+            try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+            func shell(_ command: String) {
+                let p = Process()
+                p.executableURL = URL(fileURLWithPath: "/bin/bash")
+                p.arguments = ["-c", command]
+                p.currentDirectoryURL = URL(fileURLWithPath: dir)
+                p.standardOutput = Pipe(); p.standardError = Pipe()
+                try? p.run(); p.waitUntilExit()
+            }
+            shell("git init -q && git config user.email t@t.com && git config user.name T")
+            shell("echo v1 > f.txt && git add f.txt && git commit -q -m init")
+            if dirty { shell("echo v2 > f.txt") }
+            return dir
+        }
+
+        let cleanDir = try makeRepo(dirty: false)
+        let dirtyDir = try makeRepo(dirty: true)
+        defer {
+            try? FileManager.default.removeItem(atPath: cleanDir)
+            try? FileManager.default.removeItem(atPath: dirtyDir)
+        }
+
+        let registry = SurfaceRegistry()
+        guard case let .surfaces(surfaces) = registry.handle(.listSurfaces), let target = surfaces.first else {
+            return XCTFail("expected a default surface")
+        }
+        guard case .ok = registry.handle(.updateTabCwd(surfaceID: target.surfaceID, path: cleanDir)) else {
+            return XCTFail("expected ok setting cwd")
+        }
+        guard case .ok = registry.handle(.send(surfaceID: target.surfaceID, text: "echo clean\n", origin: .automation)) else {
+            return XCTFail("a clean, unisolated tree must not be blocked")
+        }
+
+        guard case let .snapshot(snap) = registry.handle(.getSnapshot),
+              let ws = snap.activeWorkspaceID
+        else { return XCTFail("expected a workspace") }
+        guard case let .tabID(newTabID) = registry.handle(.newTab(workspaceID: ws, cwd: dirtyDir, shell: nil)) else {
+            return XCTFail("expected a new tab")
+        }
+        guard let dirtySurfaceID = registry.snapshot.workspaces
+            .flatMap({ $0.sessions.flatMap(\.tabs) })
+            .first(where: { $0.id == newTabID })?
+            .rootPane.allSurfaceIDs().first?.uuidString
+        else { return XCTFail("expected the new tab's surface") }
+
+        guard case let .error(message) = registry.handle(.send(surfaceID: dirtySurfaceID, text: "echo dirty\n", origin: .automation)) else {
+            return XCTFail("expected an automation write on a dirty, unisolated tree to be refused")
+        }
+        XCTAssertTrue(message.lowercased().contains("uncommitted"), "rejection must explain why: \(message)")
+
+        guard case .ok = registry.handle(.send(surfaceID: dirtySurfaceID, text: "echo hi\n", origin: .human)) else {
+            return XCTFail("a human write must never be blocked by the dirty-tree guard")
+        }
+    }
+
     /// P38 Phase B: `applyAgentChanges` must write subagents onto the tab snapshot alongside
     /// the primary agent, and bump the revision so clients actually see the change.
     func testApplyAgentChangesWritesSubagentsOntoTab() {

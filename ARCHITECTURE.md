@@ -104,3 +104,40 @@ agent, never executes user code). `FileEditorView`/`DiffPaneView` do syntax high
 | **Character Width Sync** | Changing Unicode width definitions requires re-running `Scripts/generate-width-table.swift` to regenerate `CharacterWidthTable.swift`. |
 | **Regression Guard** | `Tests/robot/run.sh` and `swift test` must pass before any prod release build. |
 | **Release Artifact Order** | Build order must follow `make release` ➔ `make sign` ➔ `make dmg` ➔ `make finalize` (creating DMG before signing breaks the signature). |
+
+## Architecture Decisions (dated log)
+
+**2026-09-21 — Agent safety net: shadow-git checkpoints + write-origin arbitration, not a VCS-level solution.**
+P46 needed "undo the agent's last turn" and "don't let an agent clobber human work" without
+requiring every project to adopt worktree-per-agent. Two decisions:
+
+- **Checkpoints via a temporary `GIT_INDEX_FILE`, not `git stash` or a real commit.** `git stash`
+  mutates the reflog/stash list the human is also using and can conflict with a stash they're
+  mid-use of; a real commit on the active branch pollutes history the human didn't ask for.
+  Building the tree with a throwaway index (`git read-tree HEAD` + `git add -A` + `git write-tree`
+  + `git commit-tree`) and storing the result under `refs/kouen/checkpoints/<session>/<turn>`
+  captures tracked+untracked state with zero visible side effect on the real index or branch.
+  Cost: checkpoints are per-`cwd`+session, not a full VCS history browser — acceptable, since the
+  only consumer is `kouen undo` reverting to the immediately-prior turn, not arbitrary time travel.
+- **Write-origin tagging (`human`/`automation`) at the IPC layer, arbitrated in the daemon, not the
+  GUI.** The alternative — a GUI-side "pause automation while I type" toggle — requires the human
+  to remember to flip it. Tagging every `.send`/`.sendData`/`.sendKeys` call with its origin and
+  refusing an `automation` write within 1.5s of the last `human` one, or onto a protected branch /
+  dirty checkout with no worktree isolation, makes the safety default-on and enforced at the one
+  choke point (`SurfaceRegistry.checkWriteOriginLocked`) every write path already goes through —
+  including the daemon's own `0xF6` hot-path keystroke frame, not just CLI/MCP call sites (missed
+  on the first pass, see `agent-memory/knowledge/cases/attention-fleet-hardening.md`).
+
+**2026-09-21 — Two-tier verification is opt-in for tier1, always-manual for tier2.**
+Running a syntax/build check (`tier1`) after every agent turn is cheap enough to default-enable
+per-project via `set-option -g verify-on-turn on`; running the project's full test suite (`tier2`)
+after every turn is not — a multi-minute suite on every turn would make agents feel like they've
+stalled. `tier2` stays a deliberate `kouen-cli verify tier2` invocation, never automatic.
+
+**2026-09-21 — Fleet sidebar tab: a notification destination, not a primary browsing surface.**
+Fleet flattens every live tab across every workspace into one sortable list. Its value only shows
+up with multiple concurrent agents across multiple workspaces/worktrees — a single-workspace,
+few-tab session sees no visible difference from the existing Sessions tab. Kept as a full tab
+(not collapsed into a popover) because the cost of keeping it is low and it's the correct landing
+surface for a notification's "jump to this session" action; it is not expected to be opened and
+browsed directly in normal single-agent use.

@@ -651,6 +651,41 @@ final class DaemonRoundTripTests: XCTestCase {
         XCTFail("daemon did not reply to a nil-request frame (silent hang)")
     }
 
+    /// P46 Pillar 6 gap 4: `kouen agent wait` blocks on `.waitFor(agentWaitChannel(...))` instead
+    /// of busy-polling — the daemon must actually signal that channel the instant the surface's
+    /// tab reaches `.waiting` (`markWaiting`), not leave the waiter to time out. Two real client
+    /// connections: one blocks on the channel, the other triggers the transition after a short
+    /// delay; the blocked one must wake almost immediately, not after the full timeout.
+    func testAgentWaitChannelSignaledWhenTabReachesWaiting() throws {
+        let client = DaemonClient()
+        guard case let .surfaces(surfaces) = try client.request(.listSurfaces), let target = surfaces.first else {
+            return XCTFail("expected a default surface")
+        }
+        let channel = agentWaitChannel(surfaceKey: target.surfaceID)
+
+        let waiterDone = XCTestExpectation(description: "waitFor channel signaled")
+        var waiterResponse: IPCResponse?
+        let waiterQueue = DispatchQueue(label: "test.agent-wait-channel")
+        waiterQueue.async {
+            let waiterClient = DaemonClient()
+            waiterResponse = try? waiterClient.request(.waitFor(channel: channel, mode: "wait"), timeout: 10)
+            waiterDone.fulfill()
+        }
+
+        // Give the waiter time to actually register on the daemon's queue before triggering —
+        // otherwise the transition could race ahead of `WaitForRegistry.wait` and this test would
+        // only prove the (much less interesting) full-timeout fallback path.
+        usleep(300_000)
+        guard case .ok = try client.request(.notify(surfaceID: target.surfaceID, title: "Codex", body: "Approve?")) else {
+            return XCTFail("expected ok")
+        }
+
+        wait(for: [waiterDone], timeout: 5)
+        guard case .ok = waiterResponse else {
+            return XCTFail("expected the blocked waitFor to resolve .ok well before its 10s timeout, got \(String(describing: waiterResponse))")
+        }
+    }
+
     // MARK: - Raw-socket helpers (for malformed/edge frames the typed DaemonClient can't send)
 
     private enum RawSocketError: Error { case connectFailed, writeFailed }

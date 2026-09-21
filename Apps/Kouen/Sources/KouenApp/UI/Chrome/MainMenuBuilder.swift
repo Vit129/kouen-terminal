@@ -174,6 +174,10 @@ enum MainMenuBuilder {
         view.submenu?.addItem(paletteItem)
         let promptItem = menuItem("Command Prompt", action: #selector(MenuTarget.commandPrompt), binding: BannerShortcutRegistry.commandPrompt)
         view.submenu?.addItem(promptItem)
+        let injectorItem = menuItem("Quick Context Injector", action: #selector(MenuTarget.contextInjector), binding: BannerShortcutRegistry.contextInjector)
+        view.submenu?.addItem(injectorItem)
+        let diffReviewerItem = menuItem("Turn Diff Reviewer", action: #selector(MenuTarget.turnDiffReviewer), binding: BannerShortcutRegistry.turnDiffReviewer)
+        view.submenu?.addItem(diffReviewerItem)
         let queueItem = NSMenuItem(title: "Add Clipboard to Queue", action: #selector(MenuTarget.addToQueue), keyEquivalent: "\r")
         queueItem.keyEquivalentModifierMask = [.command, .shift]
         queueItem.target = MenuTarget.shared
@@ -731,6 +735,14 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
 
     @objc func commandPrompt() {
         CommandPromptController.shared.present()
+    }
+
+    @objc func contextInjector() {
+        ContextInjectorController.shared.present()
+    }
+
+    @objc func turnDiffReviewer() {
+        TurnDiffReviewerController.shared.present()
     }
 
     @objc func searchCommandHistory() {

@@ -261,10 +261,11 @@ struct SidebarTabBarView: View {
                 Image(systemName: "clock.arrow.circlepath").tag(3).help("Session History")
                 // TODO: Issues tab — re-enable when Jira domain config UI + Azure DevOps impl are complete
                 // Image(systemName: "checklist").tag(4).help("Issues")
+                Image(systemName: "square.stack.3d.up").tag(5).help("Fleet — every live session across every workspace")
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            .frame(width: 172)
+            .frame(width: 215) // 5 icons (was 172 for 4) — widen with each tab added, segmented control has no intrinsic per-icon sizing
 
             Spacer()
         }
@@ -305,6 +306,10 @@ struct SidebarSectionLabelView: View {
             //     Text("ISSUES")
             //         .font(.system(size: 10.5, weight: .bold))
             //         .foregroundStyle(Color(nsColor: c.textTertiary))
+            } else if model.selectedTab == 5 {
+                Text("FLEET")
+                    .font(.system(size: 10.5, weight: .bold))
+                    .foregroundStyle(Color(nsColor: c.textTertiary))
             }
 
             Spacer()

@@ -77,4 +77,11 @@ public struct FeatureSummary: Codable, Sendable, Equatable, Identifiable {
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
+
+    /// Checks if a specific gate (1, 2, 3, or 4) has been approved — mirrors
+    /// `KouenFeature.isGateApproved(_:)` for the wire DTO, so CLI/MCP code reading a
+    /// `FeatureSummary` doesn't re-derive the same `gates.first { ... }` check inline.
+    public func isGateApproved(_ gateNumber: Int) -> Bool {
+        gates.first { $0.gate == gateNumber && $0.approved } != nil
+    }
 }

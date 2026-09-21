@@ -8,6 +8,7 @@ import KouenTerminalKit
 final class NotificationCoordinator {
     private unowned let coord: SessionCoordinator
     private(set) var pushedNotificationKeys: Set<String> = []
+    private var pushedErrorKeys: Set<String> = []
     private var lastAgentActivity: [String: AgentActivity] = [:]
     private var lastStopNotifyAt: [String: Date] = [:]
 
@@ -46,6 +47,58 @@ final class NotificationCoordinator {
             }
         })
         pushedNotificationKeys = pushedNotificationKeys.intersection(live)
+    }
+
+    /// P46 Phase 4 follow-up: Tier 1 verification failures set `Tab.status = .error`, but
+    /// nothing previously scanned for that status — `NotificationBus.shared.post(...)` posted
+    /// daemon-side is inert here (a separate process's own singleton instance; the daemon and
+    /// this app never share one). This mirrors `pushNewRemoteNotifications`'s exact shape for
+    /// `.error` instead of `.waiting`, and routes through the dedicated build-failure category
+    /// so the desktop alert carries a "Feed to Agent" action.
+    func pushVerificationFailureNotifications(from snapshot: SessionSnapshot) {
+        for workspace in snapshot.workspaces {
+            for session in workspace.sessions {
+                for tab in session.tabs where tab.status == .error {
+                    guard let text = tab.notificationText, !text.isEmpty,
+                          let surfaceID = tab.rootPane.allSurfaceIDs().first
+                    else { continue }
+                    let key = "\(surfaceID.uuidString)|\(text)"
+                    guard !pushedErrorKeys.contains(key) else { continue }
+                    pushedErrorKeys.insert(key)
+                    if NSApp.isActive, surfaceID == coord.activeSurfaceID { continue }
+                    let title = "\(tab.title.isEmpty ? "Terminal" : tab.title) — Build Failed"
+                    DesktopNotifier.show(
+                        title: title, body: text, withSound: true,
+                        surfaceID: surfaceID.uuidString, category: DesktopNotifier.buildFailureCategoryIdentifier
+                    )
+                }
+            }
+        }
+        let live = Set(snapshot.workspaces.flatMap { ws in
+            ws.sessions.flatMap { ses in
+                ses.tabs.compactMap { tab -> String? in
+                    guard tab.status == .error, let text = tab.notificationText, !text.isEmpty,
+                          let surfaceID = tab.rootPane.allSurfaceIDs().first
+                    else { return nil }
+                    return "\(surfaceID.uuidString)|\(text)"
+                }
+            }
+        })
+        pushedErrorKeys = pushedErrorKeys.intersection(live)
+    }
+
+    /// "Feed to Agent" notification action — fetches the full Tier 1 failure text
+    /// (`@builderror`, not just the tab's one-line `notificationText` summary) and types it
+    /// straight into the surface that failed, `origin: .human` since a person explicitly clicked
+    /// this action (same reasoning `ContextInjectorController` uses for its own injection).
+    func feedBuildErrorToAgent(for surfaceID: SurfaceID) {
+        openSurface(surfaceID)
+        Task { @MainActor [coord] in
+            let resolved = await ContextResolutionEngine().resolveTemplate(
+                "@builderror", cwd: "", daemonClient: DaemonClient(), activeSurfaceID: surfaceID.uuidString
+            )
+            _ = await coord.requestDaemon(.sendData(surfaceID: surfaceID.uuidString, data: Data(resolved.utf8), origin: .human))
+        }
     }
 
     func pushAgentActivityNotifications(from snapshot: SessionSnapshot) {

@@ -2,6 +2,17 @@
 
 Older releases. See [CHANGELOG.md](../CHANGELOG.md) for recent versions.
 
+## [4.16.0] - 2026-09-15
+
+### Added
+- Agent Swarm Core — headless fleet orchestration (P44 follow-on) ([`30d995a`](https://github.com/Vit129/kouen-terminal/commit/30d995abca4371a24288fcefed6ab3fe01447719))
+- Remote HTTP/SSE transport for kouen-mcp ([`cba6927`](https://github.com/Vit129/kouen-terminal/commit/cba6927b535fdcb4922762b21c6fbc6daf253d45))
+- Render non-markdown source files in preview, inline file-tree preview, more languages ([`5dcefd5`](https://github.com/Vit129/kouen-terminal/commit/5dcefd53a9094c259ed126487044960509404a23))
+
+### Fixed
+- Secure defaults for kouen-mcp's remote HTTP/SSE server ([`22735f9`](https://github.com/Vit129/kouen-terminal/commit/22735f9e0153e8a0af612f5a61451cc040aa6700))
+- Sync fleet node status on real completion, turn on Fleet dashboard ([`2d004d5`](https://github.com/Vit129/kouen-terminal/commit/2d004d5bfae9eed53fbbf64e6cadb16cac142236))
+
 ## [4.15.10] - 2026-09-14
 
 ### Fixed

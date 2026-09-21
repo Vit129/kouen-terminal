@@ -1728,7 +1728,7 @@ public final class KouenTerminalSurfaceView: NSView {
             // Live HUD tick: the integer cols/rows only change at cell boundaries (the drawable
             // resizes smoothly every frame), so this fires exactly when the displayed size ticks.
             onGridSizeWillChange?(newCols, newRows, false)
-            if liveResizeReflowEnabled, metalLayer.presentsWithTransaction {
+            if liveResizeReflowEnabled, metalLayer.presentsWithTransaction, liveResizeFrozenOrigin != nil {
                 // Real-time live resize (Ghostty parity): commit the authoritative reflow + PTY
                 // SIGWINCH at THIS cell boundary so the running program redraws during the drag,
                 // not on release. The reflow runs off-main and coalesces latest-wins, so a fast

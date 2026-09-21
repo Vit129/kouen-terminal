@@ -39,7 +39,13 @@ extension KouenCLI {
             if let client = client,
                let snapshot = try? client.request(.getSnapshot),
                case let .snapshot(snap) = snapshot {
-                activeSurface = snap.activeWorkspace?.activeTab?.id.uuidString
+                // Bug fix: was `activeTab?.id` (the TAB's uuid) — @last/@error/@pane/@builderror
+                // all need a real SURFACE uuid, which only coincidentally matches a tab's id for
+                // a single-pane tab. Falls back to the first leaf for a split tab (same fallback
+                // FleetViewModel/KouenCLI+Agent's firstSurfaceID(of:) already use).
+                let activeTab = snap.activeWorkspace?.activeTab
+                activeSurface = activeTab?.rootPane.surfaceID?.uuidString
+                    ?? activeTab?.rootPane.allSurfaceIDs().first?.uuidString
             }
             let output = await engine.resolveLast(daemonClient: client, activeSurfaceID: activeSurface)
             print(output)
@@ -49,7 +55,13 @@ extension KouenCLI {
             if let client = client,
                let snapshot = try? client.request(.getSnapshot),
                case let .snapshot(snap) = snapshot {
-                activeSurface = snap.activeWorkspace?.activeTab?.id.uuidString
+                // Bug fix: was `activeTab?.id` (the TAB's uuid) — @last/@error/@pane/@builderror
+                // all need a real SURFACE uuid, which only coincidentally matches a tab's id for
+                // a single-pane tab. Falls back to the first leaf for a split tab (same fallback
+                // FleetViewModel/KouenCLI+Agent's firstSurfaceID(of:) already use).
+                let activeTab = snap.activeWorkspace?.activeTab
+                activeSurface = activeTab?.rootPane.surfaceID?.uuidString
+                    ?? activeTab?.rootPane.allSurfaceIDs().first?.uuidString
             }
             let output = await engine.resolveError(cwd: cwd, daemonClient: client, activeSurfaceID: activeSurface)
             print(output)
@@ -77,7 +89,13 @@ extension KouenCLI {
             if let client = client,
                let snapshot = try? client.request(.getSnapshot),
                case let .snapshot(snap) = snapshot {
-                activeSurface = snap.activeWorkspace?.activeTab?.id.uuidString
+                // Bug fix: was `activeTab?.id` (the TAB's uuid) — @last/@error/@pane/@builderror
+                // all need a real SURFACE uuid, which only coincidentally matches a tab's id for
+                // a single-pane tab. Falls back to the first leaf for a split tab (same fallback
+                // FleetViewModel/KouenCLI+Agent's firstSurfaceID(of:) already use).
+                let activeTab = snap.activeWorkspace?.activeTab
+                activeSurface = activeTab?.rootPane.surfaceID?.uuidString
+                    ?? activeTab?.rootPane.allSurfaceIDs().first?.uuidString
             }
             let resolved = await engine.resolveTemplate(
                 prompt,

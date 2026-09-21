@@ -108,6 +108,7 @@ public final class RealPty: @unchecked Sendable {
     private var oscScanBuffer = Data()
     private static let oscScanBufferCap = 4096
     private static let oscAgentStatusMarker = Data("\u{1b}]26;".utf8)
+    private static let osc94Marker = Data("\u{1b}]9;4;".utf8)
     /// Subscriber fan-out runs here, NOT on `readQueue`: a slow or misbehaving subscriber handler
     /// must not stall PTY reads (which would back-pressure the shell and every other subscriber of
     /// this surface). Output is enqueued in read order onto this *serial* queue, so each subscriber
@@ -1204,6 +1205,30 @@ public final class RealPty: @unchecked Sendable {
             }
             oscScanBuffer.removeSubrange(oscScanBuffer.startIndex..<terminatorIndex.consumedEnd)
         }
+        while let markerRange = oscScanBuffer.range(of: Self.osc94Marker) {
+            guard let terminatorIndex = Self.findOSCTerminator(in: oscScanBuffer, from: markerRange.upperBound) else {
+                oscScanBuffer.removeSubrange(oscScanBuffer.startIndex..<markerRange.lowerBound)
+                return
+            }
+            let payload = oscScanBuffer.subdata(in: markerRange.upperBound..<terminatorIndex.payloadEnd)
+            if let payloadString = String(data: payload, encoding: .utf8) {
+                applyOSC94Payload(payloadString)
+            }
+            oscScanBuffer.removeSubrange(oscScanBuffer.startIndex..<terminatorIndex.consumedEnd)
+        }
+    }
+
+    private func applyOSC94Payload(_ payload: String) {
+        let parts = payload.split(separator: ";")
+        guard let stateStr = parts.first, let state = Int(stateStr) else { return }
+        let resolvedActivity: AgentActivity
+        switch state {
+        case 1: resolvedActivity = .working
+        case 2: resolvedActivity = .errored
+        case 3, 4: resolvedActivity = .awaiting
+        default: resolvedActivity = .idle
+        }
+        AgentDetector.setActivity(resolvedActivity, kind: nil, forSurfaceKey: id)
     }
 
     private struct OSCTerminatorMatch { let payloadEnd: Data.Index; let consumedEnd: Data.Index }

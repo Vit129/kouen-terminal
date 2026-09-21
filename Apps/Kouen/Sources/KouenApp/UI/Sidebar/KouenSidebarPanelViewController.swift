@@ -38,6 +38,8 @@ final class KouenSidebarPanelViewController: NSViewController {
     private var sessionHistoryHostingView: NSView?
     let sessionHistoryModel = AgentSessionHistoryModel()
     // private var issueTrackerHostingView: NSView?  // Issues tab disabled across the system
+    private var fleetHostingView: NSView?
+    let fleetModel = FleetViewModel()
     // Project & Workspace Storage (Orca Session == Project)
     let projectStore = ProjectStore()
     private var projectDropTarget: ProjectDropTarget?
@@ -81,6 +83,7 @@ final class KouenSidebarPanelViewController: NSViewController {
         setupFileViewer()
         setupJobsView()
         setupSessionHistoryView()
+        setupFleetView()
         // TODO: Issues tab disabled — re-enable with setupIssuesView() once Jira domain config UI + Azure impl are complete
         // setupIssuesView()
         selectSidebarTab(index: 0)
@@ -623,6 +626,39 @@ final class KouenSidebarPanelViewController: NSViewController {
         ])
     }
 
+    private func setupFleetView() {
+        let fleetView = FleetView(
+            model: fleetModel,
+            onSelect: { [weak self] item in
+                self?.focusFleetSession(item)
+            }
+        )
+        let hosting = NSHostingView(rootView: fleetView)
+        hosting.translatesAutoresizingMaskIntoConstraints = false
+        hosting.isHidden = true
+        fleetHostingView = hosting
+        view.addSubview(hosting)
+        NSLayoutConstraint.activate([
+            hosting.topAnchor.constraint(equalTo: sectionLabelHostingView.bottomAnchor),
+            hosting.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            hosting.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            hosting.bottomAnchor.constraint(equalTo: footerHostingView.topAnchor),
+        ])
+    }
+
+    /// Same jump sequence `NotificationCoordinator.jumpToLatestNotification()` uses for the
+    /// Attention Beacon's own 1-click jump — reused here for a fleet row click.
+    private func focusFleetSession(_ item: FleetSessionItem) {
+        guard let tabID = UUID(uuidString: item.tabID) else { return }
+        let coord = SessionCoordinator.shared
+        coord.selectWorkspace(item.workspaceID)
+        coord.selectTab(workspaceID: item.workspaceID, tabID: tabID)
+        if let surfaceID = coord.splitPaneCoordinator.firstSurfaceID(forTab: tabID) {
+            coord.setActiveSurface(surfaceID)
+            coord.terminalHosts.host(for: surfaceID)?.focusTerminal()
+        }
+    }
+
     private func resumeAgentSession(_ record: AgentSessionRecord) {
         let cmd = record.agentKind.resumeCommand(sessionID: record.id)
         let req = DefaultTerminalLaunchRequest(
@@ -752,6 +788,7 @@ final class KouenSidebarPanelViewController: NSViewController {
         jobsHostingView?.isHidden = index != 2
         sessionHistoryHostingView?.isHidden = index != 3
         // issueTrackerHostingView?.isHidden = index != 4  // Issues tab disabled — see TODO in viewDidLoad
+        fleetHostingView?.isHidden = index != 5
         switch index {
         case 1:
             sidebarSectionModel.text = "FILES"
@@ -775,6 +812,10 @@ final class KouenSidebarPanelViewController: NSViewController {
         // case 4:
         //     sidebarSectionModel.text = "ISSUES"
         //     sidebarSectionModel.isRepoHeader = false
+        case 5:
+            sidebarSectionModel.text = "FLEET"
+            sidebarSectionModel.isRepoHeader = false
+            fleetModel.refresh(from: SessionCoordinator.shared.snapshot, activeSurfaceID: SessionCoordinator.shared.activeSurfaceID)
         default:
             sidebarSectionModel.isRepoHeader = true
             updateRepoSectionHeader()
@@ -979,6 +1020,13 @@ final class KouenSidebarPanelViewController: NSViewController {
             NSLog("[DBG-activestate] reload() no activeTab.cwd — clearing root")
         }
         updateRepoSectionHeader()
+
+        // Fleet tab has no other refresh trigger — sessionHistory/jobs only refresh on
+        // tab-select, but a new/closed tab while Fleet is the visible tab should show up
+        // immediately, the same way the Sessions list itself does via this same reload().
+        if sidebarSectionModel.selectedTab == 5 {
+            fleetModel.refresh(from: snap, activeSurfaceID: SessionCoordinator.shared.activeSurfaceID)
+        }
     }
 
     /// Updates session card labels in place (title/cwd/branch/agent) without

@@ -61,6 +61,14 @@ public struct FleetJobItem: Identifiable, Sendable, Equatable {
         isEnabled
     }
 
+    /// For a LaunchAgent job, the `.sh` script the command invokes (used to re-detect the
+    /// script's freshly written output artifacts on re-run). `nil` for daemon jobs or when
+    /// the command has no `.sh` element. Mirrors the extraction in `fetchLaunchAgents`.
+    public var launchAgentScriptPath: String? {
+        guard case .launchAgent = source else { return nil }
+        return prompt.split(separator: " ").first(where: { $0.hasSuffix(".sh") }).map(String.init)
+    }
+
     public var statusDisplay: String {
         switch state.lowercased() {
         case "running": return "Running"
@@ -80,6 +88,28 @@ final class AutomationsFleetModel {
     var errorMessage: String? = nil
     var filterText: String = ""
     var filterStatus: FilterStatus = .all
+
+    /// IDs of jobs currently mid-run via `runNow` (esp. LaunchAgents, whose `kickstart` is
+    /// async so their persisted `state` doesn't flip to "running" on its own). Drives the
+    /// spinner in the row while we wait for the script to produce fresh output.
+    var runningJobIDs: Set<String> = []
+
+    /// When true, a scheduled run detected during `load()` (i.e. the job produced a fresher
+    /// artifact than last seen) auto-opens its result, matching the Run-Now behavior. The
+    /// user's "run now + schedule run — auto-show result" ask. Toggleable so the auto-open
+    /// can't become a nuisance if the user doesn't want scheduled reports popping open.
+    var autoOpenScheduledResults: Bool = true
+
+    /// Highest artifact mtime we've *already accounted for* per job id. Seeded on the first
+    /// `load()` (so results generated before Kouen launched never auto-open — only genuinely
+    /// new scheduled runs do), then advanced whenever we surface or open a fresher artifact.
+    /// This is the guard that makes scheduled auto-open fire exactly once per run.
+    private var lastSeenArtifactMtime: [String: Date] = [:]
+
+    /// False until the first `load()` completes. The first load only seeds the mtime
+    /// baseline; it never auto-opens (opening the last scheduled report every time the
+    /// panel first appears would be the nuisance case).
+    private var didSeedArtifactBaseline: Bool = false
 
     enum FilterStatus: String, CaseIterable {
         case all = "All"
@@ -128,6 +158,14 @@ final class AutomationsFleetModel {
     }
 
     func load() async {
+        await load(detectScheduledRuns: true)
+    }
+
+    /// Loads jobs. When `detectScheduledRuns` is true and the baseline has been seeded, any
+    /// job whose newest artifact is fresher than last seen is returned as a "just completed"
+    /// result to auto-open (scheduled-run auto-show). The caller opens them.
+    @discardableResult
+    func load(detectScheduledRuns: Bool) async -> [JobResultArtifact] {
         isLoading = true
         errorMessage = nil
 
@@ -175,6 +213,34 @@ final class AutomationsFleetModel {
         // Sort by most recently updated
         self.jobs = fetchedJobs.sorted(by: { ($0.updatedAt ?? $0.createdAt ?? .distantPast) > ($1.updatedAt ?? $1.createdAt ?? .distantPast) })
         self.isLoading = false
+
+        // Scheduled-run auto-show: compare each job's newest artifact mtime against what we
+        // last accounted for. Fresher ⇒ that job ran since we last looked ⇒ surface its
+        // primary artifact to open. The FIRST load only seeds the baseline (no auto-open of
+        // pre-launch results).
+        var freshlyCompleted: [JobResultArtifact] = []
+        for job in self.jobs {
+            guard let primary = job.artifacts.first else { continue }
+            let newest = Self.newestMtime(of: job.artifacts.map(\.path))
+            guard let newest else { continue }
+
+            let previouslySeen = lastSeenArtifactMtime[job.id]
+            let isFresher = previouslySeen == nil || newest > previouslySeen!
+            // Always advance the high-water mark so we never re-open the same run.
+            lastSeenArtifactMtime[job.id] = newest
+
+            if detectScheduledRuns,
+               didSeedArtifactBaseline,
+               autoOpenScheduledResults,
+               isFresher,
+               // A job the user is actively Run-Now-ing opens through runNow's own return
+               // value — don't double-open it here.
+               !runningJobIDs.contains(job.id) {
+                freshlyCompleted.append(primary)
+            }
+        }
+        didSeedArtifactBaseline = true
+        return freshlyCompleted
     }
 
     // MARK: - Detect Project Result Files (HTML Reports, Coverage, Graphs)
@@ -427,20 +493,80 @@ final class AutomationsFleetModel {
         return tail.isEmpty ? nil : tail.joined(separator: "\n")
     }
 
-    func runNow(_ item: FleetJobItem) async {
+    /// Runs the job now and returns the result artifact that should be auto-shown once the
+    /// run has actually produced fresh output, or `nil` if the run failed / produced nothing
+    /// to open. The caller (view) opens it — the model stays UI-framework-free.
+    ///
+    /// Timing note: a daemon automation runs synchronously behind the IPC call, so its
+    /// artifacts are fresh the moment it returns. A LaunchAgent `kickstart` only *starts*
+    /// the script and returns immediately, so the artifact on disk is still last run's until
+    /// the script rewrites it — we snapshot the primary artifact's mtime up front and wait
+    /// for it to advance (bounded) before reporting it as the thing to open.
+    @discardableResult
+    func runNow(_ item: FleetJobItem) async -> JobResultArtifact? {
+        runningJobIDs.insert(item.id)
+        defer { runningJobIDs.remove(item.id) }
+
         switch item.source {
         case .daemon:
-            guard let uuid = UUID(uuidString: item.id) else { return }
+            guard let uuid = UUID(uuidString: item.id) else { return nil }
             let res = await SessionCoordinator.shared.requestDaemon(.automationRunNow(id: uuid))
             if case let .error(err) = res {
                 self.errorMessage = err
-            } else {
-                await load()
+                return nil
             }
+            await load(detectScheduledRuns: false)
+            return jobs.first(where: { $0.id == item.id })?.artifacts.first
+
         case .launchAgent(let label, _):
+            // Baseline: newest mtime among the job's current (pre-run) artifacts.
+            let priorArtifactPaths = item.artifacts.map(\.path)
+            let baselineMtime = Self.newestMtime(of: priorArtifactPaths)
+
             await Task.detached { Self.runLaunchctl(["kickstart", "-k", "gui/\(getuid())/\(label)"]) }.value
-            await load()
+
+            // Wait (off-main) for the script to rewrite one of its artifacts, i.e. the
+            // newest artifact mtime advances past the baseline. Bounded so a slow/failing
+            // script never hangs the UI — after the ceiling we just refresh without opening.
+            let becameFresh = await Task.detached(priority: .userInitiated) { () -> Bool in
+                let deadline = Date().addingTimeInterval(Self.runArtifactWaitSeconds)
+                while Date() < deadline {
+                    // Re-detect: a brand-new sprint run folder means brand-new artifact paths,
+                    // so re-run detection each poll rather than only re-stat the old paths.
+                    var fresh: [JobResultArtifact] = []
+                    if let scriptPath = item.launchAgentScriptPath {
+                        Self.detectScriptOutputArtifacts(scriptPath: scriptPath, into: &fresh)
+                    }
+                    Self.detectRepoArtifacts(repoPath: item.repoPath, into: &fresh)
+                    let currentMtime = Self.newestMtime(of: fresh.map(\.path))
+                    if let currentMtime, baselineMtime == nil || currentMtime > baselineMtime! {
+                        return true
+                    }
+                    try? await Task.sleep(nanoseconds: 1_000_000_000) // poll every 1s
+                }
+                return false
+            }.value
+
+            await load(detectScheduledRuns: false)
+            guard becameFresh else { return nil }
+            return jobs.first(where: { $0.id == item.id })?.artifacts.first
         }
+    }
+
+    /// Upper bound on how long `runNow` waits for a LaunchAgent script to rewrite its
+    /// output before giving up on auto-opening (the manual HTML button still works after).
+    nonisolated static let runArtifactWaitSeconds: TimeInterval = 120
+
+    /// Newest modification date across the given file paths, or `nil` if none exist.
+    nonisolated private static func newestMtime(of paths: [String]) -> Date? {
+        let fm = FileManager.default
+        var newest: Date?
+        for p in paths {
+            guard let attrs = try? fm.attributesOfItem(atPath: p),
+                  let date = attrs[.modificationDate] as? Date else { continue }
+            if newest == nil || date > newest! { newest = date }
+        }
+        return newest
     }
 
     func toggleEnabled(_ item: FleetJobItem) async {
