@@ -244,9 +244,9 @@ struct ToolRegistry: Sendable {
             toolDef("kouenFeatureList", "List all features tracked in Kouen with their phase, gate status, and worktrees", [
                 param("repoPath", "string", "Filter by repository path (optional)"),
             ]),
-            toolDef("kouenFeatureApproveGate", "Approve an AI-SDLC workflow gate (1..3) for a Feature. Automatically updates the checkbox in ai-sdlc-task-progress.md", [
+            toolDef("kouenFeatureApproveGate", "Approve an AI-SDLC workflow gate (1..4) for a Feature. Automatically updates the checkbox in ai-sdlc-task-progress.md", [
                 param("slug", "string", "Feature slug"),
-                param("gate", "number", "Gate number: 1 (Architect design), 2 (Scenario list), or 3 (Seam agreement)"),
+                param("gate", "number", "Gate number: 1 (Architect design), 2 (Scenario list), 3 (Seam agreement), or 4 (Merge Review)"),
                 param("approver", "string", "Approver username/identifier"),
                 param("notes", "string", "Approval notes or conditions (optional)"),
             ]),
@@ -591,7 +591,7 @@ struct ToolRegistry: Sendable {
         } else if case let .double(d)? = args["gate"] {
             gate = Int(d)
         } else {
-            return (nil, JSONRPCError(code: -32602, message: "Missing or invalid 'gate' parameter (must be 1, 2, or 3)"))
+            return (nil, JSONRPCError(code: -32602, message: "Missing or invalid 'gate' parameter (must be 1, 2, 3, or 4)"))
         }
         let approver = optionalStringArg(args["approver"]) ?? NSUserName()
         let notes = optionalStringArg(args["notes"])

@@ -1,4 +1,9 @@
 import Foundation
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
 
 public enum KouenPaths {
     private static var overrideRootRaw: String? {
@@ -250,6 +255,17 @@ public enum KouenPaths {
         applicationSupport.appendingPathComponent("features.json")
     }
 
+    public static var memoURL: URL {
+        applicationSupport.appendingPathComponent("memo.json")
+    }
+
+    /// Sidecar lock file for `memo.json`, same shape as `remoteHostsLockURL`/`pairedDevicesLockURL` —
+    /// `kouen memo set/delete/clear` are each a fresh CLI process, so only a cross-process `flock`
+    /// (not an in-process `NSLock`) can serialize their read-modify-write cycles.
+    public static var memoLockURL: URL {
+        applicationSupport.appendingPathComponent("memo.json.lock")
+    }
+
     public static var agentRoutingRulesURL: URL {
         applicationSupport.appendingPathComponent("agent-routing-rules.json")
     }
@@ -340,6 +356,29 @@ public enum KouenPaths {
             fputs("\(label): failed to write \(url.lastPathComponent): \(error)\n", kouenStderr)
             return false
         }
+    }
+
+    /// Run `body` (a load-modify-save of a JSON store) while holding an exclusive `flock` on
+    /// `lockURL`, so concurrent processes' read-modify-write cycles serialize instead of clobbering
+    /// each other — this was independently reimplemented in `RemoteHostStore` and
+    /// `PairedDeviceStore` (P46 Pillar 6 Existing Asset Scan flagged the 3rd copy in `kouen memo`),
+    /// so it now lives here once. Any in-process lock (`NSLock` etc.) guarding the caller's own
+    /// in-memory state must already be held before calling this — it only arbitrates *across*
+    /// processes, not within one.
+    ///
+    /// Degrades to running `body` unlocked if the lock file can't be opened/locked — a missing
+    /// cross-process lock is strictly less safe than the caller's existing behaviour, never worse,
+    /// so a lock failure must not brick the caller's read-modify-write.
+    public static func withFileLock<T>(_ lockURL: URL, _ body: () -> T) -> T {
+        try? ensureDirectories()
+        let lockPath = lockURL.path
+        // O_CLOEXEC so a forked child never inherits the lock fd; 0o600 keeps it owner-only.
+        let fd = open(lockPath, O_RDWR | O_CREAT | O_CLOEXEC, 0o600)
+        guard fd >= 0 else { return body() }
+        defer { close(fd) }  // closing the fd releases the flock
+        guard flock(fd, LOCK_EX) == 0 else { return body() }
+        defer { flock(fd, LOCK_UN) }
+        return body()
     }
 }
 

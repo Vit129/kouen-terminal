@@ -240,6 +240,30 @@ public struct WorktreeManager: Sendable {
         return Divergence(ahead: ahead, behind: behind)
     }
 
+    /// `git diff base...branch --stat` — the file-level overview `kouen task merge` shows a
+    /// human at Gate 4 (Merge Review) before it lets them approve. Nil if either ref doesn't
+    /// resolve (e.g. a stale/deleted branch).
+    public func diffStat(repoPath: String, branch: String, base: String) -> String? {
+        runGitOutput(["diff", "--stat", "\(base)...\(branch)"], in: repoPath)
+    }
+
+    /// The current branch checked out at `path` — `kouen task merge` refuses to merge unless the
+    /// repo is actually sitting on `base`, rather than silently switching it out from under
+    /// whatever the human has checked out there.
+    public func currentBranch(at path: String) -> String? {
+        runGitOutput(["rev-parse", "--abbrev-ref", "HEAD"], in: path)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// `git merge --no-ff branch` on whatever is currently checked out at `repoPath` — caller
+    /// must have already verified that's `base` (`currentBranch(at:)`); this doesn't check or
+    /// switch branches itself; a --no-ff merge always leaves a merge commit, so a fast-forward
+    /// merge that could silently rewrite `base`'s ref never happens by accident.
+    @discardableResult
+    public func merge(repoPath: String, branch: String, message: String) -> Bool {
+        runGit(["merge", "--no-ff", branch, "-m", message], in: repoPath)
+    }
+
     /// Checks whether `branch` has already been merged or squash-merged into `base`.
     public func isMergedOrSquashed(repoPath: String, branch: String, base: String) -> Bool {
         // 1. Ancestor check: normal merge (fast-forward or merge commit)

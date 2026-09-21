@@ -102,7 +102,10 @@ public final class FeatureStore: @unchecked Sendable {
 
     @discardableResult
     public func approveGate(slug: String, gate: Int, approver: String, notes: String? = nil) -> KouenFeature? {
-        guard (1...3).contains(gate) else { return nil }
+        // 1-3 are the SDLC gates (Architect/Scenario/Seam); 4 is Merge Review (P46 Pillar 6),
+        // approved separately from the SDLC phase — a feature can sit in `.dev` for a while
+        // with several PRs, each gated by its own Gate 4 approval.
+        guard (1...4).contains(gate) else { return nil }
         lock.lock()
         guard let index = features.firstIndex(where: { $0.slug == slug }) else {
             lock.unlock()

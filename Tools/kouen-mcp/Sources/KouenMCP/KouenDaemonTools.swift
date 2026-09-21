@@ -212,14 +212,14 @@ struct KouenDaemonTools: Sendable {
 
     func sendPaneText(surfaceId: String, text: String, bracketed _: Bool) async -> (AnyCodable?, JSONRPCError?) {
         guard isToolAllowed("sendPaneText") else { return (nil, disabledError("sendPaneText")) }
-        let result = await okResponse(for: .send(surfaceID: surfaceId, text: text), expected: "send")
+        let result = await okResponse(for: .send(surfaceID: surfaceId, text: text, origin: .automation), expected: "send")
         if result.1 == nil { await notifyMCPActivity(surfaceId: surfaceId, tool: "sendPaneText") }
         return result
     }
 
     func sendPaneKeys(surfaceId: String, keys: [String]) async -> (AnyCodable?, JSONRPCError?) {
         guard isToolAllowed("sendPaneKeys") else { return (nil, disabledError("sendPaneKeys")) }
-        let result = await okResponse(for: .sendKeys(surfaceID: surfaceId, keys: keys), expected: "sendKeys")
+        let result = await okResponse(for: .sendKeys(surfaceID: surfaceId, keys: keys, origin: .automation), expected: "sendKeys")
         if result.1 == nil { await notifyMCPActivity(surfaceId: surfaceId, tool: "sendPaneKeys") }
         return result
     }
@@ -432,7 +432,7 @@ struct KouenDaemonTools: Sendable {
         }
 
         // Send the agent launch command
-        _ = await send(.send(surfaceID: sid, text: agentCommand))
+        _ = await send(.send(surfaceID: sid, text: agentCommand, origin: .automation))
 
         return .success(SpawnedAgentSurface(
             sessionID: sessionID, surfaceID: sid, resolvedAgent: resolvedAgent, agentCommand: agentCommand
@@ -568,7 +568,7 @@ struct KouenDaemonTools: Sendable {
         }
 
         try? await Task.sleep(nanoseconds: 3_000_000_000)
-        _ = await send(.send(surfaceID: spawned.surfaceID, text: prompt + "\n"))
+        _ = await send(.send(surfaceID: spawned.surfaceID, text: prompt + "\n", origin: .automation))
         await notifyMCPActivity(surfaceId: spawned.surfaceID, tool: "kouenSpawnWorker")
 
         return (toolResult(json: .object([

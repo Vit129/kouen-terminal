@@ -58,7 +58,27 @@ import Foundation
 /// Bumped 2026-09-18 (P46 Phase 0): added `.featureList`/`featureGet`/`featureCreate`/`featureUpdatePhase`/
 /// `featureApproveGate`/`featureSetWorktree`/`featureSupersede`/`featureDelete`/`featureSweepMerged` to `IPCRequest`
 /// and `.featureInfo`/`.features` to `IPCResponse` for AI-SDLC Embedded Workflow Engine.
-public let ipcProtocolVersion: Int = 11
+///
+/// Bumped 2026-09-21 (P46 Pillar 6 gap 3): added `origin: WriteOrigin` to `.send`/`.sendData`/
+/// `.sendKeys`. Defaulted so every existing call site keeps compiling unchanged, but same
+/// functional-addition rule as M2/M5/M10 above: the origin-lock rejection this carries is
+/// dead weight unless the daemon binary actually implements it, so this forces
+/// `install-graceful.sh` to restart into one that does.
+public let ipcProtocolVersion: Int = 12
+
+/// Who initiated a write to a surface's PTY. Lets the daemon serialize concurrent writers
+/// instead of interleaving keystrokes into one broken command (P46 Pillar 6 gap 3) — a human
+/// typing and an automation `send`/`sendKeys` landing on the same surface at once.
+public enum WriteOrigin: String, Codable, Sendable {
+    case human
+    case automation
+}
+
+/// The `.waitFor` channel name `kouen agent wait <id>` blocks on for one surface, and
+/// `DaemonServer` signals when that surface's tab reaches `.waiting`/`.done` — shared here so
+/// client and daemon can never drift on the format, and namespaced so it can't collide with a
+/// script's own `kouen wait-for <channel>` name.
+public func agentWaitChannel(surfaceKey: String) -> String { "agent-status:\(surfaceKey)" }
 
 public enum IPCRequest: Codable, Sendable {
     case ping
@@ -142,8 +162,8 @@ public enum IPCRequest: Codable, Sendable {
     /// Posted by kouen-mcp after a mutating tool succeeds, so the daemon can
     /// stamp `lastMCPControlAt` on the affected tab and the UI shows a badge.
     case notifyMCPActivity(surfaceID: String, toolName: String)
-    case send(surfaceID: String, text: String)
-    case sendData(surfaceID: String, data: Data)
+    case send(surfaceID: String, text: String, origin: WriteOrigin = .human)
+    case sendData(surfaceID: String, data: Data, origin: WriteOrigin = .human)
     case getSnapshot
     case createSurface(cwd: String?, shell: String?)
     case ensureSurface(surfaceID: String, cwd: String?, shell: String?, rows: UInt16, cols: UInt16, scrollbackBytes: Int?)
@@ -151,7 +171,7 @@ public enum IPCRequest: Codable, Sendable {
     /// Close a bare surface not owned by the layout (e.g. a `display-popup` shell).
     case closeSurface(surfaceID: String)
     // Pane + key commands
-    case sendKeys(surfaceID: String, keys: [String])
+    case sendKeys(surfaceID: String, keys: [String], origin: WriteOrigin = .human)
     case capturePane(surfaceID: String, includeScrollback: Bool)
     /// `capture-pane -S <start> -E <end>`: a line range from scrollback+screen,
     /// negative numbers counting back from the bottom (tmux semantics). `escapeSequences`
