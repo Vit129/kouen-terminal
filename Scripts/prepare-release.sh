@@ -231,6 +231,6 @@ git --no-pager diff -- "$INFO_PLIST" "$KOUEN_VERSION_SWIFT" "$RELEASE_NOTES_SWIF
 
 echo ""
 echo "Release metadata prepared. Next:"
-echo "  Scripts/commit-push.sh"
+echo "  Scripts/commit-push-merge.sh"
 echo "  make prod              # repo-root production build"
 echo "  make install-graceful  # manual /Applications install only"

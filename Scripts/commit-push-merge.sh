@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Commit + push + auto-merge into main. Used by full-cycle.sh when run from
-# a worktree, so worktree-based changes can land on main before a release.
+# Commit + push + auto-merge into main. Used by `make start` option 1, and by
+# full-cycle.sh's Step 3 (worktree or plain checkout, main or feature branch)
+# so a release always ends up actually merged instead of leaving an
+# unmerged PR that the rest of the cycle silently builds/tags around.
 #
 # - Commits any pending changes (prompts for a Conventional Commit message).
 # - Rebases onto origin/main, pushes (force-with-lease, retries on conflict).
@@ -27,6 +29,18 @@ if [[ -n "$(git status --porcelain)" ]]; then
     exit 1
   fi
   git add -A
+
+  # A release commit (full-cycle.sh's Step 2 stages Info.plist on every bump) needs a
+  # version/bump/release/build keyword or .githooks/commit-msg rejects it — auto-tag so
+  # the guardrail never blocks on a forgotten keyword. Inert on a non-bumping commit
+  # (Info.plist isn't staged then), so this is safe to run unconditionally here.
+  if git diff --cached --name-only | grep -q "Info.plist" && ! echo "$msg" | grep -qiE "version|bump|release|build|[0-9]+\.[0-9]+\.[0-9]+"; then
+    ver="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Apps/Kouen/Sources/KouenApp/Resources/Info.plist 2>/dev/null || true)"
+    if [[ -n "$ver" ]]; then
+      msg="${msg} (release v${ver})"
+    fi
+  fi
+
   git commit -m "$msg"
 else
   echo "Nothing to commit — using existing commit(s)."

@@ -63,19 +63,27 @@ else
   ./Scripts/prepare-release.sh "${BUMP_ARGS[@]}"
 fi
 
-# Step 3: Commit and push.
+# Step 3: Commit, push, and merge into main — always via commit-push-merge.sh, whether
+# run from a worktree or a plain checkout, on main or a feature branch. (Previously the
+# plain-checkout path used commit-push.sh, whose "open a PR?" prompt only ever created
+# the PR and never merged it — Step 5 below then tagged/pushed main regardless of the
+# answer, so the prompt was a no-op either way. Unifying on the worktree path's
+# always-actually-merge behavior fixes that.)
 git_dir="$(git rev-parse --git-dir)"
-if [[ "$git_dir" == *"worktrees"* ]]; then
-  echo "Detected: running in a worktree — merging into main first."
-  ./Scripts/commit-push-merge.sh
+prior_branch="$(git branch --show-current)"
+./Scripts/commit-push-merge.sh
 
+if [[ "$git_dir" == *"worktrees"* ]]; then
   common_dir="$(git rev-parse --git-common-dir)"
   main_repo="$(cd "$(dirname "$common_dir")" && pwd)"
   echo "Code merged to main."
   cd "$main_repo"
   git pull --ff-only origin main
-else
-  ./Scripts/commit-push.sh
+elif [[ "$prior_branch" != "main" ]]; then
+  echo "Code merged to main — syncing local checkout."
+  git checkout main
+  git pull --ff-only origin main
+  git branch -d "$prior_branch" 2>/dev/null || true
 fi
 
 
