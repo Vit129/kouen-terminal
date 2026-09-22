@@ -247,14 +247,8 @@ final class SessionCoordinator: NSObject {
     }
     func openDefaultTerminalLaunch(_ launch: DefaultTerminalLaunchRequest) { sessionLifecycleService.openDefaultTerminalLaunch(launch) }
     func selectWorkspace(_ id: WorkspaceID) { sessionLifecycleService.selectWorkspace(id) }
-    func selectSession(workspaceID: WorkspaceID, sessionID: SessionID) {
-        SessionHistoryNavigator.shared.recordIfNeeded(previous: SessionHistoryNavigator.currentEntry(from: self))
-        sessionLifecycleService.selectSession(workspaceID: workspaceID, sessionID: sessionID)
-    }
-    func selectTab(workspaceID: WorkspaceID, tabID: TabID) {
-        SessionHistoryNavigator.shared.recordIfNeeded(previous: SessionHistoryNavigator.currentEntry(from: self))
-        sessionLifecycleService.selectTab(workspaceID: workspaceID, tabID: tabID)
-    }
+    func selectSession(workspaceID: WorkspaceID, sessionID: SessionID) { sessionLifecycleService.selectSession(workspaceID: workspaceID, sessionID: sessionID) }
+    func selectTab(workspaceID: WorkspaceID, tabID: TabID) { sessionLifecycleService.selectTab(workspaceID: workspaceID, tabID: tabID) }
     func selectAdjacentSession(offset: Int) { sessionLifecycleService.selectAdjacentSession(offset: offset) }
     func moveActiveSession(offset: Int) { sessionLifecycleService.moveActiveSession(offset: offset) }
     func closeActiveTab() { sessionLifecycleService.closeActiveTab() }

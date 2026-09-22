@@ -155,14 +155,6 @@ public enum BannerShortcutRegistry {
         id: "moveSessionRight", title: "Move Session Right",
         modifiers: .command, keyChar: "\u{F703}", keyLabel: "→")
 
-    public static let historyBack = Keybinding(
-        id: "historyBack", title: "Back",
-        modifiers: [.command, .option], keyChar: "\u{F702}", keyLabel: "←")
-
-    public static let historyForward = Keybinding(
-        id: "historyForward", title: "Forward",
-        modifiers: [.command, .option], keyChar: "\u{F703}", keyLabel: "→")
-
     public static let commandPalette = Keybinding(
         id: "commandPalette", title: "Command Palette",
         modifiers: .command, keyChar: "p")
@@ -253,7 +245,6 @@ public enum BannerShortcutRegistry {
         .init(key: "", description: "Navigation", showInBanner: true),
         .init(key: "⌘1–9 / ⌘⇧[ / ⌘⇧]", description: "switch / prev / next session"),
         .init(key: "\(previousPane.displayKey) / \(nextPane.displayKey) / ⌘←→", description: "navigate & reorder panes"),
-        .init(key: "\(historyBack.displayKey) / \(historyForward.displayKey)", description: "back / forward through tab switch history"),
         .init(key: "", description: "Search & Navigate", showInBanner: true),
         .init(key: commandPalette.displayKey, description: "fuzzy file / directory jump (zoxide)"),
         .init(key: jumpToDirectory.displayKey, description: "frecency dir picker — ↩ cd · ⌘↩ new tab (zoxide)"),

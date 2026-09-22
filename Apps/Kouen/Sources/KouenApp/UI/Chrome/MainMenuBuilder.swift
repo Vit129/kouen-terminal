@@ -87,11 +87,6 @@ enum MainMenuBuilder {
         workspace.submenu?.addItem(moveSessionLeft)
         let moveSessionRight = menuItem("Move Session Right", action: #selector(MenuTarget.moveSessionRight), binding: BannerShortcutRegistry.moveSessionRight)
         workspace.submenu?.addItem(moveSessionRight)
-        workspace.submenu?.addItem(.separator())
-        let historyBack = menuItem("Back", action: #selector(MenuTarget.historyBack), binding: BannerShortcutRegistry.historyBack)
-        workspace.submenu?.addItem(historyBack)
-        let historyForward = menuItem("Forward", action: #selector(MenuTarget.historyForward), binding: BannerShortcutRegistry.historyForward)
-        workspace.submenu?.addItem(historyForward)
         main.addItem(workspace)
 
         let view = NSMenuItem()
@@ -488,20 +483,15 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
         coordinator.selectSession(workspaceID: workspace.id, sessionID: workspace.sessions[index].id)
     }
 
+    // `historyBack`/`historyForward` (the < > buttons next to the sidebar toggle) are literally
+    // the same action as `previousSession`/`nextSession` — one selector each, not a duplicate
+    // implementation, so the button and the menu item can never drift out of sync with each other.
     @objc func previousSession() {
         SessionCoordinator.shared.selectAdjacentSession(offset: -1)
     }
 
     @objc func nextSession() {
         SessionCoordinator.shared.selectAdjacentSession(offset: 1)
-    }
-
-    @objc func historyBack() {
-        SessionHistoryNavigator.shared.goBack()
-    }
-
-    @objc func historyForward() {
-        SessionHistoryNavigator.shared.goForward()
     }
 
     @objc func moveSessionLeft() {
