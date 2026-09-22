@@ -1,0 +1,22 @@
+{
+  "generated_at": "2026-09-22T02:39:51.408055+00:00",
+  "nodes": {
+    "apps_kouen_sources_kouenapp_ui_chrome_mainsplitviewcontroller_mainsplitviewcontroller": {
+      "code_fingerprint": "de48966fad28b69a3358a5b6a033441689ff5b98292f85278b623ae56a911c51",
+      "label": "MainSplitViewController",
+      "last": "2026-09-19T12:59:38.587958+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-19T12:59:38.587958+00:00",
+          "outcome": "useful",
+          "q": "animateSidebar setContentLeadingInset MainSplitViewController"
+        }
+      ],
+      "score": 0.942357843,
+      "source_file": "Apps/Kouen/Sources/KouenApp/UI/Chrome/MainSplitViewController.swift",
+      "status": "tentative",
+      "uses": 1
+    }
+  },
+  "version": 1
+}
