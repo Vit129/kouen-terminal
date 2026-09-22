@@ -3,13 +3,13 @@ _Auto-generated from GRAPH_REPORT.md · do not edit manually_
 _Regen: `graphify update .`_
 
 ## Summary
-- 20164 nodes · 54258 edges · 2106 communities (625 shown, 1481 thin omitted)
-- Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 8070 edges (avg confidence: 0.74)
+- 20187 nodes · 54342 edges · 2087 communities (607 shown, 1480 thin omitted)
+- Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 8084 edges (avg confidence: 0.74)
 - Token cost: 0 input · 0 output
 
 
 ## Graph Freshness
-- Built from commit: `298b0ec6`
+- Built from commit: `eb86a294`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -19,7 +19,7 @@ _Regen: `graphify update .`_
 2. `i()` - 321 edges
 3. `a()` - 284 edges
 4. `t()` - 253 edges
-5. `SessionCoordinator` - 235 edges
+5. `SessionCoordinator` - 237 edges
 6. `TerminalEmulator` - 229 edges
 7. `u()` - 219 edges
 8. `SurfaceRegistry` - 214 edges
@@ -32,15 +32,15 @@ A high-degree node isn't always architecturally central - a widely-used
 utility/config file can rack up more edges than a real coupler while only
 ever touching one area. This ranks by how many DIFFERENT communities a
 node's neighbors span, not by raw edge count.
-1. `KouenPaths` - bridges 62 areas (143 edges)
-2. `AgentKind` - bridges 54 areas (144 edges)
-3. `SessionCoordinator` - bridges 50 areas (235 edges)
-4. `SessionSnapshot` - bridges 48 areas (181 edges)
-5. `Process` - bridges 48 areas (100 edges)
-6. `SurfaceRegistry` - bridges 44 areas (214 edges)
-7. `DaemonClient` - bridges 41 areas (209 edges)
-8. `KouenTerminalSurfaceView` - bridges 37 areas (343 edges)
-9. `Notification` - bridges 36 areas (66 edges)
+1. `AgentKind` - bridges 59 areas (144 edges)
+2. `SessionCoordinator` - bridges 56 areas (237 edges)
+3. `KouenPaths` - bridges 55 areas (143 edges)
+4. `Process` - bridges 48 areas (100 edges)
+5. `SessionSnapshot` - bridges 45 areas (181 edges)
+6. `DaemonClient` - bridges 42 areas (209 edges)
+7. `SurfaceRegistry` - bridges 39 areas (214 edges)
+8. `IPCResponse` - bridges 39 areas (103 edges)
+9. `MenuTarget` - bridges 39 areas (75 edges)
 
 ## Surprising Connections (you probably didn't know these)
 - `.selectedHost` --references--> `RemoteHost`  [INFERRED]
