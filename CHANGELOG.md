@@ -8,7 +8,12 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [4.18.1] - 2026-09-22
 
 ### Added
-- Release version bump to v4.18.1.
+- Refresh graphify index before any make-start action ([`3c8c13e`](https://github.com/Vit129/kouen-terminal/commit/3c8c13e70ed75f842112abc0961132a2acdc0577))
+
+### Fixed
+- Point skill-trigger at real skill names, not a nonexistent doc ([`e32685a`](https://github.com/Vit129/kouen-terminal/commit/e32685a48b793326fd4b8d8d06423c48c295a057))
+- Skip graphify refresh for the preview option ([`37d8006`](https://github.com/Vit129/kouen-terminal/commit/37d8006146355b59bfecbf69c7a2b054953f1338))
+- Skill-keywords.json was missing entries AGENTS.md declares ([`298b0ec`](https://github.com/Vit129/kouen-terminal/commit/298b0ec62d9e56ce3a4a64cc42522822ec1df271))
 
 ## [4.18.0] - 2026-09-21
 
