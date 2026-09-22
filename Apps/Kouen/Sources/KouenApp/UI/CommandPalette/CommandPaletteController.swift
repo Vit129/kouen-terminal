@@ -253,6 +253,8 @@ enum CommandPaletteController {
             "nav.jumpNotification": { coordinator.jumpToLatestNotification() },
             "nav.prevSession": { coordinator.selectAdjacentSession(offset: -1) },
             "nav.nextSession": { coordinator.selectAdjacentSession(offset: 1) },
+            "nav.historyBack": { SessionHistoryNavigator.shared.goBack() },
+            "nav.historyForward": { SessionHistoryNavigator.shared.goForward() },
             "nav.cyclePane": { coordinator.cycleActivePane(forward: true) },
             "pr.openInBrowser": {
                 guard let cwd = coordinator.snapshot.activeWorkspace?.activeTab?.cwd else { return }
@@ -294,6 +296,8 @@ enum CommandPaletteController {
             .init(id: "nav.jumpNotification", title: "Jump to Notification",      subtitle: "Focus the next tab waiting on input",            symbol: "bell.badge",                         shortcut: "⇧⌘U",      section: "navigation"),
             .init(id: "nav.prevSession",      title: "Previous Session",          subtitle: "Cycle to the previous session",                  symbol: "chevron.left.square",                shortcut: "⌘⇧[",     section: "navigation"),
             .init(id: "nav.nextSession",      title: "Next Session",              subtitle: "Cycle to the next session",                      symbol: "chevron.right.square",               shortcut: "⌘⇧]",     section: "navigation"),
+            .init(id: "nav.historyBack",      title: "Back",                      subtitle: "Go back through tab/session switch history",     symbol: "chevron.left",                       shortcut: "⌥⌘←",     section: "navigation"),
+            .init(id: "nav.historyForward",   title: "Forward",                   subtitle: "Go forward through tab/session switch history",  symbol: "chevron.right",                      shortcut: "⌥⌘→",     section: "navigation"),
             .init(id: "nav.cyclePane",        title: "Cycle Pane",                subtitle: "Move focus to the next pane in the tab",         symbol: "rectangle.3.group",                  shortcut: "⌘]",       section: "navigation"),
             .init(id: "pr.openInBrowser",    title: "Open PR in Browser Pane",   subtitle: "View the current branch's PR inline",            symbol: "arrow.up.right.square",              shortcut: "⌃⌘G",      section: "actions"),
             .init(id: "pr.rerunFailed",      title: "Re-run Failed CI",          subtitle: "Re-run failed jobs for the latest workflow run",  symbol: "arrow.clockwise",                    shortcut: "",          section: "actions"),

@@ -29,6 +29,8 @@ final class MainSplitViewController: NSViewController {
     private let headerGroup = NSView()
     private let appTitleLabel = NSTextField(labelWithString: "Kouen")
     private let sidebarToggle = SoftIconButton(frame: NSRect(x: 0, y: 0, width: 24, height: 24))
+    private let historyBackButton = SoftIconButton(frame: NSRect(x: 0, y: 0, width: 24, height: 24))
+    private let historyForwardButton = SoftIconButton(frame: NSRect(x: 0, y: 0, width: 24, height: 24))
     private var headerGroupLeadingConstraint: NSLayoutConstraint?
     // params valid while sidebarDisplayLink is non-nil
     private var _sidebarStart: CGFloat = 0
@@ -376,6 +378,7 @@ final class MainSplitViewController: NSViewController {
             content.reloadTabBar()
         }
         updateWindowTitle()
+        updateHistoryButtonsEnabled()
     }
 
     private func updateWindowTitle() {
@@ -600,8 +603,22 @@ final class MainSplitViewController: NSViewController {
         sidebarToggle.action = #selector(toggleSidebarButtonClicked)
         sidebarToggle.translatesAutoresizingMaskIntoConstraints = false
 
+        historyBackButton.target = self
+        historyBackButton.action = #selector(historyBackButtonClicked)
+        historyBackButton.translatesAutoresizingMaskIntoConstraints = false
+        historyBackButton.setSymbol("chevron.left", accessibilityDescription: "Back", pointSize: 12, weight: .medium)
+        historyBackButton.toolTip = "Back (⌥⌘←)"
+
+        historyForwardButton.target = self
+        historyForwardButton.action = #selector(historyForwardButtonClicked)
+        historyForwardButton.translatesAutoresizingMaskIntoConstraints = false
+        historyForwardButton.setSymbol("chevron.right", accessibilityDescription: "Forward", pointSize: 12, weight: .medium)
+        historyForwardButton.toolTip = "Forward (⌥⌘→)"
+
         headerGroup.addSubview(appTitleLabel)
         headerGroup.addSubview(sidebarToggle)
+        headerGroup.addSubview(historyBackButton)
+        headerGroup.addSubview(historyForwardButton)
 
         view.addSubview(headerGroup)
 
@@ -620,9 +637,33 @@ final class MainSplitViewController: NSViewController {
             sidebarToggle.centerYAnchor.constraint(equalTo: headerGroup.centerYAnchor),
             sidebarToggle.widthAnchor.constraint(equalToConstant: 26),
             sidebarToggle.heightAnchor.constraint(equalToConstant: 26),
-            sidebarToggle.trailingAnchor.constraint(equalTo: headerGroup.trailingAnchor),
+
+            historyBackButton.leadingAnchor.constraint(equalTo: sidebarToggle.trailingAnchor, constant: 2),
+            historyBackButton.centerYAnchor.constraint(equalTo: headerGroup.centerYAnchor),
+            historyBackButton.widthAnchor.constraint(equalToConstant: 26),
+            historyBackButton.heightAnchor.constraint(equalToConstant: 26),
+
+            historyForwardButton.leadingAnchor.constraint(equalTo: historyBackButton.trailingAnchor, constant: 2),
+            historyForwardButton.centerYAnchor.constraint(equalTo: headerGroup.centerYAnchor),
+            historyForwardButton.widthAnchor.constraint(equalToConstant: 26),
+            historyForwardButton.heightAnchor.constraint(equalToConstant: 26),
+            historyForwardButton.trailingAnchor.constraint(equalTo: headerGroup.trailingAnchor),
         ])
         updateSidebarToggleIcon()
+        updateHistoryButtonsEnabled()
+    }
+
+    private func updateHistoryButtonsEnabled() {
+        historyBackButton.isEnabled = SessionHistoryNavigator.shared.canGoBack
+        historyForwardButton.isEnabled = SessionHistoryNavigator.shared.canGoForward
+    }
+
+    @objc private func historyBackButtonClicked() {
+        SessionHistoryNavigator.shared.goBack()
+    }
+
+    @objc private func historyForwardButtonClicked() {
+        SessionHistoryNavigator.shared.goForward()
     }
 
     private func updateSidebarToggleIcon() {
