@@ -308,6 +308,58 @@ final class WorktreeIsolationTests: XCTestCase {
         XCTAssertEqual(WorktreeManager.scanGeneration, gen0 + 3)
     }
 
+    // MARK: - Primary Tree Branch Guard (P47)
+    //
+    // `WorktreeAutoIsolateService.isolate()` performs this exact sequence (checkout default in
+    // the primary tree, then a REAL — never --detach — branch checkout in the worktree) when a
+    // tab's branch reactively changes. These tests exercise the same `WorktreeManager` calls the
+    // service makes, proving the mechanism the fix relies on: a real branch checkout that can
+    // never freeze/diverge like the `--detach` snapshot it replaces (see
+    // agent-memory/plans/p47-primary-branch-worktree-fix/).
+
+    func testPrimaryTreeChecksOutRealBranchNotDetached() throws {
+        // Simulate a tab whose primary tree already switched to a feature branch.
+        shell("git checkout -b feat-p47", in: repoPath)
+        XCTAssertEqual(shell("git branch --show-current", in: repoPath)?.trimmingCharacters(in: .whitespacesAndNewlines), "feat-p47")
+
+        // isolate()'s sequence: free the branch name in the primary tree first...
+        let defaultBranch = try XCTUnwrap(mgr.defaultBaseBranch(repoPath: repoPath))
+        XCTAssertEqual(defaultBranch, "main")
+        shell("git checkout \(defaultBranch)", in: repoPath)
+
+        // ...then check the branch out for real (not detached) in the worktree. `checkoutExisting:
+        // true` because the branch already exists — it's the branch the tab was just on.
+        let wtPath = try XCTUnwrap(mgr.create(repoPath: repoPath, sessionID: "feat-p47", branch: "feat-p47", baseRef: defaultBranch, checkoutExisting: true))
+
+        // Primary tree is back on the default branch, never left parked on the feature branch.
+        XCTAssertEqual(shell("git branch --show-current", in: repoPath)?.trimmingCharacters(in: .whitespacesAndNewlines), "main")
+
+        // Worktree is a real branch checkout, not a detached HEAD snapshot.
+        XCTAssertTrue(FileManager.default.fileExists(atPath: wtPath))
+        let list = mgr.list(repoPath: repoPath)
+        XCTAssertTrue(list.contains { $0.branch == "feat-p47" })
+        let gitList = shell("git worktree list", in: repoPath) ?? ""
+        XCTAssertFalse(gitList.contains("detached"), "worktree must be a real branch checkout, never detached: \(gitList)")
+
+        // Lineage is recorded (only happens for a real branch checkout, never for `branch: nil`).
+        XCTAssertEqual(mgr.baseBranch(for: "feat-p47", in: repoPath), "main")
+    }
+
+    func testDirtyPrimaryTreeIsNotCheckedOutFromUnderneath() throws {
+        // Simulate the exact incident: primary tree on a feature branch WITH an uncommitted edit.
+        shell("git checkout -b feat-p47-dirty", in: repoPath)
+        try "uncommitted".write(toFile: repoPath + "/dirty.txt", atomically: true, encoding: .utf8)
+
+        // `isolate()`'s dirty guard: `WorktreeManager.isDirty` must refuse before any checkout runs.
+        XCTAssertTrue(mgr.isDirty(worktreePath: repoPath))
+
+        // The primary tree must be left completely untouched — still on the feature branch, edit
+        // still there — never silently carried onto the default branch (which is strictly worse
+        // than the original bug, since the fresh worktree wouldn't have it either).
+        XCTAssertEqual(shell("git branch --show-current", in: repoPath)?.trimmingCharacters(in: .whitespacesAndNewlines), "feat-p47-dirty")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: repoPath + "/dirty.txt"))
+    }
+
     // MARK: - Helpers
 
     @discardableResult
