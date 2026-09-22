@@ -118,6 +118,17 @@ final class InputEncoderTests: XCTestCase {
         XCTAssertEqual(encoder.encodePaste("hi", modes: modes), bytes("\u{1b}[200~hi\u{1b}[201~"))
     }
 
+    /// Paste protection: a multi-line paste must still be wrapped even when the shell never
+    /// announced bracketed-paste support (DECSET 2004), so it lands as one block instead of
+    /// running command-per-line.
+    func testForceBracketWrapsEvenWithoutModeEnabled() {
+        let modes = TerminalModes() // bracketedPaste stays false
+        XCTAssertEqual(
+            encoder.encodePaste("line1\rline2", modes: modes, forceBracket: true),
+            bytes("\u{1b}[200~line1\rline2\u{1b}[201~")
+        )
+    }
+
     // MARK: Mouse
 
     func testMouseReturnsEmptyWhenTrackingOff() {
