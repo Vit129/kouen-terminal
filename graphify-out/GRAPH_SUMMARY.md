@@ -3,13 +3,13 @@ _Auto-generated from GRAPH_REPORT.md · do not edit manually_
 _Regen: `graphify update .`_
 
 ## Summary
-- 20164 nodes · 54273 edges · 2131 communities (648 shown, 1483 thin omitted)
-- Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 8076 edges (avg confidence: 0.74)
+- 20158 nodes · 54294 edges · 2097 communities (634 shown, 1463 thin omitted)
+- Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 8078 edges (avg confidence: 0.74)
 - Token cost: 0 input · 0 output
 
 
 ## Graph Freshness
-- Built from commit: `eb86a294`
+- Built from commit: `9574216b`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -33,14 +33,14 @@ utility/config file can rack up more edges than a real coupler while only
 ever touching one area. This ranks by how many DIFFERENT communities a
 node's neighbors span, not by raw edge count.
 1. `KouenPaths` - bridges 62 areas (143 edges)
-2. `AgentKind` - bridges 58 areas (144 edges)
-3. `Process` - bridges 54 areas (101 edges)
-4. `SessionCoordinator` - bridges 53 areas (235 edges)
-5. `SessionSnapshot` - bridges 49 areas (181 edges)
-6. `SurfaceRegistry` - bridges 48 areas (214 edges)
-7. `DaemonClient` - bridges 45 areas (209 edges)
-8. `KouenTerminalSurfaceView` - bridges 36 areas (343 edges)
-9. `MenuTarget` - bridges 36 areas (73 edges)
+2. `AgentKind` - bridges 55 areas (144 edges)
+3. `Process` - bridges 50 areas (101 edges)
+4. `SessionCoordinator` - bridges 48 areas (235 edges)
+5. `DaemonClient` - bridges 47 areas (209 edges)
+6. `SessionSnapshot` - bridges 46 areas (181 edges)
+7. `SurfaceRegistry` - bridges 38 areas (214 edges)
+8. `IPCResponse` - bridges 37 areas (103 edges)
+9. `Notification` - bridges 35 areas (66 edges)
 
 ## Surprising Connections (you probably didn't know these)
 - `.selectedHost` --references--> `RemoteHost`  [INFERRED]
