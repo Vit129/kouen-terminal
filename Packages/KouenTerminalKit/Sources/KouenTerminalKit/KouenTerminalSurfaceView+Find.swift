@@ -306,7 +306,12 @@ extension KouenTerminalSurfaceView {
     private func deliverPaste(_ normalized: String) {
         snapToBottom()
         clearSelection()
-        emit(inputEncoder.encodePaste(normalized, modes: inputModes()))
+        let modes = inputModes()
+        // Paste protection: if the shell/program never announced bracketed-paste support
+        // (DECSET 2004) but the paste is unsafe (contains a line break — would otherwise run as
+        // a command per line, unbracketed), force-wrap it ourselves rather than sending it raw.
+        let forceBracket = pasteProtection && !modes.bracketedPaste && PasteController.isUnsafePaste(normalized)
+        emit(inputEncoder.encodePaste(normalized, modes: modes, forceBracket: forceBracket))
     }
 
     /// Select the entire visible viewport (Edit ▸ Select All / ⌘A).
