@@ -29,6 +29,8 @@ final class MainSplitViewController: NSViewController {
     private let headerGroup = NSView()
     private let appTitleLabel = NSTextField(labelWithString: "Kouen")
     private let sidebarToggle = SoftIconButton(frame: NSRect(x: 0, y: 0, width: 24, height: 24))
+    private let previousSessionButton = SoftIconButton(frame: NSRect(x: 0, y: 0, width: 24, height: 24))
+    private let nextSessionButton = SoftIconButton(frame: NSRect(x: 0, y: 0, width: 24, height: 24))
     private var headerGroupLeadingConstraint: NSLayoutConstraint?
     // params valid while sidebarDisplayLink is non-nil
     private var _sidebarStart: CGFloat = 0
@@ -549,7 +551,11 @@ final class MainSplitViewController: NSViewController {
     }
 
     private var collapsedTabBarInset: CGFloat {
-        effectiveHeaderLeading + 72 + 12
+        // 72 = title label + gap + sidebarToggle (the original single-button header cluster).
+        // +56 = previousSessionButton + nextSessionButton (26pt each + 2pt gap, ×2) — without
+        // this, the collapsed-sidebar tab bar's leading inset stays too narrow and slides on top
+        // of nextSessionButton, covering it and stealing its clicks.
+        effectiveHeaderLeading + 72 + 56 + 12
     }
 
     /// Inset the tab bar proportionally to how collapsed the sidebar is: full inset
@@ -600,8 +606,25 @@ final class MainSplitViewController: NSViewController {
         sidebarToggle.action = #selector(toggleSidebarButtonClicked)
         sidebarToggle.translatesAutoresizingMaskIntoConstraints = false
 
+        // Target is MenuTarget.shared, not self — same selector the "Previous/Next Session" menu
+        // items (and ⌘⇧[ / ⌘⇧]) already use, so the < > buttons are the exact same list-order
+        // cycle through open sessions, not a second implementation to keep in sync.
+        previousSessionButton.target = MenuTarget.shared
+        previousSessionButton.action = #selector(MenuTarget.previousSession)
+        previousSessionButton.translatesAutoresizingMaskIntoConstraints = false
+        previousSessionButton.setSymbol("chevron.left", accessibilityDescription: "Previous Session", pointSize: 12, weight: .medium)
+        previousSessionButton.toolTip = "Previous Session (⌘⇧[)"
+
+        nextSessionButton.target = MenuTarget.shared
+        nextSessionButton.action = #selector(MenuTarget.nextSession)
+        nextSessionButton.translatesAutoresizingMaskIntoConstraints = false
+        nextSessionButton.setSymbol("chevron.right", accessibilityDescription: "Next Session", pointSize: 12, weight: .medium)
+        nextSessionButton.toolTip = "Next Session (⌘⇧])"
+
         headerGroup.addSubview(appTitleLabel)
         headerGroup.addSubview(sidebarToggle)
+        headerGroup.addSubview(previousSessionButton)
+        headerGroup.addSubview(nextSessionButton)
 
         view.addSubview(headerGroup)
 
@@ -620,7 +643,17 @@ final class MainSplitViewController: NSViewController {
             sidebarToggle.centerYAnchor.constraint(equalTo: headerGroup.centerYAnchor),
             sidebarToggle.widthAnchor.constraint(equalToConstant: 26),
             sidebarToggle.heightAnchor.constraint(equalToConstant: 26),
-            sidebarToggle.trailingAnchor.constraint(equalTo: headerGroup.trailingAnchor),
+
+            previousSessionButton.leadingAnchor.constraint(equalTo: sidebarToggle.trailingAnchor, constant: 2),
+            previousSessionButton.centerYAnchor.constraint(equalTo: headerGroup.centerYAnchor),
+            previousSessionButton.widthAnchor.constraint(equalToConstant: 26),
+            previousSessionButton.heightAnchor.constraint(equalToConstant: 26),
+
+            nextSessionButton.leadingAnchor.constraint(equalTo: previousSessionButton.trailingAnchor, constant: 2),
+            nextSessionButton.centerYAnchor.constraint(equalTo: headerGroup.centerYAnchor),
+            nextSessionButton.widthAnchor.constraint(equalToConstant: 26),
+            nextSessionButton.heightAnchor.constraint(equalToConstant: 26),
+            nextSessionButton.trailingAnchor.constraint(equalTo: headerGroup.trailingAnchor),
         ])
         updateSidebarToggleIcon()
     }
