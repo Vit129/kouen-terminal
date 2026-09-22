@@ -483,6 +483,9 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
         coordinator.selectSession(workspaceID: workspace.id, sessionID: workspace.sessions[index].id)
     }
 
+    // `historyBack`/`historyForward` (the < > buttons next to the sidebar toggle) are literally
+    // the same action as `previousSession`/`nextSession` — one selector each, not a duplicate
+    // implementation, so the button and the menu item can never drift out of sync with each other.
     @objc func previousSession() {
         SessionCoordinator.shared.selectAdjacentSession(offset: -1)
     }

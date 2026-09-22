@@ -240,10 +240,12 @@ public struct InputEncoder: Sendable {
         return [0x1B, 0x5B, 0x4D, cb, cx, cy] // ESC [ M …
     }
 
-    /// Wrap pasted text in bracketed-paste markers when the mode is enabled.
-    public func encodePaste(_ text: String, modes: TerminalModes) -> [UInt8] {
+    /// Wrap pasted text in bracketed-paste markers when the mode is enabled, or when
+    /// `forceBracket` is set — used by paste protection to keep a multi-line paste from being
+    /// auto-run line by line even when the shell/program never sent DECSET 2004 to request it.
+    public func encodePaste(_ text: String, modes: TerminalModes, forceBracket: Bool = false) -> [UInt8] {
         let body = Array(text.utf8)
-        guard modes.bracketedPaste else { return body }
+        guard modes.bracketedPaste || forceBracket else { return body }
         return esc("[200~") + body + esc("[201~")
     }
 
