@@ -175,7 +175,7 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/Services/SessionCoordinator.swift": {
-    "mtime": 1789981112.4572182,
+    "mtime": 1790061721.829752,
     "ast_hash": "50553fd42810eafc5cd2717080c4b89c",
     "semantic_hash": ""
   },
@@ -250,7 +250,7 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/Services/WorktreeAutoIsolateService.swift": {
-    "mtime": 1790057173.540899,
+    "mtime": 1790063819.0542853,
     "ast_hash": "b3b679be484e5a92c1056aea4cd705c7",
     "semantic_hash": ""
   },
@@ -355,13 +355,13 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Chrome/MainMenuBuilder.swift": {
-    "mtime": 1789981112.4594784,
-    "ast_hash": "869a52a0763bb118eedb884d138df435",
+    "mtime": 1790063844.1072295,
+    "ast_hash": "2636e0ddb698b78cc0369600d1698bc6",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Chrome/MainSplitViewController.swift": {
-    "mtime": 1789981112.4599433,
-    "ast_hash": "b917c7eb8c4c54306005c1b690d3e3e9",
+    "mtime": 1790063844.107852,
+    "ast_hash": "c359216542fa3cde81ec68b9a530d68d",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Chrome/MainWindowController.swift": {
@@ -410,7 +410,7 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/CommandPalette/CommandPaletteController.swift": {
-    "mtime": 1789699199.7596447,
+    "mtime": 1790061739.3508375,
     "ast_hash": "6952bfc40e9a8081859b6b3adfe8987e",
     "semantic_hash": ""
   },
@@ -610,7 +610,7 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Shared/KouenDesign.swift": {
-    "mtime": 1789694249.1412992,
+    "mtime": 1790061764.179496,
     "ast_hash": "f19385171d8040343c70d6fe3ca1a78b",
     "semantic_hash": ""
   },
@@ -1070,7 +1070,7 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/BannerShortcutRegistry.swift": {
-    "mtime": 1789981112.465658,
+    "mtime": 1790059806.5550103,
     "ast_hash": "8c1fbaaa84648e18539a0aeda180eeda",
     "semantic_hash": ""
   },
@@ -1135,7 +1135,7 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Worktree/WorktreeManager.swift": {
-    "mtime": 1790057165.1640792,
+    "mtime": 1790063819.054822,
     "ast_hash": "41d05f4b967d4a2edbb144d268885390",
     "semantic_hash": ""
   },
@@ -1620,8 +1620,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenTerminalEngine/Sources/KouenTerminalEngine/InputEncoder.swift": {
-    "mtime": 1785510867.5864778,
-    "ast_hash": "e29772e12c2535f4b97d9aacf7c3bc11",
+    "mtime": 1790063844.1082506,
+    "ast_hash": "f157ea05d6c4ddd8a310ca902294c6e8",
     "semantic_hash": ""
   },
   "Packages/KouenTerminalEngine/Sources/KouenTerminalEngine/KouenGridTerminal.swift": {
@@ -1690,8 +1690,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenTerminalKit/Sources/KouenTerminalKit/KouenTerminalSurfaceView+Find.swift": {
-    "mtime": 1788915781.2124438,
-    "ast_hash": "e8ec6b607e5a4824e0b1fee853d52843",
+    "mtime": 1790063844.1086617,
+    "ast_hash": "4ab60708f5a4176c53593d1c98f5045e",
     "semantic_hash": ""
   },
   "Packages/KouenTerminalKit/Sources/KouenTerminalKit/KouenTerminalSurfaceView+Input.swift": {
@@ -2600,7 +2600,7 @@
     "semantic_hash": ""
   },
   "Tests/KouenCoreTests/WorktreeIsolationTests.swift": {
-    "mtime": 1790057279.7584238,
+    "mtime": 1790063819.0554361,
     "ast_hash": "e2398d412ff85981419168cddfa887c4",
     "semantic_hash": ""
   },
@@ -2905,8 +2905,8 @@
     "semantic_hash": ""
   },
   "Tests/KouenTerminalEngineTests/InputEncoderTests.swift": {
-    "mtime": 1785510867.6551619,
-    "ast_hash": "ea33654e6e226ce4c3d977be7c61c290",
+    "mtime": 1790063844.108958,
+    "ast_hash": "91c75774e99845c2ba4203795983274e",
     "semantic_hash": ""
   },
   "Tests/KouenTerminalEngineTests/KittyGraphicsConformanceTests.swift": {
@@ -4392,6 +4392,11 @@
   "Tools/kouen/Sources/KouenCLI/KouenCLI+Verify.swift": {
     "mtime": 1789981112.4782088,
     "ast_hash": "2d22f8ee5b5333584bf1ee542b7eb152",
+    "semantic_hash": ""
+  },
+  "Tests/KouenTerminalKitTests/PasteControllerTests.swift": {
+    "mtime": 1790063844.1093588,
+    "ast_hash": "3d0a6e9892e3a86be4394ac2b681ac2a",
     "semantic_hash": ""
   }
 }
