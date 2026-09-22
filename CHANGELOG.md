@@ -8,7 +8,14 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [4.18.2] - 2026-09-22
 
 ### Added
-- Release version bump to v4.18.2.
+- Add browser-style back/forward navigation for tab/session switches ([`80b25ae`](https://github.com/Vit129/kouen-terminal/commit/80b25aeeecdd5627ad696cfad18380b97e28fd1e))
+
+### Changed
+- Replace MRU back/forward with the existing session-cycle logic ([`93362f0`](https://github.com/Vit129/kouen-terminal/commit/93362f0f64ae28ddb8179b5a0588bd261b97e3a1))
+
+### Fixed
+- Stop primary tree from squatting on a feature branch after auto-isolate ([`d1aa214`](https://github.com/Vit129/kouen-terminal/commit/d1aa21438eb2872f23c20f91e4f3528add15bfe9))
+- Force bracketed-paste wrapping for unsafe multi-line pastes ([`be58975`](https://github.com/Vit129/kouen-terminal/commit/be589755c20f981459f1e3a2aa4bac266ace5b33))
 
 ## [4.18.1] - 2026-09-22
 
