@@ -92,12 +92,18 @@ public struct WorktreeManager: Sendable {
     ///   - sessionID: Short identifier used verbatim as the worktree folder name.
     ///   - branch: Branch to create+checkout. If nil, detached HEAD (no new branch).
     ///   - baseRef: The ref to branch/detach from (e.g. "origin/main"). Defaults to current HEAD.
+    ///   - checkoutExisting: When `branch` is non-nil, checks out an EXISTING local branch
+    ///     (`git worktree add <path> <branch>`, no `-b`) instead of creating a new one. Used by
+    ///     `WorktreeAutoIsolateService.isolate()` (P47), where the branch already exists — it's
+    ///     the branch a tab was already on when the switch was detected — so `-b` would always
+    ///     fail with "branch already exists". Ignored when `branch` is nil.
     /// - Returns: The absolute path to the new worktree, or nil if `git worktree add` failed.
     public func create(
         repoPath: String,
         sessionID: String,
         branch: String? = nil,
-        baseRef: String? = nil
+        baseRef: String? = nil,
+        checkoutExisting: Bool = false
     ) -> String? {
         // Worktree dir is always <repoPath>/.kouen-worktrees/<sessionID> — kept inside the repo
         // (gitignored) so it's discoverable via `worktree list` and cleaned up with the repo.
@@ -105,18 +111,25 @@ public struct WorktreeManager: Sendable {
             .appendingPathComponent(Self.worktreeDir)
             .appending("/\(sessionID)")
 
-        // Build `git worktree add ...`. Order matters: [-b branch | --detach] <path> [baseRef].
+        // Build `git worktree add ...`. Order matters: [-b branch | branch | --detach] <path> [baseRef].
         var args = ["worktree", "add"]
-        if let branch {
+        if let branch, checkoutExisting {
+            // Existing-branch mode: `git worktree add <path> <branch>` — checks out a branch that
+            // already exists elsewhere in refs/heads; no `baseRef` positional (the branch IS the ref).
+            args += [worktreePath, branch]
+        } else if let branch {
             // New branch mode: `git worktree add -b <branch> <path>` — errors if branch exists.
             args += ["-b", branch, worktreePath]
+            if let baseRef {
+                // Trailing positional commit-ish the new branch starts from (branch tip / origin/main).
+                args.append(baseRef)
+            }
         } else {
             // Detached mode: `git worktree add --detach <path>` — no branch, HEAD floats at baseRef.
             args += ["--detach", worktreePath]
-        }
-        if let baseRef {
-            // Trailing positional commit-ish the new worktree starts from (branch tip / origin/main).
-            args.append(baseRef)
+            if let baseRef {
+                args.append(baseRef)
+            }
         }
 
         guard runGit(args, in: repoPath) else { return nil }
