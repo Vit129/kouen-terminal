@@ -528,10 +528,16 @@ final class MainSplitViewController: NSViewController {
         if _sidebarT0 == 0 {
             _sidebarT0 = now
         }
-        let duration = KouenDesign.Motion.fast // Snappy 0.16s instead of sluggish 0.22s
+        // 0.20s ease-out quart (own constant, not KouenDesign.Motion.fast — that token is
+        // shared by ~15 other UI animations, and this tuning is sidebar-slide-specific).
+        // The 0.16s cubic curve (2026-09-19 lag fix) killed real input lag, but 160ms end to
+        // end still reads as a snap rather than a glide — measured 170-195ms actual via
+        // sidebarLog telemetry, confirming the mechanism itself has no drops/stutter, just a
+        // duration/curve too fast to perceive as fluid. Quart (n=4) keeps the same near-instant
+        // initial velocity (no reintroduced lag) but decelerates more gradually into the stop.
+        let duration: TimeInterval = 0.20
         let raw = min(1, max(0, (now - _sidebarT0) / duration))
-        // Ease-out cubic: instantaneous high velocity for zero perceived latency, smooth deceleration
-        let eased = 1 - pow(1 - raw, 3)
+        let eased = 1 - pow(1 - raw, 4)
         let width = start + (target - start) * CGFloat(eased)
         // Drive the divider inside a transaction with implicit actions OFF.
         // Direct frame assignments in setSidebarWidth keep the divider and backdrop in sync.
@@ -541,6 +547,14 @@ final class MainSplitViewController: NSViewController {
         CATransaction.setDisableActions(true)
         setSidebarWidth(width, isAnimating: true)
         CATransaction.commit()
+        // Track the CURRENT interpolated width every frame, not just at start/end.
+        // `applySidebarVisibility` only sets this once for `start` before the slide begins, so on
+        // a close it froze at inset=0 (computed from the start width, 320) for the whole slide —
+        // the content pane's tab bar then rendered flush left with zero inset while the pane
+        // itself was sliding to cover the fixed top-left header cluster (title/sidebar-toggle/
+        // prev-next-session buttons), then snapped to the correct full inset only on completion.
+        // That "content covers the header, then jumps back" was the bug — not the duration/curve.
+        setContentLeadingInset(forSidebarWidth: width)
         if raw >= 1 {
             sidebarDisplayLink?.invalidate()
             sidebarDisplayLink = nil
