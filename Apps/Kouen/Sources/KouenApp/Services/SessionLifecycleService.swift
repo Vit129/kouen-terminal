@@ -28,7 +28,8 @@ final class SessionLifecycleService {
         name: String? = nil,
         worktreePath: String? = nil,
         parentRepoPath: String? = nil,
-        taskName: String? = nil
+        taskName: String? = nil,
+        initialCommand: String? = nil
     ) {
         let resolvedCWD = cwd ?? coord.activeTabCWD ?? coord.settings.defaultCWD
         let targetRoot = KouenDesign.projectGroupRootPath(for: resolvedCWD)
@@ -67,8 +68,16 @@ final class SessionLifecycleService {
                workspace.sessions.firstIndex(where: { $0.id == sessionID }) != targetIndex {
                 coord.reorderSession(workspaceID: workspaceID, sessionID: sessionID, toIndex: targetIndex)
             }
-            // P24: Auto-execute setupScript from kouen.json
-            if let config = ProjectConfig.load(from: resolvedCWD), let setup = config.setupScript, !setup.isEmpty {
+            // P24: Auto-execute setupScript from kouen.json — skipped when an explicit
+            // `initialCommand` was requested (e.g. resuming a past agent session): the two
+            // typed one after another into a shell that's still initializing would race.
+            if let initialCommand {
+                if let tab = coord.snapshot.activeWorkspace?.sessions.first(where: { $0.id == sessionID })?.tabs.first,
+                   let surfaceID = tab.rootPane.allSurfaceIDs().first {
+                    try? await Task.sleep(for: .milliseconds(500))
+                    await coord.requestDaemon(.sendData(surfaceID: surfaceID.uuidString, data: Data((initialCommand + "\r").utf8), origin: .automation))
+                }
+            } else if let config = ProjectConfig.load(from: resolvedCWD), let setup = config.setupScript, !setup.isEmpty {
                 if let tab = coord.snapshot.activeWorkspace?.sessions.first(where: { $0.id == sessionID })?.tabs.first,
                    let surfaceID = tab.rootPane.allSurfaceIDs().first {
                     // Small delay to let shell initialize before sending command

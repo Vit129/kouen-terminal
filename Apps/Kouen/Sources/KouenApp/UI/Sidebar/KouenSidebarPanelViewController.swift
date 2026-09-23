@@ -609,8 +609,11 @@ final class KouenSidebarPanelViewController: NSViewController {
             onResume: { [weak self] record in
                 self?.resumeAgentSession(record)
             },
-            onViewLog: { [weak self] record in
-                self?.previewFile(path: record.transcriptPath)
+            onResumeInWorktree: { [weak self] record in
+                self?.resumeAgentSessionInWorktree(record)
+            },
+            onContinueInNewSession: { [weak self] record in
+                self?.continueAgentSessionInNewSession(record)
             }
         )
         let hosting = NSHostingView(rootView: historyView)
@@ -659,6 +662,8 @@ final class KouenSidebarPanelViewController: NSViewController {
         }
     }
 
+    /// Resumes in a new tab inside the current session — the original one-button behavior.
+    /// Fastest option, but shares the current session's worktree/branch (if any).
     private func resumeAgentSession(_ record: AgentSessionRecord) {
         let cmd = record.agentKind.resumeCommand(sessionID: record.id)
         let req = DefaultTerminalLaunchRequest(
@@ -667,6 +672,55 @@ final class KouenSidebarPanelViewController: NSViewController {
             title: "\(record.agentKind.displayName): \(record.projectName)"
         )
         SessionCoordinator.shared.sessionLifecycleService.openDefaultTerminalLaunch(req)
+    }
+
+    /// Resumes inside a fresh, isolated git worktree — same idea as P32's explicit
+    /// task-worktree creation (`addAgentTask`), just seeded with a resume command instead of
+    /// a blank shell. Requires the session's original project to be a git repo.
+    private func resumeAgentSessionInWorktree(_ record: AgentSessionRecord) {
+        guard let workspaceID = SessionCoordinator.shared.snapshot.activeWorkspace?.id else { return }
+        let manager = WorktreeManager()
+        guard let repoPath = manager.repoRoot(for: record.projectPath) else {
+            let alert = NSAlert()
+            alert.messageText = "Can't resume in worktree"
+            alert.informativeText = "\(record.projectPath) isn't inside a git repository."
+            alert.runModal()
+            return
+        }
+
+        let sanitizedBranch = "resume-\(record.id)"
+            .lowercased()
+            .replacingOccurrences(of: #"[^a-z0-9-]+"#, with: "-", options: .regularExpression)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+        guard let worktreePath = manager.create(repoPath: repoPath, sessionID: sanitizedBranch, branch: sanitizedBranch) else {
+            let alert = NSAlert()
+            alert.messageText = "Can't resume in worktree"
+            alert.informativeText = "Failed to create a worktree for this session (it may already exist)."
+            alert.runModal()
+            return
+        }
+
+        SessionCoordinator.shared.addSession(
+            to: workspaceID,
+            cwd: worktreePath,
+            name: "Resume: \(record.title)",
+            worktreePath: worktreePath,
+            parentRepoPath: repoPath,
+            initialCommand: record.agentKind.resumeCommand(sessionID: record.id)
+        )
+    }
+
+    /// Resumes as a brand-new session (own tab-group in the sidebar) at the session's original
+    /// path, without touching git — for keeping the resumed conversation separate from
+    /// whatever's already open, without the isolation overhead of a worktree.
+    private func continueAgentSessionInNewSession(_ record: AgentSessionRecord) {
+        guard let workspaceID = SessionCoordinator.shared.snapshot.activeWorkspace?.id else { return }
+        SessionCoordinator.shared.addSession(
+            to: workspaceID,
+            cwd: record.projectPath,
+            name: "Resume: \(record.title)",
+            initialCommand: record.agentKind.resumeCommand(sessionID: record.id)
+        )
     }
 
     // Issues tab disabled across the system

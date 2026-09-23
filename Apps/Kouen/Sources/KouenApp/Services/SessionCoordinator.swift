@@ -225,7 +225,8 @@ final class SessionCoordinator: NSObject {
         name: String? = nil,
         worktreePath: String? = nil,
         parentRepoPath: String? = nil,
-        taskName: String? = nil
+        taskName: String? = nil,
+        initialCommand: String? = nil
     ) {
         sessionLifecycleService.addSession(
             to: workspaceID,
@@ -233,7 +234,8 @@ final class SessionCoordinator: NSObject {
             name: name,
             worktreePath: worktreePath,
             parentRepoPath: parentRepoPath,
-            taskName: taskName
+            taskName: taskName,
+            initialCommand: initialCommand
         )
     }
     func addTab(to workspaceID: WorkspaceID, cwd: String? = nil) { sessionLifecycleService.addTab(to: workspaceID, cwd: cwd) }
