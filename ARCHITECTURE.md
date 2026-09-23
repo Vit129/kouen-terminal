@@ -141,3 +141,35 @@ few-tab session sees no visible difference from the existing Sessions tab. Kept 
 (not collapsed into a popover) because the cost of keeping it is low and it's the correct landing
 surface for a notification's "jump to this session" action; it is not expected to be opened and
 browsed directly in normal single-agent use.
+
+**2026-09-23 — Mobile access: depend on each vendor's own remote-control app, don't build a
+kouen relay/mobile client.** Surfaced while comparing kouen against Orca (which ships its own
+iOS/Android app + cloud relay with X25519 pairing — see
+`agent-memory/knowledge/architecture/orca-orchestrator-research.md`). Verified per vendor
+(web search, 2026-09-23) rather than assumed:
+
+- **Claude Code**: `claude remote-control` (v2.1.52+, Claude Max) bridges the actual local CLI
+  session — the same one `kouen resumeCommand` launches — to the Claude mobile app / claude.ai/code
+  via an outbound-only HTTPS connection (no inbound ports), QR-paired, with push notifications
+  (`/config` → Push when Claude decides). CLI-level, not tied to Anthropic's own desktop app
+  wrapper — works for a session kouen started same as any other terminal. **Confirmed fit.**
+- **Codex**: ChatGPT mobile pairs with "Codex Mac app" via QR, loads live state, sends
+  notifications on completion/input-needed. Officially documented as syncing "across your laptops,
+  devboxes, or remote environments." **Not yet confirmed** whether this covers a bare `codex`
+  CLI session launched inside a third-party terminal (kouen) the same way as sessions started
+  through OpenAI's own Mac app wrapper — the docs describe the Mac app as the paired endpoint,
+  not the CLI directly. Re-verify before relying on this for kouen-launched Codex sessions.
+- **Antigravity**: shipped browser-based "Remote Control" (Aug 2026) plus a mobile companion that
+  tunnels into a Mac and streams the active session. Antigravity's CLI (`agy`) and IDE share the
+  same local data store (`~/.gemini/antigravity-cli/`, confirmed by `AgentHistoryScanner`'s own
+  Antigravity scanner reading it) — plausible this covers `agy` CLI sessions too, but not directly
+  confirmed reading the actual remote-control code path.
+
+**Decision**: kouen stays a session *launcher* (resume commands, worktree isolation, unified
+history across all four sources — the work landed 2026-09-23) and does not build its own
+relay/mobile app. Reversal cost if this turns out wrong: low for now (no code deleted, just an
+unbuilt feature), but gets more expensive the more kouen-specific UX (Fleet, Attention Beacon)
+implicitly assumes "the phone story is someone else's problem." Trade-off accepted knowingly: no
+unified cross-vendor mobile dashboard (Orca's actual differentiator) — a phone user checking on
+4 concurrent agents needs 3 different apps (Claude, ChatGPT, Antigravity), each showing only its
+own vendor's sessions, not kouen's Fleet view.
