@@ -132,18 +132,19 @@ private struct ProviderKeyRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Group {
-                if let kind = provider.agentKindForLogo {
-                    Image(nsImage: AgentIconRenderer.templateOrMonogramImage(for: kind, size: 18))
-                        .resizable()
-                } else {
-                    Image(systemName: provider.symbolName)
-                }
+            if let kind = provider.agentKindForLogo {
+                AgentBadgeView(kind: kind, iconSize: 18, fontSize: 13, showName: false)
+                    .frame(width: 18, height: 18)
+                Text(kind.displayName)
+                    .font(.system(size: 13, weight: .medium))
+                    .frame(width: 100, alignment: .leading)
+            } else {
+                Image(systemName: provider.symbolName)
+                    .frame(width: 18, height: 18)
+                Text(provider.rawValue)
+                    .font(.system(size: 13, weight: .medium))
+                    .frame(width: 100, alignment: .leading)
             }
-            .frame(width: 18, height: 18)
-            Text(provider.rawValue)
-                .font(.system(size: 13, weight: .medium))
-                .frame(width: 100, alignment: .leading)
             SecureField("API key", text: $key)
                 .textFieldStyle(.roundedBorder)
             Button("Save") { onSave() }

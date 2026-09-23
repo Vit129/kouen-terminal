@@ -6,9 +6,14 @@ Kouen renders agent brand marks from vector geometry and tints them at draw time
 
 - **[Lobe Icons](https://github.com/lobehub/lobe-icons)** (MIT, see below), the
   `@lobehub/icons-static-svg` monochrome (`currentColor`) variants: `codex`, `claude`
-  (Claude Code), `cursor`, `openclaw`, `opencode`, `gemini`, and `goose`.
-- **Vendor brand mark** for `pi` (Inflection Pi). A trademark of its owner, embedded only as
-  monochrome geometry to identify the running agent.
+  (Claude Code), `cursor`, `openclaw`, `opencode`, `gemini`, `goose`, and `githubcopilot`
+  (GitHub Copilot).
+- **Vendor brand mark** for `pi` (Inflection Pi) and `kiro` (Kiro, from kiro.dev). Trademarks
+  of their owners, embedded only as monochrome geometry to identify the running agent.
+- **Vendor brand mark** for `antigravity` (Google Antigravity), traced from the icon asset
+  published at antigravity.google/press. A trademark of its owner, embedded only as
+  monochrome geometry to identify the running agent — distinct from, not a copy of, Google
+  Gemini's mark.
 
 Agents without a mark (Hermes, Aider) fall back to a tinted two-letter monogram. (Hermes's
 official mark is a detailed portrait that is illegible at icon size, so it uses the monogram.)

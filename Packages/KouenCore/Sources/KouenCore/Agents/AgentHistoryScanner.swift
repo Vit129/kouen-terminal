@@ -382,7 +382,7 @@ public actor AgentHistoryScanner {
         let homePath = FileManager.default.homeDirectoryForCurrentUser.path
         let finalPath = projectPath ?? homePath
         let projectName = (finalPath as NSString).lastPathComponent
-        let title = firstPrompt?.components(separatedBy: .newlines).first(where: { !$0.isEmpty }) ?? "Antigravity Session \(sessionID.prefix(8))"
+        let title = firstPrompt?.components(separatedBy: .newlines).first(where: { !$0.isEmpty }) ?? "\(AgentKind.antigravity.displayName) Session \(sessionID.prefix(8))"
         let modDate = (try? fileURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? Date()
 
         return AgentSessionRecord(

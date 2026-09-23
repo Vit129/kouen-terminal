@@ -305,13 +305,21 @@ final class AutomationsFleetModel {
             let scriptPath = commandString.split(separator: " ").first(where: { $0.hasSuffix(".sh") }).map(String.init)
             let repoPath = Self.resolveProjectRoot(from: scriptPath)
 
-            let kind: AgentKind
+            var kind: AgentKind
             if label.hasPrefix("com.claude.") { kind = .claudeCode }
             else if label.hasPrefix("com.copilot.") { kind = .copilot }
             else if label.hasPrefix("com.kiro.") { kind = .kiro }
             else if label.hasPrefix("com.codex.") { kind = .codex }
             else if label.hasPrefix("com.antigravity.") || label.hasPrefix("com.gemini.") { kind = .antigravity }
             else { kind = .generic }
+
+            // A label with no provider baked in (e.g. "com.line-bot.*") can't be
+            // classified by prefix — fall back to the job's own `.env` LLM_PROVIDER,
+            // so switching providers there (agy <-> claude) updates the icon without
+            // ever renaming the LaunchAgent again.
+            if kind == .generic, let provider = Self.readEnvProvider(repoPath: repoPath) {
+                kind = AgentTitleInference.kind(from: provider) ?? kind
+            }
 
             let isLoaded = Self.isLaunchAgentLoaded(label: label)
 
@@ -441,6 +449,20 @@ final class AutomationsFleetModel {
             candidate = parent
         }
         return start
+    }
+
+    /// Reads `LLM_PROVIDER=` out of `<repoPath>/.env`, for LaunchAgent labels that don't
+    /// carry a provider prefix (see the `.generic` fallback in fetchLaunchAgents above).
+    nonisolated private static func readEnvProvider(repoPath: String) -> String? {
+        let envPath = (repoPath as NSString).appendingPathComponent(".env")
+        guard let contents = try? String(contentsOfFile: envPath, encoding: .utf8) else { return nil }
+        for line in contents.split(separator: "\n") {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard trimmed.hasPrefix("LLM_PROVIDER=") else { continue }
+            let value = trimmed.dropFirst("LLM_PROVIDER=".count).trimmingCharacters(in: .whitespaces)
+            return value.isEmpty ? nil : value
+        }
+        return nil
     }
 
     nonisolated private static func describeSchedule(plist: [String: Any]) -> String {
