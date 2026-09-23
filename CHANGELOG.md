@@ -8,7 +8,13 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [4.18.6] - 2026-09-23
 
 ### Added
-- Release version bump to v4.18.6.
+- Real Codex/Copilot session scanning, resume variants, list UX parity ([`776dded`](https://github.com/Vit129/kouen-terminal/commit/776dded462a3d6626ad055e0af420c1f833df4da))
+
+### Documentation
+- Record decision to depend on vendor remote-control apps for mobile ([`39322af`](https://github.com/Vit129/kouen-terminal/commit/39322af0b8b4b304dbfa20fa6a4d3e729a248d94))
+
+### Fixed
+- Content pane covers the header cluster during the Cmd+\ slide ([`cc3dd33`](https://github.com/Vit129/kouen-terminal/commit/cc3dd335e29f9d236d8c7152f88db3156ff2a53f))
 
 ## [4.18.4] - 2026-09-23
 
