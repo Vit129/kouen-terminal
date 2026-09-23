@@ -25,7 +25,11 @@ final class BrowserIntegrationController {
             SessionCoordinator.shared.splitPaneCoordinator.closeBrowserPane(paneID: paneIDCopy)
         }
         bv.onViewSourceRequested = { url in
-            NotificationCenter.default.post(name: Notification.Name("KouenOpenFilePreview"), object: nil, userInfo: ["path": url.path])
+            // Dedicated notification, not "KouenOpenFilePreview" — that name's handler
+            // redirects .html/.htm straight back into the browser pane (the normal
+            // terminal-link-click behavior), which would just bounce View Source back
+            // to where it started instead of ever reaching the file editor.
+            NotificationCenter.default.post(name: Notification.Name("KouenOpenFilePreviewForceEdit"), object: nil, userInfo: ["path": url.path])
         }
         bv.translatesAutoresizingMaskIntoConstraints = false
         parent.addSubview(bv)

@@ -325,13 +325,13 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Chrome/BrowserIntegrationController.swift": {
-    "mtime": 1785510867.5143933,
-    "ast_hash": "9667fd4b4e46c5c94595529cf48d0fb8",
+    "mtime": 1790148325.9290571,
+    "ast_hash": "f2c377fb8a4f4105ff5d97d2e1c07047",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Chrome/BrowserPaneView.swift": {
-    "mtime": 1790134100.5693948,
-    "ast_hash": "1be9ecee70a5c6f558f6d077fc3d723e",
+    "mtime": 1790148473.0886123,
+    "ast_hash": "891ceaa4d35e9504389414c03753ef7b",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Chrome/ContentAreaViewController.swift": {
@@ -340,8 +340,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Chrome/FilePreviewCoordinator.swift": {
-    "mtime": 1785510867.51527,
-    "ast_hash": "0d0f9fcb1b92b1d4033710aa7b9aaa69",
+    "mtime": 1790151449.0617843,
+    "ast_hash": "976f42ee0508cf83c6ac551d25785391",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Chrome/KouenChrome.swift": {
@@ -360,8 +360,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Chrome/MainSplitViewController.swift": {
-    "mtime": 1790063844.107852,
-    "ast_hash": "c359216542fa3cde81ec68b9a530d68d",
+    "mtime": 1790148343.00417,
+    "ast_hash": "9e0d065b2f54f02f59fcf3c3fa7be3d0",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Chrome/MainWindowController.swift": {
@@ -420,13 +420,13 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/FileEditor/FileEditorTabBarView.swift": {
-    "mtime": 1785510867.5217032,
-    "ast_hash": "db9bb254479b801ae3bbf7c6592a2899",
+    "mtime": 1790150767.233232,
+    "ast_hash": "d453f10770b25a6d0c0bdd187eab4417",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/FileEditor/FileEditorView.swift": {
-    "mtime": 1789636267.8217018,
-    "ast_hash": "d2ad78cda01b5ac750864ded2ed40e90",
+    "mtime": 1790151428.2218835,
+    "ast_hash": "3df1fe91747bb4f41c602d6f3fb4dad3",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/FileEditor/FileTabManager.swift": {
@@ -435,8 +435,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/FileEditor/FileViewerViewController.swift": {
-    "mtime": 1789465632.317628,
-    "ast_hash": "3139692c267460f66e504e111c3e1cb4",
+    "mtime": 1790151460.4373763,
+    "ast_hash": "5a6aab44d87480e4fbb6be0c73831117",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/FileEditor/FuzzyPathResolver.swift": {
@@ -450,8 +450,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/FileEditor/SyntaxTextView.swift": {
-    "mtime": 1788426203.8165183,
-    "ast_hash": "715bd8c87ccc542513c18b01eab8e7d1",
+    "mtime": 1790151417.8873992,
+    "ast_hash": "d1eb9bafa2e5d3c3cee5a0bef764a6b7",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/FileEditor/ViEngine.swift": {
@@ -985,8 +985,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/KouenVersion.swift": {
-    "mtime": 1790126318.148175,
-    "ast_hash": "8f10091f3b2ab5f9400e4fa29a3a4c5d",
+    "mtime": 1790147338.43798,
+    "ast_hash": "6a0bde0bc49ed04d67176c768961a192",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Layouts/LayoutTemplate.swift": {
@@ -1075,8 +1075,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/GeneratedReleaseNotes.swift": {
-    "mtime": 1790145897.8298972,
-    "ast_hash": "4f959e5882d38a7ef4dd4c4f5e57e45d",
+    "mtime": 1790147339.178186,
+    "ast_hash": "9ecb1ab15d49fe0df959d8853e23996c",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/ReleaseNotes.swift": {
@@ -4402,6 +4402,11 @@
   "graphify-out/memory/query_20260923_033726_ssetransport_auth_token_isrunning.md": {
     "mtime": 1790134646.532177,
     "ast_hash": "5e9512f1c21be2c07a69e17d42c04918",
+    "semantic_hash": ""
+  },
+  "Tests/KouenAppTests/SyntaxTextViewDirtyStateTests.swift": {
+    "mtime": 1790151483.997334,
+    "ast_hash": "5829ef4f5149142a0ef49456460937df",
     "semantic_hash": ""
   }
 }

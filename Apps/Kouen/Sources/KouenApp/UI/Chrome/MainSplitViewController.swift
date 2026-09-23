@@ -176,6 +176,12 @@ final class MainSplitViewController: NSViewController {
         )
         NotificationCenter.default.addObserver(
             self,
+            selector: #selector(openFilePreviewForceEditFromBrowser(_:)),
+            name: Notification.Name("KouenOpenFilePreviewForceEdit"),
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
             selector: #selector(openURLInBrowserPaneFromTerminal(_:)),
             name: Notification.Name("KouenOpenInBrowserPaneURL"),
             object: nil
@@ -284,6 +290,19 @@ final class MainSplitViewController: NSViewController {
             )
             return
         }
+        contentVC.openFileTab(path: path)
+        setSidebarVisible(true, animated: true)
+        sidebar.selectFilesTab(revealPath: path)
+    }
+
+    /// Same as `openFilePreviewFromTerminal` but never redirects `.html`/`.htm` back into
+    /// the browser pane — this is the browser pane's own "View Source" button asking to
+    /// leave the rendered page and land in the file editor, so the html→browser bounce
+    /// that route normally applies would just send it right back where it came from.
+    @objc private func openFilePreviewForceEditFromBrowser(_ notification: Notification) {
+        guard let path = notification.userInfo?["path"] as? String else { return }
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory), !isDirectory.boolValue else { return }
         contentVC.openFileTab(path: path)
         setSidebarVisible(true, animated: true)
         sidebar.selectFilesTab(revealPath: path)

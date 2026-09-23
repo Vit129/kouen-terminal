@@ -3,13 +3,13 @@ _Auto-generated from GRAPH_REPORT.md · do not edit manually_
 _Regen: `graphify update .`_
 
 ## Summary
-- 20164 nodes · 54337 edges · 2089 communities (632 shown, 1457 thin omitted)
-- Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 8086 edges (avg confidence: 0.74)
+- 20186 nodes · 54416 edges · 2106 communities (653 shown, 1453 thin omitted)
+- Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 8116 edges (avg confidence: 0.74)
 - Token cost: 0 input · 0 output
 
 
 ## Graph Freshness
-- Built from commit: `732fbc9a`
+- Built from commit: `2f627251`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -32,15 +32,15 @@ A high-degree node isn't always architecturally central - a widely-used
 utility/config file can rack up more edges than a real coupler while only
 ever touching one area. This ranks by how many DIFFERENT communities a
 node's neighbors span, not by raw edge count.
-1. `KouenPaths` - bridges 61 areas (143 edges)
-2. `SessionCoordinator` - bridges 53 areas (235 edges)
-3. `AgentKind` - bridges 53 areas (145 edges)
-4. `Process` - bridges 50 areas (101 edges)
-5. `SessionSnapshot` - bridges 43 areas (181 edges)
-6. `DaemonClient` - bridges 42 areas (210 edges)
-7. `KouenTerminalSurfaceView` - bridges 40 areas (343 edges)
-8. `SurfaceRegistry` - bridges 38 areas (215 edges)
-9. `i()` - bridges 35 areas (321 edges)
+1. `KouenPaths` - bridges 60 areas (143 edges)
+2. `AgentKind` - bridges 59 areas (145 edges)
+3. `SessionCoordinator` - bridges 56 areas (235 edges)
+4. `Process` - bridges 52 areas (101 edges)
+5. `SessionSnapshot` - bridges 48 areas (181 edges)
+6. `SurfaceRegistry` - bridges 46 areas (215 edges)
+7. `DaemonClient` - bridges 45 areas (210 edges)
+8. `IPCResponse` - bridges 38 areas (103 edges)
+9. `.requestDaemon(_:)` - bridges 37 areas (89 edges)
 
 ## Surprising Connections (you probably didn't know these)
 - `.selectedHost` --references--> `RemoteHost`  [INFERRED]

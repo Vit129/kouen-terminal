@@ -6,6 +6,10 @@ import KouenCore
 private final class FileEditorTabBarModel {
     var tabs: [FileTabManager.FileTab] = []
     var activeID: FileTabID?
+    /// The tab currently showing unsaved edits, if any. Only the active tab's dirty state
+    /// is ever knowable — the editor swaps a single shared buffer on tab switch, so a
+    /// background tab's content isn't loaded and can't be diffed.
+    var dirtyTabID: FileTabID?
     var onSelect: ((FileTabID) -> Void)?
     var onClose: ((FileTabID) -> Void)?
 }
@@ -32,9 +36,10 @@ final class FileEditorTabBarView: NSView {
 
     @available(*, unavailable) required init?(coder: NSCoder) { fatalError() }
 
-    func reload(tabs: [FileTabManager.FileTab], activeID: FileTabID?) {
+    func reload(tabs: [FileTabManager.FileTab], activeID: FileTabID?, dirtyTabID: FileTabID? = nil) {
         model.tabs = tabs
         model.activeID = activeID
+        model.dirtyTabID = dirtyTabID
     }
 }
 
@@ -49,6 +54,7 @@ private struct FileEditorTabBarBody: View {
                         FileTabPillView(
                             tab: tab,
                             isActive: tab.id == model.activeID,
+                            isDirty: tab.id == model.dirtyTabID,
                             onSelect: { model.onSelect?($0) },
                             onClose: { model.onClose?($0) }
                         )
@@ -65,6 +71,7 @@ private struct FileEditorTabBarBody: View {
 private struct FileTabPillView: View {
     let tab: FileTabManager.FileTab
     let isActive: Bool
+    let isDirty: Bool
     let onSelect: (FileTabID) -> Void
     let onClose: (FileTabID) -> Void
     @State private var isHovered = false
@@ -72,7 +79,7 @@ private struct FileTabPillView: View {
     var body: some View {
         let c = KouenDesign.chrome
         HStack(spacing: 4) {
-            Text(tab.title)
+            Text(isDirty ? "*\(tab.title)" : tab.title)
                 .font(.system(size: 12, weight: isActive ? .semibold : .medium))
                 .foregroundStyle(isActive ? Color(c.textPrimary) : Color(c.textSecondary))
                 .lineLimit(1)

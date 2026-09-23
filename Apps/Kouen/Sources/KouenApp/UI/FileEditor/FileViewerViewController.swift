@@ -259,7 +259,7 @@ final class FileViewerViewController: NSViewController {
         if isMarkdownEditMode {
             markdownPreviewView.isHidden = true
             showText(currentMarkdownRaw, url: url, fileExtension: ext, resetScroll: false)
-            view.window?.makeFirstResponder(syntaxView)
+            syntaxView.focus()
         } else {
             let text = syntaxView.string
             currentMarkdownRaw = text
@@ -308,7 +308,7 @@ final class FileViewerViewController: NSViewController {
             }
         }
         lspSession.open(url: url, text: text, fileExtension: ext)
-        view.window?.makeFirstResponder(syntaxView)
+        syntaxView.focus()
     }
 
     private func showQuickLook(_ url: URL) {
@@ -339,8 +339,34 @@ final class FileViewerViewController: NSViewController {
         messageLabel.stringValue = message
     }
 
+    /// Only the syntax editor is ever actually editable (markdown/rich preview is a
+    /// read-only WKWebView render), and only while it's the visible mode.
+    var isDirty: Bool { !syntaxView.isHidden && syntaxView.isDirty }
+
     @objc private func backTapped() {
-        onBack?()
+        guard isDirty, let path = pathLabel.toolTip, !path.isEmpty else {
+            onBack?()
+            return
+        }
+        // Save/Discard only resolve the dirty state here — they never navigate back
+        // themselves, same reasoning as FilePreviewCoordinator.resolveDirtyBeforeClose:
+        // leaving unrelated open work untouched matters more than this one click doing two
+        // things at once. Tap back again, now dialog-free, once it's clean.
+        let alert = NSAlert()
+        alert.messageText = "Save changes to \"\((path as NSString).lastPathComponent)\"?"
+        alert.informativeText = "This preview has unsaved changes. Save or Discard to resolve them, then go back again."
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Save")
+        alert.addButton(withTitle: "Discard")
+        alert.addButton(withTitle: "Cancel")
+        switch alert.runModal() {
+        case .alertFirstButtonReturn:
+            syntaxView.saveNow()
+        case .alertSecondButtonReturn:
+            syntaxView.discardChanges()
+        default:
+            break
+        }
     }
 
     @objc func copy(_ sender: Any?) {
