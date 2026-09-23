@@ -80,7 +80,7 @@ enum LayoutFileStore {
         guard !cwds.isEmpty else { return }
         let coord = SessionCoordinator.shared
         if let cwd = cwds.first, !cwd.isEmpty, let sid = coord.activeSurfaceID {
-            Task { await coord.requestDaemon(.sendData(surfaceID: sid.uuidString, data: Data(("cd \(cwd.shellQuoted)\r").utf8))) }
+            Task { await coord.requestDaemon(.sendData(surfaceID: sid.uuidString, data: Data(("cd \(cwd.shellQuoted)\r").utf8), origin: .automation)) }
         }
         for cwd in cwds.dropFirst() where !cwd.isEmpty {
             coord.splitActivePaneAndRun(direction: .horizontal, command: "cd \(cwd.shellQuoted)")

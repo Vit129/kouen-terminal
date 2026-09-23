@@ -332,7 +332,7 @@ public struct IssueTrackerPanelView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
             if let surfaceID = SessionCoordinator.shared.activeSurfaceID {
                 SessionCoordinator.shared.requestDaemon(
-                    .sendData(surfaceID: surfaceID.uuidString, data: Data(prompt.utf8))
+                    .sendData(surfaceID: surfaceID.uuidString, data: Data(prompt.utf8), origin: .automation)
                 )
             }
         }

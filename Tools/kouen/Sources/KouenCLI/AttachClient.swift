@@ -137,7 +137,7 @@ private final class LiveSession: @unchecked Sendable {
         // or the detach sequence.
         func send(_ data: Data?) {
             guard let data, !data.isEmpty else { return }
-            _ = try? client.request(.sendData(surfaceID: surfaceID, data: data), timeout: 1)
+            _ = try? client.request(.sendData(surfaceID: surfaceID, data: data, origin: .human), timeout: 1)
         }
         var batcher = AttachInputBatcher(detachSequence: configuration.detachSequence)
         var buffer = [UInt8](repeating: 0, count: 4096)

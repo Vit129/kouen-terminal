@@ -221,10 +221,10 @@ struct ToolRegistry: Sendable {
             toolDef("kouenTaskUpdate", "Update a Task's title, done state, and/or status", [
                 param("id", "string", "Task UUID"),
                 param("title", "string", "New title (optional)"),
-                param("done", "boolean", "New done state (optional)"),
+                param("done", "boolean", "New done state (optional). Must agree with 'status' if both are provided; passing conflicting values returns an error."),
                 param(
                     "status", "string",
-                    "New status (optional): open, running, ciFailing, mergeReady, or done. Overrides 'done' if both are given."
+                    "New status (optional): open, running, ciFailing, mergeReady, or done. Overrides 'done' if both are given, or returns an error if conflicting."
                 ),
             ]),
             toolDef("kouenTaskDelete", "Delete a Task", [

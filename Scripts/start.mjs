@@ -135,13 +135,20 @@ async function main() {
       }
     ];
 
-    // Direct argument: `node start.mjs 1` or `node start.mjs preview`
+    // Direct argument: `node start.mjs 1`, `node start.mjs preview`, or `make start patch`
     const arg = process.argv[2];
     let choice;
+    let bumpArg = process.argv[3];
     if (arg) {
       const byNumber = { '1': 'commit-push-merge', '2': 'preview', '3': 'full-cycle' };
       const byName = { 'commit-push-merge': 'commit-push-merge', 'preview': 'preview', 'full-cycle': 'full-cycle' };
-      choice = byNumber[arg] || byName[arg];
+      const bumpDirect = { 'patch': 'patch', 'minor': 'minor', 'major': 'major', 'skip': '--no-bump', '--no-bump': '--no-bump' };
+      if (bumpDirect[arg]) {
+        choice = 'full-cycle';
+        bumpArg = bumpDirect[arg];
+      } else {
+        choice = byNumber[arg] || byName[arg];
+      }
       if (!choice) { console.error(`❌ Unknown option: ${arg}`); process.exit(1); }
       console.log(`\n✅ Selected: ${options.find(o => o.value === choice)?.display}\n`);
     } else {
@@ -180,7 +187,7 @@ async function main() {
         { display: '4) skip   — keep current version', value: '--no-bump' },
       ];
       let bump;
-      const bumpArg = process.argv[3];
+      bumpArg = bumpArg || process.argv[3];
       if (bumpArg) {
         const byNumber = { '1': 'patch', '2': 'minor', '3': 'major', '4': '--no-bump' };
         const byName = { 'patch': 'patch', 'minor': 'minor', 'major': 'major', 'skip': '--no-bump', '--no-bump': '--no-bump' };

@@ -143,7 +143,7 @@ enum Phase67UI {
         popups.append(popup)
         popup.makeKeyAndOrderFront(nil)
         if let command, !command.isEmpty {
-            _ = coordinator.requestDaemon(.send(surfaceID: surfaceID, text: command + "\n"))
+            _ = coordinator.requestDaemon(.send(surfaceID: surfaceID, text: command + "\n", origin: .automation))
         }
     }
 }

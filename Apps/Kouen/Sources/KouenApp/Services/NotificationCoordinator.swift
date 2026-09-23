@@ -308,7 +308,7 @@ final class NotificationCoordinator {
     func rerunCommand(for surfaceID: SurfaceID) {
         guard let host = coord.terminalHosts.host(for: surfaceID) else { return }
         if let lastCommand = host.surfaceView.blocks.last?.command, !lastCommand.isEmpty {
-            coord.requestDaemon(.send(surfaceID: surfaceID.uuidString, text: lastCommand + "\n"))
+            coord.requestDaemon(.send(surfaceID: surfaceID.uuidString, text: lastCommand + "\n", origin: .human))
         }
     }
 

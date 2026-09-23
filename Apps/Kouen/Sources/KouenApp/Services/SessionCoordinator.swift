@@ -279,10 +279,10 @@ final class SessionCoordinator: NSObject {
         // If RUN surface already exists and is alive, re-send the script
         if let existing = runSurfaceID, tab.rootPane.allSurfaceIDs().contains(existing) {
             // Kill existing process and re-run
-            requestDaemon(.sendData(surfaceID: existing.uuidString, data: Data("\u{03}".utf8))) // Ctrl-C
+            requestDaemon(.sendData(surfaceID: existing.uuidString, data: Data("\u{03}".utf8), origin: .human)) // Ctrl-C
             Task {
                 try? await Task.sleep(for: .milliseconds(200))
-                await self.requestDaemon(.sendData(surfaceID: existing.uuidString, data: Data((script + "\r").utf8)))
+                await self.requestDaemon(.sendData(surfaceID: existing.uuidString, data: Data((script + "\r").utf8), origin: .human))
             }
             return
         }
@@ -302,7 +302,7 @@ final class SessionCoordinator: NSObject {
     func stopProjectScript() {
         guard let sid = runSurfaceID else { return }
         // Send SIGTERM via Ctrl-C
-        requestDaemon(.sendData(surfaceID: sid.uuidString, data: Data("\u{03}".utf8)))
+        requestDaemon(.sendData(surfaceID: sid.uuidString, data: Data("\u{03}".utf8), origin: .human))
     }
     func splitActivePaneAndRun(direction: SplitDirection, command: String) { splitPaneCoordinator.splitActivePaneAndRun(direction: direction, command: command) }
     func focusPaneDirectional(_ direction: DirectionalAxis) { splitPaneCoordinator.focusPaneDirectional(direction) }

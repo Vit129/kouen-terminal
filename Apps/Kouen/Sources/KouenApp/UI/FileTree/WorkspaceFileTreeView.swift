@@ -65,11 +65,11 @@ final class WorkspaceFileTreeView: NSView {
                 coordinator.splitActivePane(direction: .horizontal)
                 guard let surfaceID = coordinator.activeSurfaceID else { return }
                 let command = "open \(path)\r"
-                coordinator.requestDaemon(.sendData(surfaceID: surfaceID.uuidString, data: Data(command.utf8)))
+                coordinator.requestDaemon(.sendData(surfaceID: surfaceID.uuidString, data: Data(command.utf8), origin: .human))
             } else if action == "vi" || action == "cat" {
                 guard let surfaceID = coordinator.activeSurfaceID else { return }
                 let cmd = action == "vi" ? "vi \(path)\r" : "cat \(path)\r"
-                coordinator.requestDaemon(.sendData(surfaceID: surfaceID.uuidString, data: Data(cmd.utf8)))
+                coordinator.requestDaemon(.sendData(surfaceID: surfaceID.uuidString, data: Data(cmd.utf8), origin: .human))
             } else {
                 self.onFilePreview?(node)
             }

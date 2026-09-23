@@ -40,7 +40,7 @@ final class AgentBridge {
     /// Send raw text to the agent pane.
     func sendToAgent(_ text: String, kind: AgentKind? = nil) -> Bool {
         guard let surfaceID = agentSurfaceID(kind: kind) else { return false }
-        SessionCoordinator.shared.requestDaemon(.send(surfaceID: surfaceID.uuidString, text: text))
+        SessionCoordinator.shared.requestDaemon(.send(surfaceID: surfaceID.uuidString, text: text, origin: .automation))
         return true
     }
 

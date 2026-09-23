@@ -1038,11 +1038,17 @@ public final class SurfaceRegistry: @unchecked Sendable {
             return .taskInfo(Self.taskSummary(taskStore.create(sessionID: sessionID, title: title, cwd: cwd)))
         case let .taskUpdate(id, title, done, status):
             let coreStatus = status.flatMap { KouenTaskStatus(rawValue: $0.rawValue) }
-            guard let updated = taskStore.update(id: id, title: title, done: done, status: coreStatus)
-            else {
-                return .error("Task not found")
+            do {
+                guard let updated = try taskStore.update(id: id, title: title, done: done, status: coreStatus)
+                else {
+                    return .error("Task not found")
+                }
+                return .taskInfo(Self.taskSummary(updated))
+            } catch TaskStoreError.conflictingState(let done, let status) {
+                return .error("Conflicting task state: done=\(done) conflicts with status='\(status.rawValue)'")
+            } catch {
+                return .error("Task update failed: \(error.localizedDescription)")
             }
-            return .taskInfo(Self.taskSummary(updated))
         case let .taskDelete(id):
             return taskStore.delete(id: id) ? .ok : .error("Task not found")
         case let .worktreeList(repoPath):

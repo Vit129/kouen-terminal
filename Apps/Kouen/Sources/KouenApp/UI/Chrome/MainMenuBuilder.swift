@@ -617,7 +617,7 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
 
         let prompt = "Please run `git diff` in the current repo, review the changes, and summarize any issues you find."
         Task {
-            await coord.requestDaemon(.sendData(surfaceID: peerSurfaceID.uuidString, data: Data((prompt + "\n").utf8)))
+            await coord.requestDaemon(.sendData(surfaceID: peerSurfaceID.uuidString, data: Data((prompt + "\n").utf8), origin: .automation))
         }
     }
 

@@ -95,7 +95,7 @@ struct ScriptAPI {
                         // MCP's `sendPaneText` and the terminal input path use.
                         let sendTextBlock: @convention(block) (String) -> Void = { text in
                             let coordinator = SessionCoordinator.shared
-                            _ = coordinator.requestDaemon(.send(surfaceID: surfaceID.uuidString, text: text))
+                            _ = coordinator.requestDaemon(.send(surfaceID: surfaceID.uuidString, text: text, origin: .automation))
                             coordinator.syncFromDaemon()
                         }
                         dict["sendText"] = sendTextBlock

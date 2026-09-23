@@ -104,7 +104,7 @@ final class DaemonContentionTests: XCTestCase {
         usleep(200_000)
         let deadline = Date().addingTimeInterval(15)
         while received.count < box.count, Date() < deadline {
-            _ = try client.request(.sendData(surfaceID: surfaceID, data: Data("echo \(marker)\n".utf8)))
+            _ = try client.request(.sendData(surfaceID: surfaceID, data: Data("echo \(marker)\n".utf8), origin: .human))
             usleep(200_000)
         }
         XCTAssertEqual(received.count, box.count, "every subscriber received the fan-out marker")
@@ -133,14 +133,14 @@ final class DaemonContentionTests: XCTestCase {
         let stop = DispatchSemaphore(value: 0)
         DispatchQueue.global().async {
             while stop.wait(timeout: .now()) == .timedOut {
-                _ = try? client.request(.sendData(surfaceID: surfaceID, data: Data("echo busy\n".utf8)))
+                _ = try? client.request(.sendData(surfaceID: surfaceID, data: Data("echo busy\n".utf8), origin: .human))
                 usleep(20_000)
             }
         }
         usleep(150_000)
         doomed.cancel() // disconnect mid-stream
         usleep(150_000)
-        _ = try client.request(.sendData(surfaceID: surfaceID, data: Data("echo \(after)\n".utf8)))
+        _ = try client.request(.sendData(surfaceID: surfaceID, data: Data("echo \(after)\n".utf8), origin: .human))
         wait(for: [survivorGot], timeout: 12)
         stop.signal()
 
@@ -175,7 +175,7 @@ final class DaemonContentionTests: XCTestCase {
         let stop = DispatchSemaphore(value: 0)
         DispatchQueue.global().async {
             while stop.wait(timeout: .now()) == .timedOut {
-                _ = try? client.request(.sendData(surfaceID: fresh, data: Data("echo busy\n".utf8)))
+                _ = try? client.request(.sendData(surfaceID: fresh, data: Data("echo busy\n".utf8), origin: .human))
                 usleep(10_000)
             }
         }
@@ -207,7 +207,7 @@ final class DaemonContentionTests: XCTestCase {
         let stop = DispatchSemaphore(value: 0)
         DispatchQueue.global().async {
             while stop.wait(timeout: .now()) == .timedOut {
-                _ = try? client.request(.sendData(surfaceID: surfaceID, data: Data("echo load\n".utf8)))
+                _ = try? client.request(.sendData(surfaceID: surfaceID, data: Data("echo load\n".utf8), origin: .human))
                 usleep(5_000)
             }
         }

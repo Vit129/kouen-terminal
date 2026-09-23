@@ -436,7 +436,7 @@ public struct DiffPaneView: View {
         }
 
         Task {
-            await SessionCoordinator.shared.requestDaemon(.sendData(surfaceID: surfaceID.uuidString, data: Data(prompt.utf8)))
+            await SessionCoordinator.shared.requestDaemon(.sendData(surfaceID: surfaceID.uuidString, data: Data(prompt.utf8), origin: .automation))
             showToast("✓ Sent feedback to active agent")
             annotationInstruction = ""
             showAnnotateSheet = false

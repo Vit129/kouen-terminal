@@ -58,6 +58,16 @@ public actor ClaudeCodeHarness {
         var stdoutDrained = false
     }
 
+    public static let defaultAdapters: [any HeadlessCLIAdapter] = [ClaudeAdapter(), CodexAdapter(), AgyAdapter(), CopilotAdapter()]
+
+    public static var registeredAgentKinds: [AgentKind] {
+        defaultAdapters.map(\.agentKind)
+    }
+
+    public static func hasAdapter(for kind: AgentKind) -> Bool {
+        registeredAgentKinds.contains(kind)
+    }
+
     private let adapters: [AgentKind: any HeadlessCLIAdapter]
     private var runs: [UUID: Run] = [:]
     /// Per-adapter binary path cache — different agent kinds are different binaries, unlike
@@ -65,7 +75,15 @@ public actor ClaudeCodeHarness {
     private var cachedBinaryPaths: [AgentKind: String] = [:]
     private let transcriptsDirectory: URL
 
-    public init(adapters: [any HeadlessCLIAdapter] = [ClaudeAdapter(), CodexAdapter(), AgyAdapter(), CopilotAdapter()]) {
+    public nonisolated var registeredAgentKinds: [AgentKind] {
+        Array(adapters.keys)
+    }
+
+    public nonisolated func hasAdapter(for kind: AgentKind) -> Bool {
+        adapters[kind] != nil
+    }
+
+    public init(adapters: [any HeadlessCLIAdapter] = ClaudeCodeHarness.defaultAdapters) {
         self.adapters = Dictionary(uniqueKeysWithValues: adapters.map { ($0.agentKind, $0) })
         transcriptsDirectory = KouenPaths.applicationSupport.appendingPathComponent("claude-runs", isDirectory: true)
         try? FileManager.default.createDirectory(at: transcriptsDirectory, withIntermediateDirectories: true)

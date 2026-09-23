@@ -595,7 +595,7 @@ private struct NodeRow: View {
                         // Double-click folder → cd terminal to this path
                         let coord = SessionCoordinator.shared
                         if let surfaceID = coord.activeSurfaceID {
-                            coord.requestDaemon(.sendKeys(surfaceID: surfaceID.uuidString, keys: ["cd \(node.node.path)", "Enter"]))
+                            coord.requestDaemon(.sendKeys(surfaceID: surfaceID.uuidString, keys: ["cd \(node.node.path)", "Enter"], origin: .human))
                         }
                     }
                     .onTapGesture {
@@ -908,7 +908,7 @@ private struct NodeRow: View {
             } else {
                 cmd = "open \(node.node.path)\r"
             }
-            coordinator.requestDaemon(.sendData(surfaceID: surfaceID.uuidString, data: Data(cmd.utf8)))
+            coordinator.requestDaemon(.sendData(surfaceID: surfaceID.uuidString, data: Data(cmd.utf8), origin: .human))
         }
     }
 }

@@ -556,7 +556,7 @@ final class KouenSidebarPanelViewController: NSViewController {
                     // terminalOnly does nothing on single click to prevent navigation command spam
                     return
                 }
-                coordinator.requestDaemon(.sendData(surfaceID: surfaceID.uuidString, data: Data(cmd.utf8)))
+                coordinator.requestDaemon(.sendData(surfaceID: surfaceID.uuidString, data: Data(cmd.utf8), origin: .human))
             } else {
                 split.contentVC.openFileTab(path: node.path)
             }

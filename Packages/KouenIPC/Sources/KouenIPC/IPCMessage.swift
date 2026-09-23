@@ -171,8 +171,8 @@ public enum IPCRequest: Codable, Sendable {
     /// notification's "Feed to Agent" action actually inject. Returns `.text("")` when nothing
     /// is stored (never failed, or the daemon restarted since).
     case getVerificationOutput(surfaceID: String)
-    case send(surfaceID: String, text: String, origin: WriteOrigin = .human)
-    case sendData(surfaceID: String, data: Data, origin: WriteOrigin = .human)
+    case send(surfaceID: String, text: String, origin: WriteOrigin)
+    case sendData(surfaceID: String, data: Data, origin: WriteOrigin)
     case getSnapshot
     case createSurface(cwd: String?, shell: String?)
     case ensureSurface(surfaceID: String, cwd: String?, shell: String?, rows: UInt16, cols: UInt16, scrollbackBytes: Int?)
@@ -180,7 +180,7 @@ public enum IPCRequest: Codable, Sendable {
     /// Close a bare surface not owned by the layout (e.g. a `display-popup` shell).
     case closeSurface(surfaceID: String)
     // Pane + key commands
-    case sendKeys(surfaceID: String, keys: [String], origin: WriteOrigin = .human)
+    case sendKeys(surfaceID: String, keys: [String], origin: WriteOrigin)
     case capturePane(surfaceID: String, includeScrollback: Bool)
     /// `capture-pane -S <start> -E <end>`: a line range from scrollback+screen,
     /// negative numbers counting back from the bottom (tmux semantics). `escapeSequences`

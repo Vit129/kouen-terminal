@@ -121,7 +121,7 @@ public final class DaemonServer: @unchecked Sendable {
                 return surfaceID
             },
             sendToSurface: { surfaceID, text in
-                _ = registryRef.handle(.send(surfaceID: surfaceID, text: text))
+                _ = registryRef.handle(.send(surfaceID: surfaceID, text: text, origin: .automation))
             },
             closeSurface: { surfaceID in
                 _ = registryRef.handle(.closeSurface(surfaceID: surfaceID))
@@ -570,7 +570,13 @@ public final class DaemonServer: @unchecked Sendable {
                 Task { [weak self] in
                     guard let self else { return }
                     let resolvedLane: SwarmLane = lane == "pty" ? .pty : .structured
-                    let agentKind = AgentKind(rawValue: agentKindRaw) ?? .generic
+                    let agentKind = AgentKind(rawValue: agentKindRaw) ?? AgentHookInstaller.resolveAgentName(agentKindRaw) ?? .generic
+                    if resolvedLane == .structured && !ClaudeCodeHarness.hasAdapter(for: agentKind) {
+                        let supported = ClaudeCodeHarness.registeredAgentKinds.map(\.rawValue).joined(separator: ", ")
+                        let msg = "headless: true has no adapter for '\(agentKindRaw)' — supported: \(supported). Pass headless: false (or omit it) to use the interactive pty path."
+                        self.queue.async { self.send(.error(msg), to: fd) }
+                        return
+                    }
                     let node = await self.swarmWorkerManager.spawn(SwarmSpawnSpec(
                         lane: resolvedLane, agentKind: agentKind, cwd: cwd,
                         initialCommand: initialCommand, role: role

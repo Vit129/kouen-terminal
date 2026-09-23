@@ -7,7 +7,7 @@ final class TaskStoreTests: XCTestCase {
         FileManager.default.temporaryDirectory.appendingPathComponent("kouen-tasks-\(UUID().uuidString).json")
     }
 
-    func testCreateListGetUpdateDeleteRoundTrip() {
+    func testCreateListGetUpdateDeleteRoundTrip() throws {
         let url = tmpURL()
         defer { try? FileManager.default.removeItem(at: url) }
         let store = TaskStore(url: url)
@@ -17,7 +17,7 @@ final class TaskStoreTests: XCTestCase {
         XCTAssertEqual(store.get(id: created.id)?.title, "write tests")
         XCTAssertEqual(store.list(sessionID: sessionID).count, 1)
 
-        let renamed = store.update(id: created.id, title: "still writing tests")
+        let renamed = try store.update(id: created.id, title: "still writing tests")
         XCTAssertEqual(renamed?.title, "still writing tests")
         XCTAssertEqual(store.get(id: created.id)?.title, "still writing tests")
 
@@ -29,14 +29,14 @@ final class TaskStoreTests: XCTestCase {
     /// P44a: marking a Task done used to delete it immediately (see git history) — an
     /// Auto-Fix Loop needs a durable status history, so completion no longer implies
     /// deletion. Only explicit `delete(id:)` removes a Task now.
-    func testMarkingDoneKeepsTheTaskListed() {
+    func testMarkingDoneKeepsTheTaskListed() throws {
         let url = tmpURL()
         defer { try? FileManager.default.removeItem(at: url) }
         let store = TaskStore(url: url)
         let sessionID = SessionID()
         let created = store.create(sessionID: sessionID, title: "finish this")
 
-        let updated = store.update(id: created.id, done: true)
+        let updated = try store.update(id: created.id, done: true)
         XCTAssertEqual(updated?.done, true)
         XCTAssertEqual(updated?.status, .done, "'done' also moves status to .done for legacy callers")
 
@@ -47,7 +47,7 @@ final class TaskStoreTests: XCTestCase {
         XCTAssertNil(store.get(id: created.id))
     }
 
-    func testStatusPersistsAcrossUpdateAndReopen() {
+    func testStatusPersistsAcrossUpdateAndReopen() throws {
         let url = tmpURL()
         defer { try? FileManager.default.removeItem(at: url) }
         let sessionID = SessionID()
@@ -57,23 +57,23 @@ final class TaskStoreTests: XCTestCase {
             created = store.create(sessionID: sessionID, title: "spawn worker")
             XCTAssertEqual(created.status, .open, "new Tasks default to .open")
 
-            let updated = store.update(id: created.id, status: .running)
+            let updated = try store.update(id: created.id, status: .running)
             XCTAssertEqual(updated?.status, .running)
             XCTAssertEqual(updated?.done, false, "status alone doesn't flip done except at .done")
 
-            let ciFailed = store.update(id: created.id, status: .ciFailing)
+            let ciFailed = try store.update(id: created.id, status: .ciFailing)
             XCTAssertEqual(ciFailed?.status, .ciFailing)
         }
         let reopened = TaskStore(url: url)
         XCTAssertEqual(reopened.get(id: created.id)?.status, .ciFailing, "status survives reload from disk")
     }
 
-    func testStatusOverridesDoneWhenBothPassed() {
+    func testStatusOverridesDoneWhenBothPassed() throws {
         let url = tmpURL()
         defer { try? FileManager.default.removeItem(at: url) }
         let store = TaskStore(url: url)
         let created = store.create(sessionID: SessionID(), title: "race")
-        let updated = store.update(id: created.id, done: false, status: .mergeReady)
+        let updated = try store.update(id: created.id, done: false, status: .mergeReady)
         XCTAssertEqual(updated?.status, .mergeReady, "explicit status wins over a simultaneous done arg")
         XCTAssertEqual(updated?.done, false, "mergeReady isn't done — done only tracks .done status")
     }
@@ -143,11 +143,41 @@ final class TaskStoreTests: XCTestCase {
         XCTAssertEqual(reopened.get(id: created.id)?.title, "persisted")
     }
 
-    func testUpdateOnMissingIDReturnsNil() {
+    func testUpdateOnMissingIDReturnsNil() throws {
         let url = tmpURL()
         defer { try? FileManager.default.removeItem(at: url) }
         let store = TaskStore(url: url)
-        XCTAssertNil(store.update(id: UUID(), title: "nope"))
+        XCTAssertNil(try store.update(id: UUID(), title: "nope"))
+    }
+
+    func testUpdateThrowsOnConflictingDoneAndStatus() throws {
+        let url = tmpURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let store = TaskStore(url: url)
+        let sessionID = SessionID()
+        let created = store.create(sessionID: sessionID, title: "conflict test")
+
+        // done: true with status != .done must throw
+        XCTAssertThrowsError(try store.update(id: created.id, done: true, status: .open)) { error in
+            XCTAssertEqual(error as? TaskStoreError, .conflictingState(done: true, status: .open))
+        }
+        XCTAssertThrowsError(try store.update(id: created.id, done: true, status: .running)) { error in
+            XCTAssertEqual(error as? TaskStoreError, .conflictingState(done: true, status: .running))
+        }
+
+        // done: false with status == .done must throw
+        XCTAssertThrowsError(try store.update(id: created.id, done: false, status: .done)) { error in
+            XCTAssertEqual(error as? TaskStoreError, .conflictingState(done: false, status: .done))
+        }
+
+        // Agreeing states must succeed
+        let agreedDone = try store.update(id: created.id, done: true, status: .done)
+        XCTAssertEqual(agreedDone?.done, true)
+        XCTAssertEqual(agreedDone?.status, .done)
+
+        let agreedOpen = try store.update(id: created.id, done: false, status: .open)
+        XCTAssertEqual(agreedOpen?.done, false)
+        XCTAssertEqual(agreedOpen?.status, .open)
     }
 
     func testCreateCapturesCwdAndSurvivesTheSessionClosing() {

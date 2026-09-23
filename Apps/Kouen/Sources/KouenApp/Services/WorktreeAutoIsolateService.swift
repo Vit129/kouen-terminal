@@ -97,7 +97,8 @@ final class WorktreeAutoIsolateService {
         if let surfaceID = tab.rootPane.allSurfaceIDs().first {
             coord.requestDaemon(.sendData(
                 surfaceID: surfaceID.uuidString,
-                data: Data(("cd \(wtPath)\r").utf8)
+                data: Data(("cd \(wtPath)\r").utf8),
+                origin: .automation
             ))
         }
 

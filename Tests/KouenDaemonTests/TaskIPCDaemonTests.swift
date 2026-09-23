@@ -88,6 +88,26 @@ final class TaskIPCDaemonTests: XCTestCase {
         }
     }
 
+    func testUpdateWithConflictingDoneAndStatusReturnsErrorViaIPC() {
+        let registry = SurfaceRegistry()
+        let sessionID = UUID()
+        guard case let .taskInfo(created?) = registry.handle(.taskCreate(sessionID: sessionID, title: "conflict ipc test")) else {
+            return XCTFail("Expected .taskInfo from taskCreate")
+        }
+
+        // done: true with status: .open
+        guard case let .error(msg1) = registry.handle(.taskUpdate(id: created.id, title: nil, done: true, status: .open)) else {
+            return XCTFail("Expected .error for done=true with status=open")
+        }
+        XCTAssertTrue(msg1.contains("Conflicting task state"))
+
+        // done: false with status: .done
+        guard case let .error(msg2) = registry.handle(.taskUpdate(id: created.id, title: nil, done: false, status: .done)) else {
+            return XCTFail("Expected .error for done=false with status=done")
+        }
+        XCTAssertTrue(msg2.contains("Conflicting task state"))
+    }
+
     func testTaskCreateCapturesTheOwningSessionsCwd() throws {
         // Real regression target: taskCreate's session -> active-tab cwd lookup, added so a
         // Kouen Task Sync workflow can tell which project a task came from even after its

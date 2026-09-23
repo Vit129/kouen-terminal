@@ -72,7 +72,7 @@ final class SurfaceRegistryTests: XCTestCase {
 
         // Let the shell come up, then exit with a known code.
         usleep(400_000)
-        _ = registry.handle(.sendData(surfaceID: sid, data: Data("exit 3\n".utf8)))
+        _ = registry.handle(.sendData(surfaceID: sid, data: Data("exit 3\n".utf8), origin: .human))
         var deadTab: Tab?
         for _ in 0 ..< 100 {
             if let candidate = tab(), candidate.exitStatus != nil { deadTab = candidate; break }
@@ -108,7 +108,7 @@ final class SurfaceRegistryTests: XCTestCase {
 
         func killAndAwaitDeath() -> Bool {
             usleep(400_000)
-            _ = registry.handle(.sendData(surfaceID: sid, data: Data("exit 5\n".utf8)))
+            _ = registry.handle(.sendData(surfaceID: sid, data: Data("exit 5\n".utf8), origin: .human))
             for _ in 0 ..< 100 {
                 if tab()?.exitStatus != nil { return true }
                 usleep(100_000)
@@ -807,7 +807,7 @@ final class SurfaceRegistryTests: XCTestCase {
         usleep(400_000) // let the shell come up
         // Single-quote the path: on Linux, corelibs-foundation's itemReplacementDirectory is named
         // "(A Document Being Saved By …)" — spaces and parens are a bash syntax error unquoted.
-        _ = registry.handle(.sendData(surfaceID: sid, data: Data("cd '\(canonicalDest)'\n".utf8)))
+        _ = registry.handle(.sendData(surfaceID: sid, data: Data("cd '\(canonicalDest)'\n".utf8), origin: .human))
 
         var updated = false
         for _ in 0 ..< 50 {
