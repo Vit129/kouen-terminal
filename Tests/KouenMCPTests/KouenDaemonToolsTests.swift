@@ -500,6 +500,15 @@ final class KouenDaemonToolsTests: XCTestCase {
         XCTAssertEqual(error?.message, "'keys' must be an array of strings")
     }
 
+    func testTaskUpdateRejectsConflictingDoneAndStatus() async {
+        let tools = KouenDaemonTools(controlEnabled: { true })
+        let testUUID = UUID().uuidString
+        let (result, error) = await tools.taskUpdate(id: testUUID, title: nil, done: true, status: "open")
+        XCTAssertNil(result)
+        XCTAssertEqual(error?.code, -32602)
+        XCTAssertTrue(error?.message.contains("Conflicting 'done'") == true)
+    }
+
     private func temporaryDirectory() -> URL {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("KouenMCPTests-\(UUID().uuidString)", isDirectory: true)

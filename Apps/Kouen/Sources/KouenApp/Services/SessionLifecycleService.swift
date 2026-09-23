@@ -73,7 +73,7 @@ final class SessionLifecycleService {
                    let surfaceID = tab.rootPane.allSurfaceIDs().first {
                     // Small delay to let shell initialize before sending command
                     try? await Task.sleep(for: .milliseconds(500))
-                    await coord.requestDaemon(.sendData(surfaceID: surfaceID.uuidString, data: Data((setup + "\r").utf8)))
+                    await coord.requestDaemon(.sendData(surfaceID: surfaceID.uuidString, data: Data((setup + "\r").utf8), origin: .automation))
                 }
             }
         }
@@ -146,7 +146,7 @@ final class SessionLifecycleService {
             coord.setActiveSurface(surfaceID)
             coord.terminalHosts.host(for: surfaceID)?.focusTerminal()
             if let command = launch.command, !command.isEmpty {
-                await coord.requestDaemon(.sendData(surfaceID: surfaceID.uuidString, data: Data((command + "\r").utf8)))
+                await coord.requestDaemon(.sendData(surfaceID: surfaceID.uuidString, data: Data((command + "\r").utf8), origin: .human))
             }
         }
     }

@@ -5,6 +5,17 @@ All notable changes to Kouen are documented here. The format is based on
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
+## [4.18.4] - 2026-09-23
+
+### Added
+- Release version bump to v4.18.4.
+
+## [4.18.3] - 2026-09-23
+
+### Fixed
+- Unify Antigravity/Copilot name+logo across Models, Agents, Automation ([`4a6fe7a`](https://github.com/Vit129/kouen-terminal/commit/4a6fe7ab6516534c16719e06cf1990db8a742257))
+- Job icon env provider fallback ([#60](https://github.com/Vit129/kouen-terminal/pull/60))
+
 ## [4.18.2] - 2026-09-22
 
 ### Added

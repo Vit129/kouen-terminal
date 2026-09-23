@@ -18,6 +18,10 @@ struct KouenMCPServer {
             || args.contains("serve")
             || args.contains("--port")
             || args.contains("-p")
+            || args.contains("--host")
+            || args.contains("-H")
+            || args.contains("--token")
+            || args.contains("-t")
 
         if isHTTP {
             var port: UInt16 = 8765

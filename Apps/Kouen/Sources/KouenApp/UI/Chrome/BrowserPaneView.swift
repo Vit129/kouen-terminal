@@ -1017,7 +1017,7 @@ public final class BrowserPaneView: NSView {
             return
         }
         Task {
-            await SessionCoordinator.shared.requestDaemon(.sendData(surfaceID: surfaceID.uuidString, data: Data(prompt.utf8)))
+            await SessionCoordinator.shared.requestDaemon(.sendData(surfaceID: surfaceID.uuidString, data: Data(prompt.utf8), origin: .automation))
             Toast.show("✓ Sent style prompt to active agent", in: self)
         }
     }

@@ -17,15 +17,15 @@ extension KouenCLI {
         // `-l` (literal): send the keys text verbatim, no key-name interpretation.
         // `-H` (hex): each token is a hex byte. Both go through `sendData` (raw bytes).
         if args.contains("-l") || args.contains("--literal") {
-            _ = try checkedRequest(client, .sendData(surfaceID: surface, data: Data(keys.utf8)))
+            _ = try checkedRequest(client, .sendData(surfaceID: surface, data: Data(keys.utf8), origin: .automation))
             return
         }
         let tokens = keys.split(whereSeparator: { $0 == " " || $0 == "\t" }).map(String.init)
         if args.contains("-H") || args.contains("--hex") {
-            _ = try checkedRequest(client, .sendData(surfaceID: surface, data: KeyTokenParser.hexBytes(tokens)))
+            _ = try checkedRequest(client, .sendData(surfaceID: surface, data: KeyTokenParser.hexBytes(tokens), origin: .automation))
             return
         }
-        _ = try checkedRequest(client, .sendKeys(surfaceID: surface, keys: tokens))
+        _ = try checkedRequest(client, .sendKeys(surfaceID: surface, keys: tokens, origin: .automation))
     }
 
     static func handleCapturePane(_ args: [String], client: DaemonClient) throws {

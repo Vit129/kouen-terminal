@@ -142,7 +142,7 @@ final class MainExecutor: CommandExecutor {
             guard let surfaceID = coordinator.activeSurfaceID else {
                 throw CommandExecutionError.noActiveSurface
             }
-            coordinator.requestDaemon(.sendKeys(surfaceID: surfaceID.uuidString, keys: keys))
+            coordinator.requestDaemon(.sendKeys(surfaceID: surfaceID.uuidString, keys: keys, origin: .human))
         case .displayMessage(let format):
             DisplayMessage.show(format)
         case .runShell(let shellCommand, let captureToBuffer):
@@ -486,7 +486,7 @@ final class MainExecutor: CommandExecutor {
             } else {
                 target = canonical
             }
-            coordinator.requestDaemon(.sendKeys(surfaceID: surfaceID.uuidString, keys: ["cd \(target)", "Enter"]))
+            coordinator.requestDaemon(.sendKeys(surfaceID: surfaceID.uuidString, keys: ["cd \(target)", "Enter"], origin: .human))
         case let .mark(name, path):
             throw CommandExecutionError.unsupportedInThisContext("mark '\(name)' '\(path)' not supported in GUI context yet")
         case let .view(path):
@@ -627,7 +627,7 @@ final class MainExecutor: CommandExecutor {
               letter.value >= 0x61, letter.value <= 0x7a
         else { return }
         let byte = UInt8(letter.value - 0x60)
-        coordinator.requestDaemon(.sendData(surfaceID: sid.uuidString, data: Data([byte])))
+        coordinator.requestDaemon(.sendData(surfaceID: sid.uuidString, data: Data([byte]), origin: .human))
     }
 
     @MainActor

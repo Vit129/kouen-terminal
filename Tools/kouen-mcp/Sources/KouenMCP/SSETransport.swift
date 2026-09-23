@@ -1,5 +1,6 @@
 import Foundation
 import Network
+import CryptoKit
 import KouenCore
 
 /// HTTP and Server-Sent Events (SSE) Transport for Kouen MCP Server.
@@ -11,9 +12,34 @@ final class SSETransport: @unchecked Sendable {
     private let authToken: String?
     private let queue = DispatchQueue(label: "kouen.mcp.sse", qos: .userInitiated)
 
-    private var listener: NWListener?
+    private let stateLock = NSLock()
+    private var _listener: NWListener?
+    private var listener: NWListener? {
+        get {
+            stateLock.lock()
+            defer { stateLock.unlock() }
+            return _listener
+        }
+        set {
+            stateLock.lock()
+            defer { stateLock.unlock() }
+            _listener = newValue
+        }
+    }
     private var sessions: [String: NWConnection] = [:]
-    private var isRunning = false
+    private var _isRunning = false
+    private var isRunning: Bool {
+        get {
+            stateLock.lock()
+            defer { stateLock.unlock() }
+            return _isRunning
+        }
+        set {
+            stateLock.lock()
+            defer { stateLock.unlock() }
+            _isRunning = newValue
+        }
+    }
 
     init(server: MCPServer, host: String = "0.0.0.0", port: UInt16 = 8765, authToken: String? = nil) {
         self.server = server
@@ -57,12 +83,12 @@ final class SSETransport: @unchecked Sendable {
                 self?.handleIncomingConnection(conn)
             }
 
-            isRunning = true
+            self.isRunning = true
             l.start(queue: queue)
 
-            // Keep the async task running until cancelled
-            while isRunning {
-                try? await Task.sleep(nanoseconds: 1_000_000_000)
+            // Keep the async task running until cancelled or stopped
+            while self.isRunning && !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 100_000_000)
             }
         } catch {
             fputs("kouen-mcp: Failed to bind HTTP server on \(host):\(port): \(error)\n", stderr)
@@ -71,14 +97,15 @@ final class SSETransport: @unchecked Sendable {
     }
 
     public func stop() {
+        self.isRunning = false
         queue.async {
-            self.isRunning = false
             for (_, conn) in self.sessions {
                 conn.cancel()
             }
             self.sessions.removeAll()
-            self.listener?.cancel()
+            let l = self.listener
             self.listener = nil
+            l?.cancel()
         }
     }
 
@@ -199,7 +226,9 @@ final class SSETransport: @unchecked Sendable {
             let urlParams = parseQueryParams(url: fullPath)
             let tokenParam = urlParams["token"]
 
-            let valid = authHeader == "Bearer \(token)" || tokenParam == token
+            let bearerValid = Self.constantTimeEquals(authHeader, "Bearer \(token)")
+            let paramValid = tokenParam.map { Self.constantTimeEquals($0, token) } ?? false
+            let valid = bearerValid || paramValid
             if !valid {
                 sendHTTPResponse(conn: conn, status: "401 Unauthorized", body: "Unauthorized: Invalid or missing authentication token")
                 return
@@ -407,5 +436,15 @@ final class SSETransport: @unchecked Sendable {
             }
         }
         return params
+    }
+
+    private static func constantTimeEquals(_ a: String, _ b: String) -> Bool {
+        let hashA = SHA256.hash(data: Data(a.utf8))
+        let hashB = SHA256.hash(data: Data(b.utf8))
+        var diff: UInt8 = 0
+        for (byteA, byteB) in zip(hashA, hashB) {
+            diff |= byteA ^ byteB
+        }
+        return diff == 0
     }
 }

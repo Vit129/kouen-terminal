@@ -514,34 +514,27 @@ struct KouenDaemonTools: Sendable {
         // antigravity, copilot) fails with a clear daemon-side error rather than silently doing
         // nothing; kiro/gemini/cursor have no headless adapter at all and stay pty-only.
         if headless {
-            let agentKindRaw: String
-            switch agent.lowercased() {
-            case "claude", "claude-code": agentKindRaw = "claude-code"
-            case "codex": agentKindRaw = "codex"
-            case "antigravity", "agy": agentKindRaw = "antigravity"
-            case "copilot": agentKindRaw = "copilot"
-            default:
-                return (nil, JSONRPCError(
-                    code: -32602,
-                    message: "headless: true has no adapter for '\(agent)' — supported: claude, codex, "
-                        + "antigravity, copilot. Pass headless: false (or omit it) to use the interactive pty path."
-                ))
-            }
+            let resolvedKind = AgentHookInstaller.resolveAgentName(agent)
+            let agentKindRaw = resolvedKind?.rawValue ?? agent
             guard let response = await send(.swarmSpawn(
                 lane: "structured", agentKindRaw: agentKindRaw, cwd: cwd, initialCommand: prompt, role: nil
             )) else {
                 return (nil, JSONRPCError(code: -32000, message: "daemon unavailable"))
             }
-            guard case let .swarmTaskNode(node) = response else {
+            switch response {
+            case let .swarmTaskNode(node):
+                return (toolResult(json: .object([
+                    "taskId": .string(node.id.uuidString),
+                    "lane": .string(node.lane),
+                    "agent": .string(node.agentKind.rawValue),
+                    "status": .string(node.status),
+                    "promptSent": .string(prompt),
+                ])), nil)
+            case let .error(message):
+                return (nil, JSONRPCError(code: -32602, message: message))
+            default:
                 return (nil, JSONRPCError(code: -32000, message: "unexpected response to swarmSpawn"))
             }
-            return (toolResult(json: .object([
-                "taskId": .string(node.id.uuidString),
-                "lane": .string(node.lane),
-                "agent": .string(node.agentKind.rawValue),
-                "status": .string(node.status),
-                "promptSent": .string(prompt),
-            ])), nil)
         }
 
         let spawned: SpawnedAgentSurface
@@ -567,7 +560,15 @@ struct KouenDaemonTools: Sendable {
             ))
         }
 
-        try? await Task.sleep(nanoseconds: 3_000_000_000)
+        // Poll pane output until the CLI is ready (prompt signature detected, up to ~5s)
+        for _ in 0..<25 {
+            try? await Task.sleep(nanoseconds: 200_000_000)
+            if let resp = await send(.capturePane(surfaceID: spawned.surfaceID, includeScrollback: false)),
+               case let .text(output) = resp,
+               AgentAttentionDetector.detectPrompt(in: output) != nil {
+                break
+            }
+        }
         _ = await send(.send(surfaceID: spawned.surfaceID, text: prompt + "\n", origin: .automation))
         await notifyMCPActivity(surfaceId: spawned.surfaceID, tool: "kouenSpawnWorker")
 
@@ -753,6 +754,15 @@ struct KouenDaemonTools: Sendable {
                 return (nil, JSONRPCError(code: -32602, message: "'status' must be one of: \(allowed)"))
             }
             taskStatus = parsed
+        }
+        if let done, let taskStatus {
+            let statusImpliesDone = (taskStatus == .done)
+            if done != statusImpliesDone {
+                return (nil, JSONRPCError(
+                    code: -32602,
+                    message: "Conflicting 'done' (\(done)) and 'status' (\(taskStatus.rawValue)) parameters — either provide one, or ensure they agree"
+                ))
+            }
         }
         guard let response = await send(.taskUpdate(id: uuid, title: title, done: done, status: taskStatus))
         else {

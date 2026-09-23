@@ -166,7 +166,7 @@ struct KouenCLI {
                     fputs("Usage: kouen-cli send --surface <uuid> --text \"...\"\n", kouenStderr)
                     exit(1)
                 }
-                _ = try checkedRequest(client, .send(surfaceID: surface, text: text))
+                _ = try checkedRequest(client, .send(surfaceID: surface, text: text, origin: .automation))
             case "notify":
                 guard let surface = flagValue(args, flag: "--surface") else {
                     fputs("Usage: kouen-cli notify --surface <uuid> [--title t] [--body b] [--from-hook] [--status done] [--subagent start|stop]\n", kouenStderr)

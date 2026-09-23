@@ -108,4 +108,15 @@ final class ClaudeCodeHarnessIPCTests: XCTestCase {
         }
         XCTAssertTrue(runs.contains { $0.id == id }, "completed run should still be listed")
     }
+
+    func testSwarmSpawnStructuredRejectsUnsupportedAgentWithHelpfulError() throws {
+        let client = DaemonClient()
+        guard case let .error(message) = try client.request(
+            .swarmSpawn(lane: "structured", agentKindRaw: "cursor", cwd: nil, initialCommand: "hello", role: nil)
+        ) else {
+            return XCTFail("Expected .error when spawning structured swarm worker with unsupported agent")
+        }
+        XCTAssertTrue(message.contains("headless: true has no adapter for 'cursor'"))
+        XCTAssertTrue(message.contains("claude-code"))
+    }
 }

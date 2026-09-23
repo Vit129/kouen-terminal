@@ -419,7 +419,7 @@ public enum CommandIPCTranslator {
         // MARK: Scripting
         case let .sendKeys(keys):
             guard let pane = target.paneID, let surface = target.surfaceID(of: pane) else { return .unresolved }
-            return .requests([.sendKeys(surfaceID: surface, keys: keys)])
+            return .requests([.sendKeys(surfaceID: surface, keys: keys, origin: .automation)])
 
         // MARK: Phase 6/7 — verbs that resolve to IPC
         case .lastWindow:

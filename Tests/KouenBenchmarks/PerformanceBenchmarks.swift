@@ -967,7 +967,7 @@ final class PerformanceBenchmarks: XCTestCase {
     func testIPCCodecRoundTrip4MiB() throws {
         try skipUnlessEnabled()
         let payload = Data(repeating: 0x41, count: 4 * 1024 * 1024)
-        let envelope = IPCEnvelope(request: .sendData(surfaceID: UUID().uuidString, data: payload))
+        let envelope = IPCEnvelope(request: .sendData(surfaceID: UUID().uuidString, data: payload, origin: .human))
         let nanos = timedNanos {
             guard var framed = try? IPCCodec.encode(envelope) else { return XCTFail("encode") }
             _ = try? IPCCodec.decodeRequest(from: &framed)

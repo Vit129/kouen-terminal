@@ -60,4 +60,14 @@ final class ClaudeCodeHarnessTests: XCTestCase {
         let list = await harness.list()
         XCTAssertTrue(list.isEmpty)
     }
+
+    func testClaudeCodeHarnessAdapterQuery() {
+        XCTAssertTrue(ClaudeCodeHarness.hasAdapter(for: .claudeCode))
+        XCTAssertTrue(ClaudeCodeHarness.hasAdapter(for: .codex))
+        XCTAssertTrue(ClaudeCodeHarness.hasAdapter(for: .antigravity))
+        XCTAssertTrue(ClaudeCodeHarness.hasAdapter(for: .copilot))
+        XCTAssertFalse(ClaudeCodeHarness.hasAdapter(for: .cursor))
+        XCTAssertFalse(ClaudeCodeHarness.hasAdapter(for: .kiro))
+        XCTAssertFalse(ClaudeCodeHarness.hasAdapter(for: .gemini))
+    }
 }

@@ -12,6 +12,10 @@ public enum KouenTaskStatus: String, Codable, Sendable, Equatable, CaseIterable 
     case done
 }
 
+public enum TaskStoreError: Error, Equatable {
+    case conflictingState(done: Bool, status: KouenTaskStatus)
+}
+
 /// A session-scoped checklist item, addressable via `kouen-mcp`. Belongs to exactly one
 /// session — there is no global, session-independent Task (see LANGUAGE.md).
 public struct KouenTask: Codable, Sendable, Equatable, Identifiable {
@@ -107,13 +111,22 @@ public final class TaskStore: @unchecked Sendable {
     }
 
     /// Updates title/done/status in place — the Task stays listable afterward
+
+    /// Update a Task. `title: nil`, `done: nil`, and `status: nil` leave the respective
+    /// fields unchanged. Updates `updatedAt`. A completed Task remains in the store
     /// regardless of `done`/status (see class doc comment). Passing `done` without
     /// `status` also moves `status` to `.done`/`.open` to keep the two fields
     /// consistent for legacy callers that only ever set `done`.
     @discardableResult
     public func update(
         id: UUID, title: String? = nil, done: Bool? = nil, status: KouenTaskStatus? = nil
-    ) -> KouenTask? {
+    ) throws -> KouenTask? {
+        if let done, let status {
+            let statusIsDone = (status == .done)
+            if done != statusIsDone {
+                throw TaskStoreError.conflictingState(done: done, status: status)
+            }
+        }
         lock.lock()
         guard let index = tasks.firstIndex(where: { $0.id == id }) else {
             lock.unlock()

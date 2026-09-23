@@ -897,10 +897,10 @@ private final class WindowSession: @unchecked Sendable {
     private func dispatchForward(_ data: Data) {
         if synchronize {
             for rect in rects {
-                _ = try? client.request(.sendData(surfaceID: rect.surfaceID.uuidString, data: data), timeout: 1)
+                _ = try? client.request(.sendData(surfaceID: rect.surfaceID.uuidString, data: data, origin: .human), timeout: 1)
             }
         } else if let active = activeSurface {
-            _ = try? client.request(.sendData(surfaceID: active, data: data), timeout: 1)
+            _ = try? client.request(.sendData(surfaceID: active, data: data, origin: .human), timeout: 1)
         }
     }
 
@@ -1086,7 +1086,7 @@ private final class WindowSession: @unchecked Sendable {
             column: route.localColumn, row: route.localRow,
             modifiers: mouseModifiers(e), modes: term.modes
         )
-        if !bytes.isEmpty { _ = try? client.request(.sendData(surfaceID: sid, data: Data(bytes)), timeout: 1) }
+        if !bytes.isEmpty { _ = try? client.request(.sendData(surfaceID: sid, data: Data(bytes), origin: .human), timeout: 1) }
     }
 
     private func mouseButton(_ e: SGRMouseEvent) -> MouseButton {
@@ -1241,7 +1241,7 @@ private final class WindowSession: @unchecked Sendable {
             flashStatus(FormatString.evaluate(format, context: formatContext(target: target)))
         case .sendPrefix:
             if let active = activeSurface {
-                _ = try? client.request(.sendData(surfaceID: active, data: Data([configuration.prefix])), timeout: 1)
+                _ = try? client.request(.sendData(surfaceID: active, data: Data([configuration.prefix]), origin: .human), timeout: 1)
             }
         case .copyMode:
             if copyMode != nil { exitCopyMode() } else { enterCopyMode() }

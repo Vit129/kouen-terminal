@@ -3,13 +3,13 @@ _Auto-generated from GRAPH_REPORT.md · do not edit manually_
 _Regen: `graphify update .`_
 
 ## Summary
-- 20153 nodes · 54297 edges · 2106 communities (651 shown, 1455 thin omitted)
-- Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 8078 edges (avg confidence: 0.74)
+- 20164 nodes · 54337 edges · 2089 communities (632 shown, 1457 thin omitted)
+- Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 8086 edges (avg confidence: 0.74)
 - Token cost: 0 input · 0 output
 
 
 ## Graph Freshness
-- Built from commit: `930ee7d5`
+- Built from commit: `732fbc9a`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -22,8 +22,8 @@ _Regen: `graphify update .`_
 5. `SessionCoordinator` - 235 edges
 6. `TerminalEmulator` - 229 edges
 7. `u()` - 219 edges
-8. `SurfaceRegistry` - 214 edges
-9. `DaemonClient` - 209 edges
+8. `SurfaceRegistry` - 215 edges
+9. `DaemonClient` - 210 edges
 10. `IPCRequest` - 208 edges
 
 
@@ -33,14 +33,14 @@ utility/config file can rack up more edges than a real coupler while only
 ever touching one area. This ranks by how many DIFFERENT communities a
 node's neighbors span, not by raw edge count.
 1. `KouenPaths` - bridges 61 areas (143 edges)
-2. `AgentKind` - bridges 57 areas (144 edges)
-3. `SessionCoordinator` - bridges 54 areas (235 edges)
-4. `Process` - bridges 49 areas (101 edges)
-5. `SessionSnapshot` - bridges 48 areas (181 edges)
-6. `SurfaceRegistry` - bridges 43 areas (214 edges)
-7. `DaemonClient` - bridges 40 areas (209 edges)
-8. `IPCResponse` - bridges 40 areas (103 edges)
-9. `KouenTerminalSurfaceView` - bridges 36 areas (343 edges)
+2. `SessionCoordinator` - bridges 53 areas (235 edges)
+3. `AgentKind` - bridges 53 areas (145 edges)
+4. `Process` - bridges 50 areas (101 edges)
+5. `SessionSnapshot` - bridges 43 areas (181 edges)
+6. `DaemonClient` - bridges 42 areas (210 edges)
+7. `KouenTerminalSurfaceView` - bridges 40 areas (343 edges)
+8. `SurfaceRegistry` - bridges 38 areas (215 edges)
+9. `i()` - bridges 35 areas (321 edges)
 
 ## Surprising Connections (you probably didn't know these)
 - `.selectedHost` --references--> `RemoteHost`  [INFERRED]

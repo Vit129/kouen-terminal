@@ -131,7 +131,7 @@ final class DaemonRoundTripTests: XCTestCase {
 
         // Give the subscription socket a moment to register, then drive output.
         usleep(200_000)
-        _ = try client.request(.sendData(surfaceID: target.surfaceID, data: Data("echo \(marker)\n".utf8)))
+        _ = try client.request(.sendData(surfaceID: target.surfaceID, data: Data("echo \(marker)\n".utf8), origin: .human))
         wait(for: [streamed], timeout: 8)
     }
 
@@ -156,7 +156,7 @@ final class DaemonRoundTripTests: XCTestCase {
         // echoing input; per-marker complete commands keep the marker tokens off the line editor's
         // syntax-highlighted echo (an interactive shell colorizes a long command as it's "typed",
         // which would split a marker token across SGR escapes and defeat substring matching).
-        _ = try client.request(.sendData(surfaceID: sid, data: Data("PS1=''; stty -echo\n".utf8)))
+        _ = try client.request(.sendData(surfaceID: sid, data: Data("PS1=''; stty -echo\n".utf8), origin: .human))
         usleep(300_000)
 
         let total = 40
@@ -175,7 +175,7 @@ final class DaemonRoundTripTests: XCTestCase {
         let writer = DispatchQueue(label: "gap-writer")
         writer.async {
             for i in 0 ..< total {
-                _ = try? writerClient.request(.sendData(surfaceID: sid, data: Data("printf '\(marker(i))\\n'\n".utf8)))
+                _ = try? writerClient.request(.sendData(surfaceID: sid, data: Data("printf '\(marker(i))\\n'\n".utf8), origin: .human))
                 usleep(25_000)
             }
             burstDone.set(true)
@@ -229,7 +229,7 @@ final class DaemonRoundTripTests: XCTestCase {
         guard case let .replayResult(_, first)? = try? client.request(.replayScrollbackSequenced(surfaceID: sid, fromSequence: nil)) else {
             return XCTFail("expected a replayResult")
         }
-        _ = try client.request(.sendData(surfaceID: sid, data: Data("printf 'SEQPROBE\\n'\n".utf8)))
+        _ = try client.request(.sendData(surfaceID: sid, data: Data("printf 'SEQPROBE\\n'\n".utf8), origin: .human))
         usleep(400_000)
         guard case let .replayResult(_, second)? = try? client.request(.replayScrollbackSequenced(surfaceID: sid, fromSequence: nil)) else {
             return XCTFail("expected a second replayResult")
@@ -299,7 +299,7 @@ final class DaemonRoundTripTests: XCTestCase {
         }
         defer { subA.cancel(); subB.cancel() }
         usleep(200_000)
-        _ = try client.request(.sendData(surfaceID: target.surfaceID, data: Data("echo \(marker)\n".utf8)))
+        _ = try client.request(.sendData(surfaceID: target.surfaceID, data: Data("echo \(marker)\n".utf8), origin: .human))
         wait(for: [gotA, gotB], timeout: 8)
     }
 
@@ -326,7 +326,7 @@ final class DaemonRoundTripTests: XCTestCase {
         // A releases just this surface but keeps its connection open.
         subA.detachSurface(target.surfaceID)
         usleep(300_000)
-        _ = try client.request(.sendData(surfaceID: target.surfaceID, data: Data("echo \(after)\n".utf8)))
+        _ = try client.request(.sendData(surfaceID: target.surfaceID, data: Data("echo \(after)\n".utf8), origin: .human))
         wait(for: [bGotAfter], timeout: 8)
         XCTAssertFalse(accA.contains(after), "a detached client must stop receiving the surface's output")
     }
@@ -462,7 +462,7 @@ final class DaemonRoundTripTests: XCTestCase {
         timeout: TimeInterval = 8
     ) throws -> (rows: Int, cols: Int)? {
         let nonce = "SZQ\(UUID().uuidString.prefix(8))"
-        _ = try client.request(.sendData(surfaceID: surfaceID, data: Data("echo \(nonce); stty size\n".utf8)))
+        _ = try client.request(.sendData(surfaceID: surfaceID, data: Data("echo \(nonce); stty size\n".utf8), origin: .human))
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
             let text = output.snapshot

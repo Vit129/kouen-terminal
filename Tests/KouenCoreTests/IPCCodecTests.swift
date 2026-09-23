@@ -14,7 +14,7 @@ final class IPCCodecTests: XCTestCase {
             .newTabInWorkspace(named: "Default", cwd: "/tmp/project", shell: "/bin/bash"),
             .reorderTab(workspaceID: UUID(), tabID: UUID(), toIndex: 3),
             .resizePaneRatio(tabID: UUID(), firstPaneID: UUID(), secondPaneID: UUID(), ratio: 0.42),
-            .sendData(surfaceID: "surface-1", data: Data([0, 1, 2, 254, 255])),
+            .sendData(surfaceID: "surface-1", data: Data([0, 1, 2, 254, 255]), origin: .human),
             .notify(surfaceID: "surface-1", title: "Agent", body: "Needs approval"),
             .newSplit(tabID: UUID(), paneID: UUID(), direction: .vertical, shell: "/opt/homebrew/bin/fish"),
             .selectPane(tabID: UUID(), paneID: UUID()),
