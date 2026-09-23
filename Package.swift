@@ -9,6 +9,17 @@ import PackageDescription
 // surface framework-deprecation churn we don't want to hard-fail CI on).
 let strictFoundationSettings: [SwiftSetting] = [.unsafeFlags(["-warnings-as-errors"])]
 
+// KouenCore's Agent Session History scanner reads GitHub Copilot's local session-store.db via
+// SQLite3 (system library, no external package). Only linked on Apple platforms — the
+// `SQLite3` Clang module this uses is SDK-provided and unavailable on Linux; the scanner itself
+// guards the import with `#if canImport(SQLite3)` so the Linux/headless build of KouenCore
+// still compiles without it.
+#if os(macOS)
+let coreLinkerSettings: [LinkerSetting]? = [.linkedLibrary("sqlite3")]
+#else
+let coreLinkerSettings: [LinkerSetting]? = nil
+#endif
+
 // The Package manifest is evaluated on the *host*, so on Linux the macOS-only layers (the Metal/
 // AppKit renderer + terminal kit, the SwiftUI onboarding wizard, the GUI app, and Sparkle
 // auto-update) are dropped from products/dependencies/targets. The daemon, CLI, terminal engine,
@@ -212,7 +223,8 @@ let package = Package(
             name: "KouenCore",
             dependencies: ["KouenIPC", "KouenSettings", "KouenCommands"],
             path: "Packages/KouenCore/Sources/KouenCore",
-            swiftSettings: strictFoundationSettings
+            swiftSettings: strictFoundationSettings,
+            linkerSettings: coreLinkerSettings
         ),
         // Native terminal engine — pure Swift, no external dependencies. Foundation only
         // so it links for headless CLI use and unit tests without a GPU.

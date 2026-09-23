@@ -18,7 +18,13 @@ public final class AgentSessionHistoryModel: ObservableObject {
         didSet { extraRecordsShown = 0 }
     }
     @Published public var selectedScope: HistoryScope = .all {
-        didSet { extraRecordsShown = 0 }
+        didSet {
+            extraRecordsShown = 0
+            // Switching Workspace/Project/All previously just re-filtered whatever was already
+            // in memory, with no re-sync from disk — `refresh` respects the 5s cache window
+            // (`AgentHistoryScanner.getOrScan`) so this doesn't force a rescan on every click.
+            refresh(force: false)
+        }
     }
     @Published public var expandedSessionIDs: Set<String> = []
     @Published public var collapsedProjects: Set<String> = []
@@ -146,16 +152,19 @@ public final class AgentSessionHistoryModel: ObservableObject {
 public struct AgentSessionHistoryView: View {
     @ObservedObject var model: AgentSessionHistoryModel
     var onResume: ((AgentSessionRecord) -> Void)?
-    var onViewLog: ((AgentSessionRecord) -> Void)?
+    var onResumeInWorktree: ((AgentSessionRecord) -> Void)?
+    var onContinueInNewSession: ((AgentSessionRecord) -> Void)?
 
     public init(
         model: AgentSessionHistoryModel,
         onResume: ((AgentSessionRecord) -> Void)? = nil,
-        onViewLog: ((AgentSessionRecord) -> Void)? = nil
+        onResumeInWorktree: ((AgentSessionRecord) -> Void)? = nil,
+        onContinueInNewSession: ((AgentSessionRecord) -> Void)? = nil
     ) {
         self.model = model
         self.onResume = onResume
-        self.onViewLog = onViewLog
+        self.onResumeInWorktree = onResumeInWorktree
+        self.onContinueInNewSession = onContinueInNewSession
     }
 
     public var body: some View {
@@ -350,6 +359,27 @@ public struct AgentSessionHistoryView: View {
         }
     }
 
+    // MARK: - Action Button (shared shape for the 2x2 resume/copy grid)
+    @ViewBuilder
+    private func actionButton(icon: String, label: String, emphasized: Bool = false, action: @escaping () -> Void) -> some View {
+        let c = KouenDesign.chrome
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 9))
+                Text(label)
+                    .font(.system(size: 10, weight: emphasized ? .semibold : .regular))
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .frame(maxWidth: .infinity)
+            .background(emphasized ? Color.accentColor.opacity(0.15) : Color(nsColor: c.surfaceElevated))
+            .foregroundStyle(emphasized ? Color.accentColor : Color(nsColor: c.textSecondary))
+            .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
     // MARK: - Session Card
     @ViewBuilder
     private func sessionCard(record: AgentSessionRecord) -> some View {
@@ -393,6 +423,17 @@ public struct AgentSessionHistoryView: View {
                 Text(relativeDate(record.updatedAt))
                     .font(.system(size: 9.5))
                     .foregroundStyle(Color(nsColor: c.textTertiary))
+            }
+
+            // Latest agent message, always visible on the collapsed card (not hidden behind
+            // the expand toggle) so the list reads like a task log at a glance — collapsed
+            // when the card itself is expanded (LATEST TURNS below already shows it in full).
+            if !isExpanded, model.searchQuery.isEmpty,
+               let latestAgentTurn = record.latestTurns.last(where: { $0.role == "AGENT" }) {
+                Text("Agent: \(latestAgentTurn.content)")
+                    .font(.system(size: 10))
+                    .foregroundStyle(Color(nsColor: c.textSecondary))
+                    .lineLimit(2)
             }
 
             // Matched Content Snippet (when query matches inside chat turns or prompt)
@@ -449,62 +490,32 @@ public struct AgentSessionHistoryView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
             }
 
-            // Action Buttons Row — always visible on the card itself, not hidden behind
-            // the expand toggle (previously only reachable after expanding, so the button
-            // was easy to miss entirely).
-            HStack(spacing: 6) {
-                Button {
-                    onResume?(record)
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "play.fill")
-                            .font(.system(size: 9))
-                        Text("Resume")
-                            .font(.system(size: 10, weight: .semibold))
+            // Action Buttons — always visible on the card itself, not hidden behind the expand
+            // toggle. 2x2 grid (not a single row) so "Resume in Worktree" / "Continue in New
+            // Session…" have room for their full label without wrapping.
+            VStack(spacing: 6) {
+                HStack(spacing: 6) {
+                    actionButton(icon: "arrow.triangle.branch", label: "Resume in Worktree", emphasized: true) {
+                        onResumeInWorktree?(record)
                     }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.accentColor.opacity(0.15))
-                    .foregroundStyle(Color.accentColor)
-                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .help("Resume this session in a new tab")
+                    .help("Create an isolated git worktree and resume this session there")
 
-                Button {
-                    copySessionSummary(record)
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "doc.on.doc")
-                            .font(.system(size: 8.5))
-                        Text("Copy")
-                            .font(.system(size: 10))
+                    actionButton(icon: "play.fill", label: "Resume in New Tab", emphasized: true) {
+                        onResume?(record)
                     }
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 4)
-                    .background(Color(nsColor: c.surfaceElevated))
-                    .foregroundStyle(Color(nsColor: c.textSecondary))
-                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                    .help("Resume this session in a new tab, sharing the current session's worktree")
                 }
-                .buttonStyle(.plain)
-                .help("Copy title, prompt, and latest turns to clipboard")
+                HStack(spacing: 6) {
+                    actionButton(icon: "plus.rectangle.on.rectangle", label: "Continue in New Session…") {
+                        onContinueInNewSession?(record)
+                    }
+                    .help("Resume as a new, separate session at the original project path")
 
-                Button {
-                    onViewLog?(record)
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "doc.text")
-                            .font(.system(size: 9))
-                        Text("View Log")
-                            .font(.system(size: 10))
+                    actionButton(icon: "doc.on.doc", label: "Copy Session") {
+                        copySessionSummary(record)
                     }
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 4)
-                    .background(Color(nsColor: c.surfaceElevated))
-                    .foregroundStyle(Color(nsColor: c.textSecondary))
-                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                    .help("Copy title, project path, prompt, and latest turns to clipboard")
                 }
-                .buttonStyle(.plain)
             }
             .padding(.top, 2)
 

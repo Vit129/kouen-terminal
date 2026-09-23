@@ -91,6 +91,8 @@ public enum AgentKind: String, Codable, Sendable, CaseIterable {
             return "agy --conversation \(sessionID)"
         case .codex:
             return "codex resume \(sessionID)"
+        case .copilot:
+            return "copilot --resume \(sessionID)"
         default:
             return "claude --resume \(sessionID)"
         }
