@@ -57,6 +57,19 @@ final class FilePreviewCoordinator {
     }
 
     func closeFileTab(id: FileTabID) {
+        // Only the active tab's content is actually loaded (the editor swaps a single
+        // shared buffer on tab switch — see FileEditorTabBarModel.dirtyTabID), so a
+        // background tab's dirty state isn't knowable here and always closes immediately,
+        // same as before this confirmation existed.
+        if id == fileTabManager.activeFileTabID, fileEditorView?.isDirty == true,
+           let path = fileTabManager.activeTab()?.path {
+            resolveDirtyBeforeClose(displayName: (path as NSString).lastPathComponent)
+            return
+        }
+        performCloseFileTab(id: id)
+    }
+
+    private func performCloseFileTab(id: FileTabID) {
         fileTabManager.close(id: id)
         if fileTabManager.hasOpenTabs {
             loadActiveFileTab()
@@ -64,6 +77,32 @@ final class FilePreviewCoordinator {
             hideFileEditorSplit()
         }
         persistEditorState()
+    }
+
+    /// Save/Discard here only resolve the dirty state (write to disk, or revert the buffer
+    /// to last-saved content) — they never close the tab themselves. With multiple tabs
+    /// potentially open, a single close click shouldn't be the thing that destroys or
+    /// commits unrelated work; the tab stays open and closes on a second, now-dialog-free
+    /// click once it's clean. Content-diff dirty check (see `SyntaxTextView.isDirty`) means
+    /// editing then undoing back to the on-disk content already reports clean before this
+    /// even fires, so this only shows for a genuine, still-pending change.
+    private func resolveDirtyBeforeClose(displayName: String) {
+        let alert = NSAlert()
+        alert.messageText = "Save changes to \"\(displayName)\"?"
+        alert.informativeText = "This tab has unsaved changes. Save or Discard to resolve them, then close again."
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Save")
+        alert.addButton(withTitle: "Discard")
+        alert.addButton(withTitle: "Cancel")
+        switch alert.runModal() {
+        case .alertFirstButtonReturn:
+            fileEditorView?.save()
+        case .alertSecondButtonReturn:
+            fileEditorView?.discardChanges()
+        default:
+            break
+        }
+        refreshTabBarDirtyState()
     }
 
     func selectFileTab(id: FileTabID) {
@@ -113,10 +152,18 @@ final class FilePreviewCoordinator {
     private func loadActiveFileTab() {
         guard let tab = fileTabManager.activeTab() else { return }
         fileEditorView?.load(path: tab.path)
-        fileEditorTabBar?.reload(tabs: fileTabManager.openTabs, activeID: fileTabManager.activeFileTabID)
+        refreshTabBarDirtyState()
         if let fileEditorView {
-            fileEditorView.window?.makeFirstResponder(fileEditorView)
+            fileEditorView.focusActiveView()
         }
+    }
+
+    /// Re-renders the tab bar against the active tab's current dirty state — called right
+    /// after load (always clean at that point) and on every keystroke via
+    /// `FileEditorView.onDirtyChange`.
+    private func refreshTabBarDirtyState() {
+        let dirtyID = fileEditorView?.isDirty == true ? fileTabManager.activeFileTabID : nil
+        fileEditorTabBar?.reload(tabs: fileTabManager.openTabs, activeID: fileTabManager.activeFileTabID, dirtyTabID: dirtyID)
     }
 
     // MARK: - Split Show/Hide
@@ -144,6 +191,7 @@ final class FilePreviewCoordinator {
         editor.translatesAutoresizingMaskIntoConstraints = false
         panel.addSubview(editor)
         fileEditorView = editor
+        editor.onDirtyChange = { [weak self] in self?.refreshTabBarDirtyState() }
 
         NSLayoutConstraint.activate([
             tabBarView.topAnchor.constraint(equalTo: panel.topAnchor),

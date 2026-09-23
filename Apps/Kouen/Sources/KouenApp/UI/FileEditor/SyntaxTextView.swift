@@ -26,6 +26,15 @@ final class SyntaxTextView: NSView {
     var symbolIndex: WorkspaceSymbolIndex?
     var activeDiagnostics: [LSPDiagnostic] { diagnostics }
 
+    /// Content as of the last `load()` (i.e. what's on disk) or the last successful save.
+    /// `isDirty` diffs against this, not against "has any keystroke happened" — editing
+    /// text and then undoing back to this exact content must report clean again, so a
+    /// close-tab confirmation doesn't fire over a no-op edit.
+    private var savedContent: String = ""
+    var isDirty: Bool { textView.string != savedContent }
+    /// Fired on every keystroke so a host (tab bar `*` marker, etc.) can re-read `isDirty`.
+    var onDirtyChange: (() -> Void)?
+
     var onHover: ((LSPPosition) async -> String?)?
     var onDefinition: ((LSPPosition) async -> SyntaxDefinitionTarget?)?
 
@@ -103,6 +112,41 @@ final class SyntaxTextView: NSView {
         if resetScroll {
             setDiffLines([:])
         }
+        savedContent = text
+    }
+
+    /// Writes the current text out via `onSave` and re-snapshots `savedContent` so
+    /// `isDirty` immediately reports clean again — shared by ⌘S, `:w`/`:wq`/`ZZ`, and any
+    /// host-triggered "Save" action (e.g. a close-tab confirmation's Save button).
+    private func performSave() {
+        onSave?(textView.string)
+        savedContent = textView.string
+        onDirtyChange?()
+    }
+
+    /// Public entry point for a host-triggered save outside the vi keybindings (e.g. the
+    /// "Save" button on a close-tab confirmation alert).
+    func saveNow() {
+        performSave()
+    }
+
+    /// Reverts the live buffer back to `savedContent` (the last load/save snapshot)
+    /// without touching disk — the "Discard" action on a close-tab confirmation. Doesn't
+    /// close/navigate anything itself; it only clears `isDirty` so a caller resolving a
+    /// close/back action against multiple open tabs never destroys unrelated work by
+    /// accident — resolving one tab's dirty state is never coupled to closing it.
+    func discardChanges() {
+        load(text: savedContent, fileExtension: fileExtension, resetScroll: false)
+        onDirtyChange?()
+    }
+
+    /// Test-only seam: mutates the buffer directly, bypassing vi/insert-mode key dispatch
+    /// — a unit-test host has no real window/first-responder to drive genuine NSEvent
+    /// keystrokes through, so `isDirty`'s content-diff logic needs this to be exercisable
+    /// at all. Mirrors `debugEvaluateJS`'s role in MarkdownPreviewView.
+    func debugSetText(_ text: String) {
+        textView.textStorage?.mutableString.setString(text)
+        onDirtyChange?()
     }
 
     func setDiagnostics(_ diagnostics: [LSPDiagnostic]) {
@@ -142,24 +186,52 @@ final class SyntaxTextView: NSView {
         textView.performFindPanelAction(NSTextFinder.Action.showFindInterface)
     }
 
+    /// Jumps straight to vi insert mode — used when a host view (e.g. `FileEditorView`
+    /// switching out of rendered markdown preview) wants "i" to both reveal this view
+    /// and start editing in one keystroke, rather than requiring a separate `i` press
+    /// once this view already has focus.
+    func enterInsertMode() {
+        vi.enter(mode: .insert)
+        focus()
+    }
+
+    /// Makes the real inner `NSTextView` — not this container — first responder. Callers
+    /// that want this view "focused" (initial file open, mode toggle, ⌘E) must target the
+    /// inner text view specifically: once in insert mode, `dispatchViKey` deliberately
+    /// returns false ("let NSTextView handle it"), and that only actually inserts typed
+    /// characters if the real NSTextView is first responder — if this plain-NSView
+    /// container were first responder instead, `super.keyDown` here is inert and every
+    /// keystroke after entering insert mode would be silently swallowed.
+    func focus() {
+        window?.makeFirstResponder(textView)
+    }
+
     override var acceptsFirstResponder: Bool { true }
 
     override func keyDown(with event: NSEvent) {
+        if dispatchViKey(event) { return }
+        super.keyDown(with: event)
+    }
+
+    /// Vi/save/find key dispatch, factored out so `SyntaxTextViewInner.keyDown` (the real
+    /// NSTextView — see `focus()` above for why that's normally the actual first
+    /// responder, not this container) can route through the exact same logic. Returns
+    /// true if the event was consumed.
+    func dispatchViKey(_ event: NSEvent) -> Bool {
         let cmd = event.modifierFlags.contains(.command)
         let key = event.charactersIgnoringModifiers ?? ""
         // ⌘S: save (any mode)
         if cmd && key == "s" {
             if case .insert = vi.mode {
-                onSave?(textView.string)
+                performSave()
                 vi.enter(mode: .normal)
             }
-            return
+            return true
         }
         // ⌘F: find
-        if cmd && key == "f" { showFindBar(); return }
+        if cmd && key == "f" { showFindBar(); return true }
         // Let vi engine handle everything else
-        if vi.handle(event) { return }
-        super.keyDown(with: event)
+        return vi.handle(event)
     }
 
     func handleTextViewKeyDown(_ event: NSEvent) -> Bool {
@@ -341,7 +413,7 @@ final class SyntaxTextView: NSView {
         }
         vi.onSave = { [weak self] in
             guard let self else { return }
-            self.onSave?(self.textView.string)
+            self.performSave()
         }
         vi.onQuit = { [weak self] in
             // bubble up — ContentAreaViewController listens for this notification
@@ -755,6 +827,13 @@ final class SyntaxTextViewInner: NSTextView {
         if let parent = parentView, parent.handleTextViewKeyDown(event) {
             return
         }
+        // This is normally the actual first responder (see SyntaxTextView.focus()), so
+        // vi-command dispatch has to happen here, not just on the container's own
+        // (rarely-focused) keyDown — otherwise every vi command silently no-ops whenever
+        // the real NSTextView, not its container, holds keyboard focus.
+        if let parent = parentView, parent.dispatchViKey(event) {
+            return
+        }
         super.keyDown(with: event)
     }
 
@@ -803,6 +882,7 @@ final class SyntaxTextViewInner: NSTextView {
 
 extension SyntaxTextView: NSTextViewDelegate {
     func textDidChange(_ notification: Notification) {
+        onDirtyChange?()
         guard isEditMode, let index = symbolIndex else {
             dismissCompletionPopup()
             return

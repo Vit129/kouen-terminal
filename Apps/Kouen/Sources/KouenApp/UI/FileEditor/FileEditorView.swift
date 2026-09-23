@@ -32,6 +32,18 @@ final class FileEditorView: NSView {
     var isShowingSyntaxView: Bool { !syntaxView.isHidden }
     var isShowingMarkdownPreview: Bool { !markdownPreviewView.isHidden }
     var isShowingQuickLook: Bool { !quickLookContainer.isHidden }
+    /// Only the syntax editor is ever actually editable (markdown/rich preview is a
+    /// read-only WKWebView render) — nothing to be dirty about otherwise.
+    var isDirty: Bool { isShowingSyntaxView && syntaxView.isDirty }
+    /// Fired on every keystroke while the syntax editor is visible, so a host (the file
+    /// tab bar's `*` marker) can re-read `isDirty` live instead of only on tab switch.
+    var onDirtyChange: (() -> Void)?
+    /// Writes the current buffer to disk immediately — used by a close-tab confirmation's
+    /// "Save" action, outside the normal ⌘S/`:w` vi keybindings.
+    func save() { syntaxView.saveNow() }
+    /// Reverts the buffer back to the last-saved content without touching disk — a close-tab
+    /// confirmation's "Discard" action.
+    func discardChanges() { syntaxView.discardChanges() }
     private let fileWatcher = FileChangeWatcher()
     private let symbolIndex = WorkspaceSymbolIndex()
 
@@ -233,9 +245,27 @@ final class FileEditorView: NSView {
         lspSession.onDiagnostics = { [weak self] diagnostics in
             self?.syntaxView.setDiagnostics(diagnostics)
         }
+        syntaxView.onDirtyChange = { [weak self] in self?.onDirtyChange?() }
     }
 
     // MARK: - Editing
+
+    /// Focuses whichever inner view is actually showing (syntax editor, markdown/rich
+    /// preview, or neither) instead of always leaving `self` as first responder. Without
+    /// this, a freshly opened code file (which defaults straight into the editable syntax
+    /// view, not the preview) never routes keystrokes to `syntaxView`'s vi-engine at all —
+    /// `self.keyDown` has no case for a bare `i` once already in edit mode, so it's silently
+    /// dropped. Same call `toggleMarkdownMode()` already makes on mode switch; this covers
+    /// the initial file-open path, which previously always focused `self` instead.
+    func focusActiveView() {
+        if isShowingSyntaxView {
+            syntaxView.focus()
+        } else if isShowingMarkdownPreview {
+            window?.makeFirstResponder(markdownPreviewView)
+        } else {
+            window?.makeFirstResponder(self)
+        }
+    }
 
     func showFindBar() {
         syntaxView.showFindBar()
@@ -261,6 +291,16 @@ final class FileEditorView: NSView {
                 showFindBar()
             default: super.keyDown(with: event)
             }
+            return
+        }
+
+        // Vi-style "i" pressed while looking at the rendered preview (not the raw/syntax
+        // view): jump into edit mode and straight into insert, same as pressing "i" would
+        // do if the syntax view already had focus — otherwise "i" here silently no-ops
+        // because the preview is a WKWebView with no vi-engine wired into it.
+        if key == "i" && isMarkdownFile && !isMarkdownEditMode {
+            toggleMarkdownMode()
+            syntaxView.enterInsertMode()
             return
         }
         super.keyDown(with: event)
@@ -305,7 +345,7 @@ final class FileEditorView: NSView {
         if isMarkdownEditMode {
             markdownPreviewView.isHidden = true
             showText(currentMarkdownRaw, fileExtension: ext, resetScroll: false)
-            window?.makeFirstResponder(syntaxView)
+            syntaxView.focus()
         } else {
             let text = syntaxView.string
             currentMarkdownRaw = text

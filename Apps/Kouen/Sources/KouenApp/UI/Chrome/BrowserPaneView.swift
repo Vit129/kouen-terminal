@@ -1177,6 +1177,14 @@ public final class BrowserPaneView: NSView {
     }
 
     public func snapshot(interactive: Bool) async throws -> BrowserSnapshot {
+        // Best-effort: an MCP-driven agent that calls kouenBrowserOpen and immediately
+        // follows with kouenBrowserSnapshot (without an explicit kouenBrowserWait in
+        // between) would otherwise capture the page mid-navigation — empty DOM, no
+        // elements — and only see real content once a human happens to look at the pane
+        // later (which, e.g. via visibility-driven layout, lets the load actually finish).
+        // Ignore a timeout here; a still-loading page after the grace period is still
+        // worth snapshotting as-is rather than failing the call outright.
+        try? await waitForLoad(timeout: 5)
         let script = """
         (function(){
           // Clear stale stamps from a prior snapshot first — an element that dropped out of
@@ -1216,7 +1224,10 @@ public final class BrowserPaneView: NSView {
     }
 
     public func screenshot() async throws -> String {
-        try await withCheckedThrowingContinuation { continuation in
+        // Same race as snapshot() above — give a just-opened pane a grace period to
+        // finish its initial navigation before capturing pixels, best-effort.
+        try? await waitForLoad(timeout: 5)
+        return try await withCheckedThrowingContinuation { continuation in
             let config = WKSnapshotConfiguration()
             webView.takeSnapshot(with: config) { image, error in
                 if let error {
