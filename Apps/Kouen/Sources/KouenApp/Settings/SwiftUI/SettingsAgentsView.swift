@@ -16,7 +16,7 @@ struct SettingsAgentsView: View {
 
     private static let agentKinds: [AgentKind] = [
         .codex, .claudeCode, .cursor, .grok, .pi, .hermes,
-        .openClaw, .openCode, .aider, .gemini, .goose, .antigravity, .kiro,
+        .openClaw, .openCode, .aider, .gemini, .goose, .antigravity, .kiro, .copilot,
     ]
 
     var body: some View {
