@@ -589,6 +589,12 @@ final class SurfaceRegistryTests: XCTestCase {
         }
         let key = target.surfaceID
 
+        // The default surface runs a real shell. Let its startup output (rc files, first prompt)
+        // land first — arriving after the injected prompt below, it would both push the prompt
+        // out of the trailing tail and reset the idle clock, so the tab never reads as waiting.
+        // Deterministic on Linux CI; only timing-lucky on macOS before this.
+        Thread.sleep(forTimeInterval: 1.0)
+
         // Agent prints a confirmation prompt, then falls silent for >= 0.4s.
         registry.noteSurfaceOutput(surfaceKey: key, data: Data("Proceed? [y/N] ".utf8))
         Thread.sleep(forTimeInterval: 0.45)

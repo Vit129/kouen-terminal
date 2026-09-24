@@ -1,3 +1,5 @@
+// Network.framework/CryptoKit are Apple-only; the Linux kouen-mcp build is stdio-only.
+#if canImport(Network)
 import Foundation
 import Network
 import CryptoKit
@@ -448,3 +450,4 @@ final class SSETransport: @unchecked Sendable {
         return diff == 0
     }
 }
+#endif
