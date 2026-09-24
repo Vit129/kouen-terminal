@@ -412,6 +412,16 @@ public struct AgentSessionHistoryView: View {
             HStack(spacing: 5) {
                 AgentBadgeView(kind: record.agentKind)
 
+                if let placementLabel = placementLabel(record.placement) {
+                    Text(placementLabel)
+                        .font(.system(size: 9))
+                        .foregroundStyle(Color.accentColor)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(Color.accentColor.opacity(0.12))
+                        .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
+                }
+
                 Text("\(record.messageCount) msgs")
                     .font(.system(size: 9.5))
                     .foregroundStyle(Color(nsColor: c.textTertiary))
@@ -637,6 +647,18 @@ public struct AgentSessionHistoryView: View {
         }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(lines.joined(separator: "\n"), forType: .string)
+    }
+
+    /// `nil` for `.local` — the ordinary case, where the badge would just be noise. Non-nil
+    /// values reflect what `AgentHistoryScanner.scanClaudeAgentsCLI` learned from `claude
+    /// agents --json`, not something Kouen itself launched or is tracking live.
+    private func placementLabel(_ placement: AgentSessionPlacement) -> String? {
+        switch placement {
+        case .local: return nil
+        case .cloud: return "☁️ Cloud"
+        case .remoteControl: return "📱 Remote Control"
+        case .background: return "⌁ Background"
+        }
     }
 
     private func relativeDate(_ date: Date) -> String {
