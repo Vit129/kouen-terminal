@@ -8,12 +8,7 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [4.19.1] - 2026-09-24
 
 ### Added
-- Release version bump to v4.19.1.
-
-## [4.19.0] - 2026-09-24
-
-### Added
-- Release version bump to v4.19.0.
+- Multi-agent remote-control & centralized launch table (P50) (release v4.19.1) ([`bf0ac3b`](https://github.com/Vit129/kouen-terminal/commit/bf0ac3b1d38883e3e126ff37f889558f7513cd1f))
 
 ## [4.18.6] - 2026-09-23
 
