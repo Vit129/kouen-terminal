@@ -453,7 +453,7 @@ extension KouenCLI {
     static func openMarkdownPreview(path: String) {
         if ProcessInfo.processInfo.environment["KOUEN_SURFACE_ID"] != nil {
             print("\u{1B}]7735;\(path)\u{07}", terminator: "")
-            fflush(stdout)
+            fflush(nil)   // all streams; `stdout` itself is a non-Sendable global on Linux
         } else {
             #if canImport(Darwin)
             let process = Process()

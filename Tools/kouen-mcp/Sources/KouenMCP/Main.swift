@@ -62,14 +62,22 @@ struct KouenMCPServer {
             // still just works instead of bouncing the user to read `--help` first.
             if !Self.isLoopback(host), token == nil {
                 token = Self.generateToken()
-                fputs("kouen-mcp: no --token given for a non-loopback --host — generated one for this run:\n", stderr)
-                fputs("  \(token!)\n", stderr)
-                fputs("  Pass it back with --token, or as ?token=... / an Authorization: Bearer header.\n", stderr)
-                fflush(stderr)
+                fputs("kouen-mcp: no --token given for a non-loopback --host — generated one for this run:\n", kouenStderr)
+                fputs("  \(token!)\n", kouenStderr)
+                fputs("  Pass it back with --token, or as ?token=... / an Authorization: Bearer header.\n", kouenStderr)
+                fflush(kouenStderr)
             }
 
+            #if canImport(Network)
             let sseTransport = SSETransport(server: server, host: host, port: port, authToken: token)
             await sseTransport.start()
+            #else
+            // SSETransport is built on Network.framework (Apple-only). Off Darwin, say so instead
+            // of silently falling back to stdio, which would look like a hung server to an SSE client.
+            _ = (host, port, token)
+            fputs("kouen-mcp: SSE transport isn't available on this platform — run without --sse for stdio.\n", kouenStderr)
+            exit(1)
+            #endif
         } else {
             // Default: stdio mode for Claude Desktop, Codex, and local subprocess agents
             await server.runStdio()

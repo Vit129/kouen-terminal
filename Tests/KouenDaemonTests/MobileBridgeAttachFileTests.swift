@@ -1,3 +1,5 @@
+// MobileBridgeServer only exists where Network.framework does (it's guarded the same way).
+#if canImport(Network)
 import XCTest
 @testable import KouenCore
 @testable import KouenDaemonCore
@@ -67,3 +69,4 @@ final class MobileBridgeAttachFileTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: staleURL.path), "a 24h+ old attached file must be pruned on the next write")
     }
 }
+#endif
