@@ -183,7 +183,9 @@ extension KouenCLI {
             exit(1)
         }
 
-        let cmd = record.agentKind.resumeCommand(sessionID: record.id)
+        let cmd = record.agentKind.resumeCommand(
+            sessionID: record.id, claudeMode: KouenSettings.load().claudeSessionMode
+        )
         _ = try checkedRequest(client, .send(surfaceID: surfaceID, text: cmd + "\n", origin: .automation))
         print(tabID.uuidString)
     }
