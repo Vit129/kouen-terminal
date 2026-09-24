@@ -92,7 +92,7 @@ extension KouenCLI {
         case "codex": return "codex\n"
         case "kiro": return "kiro\n"
         case "gemini": return "gemini\n"
-        default: return "claude\n"
+        default: return KouenSettings.load().claudeSessionMode.launchCommand + "\n"
         }
     }
 }

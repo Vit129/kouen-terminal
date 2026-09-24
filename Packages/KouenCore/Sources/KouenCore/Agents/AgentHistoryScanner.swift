@@ -15,6 +15,22 @@ public struct AgentHistoryTurn: Sendable, Equatable, Codable {
     }
 }
 
+/// Where a session is actually running, learned from a live CLI listing (`claude agents
+/// --json` today; a per-vendor equivalent could feed the same field later) rather than
+/// inferred from an on-disk transcript. `.local` is the default for every other scanner in
+/// this file — a plain transcript is silent about where its session is running right now.
+public enum AgentSessionPlacement: String, Sendable, Equatable, Codable {
+    case local
+    /// Running on this machine, and currently steerable from the Claude Desktop/mobile app or
+    /// claude.ai/code (`claude --remote-control`).
+    case remoteControl = "remote-control"
+    /// Running in an Anthropic cloud container (`claude --cloud`) — its transcript lives there,
+    /// not on this disk, so `scanClaude()`'s JSONL walk can never see it on its own.
+    case cloud
+    /// Running locally, detached from any terminal (`claude --bg`).
+    case background
+}
+
 /// A parsed agent session record from local transcripts.
 public struct AgentSessionRecord: Identifiable, Sendable, Equatable {
     public let id: String
@@ -30,6 +46,16 @@ public struct AgentSessionRecord: Identifiable, Sendable, Equatable {
     public let latestTurns: [AgentHistoryTurn]
     public let transcriptPath: String
     public let worktreeAvailable: Bool
+    /// `.local` unless a live CLI listing (`scanClaudeAgentsCLI`) matched this record by id or
+    /// supplied it outright — see `AgentSessionPlacement`.
+    public let placement: AgentSessionPlacement
+    /// Live status string from that same listing (e.g. `"busy"`/`"idle"`), `nil` for a
+    /// transcript-only record with no live counterpart found.
+    public let liveStatus: String?
+    /// When set, History resume uses this verbatim instead of `agentKind.resumeCommand(...)` —
+    /// needed for `.cloud`/`.background` placements, where a plain `--resume` either can't
+    /// reach the session or races its live process for the session lock.
+    public let resumeCommandOverride: String?
 
     public init(
         id: String,
@@ -44,7 +70,10 @@ public struct AgentSessionRecord: Identifiable, Sendable, Equatable {
         firstPrompt: String,
         latestTurns: [AgentHistoryTurn] = [],
         transcriptPath: String,
-        worktreeAvailable: Bool
+        worktreeAvailable: Bool,
+        placement: AgentSessionPlacement = .local,
+        liveStatus: String? = nil,
+        resumeCommandOverride: String? = nil
     ) {
         self.id = id
         self.agentKind = agentKind
@@ -59,6 +88,92 @@ public struct AgentSessionRecord: Identifiable, Sendable, Equatable {
         self.latestTurns = latestTurns
         self.transcriptPath = transcriptPath
         self.worktreeAvailable = worktreeAvailable
+        self.placement = placement
+        self.liveStatus = liveStatus
+        self.resumeCommandOverride = resumeCommandOverride
+    }
+
+    /// The command History resume should type into a fresh pane: `resumeCommandOverride` when
+    /// set, else the ordinary per-agent-kind resume command.
+    public func effectiveResumeCommand(claudeMode: ClaudeSessionMode = .local) -> String {
+        resumeCommandOverride ?? agentKind.resumeCommand(sessionID: id, claudeMode: claudeMode)
+    }
+
+    /// Copies this record with a live placement/status attached, deriving the matching resume
+    /// override. Used by `scanAll()` to enrich a transcript-derived record once a `claude
+    /// agents --json` row matches it by session id.
+    func withLivePlacement(_ placement: AgentSessionPlacement, status: String?) -> AgentSessionRecord {
+        AgentSessionRecord(
+            id: id, agentKind: agentKind, title: title, projectPath: projectPath, projectName: projectName,
+            gitBranch: gitBranch, modelName: modelName, messageCount: messageCount, updatedAt: updatedAt,
+            firstPrompt: firstPrompt, latestTurns: latestTurns, transcriptPath: transcriptPath,
+            worktreeAvailable: worktreeAvailable, placement: placement, liveStatus: status,
+            resumeCommandOverride: AgentSessionRecord.resumeOverride(placement: placement, sessionID: id)
+        )
+    }
+
+    /// `nil` for `.local`/`.remoteControl` — both resolve through the ordinary
+    /// `agentKind.resumeCommand`/`ClaudeSessionMode` path already.
+    fileprivate static func resumeOverride(placement: AgentSessionPlacement, sessionID: String) -> String? {
+        switch placement {
+        case .cloud: return "claude --cloud \(sessionID)"
+        // `claude attach <id>` per `claude --help`: "<id> is the short id that `claude --bg`
+        // prints and `claude agents` lists" — assumed to be the same `sessionId` this scanner
+        // reads from `claude agents --json`, since that's the only id field the listing has.
+        // Not verified against a real `--bg` session (none available to test against here).
+        case .background: return "claude attach \(sessionID)"
+        case .local, .remoteControl: return nil
+        }
+    }
+}
+
+/// One row from `claude agents --json`. Sendable value copied out of the actor-isolated scan.
+struct LiveClaudeAgentEntry: Sendable {
+    let sessionId: String
+    let kind: String
+    let cwd: String?
+    let name: String?
+    let status: String?
+    let startedAt: Date?
+
+    /// `nil` for `"interactive"` (and any future/unrecognized kind) — a plain local session is
+    /// already fully covered by `scanClaude()`'s transcript walk, so merging it in here would
+    /// only risk a duplicate row if id-matching ever missed.
+    var placement: AgentSessionPlacement? {
+        switch kind {
+        case "cloud": return .cloud
+        case "background": return .background
+        case "remote-control": return .remoteControl
+        default: return nil
+        }
+    }
+
+    /// Builds a standalone record for a live session with no matching local transcript — the
+    /// normal case for `.cloud` (the transcript lives in the cloud container, not on this
+    /// disk) and possible for `.background`/`.remote-control` right after launch, before the
+    /// first transcript write lands.
+    func makeSyntheticRecord(placement: AgentSessionPlacement) -> AgentSessionRecord {
+        let resolvedCwd = cwd?.isEmpty == false ? cwd! : FileManager.default.homeDirectoryForCurrentUser.path
+        let projectName = (resolvedCwd as NSString).lastPathComponent
+        let resolvedTitle = (name?.isEmpty == false ? name! : nil) ?? "Claude Session \(sessionId.prefix(8))"
+        return AgentSessionRecord(
+            id: sessionId,
+            agentKind: .claudeCode,
+            title: String(resolvedTitle.prefix(120)),
+            projectPath: resolvedCwd,
+            projectName: projectName.isEmpty ? "Home" : projectName,
+            // Unknown from this source — `claude agents --json` reports process/liveness
+            // state, not transcript contents. `0` (not the file-based scanners' real count) is
+            // the honest value here, not a stand-in for "empty conversation".
+            messageCount: 0,
+            updatedAt: startedAt ?? Date(),
+            firstPrompt: "",
+            transcriptPath: placement == .cloud ? "cloud://\(sessionId)" : "",
+            worktreeAvailable: FileManager.default.fileExists(atPath: resolvedCwd),
+            placement: placement,
+            liveStatus: status,
+            resumeCommandOverride: AgentSessionRecord.resumeOverride(placement: placement, sessionID: sessionId)
+        )
     }
 }
 
@@ -128,12 +243,15 @@ public actor AgentHistoryScanner {
         return await scanAll()
     }
 
-    /// Scans all supported agent transcripts on disk concurrently with mtime caching.
+    /// Scans all supported agent transcripts on disk concurrently with mtime caching, then
+    /// enriches/extends the Claude Code rows with live placement from `claude agents --json`
+    /// (cloud/background/remote-control) — see `mergeLivePlacements`.
     public func scanAll() async -> [AgentSessionRecord] {
         async let claudeTask = scanClaude()
         async let antigravityTask = scanAntigravity()
         async let codexTask = scanCodex()
         async let copilotTask = scanCopilot()
+        async let liveClaudeTask = scanClaudeAgentsCLI()
 
         var results: [AgentSessionRecord] = []
         results.append(contentsOf: await claudeTask)
@@ -141,10 +259,40 @@ public actor AgentHistoryScanner {
         results.append(contentsOf: await codexTask)
         results.append(contentsOf: await copilotTask)
 
+        results = Self.mergeLivePlacements(results, live: await liveClaudeTask)
+
         results.sort { $0.updatedAt > $1.updatedAt }
         cachedRecords = results
         lastScanAt = Date()
         return results
+    }
+
+    /// Matches `live` rows onto `records` by session id, enriching the match in place; a
+    /// `.cloud`/`.background`/`.remote-control` row with no local transcript match (the normal
+    /// case for `.cloud`) becomes a new synthetic record instead. Order among unmatched
+    /// entries doesn't matter — `scanAll()` re-sorts by `updatedAt` right after.
+    static func mergeLivePlacements(_ records: [AgentSessionRecord], live: [LiveClaudeAgentEntry]) -> [AgentSessionRecord] {
+        guard !live.isEmpty else { return records }
+        // Built by hand rather than `Dictionary(uniqueKeysWithValues:)`, which traps on a
+        // duplicate key — cross-scanner id collisions should never happen (each agent kind
+        // draws ids from its own UUID/db-key namespace) but this must never crash on one.
+        var byID: [String: AgentSessionRecord] = [:]
+        var order: [String] = []
+        for record in records {
+            if byID[record.id] == nil { order.append(record.id) }
+            byID[record.id] = record
+        }
+
+        for entry in live {
+            guard let placement = entry.placement else { continue }
+            if let existing = byID[entry.sessionId] {
+                byID[entry.sessionId] = existing.withLivePlacement(placement, status: entry.status)
+            } else {
+                byID[entry.sessionId] = entry.makeSyntheticRecord(placement: placement)
+                order.append(entry.sessionId)
+            }
+        }
+        return order.compactMap { byID[$0] }
     }
 
     // MARK: - Claude Code Scanner
@@ -298,6 +446,119 @@ public actor AgentHistoryScanner {
             transcriptPath: fileURL.path,
             worktreeAvailable: FileManager.default.fileExists(atPath: finalCwd)
         )
+    }
+
+    // MARK: - Live Claude Agents CLI ("claude agents --json")
+
+    /// Resolve `claude`'s path the same way `MobileBridgeServer.cachedClaudePath` and
+    /// `GitHubCLIClient.cachedGhPath` already do: common install locations first (found via
+    /// live-testing — the curl-installer default `~/.local/bin` isn't on a launchd-spawned
+    /// process's PATH, so a bare `which` fallback alone would miss it), `which claude` for
+    /// anything else. Duplicated rather than shared because `KouenCore` can't depend on
+    /// `KouenDaemon`, where the daemon's copy lives.
+    private static let cachedClaudePath: String? = {
+        let paths = [
+            NSHomeDirectory() + "/.local/bin/claude",
+            "/opt/homebrew/bin/claude",
+            "/usr/local/bin/claude",
+        ]
+        if let found = paths.first(where: { FileManager.default.fileExists(atPath: $0) }) {
+            return found
+        }
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/which")
+        process.arguments = ["claude"]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        do {
+            try process.run()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0,
+                  let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !path.isEmpty, FileManager.default.fileExists(atPath: path)
+            else { return nil }
+            return path
+        } catch {
+            return nil
+        }
+    }()
+
+    /// Ceiling on the `claude agents --json` call — it's normally near-instant (a local query
+    /// against the CLI's own session registry), but must never be allowed to wedge this actor
+    /// if `claude` hangs (e.g. a stuck auth/network check for a cloud session).
+    private static let liveListTimeout: TimeInterval = 5
+
+    /// Live sessions `claude` itself currently knows about — interactive, background, cloud,
+    /// and remote-control-enabled. Best-effort: `[]` (never throws) if `claude` isn't
+    /// installed, isn't logged in, prints something this can't parse, or times out. Callers
+    /// merge this into the transcript-derived records rather than trusting it alone, since it
+    /// has no prompt/turn content — only enough to say *where* a session is running.
+    ///
+    /// Not `public`: `LiveClaudeAgentEntry` is internal, and nothing outside `scanAll()` (same
+    /// file) needs this directly — everything else consumes the merged `AgentSessionRecord`.
+    func scanClaudeAgentsCLI() async -> [LiveClaudeAgentEntry] {
+        guard let claudePath = Self.cachedClaudePath else { return [] }
+        return Self.runClaudeAgentsJSON(claudePath: claudePath)
+    }
+
+    private static func runClaudeAgentsJSON(claudePath: String) -> [LiveClaudeAgentEntry] {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: claudePath)
+        process.arguments = ["agents", "--json"]
+        let outPipe = Pipe()
+        process.standardOutput = outPipe
+        process.standardError = FileHandle.nullDevice
+
+        let timeoutFlag = TimeoutFlag()
+        let timeoutWork = DispatchWorkItem {
+            guard process.isRunning else { return }
+            timeoutFlag.markFired()
+            process.terminate()
+        }
+        DispatchQueue.global().asyncAfter(deadline: .now() + Self.liveListTimeout, execute: timeoutWork)
+
+        do {
+            try process.run()
+            let data = outPipe.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            timeoutWork.cancel()
+            guard !timeoutFlag.didFire, process.terminationStatus == 0 else { return [] }
+            return parseLiveAgentsJSON(data)
+        } catch {
+            timeoutWork.cancel()
+            return []
+        }
+    }
+
+    /// Boxes the "did our own timeout fire" flag — mirrors `VerificationRunner.TimeoutFlag`
+    /// (same rationale: `DispatchWorkItem.isCancelled` can't answer this on its own).
+    private final class TimeoutFlag: @unchecked Sendable {
+        private let lock = NSLock()
+        private var fired = false
+        func markFired() { lock.lock(); fired = true; lock.unlock() }
+        var didFire: Bool { lock.lock(); defer { lock.unlock() }; return fired }
+    }
+
+    /// `claude agents --json` prints an array of `{pid?, cwd?, kind, startedAt?, sessionId,
+    /// name?, status?}`. Only `kind`/`sessionId` are treated as required — everything else is
+    /// read defensively so an unrecognized/future field shape degrades to a sparser record
+    /// instead of dropping the whole row.
+    static func parseLiveAgentsJSON(_ data: Data) -> [LiveClaudeAgentEntry] {
+        guard let array = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return [] }
+        return array.compactMap { obj in
+            guard let sessionId = obj["sessionId"] as? String, let kind = obj["kind"] as? String else { return nil }
+            let startedAt = (obj["startedAt"] as? Double).map { Date(timeIntervalSince1970: $0 / 1000) }
+            return LiveClaudeAgentEntry(
+                sessionId: sessionId,
+                kind: kind,
+                cwd: obj["cwd"] as? String,
+                name: obj["name"] as? String,
+                status: obj["status"] as? String,
+                startedAt: startedAt
+            )
+        }
     }
 
     // MARK: - Antigravity Scanner

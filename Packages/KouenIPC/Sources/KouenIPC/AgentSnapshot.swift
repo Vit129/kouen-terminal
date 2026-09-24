@@ -82,11 +82,12 @@ public enum AgentKind: String, Codable, Sendable, CaseIterable {
         }
     }
 
-    /// Shell command to resume a session given its session ID.
-    public func resumeCommand(sessionID: String) -> String {
+    /// Shell command to resume a session given its session ID. `claudeMode` only affects
+    /// Claude Code (and the Claude fallback below) — see `ClaudeSessionMode.resumeCommand`.
+    public func resumeCommand(sessionID: String, claudeMode: ClaudeSessionMode = .local) -> String {
         switch self {
         case .claudeCode:
-            return "claude --resume \(sessionID)"
+            return claudeMode.resumeCommand(sessionID: sessionID)
         case .antigravity:
             return "agy --conversation \(sessionID)"
         case .codex:
@@ -94,7 +95,7 @@ public enum AgentKind: String, Codable, Sendable, CaseIterable {
         case .copilot:
             return "copilot --resume \(sessionID)"
         default:
-            return "claude --resume \(sessionID)"
+            return claudeMode.resumeCommand(sessionID: sessionID)
         }
     }
 }

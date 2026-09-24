@@ -6,10 +6,16 @@
 extension ReleaseNotes {
     public static let current = ReleaseNotes(
         version: "4.18.6",
-        changelogDigest: "4f38896ededb8a3a",
+        changelogDigest: "92a2fb31ba6a6be9",
         sections: [
             Section(title: "Added", items: [
-                "Release version bump to v4.18.6",
+                "Real Codex/Copilot session scanning, resume variants, list UX parity (776dded)",
+            ]),
+            Section(title: "Documentation", items: [
+                "Record decision to depend on vendor remote-control apps for mobile (39322af)",
+            ]),
+            Section(title: "Fixed", items: [
+                "Content pane covers the header cluster during the Cmd+\\ slide (cc3dd33)",
             ]),
         ]
     )

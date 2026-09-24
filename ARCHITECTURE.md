@@ -173,3 +173,22 @@ implicitly assumes "the phone story is someone else's problem." Trade-off accept
 unified cross-vendor mobile dashboard (Orca's actual differentiator) — a phone user checking on
 4 concurrent agents needs 3 different apps (Claude, ChatGPT, Antigravity), each showing only its
 own vendor's sessions, not kouen's Fleet view.
+
+**2026-09-24 — Claude Code sessions default to `--cloud`; History reads `claude agents --json`
+back for the reverse direction.** Two additions on top of the decision above, both still inside
+its boundary (kouen reads a vendor CLI's own listing; it still doesn't run a relay or app):
+
+- `claudeSessionMode` setting (default `cloud`) makes every kouen-launched Claude Code session
+  (`kouenSpawnAgent`, `kouen-cli wake`, Automations, the ViEx spawn command) start with `claude
+  --cloud`, so it shows up in the Claude Desktop/mobile app and claude.ai/code without an extra
+  step. History resume uses `--remote-control` instead, since `--cloud` only resumes a cloud
+  session by its own id, not an arbitrary local transcript.
+- The reverse direction — a session opened from the Claude app showing up in kouen — has a real
+  gap for `--cloud` sessions specifically: their transcript lives in the cloud container, never
+  touches this disk, so the existing JSONL scan can't see them at all. `AgentHistoryScanner` now
+  also shells out to `claude agents --json` (`AgentSessionPlacement`/`LiveClaudeAgentEntry`),
+  merging cloud/background/remote-control rows into History by session id, with a resume command
+  matched to how each one is actually reachable (`claude --cloud <id>` /
+  `claude attach <id>`). `interactive`-kind rows are skipped — already covered by the JSONL scan,
+  so merging them in too would only risk a duplicate. `claude attach`'s id has not been verified
+  against a real `--bg` session (none available to test against while building this).
