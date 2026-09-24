@@ -1,3 +1,5 @@
+// MobileBridgeServer only exists where Network.framework does (it's guarded the same way).
+#if canImport(Network)
 import Network
 import XCTest
 @testable import KouenCore
@@ -217,3 +219,4 @@ final class MobileBridgePairingTests: XCTestCase {
         XCTAssertEqual(MobileBridgeServer.allowedBindHosts(tailscaleIP: "192.168.1.20"), ["127.0.0.1"])
     }
 }
+#endif

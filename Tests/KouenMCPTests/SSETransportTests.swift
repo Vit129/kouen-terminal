@@ -1,3 +1,5 @@
+// SSETransport only exists where Network.framework does (see SSETransport.swift).
+#if canImport(Network)
 import XCTest
 @testable import KouenMCP
 import KouenCore
@@ -102,3 +104,4 @@ final class SSETransportTests: XCTestCase {
         XCTAssertEqual(paramHttp.statusCode, 200)
     }
 }
+#endif

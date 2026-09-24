@@ -1,3 +1,5 @@
+// MobileBridgeServer only exists where Network.framework does (it's guarded the same way).
+#if canImport(Network)
 import XCTest
 @testable import KouenDaemonCore
 
@@ -75,3 +77,4 @@ final class MobileBridgeFilePreviewTests: XCTestCase {
         XCTAssertNil(MobileBridgeServer.listDirectoryEntries(path: root.appendingPathComponent("nope").path))
     }
 }
+#endif
