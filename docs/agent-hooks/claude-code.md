@@ -68,3 +68,27 @@ is idempotent and self-healing: re-running it replaces Kouen's own
 `Notification`/`Stop` entries with the current versions (handy for picking up
 fixes) while leaving the rest of your config — model, permissions, MCP, and any
 non-Kouen hooks — untouched.
+
+## Session mode: cloud / Remote Control / local
+
+Every Claude Code session Kouen starts (new pane via `kouenSpawnAgent`, `kouen-cli wake`,
+Automations, the ViEx spawn command) and every History resume reads `claudeSessionMode` from
+`settings.json`:
+
+| `claudeSessionMode` | New session | Resume from History |
+|---|---|---|
+| `"cloud"` (default) | `claude --cloud` | `claude --resume <id> --remote-control …` |
+| `"remote-control"` | `claude --remote-control --remote-control-session-name-prefix kouen` | same as cloud |
+| `"local"` | `claude` | `claude --resume <id>` |
+
+- **cloud**: the agent runs in an Anthropic cloud container. The Kouen pane is a client for it,
+  and the CLI syncs this folder's files (uncommitted changes included) both ways. The session
+  appears in the Claude Desktop/mobile apps and at claude.ai/code without any extra flag.
+  Local MCP servers, local hooks and `$KOUEN_SURFACE` notifications do **not** run inside the
+  cloud container.
+- **remote-control**: the agent runs in the Kouen pane on this Mac (local files, MCP, hooks all
+  work) and the same session can be driven from the Claude app. The Mac has to stay awake and online.
+- Resuming a *local* transcript can't go to the cloud (`--cloud` only takes cloud session IDs),
+  so cloud mode resumes with Remote Control instead.
+
+Headless runs (`kouenCCRun`, `claude -p`) aren't affected.

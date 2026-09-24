@@ -380,7 +380,8 @@ struct KouenDaemonTools: Sendable {
         let agentCommand: String
         switch resolvedAgent.lowercased() {
         case "claude", "claude-code":
-            agentLabel = "Claude"; agentCommand = "claude\n"
+            agentLabel = "Claude"
+            agentCommand = KouenSettings.load().claudeSessionMode.launchCommand + "\n"
         case "codex":
             agentLabel = "Codex"; agentCommand = "codex\n"
         case "kiro":
