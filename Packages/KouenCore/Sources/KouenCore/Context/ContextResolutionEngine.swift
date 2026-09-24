@@ -145,7 +145,7 @@ public struct ContextResolutionEngine: Sendable {
             return "[Daemon client unavailable to capture pane \(surfaceID)]"
         }
 
-        guard let response = try? await client.request(.capturePane(surfaceID: surfaceID, includeScrollback: true)),
+        guard let response = try? client.request(.capturePane(surfaceID: surfaceID, includeScrollback: true)),
               case let .text(output) = response else {
             return "[No output captured from pane \(surfaceID)]"
         }
@@ -168,7 +168,7 @@ public struct ContextResolutionEngine: Sendable {
             return "[No active terminal surface to extract error]"
         }
 
-        guard let response = try? await client.request(.capturePane(surfaceID: surfaceID, includeScrollback: true)),
+        guard let response = try? client.request(.capturePane(surfaceID: surfaceID, includeScrollback: true)),
               case let .text(output) = response else {
             return "[No error stacktrace captured]"
         }
