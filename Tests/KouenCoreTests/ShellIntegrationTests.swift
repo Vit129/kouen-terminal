@@ -39,6 +39,20 @@ final class ShellIntegrationTests: XCTestCase {
                         "bash intentionally does not emit 133;C yet — no DEBUG-trap guard exists")
     }
 
+    /// Every shell wraps `claude` so a hand-typed session gets `$KOUEN_CLAUDE_SESSION_MODE`'s
+    /// flags, chains to any existing `claude` function, and guards against double-sourcing.
+    /// (Behavior of the three wrappers is checked against a fake `claude` in the PR, not here —
+    /// CI has no zsh/fish guarantee.)
+    func testScriptsWrapClaudeWithSessionMode() {
+        for shell in ShellIntegration.Shell.allCases {
+            let s = ShellIntegration.script(for: shell)
+            XCTAssertTrue(s.contains("KOUEN_CLAUDE_SESSION_MODE"), "\(shell) wrapper must read the mode")
+            XCTAssertTrue(s.contains("__kouen_claude_next"), "\(shell) wrapper must chain, not replace")
+            XCTAssertTrue(s.contains("__kouen_claude_wrapped"), "\(shell) wrapper must guard re-sourcing")
+            XCTAssertTrue(s.contains("--remote-control-session-name-prefix kouen"), "\(shell) wrapper flags")
+        }
+    }
+
     func testInstallWritesScriptAndWiresRCIdempotently() throws {
         let home = tempHome()
         defer { try? FileManager.default.removeItem(at: home) }

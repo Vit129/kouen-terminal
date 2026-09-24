@@ -89,7 +89,7 @@ final class AgentHistoryScannerTests: XCTestCase {
         XCTAssertEqual(merged.count, 1)
         XCTAssertEqual(merged[0].placement, .cloud)
         XCTAssertEqual(merged[0].liveStatus, "busy")
-        XCTAssertEqual(merged[0].resumeCommandOverride, "claude --cloud abc123")
+        XCTAssertEqual(merged[0].resumeCommandOverride, "claude --teleport abc123")
         // Enrichment must not touch unrelated fields.
         XCTAssertEqual(merged[0].title, local.title)
         XCTAssertEqual(merged[0].messageCount, local.messageCount)
@@ -109,7 +109,7 @@ final class AgentHistoryScannerTests: XCTestCase {
         XCTAssertEqual(synthetic?.title, "My cloud task")
         XCTAssertEqual(synthetic?.projectPath, "/tmp/cloud-repo")
         XCTAssertEqual(synthetic?.transcriptPath, "cloud://cloud-only")
-        XCTAssertEqual(synthetic?.resumeCommandOverride, "claude --cloud cloud-only")
+        XCTAssertEqual(synthetic?.resumeCommandOverride, "claude --teleport cloud-only")
     }
 
     func testMergeLivePlacementsSkipsInteractiveKind() {
@@ -130,7 +130,7 @@ final class AgentHistoryScannerTests: XCTestCase {
         XCTAssertEqual(
             LiveClaudeAgentEntry(sessionId: "s", kind: "cloud", cwd: nil, name: nil, status: nil, startedAt: nil)
                 .makeSyntheticRecord(placement: .cloud).resumeCommandOverride,
-            "claude --cloud s"
+            "claude --teleport s"
         )
         XCTAssertEqual(
             LiveClaudeAgentEntry(sessionId: "s", kind: "background", cwd: nil, name: nil, status: nil, startedAt: nil)
@@ -145,11 +145,72 @@ final class AgentHistoryScannerTests: XCTestCase {
 
     func testEffectiveResumeCommandPrefersOverride() {
         let record = makeRecord().withLivePlacement(.cloud, status: "busy")
-        XCTAssertEqual(record.effectiveResumeCommand(claudeMode: .remoteControl), "claude --cloud abc123")
+        XCTAssertEqual(record.effectiveResumeCommand(claudeMode: .remoteControl), "claude --teleport abc123")
     }
 
     func testEffectiveResumeCommandFallsBackToAgentKindWhenLocal() {
         let record = makeRecord()
         XCTAssertEqual(record.effectiveResumeCommand(claudeMode: .cloud), record.agentKind.resumeCommand(sessionID: record.id, claudeMode: .cloud))
+    }
+
+    // MARK: - Remembered cloud sessions
+
+    private func withStore(_ body: (ClaudeCloudSessionStore) throws -> Void) rethrows {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("kouen-cloud-store-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try body(ClaudeCloudSessionStore(fileURL: url))
+    }
+
+    private func liveRow(_ id: String, kind: String = "cloud", cwd: String? = "/tmp/repo") -> LiveClaudeAgentEntry {
+        LiveClaudeAgentEntry(sessionId: id, kind: kind, cwd: cwd, name: "task \(id)", status: "busy", startedAt: nil)
+    }
+
+    func testStoreRemembersOnlyCloudRowsAndPersists() {
+        withStore { store in
+            store.remember([liveRow("c1"), liveRow("i1", kind: "interactive"), liveRow("r1", kind: "remote-control")])
+            XCTAssertEqual(store.load().map(\.sessionId), ["c1"])
+            // A fresh store on the same file sees it — it's on disk, not just in memory.
+            XCTAssertEqual(ClaudeCloudSessionStore(fileURL: store.fileURL).load().map(\.sessionId), ["c1"])
+        }
+    }
+
+    func testStoreKeepsSessionAfterItLeavesTheLiveScan() {
+        withStore { store in
+            store.remember([liveRow("c1")])
+            let remembered = store.remember([])   // pane closed: no longer live
+            let offline = ClaudeCloudSessionStore.offlineRows(remembered, excluding: [])
+            XCTAssertEqual(offline.map(\.sessionId), ["c1"])
+            XCTAssertEqual(offline.first?.placement, .cloud)
+            XCTAssertNil(offline.first?.status, "offline rows carry no live status")
+            XCTAssertEqual(offline.first?.cwd, "/tmp/repo")
+        }
+    }
+
+    func testOfflineRowsSkipSessionsThatAreLive() {
+        withStore { store in
+            let live = [liveRow("c1")]
+            let remembered = store.remember(live)
+            XCTAssertTrue(ClaudeCloudSessionStore.offlineRows(remembered, excluding: live).isEmpty)
+        }
+    }
+
+    func testStorePrunesEntriesOlderThanMaxAge() {
+        withStore { store in
+            let long = Date(timeIntervalSinceNow: -(ClaudeCloudSessionStore.maxAge + 60))
+            store.remember([liveRow("old")], now: long)
+            XCTAssertTrue(store.remember([]).isEmpty)
+        }
+    }
+
+    func testRememberedCloudSessionShowsUpInMergedHistory() {
+        withStore { store in
+            store.remember([liveRow("c1")])
+            let rows = ClaudeCloudSessionStore.offlineRows(store.remember([]), excluding: [])
+            let merged = AgentHistoryScanner.mergeLivePlacements([makeRecord(id: "local")], live: rows)
+            let cloud = merged.first { $0.id == "c1" }
+            XCTAssertEqual(cloud?.placement, .cloud)
+            XCTAssertEqual(cloud?.resumeCommandOverride, "claude --teleport c1")
+        }
     }
 }
