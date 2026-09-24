@@ -69,46 +69,73 @@ is idempotent and self-healing: re-running it replaces Kouen's own
 fixes) while leaving the rest of your config — model, permissions, MCP, and any
 non-Kouen hooks — untouched.
 
-## Session mode: cloud / Remote Control / local
+## Session mode: Remote Control / cloud / local
 
 Every Claude Code session Kouen starts (new pane via `kouenSpawnAgent`, `kouen-cli wake`,
-Automations, the ViEx spawn command) and every History resume reads `claudeSessionMode` from
+Automations, the ViEx spawn command), every History resume, and — once shell integration is
+installed — every `claude` you type by hand in a Kouen pane reads `claudeSessionMode` from
 `settings.json`:
 
 | `claudeSessionMode` | New session | Resume from History |
 |---|---|---|
-| `"cloud"` (default) | `claude --cloud` | `claude --resume <id> --remote-control …` |
-| `"remote-control"` | `claude --remote-control --remote-control-session-name-prefix kouen` | same as cloud |
+| `"remote-control"` (default) | `claude --remote-control --remote-control-session-name-prefix kouen` | `claude --resume <id> --remote-control …` |
+| `"cloud"` | `claude --cloud` | same as remote-control |
 | `"local"` | `claude` | `claude --resume <id>` |
 
-- **cloud**: the agent runs in an Anthropic cloud container. The Kouen pane is a client for it,
-  and the CLI syncs this folder's files (uncommitted changes included) both ways. The session
-  appears in the Claude Desktop/mobile apps and at claude.ai/code without any extra flag.
-  Local MCP servers, local hooks and `$KOUEN_SURFACE` notifications do **not** run inside the
-  cloud container.
-- **remote-control**: the agent runs in the Kouen pane on this Mac (local files, MCP, hooks all
-  work) and the same session can be driven from the Claude app. The Mac has to stay awake and online.
+- **remote-control** (default): the agent runs in the Kouen pane on this Mac — local files,
+  Xcode, MCP servers, hooks and `$KOUEN_SURFACE` notifications all work — and the same
+  session shows up in the Claude Desktop/mobile apps and at claude.ai/code. The Mac has to stay
+  awake and online.
+- **cloud**: the agent runs in an Anthropic cloud container (Linux: no Xcode, so it can't build
+  or test a macOS app). The Kouen pane is a client for it, and the CLI syncs this folder's files
+  both ways. Local MCP servers, hooks and `$KOUEN_SURFACE` notifications do **not** run in the
+  container. Keeps running when the Mac sleeps.
 - Resuming a *local* transcript can't go to the cloud (`--cloud` only takes cloud session IDs),
   so cloud mode resumes with Remote Control instead.
 
 Headless runs (`kouenCCRun`, `claude -p`) aren't affected.
 
+### A `claude` typed by hand
+
+The daemon exports `KOUEN_CLAUDE_SESSION_MODE` into every pane, and the shell integration
+(`kouen-cli install-shell-integration`, re-run it after updating Kouen) defines a `claude()`
+wrapper that adds the matching flags. It:
+
+- chains to your own `claude` function if you have one (it doesn't replace it);
+- leaves the command alone when you already chose: `--cloud`, `--remote-control`/`--rc`,
+  `--teleport`, `-p`, `--bg`, `--help`/`--version`, or a subcommand (`claude agents …`);
+- adds Remote Control flags (not `--cloud`) to `--resume`/`--continue` in cloud mode, for the
+  same reason as History resume.
+
+`command claude` bypasses the wrapper entirely.
+
 ## The reverse direction: a session opened in Claude showing up in Kouen
 
-History (sidebar tab, `kouen history`) always scanned local transcripts
-(`~/.claude/projects/*.jsonl`) — a session started from Claude Desktop on this Mac already
-showed up there. The gap was `--cloud` sessions: they never write a transcript to this disk,
-so the JSONL scan alone can't see them.
+History (sidebar tab, `kouen history`) scans local transcripts (`~/.claude/projects/*.jsonl`),
+so anything that ran on this Mac — Claude Desktop in Local mode, a Remote Control session, a
+`claude` in any terminal — shows up there.
 
-`AgentHistoryScanner` now also runs `claude agents --json` and merges its rows into History by
-session id:
+It also runs `claude agents --json` and merges its rows by session id:
 
 | `kind` from `claude agents --json` | Shows up as | Resume command |
 |---|---|---|
-| `cloud` | ☁️ Cloud badge | `claude --cloud <id>` |
+| `cloud` | ☁️ Cloud badge | `claude --teleport <id>` |
 | `background` (`claude --bg`) | ⌁ Background badge | `claude attach <id>` (id not verified against a real `--bg` session) |
 | `remote-control` | 📱 Remote Control badge | ordinary `--resume`/`ClaudeSessionMode` path |
-| `interactive` | *(skipped)* | already covered by the JSONL scan; merging it in too would just risk a duplicate row |
+| `interactive` | *(skipped)* | already covered by the JSONL scan |
 
-Best-effort: if `claude` isn't installed, isn't logged in, or the call times out (5s), History
-just falls back to what the transcript scan alone would show — nothing crashes or blocks on it.
+Cloud sessions stay listed after their pane closes: every cloud row the live scan sees is
+remembered in `~/Library/Application Support/Kouen/claude-cloud-sessions.json` (30 days,
+200 max) and shown in History as a ☁️ row.
+
+**Limitation — cloud sessions started from the phone or claude.ai/code:** `claude agents --json`
+only lists sessions with a client on *this* machine, and the Claude CLI has no non-interactive
+way to list the account's cloud sessions. A cloud session that never had a client on this Mac
+therefore can't appear in History automatically. Pull it in with `claude --teleport` (it opens a
+picker of your account's cloud sessions); once teleported it has a local transcript and shows up
+in History like any other session.
+
+Best-effort throughout: if `claude` isn't found, isn't logged in, or the call times out (5s),
+History falls back to the transcript scan. Kouen looks for `claude` in `~/.local/bin`,
+`~/.claude/local`, `/opt/homebrew/bin`, `/usr/local/bin`, then `which`, then your login zsh's
+`whence -p claude` (for npm/nvm installs the GUI app's minimal PATH can't see).

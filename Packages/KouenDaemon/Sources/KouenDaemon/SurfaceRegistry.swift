@@ -2297,6 +2297,9 @@ public final class SurfaceRegistry: @unchecked Sendable {
         if let cli = Self.kouenCLIExecutableURL() {
             env["KOUEN_CLI"] = cli.path
         }
+        // Read by the shell integration's `claude()` wrapper so a `claude` typed by hand gets
+        // the same mode as a Kouen-launched one. Resolved at pane spawn, like the rest of env.
+        env["KOUEN_CLAUDE_SESSION_MODE"] = KouenSettings.load().claudeSessionMode.rawValue
         let session = sessionID(forSurfaceKey: surfaceKey)
         for (key, value) in environmentStore.resolved(sessionID: session) { env[key] = value }
         env["PATH"] = Self.pathWithKouenTools(env["PATH"] ?? ProcessInfo.processInfo.environment["PATH"])

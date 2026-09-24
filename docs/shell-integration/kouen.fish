@@ -22,3 +22,40 @@ if set -q KOUEN; and test "$TERM" != dumb
         printf '\033]133;D;%s\007' $status
     end
 end
+
+# Claude Code session mode: a `claude` typed by hand gets the same --remote-control/--cloud
+# flags as a Kouen-launched one ($KOUEN_CLAUDE_SESSION_MODE, exported by the daemon). Wraps an
+# existing `claude` function rather than replacing it; `command claude` bypasses both. Flags
+# the user already passed (--cloud, --remote-control, -p, --teleport, subcommands) win.
+if set -q KOUEN; and set -q KOUEN_CLAUDE_SESSION_MODE; and not set -q __kouen_claude_wrapped
+    set -g __kouen_claude_wrapped 1
+    if functions -q claude
+        functions -c claude __kouen_claude_next
+    else
+        function __kouen_claude_next
+            command claude $argv
+        end
+    end
+    function claude
+        switch "$argv[1]"
+            case agents attach auth auto-mode doctor gateway import install logs mcp plugin plugins project respawn rm setup-token stop kill ultrareview update upgrade
+                __kouen_claude_next $argv; return
+        end
+        set -l resume 0
+        for a in $argv
+            switch $a
+                case -p --print -h --help -v --version --cloud --remote --remote-control --rc --teleport --bg --background
+                    __kouen_claude_next $argv; return
+                case -r --resume '--resume=*' -c --continue --from-pr '--from-pr=*'
+                    set resume 1
+            end
+        end
+        if test "$KOUEN_CLAUDE_SESSION_MODE" = cloud; and test $resume -eq 0
+            __kouen_claude_next --cloud $argv
+        else if test "$KOUEN_CLAUDE_SESSION_MODE" = cloud; or test "$KOUEN_CLAUDE_SESSION_MODE" = remote-control
+            __kouen_claude_next --remote-control --remote-control-session-name-prefix kouen $argv
+        else
+            __kouen_claude_next $argv
+        end
+    end
+end
