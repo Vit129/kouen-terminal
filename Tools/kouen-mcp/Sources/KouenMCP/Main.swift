@@ -1,6 +1,8 @@
 import Foundation
 import KouenCore
+#if canImport(Security)
 import Security
+#endif
 
 @main
 struct KouenMCPServer {
@@ -82,15 +84,20 @@ struct KouenMCPServer {
     }
 
     private static func generateToken() -> String {
+        #if canImport(Security)
         var bytes = [UInt8](repeating: 0, count: 24)
         let status = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
-        if status != errSecSuccess {
-            // SecRandom failing at all is exceptionally rare (would indicate a broken keychain/
-            // entropy subsystem) — UUIDs are still CSPRNG-backed on Darwin, just a fallback of
-            // last resort rather than the primary path.
-            return (UUID().uuidString + UUID().uuidString).replacingOccurrences(of: "-", with: "").lowercased()
+        if status == errSecSuccess {
+            return bytes.map { String(format: "%02x", $0) }.joined()
         }
-        return bytes.map { String(format: "%02x", $0) }.joined()
+        // SecRandom failing at all is exceptionally rare (would indicate a broken keychain/
+        // entropy subsystem) — UUIDs are still CSPRNG-backed on Darwin, just a fallback of
+        // last resort rather than the primary path.
+        #endif
+        // Security isn't available off Darwin at all (e.g. the Linux daemon build) — UUIDs are
+        // CSPRNG-backed there too (swift-corelibs-foundation draws from the platform's real
+        // entropy source), so this is the primary path on Linux, not a downgrade.
+        return (UUID().uuidString + UUID().uuidString).replacingOccurrences(of: "-", with: "").lowercased()
     }
 
     private static func printHelp() {
