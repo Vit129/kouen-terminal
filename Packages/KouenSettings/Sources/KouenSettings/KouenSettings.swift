@@ -118,8 +118,10 @@ public struct KouenSettings: Codable, Sendable, Equatable {
     /// Fallback `AgentKind` for `agent: "auto"` spawn requests (M2 Agent Routing Rule)
     /// when no configured rule matches the target cwd.
     public var defaultAgentKind: AgentKind
-    /// How Kouen launches/resumes Claude Code: cloud (default), Remote Control, or plain local.
-    /// See `ClaudeSessionMode`.
+    /// How Kouen launches/resumes Claude Code: Remote Control (default), cloud, or plain local.
+    /// See `ClaudeSessionMode`. Remote Control is the default because a cloud session runs in a
+    /// Linux container — no Xcode, no local MCP servers/hooks — while Remote Control keeps the
+    /// agent on this Mac and still shows it in the Claude Desktop/mobile apps.
     public var claudeSessionMode: ClaudeSessionMode
     /// Color of the 1px hairline divider between sidebar and content (and any
     /// other in-window divider line). nil → derive from the theme.
@@ -363,7 +365,7 @@ public struct KouenSettings: Codable, Sendable, Equatable {
         paletteHex: [String?] = Array(repeating: nil, count: 16),
         agentColorOverrides: [String: String] = [:],
         defaultAgentKind: AgentKind = .claudeCode,
-        claudeSessionMode: ClaudeSessionMode = .cloud,
+        claudeSessionMode: ClaudeSessionMode = .remoteControl,
         // nil = derive from theme (dark themes resolve to a quiet #1E1E1E hairline; see
         // MainSplitViewController.resolvedDividerColor). A pinned value would override that
         // on every theme, so leave it unset.

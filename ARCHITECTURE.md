@@ -192,3 +192,24 @@ its boundary (kouen reads a vendor CLI's own listing; it still doesn't run a rel
   `claude attach <id>`). `interactive`-kind rows are skipped — already covered by the JSONL scan,
   so merging them in too would only risk a duplicate. `claude attach`'s id has not been verified
   against a real `--bg` session (none available to test against while building this).
+
+**2026-09-24 (later) — Revised after a live check on the Mac: default is Remote Control, not
+cloud.** The first cut (above) defaulted to `--cloud` and assumed `claude agents --json` would
+list account cloud sessions. Both were wrong for this project:
+
+- **Default `remote-control`.** A cloud session runs in a Linux container, so it can't build or
+  test Kouen (a macOS app needing Xcode), and loses local MCP/hooks/`$KOUEN_SURFACE`. Remote
+  Control keeps the agent on the Mac and still shows it in the Claude apps. `cloud` stays
+  available per-user in `settings.json`.
+- **Hand-typed `claude` now follows the setting.** The first cut only covered commands Kouen
+  typed itself; a user typing `claude` in a pane got a plain local session. The daemon now
+  exports `KOUEN_CLAUDE_SESSION_MODE` and the shell integration wraps `claude()` (chaining to any
+  existing user function, bypassable with `command claude`).
+- **`claude agents --json` is machine-local.** It lists only sessions with a client on this
+  Mac — confirmed by running it in a cloud session, where it listed just that session. There
+  is no non-interactive CLI to list the account's cloud sessions, so cloud sessions started
+  from the phone/web can't be auto-discovered; the supported route is `claude --teleport`
+  (interactive picker). What Kouen *can* do: remember every cloud session it has seen live
+  (`ClaudeCloudSessionStore`) so it stays in History after its pane closes.
+- **Cloud resume is `claude --teleport <id>`.** `claude --cloud <id>` only attaches together
+  with `-p` (post one message and exit), so the first cut's resume command would have failed.

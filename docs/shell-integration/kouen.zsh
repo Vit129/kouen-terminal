@@ -28,3 +28,35 @@ if [[ -n "$KOUEN" && "$TERM" != "dumb" ]]; then
     preexec_functions+=(__kouen_preexec)
   fi
 fi
+
+# Claude Code session mode: a `claude` typed by hand gets the same --remote-control/--cloud
+# flags as a Kouen-launched one ($KOUEN_CLAUDE_SESSION_MODE, exported by the daemon). Wraps an
+# existing `claude` function rather than replacing it; `command claude` bypasses both. Flags
+# the user already passed (--cloud, --remote-control, -p, --teleport, subcommands) win.
+if [[ -n "$KOUEN" && -n "$KOUEN_CLAUDE_SESSION_MODE" && -z "$__kouen_claude_wrapped" ]]; then
+  __kouen_claude_wrapped=1
+  if (( ${+functions[claude]} )); then
+    functions[__kouen_claude_next]=$functions[claude]
+  else
+    __kouen_claude_next() { command claude "$@"; }
+  fi
+  claude() {
+    local a resume=0
+    case "$1" in
+      agents|attach|auth|auto-mode|doctor|gateway|import|install|logs|mcp|plugin|plugins|project|respawn|rm|setup-token|stop|kill|ultrareview|update|upgrade) __kouen_claude_next "$@"; return ;;
+    esac
+    for a in "$@"; do
+      case "$a" in
+        -p|--print|-h|--help|-v|--version|--cloud|--remote|--remote-control|--rc|--teleport|--bg|--background) __kouen_claude_next "$@"; return ;;
+        -r|--resume|--resume=*|-c|--continue|--from-pr|--from-pr=*) resume=1 ;;
+      esac
+    done
+    if [[ "$KOUEN_CLAUDE_SESSION_MODE" == cloud && $resume -eq 0 ]]; then
+      __kouen_claude_next --cloud "$@"
+    elif [[ "$KOUEN_CLAUDE_SESSION_MODE" == cloud || "$KOUEN_CLAUDE_SESSION_MODE" == remote-control ]]; then
+      __kouen_claude_next --remote-control --remote-control-session-name-prefix kouen "$@"
+    else
+      __kouen_claude_next "$@"
+    fi
+  }
+fi
