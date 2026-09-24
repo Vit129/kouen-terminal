@@ -1,3 +1,5 @@
+// MobileBridgeServer only exists where Network.framework does (it's guarded the same way).
+#if canImport(Network)
 import XCTest
 import KouenIPC
 @testable import KouenCore
@@ -46,3 +48,4 @@ final class MobileBridgeBrowserTests: XCTestCase {
         XCTAssertNil(MobileBridgeServer.nextBrowserPaneID(current: nil, response: .error("Kouen GUI is not running or connected")))
     }
 }
+#endif

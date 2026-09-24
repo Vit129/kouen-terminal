@@ -375,6 +375,7 @@ final class DaemonRoundTripTests: XCTestCase {
         XCTAssertEqual(size?.cols, 200, "surface must grow back when the small client detaches (cols)")
     }
 
+    #if canImport(Network)   // uses MobileBridgeServer, which is Network.framework-only
     /// Feature B (mobile must never shrink the Mac's terminal): with a native and a mobile-labeled
     /// client on the same surface, the phone's smaller vote must NOT win — the surface holds the
     /// native size the whole time and never shrinks to the mobile size at all. This is the exact
@@ -421,6 +422,7 @@ final class DaemonRoundTripTests: XCTestCase {
         XCTAssertEqual(size?.rows, 24, "mobile-only attachment sizes to the phone's own vote (rows)")
         XCTAssertEqual(size?.cols, 80, "mobile-only attachment sizes to the phone's own vote (cols)")
     }
+    #endif
 
     /// `detachSurface` (per-surface release, connection stays open) must also drop the caller's
     /// size vote so the surface grows back to the remaining clients' smallest size.
@@ -502,6 +504,7 @@ final class DaemonRoundTripTests: XCTestCase {
         XCTAssertGreaterThan(seen.value, 0)
     }
 
+    #if canImport(Network)   // uses MobileBridgeServer, which is Network.framework-only
     /// Live-daemon precondition for the mobile-bridge "session list stays live" fix
     /// (`MobileBridgeServer.startSessionListSubscription`): a mobile connection's session-list
     /// subscription IS a `subscribeSnapshot(label: MobileBridgeServer.clientLabel)` call held open
@@ -549,6 +552,7 @@ final class DaemonRoundTripTests: XCTestCase {
                 + "already-connected mobile page must not need to reconnect to see a new session"
         )
     }
+    #endif
 
     /// Hook symmetry for long-lived subscription clients: registering a subscription must fire
     /// `client-attached`, and its disconnect must fire `client-detached`. Regression for the
@@ -664,11 +668,11 @@ final class DaemonRoundTripTests: XCTestCase {
         let channel = agentWaitChannel(surfaceKey: target.surfaceID)
 
         let waiterDone = XCTestExpectation(description: "waitFor channel signaled")
-        var waiterResponse: IPCResponse?
+        let waiterResponse = AtomicBox<IPCResponse>()
         let waiterQueue = DispatchQueue(label: "test.agent-wait-channel")
         waiterQueue.async {
             let waiterClient = DaemonClient()
-            waiterResponse = try? waiterClient.request(.waitFor(channel: channel, mode: "wait"), timeout: 10)
+            waiterResponse.set(try? waiterClient.request(.waitFor(channel: channel, mode: "wait"), timeout: 10))
             waiterDone.fulfill()
         }
 
@@ -681,8 +685,8 @@ final class DaemonRoundTripTests: XCTestCase {
         }
 
         wait(for: [waiterDone], timeout: 5)
-        guard case .ok = waiterResponse else {
-            return XCTFail("expected the blocked waitFor to resolve .ok well before its 10s timeout, got \(String(describing: waiterResponse))")
+        guard case .ok = waiterResponse.value else {
+            return XCTFail("expected the blocked waitFor to resolve .ok well before its 10s timeout, got \(String(describing: waiterResponse.value))")
         }
     }
 

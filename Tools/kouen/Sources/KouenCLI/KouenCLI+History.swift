@@ -75,7 +75,11 @@ extension KouenCLI {
             return
         }
 
+        #if canImport(Darwin)
         let df = RelativeDateTimeFormatter()
+        #else
+        let df = PortableRelativeDateFormatter()   // swift-corelibs-foundation has no RelativeDateTimeFormatter
+        #endif
         print(String(format: "%-10@ %-12@ %-22@ %-16@ %@",
                      "ID" as NSString, "AGENT" as NSString, "PROJECT" as NSString, "UPDATED" as NSString, "TITLE" as NSString))
         print(String(repeating: "-", count: 90))
@@ -197,3 +201,18 @@ extension KouenCLI {
         print(tabID.uuidString)
     }
 }
+
+#if !canImport(Darwin)
+/// Minimal stand-in for `RelativeDateTimeFormatter` on Linux, same call shape.
+private struct PortableRelativeDateFormatter {
+    func localizedString(for date: Date, relativeTo now: Date) -> String {
+        let seconds = Int(now.timeIntervalSince(date))
+        switch seconds {
+        case ..<60: return "just now"
+        case ..<3600: return "\(seconds / 60) min. ago"
+        case ..<86_400: return "\(seconds / 3600) hr. ago"
+        default: return "\(seconds / 86_400) days ago"
+        }
+    }
+}
+#endif

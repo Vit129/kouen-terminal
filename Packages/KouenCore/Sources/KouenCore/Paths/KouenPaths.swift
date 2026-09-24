@@ -11,6 +11,15 @@ public enum KouenPaths {
         return (raw?.isEmpty == false) ? raw : nil
     }
 
+    /// `NSClassFromString("XCTestCase")` alone only works on Darwin: swift-corelibs-foundation
+    /// can't look up Swift classes by name, so a Linux debug test run thought it *wasn't* under
+    /// XCTest and pointed every test at the real `~/Library/Application Support/KouenDebug`.
+    /// SwiftPM's test runner is always a `*.xctest` binary, which covers Linux.
+    private static var isRunningUnderXCTest: Bool {
+        NSClassFromString("XCTestCase") != nil
+            || (ProcessInfo.processInfo.arguments.first ?? "").hasSuffix(".xctest")
+    }
+
     private static var overrideRoot: URL? {
         guard let raw = overrideRootRaw, !raw.isEmpty else {
             let fm = FileManager.default
@@ -27,7 +36,7 @@ public enum KouenPaths {
             // This automatically points kouen-cli or debug daemon to the preview state when run from the repo.
             // Skip this auto-detection for the main GUI app (com.vit129.kouen) so it doesn't share sessions
             // with the preview environment when launched from within the repo directory.
-            if NSClassFromString("XCTestCase") == nil {
+            if !isRunningUnderXCTest {
                 if Bundle.main.bundleIdentifier != "com.vit129.kouen" {
                     var dir = URL(fileURLWithPath: fm.currentDirectoryPath)
                     while dir.path != "/" {
@@ -44,7 +53,7 @@ public enum KouenPaths {
             // In debug builds, use a dedicated debug directory so development/testing
             // never interferes with or clobbers the production daily-use sessions.
             #if DEBUG
-            if NSClassFromString("XCTestCase") == nil {
+            if !isRunningUnderXCTest {
                 return fm.homeDirectoryForCurrentUser
                     .appendingPathComponent("Library/Application Support/KouenDebug", isDirectory: true)
             }
