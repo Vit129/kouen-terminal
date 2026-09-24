@@ -92,3 +92,23 @@ Automations, the ViEx spawn command) and every History resume reads `claudeSessi
   so cloud mode resumes with Remote Control instead.
 
 Headless runs (`kouenCCRun`, `claude -p`) aren't affected.
+
+## The reverse direction: a session opened in Claude showing up in Kouen
+
+History (sidebar tab, `kouen history`) always scanned local transcripts
+(`~/.claude/projects/*.jsonl`) — a session started from Claude Desktop on this Mac already
+showed up there. The gap was `--cloud` sessions: they never write a transcript to this disk,
+so the JSONL scan alone can't see them.
+
+`AgentHistoryScanner` now also runs `claude agents --json` and merges its rows into History by
+session id:
+
+| `kind` from `claude agents --json` | Shows up as | Resume command |
+|---|---|---|
+| `cloud` | ☁️ Cloud badge | `claude --cloud <id>` |
+| `background` (`claude --bg`) | ⌁ Background badge | `claude attach <id>` (id not verified against a real `--bg` session) |
+| `remote-control` | 📱 Remote Control badge | ordinary `--resume`/`ClaudeSessionMode` path |
+| `interactive` | *(skipped)* | already covered by the JSONL scan; merging it in too would just risk a duplicate row |
+
+Best-effort: if `claude` isn't installed, isn't logged in, or the call times out (5s), History
+just falls back to what the transcript scan alone would show — nothing crashes or blocks on it.

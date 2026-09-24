@@ -53,10 +53,15 @@ extension KouenCLI {
             struct Entry: Codable {
                 let id: String, agent: String, title: String, project: String
                 let branch: String?, updatedAt: Date, messageCount: Int
+                // "local" unless `claude agents --json` reported this session live elsewhere —
+                // see `AgentSessionPlacement`.
+                let placement: String
+                let liveStatus: String?
             }
             let entries = shown.map {
                 Entry(id: $0.id, agent: $0.agentKind.displayName, title: $0.title, project: $0.projectName,
-                      branch: $0.gitBranch, updatedAt: $0.updatedAt, messageCount: $0.messageCount)
+                      branch: $0.gitBranch, updatedAt: $0.updatedAt, messageCount: $0.messageCount,
+                      placement: $0.placement.rawValue, liveStatus: $0.liveStatus)
             }
             let encoder = JSONEncoder()
             encoder.dateEncodingStrategy = .iso8601
@@ -132,6 +137,10 @@ extension KouenCLI {
         if let model = record.modelName { print("Model:      \(model)") }
         print("Messages:   \(record.messageCount)")
         print("Updated:    \(record.updatedAt)")
+        if record.placement != .local {
+            let status = record.liveStatus.map { " (\($0))" } ?? ""
+            print("Live at:    \(record.placement.rawValue)\(status)")
+        }
         print("Transcript: \(record.transcriptPath)")
         print("")
         print("First prompt:")
@@ -183,9 +192,7 @@ extension KouenCLI {
             exit(1)
         }
 
-        let cmd = record.agentKind.resumeCommand(
-            sessionID: record.id, claudeMode: KouenSettings.load().claudeSessionMode
-        )
+        let cmd = record.effectiveResumeCommand(claudeMode: KouenSettings.load().claudeSessionMode)
         _ = try checkedRequest(client, .send(surfaceID: surfaceID, text: cmd + "\n", origin: .automation))
         print(tabID.uuidString)
     }
