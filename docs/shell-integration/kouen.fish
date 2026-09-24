@@ -59,3 +59,72 @@ if set -q KOUEN; and set -q KOUEN_CLAUDE_SESSION_MODE; and not set -q __kouen_cl
         end
     end
 end
+
+# Antigravity (agy) session mode
+if set -q KOUEN; and test "$KOUEN_AGY_SESSION_MODE" = remote-control; and not set -q __kouen_agy_wrapped
+    set -g __kouen_agy_wrapped 1
+    if functions -q agy
+        functions -c agy __kouen_agy_next
+    else
+        function __kouen_agy_next; command agy $argv; end
+    end
+    function agy
+        switch "$argv[1]"
+            case auth config doctor help remote-control status update version
+                __kouen_agy_next $argv; return
+        end
+        for a in $argv
+            switch $a
+                case -h --help -v --version --remote-control --rc
+                    __kouen_agy_next $argv; return
+            end
+        end
+        __kouen_agy_next --remote-control $argv
+    end
+end
+
+# GitHub Copilot session mode
+if set -q KOUEN; and test "$KOUEN_COPILOT_SESSION_MODE" = remote-control; and not set -q __kouen_copilot_wrapped
+    set -g __kouen_copilot_wrapped 1
+    if functions -q copilot
+        functions -c copilot __kouen_copilot_next
+    else
+        function __kouen_copilot_next; command copilot $argv; end
+    end
+    function copilot
+        switch "$argv[1]"
+            case auth config help login logout status version
+                __kouen_copilot_next $argv; return
+        end
+        for a in $argv
+            switch $a
+                case -h --help -v --version --remote
+                    __kouen_copilot_next $argv; return
+            end
+        end
+        __kouen_copilot_next --remote $argv
+    end
+end
+
+# Hermes session mode
+if set -q KOUEN; and test "$KOUEN_HERMES_SESSION_MODE" = remote-control; and not set -q __kouen_hermes_wrapped
+    set -g __kouen_hermes_wrapped 1
+    if functions -q hermes
+        functions -c hermes __kouen_hermes_next
+    else
+        function __kouen_hermes_next; command hermes $argv; end
+    end
+    function hermes
+        switch "$argv[1]"
+            case auth config help login status version
+                __kouen_hermes_next $argv; return
+        end
+        for a in $argv
+            switch $a
+                case -h --help -v --version --remote
+                    __kouen_hermes_next $argv; return
+            end
+        end
+        __kouen_hermes_next --remote $argv
+    end
+end

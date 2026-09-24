@@ -213,3 +213,14 @@ list account cloud sessions. Both were wrong for this project:
   (`ClaudeCloudSessionStore`) so it stays in History after its pane closes.
 - **Cloud resume is `claude --teleport <id>`.** `claude --cloud <id>` only attaches together
   with `-p` (post one message and exit), so the first cut's resume command would have failed.
+
+### Multi-Agent Session Modes & Launch Table (P50 Phase B)
+
+Building upon the Claude session mode foundation, Kouen generalizes remote-control and cloud launching across all supported agents:
+
+- **`AgentSessionMode` (`Packages/KouenIPC/Sources/KouenIPC/AgentSessionMode.swift`):** Defines `.local`, `.remoteControl`, and `.cloud`. `ClaudeSessionMode` is preserved as a `typealias` for backward compatibility.
+- **`agentSessionModes` in `KouenSettings`:** Per-agent launch mode dictionary (`[AgentKind: AgentSessionMode]`). Decodes legacy `claudeSessionMode` seamlessly if present. Defaults to `.remoteControl` for `.claudeCode`, `.codex`, `.antigravity`, `.copilot`, and `.hermes`, and `.local` for others.
+- **Centralized Data-Driven Table (`AgentLaunchCommands`):** Replaces scattered switches with a declarative `AgentLaunchConfig` registry specifying `binary`, `supportedModes`, `cloudFallback`, `launchFlags`, `resumeStyle` (`.flag`, `.subcommand`, `.bare`, `.none`), and whether mode flags append on resume.
+- **Extensibility:** Adding or customizing agents (e.g. Hermes, OpenRouter endpoints) requires only an entry in `AgentLaunchCommands.configs` without modifying dispatch code across the daemon, CLI, or MCP tools.
+- **Safe Fallback & Resume:** Unsupported modes gracefully fall back with logging to stderr. Resuming non-Claude agents preserves native command formats (e.g. `gemini --resume <id>`, `codex resume <id>`, `hermes --resume <id>`) and never defaults to Claude Code.
+- **Unified Launch Resolution:** `KouenSettings.resolvedLaunchCommand(for:cwd:)` centralizes agent kind and mode resolution, shared between `SurfaceRegistry.automationLaunchCommand` and `KouenCLI+Wake.agentLaunchCommand`.

@@ -88,11 +88,6 @@ extension KouenCLI {
     }
 
     private static func agentLaunchCommand(for agent: String) -> String {
-        switch agent.lowercased() {
-        case "codex": return "codex\n"
-        case "kiro": return "kiro\n"
-        case "gemini": return "gemini\n"
-        default: return KouenSettings.load().claudeSessionMode.launchCommand + "\n"
-        }
+        KouenSettings.load().resolvedLaunchCommand(for: agent)
     }
 }

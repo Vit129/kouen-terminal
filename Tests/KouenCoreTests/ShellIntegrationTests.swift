@@ -53,6 +53,18 @@ final class ShellIntegrationTests: XCTestCase {
         }
     }
 
+    func testScriptsWrapOtherAgentsWithSessionMode() {
+        for shell in ShellIntegration.Shell.allCases {
+            let s = ShellIntegration.script(for: shell)
+            XCTAssertTrue(s.contains("KOUEN_AGY_SESSION_MODE"), "\(shell) wrapper must read agy mode")
+            XCTAssertTrue(s.contains("__kouen_agy_next"), "\(shell) wrapper must chain agy")
+            XCTAssertTrue(s.contains("KOUEN_COPILOT_SESSION_MODE"), "\(shell) wrapper must read copilot mode")
+            XCTAssertTrue(s.contains("__kouen_copilot_next"), "\(shell) wrapper must chain copilot")
+            XCTAssertTrue(s.contains("KOUEN_HERMES_SESSION_MODE"), "\(shell) wrapper must read hermes mode")
+            XCTAssertTrue(s.contains("__kouen_hermes_next"), "\(shell) wrapper must chain hermes")
+        }
+    }
+
     func testInstallWritesScriptAndWiresRCIdempotently() throws {
         let home = tempHome()
         defer { try? FileManager.default.removeItem(at: home) }

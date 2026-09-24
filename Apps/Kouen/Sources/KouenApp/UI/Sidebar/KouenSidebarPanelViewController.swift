@@ -662,11 +662,13 @@ final class KouenSidebarPanelViewController: NSViewController {
         }
     }
 
-    /// Resume command honoring the user's `claudeSessionMode` (Remote Control for Claude) and,
+    /// Resume command honoring the user's per-agent session mode and,
     /// when the History scan found this session live via `claude agents --json`, its
     /// `resumeCommandOverride` (`claude --cloud <id>`/`claude attach <id>`) instead.
     private static func resumeCommand(for record: AgentSessionRecord) -> String {
-        record.effectiveResumeCommand(claudeMode: KouenSettings.load().claudeSessionMode)
+        let settings = KouenSettings.load()
+        let mode = settings.sessionMode(for: record.agentKind)
+        return record.effectiveResumeCommand(mode: mode)
     }
 
     /// Resumes in a new tab inside the current session — the original one-button behavior.

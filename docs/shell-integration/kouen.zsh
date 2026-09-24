@@ -60,3 +60,66 @@ if [[ -n "$KOUEN" && -n "$KOUEN_CLAUDE_SESSION_MODE" && -z "$__kouen_claude_wrap
     fi
   }
 fi
+
+# Antigravity (agy) session mode: a `agy` typed by hand gets --remote-control when in remote-control mode ($KOUEN_AGY_SESSION_MODE).
+if [[ -n "$KOUEN" && "$KOUEN_AGY_SESSION_MODE" == "remote-control" && -z "$__kouen_agy_wrapped" ]]; then
+  __kouen_agy_wrapped=1
+  if (( ${+functions[agy]} )); then
+    functions[__kouen_agy_next]=$functions[agy]
+  else
+    __kouen_agy_next() { command agy "$@"; }
+  fi
+  agy() {
+    case "$1" in
+      auth|config|doctor|help|remote-control|status|update|version) __kouen_agy_next "$@"; return ;;
+    esac
+    for a in "$@"; do
+      case "$a" in
+        -h|--help|-v|--version|--remote-control|--rc) __kouen_agy_next "$@"; return ;;
+      esac
+    done
+    __kouen_agy_next --remote-control "$@"
+  }
+fi
+
+# GitHub Copilot session mode: a `copilot` typed by hand gets --remote when in remote-control mode ($KOUEN_COPILOT_SESSION_MODE).
+if [[ -n "$KOUEN" && "$KOUEN_COPILOT_SESSION_MODE" == "remote-control" && -z "$__kouen_copilot_wrapped" ]]; then
+  __kouen_copilot_wrapped=1
+  if (( ${+functions[copilot]} )); then
+    functions[__kouen_copilot_next]=$functions[copilot]
+  else
+    __kouen_copilot_next() { command copilot "$@"; }
+  fi
+  copilot() {
+    case "$1" in
+      auth|config|help|login|logout|status|version) __kouen_copilot_next "$@"; return ;;
+    esac
+    for a in "$@"; do
+      case "$a" in
+        -h|--help|-v|--version|--remote) __kouen_copilot_next "$@"; return ;;
+      esac
+    done
+    __kouen_copilot_next --remote "$@"
+  }
+fi
+
+# Hermes session mode: a `hermes` typed by hand gets --remote when in remote-control mode ($KOUEN_HERMES_SESSION_MODE).
+if [[ -n "$KOUEN" && "$KOUEN_HERMES_SESSION_MODE" == "remote-control" && -z "$__kouen_hermes_wrapped" ]]; then
+  __kouen_hermes_wrapped=1
+  if (( ${+functions[hermes]} )); then
+    functions[__kouen_hermes_next]=$functions[hermes]
+  else
+    __kouen_hermes_next() { command hermes "$@"; }
+  fi
+  hermes() {
+    case "$1" in
+      auth|config|help|login|status|version) __kouen_hermes_next "$@"; return ;;
+    esac
+    for a in "$@"; do
+      case "$a" in
+        -h|--help|-v|--version|--remote) __kouen_hermes_next "$@"; return ;;
+      esac
+    done
+    __kouen_hermes_next --remote "$@"
+  }
+fi

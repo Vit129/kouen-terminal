@@ -3,7 +3,7 @@ import Foundation
 /// Identifier for the family of agent currently running in a pane. Driven by
 /// `AgentDetector` (process-tree inspection) plus optional hints from CLI
 /// hooks. Keep stable strings — they appear in JSON layout files and config.
-public enum AgentKind: String, Codable, Sendable, CaseIterable {
+public enum AgentKind: String, Codable, Sendable, CaseIterable, CodingKeyRepresentable {
     case codex
     case claudeCode = "claude-code"
     case cursor
@@ -82,21 +82,15 @@ public enum AgentKind: String, Codable, Sendable, CaseIterable {
         }
     }
 
-    /// Shell command to resume a session given its session ID. `claudeMode` only affects
-    /// Claude Code (and the Claude fallback below) — see `ClaudeSessionMode.resumeCommand`.
-    public func resumeCommand(sessionID: String, claudeMode: ClaudeSessionMode = .local) -> String {
-        switch self {
-        case .claudeCode:
-            return claudeMode.resumeCommand(sessionID: sessionID)
-        case .antigravity:
-            return "agy --conversation \(sessionID)"
-        case .codex:
-            return "codex resume \(sessionID)"
-        case .copilot:
-            return "copilot --resume \(sessionID)"
-        default:
-            return claudeMode.resumeCommand(sessionID: sessionID)
-        }
+    /// Shell command to resume a session given its session ID and session mode.
+    public func resumeCommand(sessionID: String, mode: AgentSessionMode = .local) -> String {
+        AgentLaunchCommands.resume(kind: self, sessionID: sessionID, mode: mode)
+    }
+
+    /// Backwards compatibility forwarder for Claude-specific call sites.
+    @inlinable
+    public func resumeCommand(sessionID: String, claudeMode: ClaudeSessionMode) -> String {
+        resumeCommand(sessionID: sessionID, mode: claudeMode)
     }
 }
 
