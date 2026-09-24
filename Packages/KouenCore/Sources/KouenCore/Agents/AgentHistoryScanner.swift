@@ -495,7 +495,10 @@ public actor AgentHistoryScanner {
     /// installed, isn't logged in, prints something this can't parse, or times out. Callers
     /// merge this into the transcript-derived records rather than trusting it alone, since it
     /// has no prompt/turn content — only enough to say *where* a session is running.
-    public func scanClaudeAgentsCLI() async -> [LiveClaudeAgentEntry] {
+    ///
+    /// Not `public`: `LiveClaudeAgentEntry` is internal, and nothing outside `scanAll()` (same
+    /// file) needs this directly — everything else consumes the merged `AgentSessionRecord`.
+    func scanClaudeAgentsCLI() async -> [LiveClaudeAgentEntry] {
         guard let claudePath = Self.cachedClaudePath else { return [] }
         return Self.runClaudeAgentsJSON(claudePath: claudePath)
     }
