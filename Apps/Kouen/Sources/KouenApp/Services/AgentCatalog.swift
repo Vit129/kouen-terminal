@@ -147,6 +147,9 @@ public enum AgentCatalog {
         guard let config = agents[kind] else { return nil }
 
         var parts = [config.binary]
+        if kind == .claudeCode {
+            parts += KouenSettings.load().claudeSessionMode.launchFlags
+        }
 
         let resolvedModel = model ?? config.models.first
         if let m = resolvedModel {

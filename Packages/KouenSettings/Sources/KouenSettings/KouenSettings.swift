@@ -118,6 +118,9 @@ public struct KouenSettings: Codable, Sendable, Equatable {
     /// Fallback `AgentKind` for `agent: "auto"` spawn requests (M2 Agent Routing Rule)
     /// when no configured rule matches the target cwd.
     public var defaultAgentKind: AgentKind
+    /// How Kouen launches/resumes Claude Code: cloud (default), Remote Control, or plain local.
+    /// See `ClaudeSessionMode`.
+    public var claudeSessionMode: ClaudeSessionMode
     /// Color of the 1px hairline divider between sidebar and content (and any
     /// other in-window divider line). nil → derive from the theme.
     public var dividerHex: String?
@@ -360,6 +363,7 @@ public struct KouenSettings: Codable, Sendable, Equatable {
         paletteHex: [String?] = Array(repeating: nil, count: 16),
         agentColorOverrides: [String: String] = [:],
         defaultAgentKind: AgentKind = .claudeCode,
+        claudeSessionMode: ClaudeSessionMode = .cloud,
         // nil = derive from theme (dark themes resolve to a quiet #1E1E1E hairline; see
         // MainSplitViewController.resolvedDividerColor). A pinned value would override that
         // on every theme, so leave it unset.
@@ -440,6 +444,7 @@ public struct KouenSettings: Codable, Sendable, Equatable {
         self.paletteHex = KouenSettings.normalizedPalette(paletteHex)
         self.agentColorOverrides = KouenSettings.normalizedAgentColorOverrides(agentColorOverrides)
         self.defaultAgentKind = defaultAgentKind
+        self.claudeSessionMode = claudeSessionMode
         self.dividerHex = dividerHex
         self.statusLineHex = statusLineHex
         self.windowBorderHex = windowBorderHex
@@ -601,6 +606,7 @@ public struct KouenSettings: Codable, Sendable, Equatable {
         let agentColors = try container.decodeIfPresent([String: String].self, forKey: .agentColorOverrides) ?? fallback.agentColorOverrides
         agentColorOverrides = KouenSettings.normalizedAgentColorOverrides(agentColors)
         defaultAgentKind = try container.decodeIfPresent(AgentKind.self, forKey: .defaultAgentKind) ?? fallback.defaultAgentKind
+        claudeSessionMode = try container.decodeIfPresent(ClaudeSessionMode.self, forKey: .claudeSessionMode) ?? fallback.claudeSessionMode
         dividerHex = try container.decodeIfPresent(String.self, forKey: .dividerHex)
         statusLineHex = try container.decodeIfPresent(String.self, forKey: .statusLineHex)
         windowBorderHex = try container.decodeIfPresent(String.self, forKey: .windowBorderHex)

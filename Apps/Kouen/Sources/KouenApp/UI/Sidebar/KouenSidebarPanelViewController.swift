@@ -662,10 +662,17 @@ final class KouenSidebarPanelViewController: NSViewController {
         }
     }
 
+    /// Resume command honoring the user's `claudeSessionMode` (Remote Control for Claude) and,
+    /// when the History scan found this session live via `claude agents --json`, its
+    /// `resumeCommandOverride` (`claude --cloud <id>`/`claude attach <id>`) instead.
+    private static func resumeCommand(for record: AgentSessionRecord) -> String {
+        record.effectiveResumeCommand(claudeMode: KouenSettings.load().claudeSessionMode)
+    }
+
     /// Resumes in a new tab inside the current session — the original one-button behavior.
     /// Fastest option, but shares the current session's worktree/branch (if any).
     private func resumeAgentSession(_ record: AgentSessionRecord) {
-        let cmd = record.agentKind.resumeCommand(sessionID: record.id)
+        let cmd = Self.resumeCommand(for: record)
         let req = DefaultTerminalLaunchRequest(
             command: cmd,
             cwd: record.projectPath,
@@ -706,7 +713,7 @@ final class KouenSidebarPanelViewController: NSViewController {
             name: "Resume: \(record.title)",
             worktreePath: worktreePath,
             parentRepoPath: repoPath,
-            initialCommand: record.agentKind.resumeCommand(sessionID: record.id)
+            initialCommand: Self.resumeCommand(for: record)
         )
     }
 
@@ -719,7 +726,7 @@ final class KouenSidebarPanelViewController: NSViewController {
             to: workspaceID,
             cwd: record.projectPath,
             name: "Resume: \(record.title)",
-            initialCommand: record.agentKind.resumeCommand(sessionID: record.id)
+            initialCommand: Self.resumeCommand(for: record)
         )
     }
 
