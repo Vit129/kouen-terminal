@@ -116,7 +116,10 @@ public struct AgentSessionRecord: Identifiable, Sendable, Equatable {
     /// `agentKind.resumeCommand`/`ClaudeSessionMode` path already.
     fileprivate static func resumeOverride(placement: AgentSessionPlacement, sessionID: String) -> String? {
         switch placement {
-        case .cloud: return "claude --cloud \(sessionID)"
+        // `--teleport`, not `--cloud <id>`: attaching to an existing cloud session with
+        // `--cloud` only works together with `-p` (it posts one message and exits). Teleport
+        // pulls the session and its branch into this pane, which is what a resume should do.
+        case .cloud: return "claude --teleport \(sessionID)"
         // `claude attach <id>` per `claude --help`: "<id> is the short id that `claude --bg`
         // prints and `claude agents` lists" — assumed to be the same `sessionId` this scanner
         // reads from `claude agents --json`, since that's the only id field the listing has.
@@ -227,13 +230,16 @@ public actor AgentHistoryScanner {
     }
 
     private var cachedRecords: [AgentSessionRecord] = []
+    private let cloudSessionStore: ClaudeCloudSessionStore
     private var fileCache: [String: FileCacheEntry] = [:]
     private var lastScanAt: Date = .distantPast
     #if canImport(SQLite3)
     private var copilotCache: (mtime: Date, size: Int, records: [AgentSessionRecord])?
     #endif
 
-    public init() {}
+    public init() {
+        cloudSessionStore = ClaudeCloudSessionStore()
+    }
 
     /// Returns cached records if fresh (< 5s), otherwise rescans.
     public func getOrScan(force: Bool = false) async -> [AgentSessionRecord] {
@@ -259,7 +265,13 @@ public actor AgentHistoryScanner {
         results.append(contentsOf: await codexTask)
         results.append(contentsOf: await copilotTask)
 
-        results = Self.mergeLivePlacements(results, live: await liveClaudeTask)
+        // Cloud sessions stay listed after their pane closes: remember every cloud row the live
+        // scan sees and add the ones that aren't live right now as offline rows.
+        let live = await liveClaudeTask
+        let remembered = cloudSessionStore.remember(live)
+        results = Self.mergeLivePlacements(
+            results, live: live + ClaudeCloudSessionStore.offlineRows(remembered, excluding: live)
+        )
 
         results.sort { $0.updatedAt > $1.updatedAt }
         cachedRecords = results
@@ -453,37 +465,57 @@ public actor AgentHistoryScanner {
     /// Resolve `claude`'s path the same way `MobileBridgeServer.cachedClaudePath` and
     /// `GitHubCLIClient.cachedGhPath` already do: common install locations first (found via
     /// live-testing — the curl-installer default `~/.local/bin` isn't on a launchd-spawned
-    /// process's PATH, so a bare `which` fallback alone would miss it), `which claude` for
-    /// anything else. Duplicated rather than shared because `KouenCore` can't depend on
-    /// `KouenDaemon`, where the daemon's copy lives.
+    /// process's PATH, so a bare `which` fallback alone would miss it), then `which claude`.
+    /// Last resort is a login zsh's `whence -p claude`: the GUI app is launched with a minimal
+    /// PATH, so npm/nvm installs are only reachable through the user's own shell profile, and
+    /// `claude` is often a zsh *function* there, which `whence -p` sees through to the real
+    /// binary (same probe `ClaudeAdapter.probeCommand` uses). Duplicated rather than shared
+    /// because `KouenCore` can't depend on `KouenDaemon`, where the daemon's copy lives.
     private static let cachedClaudePath: String? = {
+        let home = NSHomeDirectory()
         let paths = [
-            NSHomeDirectory() + "/.local/bin/claude",
+            home + "/.local/bin/claude",
+            home + "/.claude/local/claude",   // `claude migrate-installer` location
             "/opt/homebrew/bin/claude",
             "/usr/local/bin/claude",
         ]
         if let found = paths.first(where: { FileManager.default.fileExists(atPath: $0) }) {
             return found
         }
+        if let path = AgentHistoryScanner.firstOutputLine(of: "/usr/bin/which", ["claude"]) { return path }
+        if FileManager.default.fileExists(atPath: "/bin/zsh") {
+            return AgentHistoryScanner.firstOutputLine(of: "/bin/zsh", ["-lic", "whence -p claude"])
+        }
+        return nil
+    }()
+
+    /// First stdout line of a short probe command, only if it names an existing file.
+    private static func firstOutputLine(of executable: String, _ arguments: [String]) -> String? {
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/which")
-        process.arguments = ["claude"]
+        process.executableURL = URL(fileURLWithPath: executable)
+        process.arguments = arguments
         let pipe = Pipe()
         process.standardOutput = pipe
         process.standardError = FileHandle.nullDevice
+        process.standardInput = FileHandle.nullDevice
+        // A login shell sources the user's whole profile; never let a slow/odd rc wedge the scan.
+        let timeoutWork = DispatchWorkItem { if process.isRunning { process.terminate() } }
+        DispatchQueue.global().asyncAfter(deadline: .now() + AgentHistoryScanner.liveListTimeout, execute: timeoutWork)
+        defer { timeoutWork.cancel() }
         do {
             try process.run()
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             process.waitUntilExit()
             guard process.terminationStatus == 0,
-                  let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  let path = String(data: data, encoding: .utf8)?
+                      .split(separator: "\n").last.map({ $0.trimmingCharacters(in: .whitespaces) }),
                   !path.isEmpty, FileManager.default.fileExists(atPath: path)
             else { return nil }
             return path
         } catch {
             return nil
         }
-    }()
+    }
 
     /// Ceiling on the `claude agents --json` call — it's normally near-instant (a local query
     /// against the CLI's own session registry), but must never be allowed to wedge this actor

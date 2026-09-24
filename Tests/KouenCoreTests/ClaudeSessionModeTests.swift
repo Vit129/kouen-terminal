@@ -32,8 +32,8 @@ final class ClaudeSessionModeTests: XCTestCase {
         XCTAssertEqual(AgentKind.codex.resumeCommand(sessionID: "abc", claudeMode: .cloud), "codex resume abc")
     }
 
-    func testSettingsDefaultIsCloud() {
-        XCTAssertEqual(KouenSettings().claudeSessionMode, .cloud)
+    func testSettingsDefaultIsRemoteControl() {
+        XCTAssertEqual(KouenSettings().claudeSessionMode, .remoteControl)
     }
 
     func testSettingsDecodesClaudeSessionMode() throws {
@@ -46,11 +46,11 @@ final class ClaudeSessionModeTests: XCTestCase {
         }
     }
 
-    func testSettingsMissingClaudeSessionModeDefaultsToCloud() throws {
+    func testSettingsMissingClaudeSessionModeDefaultsToRemoteControl() throws {
         try withTemporaryKouenHome { root in
             try KouenPaths.ensureDirectories()
             try Data("{ \"fontSize\": 14 }".utf8).write(to: root.appendingPathComponent("settings.json"))
-            XCTAssertEqual(KouenSettings.load().claudeSessionMode, .cloud)
+            XCTAssertEqual(KouenSettings.load().claudeSessionMode, .remoteControl)
         }
     }
 
