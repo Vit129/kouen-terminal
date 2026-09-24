@@ -376,25 +376,14 @@ struct KouenDaemonTools: Sendable {
         }
 
         // Map agent name → CLI launch command
-        let agentLabel: String
-        let agentCommand: String
-        switch resolvedAgent.lowercased() {
-        case "claude", "claude-code":
-            agentLabel = "Claude"
-            agentCommand = KouenSettings.load().claudeSessionMode.launchCommand + "\n"
-        case "codex":
-            agentLabel = "Codex"; agentCommand = "codex\n"
-        case "kiro":
-            agentLabel = "Kiro"; agentCommand = "kiro\n"
-        case "gemini":
-            agentLabel = "Gemini"; agentCommand = "gemini\n"
-        case "cursor":
-            agentLabel = "Cursor"
-            agentCommand = cwd.map { "cursor \($0)\n" } ?? "cursor .\n"
-        default:
+        guard let kind = AgentLaunchCommands.kind(from: resolvedAgent) else {
             return .failure(JSONRPCError(code: -32602,
-                message: "Unknown agent '\(resolvedAgent)'. Valid values: claude, codex, kiro, gemini, cursor"))
+                message: "Unknown agent '\(resolvedAgent)'. Valid values: claude, codex, agy, copilot, kiro, gemini, cursor"))
         }
+        let settings = KouenSettings.load()
+        let mode = settings.sessionMode(for: kind)
+        let agentLabel = (kind == .claudeCode) ? "Claude" : kind.displayName
+        let agentCommand = AgentLaunchCommands.launch(kind: kind, mode: mode, cwd: cwd) + "\n"
 
         // Spawn the session. `worktreePath` (P44a) attaches this session's first tab to a
         // Worktree at creation time — otherwise unreachable via MCP (`.setTabWorktree` has

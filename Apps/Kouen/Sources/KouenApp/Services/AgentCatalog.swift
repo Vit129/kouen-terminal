@@ -134,6 +134,48 @@ public enum AgentCatalog {
             effortFlag: "--effort",
             defaultEffort: "normal",
         ),
+
+        .antigravity: AgentConfig(
+            id: .antigravity,
+            binary: "agy",
+            models: [
+                "gemini-2.5-pro",
+                "gemini-2.5-flash",
+                "gemini-2.0-flash",
+            ],
+            effortLevels: ["low", "medium", "high"],
+            modelFlag: "--model",
+            effortFlag: "--effort",
+            defaultEffort: "medium",
+        ),
+
+        .copilot: AgentConfig(
+            id: .copilot,
+            binary: "copilot",
+            models: [
+                "gpt-5.4",
+                "claude-sonnet-4.6",
+                "o3",
+            ],
+            effortLevels: nil,
+            modelFlag: "--model",
+            effortFlag: nil,
+            defaultEffort: nil,
+        ),
+
+        .hermes: AgentConfig(
+            id: .hermes,
+            binary: "hermes",
+            models: [
+                "nousresearch/hermes-3-llama-3.1-405b",
+                "nousresearch/hermes-3-llama-3.1-70b",
+                "openrouter/auto",
+            ],
+            effortLevels: nil,
+            modelFlag: "--model",
+            effortFlag: nil,
+            defaultEffort: nil,
+        ),
     ]
 
     // MARK: - Spawn Command Builder
@@ -147,9 +189,8 @@ public enum AgentCatalog {
         guard let config = agents[kind] else { return nil }
 
         var parts = [config.binary]
-        if kind == .claudeCode {
-            parts += KouenSettings.load().claudeSessionMode.launchFlags
-        }
+        let mode = KouenSettings.load().sessionMode(for: kind)
+        parts += AgentLaunchCommands.launchFlags(kind: kind, mode: mode)
 
         let resolvedModel = model ?? config.models.first
         if let m = resolvedModel {

@@ -2297,9 +2297,14 @@ public final class SurfaceRegistry: @unchecked Sendable {
         if let cli = Self.kouenCLIExecutableURL() {
             env["KOUEN_CLI"] = cli.path
         }
-        // Read by the shell integration's `claude()` wrapper so a `claude` typed by hand gets
-        // the same mode as a Kouen-launched one. Resolved at pane spawn, like the rest of env.
-        env["KOUEN_CLAUDE_SESSION_MODE"] = KouenSettings.load().claudeSessionMode.rawValue
+        // Read by the shell integration's agent wrappers so hand-typed agents get
+        // the same mode as Kouen-launched ones. Resolved at pane spawn, like the rest of env.
+        let settings = KouenSettings.load()
+        env["KOUEN_CLAUDE_SESSION_MODE"] = settings.claudeSessionMode.rawValue
+        env["KOUEN_AGY_SESSION_MODE"] = settings.sessionMode(for: .antigravity).rawValue
+        env["KOUEN_COPILOT_SESSION_MODE"] = settings.sessionMode(for: .copilot).rawValue
+        env["KOUEN_CODEX_SESSION_MODE"] = settings.sessionMode(for: .codex).rawValue
+        env["KOUEN_HERMES_SESSION_MODE"] = settings.sessionMode(for: .hermes).rawValue
         let session = sessionID(forSurfaceKey: surfaceKey)
         for (key, value) in environmentStore.resolved(sessionID: session) { env[key] = value }
         env["PATH"] = Self.pathWithKouenTools(env["PATH"] ?? ProcessInfo.processInfo.environment["PATH"])
@@ -2518,12 +2523,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
     }
 
     private static func automationLaunchCommand(for agent: String) -> String {
-        switch agent.lowercased() {
-        case "codex": return "codex\n"
-        case "kiro": return "kiro\n"
-        case "gemini": return "gemini\n"
-        default: return KouenSettings.load().claudeSessionMode.launchCommand + "\n"
-        }
+        KouenSettings.load().resolvedLaunchCommand(for: agent)
     }
 
     private static func automationSummary(_ automation: KouenAutomation) -> AutomationSummary {

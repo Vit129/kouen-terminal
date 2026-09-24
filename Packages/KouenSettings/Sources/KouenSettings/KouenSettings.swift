@@ -118,11 +118,32 @@ public struct KouenSettings: Codable, Sendable, Equatable {
     /// Fallback `AgentKind` for `agent: "auto"` spawn requests (M2 Agent Routing Rule)
     /// when no configured rule matches the target cwd.
     public var defaultAgentKind: AgentKind
+    /// Default session modes per agent kind.
+    public static let defaultAgentSessionModes: [AgentKind: AgentSessionMode] = [
+        .claudeCode: .remoteControl,
+        .codex: .remoteControl,
+        .antigravity: .remoteControl,
+        .copilot: .remoteControl
+    ]
+    /// Per-agent session launch modes (cloud, remote-control, or local).
+    public var agentSessionModes: [AgentKind: AgentSessionMode]
     /// How Kouen launches/resumes Claude Code: Remote Control (default), cloud, or plain local.
-    /// See `ClaudeSessionMode`. Remote Control is the default because a cloud session runs in a
-    /// Linux container — no Xcode, no local MCP servers/hooks — while Remote Control keeps the
-    /// agent on this Mac and still shows it in the Claude Desktop/mobile apps.
+    /// Backward-compatibility mirror of `agentSessionModes[.claudeCode]`. Remote Control is the default
+    /// because a cloud session runs in a Linux container — no Xcode, no local MCP servers/hooks — while
+    /// Remote Control keeps the agent on this Mac and still shows it in the Claude Desktop/mobile apps.
     public var claudeSessionMode: ClaudeSessionMode
+
+    /// Returns the resolved session mode for the given agent kind.
+    public func sessionMode(for kind: AgentKind) -> AgentSessionMode {
+        agentSessionModes[kind] ?? (kind == .claudeCode ? claudeSessionMode : (Self.defaultAgentSessionModes[kind] ?? .local))
+    }
+
+    /// Resolve and build the full launch command (with trailing newline) for a named agent string.
+    public func resolvedLaunchCommand(for agentString: String, cwd: String? = nil) -> String {
+        let kind = AgentLaunchCommands.kind(from: agentString) ?? defaultAgentKind
+        let mode = sessionMode(for: kind)
+        return AgentLaunchCommands.launch(kind: kind, mode: mode, cwd: cwd) + "\n"
+    }
     /// Color of the 1px hairline divider between sidebar and content (and any
     /// other in-window divider line). nil → derive from the theme.
     public var dividerHex: String?
@@ -365,7 +386,8 @@ public struct KouenSettings: Codable, Sendable, Equatable {
         paletteHex: [String?] = Array(repeating: nil, count: 16),
         agentColorOverrides: [String: String] = [:],
         defaultAgentKind: AgentKind = .claudeCode,
-        claudeSessionMode: ClaudeSessionMode = .remoteControl,
+        agentSessionModes: [AgentKind: AgentSessionMode]? = nil,
+        claudeSessionMode: ClaudeSessionMode? = nil,
         // nil = derive from theme (dark themes resolve to a quiet #1E1E1E hairline; see
         // MainSplitViewController.resolvedDividerColor). A pinned value would override that
         // on every theme, so leave it unset.
@@ -446,7 +468,14 @@ public struct KouenSettings: Codable, Sendable, Equatable {
         self.paletteHex = KouenSettings.normalizedPalette(paletteHex)
         self.agentColorOverrides = KouenSettings.normalizedAgentColorOverrides(agentColorOverrides)
         self.defaultAgentKind = defaultAgentKind
-        self.claudeSessionMode = claudeSessionMode
+        let resolvedClaudeMode = claudeSessionMode ?? agentSessionModes?[.claudeCode] ?? .remoteControl
+        self.claudeSessionMode = resolvedClaudeMode
+        var modes = KouenSettings.defaultAgentSessionModes
+        if let explicitModes = agentSessionModes {
+            modes.merge(explicitModes) { _, new in new }
+        }
+        modes[.claudeCode] = resolvedClaudeMode
+        self.agentSessionModes = modes
         self.dividerHex = dividerHex
         self.statusLineHex = statusLineHex
         self.windowBorderHex = windowBorderHex
@@ -608,7 +637,13 @@ public struct KouenSettings: Codable, Sendable, Equatable {
         let agentColors = try container.decodeIfPresent([String: String].self, forKey: .agentColorOverrides) ?? fallback.agentColorOverrides
         agentColorOverrides = KouenSettings.normalizedAgentColorOverrides(agentColors)
         defaultAgentKind = try container.decodeIfPresent(AgentKind.self, forKey: .defaultAgentKind) ?? fallback.defaultAgentKind
-        claudeSessionMode = try container.decodeIfPresent(ClaudeSessionMode.self, forKey: .claudeSessionMode) ?? fallback.claudeSessionMode
+        let decodedClaudeMode = try container.decodeIfPresent(ClaudeSessionMode.self, forKey: .claudeSessionMode)
+        var decodedModes = try container.decodeIfPresent([AgentKind: AgentSessionMode].self, forKey: .agentSessionModes) ?? fallback.agentSessionModes
+        if let legacy = decodedClaudeMode {
+            decodedModes[.claudeCode] = legacy
+        }
+        agentSessionModes = decodedModes
+        claudeSessionMode = decodedModes[.claudeCode] ?? decodedClaudeMode ?? fallback.claudeSessionMode
         dividerHex = try container.decodeIfPresent(String.self, forKey: .dividerHex)
         statusLineHex = try container.decodeIfPresent(String.self, forKey: .statusLineHex)
         windowBorderHex = try container.decodeIfPresent(String.self, forKey: .windowBorderHex)

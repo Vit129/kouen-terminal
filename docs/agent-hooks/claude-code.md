@@ -73,8 +73,8 @@ non-Kouen hooks — untouched.
 
 Every Claude Code session Kouen starts (new pane via `kouenSpawnAgent`, `kouen-cli wake`,
 Automations, the ViEx spawn command), every History resume, and — once shell integration is
-installed — every `claude` you type by hand in a Kouen pane reads `claudeSessionMode` from
-`settings.json`:
+installed — every `claude` you type by hand in a Kouen pane reads `agentSessionModes["claude-code"]`
+(or legacy `claudeSessionMode`) from `settings.json`:
 
 | `claudeSessionMode` | New session | Resume from History |
 |---|---|---|

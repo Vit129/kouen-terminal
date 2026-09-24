@@ -183,7 +183,7 @@ struct ToolRegistry: Sendable {
                 param("path", "string", "Path to file to query diagnostics for (optional)"),
             ]),
             toolDef("kouenSpawnAgent", "Spawn a new Kouen terminal session and immediately launch an AI agent CLI (requires MCP policy allowlist or KOUEN_MCP_ALLOW_CONTROL=1)", [
-                param("agent", "string", "Agent to launch: 'claude', 'codex', 'kiro', 'gemini', or 'cursor'"),
+                param("agent", "string", "Agent to launch: 'claude', 'codex', 'agy', 'copilot', 'hermes', 'kiro', 'gemini', or 'cursor'"),
                 param("workspaceId", "string", "Workspace UUID (optional, uses active workspace if omitted)"),
                 param("cwd", "string", "Working directory for the new session (optional)"),
                 param("worktreePath", "string", "Attach the new session's first tab to this git worktree path (optional) — makes it visible via kouenList's tabJSON"),
@@ -191,7 +191,7 @@ struct ToolRegistry: Sendable {
                 param("taskName", "string", "Display-name override for the tab, e.g. the Task title it's working on (optional)"),
             ]),
             toolDef("kouenSpawnWorker", "Spawn a Worker session, launch its agent CLI, and hand it a prompt in one atomic call — for an Orchestrator delegating a Task (P44a). Reliable alternative to kouenSpawnAgent + a manual follow-up send: polls for the shell to actually be ready before typing anything. 'cursor' is not supported (GUI launcher, not an interactive agent — use kouenSpawnAgent for it instead). Requires MCP policy allowlist or KOUEN_MCP_ALLOW_CONTROL=1", [
-                param("agent", "string", "Agent to launch: 'claude', 'codex', 'kiro', or 'gemini' ('cursor' not supported here — see tool description)"),
+                param("agent", "string", "Agent to launch: 'claude', 'codex', 'agy', 'copilot', 'hermes', 'kiro', or 'gemini' ('cursor' not supported here — see tool description)"),
                 param("workspaceId", "string", "Workspace UUID (optional, uses active workspace if omitted)"),
                 param("cwd", "string", "Working directory for the new session (optional)"),
                 param("worktreePath", "string", "Attach the new session's first tab to this git worktree path (optional)"),

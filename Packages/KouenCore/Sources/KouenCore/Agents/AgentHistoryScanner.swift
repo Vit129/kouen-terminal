@@ -95,8 +95,13 @@ public struct AgentSessionRecord: Identifiable, Sendable, Equatable {
 
     /// The command History resume should type into a fresh pane: `resumeCommandOverride` when
     /// set, else the ordinary per-agent-kind resume command.
-    public func effectiveResumeCommand(claudeMode: ClaudeSessionMode = .local) -> String {
-        resumeCommandOverride ?? agentKind.resumeCommand(sessionID: id, claudeMode: claudeMode)
+    public func effectiveResumeCommand(mode: AgentSessionMode = .local) -> String {
+        resumeCommandOverride ?? AgentLaunchCommands.resume(kind: agentKind, sessionID: id, mode: mode)
+    }
+
+    @inlinable
+    public func effectiveResumeCommand(claudeMode: ClaudeSessionMode) -> String {
+        effectiveResumeCommand(mode: claudeMode)
     }
 
     /// Copies this record with a live placement/status attached, deriving the matching resume

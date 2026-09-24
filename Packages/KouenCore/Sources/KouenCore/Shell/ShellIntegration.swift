@@ -153,6 +153,66 @@ public enum ShellIntegration {
         fi
       }
     fi
+    # Antigravity (agy) session mode: a `agy` typed by hand gets --remote-control when in remote-control mode ($KOUEN_AGY_SESSION_MODE).
+    if [[ -n "$KOUEN" && "$KOUEN_AGY_SESSION_MODE" == "remote-control" && -z "$__kouen_agy_wrapped" ]]; then
+      __kouen_agy_wrapped=1
+      if (( ${+functions[agy]} )); then
+        functions[__kouen_agy_next]=$functions[agy]
+      else
+        __kouen_agy_next() { command agy "$@"; }
+      fi
+      agy() {
+        case "$1" in
+          auth|config|doctor|help|remote-control|status|update|version) __kouen_agy_next "$@"; return ;;
+        esac
+        for a in "$@"; do
+          case "$a" in
+            -h|--help|-v|--version|--remote-control|--rc) __kouen_agy_next "$@"; return ;;
+          esac
+        done
+        __kouen_agy_next --remote-control "$@"
+      }
+    fi
+    # GitHub Copilot session mode: a `copilot` typed by hand gets --remote when in remote-control mode ($KOUEN_COPILOT_SESSION_MODE).
+    if [[ -n "$KOUEN" && "$KOUEN_COPILOT_SESSION_MODE" == "remote-control" && -z "$__kouen_copilot_wrapped" ]]; then
+      __kouen_copilot_wrapped=1
+      if (( ${+functions[copilot]} )); then
+        functions[__kouen_copilot_next]=$functions[copilot]
+      else
+        __kouen_copilot_next() { command copilot "$@"; }
+      fi
+      copilot() {
+        case "$1" in
+          auth|config|help|login|logout|status|version) __kouen_copilot_next "$@"; return ;;
+        esac
+        for a in "$@"; do
+          case "$a" in
+            -h|--help|-v|--version|--remote) __kouen_copilot_next "$@"; return ;;
+          esac
+        done
+        __kouen_copilot_next --remote "$@"
+      }
+    fi
+    # Hermes session mode: a `hermes` typed by hand gets --remote when in remote-control mode ($KOUEN_HERMES_SESSION_MODE).
+    if [[ -n "$KOUEN" && "$KOUEN_HERMES_SESSION_MODE" == "remote-control" && -z "$__kouen_hermes_wrapped" ]]; then
+      __kouen_hermes_wrapped=1
+      if (( ${+functions[hermes]} )); then
+        functions[__kouen_hermes_next]=$functions[hermes]
+      else
+        __kouen_hermes_next() { command hermes "$@"; }
+      fi
+      hermes() {
+        case "$1" in
+          auth|config|help|login|status|version) __kouen_hermes_next "$@"; return ;;
+        esac
+        for a in "$@"; do
+          case "$a" in
+            -h|--help|-v|--version|--remote) __kouen_hermes_next "$@"; return ;;
+          esac
+        done
+        __kouen_hermes_next --remote "$@"
+      }
+    fi
     """
 
     // ponytail: bash has no native preexec hook (only the DEBUG trap, which fires per
@@ -208,6 +268,66 @@ public enum ShellIntegration {
         else
           __kouen_claude_next "$@"
         fi
+      }
+    fi
+    # Antigravity (agy) session mode
+    if [ -n "$KOUEN" ] && [ "$KOUEN_AGY_SESSION_MODE" = "remote-control" ] && [ -z "$__kouen_agy_wrapped" ]; then
+      __kouen_agy_wrapped=1
+      if declare -F agy >/dev/null 2>&1; then
+        eval "$(declare -f agy | sed '1s/^agy /__kouen_agy_next /')"
+      else
+        __kouen_agy_next() { command agy "$@"; }
+      fi
+      agy() {
+        case "$1" in
+          auth|config|doctor|help|remote-control|status|update|version) __kouen_agy_next "$@"; return ;;
+        esac
+        for a in "$@"; do
+          case "$a" in
+            -h|--help|-v|--version|--remote-control|--rc) __kouen_agy_next "$@"; return ;;
+          esac
+        done
+        __kouen_agy_next --remote-control "$@"
+      }
+    fi
+    # GitHub Copilot session mode
+    if [ -n "$KOUEN" ] && [ "$KOUEN_COPILOT_SESSION_MODE" = "remote-control" ] && [ -z "$__kouen_copilot_wrapped" ]; then
+      __kouen_copilot_wrapped=1
+      if declare -F copilot >/dev/null 2>&1; then
+        eval "$(declare -f copilot | sed '1s/^copilot /__kouen_copilot_next /')"
+      else
+        __kouen_copilot_next() { command copilot "$@"; }
+      fi
+      copilot() {
+        case "$1" in
+          auth|config|help|login|logout|status|version) __kouen_copilot_next "$@"; return ;;
+        esac
+        for a in "$@"; do
+          case "$a" in
+            -h|--help|-v|--version|--remote) __kouen_copilot_next "$@"; return ;;
+          esac
+        done
+        __kouen_copilot_next --remote "$@"
+      }
+    fi
+    # Hermes session mode
+    if [ -n "$KOUEN" ] && [ "$KOUEN_HERMES_SESSION_MODE" = "remote-control" ] && [ -z "$__kouen_hermes_wrapped" ]; then
+      __kouen_hermes_wrapped=1
+      if declare -F hermes >/dev/null 2>&1; then
+        eval "$(declare -f hermes | sed '1s/^hermes /__kouen_hermes_next /')"
+      else
+        __kouen_hermes_next() { command hermes "$@"; }
+      fi
+      hermes() {
+        case "$1" in
+          auth|config|help|login|status|version) __kouen_hermes_next "$@"; return ;;
+        esac
+        for a in "$@"; do
+          case "$a" in
+            -h|--help|-v|--version|--remote) __kouen_hermes_next "$@"; return ;;
+          esac
+        done
+        __kouen_hermes_next --remote "$@"
       }
     fi
     """
@@ -267,6 +387,72 @@ public enum ShellIntegration {
             else
                 __kouen_claude_next $argv
             end
+        end
+    end
+    # Antigravity (agy) session mode
+    if set -q KOUEN; and test "$KOUEN_AGY_SESSION_MODE" = remote-control; and not set -q __kouen_agy_wrapped
+        set -g __kouen_agy_wrapped 1
+        if functions -q agy
+            functions -c agy __kouen_agy_next
+        else
+            function __kouen_agy_next; command agy $argv; end
+        end
+        function agy
+            switch "$argv[1]"
+                case auth config doctor help remote-control status update version
+                    __kouen_agy_next $argv; return
+            end
+            for a in $argv
+                switch $a
+                    case -h --help -v --version --remote-control --rc
+                        __kouen_agy_next $argv; return
+                end
+            end
+            __kouen_agy_next --remote-control $argv
+        end
+    end
+    # GitHub Copilot session mode
+    if set -q KOUEN; and test "$KOUEN_COPILOT_SESSION_MODE" = remote-control; and not set -q __kouen_copilot_wrapped
+        set -g __kouen_copilot_wrapped 1
+        if functions -q copilot
+            functions -c copilot __kouen_copilot_next
+        else
+            function __kouen_copilot_next; command copilot $argv; end
+        end
+        function copilot
+            switch "$argv[1]"
+                case auth config help login logout status version
+                    __kouen_copilot_next $argv; return
+            end
+            for a in $argv
+                switch $a
+                    case -h --help -v --version --remote
+                        __kouen_copilot_next $argv; return
+                end
+            end
+            __kouen_copilot_next --remote $argv
+        end
+    end
+    # Hermes session mode
+    if set -q KOUEN; and test "$KOUEN_HERMES_SESSION_MODE" = remote-control; and not set -q __kouen_hermes_wrapped
+        set -g __kouen_hermes_wrapped 1
+        if functions -q hermes
+            functions -c hermes __kouen_hermes_next
+        else
+            function __kouen_hermes_next; command hermes $argv; end
+        end
+        function hermes
+            switch "$argv[1]"
+                case auth config help login status version
+                    __kouen_hermes_next $argv; return
+            end
+            for a in $argv
+                switch $a
+                    case -h --help -v --version --remote
+                        __kouen_hermes_next $argv; return
+                end
+            end
+            __kouen_hermes_next --remote $argv
         end
     end
     """
