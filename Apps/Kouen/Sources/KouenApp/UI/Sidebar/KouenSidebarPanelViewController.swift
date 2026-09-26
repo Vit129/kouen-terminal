@@ -1,5 +1,7 @@
 import AppKit
 import KouenCore
+import KouenIPC
+import KouenSettings
 import SwiftUI
 import os
 
@@ -609,11 +611,8 @@ final class KouenSidebarPanelViewController: NSViewController {
             onResume: { [weak self] record in
                 self?.resumeAgentSession(record)
             },
-            onResumeInWorktree: { [weak self] record in
-                self?.resumeAgentSessionInWorktree(record)
-            },
-            onContinueInNewSession: { [weak self] record in
-                self?.continueAgentSessionInNewSession(record)
+            onHandoff: { [weak self] record, targetKind in
+                self?.handoffAgentSession(record, targetKind: targetKind)
             }
         )
         let hosting = NSHostingView(rootView: historyView)
@@ -683,54 +682,68 @@ final class KouenSidebarPanelViewController: NSViewController {
         SessionCoordinator.shared.sessionLifecycleService.openDefaultTerminalLaunch(req)
     }
 
-    /// Resumes inside a fresh, isolated git worktree — same idea as P32's explicit
-    /// task-worktree creation (`addAgentTask`), just seeded with a resume command instead of
-    /// a blank shell. Requires the session's original project to be a git repo.
-    private func resumeAgentSessionInWorktree(_ record: AgentSessionRecord) {
-        guard let workspaceID = SessionCoordinator.shared.snapshot.activeWorkspace?.id else { return }
-        let manager = WorktreeManager()
-        guard let repoPath = manager.repoRoot(for: record.projectPath) else {
-            let alert = NSAlert()
-            alert.messageText = "Can't resume in worktree"
-            alert.informativeText = "\(record.projectPath) isn't inside a git repository."
-            alert.runModal()
-            return
-        }
+    /// Launches a new tab with the target agent, polls until the CLI is ready,
+    /// and injects a structured Handoff Brief formatted from the previous session using bracketed paste.
+    private func handoffAgentSession(_ record: AgentSessionRecord, targetKind: AgentKind) {
+        guard let workspaceID = SessionCoordinator.shared.snapshot.activeWorkspace?.id ?? SessionCoordinator.shared.snapshot.workspaces.first?.id else { return }
+        let settings = KouenSettings.load()
+        let mode = settings.sessionMode(for: targetKind)
+        let launchCmd = AgentLaunchCommands.launch(kind: targetKind, mode: mode, cwd: record.projectPath)
+        let brief = AgentHandoffBuilder.buildBrief(from: record, targetAgent: targetKind)
 
-        let sanitizedBranch = "resume-\(record.id)"
-            .lowercased()
-            .replacingOccurrences(of: #"[^a-z0-9-]+"#, with: "-", options: .regularExpression)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
-        guard let worktreePath = manager.create(repoPath: repoPath, sessionID: sanitizedBranch, branch: sanitizedBranch) else {
-            let alert = NSAlert()
-            alert.messageText = "Can't resume in worktree"
-            alert.informativeText = "Failed to create a worktree for this session (it may already exist)."
-            alert.runModal()
-            return
-        }
+        let coord = SessionCoordinator.shared
+        Task { @MainActor in
+            guard case let .tabID(tabID)? = await coord.requestDaemon(.newTab(
+                workspaceID: workspaceID,
+                cwd: record.projectPath,
+                shell: coord.settings.defaultShell
+            )) else {
+                await coord.syncFromDaemon()
+                return
+            }
 
-        SessionCoordinator.shared.addSession(
-            to: workspaceID,
-            cwd: worktreePath,
-            name: "Resume: \(record.title)",
-            worktreePath: worktreePath,
-            parentRepoPath: repoPath,
-            initialCommand: Self.resumeCommand(for: record)
-        )
+            let title = "Handoff: \(targetKind.displayName)"
+            await coord.requestDaemon(.renameTab(tabID: tabID, name: title))
+            await coord.syncFromDaemon()
+
+            guard let surfaceID = coord.splitPaneCoordinator.firstSurfaceID(forTab: tabID) else { return }
+            coord.setActiveSurface(surfaceID)
+            coord.terminalHosts.host(for: surfaceID)?.focusTerminal()
+
+            // 1. Launch the target agent CLI
+            await coord.requestDaemon(.sendData(
+                surfaceID: surfaceID.uuidString,
+                data: Data((launchCmd + "\r").utf8),
+                origin: .human
+            ))
+
+            // 2. Poll for the CLI to be ready (up to ~5 seconds)
+            var isReady = false
+            for _ in 0..<25 {
+                try? await Task.sleep(nanoseconds: 200_000_000)
+                if let resp = await coord.requestDaemon(.capturePane(surfaceID: surfaceID.uuidString, includeScrollback: false)),
+                   case let .text(output) = resp,
+                   AgentAttentionDetector.detectPrompt(in: output) != nil {
+                    isReady = true
+                    break
+                }
+            }
+
+            // Small safety buffer if prompt detected or timeout reached
+            if !isReady {
+                try? await Task.sleep(nanoseconds: 400_000_000)
+            }
+
+            // 3. Inject the Handoff Brief using bracketed paste
+            let pasteData = AgentHandoffBuilder.bracketedPasteData(for: brief)
+            await coord.requestDaemon(.sendData(
+                surfaceID: surfaceID.uuidString,
+                data: pasteData,
+                origin: .human
+            ))
+        }
     }
 
-    /// Resumes as a brand-new session (own tab-group in the sidebar) at the session's original
-    /// path, without touching git — for keeping the resumed conversation separate from
-    /// whatever's already open, without the isolation overhead of a worktree.
-    private func continueAgentSessionInNewSession(_ record: AgentSessionRecord) {
-        guard let workspaceID = SessionCoordinator.shared.snapshot.activeWorkspace?.id else { return }
-        SessionCoordinator.shared.addSession(
-            to: workspaceID,
-            cwd: record.projectPath,
-            name: "Resume: \(record.title)",
-            initialCommand: Self.resumeCommand(for: record)
-        )
-    }
 
     // Issues tab disabled across the system
     /*

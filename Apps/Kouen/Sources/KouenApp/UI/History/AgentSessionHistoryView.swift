@@ -152,19 +152,16 @@ public final class AgentSessionHistoryModel: ObservableObject {
 public struct AgentSessionHistoryView: View {
     @ObservedObject var model: AgentSessionHistoryModel
     var onResume: ((AgentSessionRecord) -> Void)?
-    var onResumeInWorktree: ((AgentSessionRecord) -> Void)?
-    var onContinueInNewSession: ((AgentSessionRecord) -> Void)?
+    var onHandoff: ((AgentSessionRecord, AgentKind) -> Void)?
 
     public init(
         model: AgentSessionHistoryModel,
         onResume: ((AgentSessionRecord) -> Void)? = nil,
-        onResumeInWorktree: ((AgentSessionRecord) -> Void)? = nil,
-        onContinueInNewSession: ((AgentSessionRecord) -> Void)? = nil
+        onHandoff: ((AgentSessionRecord, AgentKind) -> Void)? = nil
     ) {
         self.model = model
         self.onResume = onResume
-        self.onResumeInWorktree = onResumeInWorktree
-        self.onContinueInNewSession = onContinueInNewSession
+        self.onHandoff = onHandoff
     }
 
     public var body: some View {
@@ -380,6 +377,39 @@ public struct AgentSessionHistoryView: View {
         .buttonStyle(.plain)
     }
 
+    @ViewBuilder
+    private func handoffMenu(for record: AgentSessionRecord) -> some View {
+        let c = KouenDesign.chrome
+        let candidates = AgentLaunchCommands.configs.keys
+            .filter { $0 != .cursor && $0 != record.agentKind }
+            .sorted { $0.displayName < $1.displayName }
+
+        Menu {
+            ForEach(candidates, id: \.self) { target in
+                Button {
+                    onHandoff?(record, target)
+                } label: {
+                    Text("Handoff to \(target.displayName)")
+                }
+            }
+        } label: {
+            HStack(spacing: 3) {
+                Image(systemName: "arrowshape.turn.up.right.fill")
+                    .font(.system(size: 8.5))
+                Text("Handoff…")
+                    .font(.system(size: 10))
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 4)
+            .frame(maxWidth: .infinity)
+            .background(Color(nsColor: c.surfaceElevated))
+            .foregroundStyle(Color(nsColor: c.textSecondary))
+            .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+        }
+        .menuStyle(.borderlessButton)
+        .help("Start a new session with another agent using a handoff brief from this session")
+    }
+
     // MARK: - Session Card
     @ViewBuilder
     private func sessionCard(record: AgentSessionRecord) -> some View {
@@ -500,32 +530,19 @@ public struct AgentSessionHistoryView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
             }
 
-            // Action Buttons — always visible on the card itself, not hidden behind the expand
-            // toggle. 2x2 grid (not a single row) so "Resume in Worktree" / "Continue in New
-            // Session…" have room for their full label without wrapping.
-            VStack(spacing: 6) {
-                HStack(spacing: 6) {
-                    actionButton(icon: "arrow.triangle.branch", label: "Resume in Worktree", emphasized: true) {
-                        onResumeInWorktree?(record)
-                    }
-                    .help("Create an isolated git worktree and resume this session there")
-
-                    actionButton(icon: "play.fill", label: "Resume in New Tab", emphasized: true) {
-                        onResume?(record)
-                    }
-                    .help("Resume this session in a new tab, sharing the current session's worktree")
+            // Action Buttons
+            HStack(spacing: 6) {
+                actionButton(icon: "play.fill", label: "Resume", emphasized: true) {
+                    onResume?(record)
                 }
-                HStack(spacing: 6) {
-                    actionButton(icon: "plus.rectangle.on.rectangle", label: "Continue in New Session…") {
-                        onContinueInNewSession?(record)
-                    }
-                    .help("Resume as a new, separate session at the original project path")
+                .help("Resume this session in a new tab")
 
-                    actionButton(icon: "doc.on.doc", label: "Copy Session") {
-                        copySessionSummary(record)
-                    }
-                    .help("Copy title, project path, prompt, and latest turns to clipboard")
+                handoffMenu(for: record)
+
+                actionButton(icon: "doc.on.doc", label: "Copy") {
+                    copySessionSummary(record)
                 }
+                .help("Copy title, project path, prompt, and latest turns to clipboard")
             }
             .padding(.top, 2)
 

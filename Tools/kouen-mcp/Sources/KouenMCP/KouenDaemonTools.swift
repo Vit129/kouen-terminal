@@ -210,9 +210,18 @@ struct KouenDaemonTools: Sendable {
 
     // MARK: - Mutating daemon tools
 
-    func sendPaneText(surfaceId: String, text: String, bracketed _: Bool) async -> (AnyCodable?, JSONRPCError?) {
+    func sendPaneText(surfaceId: String, text: String, bracketed: Bool) async -> (AnyCodable?, JSONRPCError?) {
         guard isToolAllowed("sendPaneText") else { return (nil, disabledError("sendPaneText")) }
-        let result = await okResponse(for: .send(surfaceID: surfaceId, text: text, origin: .automation), expected: "send")
+        let payload: IPCRequest
+        if bracketed {
+            var data = Data("\u{1b}[200~".utf8)
+            data.append(Data(text.utf8))
+            data.append(Data("\u{1b}[201~".utf8))
+            payload = .sendData(surfaceID: surfaceId, data: data, origin: .automation)
+        } else {
+            payload = .send(surfaceID: surfaceId, text: text, origin: .automation)
+        }
+        let result = await okResponse(for: payload, expected: bracketed ? "sendData" : "send")
         if result.1 == nil { await notifyMCPActivity(surfaceId: surfaceId, tool: "sendPaneText") }
         return result
     }
@@ -559,7 +568,14 @@ struct KouenDaemonTools: Sendable {
                 break
             }
         }
-        _ = await send(.send(surfaceID: spawned.surfaceID, text: prompt + "\n", origin: .automation))
+        if prompt.contains("\n") {
+            var data = Data("\u{1b}[200~".utf8)
+            data.append(Data(prompt.utf8))
+            data.append(Data("\u{1b}[201~\n".utf8))
+            _ = await send(.sendData(surfaceID: spawned.surfaceID, data: data, origin: .automation))
+        } else {
+            _ = await send(.send(surfaceID: spawned.surfaceID, text: prompt + "\n", origin: .automation))
+        }
         await notifyMCPActivity(surfaceId: spawned.surfaceID, tool: "kouenSpawnWorker")
 
         return (toolResult(json: .object([
