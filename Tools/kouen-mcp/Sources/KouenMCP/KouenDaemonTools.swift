@@ -214,9 +214,7 @@ struct KouenDaemonTools: Sendable {
         guard isToolAllowed("sendPaneText") else { return (nil, disabledError("sendPaneText")) }
         let payload: IPCRequest
         if bracketed {
-            var data = Data("\u{1b}[200~".utf8)
-            data.append(Data(text.utf8))
-            data.append(Data("\u{1b}[201~".utf8))
+            let data = AgentHandoffBuilder.bracketedPasteData(for: text, submit: "")
             payload = .sendData(surfaceID: surfaceId, data: data, origin: .automation)
         } else {
             payload = .send(surfaceID: surfaceId, text: text, origin: .automation)
@@ -569,9 +567,7 @@ struct KouenDaemonTools: Sendable {
             }
         }
         if prompt.contains("\n") {
-            var data = Data("\u{1b}[200~".utf8)
-            data.append(Data(prompt.utf8))
-            data.append(Data("\u{1b}[201~\n".utf8))
+            let data = AgentHandoffBuilder.bracketedPasteData(for: prompt, submit: "\n")
             _ = await send(.sendData(surfaceID: spawned.surfaceID, data: data, origin: .automation))
         } else {
             _ = await send(.send(surfaceID: spawned.surfaceID, text: prompt + "\n", origin: .automation))

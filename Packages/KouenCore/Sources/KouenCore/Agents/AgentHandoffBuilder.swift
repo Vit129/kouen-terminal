@@ -47,16 +47,18 @@ public enum AgentHandoffBuilder: Sendable {
         lines.append("## Next Steps")
         lines.append("Please inspect `git status` and `git diff` to understand current progress, then continue working on the task.")
 
-        return lines.joined(separator: "\n")
+        return lines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// Wraps text in terminal bracketed-paste markers (`\e[200~` and `\e[201~`) followed by a carriage return (`\r`)
-    /// so the terminal program receives the multi-line input as a single atomic paste rather than individual lines.
-    public static func bracketedPasteData(for text: String) -> Data {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    /// Wraps text in terminal bracketed-paste markers (`\e[200~` … `\e[201~`) followed by `submit`,
+    /// so the terminal program receives multi-line input as one atomic paste. ESC bytes are stripped
+    /// from `text` first: an embedded `\e[201~` (e.g. terminal output quoted in a transcript) would
+    /// otherwise end the paste early and turn the rest into live keystrokes.
+    public static func bracketedPasteData(for text: String, submit: String = "\r") -> Data {
+        let safe = text.replacingOccurrences(of: "\u{1b}", with: "")
         var data = Data("\u{1b}[200~".utf8)
-        data.append(Data(trimmed.utf8))
-        data.append(Data("\u{1b}[201~\r".utf8))
+        data.append(Data(safe.utf8))
+        data.append(Data(("\u{1b}[201~" + submit).utf8))
         return data
     }
 }

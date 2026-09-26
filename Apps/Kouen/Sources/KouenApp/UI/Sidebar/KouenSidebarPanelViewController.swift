@@ -710,6 +710,14 @@ final class KouenSidebarPanelViewController: NSViewController {
             coord.setActiveSurface(surfaceID)
             coord.terminalHosts.host(for: surfaceID)?.focusTerminal()
 
+            func capture() async -> String? {
+                guard case let .text(output)? = await coord.requestDaemon(
+                    .capturePane(surfaceID: surfaceID.uuidString, includeScrollback: false)
+                ) else { return nil }
+                return output
+            }
+            let baseline = await capture() ?? ""
+
             // 1. Launch the target agent CLI
             await coord.requestDaemon(.sendData(
                 surfaceID: surfaceID.uuidString,
@@ -717,33 +725,44 @@ final class KouenSidebarPanelViewController: NSViewController {
                 origin: .human
             ))
 
-            // 2. Poll for the CLI to be ready (up to ~5 seconds)
+            // 2. Wait for the CLI to settle: screen changed from the pre-launch shell and then
+            // stayed unchanged for 3 polls (~600ms). A blocking prompt (e.g. Claude's folder-trust
+            // dialog) must never receive the brief + Enter, so bail out on one.
+            // ponytail: output-stability is a heuristic, not a true "input ready" signal — upgrade
+            // to per-agent idle-prompt signatures if a CLI renders a spinner while idle.
             var isReady = false
-            for _ in 0..<25 {
+            var last = ""
+            var stableCount = 0
+            for _ in 0..<40 {
                 try? await Task.sleep(nanoseconds: 200_000_000)
-                if let resp = await coord.requestDaemon(.capturePane(surfaceID: surfaceID.uuidString, includeScrollback: false)),
-                   case let .text(output) = resp,
-                   AgentAttentionDetector.detectPrompt(in: output) != nil {
-                    isReady = true
-                    break
+                guard let output = await capture() else { continue }
+                if let prompt = AgentAttentionDetector.detectPrompt(in: output), prompt.kind != .input { break }
+                if output == last, output != baseline, !output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    stableCount += 1
+                    if stableCount >= 3 { isReady = true; break }
+                } else {
+                    stableCount = 0
                 }
+                last = output
             }
 
-            // Small safety buffer if prompt detected or timeout reached
-            if !isReady {
-                try? await Task.sleep(nanoseconds: 400_000_000)
+            guard isReady else {
+                // Not safe to type into the pane — leave the brief on the clipboard instead.
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(brief, forType: .string)
+                Logger(subsystem: "com.vit129.kouen", category: "sidebar")
+                    .info("Handoff: \(targetKind.displayName, privacy: .public) not ready or showing a prompt; brief copied to clipboard")
+                return
             }
 
             // 3. Inject the Handoff Brief using bracketed paste
-            let pasteData = AgentHandoffBuilder.bracketedPasteData(for: brief)
             await coord.requestDaemon(.sendData(
                 surfaceID: surfaceID.uuidString,
-                data: pasteData,
+                data: AgentHandoffBuilder.bracketedPasteData(for: brief),
                 origin: .human
             ))
         }
     }
-
 
     // Issues tab disabled across the system
     /*
