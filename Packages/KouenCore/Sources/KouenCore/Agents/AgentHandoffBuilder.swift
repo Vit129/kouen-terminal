@@ -21,17 +21,12 @@ public enum AgentHandoffBuilder: Sendable {
         }
         lines.append("")
 
-        // 2. Recent Context
-        if !record.latestTurns.isEmpty {
-            lines.append("## Recent Progress & Discussion")
-            let turnsToInclude = record.latestTurns.suffix(3)
-            for turn in turnsToInclude {
-                let role = turn.role.capitalized
-                let content = turn.content.trimmingCharacters(in: .whitespacesAndNewlines)
-                lines.append("**[\(role)]** \(content)")
-            }
-            lines.append("")
-        }
+        // 2. Full context by reference, not by copy (same rule as the `handoff` skill: don't
+        // duplicate what already lives in an artifact). Truncated turns cost tokens and cut
+        // sentences mid-way; every agent can open the transcript itself when it needs more.
+        lines.append("## Previous Session")
+        lines.append("Full \(record.agentKind.displayName) transcript (read only if you need more context): `\(record.transcriptPath)`")
+        lines.append("")
 
         // 3. Handoff note from repository if exists (SignalFileRouter)
         if let handoff = SignalFileRouter.handoffInfo(at: record.projectPath) {
