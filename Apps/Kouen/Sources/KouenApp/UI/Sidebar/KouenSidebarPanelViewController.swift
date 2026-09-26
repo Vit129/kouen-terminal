@@ -682,20 +682,35 @@ final class KouenSidebarPanelViewController: NSViewController {
         SessionCoordinator.shared.sessionLifecycleService.openDefaultTerminalLaunch(req)
     }
 
+    /// The session's original path, or — when it's gone (e.g. its worktree was removed) — the repo
+    /// root of its nearest surviving ancestor, so the brief's `git status` step still lands in the repo.
+    nonisolated static func handoffDirectory(for projectPath: String) -> String {
+        let fm = FileManager.default
+        var isDir: ObjCBool = false
+        if fm.fileExists(atPath: projectPath, isDirectory: &isDir), isDir.boolValue { return projectPath }
+        var dir = URL(fileURLWithPath: projectPath)
+        while dir.path != "/" {
+            dir.deleteLastPathComponent()
+            if fm.fileExists(atPath: dir.path) { return WorktreeManager().repoRoot(for: dir.path) ?? dir.path }
+        }
+        return NSHomeDirectory()
+    }
+
     /// Launches a new tab with the target agent, polls until the CLI is ready,
     /// and injects a structured Handoff Brief formatted from the previous session using bracketed paste.
     private func handoffAgentSession(_ record: AgentSessionRecord, targetKind: AgentKind) {
         guard let workspaceID = SessionCoordinator.shared.snapshot.activeWorkspace?.id ?? SessionCoordinator.shared.snapshot.workspaces.first?.id else { return }
         let settings = KouenSettings.load()
         let mode = settings.sessionMode(for: targetKind)
-        let launchCmd = AgentLaunchCommands.launch(kind: targetKind, mode: mode, cwd: record.projectPath)
+        let cwd = Self.handoffDirectory(for: record.projectPath)
+        let launchCmd = AgentLaunchCommands.launch(kind: targetKind, mode: mode, cwd: cwd)
         let brief = AgentHandoffBuilder.buildBrief(from: record, targetAgent: targetKind)
 
         let coord = SessionCoordinator.shared
         Task { @MainActor in
             guard case let .tabID(tabID)? = await coord.requestDaemon(.newTab(
                 workspaceID: workspaceID,
-                cwd: record.projectPath,
+                cwd: cwd,
                 shell: coord.settings.defaultShell
             )) else {
                 await coord.syncFromDaemon()
