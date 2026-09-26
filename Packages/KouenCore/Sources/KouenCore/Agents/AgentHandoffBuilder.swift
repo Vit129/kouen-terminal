@@ -1,4 +1,5 @@
 import Foundation
+import os
 import KouenIPC
 
 /// Formats cross-agent handoff briefs and encodes bracketed paste payloads for terminal injection.
@@ -89,6 +90,10 @@ public enum AgentHandoffBuilder: Sendable {
                 process.executableURL = URL(fileURLWithPath: shell)
                 process.arguments = ["-l", "-c", "exec \"$@\"", "kouen-handoff"] + args
                 process.currentDirectoryURL = URL(fileURLWithPath: cwd)
+                // Stop hooks (e.g. skill-capture) can make `-p` print their reply instead of the doc.
+                var env = ProcessInfo.processInfo.environment
+                env["CLAUDE_SKILL_CAPTURE"] = "0"
+                process.environment = env
                 process.standardInput = FileHandle.nullDevice
                 process.standardError = FileHandle.nullDevice
                 let out = Pipe()
@@ -100,10 +105,26 @@ public enum AgentHandoffBuilder: Sendable {
                 process.waitUntilExit()
                 killer.cancel()
                 let text = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
-                continuation.resume(returning: process.terminationStatus == 0 && !text.isEmpty ? text : nil)
+                guard process.terminationStatus == 0 else {
+                    logger.info("handoff note: \(record.agentKind.rawValue, privacy: .public) exited \(process.terminationStatus) (timeout/quota?)")
+                    continuation.resume(returning: nil); return
+                }
+                guard looksLikeHandoffDoc(text) else {
+                    logger.info("handoff note: \(record.agentKind.rawValue, privacy: .public) output rejected by sanity gate (\(text.count) chars)")
+                    continuation.resume(returning: nil); return
+                }
+                continuation.resume(returning: text)
             }
         }
     }
+
+    /// Exit 0 isn't enough: a usage-limit notice or a hook's reply would otherwise become the
+    /// note the brief tells the target to "read first". Require a real markdown document.
+    static func looksLikeHandoffDoc(_ text: String) -> Bool {
+        text.count >= 300 && text.components(separatedBy: "\n").contains { $0.hasPrefix("#") }
+    }
+
+    private static let logger = Logger(subsystem: "com.vit129.kouen", category: "handoff")
 
     /// Wraps text in terminal bracketed-paste markers (`\e[200~` … `\e[201~`) followed by `submit`,
     /// so the terminal program receives multi-line input as one atomic paste. ESC bytes are stripped

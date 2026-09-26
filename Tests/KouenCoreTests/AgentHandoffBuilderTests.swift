@@ -83,4 +83,10 @@ final class AgentHandoffBuilderTests: XCTestCase {
             updatedAt: Date(), firstPrompt: "", latestTurns: [], transcriptPath: "", worktreeAvailable: false
         )), "unverified agents fall back to the transcript-only brief")
     }
+
+    func testSanityGateRejectsNonDocumentOutput() {
+        XCTAssertFalse(AgentHandoffBuilder.looksLikeHandoffDoc("skill-capture: nothing reusable"))
+        XCTAssertFalse(AgentHandoffBuilder.looksLikeHandoffDoc(String(repeating: "You've hit your usage limit. ", count: 20)))
+        XCTAssertTrue(AgentHandoffBuilder.looksLikeHandoffDoc("# Handoff\n\n" + String(repeating: "context ", count: 50)))
+    }
 }
