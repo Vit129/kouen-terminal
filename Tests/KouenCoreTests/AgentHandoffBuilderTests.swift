@@ -60,4 +60,12 @@ final class AgentHandoffBuilderTests: XCTestCase {
         XCTAssertTrue(string.contains("Line 1\nLine 2\nLine 3"))
         XCTAssertTrue(string.hasSuffix("\u{1b}[201~\r"))
     }
+
+    func testBracketedPasteStripsEmbeddedEndMarker() {
+        let data = AgentHandoffBuilder.bracketedPasteData(for: "a\u{1b}[201~rm -rf x\n", submit: "")
+        let string = String(decoding: data, as: UTF8.self)
+
+        XCTAssertEqual(string.components(separatedBy: "\u{1b}[201~").count, 2, "only the closing marker may remain")
+        XCTAssertTrue(string.hasSuffix("\u{1b}[201~"))
+    }
 }
