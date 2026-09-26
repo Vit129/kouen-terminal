@@ -740,17 +740,26 @@ final class KouenSidebarPanelViewController: NSViewController {
                 origin: .human
             ))
 
-            // 2. Wait for the CLI to settle: screen changed from the pre-launch shell and then
-            // stayed unchanged for 3 polls (~600ms). A blocking prompt (e.g. Claude's folder-trust
-            // dialog) must never receive the brief + Enter, so bail out on one.
+            // 2. Wait for the CLI to settle: the tab's foreground process must no longer be the
+            // shell (so the paste can't land in zsh while the agent is still booting), then the
+            // screen must stay unchanged for 3 polls (~600ms). A blocking prompt (e.g. Claude's
+            // folder-trust dialog) must never receive the brief + Enter, so bail out on one.
             // ponytail: output-stability is a heuristic, not a true "input ready" signal — upgrade
             // to per-agent idle-prompt signatures if a CLI renders a spinner while idle.
+            let shells: Set<String> = ["zsh", "bash", "fish", "sh", "dash", "tcsh", "nu", "login",
+                                       URL(fileURLWithPath: coord.settings.defaultShell).lastPathComponent]
+            @MainActor func agentInForeground() -> Bool {
+                let tab = coord.snapshot.workspaces.flatMap(\.sessions).flatMap(\.tabs).first { $0.id == tabID }
+                guard let cmd = tab?.currentCommand?.trimmingCharacters(in: CharacterSet(charactersIn: "-")),
+                      !cmd.isEmpty else { return false }
+                return !shells.contains(cmd)
+            }
             var isReady = false
             var last = ""
             var stableCount = 0
-            for _ in 0..<40 {
+            for _ in 0..<75 {
                 try? await Task.sleep(nanoseconds: 200_000_000)
-                guard let output = await capture() else { continue }
+                guard agentInForeground(), let output = await capture() else { stableCount = 0; continue }
                 if let prompt = AgentAttentionDetector.detectPrompt(in: output), prompt.kind != .input { break }
                 if output == last, output != baseline, !output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     stableCount += 1
