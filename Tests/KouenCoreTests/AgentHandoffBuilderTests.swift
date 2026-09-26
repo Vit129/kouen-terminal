@@ -68,4 +68,19 @@ final class AgentHandoffBuilderTests: XCTestCase {
         XCTAssertEqual(string.components(separatedBy: "\u{1b}[201~").count, 2, "only the closing marker may remain")
         XCTAssertTrue(string.hasSuffix("\u{1b}[201~"))
     }
+
+    func testBriefPointsAtHandoffNoteWhenGenerated() {
+        let record = AgentSessionRecord(
+            id: "s", agentKind: .antigravity, title: "t", projectPath: "/nonexistent", projectName: "p",
+            messageCount: 1, updatedAt: Date(), firstPrompt: "goal", latestTurns: [],
+            transcriptPath: "/x.jsonl", worktreeAvailable: false
+        )
+        let brief = AgentHandoffBuilder.buildBrief(from: record, targetAgent: .claudeCode, handoffNotePath: "/tmp/kouen-handoff-s.md")
+        XCTAssertTrue(brief.contains("read this first: `/tmp/kouen-handoff-s.md`"))
+        XCTAssertTrue(brief.contains("`/x.jsonl`"), "transcript stays as the fallback reference")
+        XCTAssertNil(AgentHandoffBuilder.headlessHandoffArguments(for: AgentSessionRecord(
+            id: "s", agentKind: .aider, title: "t", projectPath: "/", projectName: "p", messageCount: 1,
+            updatedAt: Date(), firstPrompt: "", latestTurns: [], transcriptPath: "", worktreeAvailable: false
+        )), "unverified agents fall back to the transcript-only brief")
+    }
 }

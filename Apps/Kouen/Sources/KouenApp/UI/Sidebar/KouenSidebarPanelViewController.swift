@@ -704,7 +704,6 @@ final class KouenSidebarPanelViewController: NSViewController {
         let mode = settings.sessionMode(for: targetKind)
         let cwd = Self.handoffDirectory(for: record.projectPath)
         let launchCmd = AgentLaunchCommands.launch(kind: targetKind, mode: mode, cwd: cwd)
-        let brief = AgentHandoffBuilder.buildBrief(from: record, targetAgent: targetKind)
 
         let coord = SessionCoordinator.shared
         Task { @MainActor in
@@ -716,6 +715,18 @@ final class KouenSidebarPanelViewController: NSViewController {
                 await coord.syncFromDaemon()
                 return
             }
+
+            // 0. Have the source agent write a handoff note (the `handoff` skill for Claude, its
+            // instructions for others). Kouen writes the file itself — headless runs can't
+            // answer a Write permission prompt. Failure → transcript-only brief.
+            await coord.requestDaemon(.renameTab(tabID: tabID, name: "Handoff: \(record.agentKind.displayName) writing note…"))
+            await coord.syncFromDaemon()
+            var notePath: String?
+            if let note = await AgentHandoffBuilder.generateHandoffNote(for: record) {
+                let url = FileManager.default.temporaryDirectory.appendingPathComponent("kouen-handoff-\(record.id).md")
+                if (try? note.write(to: url, atomically: true, encoding: .utf8)) != nil { notePath = url.path }
+            }
+            let brief = AgentHandoffBuilder.buildBrief(from: record, targetAgent: targetKind, handoffNotePath: notePath)
 
             let title = "Handoff: \(targetKind.displayName)"
             await coord.requestDaemon(.renameTab(tabID: tabID, name: title))
