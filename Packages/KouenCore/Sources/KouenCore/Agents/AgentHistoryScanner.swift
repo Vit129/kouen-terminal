@@ -641,7 +641,7 @@ public actor AgentHistoryScanner {
         return records
     }
 
-    private func parseAntigravityTranscript(sessionID: String, fileURL: URL) -> AgentSessionRecord? {
+    func parseAntigravityTranscript(sessionID: String, fileURL: URL) -> AgentSessionRecord? {
         guard let data = try? Data(contentsOf: fileURL, options: .mappedIfSafe),
               let string = String(data: data, encoding: .utf8) else { return nil }
 
@@ -711,7 +711,9 @@ public actor AgentHistoryScanner {
             let type = json["type"] as? String ?? ""
             let content = json["content"] as? String ?? ""
 
-            if !content.isEmpty {
+            // Only the real conversation — GENERIC (tool output), SYSTEM_MESSAGE and CHECKPOINT
+            // entries would otherwise show up (and get handed off) as "AGENT" turns.
+            if !content.isEmpty, type == "USER_INPUT" || type == "PLANNER_RESPONSE" {
                 let role = (type == "USER_INPUT") ? "YOU" : "AGENT"
                 var displayContent = content
                 if let rangeStart = displayContent.range(of: "<USER_REQUEST>"),
