@@ -25,8 +25,8 @@ final class AgentHandoffBuilderTests: XCTestCase {
 
         XCTAssertTrue(brief.contains("Task Handoff from Claude Code to Codex"))
         XCTAssertTrue(brief.contains("Please fix the crash in JSON parser"))
-        XCTAssertTrue(brief.contains("**[User]** Did you run tests?"))
-        XCTAssertTrue(brief.contains("**[Assistant]** Yes, 3 tests passed."))
+        XCTAssertTrue(brief.contains("`/path/to/transcript.jsonl`"))
+        XCTAssertFalse(brief.contains("Did you run tests?"), "turns are referenced via the transcript, not copied")
         XCTAssertTrue(brief.contains("Please inspect `git status` and `git diff`"))
     }
 
