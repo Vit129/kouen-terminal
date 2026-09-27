@@ -450,8 +450,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/FileEditor/SyntaxTextView.swift": {
-    "mtime": 1790151417.8873992,
-    "ast_hash": "d1eb9bafa2e5d3c3cee5a0bef764a6b7",
+    "mtime": 1790512557.2288792,
+    "ast_hash": "e5fc907a81f560e16c770e477ea0cd7f",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/FileEditor/ViEngine.swift": {
@@ -665,7 +665,7 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Sidebar/KouenSidebarPanelViewController.swift": {
-    "mtime": 1790261224.988341,
+    "mtime": 1790403987.505089,
     "ast_hash": "4de530e8221e3483673de25baec76105",
     "semantic_hash": ""
   },
@@ -985,8 +985,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/KouenVersion.swift": {
-    "mtime": 1790257675.9795227,
-    "ast_hash": "37a600b970174633451f2e1b4f2b9532",
+    "mtime": 1790265113.0049944,
+    "ast_hash": "c2ffbae503b3b7e650a867c49c66f7b0",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Layouts/LayoutTemplate.swift": {
@@ -1075,8 +1075,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/GeneratedReleaseNotes.swift": {
-    "mtime": 1790257675.9796891,
-    "ast_hash": "6cafd1ade403a8643375f5ad7b946970",
+    "mtime": 1790265116.8702774,
+    "ast_hash": "4feca2ce17f1fa3f58c9e17c9623d77b",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/ReleaseNotes.swift": {
@@ -3150,7 +3150,7 @@
     "semantic_hash": ""
   },
   "Tools/kouen-mcp/Sources/KouenMCP/KouenDaemonTools.swift": {
-    "mtime": 1790261224.9907918,
+    "mtime": 1790403987.5058632,
     "ast_hash": "eb3c3ccd79b1ccfa6e40dc8c0dc2ca2a",
     "semantic_hash": ""
   },
@@ -4250,7 +4250,7 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/History/AgentSessionHistoryView.swift": {
-    "mtime": 1790257675.976961,
+    "mtime": 1790403987.5045595,
     "ast_hash": "91afe817259cc587ac9eeb32171d41dc",
     "semantic_hash": ""
   },
@@ -4442,6 +4442,11 @@
   "Tests/KouenDaemonTests/AgentRemoteControlDaemonServiceTests.swift": {
     "mtime": 1790264102.7223005,
     "ast_hash": "1b3df84f839202c51430059a87f94d26",
+    "semantic_hash": ""
+  },
+  "Tests/KouenAppTests/SyntaxLineIndexTests.swift": {
+    "mtime": 1790512631.3147588,
+    "ast_hash": "da3cb41456cf9e5527668eb82c4b1afd",
     "semantic_hash": ""
   }
 }
