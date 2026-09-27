@@ -51,17 +51,9 @@ public enum AgentHandoffBuilder: Sendable {
 
     // MARK: - Source-agent handoff note
 
-    /// The `mattpocock-skills:handoff` skill's instructions, for agents that don't have the skill
-    /// installed (Codex). Asks for the doc on stdout — a headless run can't answer a Write permission prompt.
-    static let handoffInstructions = """
-        Write a handoff document summarising this conversation so a fresh agent can continue the work. \
-        Include a "suggested skills" section naming skills the next agent should use. \
-        Do not duplicate content already captured in other artifacts (specs, plans, ADRs, issues, commits, diffs); \
-        reference them by path or URL instead. Redact any sensitive information such as API keys, passwords, or PII. \
-        Output the full document as your final reply; do not save any file.
-        """
-
-    /// argv for resuming `record` headlessly and printing a handoff doc; `nil` when that agent
+    /// argv for resuming `record` headlessly and running the mattpocock `handoff` skill (each agent
+    /// has it installed; the doc is also requested on stdout since a headless run can't answer a
+    /// Write permission prompt); `nil` when that agent
     /// has no verified non-interactive resume (caller falls back to the transcript-only brief).
     public static func headlessHandoffArguments(for record: AgentSessionRecord) -> [String]? {
         switch record.agentKind {
@@ -73,7 +65,9 @@ public enum AgentHandoffBuilder: Sendable {
             return ["agy", "--conversation", record.id, "-p",
                     "/handoff Output the full document as your final reply as well."]
         case .codex:
-            return ["codex", "exec", "--skip-git-repo-check", "resume", record.id, handoffInstructions]
+            // `$name` is Codex's skill mention; `handoff` lives in ~/.codex/skills/.
+            return ["codex", "exec", "--skip-git-repo-check", "resume", record.id,
+                    "$handoff Output the full document as your final reply as well."]
         default:
             return nil
         }
