@@ -214,6 +214,25 @@ final class HeadlessCLIAdapterTests: XCTestCase {
         XCTAssertEqual(Array(args.drop { $0 != "--session-id" }.prefix(2)), ["--session-id", id.uuidString])
     }
 
+    // MARK: - Session-id capture (headless-worker-followup). Lines captured from real CLI output 2026-09-27.
+
+    func test_TS0001_claudeInitLineEmitsSessionID() {
+        let line = #"{"type":"system","subtype":"init","session_id":"227205dd-b2aa-4c46-af32-b6c4896bb4c4","cwd":"/tmp"}"#
+        XCTAssertEqual(ClaudeAdapter().parseLine(Data(line.utf8)), [.sessionID("227205dd-b2aa-4c46-af32-b6c4896bb4c4")])
+    }
+
+    func test_TS0002_agyResultLineEmitsResultAndSessionID() {
+        let line = #"{"event":"result","result":{"conversation_id":"917076a8-68ed-44d8-ae22-cefe1c0e7e74","status":"SUCCESS","response":"done"}}"#
+        let events = AgyAdapter().parseLine(Data(line.utf8))
+        XCTAssertTrue(events.contains(.sessionID("917076a8-68ed-44d8-ae22-cefe1c0e7e74")))
+        XCTAssertTrue(events.contains { if case .result(text: "done", _, isError: false) = $0 { return true }; return false })
+    }
+
+    func test_TS0003_codexThreadStartedEmitsSessionID() {
+        let line = #"{"type":"thread.started","thread_id":"01a0cd30-2bf7-7ca0-90dc-f99dbe0a661c"}"#
+        XCTAssertEqual(CodexAdapter().parseLine(Data(line.utf8)), [.sessionID("01a0cd30-2bf7-7ca0-90dc-f99dbe0a661c")])
+    }
+
     func testHarnessRoutesParseLineToTheRunsOwnAdapter() async {
         // Exercises the engine's per-run adapter lookup added for multi-adapter support —
         // feeding a Codex-shaped line through with `agentKind: .codex` must decode using

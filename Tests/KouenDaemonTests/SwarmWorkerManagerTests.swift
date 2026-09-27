@@ -6,14 +6,14 @@ import XCTest
 /// state shared across a sync closure call and the test's own thread.
 private final class CallRecorder: @unchecked Sendable {
     private let lock = NSLock()
-    private var _harnessCalls: [(id: UUID, prompt: String, cwd: String)] = []
+    private var _harnessCalls: [(id: UUID, prompt: String, cwd: String, resume: UUID?)] = []
     private var _surfaceCalls: [(surfaceID: String, text: String)] = []
     private var _closeCalls: [String] = []
     private var _cancelCalls: [UUID] = []
     private var _harnessSummaries: [UUID: ClaudeCodeHarness.RunSummary] = [:]
 
-    func recordHarness(id: UUID, prompt: String, cwd: String) {
-        lock.lock(); _harnessCalls.append((id, prompt, cwd)); lock.unlock()
+    func recordHarness(id: UUID, prompt: String, cwd: String, resume: UUID? = nil) {
+        lock.lock(); _harnessCalls.append((id, prompt, cwd, resume)); lock.unlock()
     }
     /// Lets a test control what `getHarnessRun(id)` reports, to exercise
     /// `SwarmWorkerManager`'s completion-poll loop deterministically.
@@ -33,7 +33,7 @@ private final class CallRecorder: @unchecked Sendable {
         lock.lock(); _cancelCalls.append(id); lock.unlock()
     }
 
-    var harnessCalls: [(id: UUID, prompt: String, cwd: String)] { lock.lock(); defer { lock.unlock() }; return _harnessCalls }
+    var harnessCalls: [(id: UUID, prompt: String, cwd: String, resume: UUID?)] { lock.lock(); defer { lock.unlock() }; return _harnessCalls }
     var surfaceCalls: [(surfaceID: String, text: String)] { lock.lock(); defer { lock.unlock() }; return _surfaceCalls }
     var closeCalls: [String] { lock.lock(); defer { lock.unlock() }; return _closeCalls }
     var cancelCalls: [UUID] { lock.lock(); defer { lock.unlock() }; return _cancelCalls }
@@ -51,8 +51,8 @@ final class SwarmWorkerManagerTests: XCTestCase {
             createPTYSurface: { _ in surfaceID },
             sendToSurface: { sid, text in recorder.recordSurface(sid, text) },
             closeSurface: { sid in recorder.recordClose(sid) },
-            startHarnessRun: { id, _, prompt, cwd in
-                recorder.recordHarness(id: id, prompt: prompt, cwd: cwd)
+            startHarnessRun: { id, _, prompt, cwd, resume in
+                recorder.recordHarness(id: id, prompt: prompt, cwd: cwd, resume: resume)
                 return ClaudeCodeHarness.RunSummary(id: id, state: .running, cwd: cwd, startedAt: Date())
             },
             cancelHarnessRun: { id in
@@ -106,7 +106,7 @@ final class SwarmWorkerManagerTests: XCTestCase {
         XCTAssertEqual(recorder.surfaceCalls.count, 0)
     }
 
-    func testSendToPTYWorkerTypesTextAndSetsWorking() async {
+    func test_TS0011_sendToPTYWorkerTypesTextAndSetsWorking() async {
         let recorder = CallRecorder()
         let manager = makeManager(recorder: recorder)
         let node = await manager.spawn(SwarmSpawnSpec(lane: .pty, agentKind: .codex, cwd: nil, initialCommand: "codex\n"))
@@ -122,16 +122,17 @@ final class SwarmWorkerManagerTests: XCTestCase {
         XCTAssertEqual(snapshot.nodes[0].status, .working)
     }
 
-    func testSendToStructuredWorkerReturnsFalse() async {
+    func test_TS0007_sendToStillRunningStructuredWorkerReturnsFalse() async {
         let recorder = CallRecorder()
         let manager = makeManager(recorder: recorder)
         let node = await manager.spawn(SwarmSpawnSpec(lane: .structured, agentKind: .claudeCode, cwd: "/tmp", initialCommand: "hello"))
 
         let result = await manager.send(taskID: node.id, text: "do the thing")
         XCTAssertFalse(result)
+        XCTAssertEqual(recorder.harnessCalls.count, 1, "no follow-up run while the first is still running")
     }
 
-    func testSendToUnknownTaskIDReturnsFalse() async {
+    func test_TS0009_sendToUnknownTaskIDReturnsFalse() async {
         let recorder = CallRecorder()
         let manager = makeManager(recorder: recorder)
         let result = await manager.send(taskID: UUID(), text: "do the thing")
@@ -225,5 +226,93 @@ final class SwarmWorkerManagerTests: XCTestCase {
         let updated = snapshot.nodes.first { $0.id == node.id }
         XCTAssertEqual(updated?.status, .failed)
         XCTAssertTrue(updated?.summary?.contains("timed out") ?? false, "summary was: \(String(describing: updated?.summary))")
+    }
+
+    // MARK: - Lane A follow-up turns (headless-worker-followup)
+
+    private static let sessionID = UUID(uuidString: "227205dd-b2aa-4c46-af32-b6c4896bb4c4")!
+
+    /// Polls `condition` until true or `timeout` — a wait-for-condition, not a fixed sleep.
+    private func waitUntil(timeout: Duration = .seconds(3), _ condition: () async -> Bool) async -> Bool {
+        let clock = ContinuousClock(); let end = clock.now + timeout
+        while clock.now < end {
+            if await condition() { return true }
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+        return false
+    }
+
+    private func status(_ manager: SwarmWorkerManager, _ id: UUID) async -> SwarmTaskStatus? {
+        await manager.snapshot().nodes.first { $0.id == id }?.status
+    }
+
+    /// Spawns a structured worker whose first run has finished with a captured session id.
+    private func finishedWorker(_ recorder: CallRecorder, _ manager: SwarmWorkerManager, sessionID: String? = sessionID.uuidString.lowercased()) async -> SwarmTaskNode {
+        let node = await manager.spawn(SwarmSpawnSpec(lane: .structured, agentKind: .codex, cwd: "/repo", initialCommand: "turn 1"))
+        var done = ClaudeCodeHarness.RunSummary(id: node.id, state: .succeeded, cwd: "/repo", startedAt: Date(), resultText: "first")
+        done.agentSessionID = sessionID
+        recorder.setHarnessSummary(node.id, done)
+        let synced = await waitUntil { await self.status(manager, node.id) == .succeeded }
+        XCTAssertTrue(synced, "first run should sync to succeeded")
+        return node
+    }
+
+    func test_TS0005_followUpStartsResumedRunWithCapturedSessionID() async {
+        let recorder = CallRecorder()
+        let manager = makeManager(recorder: recorder)
+        let node = await finishedWorker(recorder, manager)
+
+        let sent = await manager.send(taskID: node.id, text: "turn 2")
+
+        XCTAssertTrue(sent)
+        XCTAssertEqual(recorder.harnessCalls.count, 2)
+        let followUp = recorder.harnessCalls[1]
+        XCTAssertEqual(followUp.prompt, "turn 2")
+        XCTAssertEqual(followUp.cwd, "/repo")
+        XCTAssertEqual(followUp.resume, Self.sessionID)
+        XCTAssertNotEqual(followUp.id, node.id, "each turn gets its own harness run id")
+        let working = await status(manager, node.id)
+        XCTAssertEqual(working, .working)
+    }
+
+    func test_TS0006_followUpCompletionSyncsFromTheNewRun() async {
+        let recorder = CallRecorder()
+        let manager = makeManager(recorder: recorder)
+        let node = await finishedWorker(recorder, manager)
+        _ = await manager.send(taskID: node.id, text: "turn 2")
+        let runID = recorder.harnessCalls[1].id
+
+        recorder.setHarnessSummary(runID, ClaudeCodeHarness.RunSummary(id: runID, state: .failed, cwd: "/repo", startedAt: Date(), resultText: "second"))
+
+        let synced = await waitUntil { await self.status(manager, node.id) == .failed }
+        XCTAssertTrue(synced)
+        let summary = await manager.snapshot().nodes.first { $0.id == node.id }?.summary
+        XCTAssertEqual(summary, "second")
+    }
+
+    func test_TS0008_followUpWithoutCapturedSessionIDReturnsFalse() async {
+        let recorder = CallRecorder()
+        let manager = makeManager(recorder: recorder)
+        let node = await finishedWorker(recorder, manager, sessionID: nil)
+
+        let sent = await manager.send(taskID: node.id, text: "turn 2")
+
+        XCTAssertFalse(sent)
+        XCTAssertEqual(recorder.harnessCalls.count, 1)
+    }
+
+    func test_TS0010_terminateAfterFollowUpCancelsTheCurrentRun() async {
+        let recorder = CallRecorder()
+        let manager = makeManager(recorder: recorder)
+        let node = await finishedWorker(recorder, manager)
+        _ = await manager.send(taskID: node.id, text: "turn 2")
+        let runID = recorder.harnessCalls[1].id
+
+        let terminated = await manager.terminate(taskID: node.id)
+
+        XCTAssertTrue(terminated)
+        XCTAssertEqual(recorder.cancelCalls.last, runID)
+        let cancelled = await status(manager, node.id)
+        XCTAssertEqual(cancelled, .cancelled)
     }
 }

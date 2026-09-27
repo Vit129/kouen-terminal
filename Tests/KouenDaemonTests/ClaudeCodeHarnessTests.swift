@@ -32,6 +32,16 @@ final class ClaudeCodeHarnessTests: XCTestCase {
         XCTAssertEqual(summary.totalCostUSD, 0.261165)
     }
 
+    func test_TS0004_parseLineStoresAgentSessionID() async {
+        let harness = ClaudeCodeHarness()
+        var summary = emptySummary()
+        let line = #"{"type":"thread.started","thread_id":"01a0cd30-2bf7-7ca0-90dc-f99dbe0a661c"}"#
+        await harness.parseLine(Data(line.utf8), into: &summary, agentKind: .codex)
+        XCTAssertEqual(summary.agentSessionID, "01a0cd30-2bf7-7ca0-90dc-f99dbe0a661c")
+        XCTAssertEqual(summary.state, .running, "a session-id line doesn't end the run")
+        XCTAssertNil(summary.resultText)
+    }
+
     func testParsesFailedResultLine() async {
         let harness = ClaudeCodeHarness()
         var summary = emptySummary()
