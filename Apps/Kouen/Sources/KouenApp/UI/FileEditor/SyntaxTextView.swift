@@ -24,6 +24,7 @@ final class SyntaxTextView: NSView {
     private var currentPrefix: String = ""
 
     var symbolIndex: WorkspaceSymbolIndex?
+    private var symbolReindex: DispatchWorkItem?
     var activeDiagnostics: [LSPDiagnostic] { diagnostics }
 
     /// Content as of the last `load()` (i.e. what's on disk) or the last successful save.
@@ -375,6 +376,9 @@ final class SyntaxTextView: NSView {
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.isAutomaticTextReplacementEnabled = false
         textView.usesFindBar = true
+        // Without this NSLayoutManager lays out the whole document on load/scroll — the main
+        // cost of opening a large file.
+        textView.layoutManager?.allowsNonContiguousLayout = true
         textView.isIncrementalSearchingEnabled = true
         scrollView.documentView = textView
 
@@ -602,10 +606,8 @@ private final class SyntaxLineNumberGutterView: NSView {
             .foregroundColor: c.textSecondary,
         ]
 
-        var lineNumber = 1
-        text.enumerateSubstrings(in: NSRange(location: 0, length: charRange.location), options: [.byLines, .substringNotRequired]) { _, _, _, _ in
-            lineNumber += 1
-        }
+        let inner = textView as? SyntaxTextViewInner
+        var lineNumber = inner?.lineNumber(at: charRange.location) ?? 1
 
         let diagnosticLines = Set(diagnostics.map { $0.range.start.line + 1 })
         let inset = textView.textContainerInset.height
@@ -614,11 +616,7 @@ private final class SyntaxLineNumberGutterView: NSView {
         // where N = visible lines and M = file length to cursor.
         let cursorLine: Int
         if relativeNumbers {
-            let cursorPos = textView.selectedRange().location
-            var ln = 1
-            text.enumerateSubstrings(in: NSRange(location: 0, length: cursorPos),
-                                     options: [.byLines, .substringNotRequired]) { _, _, _, _ in ln += 1 }
-            cursorLine = ln
+            cursorLine = inner?.lineNumber(at: textView.selectedRange().location) ?? 1
         } else {
             cursorLine = 0
         }
@@ -656,12 +654,17 @@ private final class SyntaxLineNumberGutterView: NSView {
 
 @MainActor
 enum SyntaxHighlighter {
+    static let maxHighlightLength = 300_000
+
     static func highlight(_ text: String, fileExtension ext: String) -> NSAttributedString {
         let font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
         let attributed = NSMutableAttributedString(string: text, attributes: [
             .font: font,
             .foregroundColor: NSColor(white: 0.9, alpha: 1),
         ])
+        // Whole-document regex passes on the main thread freeze the UI for large files
+        // (and re-run on every LSP diagnostics push); show them as plain text instead.
+        guard attributed.length <= maxHighlightLength else { return attributed }
         let fullRange = NSRange(location: 0, length: attributed.length)
         let comments = commentPattern(for: ext)
         let strings = stringPattern(for: ext)
@@ -823,6 +826,35 @@ final class SyntaxTextViewInner: NSTextView {
         didSet { needsDisplay = true }
     }
 
+    /// UTF-16 offsets of each line start, built lazily and dropped on any storage edit.
+    /// The gutter/diff drawing used to re-count lines from offset 0 on every redraw
+    /// (every scroll frame), which is O(file size) per frame on large files.
+    private var lineStarts: [Int]?
+    private var storageObserver: NSObjectProtocol?
+
+    /// 1-based line number containing `charIndex`.
+    /// ponytail: only `\n` counts as a line break (lone `\r` / U+2028 files mis-number); fine for source files.
+    func lineNumber(at charIndex: Int) -> Int {
+        if storageObserver == nil, let textStorage {
+            storageObserver = NotificationCenter.default.addObserver(
+                forName: NSTextStorage.didProcessEditingNotification, object: textStorage, queue: nil
+            ) { [weak self] _ in MainActor.assumeIsolated { self?.lineStarts = nil } }
+        }
+        let starts = lineStarts ?? {
+            var result = [0]
+            for (i, unit) in string.utf16.enumerated() where unit == 10 { result.append(i + 1) }
+            lineStarts = result
+            return result
+        }()
+        // Last start <= charIndex.
+        var lo = 0, hi = starts.count - 1
+        while lo < hi {
+            let mid = (lo + hi + 1) / 2
+            if starts[mid] <= charIndex { lo = mid } else { hi = mid - 1 }
+        }
+        return lo + 1
+    }
+
     override func keyDown(with event: NSEvent) {
         if let parent = parentView, parent.handleTextViewKeyDown(event) {
             return
@@ -853,10 +885,7 @@ final class SyntaxTextViewInner: NSTextView {
         let charRange = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
         let text = string as NSString
 
-        var lineNumber = 1
-        text.enumerateSubstrings(in: NSRange(location: 0, length: charRange.location), options: [.byLines, .substringNotRequired]) { _, _, _, _ in
-            lineNumber += 1
-        }
+        var lineNumber = lineNumber(at: charRange.location)
 
         let inset = textContainerInset.height
         let width = max(bounds.width, dirtyRect.maxX)
@@ -887,7 +916,14 @@ extension SyntaxTextView: NSTextViewDelegate {
             dismissCompletionPopup()
             return
         }
-        index.updateCurrentFileSymbols(text: textView.string)
+        // Re-scanning the whole buffer on every keystroke lags typing in large files.
+        symbolReindex?.cancel()
+        let reindex = DispatchWorkItem { [weak self, weak index] in
+            guard let self else { return }
+            index?.updateCurrentFileSymbols(text: self.textView.string)
+        }
+        symbolReindex = reindex
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: reindex)
         
         let selectedRange = textView.selectedRange()
         guard selectedRange.location != NSNotFound, selectedRange.length == 0 else {
