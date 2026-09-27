@@ -126,8 +126,8 @@ public final class DaemonServer: @unchecked Sendable {
             closeSurface: { surfaceID in
                 _ = registryRef.handle(.closeSurface(surfaceID: surfaceID))
             },
-            startHarnessRun: { id, agentKind, prompt, cwd in
-                await harness.start(id: id, agentKind: agentKind, prompt: prompt, cwd: cwd, profile: .edit, model: nil, effort: nil, resumeSessionID: nil)
+            startHarnessRun: { id, agentKind, prompt, cwd, resumeSessionID in
+                await harness.start(id: id, agentKind: agentKind, prompt: prompt, cwd: cwd, profile: .edit, model: nil, effort: nil, resumeSessionID: resumeSessionID)
             },
             cancelHarnessRun: { id in
                 await harness.cancel(id: id)

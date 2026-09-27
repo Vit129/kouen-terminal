@@ -201,7 +201,7 @@ struct ToolRegistry: Sendable {
                 param("headless", "boolean", "Agent Swarm Core: spawn with no Tab/Pane instead of a visible session (optional, default false). Supported headless agents: 'claude', 'codex', 'antigravity', 'copilot' — see kouenSwarmList/Input/Terminate for managing headless workers"),
             ]),
             toolDef("kouenSwarmList", "List Agent Swarm Core fleet workers (both headless-Claude and pty-backed lanes) and their status", []),
-            toolDef("kouenSwarmInput", "Type text into a headless Lane B (pty-backed) fleet worker's surface. No effect on a Lane A (structured/claude) worker — see tool description of kouenSpawnWorker's headless flag. Requires MCP policy allowlist or KOUEN_MCP_ALLOW_CONTROL=1", [
+            toolDef("kouenSwarmInput", "Type text into a headless Lane B (pty-backed) fleet worker's surface, or start a follow-up turn on a finished Lane A worker (claude/antigravity/codex; rejected while running) by resuming its CLI session. Requires MCP policy allowlist or KOUEN_MCP_ALLOW_CONTROL=1", [
                 param("taskId", "string", "Task id returned by kouenSpawnWorker(headless: true)"),
                 param("text", "string", "Text to type into the worker"),
             ]),

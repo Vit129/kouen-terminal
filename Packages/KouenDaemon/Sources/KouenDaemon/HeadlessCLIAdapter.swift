@@ -32,4 +32,5 @@ public protocol HeadlessCLIAdapter: Sendable {
 public enum HeadlessRunEvent: Sendable, Equatable {
     case assistantText(String)
     case result(text: String?, costUSD: Double?, isError: Bool)
+    case sessionID(String)
 }
