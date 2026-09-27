@@ -534,13 +534,14 @@ public final class DaemonServer: @unchecked Sendable {
                 handler(enabled)
                 send(.ok, to: fd)
                 continue
-            case let .ccRunStart(id, prompt, cwd, profile, model, effort):
+            case let .ccRunStart(id, prompt, cwd, profile, model, effort, agentKind, resumeSessionID):
                 Task { [weak self] in
                     guard let self else { return }
                     let profileValue = ClaudeCodeHarness.Profile(rawValue: profile) ?? .readonly
+                    let kind = agentKind.flatMap(AgentKind.init(rawValue:)) ?? .claudeCode
                     let summary = await self.claudeCodeHarness.start(
-                        id: id, prompt: prompt, cwd: cwd, profile: profileValue, model: model, effort: effort,
-                        resumeSessionID: nil
+                        id: id, agentKind: kind, prompt: prompt, cwd: cwd, profile: profileValue,
+                        model: model, effort: effort, resumeSessionID: resumeSessionID
                     )
                     self.queue.async { self.send(.ccRunInfo(Self.wireSummary(summary)), to: fd) }
                 }

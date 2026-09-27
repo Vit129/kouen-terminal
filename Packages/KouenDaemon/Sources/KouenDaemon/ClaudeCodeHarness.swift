@@ -126,6 +126,9 @@ public actor ClaudeCodeHarness {
         process.currentDirectoryURL = URL(fileURLWithPath: cwd)
         var env = ProcessInfo.processInfo.environment
         if let path = await resolvedPATH() { env["PATH"] = path }
+        // A resumed Claude run loads user settings (for plugin skills) and with them the user's
+        // Stop hooks — the skill-capture nudge would otherwise replace the final reply.
+        env["CLAUDE_SKILL_CAPTURE"] = "0"
         process.environment = env
         // Some adapters' CLIs (Codex's `exec`) read and append stdin even when a prompt is
         // given as an argument — closed explicitly so a daemon whose own stdin happens to be

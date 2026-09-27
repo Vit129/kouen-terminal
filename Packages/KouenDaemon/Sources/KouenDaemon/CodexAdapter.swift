@@ -16,9 +16,9 @@ import KouenCore
 /// always generates its own `thread_id` (visible only in `thread.started`), so unlike Claude,
 /// `id` here is never actually passed to the process. Resuming a specific run would need the
 /// engine to capture and store that reported `thread_id` separately from `id`, which is a
-/// separate not-yet-built slice (see agent-memory/plans/agent-swarm-core/design.md) — for now
-/// `resumeSessionID` is accepted but ignored, same scope boundary already established for
-/// Lane A follow-up turns generally.
+/// separate not-yet-built slice (see agent-memory/plans/agent-swarm-core/design.md).
+/// `resumeSessionID` therefore only continues an existing Codex session by its own id (e.g.
+/// from History), via `exec resume <id>`.
 ///
 /// `turn.completed` carries no final-text/success field of its own on a normal run —
 /// `parseLine` emits `.assistantText` (from `agent_message` items) and lets the engine's
@@ -62,8 +62,8 @@ public struct CodexAdapter: HeadlessCLIAdapter {
     /// never prompts for approval (there's no TTY to prompt on), so the sandbox flag alone is
     /// the entire permission boundary, same role Claude's `--allowedTools`/`--disallowedTools`
     /// play. `--skip-git-repo-check` makes headless runs robust regardless of whether `cwd`
-    /// happens to be on Codex's own trusted-directory list. `model`/`resumeSessionID` are
-    /// accepted per the protocol but `resumeSessionID` is a no-op (see the type's doc comment);
+    /// happens to be on Codex's own trusted-directory list. `resumeSessionID`
+    /// switches to `exec … resume <id> <prompt>` (see the type's doc comment);
     /// Codex `exec` exposes no reasoning-effort flag, so `effort` is also ignored.
     public func buildArguments(
         id: UUID, prompt: String, profile: ClaudeCodeHarness.Profile,
@@ -71,6 +71,8 @@ public struct CodexAdapter: HeadlessCLIAdapter {
     ) -> [String] {
         var args = ["exec", "--json", "--skip-git-repo-check", "-s", profile == .readonly ? "read-only" : "workspace-write"]
         if let model { args += ["-m", model] }
+        // `exec [opts] resume <id> <prompt>` — options must precede the subcommand.
+        if let resumeSessionID { args += ["resume", resumeSessionID.uuidString.lowercased()] }
         args.append(prompt)
         return args
     }

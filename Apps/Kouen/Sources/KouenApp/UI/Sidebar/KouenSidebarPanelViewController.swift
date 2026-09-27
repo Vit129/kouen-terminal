@@ -696,6 +696,39 @@ final class KouenSidebarPanelViewController: NSViewController {
         return NSHomeDirectory()
     }
 
+    /// Resumes the source session through the daemon's headless harness (`.ccRunStart`, readonly
+    /// profile) running the `handoff` skill, and returns the doc — or `nil` on failure, timeout,
+    /// or output that isn't a real document (e.g. a usage-limit notice: the source is often out
+    /// of quota, which is why the user is handing off at all).
+    @MainActor
+    private static func generateHandoffNote(for record: AgentSessionRecord, timeout: TimeInterval = 180) async -> String? {
+        let log = Logger(subsystem: "com.vit129.kouen", category: "handoff")
+        guard let prompt = AgentHandoffBuilder.handoffSkillPrompt(for: record.agentKind),
+              let sessionID = UUID(uuidString: record.id) else { return nil }
+        let coord = SessionCoordinator.shared
+        let runID = UUID()
+        guard case .ccRunInfo? = await coord.requestDaemon(.ccRunStart(
+            id: runID, prompt: prompt, cwd: handoffDirectory(for: record.projectPath), profile: "readonly",
+            model: nil, effort: nil, agentKind: record.agentKind.rawValue, resumeSessionID: sessionID
+        )) else { log.info("handoff note: daemon rejected ccRunStart"); return nil }
+
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            guard case let .ccRunInfo(summary?)? = await coord.requestDaemon(.ccRunGet(id: runID)),
+                  summary.state != "running" else { continue }
+            let text = (summary.resultText ?? summary.lastAssistantText ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            guard summary.state == "succeeded", AgentHandoffBuilder.looksLikeHandoffDoc(text) else {
+                log.info("handoff note: \(record.agentKind.rawValue, privacy: .public) run \(summary.state, privacy: .public), \(text.count) chars — using transcript-only brief")
+                return nil
+            }
+            return text
+        }
+        await coord.requestDaemon(.ccRunCancel(id: runID))
+        log.info("handoff note: \(record.agentKind.rawValue, privacy: .public) timed out")
+        return nil
+    }
+
     /// Launches a new tab with the target agent, polls until the CLI is ready,
     /// and injects a structured Handoff Brief formatted from the previous session using bracketed paste.
     private func handoffAgentSession(_ record: AgentSessionRecord, targetKind: AgentKind) {
@@ -722,7 +755,7 @@ final class KouenSidebarPanelViewController: NSViewController {
             await coord.requestDaemon(.renameTab(tabID: tabID, name: "Handoff: \(record.agentKind.displayName) writing note…"))
             await coord.syncFromDaemon()
             var notePath: String?
-            if let note = await AgentHandoffBuilder.generateHandoffNote(for: record) {
+            if let note = await Self.generateHandoffNote(for: record) {
                 let url = FileManager.default.temporaryDirectory.appendingPathComponent("kouen-handoff-\(record.id).md")
                 if (try? note.write(to: url, atomically: true, encoding: .utf8)) != nil { notePath = url.path }
             }
