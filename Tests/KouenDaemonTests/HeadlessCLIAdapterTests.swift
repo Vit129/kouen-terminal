@@ -188,6 +188,32 @@ final class HeadlessCLIAdapterTests: XCTestCase {
 
     // MARK: - Multi-adapter registry (ClaudeCodeHarness)
 
+    // Argument shapes below were each verified live against a real session (2026-09-27).
+    func testResumeArgumentsPerAdapter() {
+        let resume = UUID()
+        let lower = resume.uuidString.lowercased()
+
+        let claude = ClaudeAdapter().buildArguments(id: UUID(), prompt: "p", profile: .readonly, model: nil, effort: nil, resumeSessionID: resume)
+        XCTAssertEqual(Array(claude.drop { $0 != "--resume" }.prefix(2)), ["--resume", lower])
+        XCTAssertEqual(Array(claude.drop { $0 != "--setting-sources" }.prefix(2)), ["--setting-sources", "user"],
+                       "resumed runs need user settings so plugin skills load")
+        XCTAssertFalse(claude.contains("--session-id"))
+
+        let agy = AgyAdapter().buildArguments(id: UUID(), prompt: "p", profile: .readonly, model: nil, effort: nil, resumeSessionID: resume)
+        XCTAssertEqual(Array(agy.drop { $0 != "--conversation" }.prefix(2)), ["--conversation", lower])
+
+        let codex = CodexAdapter().buildArguments(id: UUID(), prompt: "p", profile: .readonly, model: nil, effort: nil, resumeSessionID: resume)
+        XCTAssertEqual(Array(codex.suffix(3)), ["resume", lower, "p"], "options precede `resume <id> <prompt>`")
+        XCTAssertEqual(codex.first, "exec")
+    }
+
+    func testFreshClaudeRunKeepsEmptySettingSources() {
+        let id = UUID()
+        let args = ClaudeAdapter().buildArguments(id: id, prompt: "p", profile: .readonly, model: nil, effort: nil, resumeSessionID: nil)
+        XCTAssertEqual(Array(args.drop { $0 != "--setting-sources" }.prefix(2)), ["--setting-sources", ""])
+        XCTAssertEqual(Array(args.drop { $0 != "--session-id" }.prefix(2)), ["--session-id", id.uuidString])
+    }
+
     func testHarnessRoutesParseLineToTheRunsOwnAdapter() async {
         // Exercises the engine's per-run adapter lookup added for multi-adapter support —
         // feeding a Codex-shaped line through with `agentKind: .codex` must decode using

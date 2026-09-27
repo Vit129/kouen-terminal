@@ -80,10 +80,7 @@ final class AgentHandoffBuilderTests: XCTestCase {
         XCTAssertTrue(brief.contains("read this first: `/tmp/kouen-handoff-s.md`"))
         XCTAssertTrue(brief.contains("`/x.jsonl`"), "transcript stays as the fallback reference")
         XCTAssertFalse(brief.contains("No handoff note could be generated"))
-        XCTAssertNil(AgentHandoffBuilder.headlessHandoffArguments(for: AgentSessionRecord(
-            id: "s", agentKind: .aider, title: "t", projectPath: "/", projectName: "p", messageCount: 1,
-            updatedAt: Date(), firstPrompt: "", latestTurns: [], transcriptPath: "", worktreeAvailable: false
-        )), "unverified agents fall back to the transcript-only brief")
+XCTAssertNil(AgentHandoffBuilder.handoffSkillPrompt(for: .aider), "unverified agents fall back to the transcript-only brief")
     }
 
     func testSanityGateRejectsNonDocumentOutput() {

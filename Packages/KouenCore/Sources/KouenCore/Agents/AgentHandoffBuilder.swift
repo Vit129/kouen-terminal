@@ -1,5 +1,4 @@
 import Foundation
-import os
 import KouenIPC
 
 /// Formats cross-agent handoff briefs and encodes bracketed paste payloads for terminal injection.
@@ -58,76 +57,24 @@ public enum AgentHandoffBuilder: Sendable {
 
     // MARK: - Source-agent handoff note
 
-    /// argv for resuming `record` headlessly and running the mattpocock `handoff` skill (each agent
-    /// has it installed; the doc is also requested on stdout since a headless run can't answer a
-    /// Write permission prompt); `nil` when that agent
-    /// has no verified non-interactive resume (caller falls back to the transcript-only brief).
-    public static func headlessHandoffArguments(for record: AgentSessionRecord) -> [String]? {
-        switch record.agentKind {
-        case .claudeCode:
-            return ["claude", "--resume", record.id, "-p",
-                    "/mattpocock-skills:handoff Output the full document as your final reply as well."]
-        case .antigravity:
-            // Same mattpocock `handoff` skill, installed for agy under ~/.agents/skills/.
-            return ["agy", "--conversation", record.id, "-p",
-                    "/handoff Output the full document as your final reply as well."]
-        case .codex:
-            // `$name` is Codex's skill mention; `handoff` lives in ~/.codex/skills/.
-            return ["codex", "exec", "--skip-git-repo-check", "resume", record.id,
-                    "$handoff Output the full document as your final reply as well."]
-        default:
-            return nil
-        }
-    }
-
-    /// Resumes the source session headlessly (through a login shell, so the GUI app gets the
-    /// user's PATH) and returns the handoff doc it prints, or `nil` on failure/timeout/empty output —
-    /// e.g. the source agent is out of quota, which is often why the user is handing off at all.
-    public static func generateHandoffNote(for record: AgentSessionRecord, timeout: TimeInterval = 180) async -> String? {
-        guard let args = headlessHandoffArguments(for: record) else { return nil }
-        let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
-        let cwd = FileManager.default.fileExists(atPath: record.projectPath) ? record.projectPath : NSHomeDirectory()
-        return await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: shell)
-                process.arguments = ["-l", "-c", "exec \"$@\"", "kouen-handoff"] + args
-                process.currentDirectoryURL = URL(fileURLWithPath: cwd)
-                // Stop hooks (e.g. skill-capture) can make `-p` print their reply instead of the doc.
-                var env = ProcessInfo.processInfo.environment
-                env["CLAUDE_SKILL_CAPTURE"] = "0"
-                process.environment = env
-                process.standardInput = FileHandle.nullDevice
-                process.standardError = FileHandle.nullDevice
-                let out = Pipe()
-                process.standardOutput = out
-                do { try process.run() } catch { continuation.resume(returning: nil); return }
-                let killer = DispatchWorkItem { if process.isRunning { process.terminate() } }
-                DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: killer)
-                let data = out.fileHandleForReading.readDataToEndOfFile()
-                process.waitUntilExit()
-                killer.cancel()
-                let text = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
-                guard process.terminationStatus == 0 else {
-                    logger.info("handoff note: \(record.agentKind.rawValue, privacy: .public) exited \(process.terminationStatus) (timeout/quota?)")
-                    continuation.resume(returning: nil); return
-                }
-                guard looksLikeHandoffDoc(text) else {
-                    logger.info("handoff note: \(record.agentKind.rawValue, privacy: .public) output rejected by sanity gate (\(text.count) chars)")
-                    continuation.resume(returning: nil); return
-                }
-                continuation.resume(returning: text)
-            }
+    /// Prompt that runs the mattpocock `handoff` skill in `kind`'s own CLI (each agent has it
+    /// installed; the doc is also requested as the final reply since a headless run can't answer
+    /// a Write permission prompt). `nil` = no verified headless resume → transcript-only brief.
+    public static func handoffSkillPrompt(for kind: AgentKind) -> String? {
+        let tail = "Output the full document as your final reply as well."
+        switch kind {
+        case .claudeCode: return "/mattpocock-skills:handoff \(tail)"
+        case .antigravity: return "/handoff \(tail)"   // ~/.agents/skills/handoff
+        case .codex: return "$handoff \(tail)"          // Codex skill mention, ~/.codex/skills/handoff
+        default: return nil
         }
     }
 
     /// Exit 0 isn't enough: a usage-limit notice or a hook's reply would otherwise become the
     /// note the brief tells the target to "read first". Require a real markdown document.
-    static func looksLikeHandoffDoc(_ text: String) -> Bool {
+    public static func looksLikeHandoffDoc(_ text: String) -> Bool {
         text.count >= 300 && text.components(separatedBy: "\n").contains { $0.hasPrefix("#") }
     }
-
-    private static let logger = Logger(subsystem: "com.vit129.kouen", category: "handoff")
 
     /// Wraps text in terminal bracketed-paste markers (`\e[200~` … `\e[201~`) followed by `submit`,
     /// so the terminal program receives multi-line input as one atomic paste. ESC bytes are stripped
