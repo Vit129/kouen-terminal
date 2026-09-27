@@ -52,7 +52,7 @@ public enum AgentHandoffBuilder: Sendable {
     // MARK: - Source-agent handoff note
 
     /// The `mattpocock-skills:handoff` skill's instructions, for agents that don't have the skill
-    /// installed. Asks for the doc on stdout — a headless run can't answer a Write permission prompt.
+    /// installed (Codex). Asks for the doc on stdout — a headless run can't answer a Write permission prompt.
     static let handoffInstructions = """
         Write a handoff document summarising this conversation so a fresh agent can continue the work. \
         Include a "suggested skills" section naming skills the next agent should use. \
@@ -69,7 +69,9 @@ public enum AgentHandoffBuilder: Sendable {
             return ["claude", "--resume", record.id, "-p",
                     "/mattpocock-skills:handoff Output the full document as your final reply as well."]
         case .antigravity:
-            return ["agy", "--conversation", record.id, "-p", handoffInstructions]
+            // Same mattpocock `handoff` skill, installed for agy under ~/.agents/skills/.
+            return ["agy", "--conversation", record.id, "-p",
+                    "/handoff Output the full document as your final reply as well."]
         case .codex:
             return ["codex", "exec", "--skip-git-repo-check", "resume", record.id, handoffInstructions]
         default:
