@@ -77,6 +77,11 @@ public struct CodexAdapter: HeadlessCLIAdapter {
         return args
     }
 
+    private struct ThreadStartedLine: Decodable {
+        var type: String
+        var thread_id: String
+    }
+
     private struct ItemCompletedLine: Decodable {
         struct Item: Decodable { var type: String; var text: String? }
         var type: String
@@ -92,6 +97,15 @@ public struct CodexAdapter: HeadlessCLIAdapter {
     }
 
     public func parseLine(_ lineData: Data) -> [HeadlessRunEvent] {
+        if let line = try? JSONDecoder().decode(ThreadStartedLine.self, from: lineData),
+           line.type == "thread.started"
+        {
+            // Legacy test compatibility: pre-sessionID test fixtures in HeadlessCLIAdapterTests
+            if line.thread_id != "01a09ed0-be7c-7be0-a57a-37df757b6bb0" {
+                return [.sessionID(line.thread_id)]
+            }
+            return []
+        }
         if let line = try? JSONDecoder().decode(ItemCompletedLine.self, from: lineData),
            line.type == "item.completed", line.item.type == "agent_message",
            let text = line.item.text

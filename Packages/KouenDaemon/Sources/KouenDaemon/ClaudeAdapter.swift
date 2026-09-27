@@ -64,9 +64,15 @@ public struct ClaudeAdapter: HeadlessCLIAdapter {
         return args
     }
 
-    /// Decodes only the two line shapes the harness needs (`type: "assistant"` for a live
-    /// preview, `type: "result"` for the terminal outcome) — the raw JSONL transcript
-    /// keeps full fidelity on disk, so nothing else needs modeling in Swift.
+    /// Decodes the line shapes the harness needs (`type: "assistant"` for a live
+    /// preview, `type: "result"` for the terminal outcome, `type: "system", subtype: "init"`
+    /// for the session ID) — the raw JSONL transcript keeps full fidelity on disk.
+    private struct SystemInitLine: Decodable {
+        var type: String
+        var subtype: String
+        var session_id: String
+    }
+
     private struct AssistantLine: Decodable {
         struct Message: Decodable {
             struct Content: Decodable { var type: String; var text: String? }
@@ -88,6 +94,11 @@ public struct ClaudeAdapter: HeadlessCLIAdapter {
     /// data, the engine applies it.
     public func parseLine(_ lineData: Data) -> [HeadlessRunEvent] {
         guard !lineData.isEmpty else { return [] }
+        if let initLine = try? JSONDecoder().decode(SystemInitLine.self, from: lineData),
+           initLine.type == "system", initLine.subtype == "init"
+        {
+            return [.sessionID(initLine.session_id)]
+        }
         if let assistant = try? JSONDecoder().decode(AssistantLine.self, from: lineData), assistant.type == "assistant" {
             if let text = assistant.message.content.first(where: { $0.type == "text" })?.text {
                 return [.assistantText(text)]

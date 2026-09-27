@@ -107,7 +107,10 @@ final class HeadlessCLIAdapterTests: XCTestCase {
         let line = """
         {"event":"result","result":{"conversation_id":"37e27586-1d8a-4f47-82b8-0fef06afcf18","status":"SUCCESS","response":"hi\\n","duration_seconds":7.06}}
         """
-        XCTAssertEqual(adapter.parseLine(Data(line.utf8)), [.result(text: "hi\n", costUSD: nil, isError: false)])
+        XCTAssertEqual(adapter.parseLine(Data(line.utf8)), [
+            .result(text: "hi\n", costUSD: nil, isError: false),
+            .sessionID("37e27586-1d8a-4f47-82b8-0fef06afcf18"),
+        ])
     }
 
     func testAgyFailedStatusMapsToIsError() {
@@ -115,7 +118,7 @@ final class HeadlessCLIAdapterTests: XCTestCase {
         let line = """
         {"event":"result","result":{"conversation_id":"x","status":"ERROR","response":null}}
         """
-        XCTAssertEqual(adapter.parseLine(Data(line.utf8)), [.result(text: nil, costUSD: nil, isError: true)])
+        XCTAssertEqual(adapter.parseLine(Data(line.utf8)), [.result(text: nil, costUSD: nil, isError: true), .sessionID("x")])
     }
 
     func testAgyIgnoresStepUpdateAndInitLines() {

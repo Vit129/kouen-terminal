@@ -34,7 +34,13 @@ public actor SwarmWorkerManager {
     public typealias CreatePTYSurface = @Sendable (_ cwd: String?) -> String?
     public typealias SendToSurface = @Sendable (_ surfaceID: String, _ text: String) -> Void
     public typealias CloseSurface = @Sendable (_ surfaceID: String) -> Void
-    public typealias StartHarnessRun = @Sendable (_ id: UUID, _ agentKind: AgentKind, _ prompt: String, _ cwd: String) async -> ClaudeCodeHarness.RunSummary
+    public typealias StartHarnessRun = @Sendable (
+        _ id: UUID,
+        _ agentKind: AgentKind,
+        _ prompt: String,
+        _ cwd: String,
+        _ resumeSessionID: UUID?
+    ) async -> ClaudeCodeHarness.RunSummary
     public typealias CancelHarnessRun = @Sendable (_ id: UUID) async -> Bool
     /// Polled after a Lane A spawn to sync the DAG node's status once the run actually
     /// finishes — `startHarnessRun`/`ClaudeCodeHarness.start()` return as soon as the process
@@ -61,9 +67,12 @@ public actor SwarmWorkerManager {
     /// target. Injectable (not a hardcoded constant) so tests can verify the timeout path
     /// itself without a real 180s wait.
     private let harnessRunTimeout: Duration
-    /// Lane B only: which surface a task id is bound to. Lane A has no equivalent (its
-    /// identity lives entirely in `ClaudeCodeHarness`'s own run table, keyed by the same id).
+    /// Lane B only: which surface a task id is bound to.
     private var surfaceByTask: [UUID: String] = [:]
+    /// Lane A: task id -> current harness run id.
+    private var runByTask: [UUID: UUID] = [:]
+    /// Lane A: task id -> agent kind and cwd stored at spawn to reuse for follow-up turns.
+    private var taskConfig: [UUID: (agentKind: AgentKind, cwd: String)] = [:]
 
     public init(
         dagStore: SwarmDAGStore,
@@ -93,10 +102,13 @@ public actor SwarmWorkerManager {
         let id = UUID()
         switch spec.lane {
         case .structured:
+            let cwd = spec.cwd ?? FileManager.default.currentDirectoryPath
+            runByTask[id] = id
+            taskConfig[id] = (agentKind: spec.agentKind, cwd: cwd)
             let node = SwarmTaskNode(id: id, lane: .structured, agentKind: spec.agentKind, role: spec.role, status: .working)
             await dagStore.recordSpawn(node)
-            _ = await startHarnessRun(id, spec.agentKind, spec.initialCommand, spec.cwd ?? FileManager.default.currentDirectoryPath)
-            pollForCompletion(id)
+            _ = await startHarnessRun(id, spec.agentKind, spec.initialCommand, cwd, nil)
+            pollForCompletion(taskID: id, runID: id)
             return node
         case .pty:
             guard let surfaceID = createPTYSurface(spec.cwd) else {
@@ -118,16 +130,33 @@ public actor SwarmWorkerManager {
         }
     }
 
-    /// Types `text` into a Lane B worker's surface. Lane A has no equivalent yet — a running
-    /// one-shot `claude -p` process has no stdin to steer mid-run; a follow-up turn needs
-    /// `resumeSessionID` chaining, which is a separate, not-yet-built slice (see
-    /// agent-memory/plans/agent-swarm-core/design.md). Returns `false` for an unknown id OR
-    /// a Lane A id (both are "can't do this yet" from the caller's point of view).
+    /// Types `text` into a Lane B worker's surface, or starts a follow-up turn on a finished
+    /// Lane A worker by resuming its CLI session.
     @discardableResult
     public func send(taskID: UUID, text: String) async -> Bool {
-        guard let surfaceID = surfaceByTask[taskID] else { return false }
-        sendToSurface(surfaceID, text)
+        if let surfaceID = surfaceByTask[taskID] {
+            sendToSurface(surfaceID, text)
+            await dagStore.updateStatus(taskID, status: .working)
+            return true
+        }
+        guard let currentRunID = runByTask[taskID],
+              let config = taskConfig[taskID],
+              let summary = await getHarnessRun(currentRunID),
+              summary.state != .running,
+              let sessionIDStr = summary.agentSessionID,
+              let resumeUUID = UUID(uuidString: sessionIDStr),
+              // Actor reentrancy: another `send` may have started a follow-up while this one
+              // awaited `getHarnessRun` — only the first caller for a given run proceeds.
+              runByTask[taskID] == currentRunID
+        else {
+            return false
+        }
+
+        let newRunID = UUID()
+        runByTask[taskID] = newRunID
         await dagStore.updateStatus(taskID, status: .working)
+        _ = await startHarnessRun(newRunID, config.agentKind, text, config.cwd, resumeUUID)
+        pollForCompletion(taskID: taskID, runID: newRunID)
         return true
     }
 
@@ -144,7 +173,8 @@ public actor SwarmWorkerManager {
             await dagStore.updateStatus(taskID, status: .cancelled)
             return true
         }
-        let cancelled = await cancelHarnessRun(taskID)
+        guard let currentRunID = runByTask[taskID] else { return false }
+        let cancelled = await cancelHarnessRun(currentRunID)
         if cancelled {
             await dagStore.updateStatus(taskID, status: .cancelled)
         }
@@ -161,7 +191,7 @@ public actor SwarmWorkerManager {
     /// returns and long outlives any single method call — same shape as
     /// `RealPty`'s termination-handler `Task { await self?... }` hops elsewhere in this daemon,
     /// just started explicitly instead of from a C callback.
-    private func pollForCompletion(_ id: UUID) {
+    private func pollForCompletion(taskID: UUID, runID: UUID) {
         let dagStore = dagStore
         let getHarnessRun = getHarnessRun
         let cancelHarnessRun = cancelHarnessRun
@@ -171,12 +201,12 @@ public actor SwarmWorkerManager {
             while true {
                 try? await Task.sleep(for: .milliseconds(500))
                 elapsed += .milliseconds(500)
-                guard let summary = await getHarnessRun(id) else { return }
+                guard let summary = await getHarnessRun(runID) else { return }
                 if summary.state == .running {
                     guard elapsed < harnessRunTimeout else {
-                        _ = await cancelHarnessRun(id)
+                        _ = await cancelHarnessRun(runID)
                         await dagStore.updateStatus(
-                            id, status: .failed,
+                            taskID, status: .failed,
                             summary: "timed out after \(Int(harnessRunTimeout.components.seconds))s with no response"
                         )
                         return
@@ -190,7 +220,7 @@ public actor SwarmWorkerManager {
                 case .cancelled: status = .cancelled
                 case .running: status = .working // unreachable, guarded above
                 }
-                await dagStore.updateStatus(id, status: status, summary: summary.resultText)
+                await dagStore.updateStatus(taskID, status: status, summary: summary.resultText)
                 return
             }
         }

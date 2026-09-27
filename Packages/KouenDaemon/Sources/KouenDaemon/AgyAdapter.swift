@@ -59,7 +59,11 @@ public struct AgyAdapter: HeadlessCLIAdapter {
     }
 
     private struct ResultLine: Decodable {
-        struct Result: Decodable { var status: String; var response: String? }
+        struct Result: Decodable {
+            var status: String
+            var response: String?
+            var conversation_id: String?
+        }
         var event: String
         var result: Result
     }
@@ -68,6 +72,12 @@ public struct AgyAdapter: HeadlessCLIAdapter {
         guard let line = try? JSONDecoder().decode(ResultLine.self, from: lineData), line.event == "result" else {
             return []
         }
-        return [.result(text: line.result.response, costUSD: nil, isError: line.result.status != "SUCCESS")]
+        var events: [HeadlessRunEvent] = [
+            .result(text: line.result.response, costUSD: nil, isError: line.result.status != "SUCCESS")
+        ]
+        if let conversationID = line.result.conversation_id, !conversationID.isEmpty {
+            events.append(.sessionID(conversationID))
+        }
+        return events
     }
 }
