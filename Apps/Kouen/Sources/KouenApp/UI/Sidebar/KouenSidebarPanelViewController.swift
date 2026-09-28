@@ -1,5 +1,7 @@
 import AppKit
 import KouenCore
+import KouenIPC
+import KouenSettings
 import SwiftUI
 import os
 
@@ -609,11 +611,8 @@ final class KouenSidebarPanelViewController: NSViewController {
             onResume: { [weak self] record in
                 self?.resumeAgentSession(record)
             },
-            onResumeInWorktree: { [weak self] record in
-                self?.resumeAgentSessionInWorktree(record)
-            },
-            onContinueInNewSession: { [weak self] record in
-                self?.continueAgentSessionInNewSession(record)
+            onHandoff: { [weak self] record, targetKind in
+                self?.handoffAgentSession(record, targetKind: targetKind)
             }
         )
         let hosting = NSHostingView(rootView: historyView)
@@ -683,53 +682,154 @@ final class KouenSidebarPanelViewController: NSViewController {
         SessionCoordinator.shared.sessionLifecycleService.openDefaultTerminalLaunch(req)
     }
 
-    /// Resumes inside a fresh, isolated git worktree — same idea as P32's explicit
-    /// task-worktree creation (`addAgentTask`), just seeded with a resume command instead of
-    /// a blank shell. Requires the session's original project to be a git repo.
-    private func resumeAgentSessionInWorktree(_ record: AgentSessionRecord) {
-        guard let workspaceID = SessionCoordinator.shared.snapshot.activeWorkspace?.id else { return }
-        let manager = WorktreeManager()
-        guard let repoPath = manager.repoRoot(for: record.projectPath) else {
-            let alert = NSAlert()
-            alert.messageText = "Can't resume in worktree"
-            alert.informativeText = "\(record.projectPath) isn't inside a git repository."
-            alert.runModal()
-            return
+    /// The session's original path, or — when it's gone (e.g. its worktree was removed) — the repo
+    /// root of its nearest surviving ancestor, so the brief's `git status` step still lands in the repo.
+    nonisolated static func handoffDirectory(for projectPath: String) -> String {
+        let fm = FileManager.default
+        var isDir: ObjCBool = false
+        if fm.fileExists(atPath: projectPath, isDirectory: &isDir), isDir.boolValue { return projectPath }
+        var dir = URL(fileURLWithPath: projectPath)
+        while dir.path != "/" {
+            dir.deleteLastPathComponent()
+            if fm.fileExists(atPath: dir.path) { return WorktreeManager().repoRoot(for: dir.path) ?? dir.path }
         }
-
-        let sanitizedBranch = "resume-\(record.id)"
-            .lowercased()
-            .replacingOccurrences(of: #"[^a-z0-9-]+"#, with: "-", options: .regularExpression)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
-        guard let worktreePath = manager.create(repoPath: repoPath, sessionID: sanitizedBranch, branch: sanitizedBranch) else {
-            let alert = NSAlert()
-            alert.messageText = "Can't resume in worktree"
-            alert.informativeText = "Failed to create a worktree for this session (it may already exist)."
-            alert.runModal()
-            return
-        }
-
-        SessionCoordinator.shared.addSession(
-            to: workspaceID,
-            cwd: worktreePath,
-            name: "Resume: \(record.title)",
-            worktreePath: worktreePath,
-            parentRepoPath: repoPath,
-            initialCommand: Self.resumeCommand(for: record)
-        )
+        return NSHomeDirectory()
     }
 
-    /// Resumes as a brand-new session (own tab-group in the sidebar) at the session's original
-    /// path, without touching git — for keeping the resumed conversation separate from
-    /// whatever's already open, without the isolation overhead of a worktree.
-    private func continueAgentSessionInNewSession(_ record: AgentSessionRecord) {
-        guard let workspaceID = SessionCoordinator.shared.snapshot.activeWorkspace?.id else { return }
-        SessionCoordinator.shared.addSession(
-            to: workspaceID,
-            cwd: record.projectPath,
-            name: "Resume: \(record.title)",
-            initialCommand: Self.resumeCommand(for: record)
-        )
+    /// Resumes the source session through the daemon's headless harness (`.ccRunStart`, readonly
+    /// profile) running the `handoff` skill, and returns the doc — or `nil` on failure, timeout,
+    /// or output that isn't a real document (e.g. a usage-limit notice: the source is often out
+    /// of quota, which is why the user is handing off at all).
+    @MainActor
+    private static func generateHandoffNote(for record: AgentSessionRecord, timeout: TimeInterval = 180) async -> String? {
+        let log = Logger(subsystem: "com.vit129.kouen", category: "handoff")
+        guard let prompt = AgentHandoffBuilder.handoffSkillPrompt(for: record.agentKind),
+              let sessionID = UUID(uuidString: record.id) else { return nil }
+        let coord = SessionCoordinator.shared
+        let runID = UUID()
+        guard case .ccRunInfo? = await coord.requestDaemon(.ccRunStart(
+            id: runID, prompt: prompt, cwd: handoffDirectory(for: record.projectPath), profile: "readonly",
+            model: nil, effort: nil, agentKind: record.agentKind.rawValue, resumeSessionID: sessionID
+        )) else { log.info("handoff note: daemon rejected ccRunStart"); return nil }
+
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            guard case let .ccRunInfo(summary?)? = await coord.requestDaemon(.ccRunGet(id: runID)),
+                  summary.state != "running" else { continue }
+            let text = (summary.resultText ?? summary.lastAssistantText ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            guard summary.state == "succeeded", AgentHandoffBuilder.looksLikeHandoffDoc(text) else {
+                log.info("handoff note: \(record.agentKind.rawValue, privacy: .public) run \(summary.state, privacy: .public), \(text.count) chars — using transcript-only brief")
+                return nil
+            }
+            return text
+        }
+        await coord.requestDaemon(.ccRunCancel(id: runID))
+        log.info("handoff note: \(record.agentKind.rawValue, privacy: .public) timed out")
+        return nil
+    }
+
+    /// Launches a new tab with the target agent, polls until the CLI is ready,
+    /// and injects a structured Handoff Brief formatted from the previous session using bracketed paste.
+    private func handoffAgentSession(_ record: AgentSessionRecord, targetKind: AgentKind) {
+        guard let workspaceID = SessionCoordinator.shared.snapshot.activeWorkspace?.id ?? SessionCoordinator.shared.snapshot.workspaces.first?.id else { return }
+        let settings = KouenSettings.load()
+        let mode = settings.sessionMode(for: targetKind)
+        let cwd = Self.handoffDirectory(for: record.projectPath)
+        let launchCmd = AgentLaunchCommands.launch(kind: targetKind, mode: mode, cwd: cwd)
+
+        let coord = SessionCoordinator.shared
+        Task { @MainActor in
+            guard case let .tabID(tabID)? = await coord.requestDaemon(.newTab(
+                workspaceID: workspaceID,
+                cwd: cwd,
+                shell: coord.settings.defaultShell
+            )) else {
+                await coord.syncFromDaemon()
+                return
+            }
+
+            // 0. Have the source agent write a handoff note (the `handoff` skill for Claude, its
+            // instructions for others). Kouen writes the file itself — headless runs can't
+            // answer a Write permission prompt. Failure → transcript-only brief.
+            await coord.requestDaemon(.renameTab(tabID: tabID, name: "Handoff: \(record.agentKind.displayName) writing note…"))
+            await coord.syncFromDaemon()
+            var notePath: String?
+            if let note = await Self.generateHandoffNote(for: record) {
+                let url = FileManager.default.temporaryDirectory.appendingPathComponent("kouen-handoff-\(record.id).md")
+                if (try? note.write(to: url, atomically: true, encoding: .utf8)) != nil { notePath = url.path }
+            }
+            let brief = AgentHandoffBuilder.buildBrief(from: record, targetAgent: targetKind, handoffNotePath: notePath)
+
+            let title = "Handoff: \(targetKind.displayName)"
+            await coord.requestDaemon(.renameTab(tabID: tabID, name: title))
+            await coord.syncFromDaemon()
+
+            guard let surfaceID = coord.splitPaneCoordinator.firstSurfaceID(forTab: tabID) else { return }
+            coord.setActiveSurface(surfaceID)
+            coord.terminalHosts.host(for: surfaceID)?.focusTerminal()
+
+            func capture() async -> String? {
+                guard case let .text(output)? = await coord.requestDaemon(
+                    .capturePane(surfaceID: surfaceID.uuidString, includeScrollback: false)
+                ) else { return nil }
+                return output
+            }
+            let baseline = await capture() ?? ""
+
+            // 1. Launch the target agent CLI
+            await coord.requestDaemon(.sendData(
+                surfaceID: surfaceID.uuidString,
+                data: Data((launchCmd + "\r").utf8),
+                origin: .human
+            ))
+
+            // 2. Wait for the CLI to settle: the tab's foreground process must no longer be the
+            // shell (so the paste can't land in zsh while the agent is still booting), then the
+            // screen must stay unchanged for 3 polls (~600ms). A blocking prompt (e.g. Claude's
+            // folder-trust dialog) must never receive the brief + Enter, so bail out on one.
+            // ponytail: output-stability is a heuristic, not a true "input ready" signal — upgrade
+            // to per-agent idle-prompt signatures if a CLI renders a spinner while idle.
+            let shells: Set<String> = ["zsh", "bash", "fish", "sh", "dash", "tcsh", "nu", "login",
+                                       URL(fileURLWithPath: coord.settings.defaultShell).lastPathComponent]
+            @MainActor func agentInForeground() -> Bool {
+                let tab = coord.snapshot.workspaces.flatMap(\.sessions).flatMap(\.tabs).first { $0.id == tabID }
+                guard let cmd = tab?.currentCommand?.trimmingCharacters(in: CharacterSet(charactersIn: "-")),
+                      !cmd.isEmpty else { return false }
+                return !shells.contains(cmd)
+            }
+            var isReady = false
+            var last = ""
+            var stableCount = 0
+            for _ in 0..<75 {
+                try? await Task.sleep(nanoseconds: 200_000_000)
+                guard agentInForeground(), let output = await capture() else { stableCount = 0; continue }
+                if let prompt = AgentAttentionDetector.detectPrompt(in: output), prompt.kind != .input { break }
+                if output == last, output != baseline, !output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    stableCount += 1
+                    if stableCount >= 3 { isReady = true; break }
+                } else {
+                    stableCount = 0
+                }
+                last = output
+            }
+
+            guard isReady else {
+                // Not safe to type into the pane — leave the brief on the clipboard instead.
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(brief, forType: .string)
+                Logger(subsystem: "com.vit129.kouen", category: "sidebar")
+                    .info("Handoff: \(targetKind.displayName, privacy: .public) not ready or showing a prompt; brief copied to clipboard")
+                return
+            }
+
+            // 3. Inject the Handoff Brief using bracketed paste
+            await coord.requestDaemon(.sendData(
+                surfaceID: surfaceID.uuidString,
+                data: AgentHandoffBuilder.bracketedPasteData(for: brief),
+                origin: .human
+            ))
+        }
     }
 
     // Issues tab disabled across the system

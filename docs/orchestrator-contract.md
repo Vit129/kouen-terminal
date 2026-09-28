@@ -101,7 +101,7 @@ Isolate the Worker's changes from the main checkout and other parallel workers:
 - **Never** nest a worktree inside an existing worktree directory. Always create from the primary repository root.
 
 #### 2. Spawn Worker with Atomic Prompt Delivery
-Spawn the Worker session, bind it to the worktree, and deliver the execution prompt:
+Spawn the Worker session, bind it to the worktree, and deliver the execution prompt. Unattended Workers spawned by an Orchestrator use `kouenSpawnWorker(headless: true)` (Lane A structured run):
 ```json
 // kouenSpawnWorker
 {
@@ -110,7 +110,8 @@ Spawn the Worker session, bind it to the worktree, and deliver the execution pro
   "worktreePath": "/Users/user/Git/Personal/project/.kouen-worktrees/auth-token-refresh",
   "parentRepoPath": "/Users/user/Git/Personal/project",
   "taskName": "Implement auth token refresh logic",
-  "prompt": "You are working on Task: Implement auth token refresh logic.\n\nContext & Requirements:\n- Target files: Sources/Auth/TokenManager.swift\n- Implement proactive token expiration checks and refresh retry logic.\n- Verify all unit tests pass with `swift test --filter AuthTests`.\n\nDeliverable:\n- Commit your changes with a clear message.\n- Push branch 'feature/auth-token-refresh' to origin.\n- Open a PR against main using `gh pr create --title \"Implement auth token refresh\" --body \"...\"`."
+  "prompt": "You are working on Task: Implement auth token refresh logic.\n\nContext & Requirements:\n- Target files: Sources/Auth/TokenManager.swift\n- Implement proactive token expiration checks and refresh retry logic.\n- Verify all unit tests pass with `swift test --filter AuthTests`.\n\nDeliverable:\n- Commit your changes with a clear message.\n- Push branch 'feature/auth-token-refresh' to origin.\n- Open a PR against main using `gh pr create --title \"Implement auth token refresh\" --body \"...\"`.",
+  "headless": true
 }
 ```
 
@@ -170,7 +171,7 @@ sequenceDiagram
     O->>M: kouenPRStatus() -> checksStatus: "fail"
     O->>M: kouenTaskUpdate(status: "ciFailing")
     Note over O: Increment retry count (1/3)
-    O->>W: sendPaneText(fixPrompt) / kouenSpawnWorker
+    O->>W: kouenSwarmInput(fixPrompt) / sendPaneText
     O->>M: kouenTaskUpdate(status: "running")
     W->>CI: Push fix commit
     O->>M: kouenPRStatus() -> checksStatus: "pass"
@@ -193,7 +194,15 @@ Set the Task status to `ciFailing`:
 - Reusing the existing Worker session and worktree checkout preserves git history, build artifacts, and modified state while preventing disk and worktree sprawl.
 
 #### 3. Dispatch Fix Prompt
-- If the Worker session is still active:
+- For **headless workers** (`headless: true`, Lane A): send the fix prompt via `kouenSwarmInput` using the `taskId` returned from `kouenSpawnWorker`. This starts a follow-up turn resuming the worker's own CLI session:
+  ```json
+  // kouenSwarmInput
+  {
+    "taskId": "<worker-task-uuid>",
+    "text": "CI checks failed on your PR. Run `gh pr checks` to inspect the failing test logs, reproduce the failure locally in this worktree, apply the fix, verify all tests pass, and push a new commit to update the PR.\n"
+  }
+  ```
+- For **pty workers** (Lane B): send text into the surface using `sendPaneText`:
   ```json
   // sendPaneText
   {
@@ -201,7 +210,7 @@ Set the Task status to `ciFailing`:
     "text": "CI checks failed on your PR. Run `gh pr checks` to inspect the failing test logs, reproduce the failure locally in this worktree, apply the fix, verify all tests pass, and push a new commit to update the PR.\n"
   }
   ```
-- If the Worker session exited:
+- If the Worker session exited unexpectedly or terminated:
   Call `kouenSpawnWorker` targeting the **exact same** `worktreePath` and `cwd`.
 - Update Task status back to `running` while the fix is underway:
   ```json

@@ -17,8 +17,8 @@ import KouenCore
 /// event already carries the complete answer in `response`, so `parseLine` only decodes that one
 /// line shape and ignores every `step_update`/`init` line. `--conversation <id>` is agy's resume
 /// flag, but (same as Codex) `agy` assigns its own `conversation_id` rather than accepting a
-/// caller-chosen one — `resumeSessionID` is accepted per the protocol but ignored, same
-/// not-yet-built-slice boundary as `CodexAdapter`. No cost-in-USD is exposed, only token usage,
+/// caller-chosen one, so `resumeSessionID` only continues an existing conversation (its id
+/// from the transcript/History), never names a new one. No cost-in-USD is exposed, only token usage,
 /// so `totalCostUSD` stays nil.
 public struct AgyAdapter: HeadlessCLIAdapter {
     public let agentKind: AgentKind = .antigravity
@@ -52,13 +52,18 @@ public struct AgyAdapter: HeadlessCLIAdapter {
             "--mode", profile == .readonly ? "plan" : "accept-edits",
             "--print=\(prompt)",
         ]
+        if let resumeSessionID { args += ["--conversation", resumeSessionID.uuidString.lowercased()] }
         if let model { args += ["--model", model] }
         if let effort { args += ["--effort", effort] }
         return args
     }
 
     private struct ResultLine: Decodable {
-        struct Result: Decodable { var status: String; var response: String? }
+        struct Result: Decodable {
+            var status: String
+            var response: String?
+            var conversation_id: String?
+        }
         var event: String
         var result: Result
     }
@@ -67,6 +72,12 @@ public struct AgyAdapter: HeadlessCLIAdapter {
         guard let line = try? JSONDecoder().decode(ResultLine.self, from: lineData), line.event == "result" else {
             return []
         }
-        return [.result(text: line.result.response, costUSD: nil, isError: line.result.status != "SUCCESS")]
+        var events: [HeadlessRunEvent] = [
+            .result(text: line.result.response, costUSD: nil, isError: line.result.status != "SUCCESS")
+        ]
+        if let conversationID = line.result.conversation_id, !conversationID.isEmpty {
+            events.append(.sessionID(conversationID))
+        }
+        return events
     }
 }

@@ -38,6 +38,29 @@ public actor ClaudeCodeHarness {
         public var resultText: String?
         public var totalCostUSD: Double?
         public var exitCode: Int32?
+        public var agentSessionID: String?
+
+        public init(
+            id: UUID,
+            state: RunState,
+            cwd: String,
+            startedAt: Date,
+            lastAssistantText: String? = nil,
+            resultText: String? = nil,
+            totalCostUSD: Double? = nil,
+            exitCode: Int32? = nil,
+            agentSessionID: String? = nil
+        ) {
+            self.id = id
+            self.state = state
+            self.cwd = cwd
+            self.startedAt = startedAt
+            self.lastAssistantText = lastAssistantText
+            self.resultText = resultText
+            self.totalCostUSD = totalCostUSD
+            self.exitCode = exitCode
+            self.agentSessionID = agentSessionID
+        }
     }
 
     private struct Run {
@@ -126,6 +149,9 @@ public actor ClaudeCodeHarness {
         process.currentDirectoryURL = URL(fileURLWithPath: cwd)
         var env = ProcessInfo.processInfo.environment
         if let path = await resolvedPATH() { env["PATH"] = path }
+        // A resumed Claude run loads user settings (for plugin skills) and with them the user's
+        // Stop hooks — the skill-capture nudge would otherwise replace the final reply.
+        env["CLAUDE_SKILL_CAPTURE"] = "0"
         process.environment = env
         // Some adapters' CLIs (Codex's `exec`) read and append stdin even when a prompt is
         // given as an argument — closed explicitly so a daemon whose own stdin happens to be
@@ -218,6 +244,8 @@ public actor ClaudeCodeHarness {
                 summary.resultText = text
                 summary.totalCostUSD = costUSD
                 summary.state = isError ? .failed : .succeeded
+            case .sessionID(let sessionID):
+                summary.agentSessionID = sessionID
             }
         }
     }
