@@ -2,6 +2,60 @@
 
 Older releases. See [CHANGELOG.md](../CHANGELOG.md) for recent versions.
 
+## [4.18.6] - 2026-09-23
+
+### Added
+- Real Codex/Copilot session scanning, resume variants, list UX parity ([`776dded`](https://github.com/Vit129/kouen-terminal/commit/776dded462a3d6626ad055e0af420c1f833df4da))
+
+### Documentation
+- Record decision to depend on vendor remote-control apps for mobile ([`39322af`](https://github.com/Vit129/kouen-terminal/commit/39322af0b8b4b304dbfa20fa6a4d3e729a248d94))
+
+### Fixed
+- Content pane covers the header cluster during the Cmd+\ slide ([`cc3dd33`](https://github.com/Vit129/kouen-terminal/commit/cc3dd335e29f9d236d8c7152f88db3156ff2a53f))
+
+## [4.18.4] - 2026-09-23
+
+### Changed
+- P49 architectural hardening and decoupling (release v4.18.4) ([`c75ba14`](https://github.com/Vit129/kouen-terminal/commit/c75ba1499007082b5c86c00136185239efc5dc10))
+
+## [4.18.2] - 2026-09-22
+
+### Added
+- Add browser-style back/forward navigation for tab/session switches ([`80b25ae`](https://github.com/Vit129/kouen-terminal/commit/80b25aeeecdd5627ad696cfad18380b97e28fd1e))
+
+### Changed
+- Replace MRU back/forward with the existing session-cycle logic ([`93362f0`](https://github.com/Vit129/kouen-terminal/commit/93362f0f64ae28ddb8179b5a0588bd261b97e3a1))
+
+### Fixed
+- Stop primary tree from squatting on a feature branch after auto-isolate ([`d1aa214`](https://github.com/Vit129/kouen-terminal/commit/d1aa21438eb2872f23c20f91e4f3528add15bfe9))
+- Force bracketed-paste wrapping for unsafe multi-line pastes ([`be58975`](https://github.com/Vit129/kouen-terminal/commit/be589755c20f981459f1e3a2aa4bac266ace5b33))
+
+## [4.18.1] - 2026-09-22
+
+### Added
+- Refresh graphify index before any make-start action ([`3c8c13e`](https://github.com/Vit129/kouen-terminal/commit/3c8c13e70ed75f842112abc0961132a2acdc0577))
+
+### Fixed
+- Point skill-trigger at real skill names, not a nonexistent doc ([`e32685a`](https://github.com/Vit129/kouen-terminal/commit/e32685a48b793326fd4b8d8d06423c48c295a057))
+- Skip graphify refresh for the preview option ([`37d8006`](https://github.com/Vit129/kouen-terminal/commit/37d8006146355b59bfecbf69c7a2b054953f1338))
+- Skill-keywords.json was missing entries AGENTS.md declares ([`298b0ec`](https://github.com/Vit129/kouen-terminal/commit/298b0ec62d9e56ce3a4a64cc42522822ec1df271))
+
+## [4.18.0] - 2026-09-21
+
+### Added
+- Auto-show job result on run-now + scheduled runs ([`ce56d8d`](https://github.com/Vit129/kouen-terminal/commit/ce56d8db59febcae9232ed6c2108582c1f653a15))
+- Harden multi-agent attention & write safety (P46 Pillar 6) ([`28585cf`](https://github.com/Vit129/kouen-terminal/commit/28585cf27ec24584a8633d3bd1815ebdcccf3020))
+- Complete P46 CLI-First Agent Harness (phases 1-4) ([`9a7eda8`](https://github.com/Vit129/kouen-terminal/commit/9a7eda8598779fc48aab784ed9a822187efbfd9a))
+- Plan-46-agent-dev-env-completely (release v4.18.0) ([`b951db9`](https://github.com/Vit129/kouen-terminal/commit/b951db9b193eb19e04a6dbecf0b9bd174489b2c2))
+
+### Documentation
+- Add document for kouen agent dev env terminal ([`68edb71`](https://github.com/Vit129/kouen-terminal/commit/68edb71e557046ef306b9644357ccf8f3a74a6d0))
+
+### Fixed
+- Close P46 follow-up gaps — verification timeout, dirty-tree guard, feed-to-agent ([`6014b78`](https://github.com/Vit129/kouen-terminal/commit/6014b7855c99785259ec425255f3f572fdefbb10))
+- Row click did nothing — .onTapGesture inside List is a no-op on macOS ([`06153c2`](https://github.com/Vit129/kouen-terminal/commit/06153c21532d16788337534d78977a2f6a71fd52))
+- Make PR and no-PR release paths behave identically ([`61ff7d7`](https://github.com/Vit129/kouen-terminal/commit/61ff7d7da8a46966dffc0186b6744d63dfb120a3))
+
 ## [4.17.3] - 2026-09-19
 
 ### Added
