@@ -212,6 +212,21 @@ public final class SurfaceRegistry: @unchecked Sendable {
         monitorLock.unlock()
     }
 
+    /// Time elapsed since the surface last produced output, or nil if no monitor exists.
+    /// `internal` so tests can poll for background PTY output to settle without fixed sleeps.
+    func surfaceIdleTime(for surfaceKey: String) -> TimeInterval? {
+        monitorLock.lock()
+        defer { monitorLock.unlock() }
+        guard let m = monitors[surfaceKey] else { return nil }
+        return Date().timeIntervalSince(m.lastOutput)
+    }
+
+    /// Clear a surface's trailing output buffer under `monitorLock`.
+    /// `internal` so tests driving prompt-detection can start from a clean slate.
+    func resetTrailingOutput(surfaceKey: String) {
+        resetTrailingOutputLocked(surfaceKey: surfaceKey)
+    }
+
     /// Drain the monitor state (timer) and raise activity/silence/bell alerts on non-current
     /// windows, gated on the matching option. Sets the tab flag (surfaced as `#`/`~`/`!` in
     /// `#{window_flags}`) and fires the hook — both only on a real transition.
