@@ -67,12 +67,18 @@ public actor SwarmWorkerManager {
     /// target. Injectable (not a hardcoded constant) so tests can verify the timeout path
     /// itself without a real 180s wait.
     private let harnessRunTimeout: Duration
-    /// Lane B only: which surface a task id is bound to.
+    private struct LaneATask {
+        var runID: UUID
+        let agentKind: AgentKind
+        let cwd: String
+    }
+
+    /// Lane B (interactive/PTY): maps task ID -> terminal surface ID where the agent process runs.
     private var surfaceByTask: [UUID: String] = [:]
-    /// Lane A: task id -> current harness run id.
-    private var runByTask: [UUID: UUID] = [:]
-    /// Lane A: task id -> agent kind and cwd stored at spawn to reuse for follow-up turns.
-    private var taskConfig: [UUID: (agentKind: AgentKind, cwd: String)] = [:]
+
+    /// Lane A (headless/structured): maps task ID -> current run ID, agent kind, and working directory
+    /// used to resume follow-up turns via CLI session continuity.
+    private var laneAByTask: [UUID: LaneATask] = [:]
 
     public init(
         dagStore: SwarmDAGStore,
@@ -103,8 +109,7 @@ public actor SwarmWorkerManager {
         switch spec.lane {
         case .structured:
             let cwd = spec.cwd ?? FileManager.default.currentDirectoryPath
-            runByTask[id] = id
-            taskConfig[id] = (agentKind: spec.agentKind, cwd: cwd)
+            laneAByTask[id] = LaneATask(runID: id, agentKind: spec.agentKind, cwd: cwd)
             let node = SwarmTaskNode(id: id, lane: .structured, agentKind: spec.agentKind, role: spec.role, status: .working)
             await dagStore.recordSpawn(node)
             _ = await startHarnessRun(id, spec.agentKind, spec.initialCommand, cwd, nil)
@@ -139,9 +144,8 @@ public actor SwarmWorkerManager {
             await dagStore.updateStatus(taskID, status: .working)
             return true
         }
-        guard let currentRunID = runByTask[taskID],
-              let config = taskConfig[taskID],
-              let summary = await getHarnessRun(currentRunID),
+        guard let task = laneAByTask[taskID],
+              let summary = await getHarnessRun(task.runID),
               summary.state != .running,
               let sessionIDStr = summary.agentSessionID,
               // ponytail: resume ids are UUIDs end to end (true for Claude/agy/Codex today); a CLI
@@ -149,16 +153,16 @@ public actor SwarmWorkerManager {
               let resumeUUID = UUID(uuidString: sessionIDStr),
               // Actor reentrancy: another `send` may have started a follow-up while this one
               // awaited `getHarnessRun` — only the first caller for a given run proceeds.
-              runByTask[taskID] == currentRunID
+              laneAByTask[taskID]?.runID == task.runID
         else {
             return false
         }
 
         let newRunID = UUID()
-        runByTask[taskID] = newRunID
+        laneAByTask[taskID]?.runID = newRunID
         await dagStore.updateStatus(taskID, status: .working)
-        _ = await startHarnessRun(newRunID, config.agentKind, text, config.cwd, resumeUUID)
-        guard runByTask[taskID] == newRunID else {
+        _ = await startHarnessRun(newRunID, task.agentKind, text, task.cwd, resumeUUID)
+        guard laneAByTask[taskID]?.runID == newRunID else {
             // Terminated while the run was launching — don't leave an orphaned run behind.
             _ = await cancelHarnessRun(newRunID)
             return false
@@ -182,9 +186,8 @@ public actor SwarmWorkerManager {
         }
         // Removed before cancelling so a `send` suspended in `startHarnessRun` sees the task is
         // gone and cancels the run it just started (see the post-start check in `send`).
-        guard let currentRunID = runByTask.removeValue(forKey: taskID) else { return false }
-        taskConfig.removeValue(forKey: taskID)
-        let cancelled = await cancelHarnessRun(currentRunID)
+        guard let task = laneAByTask.removeValue(forKey: taskID) else { return false }
+        let cancelled = await cancelHarnessRun(task.runID)
         if cancelled {
             await dagStore.updateStatus(taskID, status: .cancelled)
         }
