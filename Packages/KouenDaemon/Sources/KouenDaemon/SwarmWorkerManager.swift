@@ -144,6 +144,8 @@ public actor SwarmWorkerManager {
               let summary = await getHarnessRun(currentRunID),
               summary.state != .running,
               let sessionIDStr = summary.agentSessionID,
+              // ponytail: resume ids are UUIDs end to end (true for Claude/agy/Codex today); a CLI
+              // with non-UUID session ids can't follow up until resumeSessionID becomes a String.
               let resumeUUID = UUID(uuidString: sessionIDStr),
               // Actor reentrancy: another `send` may have started a follow-up while this one
               // awaited `getHarnessRun` — only the first caller for a given run proceeds.
@@ -156,6 +158,11 @@ public actor SwarmWorkerManager {
         runByTask[taskID] = newRunID
         await dagStore.updateStatus(taskID, status: .working)
         _ = await startHarnessRun(newRunID, config.agentKind, text, config.cwd, resumeUUID)
+        guard runByTask[taskID] == newRunID else {
+            // Terminated while the run was launching — don't leave an orphaned run behind.
+            _ = await cancelHarnessRun(newRunID)
+            return false
+        }
         pollForCompletion(taskID: taskID, runID: newRunID)
         return true
     }
@@ -173,7 +180,10 @@ public actor SwarmWorkerManager {
             await dagStore.updateStatus(taskID, status: .cancelled)
             return true
         }
-        guard let currentRunID = runByTask[taskID] else { return false }
+        // Removed before cancelling so a `send` suspended in `startHarnessRun` sees the task is
+        // gone and cancels the run it just started (see the post-start check in `send`).
+        guard let currentRunID = runByTask.removeValue(forKey: taskID) else { return false }
+        taskConfig.removeValue(forKey: taskID)
         let cancelled = await cancelHarnessRun(currentRunID)
         if cancelled {
             await dagStore.updateStatus(taskID, status: .cancelled)

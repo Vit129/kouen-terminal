@@ -1,19 +1,20 @@
 import XCTest
 @testable import KouenDaemonCore
+import KouenCore
 
 /// Records what `SwarmWorkerManager`'s injected closures were called with, for assertions.
 /// `@unchecked Sendable` + `NSLock` — same pattern `RealPty`/`SurfaceRegistry` already use for
 /// state shared across a sync closure call and the test's own thread.
 private final class CallRecorder: @unchecked Sendable {
     private let lock = NSLock()
-    private var _harnessCalls: [(id: UUID, prompt: String, cwd: String, resume: UUID?)] = []
+    private var _harnessCalls: [(id: UUID, prompt: String, cwd: String, resume: UUID?, kind: AgentKind?)] = []
     private var _surfaceCalls: [(surfaceID: String, text: String)] = []
     private var _closeCalls: [String] = []
     private var _cancelCalls: [UUID] = []
     private var _harnessSummaries: [UUID: ClaudeCodeHarness.RunSummary] = [:]
 
-    func recordHarness(id: UUID, prompt: String, cwd: String, resume: UUID? = nil) {
-        lock.lock(); _harnessCalls.append((id, prompt, cwd, resume)); lock.unlock()
+    func recordHarness(id: UUID, prompt: String, cwd: String, resume: UUID? = nil, kind: AgentKind? = nil) {
+        lock.lock(); _harnessCalls.append((id, prompt, cwd, resume, kind)); lock.unlock()
     }
     /// Lets a test control what `getHarnessRun(id)` reports, to exercise
     /// `SwarmWorkerManager`'s completion-poll loop deterministically.
@@ -33,7 +34,7 @@ private final class CallRecorder: @unchecked Sendable {
         lock.lock(); _cancelCalls.append(id); lock.unlock()
     }
 
-    var harnessCalls: [(id: UUID, prompt: String, cwd: String, resume: UUID?)] { lock.lock(); defer { lock.unlock() }; return _harnessCalls }
+    var harnessCalls: [(id: UUID, prompt: String, cwd: String, resume: UUID?, kind: AgentKind?)] { lock.lock(); defer { lock.unlock() }; return _harnessCalls }
     var surfaceCalls: [(surfaceID: String, text: String)] { lock.lock(); defer { lock.unlock() }; return _surfaceCalls }
     var closeCalls: [String] { lock.lock(); defer { lock.unlock() }; return _closeCalls }
     var cancelCalls: [UUID] { lock.lock(); defer { lock.unlock() }; return _cancelCalls }
@@ -51,8 +52,8 @@ final class SwarmWorkerManagerTests: XCTestCase {
             createPTYSurface: { _ in surfaceID },
             sendToSurface: { sid, text in recorder.recordSurface(sid, text) },
             closeSurface: { sid in recorder.recordClose(sid) },
-            startHarnessRun: { id, _, prompt, cwd, resume in
-                recorder.recordHarness(id: id, prompt: prompt, cwd: cwd, resume: resume)
+            startHarnessRun: { id, kind, prompt, cwd, resume in
+                recorder.recordHarness(id: id, prompt: prompt, cwd: cwd, resume: resume, kind: kind)
                 return ClaudeCodeHarness.RunSummary(id: id, state: .running, cwd: cwd, startedAt: Date())
             },
             cancelHarnessRun: { id in
@@ -269,6 +270,7 @@ final class SwarmWorkerManagerTests: XCTestCase {
         let followUp = recorder.harnessCalls[1]
         XCTAssertEqual(followUp.prompt, "turn 2")
         XCTAssertEqual(followUp.cwd, "/repo")
+        XCTAssertEqual(followUp.kind, .codex)
         XCTAssertEqual(followUp.resume, Self.sessionID)
         XCTAssertNotEqual(followUp.id, node.id, "each turn gets its own harness run id")
         let working = await status(manager, node.id)

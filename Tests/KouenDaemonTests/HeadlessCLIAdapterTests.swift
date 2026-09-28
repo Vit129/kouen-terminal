@@ -26,7 +26,6 @@ final class HeadlessCLIAdapterTests: XCTestCase {
     func testCodexIgnoresLifecycleLines() {
         let adapter = CodexAdapter()
         for line in [
-            #"{"type":"thread.started","thread_id":"01a09ed0-be7c-7be0-a57a-37df757b6bb0"}"#,
             #"{"type":"turn.started"}"#,
             #"{"type":"turn.completed","usage":{"input_tokens":26038,"output_tokens":5}}"#,
         ] {
