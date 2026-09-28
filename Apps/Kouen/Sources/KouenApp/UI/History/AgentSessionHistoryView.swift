@@ -532,10 +532,13 @@ public struct AgentSessionHistoryView: View {
 
             // Action Buttons
             HStack(spacing: 6) {
-                actionButton(icon: "play.fill", label: "Resume", emphasized: true) {
-                    onResume?(record)
+                // VS Code chats live in VS Code's own store — the Copilot CLI can't resume them.
+                if record.placement != .vscode {
+                    actionButton(icon: "play.fill", label: "Resume", emphasized: true) {
+                        onResume?(record)
+                    }
+                    .help("Resume this session in a new tab")
                 }
-                .help("Resume this session in a new tab")
 
                 handoffMenu(for: record)
 
@@ -675,6 +678,7 @@ public struct AgentSessionHistoryView: View {
         case .cloud: return "☁️ Cloud"
         case .remoteControl: return "📱 Remote Control"
         case .background: return "⌁ Background"
+        case .vscode: return "VS Code"
         }
     }
 
