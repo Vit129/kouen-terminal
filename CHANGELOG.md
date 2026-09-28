@@ -8,12 +8,28 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [4.20.0] - 2026-09-28
 
 ### Added
-- Release version bump to v4.20.0.
+- Cross-agent handoff & simplified session resume actions ([`ff445c7`](https://github.com/Vit129/kouen-terminal/commit/ff445c7960a4a4f6d64f5e2c5a7f9ae16eebef59))
+- Reference the transcript instead of copying truncated turns ([`fcef848`](https://github.com/Vit129/kouen-terminal/commit/fcef84872d8be1eb61d9df6b0a433877c96690c7))
+- Have the source agent write a handoff note first ([`e4d704c`](https://github.com/Vit129/kouen-terminal/commit/e4d704c703b82d79eb5c0037e8dc912a8e65d5c8))
+- Use agy's installed /handoff skill ([`58449cb`](https://github.com/Vit129/kouen-terminal/commit/58449cb3a994320c73b939f98b67f898c3e0a173))
+- Use Codex's installed $handoff skill, drop embedded instructions ([`9e79de9`](https://github.com/Vit129/kouen-terminal/commit/9e79de98541b9217bdbaa80f0dd37577ca56b8cf))
+- Target writes the handoff itself when the source can't ([`9fd50fb`](https://github.com/Vit129/kouen-terminal/commit/9fd50fba3659fe98414fa2efd0eddaeb75e74a89))
+- Resume any adapter's session headlessly; handoff uses it ([`e6c2bea`](https://github.com/Vit129/kouen-terminal/commit/e6c2bea724b894b128a909bb870f8c0c355c69f3))
+- Follow-up turns for headless workers via session resume ([`a16ba96`](https://github.com/Vit129/kouen-terminal/commit/a16ba9665f194e08bd478d7efb58bb671aca5d75))
+- VS Code Copilot Chat sessions; hide agy/Codex subagents ([`e948db7`](https://github.com/Vit129/kouen-terminal/commit/e948db7294f8c772eea6d7fed6a6063b9da7104b))
+- Cross-agent handoff, headless worker follow-ups, History for VS Code Copilot Chat (release v4.20.0) ([`2ce8072`](https://github.com/Vit129/kouen-terminal/commit/2ce8072bec172dc05feebf300198c1febcf506d0))
 
-## [4.19.2] - 2026-09-27
+### Changed
+- LaneATask struct; fix flaky SurfaceRegistry prompt test ([`e8f6187`](https://github.com/Vit129/kouen-terminal/commit/e8f61879f6abed99781a125e8da9f3b6ce96cb4d))
 
-### Added
-- Release version bump to v4.19.2.
+### Fixed
+- File preview is very slow (release v4.19.2) ([`5550f80`](https://github.com/Vit129/kouen-terminal/commit/5550f80bdedc9986caf60d3f7e969b309f809317))
+- Safe readiness wait and paste-injection guard ([`a806755`](https://github.com/Vit129/kouen-terminal/commit/a80675586636a6532df6486a66bdd6babcbe054a))
+- Fall back to repo root when session path is gone ([`56138b2`](https://github.com/Vit129/kouen-terminal/commit/56138b292e94c6efac6850cebc2b5236f086e31f))
+- Wait for agent to own the pane before pasting ([`34959a0`](https://github.com/Vit129/kouen-terminal/commit/34959a0aa91ca75a5e971ea36d77ae13d394ac9d))
+- Keep only real turns from Antigravity transcripts ([`5e3671a`](https://github.com/Vit129/kouen-terminal/commit/5e3671a9c3834c8d44fb099db33b76e0dbebe7e7))
+- Reject non-document note output, disable skill-capture hook ([`2e87473`](https://github.com/Vit129/kouen-terminal/commit/2e87473ca132b9550c8dec0dd5ebe0ec9593693e))
+- Code-review fixes for headless follow-up ([`10ad1f1`](https://github.com/Vit129/kouen-terminal/commit/10ad1f1c9a23e01ba5e4c055bcccb64a7aace946))
 
 ## [4.19.1] - 2026-09-24
 
