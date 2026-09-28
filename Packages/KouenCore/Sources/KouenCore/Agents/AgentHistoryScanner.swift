@@ -29,6 +29,9 @@ public enum AgentSessionPlacement: String, Sendable, Equatable, Codable {
     case cloud
     /// Running locally, detached from any terminal (`claude --bg`).
     case background
+    /// Copilot Chat inside VS Code — its own store, which the Copilot CLI can't resume. View
+    /// and handoff only.
+    case vscode
 }
 
 /// A parsed agent session record from local transcripts.
@@ -130,7 +133,7 @@ public struct AgentSessionRecord: Identifiable, Sendable, Equatable {
         // reads from `claude agents --json`, since that's the only id field the listing has.
         // Not verified against a real `--bg` session (none available to test against here).
         case .background: return "claude attach \(sessionID)"
-        case .local, .remoteControl: return nil
+        case .local, .remoteControl, .vscode: return nil
         }
     }
 }
@@ -262,6 +265,7 @@ public actor AgentHistoryScanner {
         async let antigravityTask = scanAntigravity()
         async let codexTask = scanCodex()
         async let copilotTask = scanCopilot()
+        async let vscodeTask = scanVSCodeCopilotChat()
         async let liveClaudeTask = scanClaudeAgentsCLI()
 
         var results: [AgentSessionRecord] = []
@@ -269,6 +273,7 @@ public actor AgentHistoryScanner {
         results.append(contentsOf: await antigravityTask)
         results.append(contentsOf: await codexTask)
         results.append(contentsOf: await copilotTask)
+        results.append(contentsOf: await vscodeTask)
 
         // Cloud sessions stay listed after their pane closes: remember every cloud row the live
         // scan sees and add the ones that aren't live right now as offline rows.
@@ -609,9 +614,14 @@ public actor AgentHistoryScanner {
         guard let sessionFolders = try? FileManager.default.contentsOfDirectory(atPath: brainDir.path) else {
             return []
         }
+        // Subagent conversations get their own brain folder too; listing them would show one
+        // piece of work as several sessions.
+        let subagentIDs = Self.antigravitySubagentIDs(
+            dbPath: home.appendingPathComponent(".gemini/antigravity-cli/conversation_summaries.db").path
+        )
 
         for folder in sessionFolders {
-            if folder.hasPrefix(".") { continue }
+            if folder.hasPrefix(".") || subagentIDs.contains(folder) { continue }
             let sessionDir = brainDir.appendingPathComponent(folder)
             // Don't hardcode the exact sub-depth to the transcript — Antigravity's on-disk
             // layout has moved before (see the newer `conversations/*.db` SQLite format this
@@ -833,6 +843,8 @@ public actor AgentHistoryScanner {
             let type = json["type"] as? String ?? ""
 
             if type == "session_meta" {
+                // Subagent threads (`source: {subagent: …}`) belong to their parent session.
+                if (payload["source"] as? [String: Any])?["subagent"] != nil { return nil }
                 if sessionID == nil { sessionID = payload["session_id"] as? String ?? payload["id"] as? String }
                 if cwd == nil { cwd = payload["cwd"] as? String }
                 continue
@@ -876,6 +888,103 @@ public actor AgentHistoryScanner {
             latestTurns: turns,
             transcriptPath: fileURL.path,
             worktreeAvailable: FileManager.default.fileExists(atPath: finalCwd)
+        )
+    }
+
+    #if canImport(SQLite3)
+    /// Ids of Antigravity subagent conversations (`parent_conversation_id` set).
+    static func antigravitySubagentIDs(dbPath: String) -> Set<String> {
+        var db: OpaquePointer?
+        guard sqlite3_open_v2(dbPath, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK, let db else {
+            sqlite3_close(db)
+            return []
+        }
+        defer { sqlite3_close(db) }
+        var stmt: OpaquePointer?
+        let sql = "SELECT conversation_id FROM conversation_summaries WHERE parent_conversation_id != ''"
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
+        defer { sqlite3_finalize(stmt) }
+        var ids: Set<String> = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            if let c = sqlite3_column_text(stmt, 0) { ids.insert(String(cString: c)) }
+        }
+        return ids
+    }
+    #else
+    static func antigravitySubagentIDs(dbPath: String) -> Set<String> { [] }
+    #endif
+
+    // MARK: - VS Code Copilot Chat Scanner
+
+    /// Copilot Chat sessions from VS Code's workspace storage — see `VSCodeChatSession`.
+    public func scanVSCodeCopilotChat() async -> [AgentSessionRecord] {
+        let fm = FileManager.default
+        let storage = fm.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/Code/User/workspaceStorage")
+        guard let workspaces = try? fm.contentsOfDirectory(atPath: storage.path) else { return [] }
+
+        var records: [AgentSessionRecord] = []
+        for workspace in workspaces {
+            let dir = storage.appendingPathComponent(workspace)
+            guard let files = try? fm.contentsOfDirectory(atPath: dir.appendingPathComponent("chatSessions").path),
+                  !files.isEmpty else { continue }
+            let projectPath = Self.vscodeWorkspacePath(dir.appendingPathComponent("workspace.json"))
+            for file in files where file.hasSuffix(".json") || file.hasSuffix(".jsonl") {
+                let url = dir.appendingPathComponent("chatSessions").appendingPathComponent(file)
+                guard let rv = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey]),
+                      let mtime = rv.contentModificationDate, let size = rv.fileSize else { continue }
+                if let cached = fileCache[url.path], cached.mtime == mtime, cached.size == size {
+                    records.append(cached.record)
+                    continue
+                }
+                guard let data = try? Data(contentsOf: url, options: .mappedIfSafe),
+                      let session = VSCodeChatSession.parse(data, isJSONL: file.hasSuffix(".jsonl")),
+                      let record = Self.vscodeRecord(session, projectPath: projectPath, transcriptPath: url.path, fallbackDate: mtime)
+                else { continue }
+                fileCache[url.path] = FileCacheEntry(mtime: mtime, size: size, record: record)
+                records.append(record)
+            }
+        }
+        return records
+    }
+
+    /// `workspace.json` holds `folder` (a `file://` dir) or `workspace` (a `.code-workspace`
+    /// file — its directory is used). Falls back to home when neither resolves.
+    static func vscodeWorkspacePath(_ workspaceJSON: URL) -> String {
+        let json = (try? Data(contentsOf: workspaceJSON))
+            .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: String] } ?? [:]
+        if let folder = json["folder"].flatMap(URL.init(string:)), folder.isFileURL { return folder.path }
+        if let file = json["workspace"].flatMap(URL.init(string:)), file.isFileURL {
+            return file.deletingLastPathComponent().path
+        }
+        return FileManager.default.homeDirectoryForCurrentUser.path
+    }
+
+    static func vscodeRecord(_ session: VSCodeChatSession, projectPath: String, transcriptPath: String, fallbackDate: Date) -> AgentSessionRecord? {
+        guard let first = session.requests.first else { return nil }
+        var turns: [AgentHistoryTurn] = []
+        for request in session.requests {
+            turns.append(AgentHistoryTurn(role: "YOU", content: String(request.prompt.prefix(turnContentLimit))))
+            if !request.response.isEmpty {
+                turns.append(AgentHistoryTurn(role: "AGENT", content: String(request.response.prefix(turnContentLimit))))
+            }
+        }
+        let title = session.title
+            ?? first.prompt.components(separatedBy: .newlines).first(where: { !$0.isEmpty })
+            ?? "VS Code Chat \(session.sessionID.prefix(8))"
+        return AgentSessionRecord(
+            id: session.sessionID,
+            agentKind: .copilot,
+            title: String(title.prefix(120)),
+            projectPath: projectPath,
+            projectName: URL(fileURLWithPath: projectPath).lastPathComponent,
+            messageCount: turns.count,
+            updatedAt: session.lastMessageDate ?? fallbackDate,
+            firstPrompt: first.prompt,
+            latestTurns: Array(turns.suffix(maxLatestTurns)),
+            transcriptPath: transcriptPath,
+            worktreeAvailable: false,
+            placement: .vscode
         )
     }
 
