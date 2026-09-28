@@ -26,7 +26,6 @@ final class HeadlessCLIAdapterTests: XCTestCase {
     func testCodexIgnoresLifecycleLines() {
         let adapter = CodexAdapter()
         for line in [
-            #"{"type":"thread.started","thread_id":"01a09ed0-be7c-7be0-a57a-37df757b6bb0"}"#,
             #"{"type":"turn.started"}"#,
             #"{"type":"turn.completed","usage":{"input_tokens":26038,"output_tokens":5}}"#,
         ] {
@@ -107,7 +106,10 @@ final class HeadlessCLIAdapterTests: XCTestCase {
         let line = """
         {"event":"result","result":{"conversation_id":"37e27586-1d8a-4f47-82b8-0fef06afcf18","status":"SUCCESS","response":"hi\\n","duration_seconds":7.06}}
         """
-        XCTAssertEqual(adapter.parseLine(Data(line.utf8)), [.result(text: "hi\n", costUSD: nil, isError: false)])
+        XCTAssertEqual(adapter.parseLine(Data(line.utf8)), [
+            .result(text: "hi\n", costUSD: nil, isError: false),
+            .sessionID("37e27586-1d8a-4f47-82b8-0fef06afcf18"),
+        ])
     }
 
     func testAgyFailedStatusMapsToIsError() {
@@ -115,7 +117,7 @@ final class HeadlessCLIAdapterTests: XCTestCase {
         let line = """
         {"event":"result","result":{"conversation_id":"x","status":"ERROR","response":null}}
         """
-        XCTAssertEqual(adapter.parseLine(Data(line.utf8)), [.result(text: nil, costUSD: nil, isError: true)])
+        XCTAssertEqual(adapter.parseLine(Data(line.utf8)), [.result(text: nil, costUSD: nil, isError: true), .sessionID("x")])
     }
 
     func testAgyIgnoresStepUpdateAndInitLines() {
@@ -187,6 +189,51 @@ final class HeadlessCLIAdapterTests: XCTestCase {
     }
 
     // MARK: - Multi-adapter registry (ClaudeCodeHarness)
+
+    // Argument shapes below were each verified live against a real session (2026-09-27).
+    func testResumeArgumentsPerAdapter() {
+        let resume = UUID()
+        let lower = resume.uuidString.lowercased()
+
+        let claude = ClaudeAdapter().buildArguments(id: UUID(), prompt: "p", profile: .readonly, model: nil, effort: nil, resumeSessionID: resume)
+        XCTAssertEqual(Array(claude.drop { $0 != "--resume" }.prefix(2)), ["--resume", lower])
+        XCTAssertEqual(Array(claude.drop { $0 != "--setting-sources" }.prefix(2)), ["--setting-sources", "user"],
+                       "resumed runs need user settings so plugin skills load")
+        XCTAssertFalse(claude.contains("--session-id"))
+
+        let agy = AgyAdapter().buildArguments(id: UUID(), prompt: "p", profile: .readonly, model: nil, effort: nil, resumeSessionID: resume)
+        XCTAssertEqual(Array(agy.drop { $0 != "--conversation" }.prefix(2)), ["--conversation", lower])
+
+        let codex = CodexAdapter().buildArguments(id: UUID(), prompt: "p", profile: .readonly, model: nil, effort: nil, resumeSessionID: resume)
+        XCTAssertEqual(Array(codex.suffix(3)), ["resume", lower, "p"], "options precede `resume <id> <prompt>`")
+        XCTAssertEqual(codex.first, "exec")
+    }
+
+    func testFreshClaudeRunKeepsEmptySettingSources() {
+        let id = UUID()
+        let args = ClaudeAdapter().buildArguments(id: id, prompt: "p", profile: .readonly, model: nil, effort: nil, resumeSessionID: nil)
+        XCTAssertEqual(Array(args.drop { $0 != "--setting-sources" }.prefix(2)), ["--setting-sources", ""])
+        XCTAssertEqual(Array(args.drop { $0 != "--session-id" }.prefix(2)), ["--session-id", id.uuidString])
+    }
+
+    // MARK: - Session-id capture (headless-worker-followup). Lines captured from real CLI output 2026-09-27.
+
+    func test_TS0001_claudeInitLineEmitsSessionID() {
+        let line = #"{"type":"system","subtype":"init","session_id":"227205dd-b2aa-4c46-af32-b6c4896bb4c4","cwd":"/tmp"}"#
+        XCTAssertEqual(ClaudeAdapter().parseLine(Data(line.utf8)), [.sessionID("227205dd-b2aa-4c46-af32-b6c4896bb4c4")])
+    }
+
+    func test_TS0002_agyResultLineEmitsResultAndSessionID() {
+        let line = #"{"event":"result","result":{"conversation_id":"917076a8-68ed-44d8-ae22-cefe1c0e7e74","status":"SUCCESS","response":"done"}}"#
+        let events = AgyAdapter().parseLine(Data(line.utf8))
+        XCTAssertTrue(events.contains(.sessionID("917076a8-68ed-44d8-ae22-cefe1c0e7e74")))
+        XCTAssertTrue(events.contains { if case .result(text: "done", _, isError: false) = $0 { return true }; return false })
+    }
+
+    func test_TS0003_codexThreadStartedEmitsSessionID() {
+        let line = #"{"type":"thread.started","thread_id":"01a0cd30-2bf7-7ca0-90dc-f99dbe0a661c"}"#
+        XCTAssertEqual(CodexAdapter().parseLine(Data(line.utf8)), [.sessionID("01a0cd30-2bf7-7ca0-90dc-f99dbe0a661c")])
+    }
 
     func testHarnessRoutesParseLineToTheRunsOwnAdapter() async {
         // Exercises the engine's per-run adapter lookup added for multi-adapter support —
