@@ -589,16 +589,25 @@ final class SurfaceRegistryTests: XCTestCase {
         }
         let key = target.surfaceID
 
-        // The default surface runs a real shell. Let its startup output (rc files, first prompt)
-        // land first — arriving after the injected prompt below, it would both push the prompt
-        // out of the trailing tail and reset the idle clock, so the tab never reads as waiting.
-        // Deterministic on Linux CI; only timing-lucky on macOS before this.
-        Thread.sleep(forTimeInterval: 1.0)
+        // The default surface runs a real shell. Wait for its startup output (rc files, first prompt)
+        // to land and settle before injecting the test prompt — arriving after the prompt, it would
+        // both push the prompt out of the trailing tail and reset the idle clock.
+        let startupDeadline = Date().addingTimeInterval(5.0)
+        while Date() < startupDeadline {
+            if let idle = registry.surfaceIdleTime(for: key), idle >= 0.4 {
+                break
+            }
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+        registry.resetTrailingOutput(surfaceKey: key)
 
         // Agent prints a confirmation prompt, then falls silent for >= 0.4s.
         registry.noteSurfaceOutput(surfaceKey: key, data: Data("Proceed? [y/N] ".utf8))
-        Thread.sleep(forTimeInterval: 0.45)
-        registry.processMonitors()
+        let deadline = Date().addingTimeInterval(3.0)
+        while Date() < deadline && statusOfTab(backing: key, in: registry) != .waiting {
+            Thread.sleep(forTimeInterval: 0.05)
+            registry.processMonitors()
+        }
         XCTAssertEqual(statusOfTab(backing: key, in: registry), .waiting, "prompt signature must mark the tab waiting")
 
         // A steady stream of matching output must not re-fire / stay stuck re-matching.
