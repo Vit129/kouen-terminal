@@ -3,13 +3,13 @@ _Auto-generated from GRAPH_REPORT.md · do not edit manually_
 _Regen: `graphify update .`_
 
 ## Summary
-- 20383 nodes · 55198 edges · 2051 communities (640 shown, 1411 thin omitted)
+- 20380 nodes · 55198 edges · 2041 communities (635 shown, 1406 thin omitted)
 - Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 8239 edges (avg confidence: 0.74)
 - Token cost: 0 input · 0 output
 
 
 ## Graph Freshness
-- Built from commit: `f8e571fd`
+- Built from commit: `3b99d39c`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -32,15 +32,15 @@ A high-degree node isn't always architecturally central - a widely-used
 utility/config file can rack up more edges than a real coupler while only
 ever touching one area. This ranks by how many DIFFERENT communities a
 node's neighbors span, not by raw edge count.
-1. `KouenPaths` - bridges 63 areas (149 edges)
-2. `NSView` - bridges 62 areas (191 edges)
+1. `NSView` - bridges 62 areas (191 edges)
+2. `KouenPaths` - bridges 62 areas (149 edges)
 3. `AgentKind` - bridges 61 areas (166 edges)
 4. `SessionCoordinator` - bridges 51 areas (236 edges)
 5. `Process` - bridges 51 areas (105 edges)
-6. `SessionSnapshot` - bridges 47 areas (181 edges)
-7. `SurfaceRegistry` - bridges 45 areas (217 edges)
-8. `DaemonClient` - bridges 42 areas (210 edges)
-9. `KouenTerminalSurfaceView` - bridges 37 areas (343 edges)
+6. `SessionSnapshot` - bridges 48 areas (181 edges)
+7. `SurfaceRegistry` - bridges 44 areas (217 edges)
+8. `DaemonClient` - bridges 40 areas (210 edges)
+9. `Notification` - bridges 38 areas (68 edges)
 
 ## Surprising Connections (you probably didn't know these)
 - `.selectedHost` --references--> `RemoteHost`  [INFERRED]
