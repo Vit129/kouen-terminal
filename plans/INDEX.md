@@ -5,7 +5,6 @@
 | File | Title | Status |
 |------|-------|--------|
 | [p41-automations/dev-task-progress.md](p41-automations/dev-task-progress.md) | P41 — Automations (scheduled agent launches, `kouen-mcp`) | All tasks built, build/test/robot green, live-check pending |
-| [p37-mobile-connect-v1.md](p37-mobile-connect-v1.md) | P37 — Mobile Connect v1 (QR+Tailscale hardening, in-app QR, real client) | Active — F2/F3/F4 done (F4 reconnect resilience live-verified 2026-07-13), F5 deferred pending web feature completion, F6 parked, F1 blocked on user's own APNs cert setup |
 | [p8-macos27-adoption.md](p8-macos27-adoption.md) | P8 — macOS 27 Golden Gate Adoption | Active |
 
 ## Completed
@@ -16,7 +15,15 @@
 
 | Plan | Version | Notes |
 |------|---------|-------|
-| P25 — iOS/iPadOS Support | Parked | Native app blocked on no paid Apple Developer Program account (confirmed still true 2026-07-23 — a free Xcode signing cert isn't one); Web/PWA MVP continues as P37 — see completed-archive.md |
+| P50 — Multi-agent remote-control / launch table | v4.19.1 | Data-driven `AgentLaunchCommands` + per-agent `agentSessionModes`; Codex cloud exec and Copilot `&` dispatch still open in the plan |
+| P49 — Architectural hardening | v4.18.4 | `KouenIPC` wire contracts, non-defaulted write `origin:`, `TaskStore` invariants, thin-client dependency layering |
+| P48 — Session prev/next buttons | v4.18.2 | ◀ ▶ beside the sidebar toggle = previous/next session in list order (MRU stack dropped); manual preview check and PR were still open in the plan |
+| P47 — Primary-branch worktree fix | v4.18.2 | Auto-isolate no longer strands the primary tree on a feature branch; robot suite not run |
+| P46 — Agentic dev env | v4.18.0 | Checkpoints, undo/verify, write-origin guards, Fleet, Turn Diff Reviewer, context injector |
+| P45 — Orca-class worktree sessions | see CHANGELOG (v4.17–v4.18) | Worktree lineage, Fleet/History, diff viewer, issue tracker drawer |
+| P44 — Autonomous Orchestrator | v4.14.0 / v4.16.0 | Orchestrator contract, worker spawn, inline task status; Agent Swarm core in v4.16.0 |
+| P37 — Mobile Connect v1 | Closed 2026-09-30 | QR+Tailscale web client abandoned in favor of vendor remote-control apps; bridge code kept, deprecated, off by default |
+| P25 — iOS/iPadOS Support | Superseded | Native app was parked (no paid Apple Developer Program account); now closed — mobile access uses each vendor's own remote-control app (decision 2026-09-23, `ARCHITECTURE.md`) |
 | P43 — Add Repo/Folder to Workspace | Reverted | Browse-only built + live-verified, "open session here" follow-up broke on first test, torn down 2026-07-17 — see completed-archive.md |
 | P42 — Workspace Sidebar Panels | Superseded | Built+shipped then reverted (too cramped in narrow sidebar), real ask continued as P43 (2026-07-17) — see completed-archive.md |
 | P40 — MCP Surface Expansion + Shader Presets | Unreleased | Task Dashboard/Worktree/Host MCP tools live-checked 2026-07-13; shader UI reverted separately — see completed-archive.md |

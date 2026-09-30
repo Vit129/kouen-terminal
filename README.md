@@ -4,7 +4,7 @@
 
 > This is a personal fork of [robzilla1738/harness-terminal](https://github.com/robzilla1738/harness-terminal), maintained independently by [Vit129](https://github.com/Vit129). Not affiliated with the original project or its author. It's a hard fork, not a PR queue back upstream — see [What's different from upstream](#whats-different-from-upstream).
 
-Kouen is an Agent Development Environment built around a native macOS terminal — a first-party Swift terminal engine, a background session daemon, a scriptable CLI, embedded browser with MCP control, and multi-agent awareness, plus worktree-aware sessions, a diff viewer that feeds review comments straight back to the agent, an issue tracker that spins up an isolated worktree per ticket, and a fleet view for scheduled automations — all in one app.
+Kouen is an Agent Development Environment built around a native macOS terminal — a first-party Swift terminal engine, a background session daemon, a scriptable CLI, embedded browser with MCP control, and multi-agent awareness, plus worktree-aware sessions, a diff viewer that feeds review comments straight back to the agent, an issue tracker that spins up an isolated worktree per ticket, and a fleet view for scheduled automations, an orchestrator that spawns and supervises worker agents, and cross-agent history with handoff — all in one app. Terminal-first: it supervises agents and git/process state, it is not an IDE.
 
 Run Claude Code, Codex, Gemini CLI, or any agent side-by-side. Sessions persist across app restarts, agents notify you when done, the embedded browser responds to MCP tool calls, and panes render on Metal.
 
@@ -12,7 +12,7 @@ Run Claude Code, Codex, Gemini CLI, or any agent side-by-side. Sessions persist 
 
 ## What's different from upstream
 
-This fork started from upstream (currently v1.12.1) and has since diverged substantially — 47 releases of its own versus upstream's 23, and five new first-party Swift packages backing the features below. Checked directly against upstream's current source, not assumed:
+This fork started from upstream (currently v1.12.1) and has since diverged substantially — over 100 changelog entries of its own (upstream's count of 23 was last checked earlier and may be stale), and a set of first-party Swift packages backing the features below (see [ARCHITECTURE.md](ARCHITECTURE.md)). Checked directly against upstream's current source, not assumed:
 
 - **AI browser control via MCP** — `kouen-mcp` exposes tools like `kouenBrowserOpen` and `kouenBrowserSnapshot` (full list under [AI Browser Control](#ai-browser-control-kouen-mcp)) so agents can drive the embedded browser pane directly. Upstream has no browser pane and no MCP server.
 - **A built-in code editor with LSP** across 21 languages, with vi ex commands `gd` / `K` / `:errors` working against the live session (see [Editor & LSP](#editor--lsp)). Upstream's sidebar is session/tab lists only — no file editor, no LSP.
@@ -80,6 +80,11 @@ See [USAGE.md](USAGE.md) for the full install, run, CLI, and remote/headless gui
 - Embedded browser pane with `kouen-mcp` — AI agents can open URLs, read DOM snapshots, click elements, fill forms, capture screenshots, and inspect network/storage without a separate Playwright process.
 - Headless Claude Code runs — `kouen cc run` (CLI) or `kouenCCRun`/`kouenCCStatus` (`kouen-mcp`) drive `claude` as a real subprocess for one-shot prompts/automations, no pane or human supervision needed.
 - Multi-agent workflows — run Claude Code, Codex, and Gemini CLI in parallel panes with per-agent statusline showing model, context usage, and rate limits.
+- Orchestrator and Agent Swarm — an agent decomposes a goal into Tasks, spawns Worker sessions (interactive or headless via `kouenSpawnWorker`), and drives each toward merge-ready with a bounded auto-fix loop; task status shows inline on tabs and the sidebar. Headless workers accept follow-up turns.
+- Automations — scheduled agent launches with a Jobs fleet view and result viewer (`kouenAutomation*` MCP tools).
+- Worktree-first sessions — lineage and drift tracking per worktree, per-ticket isolated worktrees from the issue tracker, and auto-isolate that keeps the primary checkout on its own branch.
+- Unified History — Claude Code, Codex, Antigravity, Copilot and VS Code Copilot Chat sessions in one list; resume in place or hand a session off to another agent. ◀ ▶ next to the sidebar toggle step to the previous/next session in list order (same action as ⌘⇧[ / ⌘⇧], not a switch-history stack).
+- Per-agent launch modes — `local`, `remote-control` or `cloud` per agent (`agentSessionModes` in `settings.json`), driven by one launch table; see [Mobile](#mobile).
 - Optional tmux-style controls: prefix key, status line, copy mode, paste buffers, hooks, command prompt, and many tmux-compatible commands.
 - IDE-like navigation — double-click folders to cd, ⌘P fuzzy jump to any directory via zoxide frecency, ⌘⇧J frecency dir picker (↩ cd · ⌘↩ open new tab), ⌘⇧R saved command recipes, ⌘-click file paths, `:cd` from the command prompt, and **Open With Kouen** from Finder on any source file.
 - Sidebar tools for sessions, file navigation, real-time Git workflows (one-step Commit & Push, per-hunk stage/unstage, PR merge with squash/rebase/merge picker), command palette, and editor/LSP flows across 21 languages — see [Editor & LSP](#editor--lsp).
@@ -230,7 +235,7 @@ surfaces as a desktop notification instead of silently compounding into the next
   `@last`, `@error`, `@builderror` for the last failed `verify-on-turn` output, `@pane:<id>`,
   `@graph:<symbol>`, `@issue`) and sends the expanded text straight into the active surface.
 - **`kouen history`** — list, search, show, or resume past agent sessions (Claude Code, Codex,
-  Antigravity) across every workspace from the shell: `kouen history`, `kouen history search
+  Antigravity) across every workspace from the shell (Copilot and VS Code Copilot Chat sessions also appear in the app's History view): `kouen history`, `kouen history search
   <keyword>`, `kouen history show <id>`, `kouen history resume <id>`.
 - **`kouen task pack-pr [<slug>] [--out <file>]`** — assembles a PR description (diff stat, gate
   approvals, task checklist) from a feature's tracked state, for `gh pr create --body "$(kouen
@@ -274,6 +279,18 @@ Nothing ships bundled — install the server binary you need yourself. Auto-star
 | Shell | `.sh` `.bash` `.zsh` | `bash-language-server` |
 | Markdown | `.md` | `marksman` |
 
+## Mobile
+
+Kouen does not ship its own mobile app or relay. To watch or steer an agent from a phone, use the vendor's own remote-control app for the session Kouen launched:
+
+| Agent | Mobile route | Status |
+| --- | --- | --- |
+| Claude Code | `claude remote-control` → Claude app / claude.ai/code (Kouen's default launch mode) | Confirmed |
+| Codex | ChatGPT mobile app | Not yet confirmed for `codex` CLI sessions started inside Kouen |
+| Antigravity | Antigravity remote control / companion app | Not yet confirmed for `agy` CLI sessions |
+
+Trade-off: no single cross-vendor mobile dashboard — Kouen's Fleet view is desktop-only. The earlier built-in Mobile Connect bridge (QR + Tailscale web client) is deprecated, off by default (`mobileBridgeEnabled`) and no longer developed. Reasoning: [ARCHITECTURE.md](ARCHITECTURE.md) § Architecture Decisions (2026-09-23).
+
 ## Remote And Headless
 
 The daemon and CLI can run without the GUI, including on Linux. Register a remote daemon over SSH and use `--host` with normal CLI commands:
@@ -299,6 +316,7 @@ kouen-cli capture-pane --host devbox --surface <id>
 
 ## Documentation
 
+- [PRODUCT.md](PRODUCT.md) / [ARCHITECTURE.md](ARCHITECTURE.md) / [DESIGN.md](DESIGN.md) - product scope, system architecture and decision log, visual system
 - [USAGE.md](USAGE.md) - install, run, CLI, remote/headless, IDE-like workflow, experience modes, migration, and troubleshooting
 - [docs/MODES.md](docs/MODES.md) - Plain, Persistent, Full, and Agent Workspace modes (detail)
 - [docs/MIGRATION.md](docs/MIGRATION.md) - migrating from tmux or another terminal setup
