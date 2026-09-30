@@ -1,6 +1,6 @@
 # Kouen Terminal — System Architecture
 
-> Status: **active**. Companion to `PRODUCT.md` (vision/features), `DESIGN.md` (visual system & tokens), and `CONTEXT.md` (domain terms).
+> Status: **active**, synced with code through v4.20.1 (P50). Companion to `PRODUCT.md` (vision/features), `DESIGN.md` (visual system & tokens), and `CONTEXT.md` (domain terms).
 
 ## Constraints & System Invariants
 
@@ -43,8 +43,9 @@ state only), History Hub — resuming a session always re-attaches a **real PTY*
 real CLI scrollback (`claude --resume <id>` etc.), never a separate chat-bubble/document
 reader — Diff Viewer (reads git diff, no compile/lint), Issue Tracker Drawer (fetches
 tickets, spawns worktrees/sessions), Browser Design Mode Bridge (forwards a CSS string to an
-agent, never executes user code). `FileEditorView`/`DiffPaneView` do syntax highlighting only
-— no LSP diagnostics, no breakpoints.
+agent, never executes user code). `FileEditorView`/`DiffPaneView` do syntax highlighting plus
+on-demand LSP lookups (`gd`, `K`, `:errors` from the ex prompt) — no persistent Problems panel,
+no breakpoints, no Run button.
 
 ## Subsystems & Package Map
 
@@ -62,28 +63,42 @@ agent, never executes user code). `FileEditorView`/`DiffPaneView` do syntax high
 │  - SurfaceRegistry (PTY Sessions & Lifecycle)          │
 │  - Unix Domain Socket Server (chmod 0600)              │
 │  - Scrollback Buffer & Hook Event Interception         │
-└──────────▲───────────────────────────────▲─────────────┘
-           │                               │
-           ▼ Unix Domain Socket            ▼ Stdin/Pipes
-┌──────────────────────────────┐ ┌───────────────────────┐
-│     KouenCLI (Frontend)      │ │   ACP / Agent Hooks   │
-│ - attach / send-keys         │ │ - Agent stdin pipe    │
-│ - capture-pane / hooks       │ │ - LSP-style framing   │
-└──────────────────────────────┘ └───────────────────────┘
+│  - Checkpoints, verify, write-origin arbitration       │
+│  - Automations scheduler, headless workers / swarm     │
+└──────────▲───────────────▲───────────────▲─────────────┘
+           │               │               │
+           ▼ Unix socket   ▼ Unix socket   ▼ Stdin/Pipes
+┌──────────────────┐ ┌───────────────────┐ ┌───────────────────┐
+│ KouenCLI         │ │ kouen-mcp         │ │ ACP / Agent Hooks │
+│ - attach/send    │ │ (KouenMCP)        │ │ - Agent stdin pipe│
+│ - capture-pane   │ │ - stdio + HTTP/SSE│ │ - LSP-style frame │
+│ - undo/verify/cc │ │ - browser, tasks, │ └───────────────────┘
+│   history/task   │ │   swarm, features │
+└──────────────────┘ └───────────────────┘
 ```
+
+`KouenCLI` and `KouenMCP` are thin clients: they depend only on interface/data packages
+(`KouenIPC`, `KouenCommands`, `KouenCore`), never on `KouenDaemonCore` (P49).
 
 | Package | Path | Role | Target Platform |
 |---|---|---|---|
-| `KouenCore` | `Packages/KouenCore/` | Shared foundation: IPC codec/client, commands, settings, keybindings, persistence. | All |
+| `KouenIPC` | `Packages/KouenIPC/` | Wire contracts: `IPCMessage`/`IPCCodec`, agent snapshots/summaries, `AgentSessionMode`, `AgentLaunchCommands` (data-driven per-agent launch table). | All |
+| `KouenSettings` | `Packages/KouenSettings/` | `KouenSettings` model, `ExperienceMode`, notch visibility, project config, shell RC wiring. | All |
+| `KouenCommands` | `Packages/KouenCommands/` | Command parser/executor, tmux-style command set, SGR mouse, board model. | All |
+| `KouenCore` | `Packages/KouenCore/` | Shared domain logic: worktree manager, `TaskStore`, `AgentHistoryScanner`, paths/LaunchAgent installer, keybindings, persistence. | All |
 | `KouenTerminalEngine` | `Packages/KouenTerminalEngine/` | Pure-Swift VT100/Xterm parser and screen grid model. No AppKit/Metal. | All |
 | `KouenCopyMode` | `Packages/KouenCopyMode/` | UI-agnostic keyboard copy-mode reducer. | All |
 | `KouenTheme` | `Packages/KouenTheme/` | Theme catalog (`.kouentheme`), base64 embedded in `BundledThemesData.swift`. | All |
 | `CKouenSys` | `Packages/CKouenSys/` | C shim for variadic `ioctl` and POSIX PTY helpers. | Darwin / Glibc |
-| `KouenDaemonCore` | `Packages/KouenDaemon/` | Daemon library: socket server, PTY registry, lifecycle management. | All |
-| `KouenCLI` | `Tools/kouen/Sources/KouenCLI/` | Command-line client (`attach`, `send-keys`, `capture-pane`). | All |
+| `KouenDaemonCore` | `Packages/KouenDaemon/` | Daemon library: socket server, PTY registry, checkpoints/verify, automations, agent adapters, headless workers. Also hosts the legacy `MobileBridgeServer` (see Communication Protocols). | All |
+| `KouenCLI` | `Tools/kouen/Sources/KouenCLI/` | Command-line client (`attach`, `send-keys`, `capture-pane`, `undo`, `verify`, `cc`, `history`, `task`). | All |
+| `KouenMCP` | `Tools/kouen-mcp/Sources/KouenMCP/` | MCP server (`kouen-mcp`): stdio and remote HTTP/SSE transports; browser, task, worktree, host, automation, feature, swarm and worker tools. | All |
+| `KouenLSP` | `Packages/KouenLSP/` | LSP client, server registry, transport (21 languages). | All |
+| `KouenSyntaxResources` | `Packages/KouenSyntaxResources/` | Tree-sitter grammar and markdown/mermaid preview bundles. | macOS |
+| `KouenOnboarding` | `Packages/KouenOnboarding/` | First-run onboarding flow. | macOS |
 | `KouenTerminalRenderer` | `Packages/KouenTerminalRenderer/` | CoreText & Metal glyph atlas, GPU frame builder, wide-gamut sRGB/Display P3. | macOS |
 | `KouenTerminalKit` | `Packages/KouenTerminalKit/` | AppKit terminal host view (`TerminalHostView`, gesture/input handling). | macOS |
-| `KouenApp` | `Apps/Kouen/Sources/KouenApp/` | Native macOS application container and window manager. | macOS |
+| `KouenApp` | `Apps/Kouen/Sources/KouenApp/` | Native macOS application: windows, sidebar, Fleet/Jobs/History views, Agent Notch HUD, issue tracker, diff and file editor. | macOS |
 
 ## Communication Protocols
 
@@ -94,6 +109,10 @@ agent, never executes user code). `FileEditorView`/`DiffPaneView` do syntax high
    - **Daemon Socket Security:** Socket file permissions are owner-only (`chmod 0600`); peer kernel UID is validated against `geteuid()`.
 2. **Remote Daemon (SSH Tunneling):**
    - Managed via `SSHTunnelManager` (`ssh -N -L <local>:<remote>`) exposing a local loopback Unix endpoint with transparent IPC.
+3. **kouen-mcp remote transport (HTTP/SSE):**
+   - Added v4.16.0 alongside stdio, with secure-by-default settings and the same tool registry as stdio. Bearer-token comparison was hardened against timing side-channels in P49.
+4. **Mobile bridge (deprecated, opt-in):**
+   - `MobileBridgeServer` (QR + Tailscale web/PWA client, paired-device store) still ships in `KouenDaemonCore`, gated by `mobileBridgeEnabled` (default `false`) and the `setMobileBridgeEnabled`/`mobile*` IPC messages. **No longer developed** — superseded by the 2026-09-23 decision below (use each vendor's own remote-control app); P37 and P25 are closed. Kept, not deleted, pending a dedicated removal task.
 
 ## Dev & QA Verification Invariants
 
@@ -214,7 +233,7 @@ list account cloud sessions. Both were wrong for this project:
 - **Cloud resume is `claude --teleport <id>`.** `claude --cloud <id>` only attaches together
   with `-p` (post one message and exit), so the first cut's resume command would have failed.
 
-### Multi-Agent Session Modes & Launch Table (P50 Phase B)
+**2026-09-24 (P50 Phase B) — Multi-agent session modes & launch table.**
 
 Building upon the Claude session mode foundation, Kouen generalizes remote-control and cloud launching across all supported agents:
 
@@ -224,3 +243,16 @@ Building upon the Claude session mode foundation, Kouen generalizes remote-contr
 - **Extensibility:** Adding or customizing agents (e.g. Hermes, OpenRouter endpoints) requires only an entry in `AgentLaunchCommands.configs` without modifying dispatch code across the daemon, CLI, or MCP tools.
 - **Safe Fallback & Resume:** Unsupported modes gracefully fall back with logging to stderr. Resuming non-Claude agents preserves native command formats (e.g. `gemini --resume <id>`, `codex resume <id>`, `hermes --resume <id>`) and never defaults to Claude Code.
 - **Unified Launch Resolution:** `KouenSettings.resolvedLaunchCommand(for:cwd:)` centralizes agent kind and mode resolution, shared between `SurfaceRegistry.automationLaunchCommand` and `KouenCLI+Wake.agentLaunchCommand`.
+
+### Shipped capability summary, P44–P49 (2026-08-31 → 2026-09-23)
+
+One-line records; reasoning lives in each plan under `agent-memory/plans/`.
+
+- **P44 Autonomous Orchestrator (v4.14.0):** a CLI agent session decomposes a goal into Tasks, spawns Worker sessions via `kouenSpawnWorker`, and drives each toward merge-ready with a bounded auto-fix loop; task status shows inline on session tabs/sidebar instead of a clickable board. **Agent Swarm Core** (v4.16.0) adds headless fleet orchestration; headless workers accept follow-up turns via session resume (v4.20.0).
+- **P41 Automations / Jobs view (v4.17.0):** scheduled agent launches, addressable through `kouen-mcp` (`kouenAutomation*`), shown in a Jobs fleet view.
+- **P45 Worktree lineage & History:** worktrees are first-class sessions with base/drift tracking; `AgentHistoryScanner` indexes Claude Code, Codex, Antigravity, Copilot and VS Code Copilot Chat, with resume and cross-agent handoff (v4.20.0).
+- **P46 Agentic dev env:** checkpoints, `kouen undo`/`verify`, write-origin guards, Fleet tab, Turn Diff Reviewer, Quick Context Injector (see the 2026-09-21 entries above).
+- **P47 Primary-tree fix:** auto-isolate no longer leaves the primary checkout squatting on a feature branch.
+- **P48 Session navigation buttons (v4.18.2):** started as an MRU switch-history stack (`SessionHistoryNavigator`), replaced in `93362f0f` by the existing `selectAdjacentSession` — ◀ ▶ buttons, Session menu, palette and ⌘⇧[ / ⌘⇧] share one implementation. Order is list order, not visit order.
+- **P49 Architectural hardening (v4.18.4):** IPC wire contracts split into `KouenIPC`; write `origin:` is non-defaulted; `TaskStore` owns its own status invariants; `KouenMCP`/`KouenCLI` no longer depend on `KouenDaemonCore`.
+- **P50 Multi-agent launch table:** see the Phase B entry above. Codex cloud exec and Copilot `&` cloud dispatch were still open tasks in the plan when this was written.
