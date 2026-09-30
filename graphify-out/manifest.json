@@ -365,8 +365,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Chrome/MainWindowController.swift": {
-    "mtime": 1785510867.5164337,
-    "ast_hash": "ac73a821fc8c640b6a61994e57203297",
+    "mtime": 1790760310.012528,
+    "ast_hash": "782da030aabfaac313e211fa49e6de4c",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Chrome/MenuBarController.swift": {
@@ -400,8 +400,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Chrome/WindowTitleStripView.swift": {
-    "mtime": 1789640954.7263389,
-    "ast_hash": "e7d2e69ac7a0118d22fe3651877a76b7",
+    "mtime": 1790760310.0128748,
+    "ast_hash": "8acebef1a8860c31a66bb24cb860ffb4",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/CommandPalette/CommandHistorySearchController.swift": {
@@ -680,8 +680,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Sidebar/SidebarSessionRows.swift": {
-    "mtime": 1789699079.2015853,
-    "ast_hash": "16198f559ef8c12cad7135ba4cf37b6a",
+    "mtime": 1790760310.013398,
+    "ast_hash": "eb085413cd005a73179dcc5fe3d3adb4",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Sidebar/SidebarWorkspaceViews.swift": {
@@ -705,8 +705,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Terminal/TerminalTabBarView.swift": {
-    "mtime": 1789981112.462923,
-    "ast_hash": "95da18dd1622fe629b9f3bf43c1ef23e",
+    "mtime": 1790760310.0139108,
+    "ast_hash": "71a978e16e0ace5f3aef7a8c24e447f8",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/main.swift": {
@@ -1205,8 +1205,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/SurfaceRegistry.swift": {
-    "mtime": 1790263903.1940343,
-    "ast_hash": "5e1c1a1f2de07bd90280cb03f1a3c0ef",
+    "mtime": 1790608642.8185318,
+    "ast_hash": "af437cc4025c88455f7ad5e0eb727fad",
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/VersionBannerState.swift": {
