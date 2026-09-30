@@ -78,13 +78,16 @@ These are fixed `NSMenuItem` bindings defined in `MainMenuBuilder` — not prefi
 | Close session (workspace) | `⌘⇧W` |
 | Switch to session 1–9 | `⌘1` … `⌘9` |
 | Close pane (or tab if single pane) | `⌘W` |
-| Previous / Next session | `⌘[` / `⌘]` |
+| Previous / Next pane | `⌘[` / `⌘]` |
+| Previous / Next session | `⌘⇧[` / `⌘⇧]` (also the ◀ ▶ buttons beside the sidebar toggle) |
+| Move session left / right | `⌘←` / `⌘→` |
+| Close tab | `⌘⇧W` |
 | Split Right | `⌘D` |
 | Split Down | `⌘⇧D` |
-| Close Pane | `⌘⌥W` |
 | Focus Pane direction | `⌘⌥←/→/↑/↓` |
 | **Find File (fuzzy)** | **`⌘P`** |
-| **Find in Files (grep)** | **`⌘F`** |
+| Find in scrollback | `⌘F` |
+| **Find in Files (grep)** | **`⌘⇧F`** |
 | **Jump to Directory** | **`⌘⇧J`** — `↩` cd here · `⌘↩` open new tab · reads zoxide list |
 | **Recipes** | **`⌘⇧R`** — run or send a saved command to Composer |
 | Command prompt | `⌘;` |
@@ -92,9 +95,14 @@ These are fixed `NSMenuItem` bindings defined in `MainMenuBuilder` — not prefi
 | Turn Diff Reviewer (`y` accept · `r` revert to checkpoint · `esc` dismiss) | `⌘⌥D` |
 | Search command history | `⌃R` |
 | Toggle sidebar | `⌘\` |
-| Show Git panel | `⌘G` |
+| Open Lazygit on right / bottom | `⌘G` / `⌘⇧G` |
+| Tab overview | `⌘⇧\` |
+| Composer | `⌘⇧E` |
+| Fork tab | `⌘⇧K` |
+| Floating terminal | `⌘⌥F` |
 | Toggle Agent Notch | `⌘⇧I` |
-| Notifications inbox | `⌘⇧U` |
+| Notifications inbox (Show Notifications) | `⌘⌃I` |
+| Hint mode (open link) | `⌘⇧U` — the View menu also binds Toggle Solid/Glass Opacity to `⌘⇧U` (duplicate binding in code) |
 | Open Browser Pane | `⌘B` |
 | Settings | `⌘,` |
 | Increase / Decrease / Reset font size | `⌘+` / `⌘-` / `⌘0` |

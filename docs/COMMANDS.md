@@ -317,7 +317,7 @@ to target a tab other than the active one, or `--feature <slug>` to resolve the 
 
 | Command | Effect |
 |---|---|
-| `kouen-cli history [list] [--limit N] [--json]` | Recent agent sessions (Claude Code, Codex, Antigravity) across every workspace, newest first. |
+| `kouen-cli history [list] [--limit N] [--json]` | Recent agent sessions (Claude Code, Codex, Antigravity, Copilot, VS Code Copilot Chat) across every workspace, newest first. |
 | `kouen-cli history search <keyword> [--limit N]` | Search prompts/output across all scanned transcripts. |
 | `kouen-cli history show <id>` | Show one session's full detail (agent, project, branch, model, transcript path, recent turns) — `<id>` is prefix-matched. |
 | `kouen-cli history resume <id>` | Open a new tab at that session's project path and replay the agent's own resume command into it. |
@@ -325,6 +325,7 @@ to target a tab other than the active one, or `--feature <slug>` to resolve the 
 | `kouen-cli undo list [--tab/--surface/--feature <id>]` | List that tab's checkpoints, oldest first, each with its diffstat summary line. |
 | `kouen-cli verify [tier1] [--tab/--surface/--feature <id>]` | Fast syntax/build check for the tab's project, auto-detecting the toolchain (same check `verify-on-turn` runs automatically). |
 | `kouen-cli verify tier2 [--tab/--surface/--feature <id>]` | The project's own full test command — deliberately manual-only, since running a full suite after every agent turn is too expensive a default. |
+| `kouen-cli task <new\|status\|list\|gate\|phase\|supersede\|delete\|merge\|sweep\|preview>` | Feature/task tracking subcommands (`Tools/kouen/Sources/KouenCLI/KouenCLI+Task.swift`). |
 | `kouen-cli task pack-pr [<slug>] [--out <file>]` | Assemble a PR description (diff stat, gate approvals, task checklist) from a `kouen task` feature's tracked state; defaults to the current directory's feature when `<slug>` is omitted. |
 
 Checkpoints are created automatically on every agent Stop hook (no command needed); `tier1`
