@@ -190,3 +190,16 @@ final class MainWindowController: NSWindowController {
         WindowBlur.apply(radius: isOpaque ? 0 : settings.backgroundBlur, to: window)
     }
 }
+
+extension NSView {
+    /// Shared titlebar-style double-click → window zoom, for every draggable chrome strip
+    /// (title strip, sidebar header, tab bar). Returns true when the event was consumed.
+    @MainActor
+    func zoomWindowIfDoubleClick(_ event: NSEvent) -> Bool {
+        guard event.clickCount >= 2,
+              let controller = window?.windowController as? MainWindowController
+        else { return false }
+        controller.toggleVisibleFrameZoom(self)
+        return true
+    }
+}

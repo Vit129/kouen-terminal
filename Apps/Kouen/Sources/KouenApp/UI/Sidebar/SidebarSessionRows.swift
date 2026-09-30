@@ -579,12 +579,7 @@ final class SidebarTitlebarHeaderView: NSView {
     override var mouseDownCanMoveWindow: Bool { true }
 
     override func mouseUp(with event: NSEvent) {
-        if event.clickCount >= 2,
-           let controller = window?.windowController as? MainWindowController
-        {
-            controller.toggleVisibleFrameZoom(self)
-            return
-        }
+        if zoomWindowIfDoubleClick(event) { return }
         super.mouseUp(with: event)
     }
 
