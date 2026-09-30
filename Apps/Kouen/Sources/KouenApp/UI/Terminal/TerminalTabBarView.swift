@@ -86,6 +86,11 @@ final class TerminalTabBarView: NSView {
 
     override var mouseDownCanMoveWindow: Bool { true }
 
+    override func mouseUp(with event: NSEvent) {
+        if zoomWindowIfDoubleClick(event) { return }
+        super.mouseUp(with: event)
+    }
+
     func reload(tabs: [Tab], activeTabID: TabID?) {
         model.tabs = tabs
         model.activeTabID = activeTabID
