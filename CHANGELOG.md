@@ -8,12 +8,12 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [4.20.2] - 2026-10-01
 
 ### Added
-- Release version bump to v4.20.2.
+- Double-click tab bar zooms window, centralize zoom helper ([`3b99d39`](https://github.com/Vit129/kouen-terminal/commit/3b99d39c7b58f0a20a16f6141230783ee54c2eae))
+- Model ID field and Test Connection for custom endpoints (release v4.20.2) ([`f5a28ae`](https://github.com/Vit129/kouen-terminal/commit/f5a28ae04cfcde243d0377d1ab0611ffb97e5669))
 
-## [4.20.1] - 2026-09-30
-
-### Added
-- Release version bump to v4.20.1.
+### Documentation
+- Sync README/ARCHITECTURE/PRODUCT/DESIGN with code through v4.20.1 (P40-P50) ([#65](https://github.com/Vit129/kouen-terminal/pull/65)) ([`21ff621`](https://github.com/Vit129/kouen-terminal/commit/21ff621312533dcbc57a95d018a888cf95aaba26))
+- Fix shortcuts, CLI subcommands, options and MCP tool list ([#66](https://github.com/Vit129/kouen-terminal/pull/66)) ([`8e4a609`](https://github.com/Vit129/kouen-terminal/commit/8e4a6095db4770a4d89441570986fbdda78586cc))
 
 ## [4.20.0] - 2026-09-28
 
