@@ -7,8 +7,8 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
 ## [4.20.3] - 2026-10-01
 
-### Added
-- Release version bump to v4.20.3.
+### Fixed
+- Show handoff progress in the tab title and log every step ([#69](https://github.com/Vit129/kouen-terminal/pull/69)) ([`4e1eac9`](https://github.com/Vit129/kouen-terminal/commit/4e1eac90f417c63aaeb0fa24d04f353de3e44f71))
 
 ## [4.20.2] - 2026-10-01
 
