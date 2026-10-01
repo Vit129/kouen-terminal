@@ -78,11 +78,23 @@ public struct CustomModelEndpoint: Identifiable, Codable, Sendable, Equatable {
     public let id: String
     public var name: String
     public var baseURL: String
+    /// The `model` value sent in a Chat Completions request (e.g. `deepseek/deepseek-v4.1-flash/8ac8a`).
+    /// Empty for endpoints saved before this field existed.
+    public var modelID: String
 
-    public init(id: String = UUID().uuidString, name: String, baseURL: String) {
+    public init(id: String = UUID().uuidString, name: String, baseURL: String, modelID: String = "") {
         self.id = id
         self.name = name
         self.baseURL = baseURL
+        self.modelID = modelID
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        baseURL = try c.decode(String.self, forKey: .baseURL)
+        modelID = try c.decodeIfPresent(String.self, forKey: .modelID) ?? ""
     }
 }
 
