@@ -263,6 +263,13 @@ Built-in defaults include:
 - `set-titles` (bool, default `off`) — apply `set-titles-string` to the outer terminal (OSC 2) on attach clients.
 - `set-titles-string` (string) — `FormatString` for the outer terminal title.
 - `detach-on-destroy` (bool, default `on`) — detach `attach-window` clients when their session is destroyed; off re-targets the most recent surviving session.
+- `status-position` (string, default `bottom`) — where the status line is drawn.
+- `word-separators` (string, default space + tab) — characters that bound words in copy-mode `w`/`b`/`e` motions and double-click selection.
+- `wrap-search` (bool, default `on`) — copy-mode search wraps at the buffer edge; off stops at the top/bottom.
+- `window-size` (string, default `smallest`) — how the daemon sizes a window shared by several attached clients (tmux semantics: the smallest request wins).
+- `destroy-unattached` (bool, default `off`) — when the last client detaches, kill sessions that have no attached client.
+- `default-terminal` (string) — terminal identity advertised to programs in a pane.
+- `verify-on-turn` (bool, default `off`) — run the tier-1 build/syntax check after every agent turn (see Agent safety CLI below).
 
 ## Hooks
 
@@ -333,3 +340,57 @@ verification runs automatically after every turn only when enabled via `set-opti
 verify-on-turn on` (see [§ Options](#options)) — a failing check surfaces as a desktop
 notification with a "feed error to agent" action, which resolves `@builderror` via the Quick
 Context Injector (⌘K) and sends it straight into that surface.
+
+## Additional `kouen-cli` subcommands
+
+Usage lines below are taken from the CLI source (`Tools/kouen/Sources/KouenCLI/`).
+
+### Agents, context and scratchpad
+
+| Command | Effect |
+|---|---|
+| `kouen-cli wake <org/repo\|path> --workspace <name\|uuid> [--issue N] [--agent claude] [--branch name] [--prompt text]` | One-shot: resolve or clone the repo, create an isolated worktree, spawn a session, launch the agent, and type the initial prompt (from `--prompt` or the GitHub issue). |
+| `kouen-cli agent list [--status <status>] [--json]` | List active agents and their attention state. |
+| `kouen-cli agent wait <tab-or-surface-id> [--timeout <sec>]` / `agent wait --feature <slug> [--timeout <sec>]` | Block until the agent finishes or asks for attention. |
+| `kouen-cli agent send <file> [--message <msg>] [--tab/--surface/--feature <id>]` | Send a file as context to an agent pane (a target is required when more than one agent is running). |
+| `kouen-cli context diff [--staged] [--all]` | Print the git diff, token-guarded and filtered. |
+| `kouen-cli context file <path>` / `pane <surfaceID> [--tail N]` / `last` / `error` | Print bounded file contents, a pane's tail, the active pane's recent output, or the latest compiler/runtime error. |
+| `kouen-cli context graph <query>` / `issue` | Graphify AST summary for a symbol or feature; the current SDLC feature and checklist. |
+| `kouen-cli context inject "<template>"` | Resolve `@diff`, `@file:<path>`, `@last`, `@error` mentions in a template (same tokens as the ⌘K injector). |
+| `kouen-cli memo set <key> <val>` / `get <key>` / `list [--json]` / `delete <key>` / `clear` | Shared key-value scratchpad for agents. |
+| `kouen-cli cc run "<prompt>" [--cwd <path>] [--profile edit\|readonly] [--model <name>] [--effort <level>] [--no-wait]` | Run `claude` headlessly; `cc status <runId>`, `cc list`, `cc cancel <runId>` manage runs. |
+| `kouen-cli notify --surface <uuid> [--title t] [--body b] [--from-hook] [--status done] [--subagent start\|stop]` | Post an agent notification for a surface (used by agent hooks). |
+| `kouen-cli detect-agent --surface <id>` | Print the agent kind, executable and activity for a surface. |
+| `kouen-cli mcp setup` / `status` / `remove` / `serve` | Write `kouen-mcp` into each installed agent's MCP config, show which agents have it, remove it, or launch it as a remote HTTP/SSE server. |
+
+### Editor, LSP and setup
+
+| Command | Effect |
+|---|---|
+| `kouen-cli view <file>` | Inside Kouen, open the file in the sidebar viewer; elsewhere print its text (files up to 1 MB, UTF-8 only). |
+| `kouen-cli lsp start\|status` / `lsp hover <file>:<line>:<col> [--json]` / `lsp definition <file>:<line>:<col> [--json]` / `lsp diagnostics <file> [--json]` | Query the language server for a file. |
+| `kouen-cli settings show` / `export [path]` / `import <path>` | Print, export or import the settings JSON. |
+| `kouen-cli install-tools` | Install recommended shell tools via Homebrew (zoxide, fd, fzf, ripgrep, bat, eza, jq, lazygit). |
+| `kouen-cli completions <zsh\|fish\|bash>` | Print a shell completion script. |
+
+### Sessions, tabs and recording
+
+| Command | Effect |
+|---|---|
+| `kouen-cli new-tab --workspace <name\|uuid> [--cwd path]` | New tab in a workspace. |
+| `kouen-cli new-split --tab <uuid> --direction horizontal\|vertical` | Split a tab. |
+| `kouen-cli select-workspace --workspace <name\|uuid>` / `select-tab --workspace <uuid> --tab <uuid>` / `select-session --workspace <name\|uuid> --session <uuid>` | Focus a workspace, tab or session. |
+| `kouen-cli close-tab --tab <uuid>` / `close-session --session <uuid>` | Close a tab or session. |
+| `kouen-cli record --surface <uuid> --output <file> [--display]` | Record a surface's output to a file. |
+| `kouen-cli replay <file> [--speed <n>] [--no-timing]` | Play a recording back in this terminal (`--speed 2` = twice as fast). |
+
+### Daemon and diagnostics
+
+| Command | Effect |
+|---|---|
+| `kouen-cli daemon-stats` | Daemon pid, version/build, uptime, surface count and total scrollback bytes. |
+| `kouen-cli list-clients` | Attached clients (id, label, attached surface, connected-at). |
+| `kouen-cli socket-path` | Print the daemon socket path. |
+| `kouen-cli version` / `protocol-version` | Print the version (best-effort daemon query, works with the daemon down) / the IPC protocol version compiled into this binary. |
+| `kouen-cli flush-session-state` | Ask the daemon to flush session state; used by the graceful-install script before a daemon restart. |
+| `kouen-cli mobile-list-clients` / `mobile-revoke-client --device <id>` | List or revoke paired devices of the deprecated mobile bridge (see ARCHITECTURE.md). |
