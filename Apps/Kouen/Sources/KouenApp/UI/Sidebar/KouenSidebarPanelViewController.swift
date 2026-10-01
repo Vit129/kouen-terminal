@@ -739,31 +739,40 @@ final class KouenSidebarPanelViewController: NSViewController {
         let launchCmd = AgentLaunchCommands.launch(kind: targetKind, mode: mode, cwd: cwd)
 
         let coord = SessionCoordinator.shared
+        let log = Logger(subsystem: "com.vit129.kouen", category: "handoff")
+        log.info("handoff: \(record.agentKind.rawValue, privacy: .public) -> \(targetKind.rawValue, privacy: .public), mode \(mode.rawValue, privacy: .public), cwd \(cwd, privacy: .public)")
         Task { @MainActor in
             guard case let .tabID(tabID)? = await coord.requestDaemon(.newTab(
                 workspaceID: workspaceID,
                 cwd: cwd,
                 shell: coord.settings.defaultShell
             )) else {
+                log.error("handoff: daemon did not create the new tab")
                 await coord.syncFromDaemon()
                 return
+            }
+            /// The new tab is a plain shell until the agent boots, so its title is the only progress
+            /// the user can see — keep it current at every step, including failures.
+            func setStatus(_ status: String) async {
+                log.info("handoff: \(status, privacy: .public)")
+                await coord.requestDaemon(.renameTab(tabID: tabID, name: status))
+                await coord.syncFromDaemon()
             }
 
             // 0. Have the source agent write a handoff note (the `handoff` skill for Claude, its
             // instructions for others). Kouen writes the file itself — headless runs can't
             // answer a Write permission prompt. Failure → transcript-only brief.
-            await coord.requestDaemon(.renameTab(tabID: tabID, name: "Handoff: \(record.agentKind.displayName) writing note…"))
-            await coord.syncFromDaemon()
+            await setStatus("Handoff: \(record.agentKind.displayName) writing note… (up to 3 min)")
             var notePath: String?
             if let note = await Self.generateHandoffNote(for: record) {
                 let url = FileManager.default.temporaryDirectory.appendingPathComponent("kouen-handoff-\(record.id).md")
                 if (try? note.write(to: url, atomically: true, encoding: .utf8)) != nil { notePath = url.path }
             }
             let brief = AgentHandoffBuilder.buildBrief(from: record, targetAgent: targetKind, handoffNotePath: notePath)
+            log.info("handoff: note \(notePath == nil ? "unavailable, transcript-only brief" : "written", privacy: .public)")
 
             let title = "Handoff: \(targetKind.displayName)"
-            await coord.requestDaemon(.renameTab(tabID: tabID, name: title))
-            await coord.syncFromDaemon()
+            await setStatus("Handoff: starting \(targetKind.displayName)…")
 
             guard let surfaceID = coord.splitPaneCoordinator.firstSurfaceID(forTab: tabID) else { return }
             coord.setActiveSurface(surfaceID)
@@ -818,8 +827,7 @@ final class KouenSidebarPanelViewController: NSViewController {
                 // Not safe to type into the pane — leave the brief on the clipboard instead.
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(brief, forType: .string)
-                Logger(subsystem: "com.vit129.kouen", category: "sidebar")
-                    .info("Handoff: \(targetKind.displayName, privacy: .public) not ready or showing a prompt; brief copied to clipboard")
+                await setStatus("Handoff: \(targetKind.displayName) not ready — brief copied, paste with ⌘V")
                 return
             }
 
@@ -829,6 +837,7 @@ final class KouenSidebarPanelViewController: NSViewController {
                 data: AgentHandoffBuilder.bracketedPasteData(for: brief),
                 origin: .human
             ))
+            await setStatus(title)
         }
     }
 
