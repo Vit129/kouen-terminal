@@ -356,11 +356,6 @@ public final class KouenTerminalSurfaceView: NSView {
     public var onCopy: ((String) -> Void)?
     /// Optional per-frame renderer stats sink for diagnostics/benchmarks.
     public var onRenderStats: ((TerminalRenderStats) -> Void)?
-    /// ⌥Space hotkey — triggered before the key reaches the PTY. Return `true` to suppress PTY delivery.
-    public var onOptionSpace: (() -> Bool)?
-    /// Generic key intercept — fires before Command shortcuts and PTY delivery (but after copy-mode).
-    /// Return `true` to consume the event. Used by overlay UIs (e.g. `InlineAICompletionView`).
-    public var onKeyIntercept: ((NSEvent) -> Bool)?
     /// Whether Vi modal editing is active. Off by default — Esc reaches the PTY normally until enabled.
     public var viModeEnabled: Bool = false
     /// Vi modal editing state. `.insert` = passthrough; `.normal` = motion keys intercepted.

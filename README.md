@@ -16,7 +16,6 @@ This fork started from upstream (currently v1.12.1) and has since diverged subst
 
 - **AI browser control via MCP** — `kouen-mcp` exposes tools like `kouenBrowserOpen` and `kouenBrowserSnapshot` (full list under [AI Browser Control](#ai-browser-control-kouen-mcp)) so agents can drive the embedded browser pane directly. Upstream has no browser pane and no MCP server.
 - **A built-in code editor with LSP** across 21 languages, with vi ex commands `gd` / `K` / `:errors` working against the live session (see [Editor & LSP](#editor--lsp)). Upstream's sidebar is session/tab lists only — no file editor, no LSP.
-- **Inline AI command suggestions** (`⌥Space`, see [Keyboard Shortcuts](#keyboard-shortcuts)) — sends the pane's recent output to Claude and suggests the next command inline. No equivalent upstream.
 - **A denser navigation layer** — Recipes (`⌘⇧R`), Composer (`⌘⇧E`), the zoxide frecency picker (`⌘⇧J`), tab overview (`⌘⇧\`), and hint mode (`⌘⇧U`) — none of these shortcuts exist upstream.
 - **JavaScriptCore-based scripting** (see [Stack](#stack)) — upstream has no scripting layer at all.
 
@@ -107,7 +106,6 @@ The most-used ones. Full reference (Vi modal editing, prompt tools, navigation, 
 | ⌘⌥F | Floating terminal pane (NSPanel, persisted frame) |
 | ⌘⇧\ | Tab overview — thumbnail grid, click to switch |
 | ⌘F / ⌘⇧F | Scrollback search / find in files |
-| ⌥Space | Inline AI command suggestion overlay — sends recent pane output to Claude, suggests a next command |
 | ⌘⇧U | Hint mode — keyboard-driven link/path opening |
 | ⌘K | Quick Context Injector — inject `@diff`/`@file`/`@last`/`@error`/`@builderror` into the terminal |
 | ⌘⌥D | Turn Diff Reviewer — review the agent's last turn against its checkpoint (`y` accept, `r` revert) |
