@@ -43,7 +43,7 @@ Most multiplexer commands start with a **prefix** keystroke, then a second key.
 
 - **Default prefix: `Ctrl-A`** (the screen/`C-a` convention).
 - Change it in **Settings ▸ Keys** (or `settings.prefixKey`); set it empty to disable the prefix
-  entirely (then drive everything from the `:` prompt, the `Cmd-K` palette, and macOS shortcuts).
+  entirely (then drive everything from the `:` prompt, the `Cmd-P` palette, and macOS shortcuts).
 - Press **`prefix ?`** any time for a live cheatsheet generated from your current bindings.
 
 > The prefix layer only appears in modes that show Kouen controls (Full/Agent modes, or when
@@ -88,9 +88,9 @@ pane into the current one (Kouen's `move-pane`/`join-pane`).
 | `prefix c` | New tab |
 | `prefix n` / `prefix p` | Next / previous tab |
 | `prefix ,` | Rename the current tab |
-| `Cmd-1` … `Cmd-9` | Jump straight to tab 1–9 (shown as `⌘N` on the pills) |
-| `Cmd-Shift-[` / `Cmd-Shift-]` | Previous / next tab |
-| `Cmd-T` / `Cmd-W` | New tab / close tab |
+| `Cmd-1` … `Cmd-9` | Jump straight to session 1–9 |
+| `Cmd-Shift-[` / `Cmd-Shift-]` | Previous / next session (also the ◀ ▶ buttons beside the sidebar toggle) |
+| `Cmd-T` / `Cmd-W` | New session / close pane |
 
 Tab titles auto-follow the pane's working directory (or the running agent), so the strip stays
 readable without manual renaming.
@@ -107,7 +107,6 @@ sidebar rather than something you "attach" to one at a time.
 - **Persistence** (see [MODES.md](MODES.md)): a session survives a *clean* quit if the global
   "keep sessions on quit" is on **or** the session is pinned. Pin/unpin from the sidebar context
   menu or `kouen-cli promote-session` / `demote-session`. A crash leaves everything running.
-- `Cmd-Shift-N` makes a new workspace.
 
 **Grouped sessions:** `kouen-cli new-session --group-with <session>` creates an independent session
 sharing the target session's window list (linked windows with shared surfaces). Every member sees the
@@ -162,7 +161,7 @@ Anything you can bind, you can type.
 - **`prefix :`** or **`Cmd-;`** opens the command prompt; it accepts any command string
   (`split-window -v`, `select-layout tiled`, `bind-key -T prefix S new-session`), with `↑`/`↓`
   history.
-- **`Cmd-K`** opens the command palette (fuzzy actions + themes).
+- **`Cmd-P`** opens the command palette (fuzzy actions + themes); **`Cmd-K`** is the Quick Context Injector.
 - From a shell, **`kouen-cli <verb>`** runs the same vocabulary (and a lot more — buffers,
   hooks, options, layout ops). Run `kouen-cli` with no args for the full list.
 - Rebind anything: `kouen-cli bind-key C-x x kill-pane`, multi-step with `;`
@@ -329,12 +328,12 @@ automatically and notify via Kouen's activity path, so there's nothing to instal
 
 | Shortcut | Action | | Shortcut | Action |
 |---|---|---|---|---|
-| `Cmd-T` / `Cmd-W` | New / close tab | | `Cmd-K` | Command palette |
+| `Cmd-T` / `Cmd-W` | New session / close pane | | `Cmd-P` | Command palette |
 | `Cmd-D` / `Cmd-Shift-D` | Split H / V | | `Cmd-;` | Command prompt |
-| `Cmd-1`…`Cmd-9` | Switch to tab N | | `Cmd-,` | Settings |
-| `Cmd-Shift-[` / `]` | Prev / next tab | | `Cmd-\` | Toggle sidebar |
-| `Cmd-Shift-N` | New workspace | | `Cmd-+` / `-` / `0` | Font bigger / smaller / reset |
-| `Cmd-Shift-I` | Toggle Agent Notch | | `Cmd-Shift-U` | Notifications inbox |
+| `Cmd-1`…`Cmd-9` | Switch to session N | | `Cmd-,` | Settings |
+| `Cmd-Shift-[` / `]` | Prev / next session | | `Cmd-\` | Toggle sidebar |
+| `Cmd-K` | Quick Context Injector | | `Cmd-+` / `-` / `0` | Font bigger / smaller / reset |
+| `Cmd-Shift-I` | Toggle Agent Notch | | `Cmd-Ctrl-I` | Notifications inbox |
 
 > Coming from another multiplexer? [MIGRATION.md](MIGRATION.md) has a key-by-key translation table
 > and a tested path for bringing your config and bindings over. You can migrate a `.tmux.conf` by
@@ -356,7 +355,7 @@ PANES        prefix %  split →      prefix "  split ↓
              prefix m / j  mark / join pane     prefix S  sync-panes
 
 TABS         prefix c  new          prefix n/p  next/prev   prefix ,  rename
-             Cmd-1..9  jump N        Cmd-Shift-[ ]  prev/next
+             Cmd-1..9  session N     Cmd-Shift-[ ]  prev/next session
 
 COPY MODE    prefix [  enter        hjkl move   v/V/C-v select   y yank
              / ? search  n/N next   [ ] jump prompt           q/Esc exit
@@ -364,7 +363,7 @@ COPY MODE    prefix [  enter        hjkl move   v/V/C-v select   y yank
 SESSION      prefix d  detach       View ▸ Detach/Reattach Pane
              attach over ssh:  kouen-cli attach-window [--session NAME]
 
-COMMAND      prefix :  or Cmd-;     Cmd-K palette     kouen-cli <verb>
+COMMAND      prefix :  or Cmd-;     Cmd-P palette     kouen-cli <verb>
 
 SETUP        kouen-cli install                      (CLI + daemon + completion)
              kouen-cli install-shell-integration    (OSC 133 prompt gutter)

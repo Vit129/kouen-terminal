@@ -37,7 +37,7 @@ bringing an existing setup over.
 
 Persistent project workspaces with AI-agent detection, waiting/done/error notifications, and
 notch-based jump-to-agent (`⌘⇧I`) foregrounded. The notifications inbox remains available at
-`⌘⇧U`. The prefix + status line are **available but off by default**
+`⌘⌃I`. The prefix + status line are **available but off by default**
 — enable them without leaving the mode (see *Opting into the prefix + status line*).
 
 ## Persistence (ephemeral vs. persistent)
