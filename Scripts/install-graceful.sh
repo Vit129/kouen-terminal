@@ -122,10 +122,18 @@ if pgrep -x Kouen > /dev/null 2>&1; then
   # Hand install + relaunch off to a process that survives Kouen dying.
   nohup bash -c "
     echo '-- waiting for Kouen GUI to exit'
-    for i in \$(seq 1 100); do
+    for i in \$(seq 1 600); do
       pgrep -x Kouen > /dev/null 2>&1 || break
       sleep 0.1
     done
+    # Never overwrite the bundle under a running GUI: the old process keeps executing from a
+    # replaced app (stale code/resources → freezes, dead shortcuts) and \`open\` would not
+    # relaunch it. A quit-confirmation dialog or a very slow shutdown lands here.
+    if pgrep -x Kouen > /dev/null 2>&1; then
+      echo '-- ABORTED: Kouen did not quit within 60s; the running app was NOT replaced. Quit Kouen, then run: Scripts/install-graceful.sh --no-build'
+      osascript -e 'display notification \"Kouen did not quit - install postponed. Quit Kouen, then run make install-graceful-no-build.\" with title \"Kouen install\"' 2>/dev/null || true
+      exit 0
+    fi
 $STOP_DAEMON_LINES
     echo '-- installing $SRC_ABS -> $DEST_ABS'
     rm -rf '$DEST_ABS'
