@@ -20,8 +20,9 @@ enum SettingsModelsFocus {
 
 /// "Manage Models" — Phase 6.2 of the P45 plan. Generalizes the old single, plaintext
 /// `KouenSettings.claudeAPIKey` field into a Keychain-backed key per `ModelProvider`, plus
-/// arbitrary user-added custom endpoints. Feeds Kouen's own built-in AI features (chat sidebar,
-/// inline completion) — never touches how a third-party agent CLI authenticates itself.
+/// arbitrary user-added custom endpoints. Currently only stored and checkable with Test Connection — no
+/// built-in Kouen feature calls these endpoints yet. Never touches how a third-party agent CLI
+/// authenticates itself.
 struct SettingsModelsView: View {
     /// Pre-selects a row when opened from the Phase 6.3 cross-link on an Agents-tab row.
     var focusedProvider: ModelProvider?

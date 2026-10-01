@@ -190,8 +190,6 @@ extension KouenTerminalSurfaceView {
             handleCopyModeKey(event)
             return
         }
-        // Overlay intercept: e.g. InlineAICompletionController handling Tab/Return/Esc.
-        if let intercept = onKeyIntercept, intercept(event) { return }
         // Vi modal editing: Esc enters normal mode; normal mode maps h/j/k/l etc. to PTY escapes.
         if handleViMode(event) { return }
         // Let the app handle Command shortcuts (menus, palette, etc.).
@@ -275,11 +273,6 @@ extension KouenTerminalSurfaceView {
 
         if let special = Self.specialKey(for: event) {
             emit(inputEncoder.encode(special, modifiers: mods, event: eventType, modes: modes))
-            return
-        }
-
-        // ⌥Space: inline AI completion shortcut. Let the host intercept before the key reaches the PTY.
-        if mods == .option, event.charactersIgnoringModifiers == " ", let handler = onOptionSpace, handler() {
             return
         }
 

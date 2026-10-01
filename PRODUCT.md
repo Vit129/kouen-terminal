@@ -20,7 +20,7 @@ The maintainer (Vit129). Personal hard fork of `robzilla1738/harness-terminal`, 
 - **Daemon-persisted sessions/panes** — survive window close, remote/headless SSH
 - **kouen-mcp** — embedded browser with MCP control, scriptable via JavaScriptCore
 - **Multi-agent awareness** — Agents/Tasks/Board UI, per-agent status/color tinting
-- Built-in code editor + LSP (21 languages), inline AI command suggestions (⌥Space)
+- Built-in code editor + LSP (21 languages)
 - Sidebar Git workflows, Recipes/Composer/zoxide picker, hint mode
 - Four experience modes: Plain Terminal, Persistent Terminal, Full Terminal, Agent Workspace
 - **Agent safety net** — automatic per-turn checkpoints (`kouen-cli undo`), two-tier build/test verification (`kouen-cli verify`, opt-in `verify-on-turn`), and write-origin guards refusing an automation write onto a protected branch, a dirty unisolated checkout, or a surface a human is actively typing in

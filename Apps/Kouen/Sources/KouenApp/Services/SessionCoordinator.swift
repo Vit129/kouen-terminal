@@ -33,8 +33,6 @@ final class SessionCoordinator: NSObject {
     var surfaceIndex: [SurfaceID: (tab: Tab, tabID: TabID)] = [:]
     var lastClosedTab: (cwd: String, title: String)?
     let terminalHosts = TerminalPaneRegistry()
-    /// One inline AI completion controller per terminal pane — keyed by surface UUID string.
-    private var inlineAIControllers: [String: InlineAICompletionController] = [:]
     private var lastDaemonErrorNotice: Date?
     private let snapshotCoalescer = SnapshotCoalescer()
 
@@ -45,9 +43,7 @@ final class SessionCoordinator: NSObject {
 
     private override init() {
         super.init()
-        // Drop the per-surface AI controllers when their host is retired.
         terminalHosts.onRetire = { [weak self] surfaceID in
-            self?.inlineAIControllers.removeValue(forKey: surfaceID.uuidString)
             SecureInputMonitor.shared.release(surfaceID)
             ActivityAssertionManager.shared.releaseAssertions(forSurface: surfaceID)
             if self?.runSurfaceID == surfaceID { self?.runSurfaceID = nil }
@@ -481,10 +477,6 @@ final class SessionCoordinator: NSObject {
         themeService.applyTerminalIdentity(to: host)
         themeService.pushBorderColors(to: host)
         terminalHosts.register(host)
-        // Wire the inline AI completion overlay (⌥Space → Claude command suggestion).
-        let aiController = InlineAICompletionController()
-        aiController.install(in: host)
-        inlineAIControllers[surfaceID.uuidString] = aiController
         // Block output tint + AI explain action bar (Phase 12b).
         let tintOverlay = BlockTintOverlay(surfaceView: host.surfaceView)
         tintOverlay.translatesAutoresizingMaskIntoConstraints = false
