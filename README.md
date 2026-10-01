@@ -182,6 +182,22 @@ AI agents (Claude Code, Codex, Kiro) can see and interact with the embedded brow
 
 **Token efficiency:** snapshot returns structured data (~200–500 tokens), not screenshots or raw HTML — significantly cheaper than vision-based browser automation.
 
+**Beyond the browser** — `kouen-mcp` registers 77 tools in total (`Tools/kouen-mcp/Sources/KouenMCP/ToolRegistry.swift`). The tables in this README cover the browser and Claude Code tools; the rest, by group:
+
+| Group | Tools |
+| --- | --- |
+| Browser (also) | `kouenBrowserWait`, `kouenBrowserClose`, `kouenBrowserEvaluate`, `kouenBrowserGoBack`, `kouenBrowserGoForward`, `kouenBrowserReload`, `kouenBrowserDesignModeInfo` |
+| Panes and sessions | `kouenList`, `kouenBoard`, `openDiffReview`, `readPaneOutput`, `kouenGetLastBlock`, `kouenGetBlock`, `setPaneLabel`, `sendPaneText`, `sendPaneKeys`, `spawnSession`, `splitPane`, `closePane`, `waitForPaneOutput` |
+| Files and commands | `readFile`, `writeFile`, `listDirectory`, `runCommand` |
+| Git | `gitStatus`, `gitDiff`, `gitLog`, `kouenPRStatus` |
+| Code navigation | `kouenFind`, `kouenGrep`, `kouenRecent`, `kouenErrors` |
+| Agents and swarm | `kouenSpawnAgent`, `kouenSpawnWorker`, `kouenSwarmList`, `kouenSwarmInput`, `kouenSwarmTerminate` |
+| Tasks | `kouenTaskList`, `kouenTaskGet`, `kouenTaskCreate`, `kouenTaskUpdate`, `kouenTaskDelete` |
+| Features (AI-SDLC) | `kouenFeatureCreate`, `kouenFeatureGet`, `kouenFeatureList`, `kouenFeatureApproveGate`, `kouenFeatureUpdatePhase`, `kouenContextResolve`, `kouenFeaturePreview` |
+| Worktrees, hosts, projects | `kouenWorktreeList`, `kouenWorktreeCreate`, `kouenWorktreeRemove`, `kouenHostList`, `kouenProjectsList` |
+| Automations | `kouenAutomationList`, `kouenAutomationGet`, `kouenAutomationCreate`, `kouenAutomationUpdate`, `kouenAutomationDelete`, `kouenAutomationPause`, `kouenAutomationResume`, `kouenAutomationRunNow` |
+| Agent routing rules | `kouenRoutingRuleList`, `kouenRoutingRuleCreate`, `kouenRoutingRuleUpdate`, `kouenRoutingRuleDelete`, `kouenRoutingRuleReorder` |
+
 ## Claude Code Harness
 
 Run `claude` as a real subprocess — `-p --output-format stream-json` — instead of a pty pane. No adapter binary, no screen-scraping; tool access is controlled via `--allowedTools`/`--disallowedTools`. For one-shot prompts and automations where nothing needs to watch it run; use `kouenSpawnAgent`/an interactive pane instead when a human is steering.

@@ -74,7 +74,7 @@ kouen-cli install-hooks codex
 kouen-cli install-hooks cursor
 ```
 
-`⌘⇧I` opens the Agent Notch. `⌘⇧U` opens the notifications inbox.
+`⌘⇧I` opens the Agent Notch. `⌘⌃I` opens the notifications inbox.
 
 → [docs/agent-hooks/README.md](docs/agent-hooks/README.md)
 

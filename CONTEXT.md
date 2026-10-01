@@ -17,7 +17,7 @@ A CLI agent session that, given a human-supplied goal, decomposes it into Tasks,
 _Avoid_: Autonomous agent, First-party AI brain
 
 **Worker**:
-A session an Orchestrator spawns (via `kouenSpawnAgent`) to execute one Task in its own isolated Worktree.
+A session an Orchestrator spawns (via `kouenSpawnWorker`, or `kouenSpawnAgent` for an interactive pane) to execute one Task in its own isolated Worktree.
 _Avoid_: Subordinate bot, Background worker thread
 
 **Auto-Fix Loop**:
@@ -87,5 +87,5 @@ _Avoid_: Terminal autocomplete, AI prompt popup
 - A **Host (MCP resource)** is read-only via MCP — creating/editing a Host remains a Settings-UI-only action.
 - An **Automation** is independent of Tasks, Worktrees, and Hosts.
 - An **Agent Routing Rule** resolves to an existing **AgentKind** value — it selects the binary to spawn, not the internal model.
-- An **Orchestrator** creates **Worker** sessions via `kouenSpawnAgent` — a Worker is an ordinary session whose lifecycle is managed by the Orchestrator.
+- An **Orchestrator** creates **Worker** sessions via `kouenSpawnWorker` — a Worker is an ordinary session whose lifecycle is managed by the Orchestrator.
 - An **Auto-Fix Loop** only ever retries the same **Worker** on its own **Worktree** — it never spawns a second Worker on the same Task, and never touches the **Merge Waiver** gate.
