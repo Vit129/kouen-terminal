@@ -31,6 +31,9 @@ struct SettingsModelsView: View {
     @State private var newEndpointName = ""
     @State private var newEndpointURL = ""
     @State private var newEndpointKey = ""
+    @State private var newEndpointModel = ""
+    @State private var formTest: EndpointTestStatus = .idle
+    @State private var rowTests: [String: EndpointTestStatus] = [:]
 
     var body: some View {
         Form {
@@ -57,8 +60,17 @@ struct SettingsModelsView: View {
                             Text(endpoint.baseURL)
                                 .font(.system(size: 10.5, design: .monospaced))
                                 .foregroundStyle(.secondary)
+                            if !endpoint.modelID.isEmpty {
+                                Text(endpoint.modelID)
+                                    .font(.system(size: 10.5, design: .monospaced))
+                                    .foregroundStyle(.secondary)
+                            }
+                            if let status = rowTests[endpoint.id] { TestStatusLabel(status: status) }
                         }
                         Spacer()
+                        Button("Test") { testSaved(endpoint) }
+                            .buttonStyle(.bordered)
+                            .disabled(rowTests[endpoint.id] == .testing)
                         Button("Remove", role: .destructive) {
                             ModelKeyStore.removeCustomEndpoint(id: endpoint.id)
                             customEndpoints = ModelKeyStore.loadCustomEndpoints()
@@ -72,8 +84,17 @@ struct SettingsModelsView: View {
                         .textFieldStyle(.roundedBorder)
                     TextField("Base URL (e.g. https://api.example.com/v1)", text: $newEndpointURL)
                         .textFieldStyle(.roundedBorder)
+                    TextField("Model ID (e.g. deepseek/deepseek-v4.1-flash)", text: $newEndpointModel)
+                        .textFieldStyle(.roundedBorder)
                     SecureField("API Key", text: $newEndpointKey)
                         .textFieldStyle(.roundedBorder)
+                    HStack {
+                        Button("Test Connection") { testForm() }
+                            .buttonStyle(.bordered)
+                            .disabled(newEndpointURL.isEmpty || newEndpointKey.isEmpty
+                                || newEndpointModel.isEmpty || formTest == .testing)
+                        TestStatusLabel(status: formTest)
+                    }
                     Button("Add Custom Endpoint") {
                         addCustomEndpoint()
                     }
@@ -82,7 +103,8 @@ struct SettingsModelsView: View {
                     // requests get sent to, the entire reason a "custom" entry exists (an
                     // unlisted/self-hosted provider the app has no built-in URL for). A saved
                     // name+key with no URL has nowhere to route a request.
-                    .disabled(newEndpointName.isEmpty || newEndpointURL.isEmpty || newEndpointKey.isEmpty)
+                    .disabled(newEndpointName.isEmpty || newEndpointURL.isEmpty || newEndpointKey.isEmpty
+                        || newEndpointModel.isEmpty)
                 }
                 .padding(.top, 4)
             }
@@ -114,12 +136,56 @@ struct SettingsModelsView: View {
     }
 
     private func addCustomEndpoint() {
-        let endpoint = CustomModelEndpoint(name: newEndpointName, baseURL: newEndpointURL)
+        let endpoint = CustomModelEndpoint(
+            name: newEndpointName, baseURL: newEndpointURL, modelID: newEndpointModel
+        )
         ModelKeyStore.addCustomEndpoint(endpoint, key: newEndpointKey)
         customEndpoints = ModelKeyStore.loadCustomEndpoints()
         newEndpointName = ""
         newEndpointURL = ""
         newEndpointKey = ""
+        newEndpointModel = ""
+        formTest = .idle
+    }
+
+    private func testForm() {
+        formTest = .testing
+        let (url, model, key) = (newEndpointURL, newEndpointModel, newEndpointKey)
+        Task { formTest = .done(await CustomEndpointTester.test(baseURL: url, modelID: model, apiKey: key)) }
+    }
+
+    private func testSaved(_ endpoint: CustomModelEndpoint) {
+        rowTests[endpoint.id] = .testing
+        let key = ModelKeyStore.loadKey(forCustomEndpointID: endpoint.id) ?? ""
+        Task {
+            let result = await CustomEndpointTester.test(
+                baseURL: endpoint.baseURL, modelID: endpoint.modelID, apiKey: key
+            )
+            rowTests[endpoint.id] = .done(result)
+        }
+    }
+}
+
+private enum EndpointTestStatus: Equatable {
+    case idle
+    case testing
+    case done(CustomEndpointTester.Result)
+}
+
+private struct TestStatusLabel: View {
+    let status: EndpointTestStatus
+
+    var body: some View {
+        switch status {
+        case .idle:
+            EmptyView()
+        case .testing:
+            Text("Testing…").font(.system(size: 11)).foregroundStyle(.secondary)
+        case let .done(result):
+            Text(result.message)
+                .font(.system(size: 11))
+                .foregroundStyle(result.ok ? Color.green : Color.red)
+        }
     }
 }
 
