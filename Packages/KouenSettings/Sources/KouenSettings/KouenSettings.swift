@@ -311,8 +311,6 @@ public struct KouenSettings: Codable, Sendable, Equatable {
     /// Stored in settings.json (plain text). Users who prefer Keychain can leave this empty
     /// and set ANTHROPIC_API_KEY in their environment instead.
     public var claudeAPIKey: String?
-    /// Whether inline AI ghost-text completion is enabled in the terminal input (Tab to accept).
-    public var inlineAICompletion: Bool
     /// Post-processing shader effect applied over the rendered terminal frame.
     /// Values: "none" (default), "scanlines", "grain", "vignette", "crt" — must match
     /// `TerminalMetalRenderer`'s `overlayMode` switch exactly; an unrecognized string
@@ -434,7 +432,6 @@ public struct KouenSettings: Codable, Sendable, Equatable {
         lspServers: [String: String] = [:],
         fileClickAction: String = "preview",
         claudeAPIKey: String? = nil,
-        inlineAICompletion: Bool = false,
         terminalShaderEffect: String = "none",
         browserHomePage: String = "https://www.google.com"
     ) {
@@ -518,7 +515,6 @@ public struct KouenSettings: Codable, Sendable, Equatable {
         self.lspServers = lspServers
         self.fileClickAction = fileClickAction
         self.claudeAPIKey = claudeAPIKey
-        self.inlineAICompletion = inlineAICompletion
         self.terminalShaderEffect = terminalShaderEffect
         self.browserHomePage = browserHomePage
     }
@@ -717,7 +713,6 @@ public struct KouenSettings: Codable, Sendable, Equatable {
         lspServers = try container.decodeIfPresent([String: String].self, forKey: .lspServers) ?? fallback.lspServers
         fileClickAction = try container.decodeIfPresent(String.self, forKey: .fileClickAction) ?? fallback.fileClickAction
         claudeAPIKey = try container.decodeIfPresent(String.self, forKey: .claudeAPIKey)
-        inlineAICompletion = try container.decodeIfPresent(Bool.self, forKey: .inlineAICompletion) ?? fallback.inlineAICompletion
         terminalShaderEffect = try container.decodeIfPresent(String.self, forKey: .terminalShaderEffect) ?? fallback.terminalShaderEffect
         browserHomePage = try container.decodeIfPresent(String.self, forKey: .browserHomePage) ?? fallback.browserHomePage
     }

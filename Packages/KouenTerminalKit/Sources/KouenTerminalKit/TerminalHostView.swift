@@ -759,19 +759,7 @@ public final class TerminalHostView: NSView {
         nativeView.captureVisibleLines(maxLines: maxLines)
     }
 
-    /// ⌥Space handler — set by `InlineAICompletionController` to intercept the hotkey before it
-    /// reaches the PTY. Return `true` to consume the event.
-    public var onOptionSpace: (() -> Bool)? {
-        get { nativeView.onOptionSpace }
-        set { nativeView.onOptionSpace = newValue }
-    }
 
-    /// Generic key intercept — fires before Command shortcuts and PTY delivery (after copy-mode).
-    /// Return `true` to consume the event.
-    public var onKeyIntercept: ((NSEvent) -> Bool)? {
-        get { nativeView.onKeyIntercept }
-        set { nativeView.onKeyIntercept = newValue }
-    }
 
     /// Send raw bytes to the PTY as if the user typed them. Routes through the same
     /// `InputGate` path as keyboard input (sync panes, etc.).
