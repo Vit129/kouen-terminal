@@ -7,8 +7,9 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
 ## [4.20.4] - 2026-10-02
 
-### Added
-- Release version bump to v4.20.4.
+### Fixed
+- Never replace the app bundle under a running GUI ([#70](https://github.com/Vit129/kouen-terminal/pull/70)) ([`50ab333`](https://github.com/Vit129/kouen-terminal/commit/50ab333d2f866d50fc5243d68638900890b26b87))
+- Resume/handoff open and select a real new tab, hide notch when Vorssaint runs, remove Quick Terminal (release 4.20.4) ([`493ac96`](https://github.com/Vit129/kouen-terminal/commit/493ac9625c90dd93c0d4e1b67100ebf23c1d686f))
 
 ## [4.20.3] - 2026-10-01
 
