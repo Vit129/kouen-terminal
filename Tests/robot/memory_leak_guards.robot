@@ -45,7 +45,6 @@ Leak C - Every Per-Surface Dict In Coordinator Has Retire Cleanup
     ...                the "insert-only dict" pattern before it ships — add the dict,
     ...                forget the cleanup, this fails at PR time.
     ${result}=    Run Process    python3    ${RETIRE_CHECKER}    ${COORDINATOR}
-    ...           stdout=PIPE    stderr=PIPE
     Log    ${result.stdout}
     Should Be Equal As Integers    ${result.rc}    0
     ...    msg=Missing onRetire cleanup — ${result.stdout}
@@ -57,7 +56,6 @@ Leak D - Every Per-Surface Dict In NotificationCoordinator Is Snapshot-Swept
     ...                this guard enforces the same insert-only prevention with the correct strategy.
     ${result}=    Run Process    python3    ${RETIRE_CHECKER}    ${NOTIFICATION_COORD}
     ...           --mode    filter
-    ...           stdout=PIPE    stderr=PIPE
     Log    ${result.stdout}
     Should Be Equal As Integers    ${result.rc}    0
     ...    msg=Missing snapshot-sweep cleanup — ${result.stdout}
