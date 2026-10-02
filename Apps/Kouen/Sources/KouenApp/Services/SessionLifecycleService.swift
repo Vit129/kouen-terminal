@@ -150,8 +150,12 @@ final class SessionLifecycleService {
             if let title = launch.title, !title.isEmpty {
                 await coord.requestDaemon(.renameTab(tabID: tabID, name: title))
             }
+            // Same two-step sync as ⌘T (`addTab`): the tab strip/terminal host lags the daemon.
+            await coord.syncFromDaemon()
+            try? await Task.sleep(for: .milliseconds(600))
             await coord.syncFromDaemon()
             guard let surfaceID = coord.splitPaneCoordinator.firstSurfaceID(forTab: tabID) else { return }
+            coord.selectTab(workspaceID: workspaceID, tabID: tabID)
             coord.setActiveSurface(surfaceID)
             coord.terminalHosts.host(for: surfaceID)?.focusTerminal()
             if let command = launch.command, !command.isEmpty {

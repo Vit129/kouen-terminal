@@ -54,6 +54,11 @@ final class NotchPanelController: NSObject {
     /// — same as any other OS notification, not tied to the persistent-HUD toggle.
     private func applyIdleVisibility() {
         guard panel != nil else { return }
+        // Vorssaint already renders a notch HUD — don't draw a second one on top of it.
+        if Self.isVorssaintRunning {
+            panel?.orderOut(nil)
+            return
+        }
         let enabled = SessionCoordinator.shared.settings.notchVisibilityMode
             .isEnabled(for: SessionCoordinator.shared.settings.experienceMode)
         let shouldShow = enabled
@@ -64,6 +69,10 @@ final class NotchPanelController: NSObject {
         } else {
             panel?.orderOut(nil)
         }
+    }
+
+    private static var isVorssaintRunning: Bool {
+        !NSRunningApplication.runningApplications(withBundleIdentifier: "com.vorssaint.utils").isEmpty
     }
 
     func openFromMenu() {
@@ -103,6 +112,11 @@ final class NotchPanelController: NSObject {
     }
 
     private func observeNotifications() {
+        for name in [NSWorkspace.didLaunchApplicationNotification, NSWorkspace.didTerminateApplicationNotification] {
+            NSWorkspace.shared.notificationCenter.addObserver(
+                self, selector: #selector(workspaceAppsChanged(_:)), name: name, object: nil
+            )
+        }
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(snapshotChanged(_:)),
@@ -191,6 +205,12 @@ final class NotchPanelController: NSObject {
         let rect = CGRect(x: x, y: 0, width: width, height: height)
         maskAnimator.update(to: rect, topRadius: topRadius, bottomRadius: bottomRadius,
                             isOpening: isOpening, reduceMotion: reduceMotion, animated: animated)
+    }
+
+    @objc private func workspaceAppsChanged(_ note: Notification) {
+        guard (note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?
+            .bundleIdentifier == "com.vorssaint.utils" else { return }
+        refreshVisibility()
     }
 
     @objc private func snapshotChanged(_ note: Notification) {

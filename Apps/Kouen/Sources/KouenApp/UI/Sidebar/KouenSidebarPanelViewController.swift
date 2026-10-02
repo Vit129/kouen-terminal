@@ -775,6 +775,7 @@ final class KouenSidebarPanelViewController: NSViewController {
             await setStatus("Handoff: starting \(targetKind.displayName)…")
 
             guard let surfaceID = coord.splitPaneCoordinator.firstSurfaceID(forTab: tabID) else { return }
+            coord.selectTab(workspaceID: workspaceID, tabID: tabID)
             coord.setActiveSurface(surfaceID)
             coord.terminalHosts.host(for: surfaceID)?.focusTerminal()
 
