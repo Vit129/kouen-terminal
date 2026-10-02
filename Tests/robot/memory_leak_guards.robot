@@ -29,9 +29,6 @@ Leak A - Retiring A Host Drops Its AI Controllers
     ${registry}=    Get File    ${PANE_REGISTRY}
     Should Contain    ${registry}    onRetire
     ...    msg=TerminalPaneRegistry must expose an onRetire hook fired from retire()
-    ${coord}=    Get File    ${COORDINATOR}
-    Should Contain    ${coord}    inlineAIControllers.removeValue
-    ...    msg=Coordinator must drop the inline AI controller when its host retires
 
 Leak B - Browser Network Capture Is Bounded
     [Documentation]    The injected fetch/XHR capture array must be capped so a

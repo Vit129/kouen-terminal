@@ -68,6 +68,8 @@ public enum AgentAvailabilityChecker {
             candidates = [".gemini/antigravity-cli/brain", ".config/gcloud/application_default_credentials.json"]
         case .cursor:
             candidates = [".cursor/config.json"]
+        case .copilot:
+            candidates = [".copilot/config.json", ".copilot/session-store.db"]
         default:
             return true // No known config-file convention: don't flag a false "needs key".
         }
