@@ -970,8 +970,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/KouenVersion.swift": {
-    "mtime": 1790907464.0396152,
-    "ast_hash": "b7b7126c15001f12cd338f991fbae44e",
+    "mtime": 1790928058.0940495,
+    "ast_hash": "29ab424ccb6fb7b0f697ade42e0c2b04",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Layouts/LayoutTemplate.swift": {
@@ -1060,8 +1060,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/GeneratedReleaseNotes.swift": {
-    "mtime": 1790907465.164832,
-    "ast_hash": "084cf2a41f322f85d8148f735587abac",
+    "mtime": 1790928059.259383,
+    "ast_hash": "574b58459556e9ceb0f6c03091273c51",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/ReleaseNotes.swift": {
@@ -4185,8 +4185,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Sidebar/ProjectDirectoryTree.swift": {
-    "mtime": 1789825019.985213,
-    "ast_hash": "2e97db52cd8d8a5aa55f71fa7c753287",
+    "mtime": 1790939599.282279,
+    "ast_hash": "5baf5ee233666a42943368dfd03a18c8",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Archive/GitPanelView.swift": {
