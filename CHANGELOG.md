@@ -7,8 +7,8 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
 ## [4.20.6] - 2026-10-02
 
-### Added
-- Release version bump to v4.20.6.
+### Fixed
+- Stop re-importing stale recents as projects (release 4.20.6) ([`0a71ddb`](https://github.com/Vit129/kouen-terminal/commit/0a71ddb2f04def16c3408419b6acac934e437db6))
 
 ## [4.20.5] - 2026-10-02
 
