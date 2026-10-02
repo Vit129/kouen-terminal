@@ -219,6 +219,12 @@ private struct SidebarProjectHeaderRow: View {
                     .foregroundStyle(Color(nsColor: c.textTertiary))
             }
 
+            if item.isMissing {
+                Text("missing")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.orange)
+            }
+
             if item.hasWorktrees {
                 Image(systemName: "arrow.triangle.branch")
                     .font(.system(size: 9.5, weight: .semibold))
@@ -303,6 +309,9 @@ private struct SidebarProjectHeaderRow: View {
             }
         }
 
+        if item.isMissing {
+            Button("Relocate…") { relocate() }
+        }
         Divider()
         Button("Reveal in Finder") {
             NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: item.path)
@@ -311,6 +320,18 @@ private struct SidebarProjectHeaderRow: View {
         Button("Remove from Workspace", role: .destructive) {
             onRemoveProject()
         }
+    }
+
+    private func relocate() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Relocate"
+        panel.message = "Choose the new folder for \(item.name)"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        model.projectStore?.relocateProject(item.path, to: url.path)
+        model.scheduleRebuild()
     }
 
     private func promptNewGroup(for projectPath: String) {

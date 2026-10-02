@@ -43,6 +43,8 @@ struct SidebarProjectHeaderItem: Identifiable, Sendable {
     let hasWorktrees: Bool
     let sessionsCount: Int
     let isCollapsed: Bool
+    /// The project's folder no longer exists (moved/renamed/deleted) — offer Relocate/Remove.
+    var isMissing: Bool = false
 
     var id: String { path }
 }
@@ -113,19 +115,7 @@ final class SidebarListModel {
         activeSessionID = snapshot.activeWorkspace?.activeSessionID
         activeWorkspaceID = snapshot.activeWorkspaceID
 
-        if let store = projectStore {
-            for session in sessions {
-                let root = repoRootForSession(session)
-                // Only a real repo root (a `.git` *directory*) auto-registers. `repoRootForSession`
-                // falls back to the raw cwd while git is still resolving, which used to persist
-                // worktree dirs, `.kouen-worktrees`, and non-repo parent folders as phantom projects.
-                var isDir: ObjCBool = false
-                if !root.isEmpty, root != "Other",
-                   FileManager.default.fileExists(atPath: root + "/.git", isDirectory: &isDir), isDir.boolValue {
-                    store.addProject(root)
-                }
-            }
-        }
+        registerSessionProjects()
         rebuildRows()
     }
 
@@ -224,20 +214,27 @@ final class SidebarListModel {
         }
     }
 
+    /// Auto-registers each session's repo as a project — only a real repo root (a `.git`
+    /// *directory*). `repoRootForSession` falls back to the raw cwd while git is still resolving,
+    /// which used to persist worktrees and non-repo folders as phantom projects.
+    private func registerSessionProjects() {
+        guard let store = projectStore else { return }
+        for session in sessions {
+            let root = repoRootForSession(session)
+            var isDir: ObjCBool = false
+            if !root.isEmpty, root != "Other",
+               FileManager.default.fileExists(atPath: root + "/.git", isDirectory: &isDir), isDir.boolValue {
+                store.addProject(root)
+            }
+        }
+    }
+
     private func rebuildRows() {
         guard !isRebuilding else { return }
         isRebuilding = true
         defer { isRebuilding = false }
 
-        if let store = projectStore {
-            let home = FileManager.default.homeDirectoryForCurrentUser.path
-            for session in sessions {
-                let root = repoRootForSession(session)
-                if !root.isEmpty && root != "Other" && root != home && !root.hasSuffix("/.git") && (root as NSString).lastPathComponent != ".git" {
-                    store.addProject(root)
-                }
-            }
-        }
+        registerSessionProjects()
 
         var newRows: [SidebarSessionRow] = []
 
@@ -318,7 +315,8 @@ final class SidebarListModel {
             categoryID: project.categoryID,
             hasWorktrees: hasWorktrees,
             sessionsCount: matchingSessions.count + extraWorktrees.count,
-            isCollapsed: isCollapsed
+            isCollapsed: isCollapsed,
+            isMissing: !FileManager.default.fileExists(atPath: project.path)
         )
         result.append(.projectHeader(headerItem))
 
