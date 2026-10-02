@@ -7,8 +7,8 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
 ## [4.20.7] - 2026-10-02
 
-### Added
-- Release version bump to v4.20.7.
+### Fixed
+- Single guarded project auto-registration, missing/relocate for moved projects (release 4.20.7) ([`703a9f3`](https://github.com/Vit129/kouen-terminal/commit/703a9f376bc85a147bd26893852008cb809d11bb))
 
 ## [4.20.6] - 2026-10-02
 
