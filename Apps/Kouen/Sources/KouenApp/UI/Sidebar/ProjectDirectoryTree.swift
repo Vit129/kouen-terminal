@@ -65,7 +65,13 @@ final class ProjectStore {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         let existing = Set(projects.map(\.path))
         let legacyPaths = (UserDefaults.standard.stringArray(forKey: "RecentProjectPaths") ?? [])
-            .filter { !existing.contains($0) && !$0.hasSuffix("/.git") && ($0 as NSString).lastPathComponent != ".git" && $0 != home }
+            .filter { path in
+                var isDir: ObjCBool = false
+                // Same rule as SidebarListModel.update: only a real repo root (`.git` directory),
+                // else stale recents re-import worktrees and non-repo folders on every launch.
+                return !existing.contains(path) && path != home
+                    && FileManager.default.fileExists(atPath: path + "/.git", isDirectory: &isDir) && isDir.boolValue
+            }
         guard !legacyPaths.isEmpty else { return }
         for path in legacyPaths {
             projects.append(ProjectEntry(path: path))
