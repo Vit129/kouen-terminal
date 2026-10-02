@@ -116,7 +116,12 @@ final class SidebarListModel {
         if let store = projectStore {
             for session in sessions {
                 let root = repoRootForSession(session)
-                if !root.isEmpty && root != "Other" {
+                // Only a real repo root (a `.git` *directory*) auto-registers. `repoRootForSession`
+                // falls back to the raw cwd while git is still resolving, which used to persist
+                // worktree dirs, `.kouen-worktrees`, and non-repo parent folders as phantom projects.
+                var isDir: ObjCBool = false
+                if !root.isEmpty, root != "Other",
+                   FileManager.default.fileExists(atPath: root + "/.git", isDirectory: &isDir), isDir.boolValue {
                     store.addProject(root)
                 }
             }
