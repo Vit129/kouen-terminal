@@ -96,6 +96,17 @@ final class ProjectStore {
         KouenSidebarPanelViewController.recordRecentProject(path)
     }
 
+    /// Points an existing project at its new folder, keeping its group.
+    func relocateProject(_ oldPath: String, to newPath: String) {
+        guard let idx = projects.firstIndex(where: { $0.path == oldPath }) else { return }
+        if projects.contains(where: { $0.path == newPath }) {
+            projects.remove(at: idx)   // new location already tracked — just drop the stale one
+        } else {
+            projects[idx].path = newPath
+        }
+        save()
+    }
+
     func removeProject(_ path: String) {
         projects.removeAll { $0.path == path }
         save()
