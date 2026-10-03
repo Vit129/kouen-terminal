@@ -970,8 +970,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/KouenVersion.swift": {
-    "mtime": 1790939803.915464,
-    "ast_hash": "91726ee18bc1211fcb70319d0a70e30d",
+    "mtime": 1790940579.4211693,
+    "ast_hash": "8e2239c836e46e7e4f4195a46a5820a8",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Layouts/LayoutTemplate.swift": {
@@ -1060,8 +1060,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/GeneratedReleaseNotes.swift": {
-    "mtime": 1790939804.6440697,
-    "ast_hash": "b71df39559c8387a2b93175c413f76bf",
+    "mtime": 1790940580.0978768,
+    "ast_hash": "d0abbf50cf1a60bb7378f5a1b7eff813",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/ReleaseNotes.swift": {
@@ -3110,8 +3110,8 @@
     "semantic_hash": ""
   },
   "Tests/robot/memory_leak_guards.robot": {
-    "mtime": 1790907487.12097,
-    "ast_hash": "b4e8406491b99e334dfd77845e4f9784",
+    "mtime": 1790954716.033366,
+    "ast_hash": "34fa747f5f8dda39733a14efaabea35f",
     "semantic_hash": ""
   },
   "Tests/robot/mobile_bridge_pairing_bugs.robot": {
@@ -4080,8 +4080,8 @@
     "semantic_hash": ""
   },
   "ARCHITECTURE.md": {
-    "mtime": 1790829317.1375551,
-    "ast_hash": "5967e7f37fd932d3a8a6b2d72f4c0bea",
+    "mtime": 1790954716.0331466,
+    "ast_hash": "a873050a33cd8d1aa4a33dfdfd414804",
     "semantic_hash": ""
   },
   "CONTEXT.md": {
