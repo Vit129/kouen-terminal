@@ -4,12 +4,13 @@ import KouenIPC
 import KouenSettings
 
 /// Manages background remote-control companion daemons (e.g. `codex remote-control start`,
-/// `agy remote-control start`) that run at most once per daemon lifetime.
+/// `agy remote-control start`, `happy daemon start`) that run at most once per daemon lifetime.
 public final class AgentRemoteControlDaemonService: @unchecked Sendable {
     public static let shared = AgentRemoteControlDaemonService()
 
     private let lock = NSLock()
     private var startedAgents: Set<AgentKind> = []
+    private var startedHappy = false
 
     public init() {}
 
@@ -18,6 +19,7 @@ public final class AgentRemoteControlDaemonService: @unchecked Sendable {
         let home = NSHomeDirectory()
         let candidates = [
             home + "/.local/bin/" + name,
+            home + "/.volta/bin/" + name,
             "/opt/homebrew/bin/" + name,
             "/usr/local/bin/" + name,
             "/usr/bin/" + name,
@@ -45,6 +47,14 @@ public final class AgentRemoteControlDaemonService: @unchecked Sendable {
         }
     }
 
+    /// True when any agent Happy can wrap is set to `.happy` — Happy's daemon must be up so a
+    /// phone can start or resume sessions while no pane is open.
+    static func wantsHappyDaemon(_ settings: KouenSettings) -> Bool {
+        AgentLaunchCommands.configs.contains { kind, config in
+            config.happyCommand != nil && settings.sessionMode(for: kind) == .happy
+        }
+    }
+
     /// Starts companion daemons for configured agents if their mode is `.remoteControl`
     /// and their binary exists on this Mac.
     public func startConfiguredDaemons(settings: KouenSettings = .load(), log: (@Sendable (String) -> Void)? = nil) {
@@ -66,6 +76,15 @@ public final class AgentRemoteControlDaemonService: @unchecked Sendable {
                 startedAgents.insert(.antigravity)
                 log?("Starting Antigravity remote-control daemon (\(bin))")
                 spawnDaemon(executable: bin, arguments: ["remote-control", "start"], log: log)
+            }
+        }
+
+        // 3. Happy daemon (`happy daemon start` detaches itself; a no-op if already running)
+        if Self.wantsHappyDaemon(settings) && !startedHappy {
+            if let bin = Self.resolveExecutable(named: "happy") {
+                startedHappy = true
+                log?("Starting Happy daemon (\(bin))")
+                spawnDaemon(executable: bin, arguments: ["daemon", "start"], log: log)
             }
         }
     }

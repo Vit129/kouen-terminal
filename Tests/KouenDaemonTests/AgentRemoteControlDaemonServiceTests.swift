@@ -25,6 +25,17 @@ final class AgentRemoteControlDaemonServiceTests: XCTestCase {
         XCTAssertNil(AgentRemoteControlDaemonService.resolveExecutable(named: "non_existent_binary_xyz_123"))
     }
 
+    func testWantsHappyDaemonOnlyWhenAnAgentUsesHappyMode() {
+        XCTAssertFalse(AgentRemoteControlDaemonService.wantsHappyDaemon(KouenSettings()))
+        var settings = KouenSettings()
+        settings.agentSessionModes[.copilot] = .happy
+        XCTAssertTrue(AgentRemoteControlDaemonService.wantsHappyDaemon(settings))
+        // Unsupported agent: sessionMode may say .happy but there is no happyCommand to start.
+        var unsupported = KouenSettings()
+        unsupported.agentSessionModes = [.kiro: .happy]
+        XCTAssertFalse(AgentRemoteControlDaemonService.wantsHappyDaemon(unsupported))
+    }
+
     func testServiceIdempotent() {
         let service = AgentRemoteControlDaemonService()
         let box = LogBox()

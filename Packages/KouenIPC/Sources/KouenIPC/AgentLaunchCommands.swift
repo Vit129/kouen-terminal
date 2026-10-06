@@ -74,13 +74,14 @@ public enum AgentLaunchCommands {
         ),
         .copilot: AgentLaunchConfig(
             binary: "copilot",
-            supportedModes: [.local, .remoteControl],
+            supportedModes: [.local, .remoteControl, .happy],
             cloudFallback: .remoteControl,
             launchFlags: [
                 .remoteControl: ["--remote"]
             ],
             resumeStyle: .flag("--resume"),
-            appendModeFlagsOnResume: true
+            appendModeFlagsOnResume: true,
+            happyCommand: "happy acp -- copilot --acp"
         ),
         .codex: AgentLaunchConfig(
             binary: "codex",
