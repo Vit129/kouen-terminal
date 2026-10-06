@@ -7,8 +7,8 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
 ## [4.20.8] - 2026-10-06
 
-### Added
-- Release version bump to v4.20.8.
+### Fixed
+- Stop memory-leak guard tests from writing a PIPE file at the repo root ([`b99dca7`](https://github.com/Vit129/kouen-terminal/commit/b99dca70538ae3428e34b9548fa3c38d6c521143))
 
 ## [4.20.7] - 2026-10-02
 
