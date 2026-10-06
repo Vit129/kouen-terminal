@@ -167,19 +167,29 @@ extension KouenCLI {
             exit(1)
         }
 
+        let settings = KouenSettings.load()
+        let mode = settings.sessionMode(for: record.agentKind)
+        let cmd = record.effectiveResumeCommand(mode: mode)
+        let tabID = try await openTab(running: cmd, cwd: record.projectPath, client: client, label: "history")
+        print(tabID.uuidString)
+    }
+
+    /// New tab in the active workspace, wait for its surface, then type `command`. Shared by
+    /// `history resume` and `happy adopt`. Same spawn/poll shape `handleWake` and
+    /// `kouenSpawnAgent` (MCP) use.
+    static func openTab(running command: String, cwd: String?, client: DaemonClient, label: String) async throws -> UUID {
         let snap = try snapshot(client)
         guard let workspaceID = snap.activeWorkspaceID ?? snap.workspaces.first?.id else {
-            fputs("history: no workspace to resume into\n", kouenStderr)
+            fputs("\(label): no workspace to open a tab in\n", kouenStderr)
             exit(1)
         }
 
-        let response = try checkedRequest(client, .newTab(workspaceID: workspaceID, cwd: record.projectPath, shell: nil))
+        let response = try checkedRequest(client, .newTab(workspaceID: workspaceID, cwd: cwd, shell: nil))
         guard case let .tabID(tabID) = response else {
-            if case let .error(msg) = response { fputs("history: \(msg)\n", kouenStderr) }
+            if case let .error(msg) = response { fputs("\(label): \(msg)\n", kouenStderr) }
             exit(1)
         }
 
-        // Same spawn/poll shape `handleWake` and `kouenSpawnAgent` (MCP) both already use.
         var surfaceID: String?
         for attempt in 0..<6 {
             if attempt > 0 { try? await Task.sleep(nanoseconds: 350_000_000) }
@@ -192,15 +202,11 @@ extension KouenCLI {
             break
         }
         guard let surfaceID else {
-            fputs("history: tab created but surface not ready in time (tabID=\(tabID.uuidString))\n", kouenStderr)
+            fputs("\(label): tab created but surface not ready in time (tabID=\(tabID.uuidString))\n", kouenStderr)
             exit(1)
         }
-
-        let settings = KouenSettings.load()
-        let mode = settings.sessionMode(for: record.agentKind)
-        let cmd = record.effectiveResumeCommand(mode: mode)
-        _ = try checkedRequest(client, .send(surfaceID: surfaceID, text: cmd + "\n", origin: .automation))
-        print(tabID.uuidString)
+        _ = try checkedRequest(client, .send(surfaceID: surfaceID, text: command + "\n", origin: .automation))
+        return tabID
     }
 }
 
