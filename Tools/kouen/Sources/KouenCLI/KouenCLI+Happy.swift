@@ -25,6 +25,15 @@ extension KouenCLI {
         sessions.filter { $0.startedBy == "daemon" && isAlive($0.pid) }
     }
 
+    /// Happy may pick a stale npm `claude` (EACCES) and the pane's `claude` is a shell function, so
+    /// pin the real binary found on this process's PATH.
+    static func happyResumeCommand(_ id: String, path: String = ProcessInfo.processInfo.environment["PATH"] ?? "",
+                                   isExecutable: (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) }) -> String {
+        let claude = path.split(separator: ":").map { "\($0)/claude" }.first(where: isExecutable)
+        let prefix = claude.map { "HAPPY_CLAUDE_PATH='\($0.replacingOccurrences(of: "'", with: "'\\''"))' " } ?? ""
+        return "\(prefix)happy resume \(id)"
+    }
+
     private static func runHappy(_ arguments: [String]) -> String? {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
@@ -77,7 +86,7 @@ extension KouenCLI {
                 fputs("happy: pid \(session.pid) did not stop; not resuming \(session.happySessionId)\n", kouenStderr)
                 continue
             }
-            let tabID = try await openTab(running: "happy resume \(session.happySessionId)", cwd: nil, client: client, label: "happy")
+            let tabID = try await openTab(running: happyResumeCommand(session.happySessionId), cwd: nil, client: client, label: "happy")
             print(tabID.uuidString)
         }
     }

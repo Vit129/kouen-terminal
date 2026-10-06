@@ -83,15 +83,32 @@ public final class AgentRemoteControlDaemonService: @unchecked Sendable {
         if !startedHappy, let bin = happy, Self.shouldStartHappyDaemon(happyPath: happy) {
             startedHappy = true
             log?("Starting Happy daemon (\(bin))")
-            spawnDaemon(executable: bin, arguments: ["daemon", "start"], log: log)
+            spawnDaemon(executable: bin, arguments: ["daemon", "start"], environment: Self.happyEnvironment(), log: log)
         }
     }
 
-    private func spawnDaemon(executable: String, arguments: [String], log: (@Sendable (String) -> Void)?) {
+    /// The Kouen daemon runs under launchd with a bare `PATH` (`/usr/bin:/bin:...`). Phone-started
+    /// sessions are spawned by Happy's daemon, which inherits this env, so give it the tool dirs a
+    /// login shell would have and pin `HAPPY_CLAUDE_PATH` to the real `claude` (Happy otherwise may
+    /// pick a stale npm install or find none).
+    static func happyEnvironment(base: [String: String] = ProcessInfo.processInfo.environment,
+                                 home: String = NSHomeDirectory(),
+                                 claude: String? = resolveExecutable(named: "claude")) -> [String: String] {
+        var env = base
+        let extra = [home + "/.local/bin", home + "/.volta/bin", "/opt/homebrew/bin", "/usr/local/bin"]
+        let existing = (base["PATH"] ?? "").split(separator: ":").map(String.init)
+        env["PATH"] = (extra + existing.filter { !extra.contains($0) }).joined(separator: ":")
+        if env["HAPPY_CLAUDE_PATH"] == nil, let claude { env["HAPPY_CLAUDE_PATH"] = claude }
+        return env
+    }
+
+    private func spawnDaemon(executable: String, arguments: [String], environment: [String: String]? = nil,
+                             log: (@Sendable (String) -> Void)?) {
         DispatchQueue.global().async {
             let process = Process()
             process.executableURL = URL(fileURLWithPath: executable)
             process.arguments = arguments
+            if let environment { process.environment = environment }
             process.standardOutput = FileHandle.nullDevice
             process.standardError = FileHandle.nullDevice
             do {

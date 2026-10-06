@@ -274,9 +274,15 @@ fills the "3 vendor apps for 3 agents" gap without kouen running any relay itsel
   Hand-typed `claude`/`codex` go through Happy in `happy` mode via the shell wrappers. Risk to verify: Happy's README says a daemon started from a
   launchd agent domain cannot reach the keychain, so phone-spawned Claude sessions may fail
   auth (401) if Kouen's daemon runs outside the GUI session; terminal-started sessions are unaffected.
-- **Known gaps:** whether kouen's waiting/needs-approval state fires while a Happy permission
-  request is pending is unverified (remote-mode claude runs with `--permission-prompt-tool stdio`,
-  so claude hooks may not fire); Happy may pick a stale npm `claude` (EACCES) — set
+- **Phone-started sessions:** `kouen-cli happy adopt <id>|--all` stops the headless process and
+  `happy resume`s it in a new tab (verified: phone → tab → phone round trip, one process). Happy's
+  daemon is started by the Kouen daemon with a tool-dir `PATH` and `HAPPY_CLAUDE_PATH` pinned;
+  verified under a launchd LaunchAgent with the same bare `PATH`: a phone-started Claude session
+  answered, no keychain 401.
+- **Known gaps:** kouen does **not** show "waiting" while a Happy permission request is pending
+  (verified: `list-agents --waiting` stays empty; remote-mode claude uses
+  `--permission-prompt-tool stdio`, which bypasses the hooks that set the state). Happy's push is
+  the only alert. Happy may pick a stale npm `claude` (EACCES) — set
   `HAPPY_CLAUDE_PATH` to the real binary; `happy agy --conversation <id>` resume is untested.
 
 ### Shipped capability summary, P44–P49 (2026-08-31 → 2026-09-23)

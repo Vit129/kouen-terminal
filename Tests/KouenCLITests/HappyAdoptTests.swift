@@ -22,4 +22,10 @@ final class HappyAdoptTests: XCTestCase {
         let adoptable = KouenCLI.adoptableHappySessions(all) { $0 != 300 }   // 300 is a stale pid
         XCTAssertEqual(adoptable.map(\.happySessionId), ["cmuaaa"], "terminal-started and dead sessions are skipped")
     }
+
+    func testResumeCommandPinsClaudeOnPath() {
+        XCTAssertEqual(KouenCLI.happyResumeCommand("cmu1", path: "/a:/h/.local/bin:/b") { $0 == "/h/.local/bin/claude" },
+                       "HAPPY_CLAUDE_PATH='/h/.local/bin/claude' happy resume cmu1")
+        XCTAssertEqual(KouenCLI.happyResumeCommand("cmu1", path: "/a") { _ in false }, "happy resume cmu1")
+    }
 }
