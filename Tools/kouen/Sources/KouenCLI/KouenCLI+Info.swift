@@ -223,6 +223,7 @@ extension KouenCLI {
           list-panes [--tab <uuid>] [--json] [--pretty]
           list-agents [--waiting] [--json] [--pretty] (running agents: state, age, surface)
           task <new|status|list|gate|phase|supersede|delete|sweep> (AI-SDLC feature workflow & worktree discipline)
+          happy adopt <session-id-prefix>|--all        (open a phone-started Happy session in a new tab)
           has-session --session <name|uuid>           (exit 0 if it exists, else 1)
           list-commands
           get-snapshot
