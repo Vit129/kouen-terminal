@@ -121,6 +121,12 @@ final class NotificationCoordinator {
                         )
                     }
 
+                    // `.awaiting` is excluded: the agent is blocked on the user mid-task and may
+                    // still need the browser pane it opened to verify its work.
+                    if previous == .working && agent.activity == .idle {
+                        coord.splitPaneCoordinator.closeAgentBrowserPanes(origin: surfaceID)
+                    }
+
                     let stopped = previous == .working
                         && (agent.activity == .idle || agent.activity == .awaiting)
                     guard stopped else { continue }

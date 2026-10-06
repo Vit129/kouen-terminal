@@ -3,10 +3,38 @@ import Foundation
 import KouenCore
 import KouenTerminalKit
 
+/// Browser panes an agent created via `kouenBrowserOpen`, keyed by the surface that asked.
+/// Only panes created for an agent are tracked — a pane the user opened (or one an agent call
+/// merely reused) is never in here, so it is never auto-closed.
+struct AgentBrowserPaneTracker {
+    private var panes: [SurfaceID: Set<PaneID>] = [:]
+
+    mutating func track(_ paneID: PaneID, origin: SurfaceID) {
+        panes[origin, default: []].insert(paneID)
+    }
+
+    /// Returns and forgets the panes tracked for `origin`.
+    mutating func drain(origin: SurfaceID) -> Set<PaneID> {
+        panes.removeValue(forKey: origin) ?? []
+    }
+}
+
 /// Handles split pane creation, focus, killing, and pane-tree navigation.
 @MainActor
 final class SplitPaneCoordinator {
     private unowned let coord: SessionCoordinator
+    private var agentBrowserPanes = AgentBrowserPaneTracker()
+
+    func trackAgentBrowserPane(_ paneID: PaneID, origin: SurfaceID) {
+        agentBrowserPanes.track(paneID, origin: origin)
+    }
+
+    /// Closes the browser panes `origin` opened for itself — called when its agent goes idle.
+    func closeAgentBrowserPanes(origin: SurfaceID) {
+        for paneID in agentBrowserPanes.drain(origin: origin) {
+            closeBrowserPane(paneID: paneID)
+        }
+    }
 
     init(coordinator: SessionCoordinator) {
         self.coord = coordinator
