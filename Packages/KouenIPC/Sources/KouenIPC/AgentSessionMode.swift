@@ -8,10 +8,13 @@ import Foundation
 /// - `remoteControl`: remote connection enabled — agent runs in the pane (local files,
 ///   MCP servers, hooks) while being steerable from mobile/web.
 /// - `cloud`: agent runs in a cloud environment (e.g. Anthropic cloud container for Claude Code).
+/// - `happy`: agent runs in the pane through the Happy wrapper (`happy claude`), so one
+///   cross-vendor mobile app can steer it. Only agents with a `happyCommand` support it.
 public enum AgentSessionMode: String, Codable, Sendable, CaseIterable {
     case local
     case remoteControl = "remote-control"
     case cloud
+    case happy
 
     /// Groups Kouen-launched sessions together in vendor apps where supported.
     public static let remoteControlNamePrefix = "kouen"

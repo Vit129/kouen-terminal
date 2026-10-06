@@ -303,7 +303,9 @@ Kouen does not ship its own mobile app or relay. To watch or steer an agent from
 | Codex | ChatGPT mobile app | Not yet confirmed for `codex` CLI sessions started inside Kouen |
 | Antigravity | Antigravity remote control / companion app | Not yet confirmed for `agy` CLI sessions |
 
-Trade-off: no single cross-vendor mobile dashboard — Kouen's Fleet view is desktop-only. The earlier built-in Mobile Connect bridge (QR + Tailscale web client) is deprecated, off by default (`mobileBridgeEnabled`) and no longer developed. Reasoning: [ARCHITECTURE.md](ARCHITECTURE.md) § Architecture Decisions (2026-09-23).
+Optional: set an agent's mode to `happy` in `agentSessionModes` (`settings.json`) to launch it through [Happy](https://happy.engineering) (`happy claude`, `happy agy`) and steer it from one cross-vendor mobile/web app. Needs `npm i -g happy` and `happy auth login`. Claude Code approvals work from the phone (permission mode `default`); `agy` runs one-shot with no per-tool approval.
+
+Trade-off: no single cross-vendor mobile dashboard by default — Kouen's Fleet view is desktop-only. The earlier built-in Mobile Connect bridge (QR + Tailscale web client) is deprecated, off by default (`mobileBridgeEnabled`) and no longer developed. Reasoning: [ARCHITECTURE.md](ARCHITECTURE.md) § Architecture Decisions (2026-09-23).
 
 ## Remote And Headless
 
