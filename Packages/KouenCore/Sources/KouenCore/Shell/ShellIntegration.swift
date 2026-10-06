@@ -148,9 +148,32 @@ public enum ShellIntegration {
           __kouen_claude_next --cloud "$@"
         elif [[ "$KOUEN_CLAUDE_SESSION_MODE" == cloud || "$KOUEN_CLAUDE_SESSION_MODE" == remote-control ]]; then
           __kouen_claude_next --remote-control --remote-control-session-name-prefix kouen "$@"
+        elif [[ "$KOUEN_CLAUDE_SESSION_MODE" == happy ]] && (( ${+commands[happy]} )); then
+          HAPPY_CLAUDE_PATH="${HAPPY_CLAUDE_PATH:-${commands[claude]}}" happy claude "$@"
         else
           __kouen_claude_next "$@"
         fi
+      }
+    fi
+    # Codex session mode: a `codex` typed by hand runs through Happy when $KOUEN_CODEX_SESSION_MODE is `happy`.
+    if [[ -n "$KOUEN" && "$KOUEN_CODEX_SESSION_MODE" == "happy" && -z "$__kouen_codex_wrapped" ]]; then
+      __kouen_codex_wrapped=1
+      if (( ${+functions[codex]} )); then
+        functions[__kouen_codex_next]=$functions[codex]
+      else
+        __kouen_codex_next() { command codex "$@"; }
+      fi
+      codex() {
+        local a
+        case "$1" in
+          agents|exec|e|review|login|logout|mcp|plugin|app-server|remote-control|app|completion|update|doctor|sandbox|debug|apply|a|resume|queue|archive|delete|migrate-rollouts|unarchive|fork|cloud|exec-server|features|help) __kouen_codex_next "$@"; return ;;
+        esac
+        for a in "$@"; do
+          case "$a" in
+            -h|--help|-V|--version) __kouen_codex_next "$@"; return ;;
+          esac
+        done
+        if (( ${+commands[happy]} )); then happy codex "$@"; else __kouen_codex_next "$@"; fi
       }
     fi
     # Antigravity (agy) session mode: a `agy` typed by hand gets --remote-control when in remote-control mode ($KOUEN_AGY_SESSION_MODE).
@@ -265,9 +288,32 @@ public enum ShellIntegration {
           __kouen_claude_next --cloud "$@"
         elif [[ "$KOUEN_CLAUDE_SESSION_MODE" == cloud || "$KOUEN_CLAUDE_SESSION_MODE" == remote-control ]]; then
           __kouen_claude_next --remote-control --remote-control-session-name-prefix kouen "$@"
+        elif [[ "$KOUEN_CLAUDE_SESSION_MODE" == happy ]] && command -v happy >/dev/null 2>&1; then
+          HAPPY_CLAUDE_PATH="${HAPPY_CLAUDE_PATH:-$(type -P claude)}" happy claude "$@"
         else
           __kouen_claude_next "$@"
         fi
+      }
+    fi
+    # Codex session mode: a `codex` typed by hand runs through Happy when $KOUEN_CODEX_SESSION_MODE is `happy`.
+    if [ -n "$KOUEN" ] && [ "$KOUEN_CODEX_SESSION_MODE" = "happy" ] && [ -z "$__kouen_codex_wrapped" ]; then
+      __kouen_codex_wrapped=1
+      if declare -F codex >/dev/null 2>&1; then
+        eval "$(declare -f codex | sed '1s/^codex /__kouen_codex_next /')"
+      else
+        __kouen_codex_next() { command codex "$@"; }
+      fi
+      codex() {
+        local a
+        case "$1" in
+          agents|exec|e|review|login|logout|mcp|plugin|app-server|remote-control|app|completion|update|doctor|sandbox|debug|apply|a|resume|queue|archive|delete|migrate-rollouts|unarchive|fork|cloud|exec-server|features|help) __kouen_codex_next "$@"; return ;;
+        esac
+        for a in "$@"; do
+          case "$a" in
+            -h|--help|-V|--version) __kouen_codex_next "$@"; return ;;
+          esac
+        done
+        if command -v happy >/dev/null 2>&1; then happy codex "$@"; else __kouen_codex_next "$@"; fi
       }
     fi
     # Antigravity (agy) session mode
@@ -384,8 +430,40 @@ public enum ShellIntegration {
                 __kouen_claude_next --cloud $argv
             else if test "$KOUEN_CLAUDE_SESSION_MODE" = cloud; or test "$KOUEN_CLAUDE_SESSION_MODE" = remote-control
                 __kouen_claude_next --remote-control --remote-control-session-name-prefix kouen $argv
+            else if test "$KOUEN_CLAUDE_SESSION_MODE" = happy; and type -q happy
+                set -l claude_path $HAPPY_CLAUDE_PATH
+                test -n "$claude_path"; or set claude_path (type -p claude)
+                env HAPPY_CLAUDE_PATH=$claude_path happy claude $argv
             else
                 __kouen_claude_next $argv
+            end
+        end
+    end
+    # Codex session mode: a `codex` typed by hand runs through Happy when $KOUEN_CODEX_SESSION_MODE is `happy`.
+    if set -q KOUEN; and test "$KOUEN_CODEX_SESSION_MODE" = happy; and not set -q __kouen_codex_wrapped
+        set -g __kouen_codex_wrapped 1
+        if functions -q codex
+            functions -c codex __kouen_codex_next
+        else
+            function __kouen_codex_next
+                command codex $argv
+            end
+        end
+        function codex
+            switch "$argv[1]"
+                case agents exec e review login logout mcp plugin app-server remote-control app completion update doctor sandbox debug apply a resume queue archive delete migrate-rollouts unarchive fork cloud exec-server features help
+                    __kouen_codex_next $argv; return
+            end
+            for a in $argv
+                switch $a
+                    case -h --help -V --version
+                        __kouen_codex_next $argv; return
+                end
+            end
+            if type -q happy
+                happy codex $argv
+            else
+                __kouen_codex_next $argv
             end
         end
     end
