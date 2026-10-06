@@ -192,7 +192,7 @@ public enum AgentLaunchCommands {
             return mode
         }
         let fallback = (mode == .cloud) ? config.cloudFallback : .local
-        fputs("Kouen: mode '\(mode.rawValue)' is not supported for \(kind.rawValue); falling back to '\(fallback.rawValue)'\n", stderr)
+        FileHandle.standardError.write(Data("Kouen: mode '\(mode.rawValue)' is not supported for \(kind.rawValue); falling back to '\(fallback.rawValue)'\n".utf8))
         return fallback
     }
 
