@@ -117,6 +117,9 @@ final class DaemonSyncService {
                 coord.splitPaneCoordinator.openBrowserPane(
                     url: url, direction: direction ?? .horizontal, paneID: newPaneID, originSurfaceID: originSurfaceID
                 )
+                if let originSurfaceID {
+                    coord.splitPaneCoordinator.trackAgentBrowserPane(newPaneID, origin: originSurfaceID)
+                }
                 _ = await request(.browserResponse(id: id, response: .open(paneID: newPaneID)))
             }
 
