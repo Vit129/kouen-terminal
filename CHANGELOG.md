@@ -8,7 +8,19 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [4.20.11] - 2026-10-06
 
 ### Added
-- Release version bump to v4.20.11.
+- Optional `happy` session mode for Claude Code and Antigravity ([`800896d`](https://github.com/Vit129/kouen-terminal/commit/800896d107b6cd1230d8d4b5bc7b65835e7c503d))
+- Happy mode for Copilot (ACP) and keep the Happy daemon running ([`1c4e9b3`](https://github.com/Vit129/kouen-terminal/commit/1c4e9b380f581c44d25a77bffda7bbc1c08a2d2a))
+- Happy mode for Codex (`happy codex`) ([`6935022`](https://github.com/Vit129/kouen-terminal/commit/6935022082a077da1d4975b110e59e140a7e95c6))
+- Hand-typed claude/codex run through Happy in `happy` mode ([`7404120`](https://github.com/Vit129/kouen-terminal/commit/740412081d2dd56bf047131c039c04fa014ade48))
+- `kouen-cli happy adopt` opens a phone-started Happy session in a pane ([`43032e7`](https://github.com/Vit129/kouen-terminal/commit/43032e76e43d227281b244ac69a1befbed22a704))
+
+### Documentation
+- Happy mode covers Copilot and the always-on Happy daemon ([`90b0630`](https://github.com/Vit129/kouen-terminal/commit/90b06307f9dba14db2bb6979d423d27df64d6f33))
+
+### Fixed
+- Write the mode-fallback warning via FileHandle, not C stderr ([`15a8bf4`](https://github.com/Vit129/kouen-terminal/commit/15a8bf48db99bffcd1bed8a7a74e1a87e8d318fc))
+- Start Happy's daemon whenever Happy is installed and logged in ([`17d2fec`](https://github.com/Vit129/kouen-terminal/commit/17d2feccd1623134ac3ec3de70807667223d58ca))
+- Give Happy's daemon a usable env; pin claude when adopting; document limits ([`34e0095`](https://github.com/Vit129/kouen-terminal/commit/34e0095833783ab5c2c6256b94892d43555f3e6e))
 
 ## [4.20.9] - 2026-10-06
 
