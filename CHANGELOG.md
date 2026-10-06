@@ -8,7 +8,7 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [4.20.9] - 2026-10-06
 
 ### Added
-- Release version bump to v4.20.9.
+- Auto-close the browser pane an agent opened once that agent goes idle ([`4b0ed0c`](https://github.com/Vit129/kouen-terminal/commit/4b0ed0c22947b4c85742fb0405bacc95bd28e5c8))
 
 ## [4.20.8] - 2026-10-06
 
