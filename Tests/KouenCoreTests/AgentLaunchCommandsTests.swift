@@ -102,6 +102,22 @@ final class AgentLaunchCommandsTests: XCTestCase {
         XCTAssertEqual(AgentLaunchCommands.launch(kind: .codex, mode: .cloud), "codex")
     }
 
+    func testHappyLaunchAndResumeCommands() throws {
+        XCTAssertEqual(AgentLaunchCommands.launch(kind: .claudeCode, mode: .happy), "happy claude")
+        XCTAssertEqual(AgentLaunchCommands.launch(kind: .antigravity, mode: .happy), "happy agy")
+        XCTAssertEqual(
+            AgentLaunchCommands.resume(kind: .claudeCode, sessionID: "s-123", mode: .happy),
+            "happy claude --resume s-123"
+        )
+        XCTAssertEqual(AgentLaunchCommands.happyCommand(kind: .claudeCode, mode: .happy), "happy claude")
+        XCTAssertNil(AgentLaunchCommands.happyCommand(kind: .claudeCode, mode: .remoteControl))
+        // Agents without a happyCommand fall back to local, never to a bogus `happy` binary.
+        XCTAssertEqual(AgentLaunchCommands.launch(kind: .kiro, mode: .happy), "kiro")
+        XCTAssertNil(AgentLaunchCommands.happyCommand(kind: .kiro, mode: .happy))
+        let data = try JSONEncoder().encode(AgentSessionMode.happy)
+        XCTAssertEqual(try JSONDecoder().decode(AgentSessionMode.self, from: data), .happy)
+    }
+
     func testOtherAgentsLaunchCommands() {
         XCTAssertEqual(AgentLaunchCommands.launch(kind: .kiro, mode: .local), "kiro")
         XCTAssertEqual(AgentLaunchCommands.launch(kind: .gemini, mode: .local), "gemini")
