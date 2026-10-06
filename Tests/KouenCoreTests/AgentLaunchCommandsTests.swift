@@ -105,6 +105,7 @@ final class AgentLaunchCommandsTests: XCTestCase {
     func testHappyLaunchAndResumeCommands() throws {
         XCTAssertEqual(AgentLaunchCommands.launch(kind: .claudeCode, mode: .happy), "happy claude")
         XCTAssertEqual(AgentLaunchCommands.launch(kind: .antigravity, mode: .happy), "happy agy")
+        XCTAssertEqual(AgentLaunchCommands.launch(kind: .copilot, mode: .happy), "happy acp -- copilot --acp")
         XCTAssertEqual(
             AgentLaunchCommands.resume(kind: .claudeCode, sessionID: "s-123", mode: .happy),
             "happy claude --resume s-123"
