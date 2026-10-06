@@ -244,6 +244,31 @@ Building upon the Claude session mode foundation, Kouen generalizes remote-contr
 - **Safe Fallback & Resume:** Unsupported modes gracefully fall back with logging to stderr. Resuming non-Claude agents preserves native command formats (e.g. `gemini --resume <id>`, `codex resume <id>`, `hermes --resume <id>`) and never defaults to Claude Code.
 - **Unified Launch Resolution:** `KouenSettings.resolvedLaunchCommand(for:cwd:)` centralizes agent kind and mode resolution, shared between `SurfaceRegistry.automationLaunchCommand` and `KouenCLI+Wake.agentLaunchCommand`.
 
+**2026-10-06 — Happy as an optional, per-agent `happy` session mode (not a replacement).**
+Builds on the 2026-09-23 decision (no kouen relay/mobile client). [Happy](https://happy.engineering)
+(`npm i -g happy`, MIT) is a third-party wrapper (`happy claude`, `happy agy`, `happy codex`) that
+bridges the local CLI session to one cross-vendor mobile/web app via an E2E-encrypted relay. It
+fills the "3 vendor apps for 3 agents" gap without kouen running any relay itself.
+
+- **Design:** `AgentSessionMode.happy` + `AgentLaunchConfig.happyCommand` (`happy claude`,
+  `happy agy`). The command replaces the agent binary; extra args pass through
+  (`happy claude --resume <id>`, verified: `happy claude --version` reaches `claude`). One table
+  row per agent, no new subsystem. Opt-in via `agentSessionModes` in `settings.json`; defaults are
+  unchanged (`remote-control`), so every vendor's own route keeps working side by side.
+- **Why a mode, not a hook-in:** the session still runs in a kouen pane (worktree isolation, hooks,
+  detection). Sessions started *from the phone* are spawned headless by Happy's daemon and are
+  invisible to kouen; `happy resume <id>` in a pane pulls one in, but the headless process must be
+  stopped first or two processes share one session id.
+- **Spike results (2026-10-06, Claude + agy):** phone→pane messages work (~3.5 s warm, ~33 s
+  right after a local→remote switch, dominated by MCP server startup); Write approvals from the
+  phone work only when the permission mode is `default` (`auto` never asks); kouen detects the
+  agent in local mode but not on Happy's "Remote Mode" screen. `happy agy` runs `agy --print`
+  one-shot: multi-turn works, but there is **no per-tool approval** (sandbox flag only).
+- **Known gaps:** Happy's own remote-mode screen is not recognised by `AgentDetector` (no
+  "controlled from phone / awaiting approval" state in kouen); `happy codex` untested, so Codex
+  has no `happyCommand` yet; Happy may pick a stale npm `claude` (EACCES) — set
+  `HAPPY_CLAUDE_PATH` to the real binary; `happy agy --conversation <id>` resume is untested.
+
 ### Shipped capability summary, P44–P49 (2026-08-31 → 2026-09-23)
 
 One-line records; reasoning lives in each plan under `agent-memory/plans/`.
