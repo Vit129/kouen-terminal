@@ -260,20 +260,23 @@ fills the "3 vendor apps for 3 agents" gap without kouen running any relay itsel
   invisible to kouen; `happy resume <id>` in a pane pulls one in, but the headless process must be
   stopped first or two processes share one session id.
 - **Spike results (2026-10-06, Claude + agy):** phone→pane messages work (~3.5 s warm, ~33 s
-  right after a local→remote switch, dominated by MCP server startup); Write approvals from the
-  phone work only when the permission mode is `default` (`auto` never asks); kouen detects the
-  agent in local mode but not on Happy's "Remote Mode" screen. `happy agy` runs `agy --print`
+  right after a local→remote switch; the log shows ~30 s of session init, MCP server startup is the likely cause but unproven); Write approvals from the
+  phone work only when the permission mode is `default` (`auto` never asks); kouen's `AgentDetector` sees the
+  agent in both modes (`kouen-cli detect-agent` reports `claude-code`/`working` on Happy's SDK `claude`
+  child in Remote Mode; `list-agents` is per tab, so a second agent pane in one tab hides it). `happy agy` runs `agy --print`
   one-shot: multi-turn works, but there is **no per-tool approval** (sandbox flag only).
 - **Follow-up (same day):** Codex joins (`happy codex`; verified: patch approval from the phone
   let the write through, ~16 s for a first reply). Copilot joins via ACP (`happy acp -- copilot --acp`; Happy requests
   `plan`/`agent`/`autopilot` modes — only `agent` asks for approval, verified for `execute`).
-  `AgentRemoteControlDaemonService` also runs `happy daemon start` once when any agent is in
-  `happy` mode, next to the codex/agy `remote-control start` companions. Evaluated at Kouen
-  daemon start, like those. Risk to verify: Happy's README says a daemon started from a
+  `AgentRemoteControlDaemonService` also runs `happy daemon start` once whenever `happy` is
+  installed and logged in (`~/.happy/access.key`), independent of any agent's mode, next to the
+  codex/agy `remote-control start` companions. Evaluated at Kouen daemon start, like those.
+  Hand-typed `claude`/`codex` go through Happy in `happy` mode via the shell wrappers. Risk to verify: Happy's README says a daemon started from a
   launchd agent domain cannot reach the keychain, so phone-spawned Claude sessions may fail
   auth (401) if Kouen's daemon runs outside the GUI session; terminal-started sessions are unaffected.
-- **Known gaps:** Happy's own remote-mode screen is not recognised by `AgentDetector` (no
-  "controlled from phone / awaiting approval" state in kouen); Happy may pick a stale npm `claude` (EACCES) — set
+- **Known gaps:** whether kouen's waiting/needs-approval state fires while a Happy permission
+  request is pending is unverified (remote-mode claude runs with `--permission-prompt-tool stdio`,
+  so claude hooks may not fire); Happy may pick a stale npm `claude` (EACCES) — set
   `HAPPY_CLAUDE_PATH` to the real binary; `happy agy --conversation <id>` resume is untested.
 
 ### Shipped capability summary, P44–P49 (2026-08-31 → 2026-09-23)

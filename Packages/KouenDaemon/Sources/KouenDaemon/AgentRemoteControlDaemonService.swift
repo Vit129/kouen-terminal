@@ -47,12 +47,11 @@ public final class AgentRemoteControlDaemonService: @unchecked Sendable {
         }
     }
 
-    /// True when any agent Happy can wrap is set to `.happy` — Happy's daemon must be up so a
-    /// phone can start or resume sessions while no pane is open.
-    static func wantsHappyDaemon(_ settings: KouenSettings) -> Bool {
-        AgentLaunchCommands.configs.contains { kind, config in
-            config.happyCommand != nil && settings.sessionMode(for: kind) == .happy
-        }
+    /// Happy's daemon is worth running whenever `happy` is installed and logged in (its
+    /// `~/.happy/access.key` exists), whatever each agent's launch mode is: it lets a phone start
+    /// or resume sessions with no pane open, and `remote-control` modes are unaffected.
+    static func shouldStartHappyDaemon(happyPath: String?, home: String = NSHomeDirectory()) -> Bool {
+        happyPath != nil && FileManager.default.fileExists(atPath: home + "/.happy/access.key")
     }
 
     /// Starts companion daemons for configured agents if their mode is `.remoteControl`
@@ -80,12 +79,11 @@ public final class AgentRemoteControlDaemonService: @unchecked Sendable {
         }
 
         // 3. Happy daemon (`happy daemon start` detaches itself; a no-op if already running)
-        if Self.wantsHappyDaemon(settings) && !startedHappy {
-            if let bin = Self.resolveExecutable(named: "happy") {
-                startedHappy = true
-                log?("Starting Happy daemon (\(bin))")
-                spawnDaemon(executable: bin, arguments: ["daemon", "start"], log: log)
-            }
+        let happy = Self.resolveExecutable(named: "happy")
+        if !startedHappy, let bin = happy, Self.shouldStartHappyDaemon(happyPath: happy) {
+            startedHappy = true
+            log?("Starting Happy daemon (\(bin))")
+            spawnDaemon(executable: bin, arguments: ["daemon", "start"], log: log)
         }
     }
 

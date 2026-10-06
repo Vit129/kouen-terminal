@@ -25,15 +25,16 @@ final class AgentRemoteControlDaemonServiceTests: XCTestCase {
         XCTAssertNil(AgentRemoteControlDaemonService.resolveExecutable(named: "non_existent_binary_xyz_123"))
     }
 
-    func testWantsHappyDaemonOnlyWhenAnAgentUsesHappyMode() {
-        XCTAssertFalse(AgentRemoteControlDaemonService.wantsHappyDaemon(KouenSettings()))
-        var settings = KouenSettings()
-        settings.agentSessionModes[.copilot] = .happy
-        XCTAssertTrue(AgentRemoteControlDaemonService.wantsHappyDaemon(settings))
-        // Unsupported agent: sessionMode may say .happy but there is no happyCommand to start.
-        var unsupported = KouenSettings()
-        unsupported.agentSessionModes = [.kiro: .happy]
-        XCTAssertFalse(AgentRemoteControlDaemonService.wantsHappyDaemon(unsupported))
+    func testHappyDaemonStartsOnlyWhenInstalledAndLoggedIn() throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("kouen-happy-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: home.appendingPathComponent(".happy"), withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: home) }
+        XCTAssertFalse(AgentRemoteControlDaemonService.shouldStartHappyDaemon(happyPath: "/bin/happy", home: home.path),
+                       "no access.key yet: not logged in")
+        FileManager.default.createFile(atPath: home.appendingPathComponent(".happy/access.key").path, contents: Data("k".utf8))
+        XCTAssertTrue(AgentRemoteControlDaemonService.shouldStartHappyDaemon(happyPath: "/bin/happy", home: home.path))
+        XCTAssertFalse(AgentRemoteControlDaemonService.shouldStartHappyDaemon(happyPath: nil, home: home.path),
+                       "happy not installed")
     }
 
     func testServiceIdempotent() {
