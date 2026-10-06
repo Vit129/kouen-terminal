@@ -113,6 +113,8 @@ struct KouenCLI {
                 try await Self.handleContext(Array(args.dropFirst()), client: client)
             case "history":
                 try await Self.handleHistory(Array(args.dropFirst()), client: client)
+            case "happy":
+                try await Self.handleHappy(Array(args.dropFirst()), client: client)
             case "undo":
                 try Self.handleUndo(Array(args.dropFirst()), client: client)
             case "verify":
