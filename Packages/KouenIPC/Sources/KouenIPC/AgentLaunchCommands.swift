@@ -85,11 +85,12 @@ public enum AgentLaunchCommands {
         ),
         .codex: AgentLaunchConfig(
             binary: "codex",
-            supportedModes: [.local, .remoteControl],
+            supportedModes: [.local, .remoteControl, .happy],
             cloudFallback: .remoteControl,
             launchFlags: [:],
             resumeStyle: .subcommand("resume"),
-            appendModeFlagsOnResume: false
+            appendModeFlagsOnResume: false,
+            happyCommand: "happy codex"
         ),
         .hermes: AgentLaunchConfig(
             binary: "hermes",
