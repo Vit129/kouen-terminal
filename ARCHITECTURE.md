@@ -264,6 +264,13 @@ fills the "3 vendor apps for 3 agents" gap without kouen running any relay itsel
   phone work only when the permission mode is `default` (`auto` never asks); kouen detects the
   agent in local mode but not on Happy's "Remote Mode" screen. `happy agy` runs `agy --print`
   one-shot: multi-turn works, but there is **no per-tool approval** (sandbox flag only).
+- **Follow-up (same day):** Copilot joins via ACP (`happy acp -- copilot --acp`; Happy requests
+  `plan`/`agent`/`autopilot` modes — only `agent` asks for approval, verified for `execute`).
+  `AgentRemoteControlDaemonService` also runs `happy daemon start` once when any agent is in
+  `happy` mode, next to the codex/agy `remote-control start` companions. Evaluated at Kouen
+  daemon start, like those. Risk to verify: Happy's README says a daemon started from a
+  launchd agent domain cannot reach the keychain, so phone-spawned Claude sessions may fail
+  auth (401) if Kouen's daemon runs outside the GUI session; terminal-started sessions are unaffected.
 - **Known gaps:** Happy's own remote-mode screen is not recognised by `AgentDetector` (no
   "controlled from phone / awaiting approval" state in kouen); `happy codex` untested, so Codex
   has no `happyCommand` yet; Happy may pick a stale npm `claude` (EACCES) — set
