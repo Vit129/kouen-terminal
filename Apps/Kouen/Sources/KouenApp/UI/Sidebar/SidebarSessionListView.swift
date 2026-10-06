@@ -274,9 +274,6 @@ private struct SidebarProjectHeaderRow: View {
         .contentShape(Rectangle())
         .onTapGesture { onToggleCollapse() }
         .onHover { isHovered = $0 }
-        .contextMenu {
-            projectActionsMenuContent
-        }
     }
 
     @ViewBuilder
