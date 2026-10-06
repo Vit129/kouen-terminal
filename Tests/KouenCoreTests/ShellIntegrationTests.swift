@@ -65,6 +65,19 @@ final class ShellIntegrationTests: XCTestCase {
         }
     }
 
+    /// `happy` mode: a hand-typed `claude` / `codex` runs through Happy and falls back to the plain
+    /// command when `happy` is missing. (Behavior was exercised against fake binaries in zsh and bash.)
+    func testScriptsRouteClaudeAndCodexThroughHappyMode() {
+        for shell in ShellIntegration.Shell.allCases {
+            let s = ShellIntegration.script(for: shell)
+            XCTAssertTrue(s.contains("happy claude"), "\(shell) must route claude via happy")
+            XCTAssertTrue(s.contains("happy codex"), "\(shell) must route codex via happy")
+            XCTAssertTrue(s.contains("KOUEN_CODEX_SESSION_MODE"), "\(shell) must read codex mode")
+            XCTAssertTrue(s.contains("__kouen_codex_next"), "\(shell) must chain codex")
+            XCTAssertTrue(s.contains("HAPPY_CLAUDE_PATH"), "\(shell) must pin the real claude binary")
+        }
+    }
+
     func testInstallWritesScriptAndWiresRCIdempotently() throws {
         let home = tempHome()
         defer { try? FileManager.default.removeItem(at: home) }
