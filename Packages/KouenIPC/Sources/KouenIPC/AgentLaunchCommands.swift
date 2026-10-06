@@ -74,21 +74,23 @@ public enum AgentLaunchCommands {
         ),
         .copilot: AgentLaunchConfig(
             binary: "copilot",
-            supportedModes: [.local, .remoteControl],
+            supportedModes: [.local, .remoteControl, .happy],
             cloudFallback: .remoteControl,
             launchFlags: [
                 .remoteControl: ["--remote"]
             ],
             resumeStyle: .flag("--resume"),
-            appendModeFlagsOnResume: true
+            appendModeFlagsOnResume: true,
+            happyCommand: "happy acp -- copilot --acp"
         ),
         .codex: AgentLaunchConfig(
             binary: "codex",
-            supportedModes: [.local, .remoteControl],
+            supportedModes: [.local, .remoteControl, .happy],
             cloudFallback: .remoteControl,
             launchFlags: [:],
             resumeStyle: .subcommand("resume"),
-            appendModeFlagsOnResume: false
+            appendModeFlagsOnResume: false,
+            happyCommand: "happy codex"
         ),
         .hermes: AgentLaunchConfig(
             binary: "hermes",
@@ -191,7 +193,7 @@ public enum AgentLaunchCommands {
             return mode
         }
         let fallback = (mode == .cloud) ? config.cloudFallback : .local
-        fputs("Kouen: mode '\(mode.rawValue)' is not supported for \(kind.rawValue); falling back to '\(fallback.rawValue)'\n", stderr)
+        FileHandle.standardError.write(Data("Kouen: mode '\(mode.rawValue)' is not supported for \(kind.rawValue); falling back to '\(fallback.rawValue)'\n".utf8))
         return fallback
     }
 
