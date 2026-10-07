@@ -8,7 +8,6 @@ runtime under the hood.
 
 This guide is the narrative "how it works + shortcuts" tour. For exhaustive references see:
 
-- [KOUEN_TMUX_CAPABILITIES.pdf](KOUEN_TMUX_CAPABILITIES.pdf) — printable setup and shortcuts guide.
 - [KEYBINDINGS.md](KEYBINDINGS.md) — every default binding + the key-spec syntax.
 - [COMMANDS.md](COMMANDS.md) — the full command grammar.
 - [MIGRATION.md](MIGRATION.md) — moving an existing terminal/multiplexer setup over.

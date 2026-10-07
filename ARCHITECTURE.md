@@ -1,6 +1,6 @@
 # Kouen Terminal — System Architecture
 
-> Status: **active**, synced with code through v4.20.1 (P50). Companion to `PRODUCT.md` (vision/features), `DESIGN.md` (visual system & tokens), and `CONTEXT.md` (domain terms).
+> Status: **active**, synced with code through v4.20.11 (P50 + Happy mode). Companion to `PRODUCT.md` (vision/features), `DESIGN.md` (visual system & tokens), and `CONTEXT.md` (domain terms).
 
 ## Constraints & System Invariants
 
@@ -285,6 +285,19 @@ fills the "3 vendor apps for 3 agents" gap without kouen running any relay itsel
   the only alert. Happy may pick a stale npm `claude` (EACCES) — set
   `HAPPY_CLAUDE_PATH` to the real binary; `happy agy --conversation <id>` resume is untested.
 
+**2026-10-07 — Dual remote access: vendor remote-control and Happy together.**
+Refines the 2026-10-06 `happy` mode. A hand-typed agent in a Kouen pane now reaches the phone through
+both routes when Happy is installed *and* logged in (`~/.happy/access.key`), without switching modes:
+- `claude` in `remote-control` or `happy` mode runs `happy claude --remote-control
+  --remote-control-session-name-prefix kouen` (`HAPPY_CLAUDE_PATH` defaulted to the real binary), so the
+  session shows in the Claude app *and* Happy. Without Happy it falls back to plain `claude --remote-control …`.
+- `codex` in `remote-control` mode goes through `happy codex` (same login guard); `agy` and `copilot`
+  use `happy agy` / `happy acp -- copilot --acp` only in `happy` mode, else their own `--remote-control` / `--remote`.
+- Implemented once per shell in `ShellIntegration.swift` (zsh, bash, fish wrappers). Agent launches from
+  the launch table are unchanged.
+- Release cycle: `Scripts/full-cycle.sh` compares `kouen-cli version --json` CLI/daemon builds after install and,
+  on mismatch, offers to run `kouen-cli install` (reloads the daemon; running tasks stay alive until then).
+
 ### Shipped capability summary, P44–P49 (2026-08-31 → 2026-09-23)
 
 One-line records; reasoning lives in each plan under `agent-memory/plans/`.
@@ -297,6 +310,16 @@ One-line records; reasoning lives in each plan under `agent-memory/plans/`.
 - **P48 Session navigation buttons (v4.18.2):** started as an MRU switch-history stack (`SessionHistoryNavigator`), replaced in `93362f0f` by the existing `selectAdjacentSession` — ◀ ▶ buttons, Session menu, palette and ⌘⇧[ / ⌘⇧] share one implementation. Order is list order, not visit order.
 - **P49 Architectural hardening (v4.18.4):** IPC wire contracts split into `KouenIPC`; write `origin:` is non-defaulted; `TaskStore` owns its own status invariants; `KouenMCP`/`KouenCLI` no longer depend on `KouenDaemonCore`.
 - **P50 Multi-agent launch table:** see the Phase B entry above. Codex cloud exec and Copilot `&` cloud dispatch were still open tasks in the plan when this was written.
+
+### Post-P50 changes (v4.20.2 → v4.20.11, 2026-10-01 → 2026-10-06)
+
+- **Removed:** Quick Terminal (⌥Space panel, v4.20.4), the dormant ⌥Space inline-AI completion (v4.20.3), the sidebar project-header right-click menu (the ellipsis menu stays) and the Files-tab inline preview (a click opens the main-pane preview only, v4.20.8).
+- **Agent browser panes (v4.20.9):** a pane opened by `kouenBrowserOpen` (not reused, not user-opened) is tracked per origin surface and closed on that agent's working → idle transition; `.awaiting` keeps it open.
+- **Projects (v4.20.5–v4.20.7):** sessions auto-register a project only when the repo root has a real `.git` *directory* (no worktrees or plain folders as phantom projects); stale recents are not re-imported; a project whose folder moved shows as missing with Relocate/Remove.
+- **Notch:** hidden while Vorssaint (`com.vorssaint.utils`) is running, so two notch HUDs never stack; still off by default.
+- **Resume/handoff** open and select a real new tab (v4.20.4); handoff progress shows in the tab title (v4.20.3).
+- **Install:** the app bundle is never replaced under a running GUI (v4.20.4). **Settings:** custom endpoints get a Model ID field and Test Connection (v4.20.2).
+- **Happy mode** (v4.20.10–v4.20.11): see the 2026-10-06 and 2026-10-07 entries above.
 
 ## Structure deviations
 
