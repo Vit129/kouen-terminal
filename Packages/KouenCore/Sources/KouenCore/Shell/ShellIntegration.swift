@@ -134,16 +134,21 @@ public enum ShellIntegration {
         __kouen_claude_next() { command claude "$@"; }
       fi
       claude() {
-        local a resume=0
+        local a resume=0 rc=0
         case "$1" in
           agents|attach|auth|auto-mode|doctor|gateway|import|install|logs|mcp|plugin|plugins|project|respawn|rm|setup-token|stop|kill|ultrareview|update|upgrade) __kouen_claude_next "$@"; return ;;
         esac
         for a in "$@"; do
           case "$a" in
-            -p|--print|-h|--help|-v|--version|--cloud|--remote|--remote-control|--rc|--teleport|--bg|--background) __kouen_claude_next "$@"; return ;;
+            -p|--print|-h|--help|-v|--version|--cloud|--remote|--teleport|--bg|--background) __kouen_claude_next "$@"; return ;;
+            --remote-control|--rc) rc=1 ;;
             -r|--resume|--resume=*|-c|--continue|--from-pr|--from-pr=*) resume=1 ;;
           esac
         done
+        if (( rc )); then
+          if (( ${+commands[happy]} )) && [[ -f "$HOME/.happy/access.key" ]]; then HAPPY_CLAUDE_PATH="${HAPPY_CLAUDE_PATH:-${commands[claude]}}" happy claude "$@"; else __kouen_claude_next "$@"; fi
+          return
+        fi
         if [[ "$KOUEN_CLAUDE_SESSION_MODE" == cloud && $resume -eq 0 ]]; then
           __kouen_claude_next --cloud "$@"
         elif [[ "$KOUEN_CLAUDE_SESSION_MODE" == cloud || "$KOUEN_CLAUDE_SESSION_MODE" == remote-control ]]; then
@@ -189,14 +194,21 @@ public enum ShellIntegration {
         __kouen_agy_next() { command agy "$@"; }
       fi
       agy() {
+        local a rc=0
         case "$1" in
           auth|config|doctor|help|remote-control|status|update|version) __kouen_agy_next "$@"; return ;;
         esac
         for a in "$@"; do
           case "$a" in
-            -h|--help|-v|--version|--remote-control|--rc) __kouen_agy_next "$@"; return ;;
+            -h|--help|-v|--version) __kouen_agy_next "$@"; return ;;
+            --remote-control|--rc) rc=1 ;;
           esac
         done
+        if (( ${+commands[happy]} )) && [[ -f "$HOME/.happy/access.key" ]]; then
+          if (( rc )); then happy agy "$@"; else happy agy --remote-control "$@"; fi
+          return
+        fi
+        if (( rc )); then __kouen_agy_next "$@"; return; fi
         if [[ "$KOUEN_AGY_SESSION_MODE" == "happy" ]] && (( ${+commands[happy]} )); then
           happy agy "$@"
         else
@@ -286,16 +298,21 @@ public enum ShellIntegration {
         __kouen_claude_next() { command claude "$@"; }
       fi
       claude() {
-        local a resume=0
+        local a resume=0 rc=0
         case "$1" in
           agents|attach|auth|auto-mode|doctor|gateway|import|install|logs|mcp|plugin|plugins|project|respawn|rm|setup-token|stop|kill|ultrareview|update|upgrade) __kouen_claude_next "$@"; return ;;
         esac
         for a in "$@"; do
           case "$a" in
-            -p|--print|-h|--help|-v|--version|--cloud|--remote|--remote-control|--rc|--teleport|--bg|--background) __kouen_claude_next "$@"; return ;;
+            -p|--print|-h|--help|-v|--version|--cloud|--remote|--teleport|--bg|--background) __kouen_claude_next "$@"; return ;;
+            --remote-control|--rc) rc=1 ;;
             -r|--resume|--resume=*|-c|--continue|--from-pr|--from-pr=*) resume=1 ;;
           esac
         done
+        if (( rc )); then
+          if command -v happy >/dev/null 2>&1 && [ -f "$HOME/.happy/access.key" ]; then HAPPY_CLAUDE_PATH="${HAPPY_CLAUDE_PATH:-$(type -P claude)}" happy claude "$@"; else __kouen_claude_next "$@"; fi
+          return
+        fi
         if [[ "$KOUEN_CLAUDE_SESSION_MODE" == cloud && $resume -eq 0 ]]; then
           __kouen_claude_next --cloud "$@"
         elif [[ "$KOUEN_CLAUDE_SESSION_MODE" == cloud || "$KOUEN_CLAUDE_SESSION_MODE" == remote-control ]]; then
@@ -341,14 +358,21 @@ public enum ShellIntegration {
         __kouen_agy_next() { command agy "$@"; }
       fi
       agy() {
+        local a rc=0
         case "$1" in
           auth|config|doctor|help|remote-control|status|update|version) __kouen_agy_next "$@"; return ;;
         esac
         for a in "$@"; do
           case "$a" in
-            -h|--help|-v|--version|--remote-control|--rc) __kouen_agy_next "$@"; return ;;
+            -h|--help|-v|--version) __kouen_agy_next "$@"; return ;;
+            --remote-control|--rc) rc=1 ;;
           esac
         done
+        if command -v happy >/dev/null 2>&1 && [ -f "$HOME/.happy/access.key" ]; then
+          if (( rc )); then happy agy "$@"; else happy agy --remote-control "$@"; fi
+          return
+        fi
+        if (( rc )); then __kouen_agy_next "$@"; return; fi
         if [ "$KOUEN_AGY_SESSION_MODE" = "happy" ] && command -v happy >/dev/null 2>&1; then
           happy agy "$@"
         else
@@ -442,15 +466,26 @@ public enum ShellIntegration {
                     __kouen_claude_next $argv; return
             end
             set -l resume 0
+            set -l rc 0
             for a in $argv
                 switch $a
-                    case -p --print -h --help -v --version --cloud --remote --remote-control --rc --teleport --bg --background
+                    case -p --print -h --help -v --version --cloud --remote --teleport --bg --background
                         __kouen_claude_next $argv; return
+                    case --remote-control --rc
+                        set rc 1
                     case -r --resume '--resume=*' -c --continue --from-pr '--from-pr=*'
                         set resume 1
                 end
             end
-            if test "$KOUEN_CLAUDE_SESSION_MODE" = cloud; and test $resume -eq 0
+            if test $rc -eq 1
+                if type -q happy; and test -f "$HOME/.happy/access.key"
+                    set -l claude_path $HAPPY_CLAUDE_PATH
+                    test -n "$claude_path"; or set claude_path (type -p claude)
+                    env HAPPY_CLAUDE_PATH=$claude_path happy claude $argv
+                else
+                    __kouen_claude_next $argv
+                end
+            else if test "$KOUEN_CLAUDE_SESSION_MODE" = cloud; and test $resume -eq 0
                 __kouen_claude_next --cloud $argv
             else if test "$KOUEN_CLAUDE_SESSION_MODE" = cloud; or test "$KOUEN_CLAUDE_SESSION_MODE" = remote-control
                 if type -q happy; and test -f "$HOME/.happy/access.key"
@@ -510,12 +545,24 @@ public enum ShellIntegration {
                 case auth config doctor help remote-control status update version
                     __kouen_agy_next $argv; return
             end
+            set -l rc 0
             for a in $argv
                 switch $a
-                    case -h --help -v --version --remote-control --rc
+                    case -h --help -v --version
                         __kouen_agy_next $argv; return
+                    case --remote-control --rc
+                        set rc 1
                 end
             end
+            if type -q happy; and test -f "$HOME/.happy/access.key"
+                if test $rc -eq 1
+                    happy agy $argv
+                else
+                    happy agy --remote-control $argv
+                end
+                return
+            end
+            if test $rc -eq 1; __kouen_agy_next $argv; return; end
             if test "$KOUEN_AGY_SESSION_MODE" = happy; and type -q happy
                 happy agy $argv
             else
