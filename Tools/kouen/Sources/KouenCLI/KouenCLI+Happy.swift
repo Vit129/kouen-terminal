@@ -34,6 +34,67 @@ extension KouenCLI {
         return "\(prefix)happy resume \(id)"
     }
 
+    /// `flavor` and `path` of a Happy session from `~/.happy/sessions.json` (plaintext metadata).
+    static func happyLocalSession(_ id: String, sessionsJSON: Data) -> (flavor: String, path: String)? {
+        guard let root = (try? JSONSerialization.jsonObject(with: sessionsJSON)) as? [String: Any],
+              let sessions = root["sessions"] as? [String: Any],
+              let meta = (sessions[id] as? [String: Any])?["metadata"] as? [String: Any],
+              let flavor = meta["flavor"] as? String, let path = meta["path"] as? String
+        else { return nil }
+        return (flavor, path)
+    }
+
+    /// `happy agy` is a one-shot `agy --print` driver, so the phone session is just an agy
+    /// conversation; agy's own cache records the latest one per cwd.
+    static func agyResumeCommand(path: String, cacheJSON: Data) -> String? {
+        guard let map = (try? JSONSerialization.jsonObject(with: cacheJSON)) as? [String: String],
+              let id = map[path] else { return nil }
+        return "agy --conversation \(id)"
+    }
+
+    /// One Copilot `session-state/<id>/workspace.yaml`, reduced to what adopt needs.
+    struct CopilotSessionInfo: Equatable {
+        let id: String, cwd: String, clientName: String, updatedAt: String
+    }
+
+    static func parseCopilotWorkspace(_ yaml: String) -> CopilotSessionInfo? {
+        var f: [String: String] = [:]
+        for line in yaml.split(separator: "\n") {
+            guard let c = line.firstIndex(of: ":") else { continue }
+            f[String(line[..<c])] = line[line.index(after: c)...].trimmingCharacters(in: .whitespaces)
+        }
+        guard let id = f["id"], let cwd = f["cwd"] else { return nil }
+        return CopilotSessionInfo(id: id, cwd: cwd, clientName: f["client_name"] ?? "", updatedAt: f["updated_at"] ?? "")
+    }
+
+    /// `happy acp -- copilot` tags the Copilot session `client_name: happy-cli`; ACP session ids
+    /// are not stored in Happy's metadata, so take the most recently updated one for the cwd.
+    /// ponytail: two Happy copilot sessions in one cwd resolve to the newer; upgrade = match by start time.
+    static func copilotResumeCommand(path: String, sessions: [CopilotSessionInfo]) -> String? {
+        sessions.filter { $0.clientName == "happy-cli" && $0.cwd == path }
+            .max { $0.updatedAt < $1.updatedAt }
+            .map { "copilot --resume \($0.id)" }
+    }
+
+    /// Resume command for a phone-started Happy session, by agent flavor. `happy resume` only
+    /// knows claude/codex; agy and copilot resume natively in the pane. `nil` = cannot resume.
+    static func adoptResumeCommand(id: String, flavor: String, path: String,
+                                   agyCache: Data?, copilotSessions: [CopilotSessionInfo]) -> String? {
+        switch flavor {
+        case "agy": return agyCache.flatMap { agyResumeCommand(path: path, cacheJSON: $0) }
+        case "acp": return copilotResumeCommand(path: path, sessions: copilotSessions)
+        default: return happyResumeCommand(id)
+        }
+    }
+
+    private static func loadCopilotSessions(home: String = NSHomeDirectory()) -> [CopilotSessionInfo] {
+        let root = home + "/.copilot/session-state"
+        let dirs = (try? FileManager.default.contentsOfDirectory(atPath: root)) ?? []
+        return dirs.compactMap { d in
+            (try? String(contentsOfFile: "\(root)/\(d)/workspace.yaml", encoding: .utf8)).flatMap(parseCopilotWorkspace)
+        }
+    }
+
     private static func runHappy(_ arguments: [String]) -> String? {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
@@ -75,7 +136,19 @@ extension KouenCLI {
             fputs("happy: no phone-started session to adopt\n", kouenStderr)
             exit(1)
         }
+        let home = NSHomeDirectory()
+        let sessionsJSON = FileManager.default.contents(atPath: home + "/.happy/sessions.json") ?? Data()
+        let agyCache = FileManager.default.contents(atPath: home + "/.gemini/antigravity-cli/cache/last_conversations.json")
+        let copilotSessions = loadCopilotSessions(home: home)
         for session in targets {
+            let local = happyLocalSession(session.happySessionId, sessionsJSON: sessionsJSON)
+            let flavor = local?.flavor ?? "claude"
+            let path = local?.path ?? ""
+            guard let command = adoptResumeCommand(id: session.happySessionId, flavor: flavor, path: path,
+                                                   agyCache: agyCache, copilotSessions: copilotSessions) else {
+                fputs("happy: no \(flavor) conversation found to resume for \(session.happySessionId); leaving it running\n", kouenStderr)
+                continue
+            }
             kill(session.pid, SIGTERM)
             var waited = 0
             while isAlive(session.pid), waited < 30 {
@@ -86,7 +159,7 @@ extension KouenCLI {
                 fputs("happy: pid \(session.pid) did not stop; not resuming \(session.happySessionId)\n", kouenStderr)
                 continue
             }
-            let tabID = try await openTab(running: happyResumeCommand(session.happySessionId), cwd: nil, client: client, label: "happy")
+            let tabID = try await openTab(running: command, cwd: path.isEmpty ? nil : path, client: client, label: "happy")
             print(tabID.uuidString)
         }
     }

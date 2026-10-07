@@ -970,8 +970,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/KouenVersion.swift": {
-    "mtime": 1791374627.6284351,
-    "ast_hash": "3ad32a5000a6ebf8a28a4764d0bac988",
+    "mtime": 1791382716.2769606,
+    "ast_hash": "24b960b31c73ff408f1d83ea2073e511",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Layouts/LayoutTemplate.swift": {
@@ -1060,8 +1060,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/GeneratedReleaseNotes.swift": {
-    "mtime": 1791374628.9800806,
-    "ast_hash": "710cfd3cc2cd987816c3168ba8b2407c",
+    "mtime": 1791382717.0574083,
+    "ast_hash": "bcd7f920a71a8f3fb5aeb439fe6f0a9a",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/ReleaseNotes.swift": {
@@ -4085,8 +4085,8 @@
     "semantic_hash": ""
   },
   "docs/USAGE.md": {
-    "mtime": 1791358916.131823,
-    "ast_hash": "0de8567c6630c81c5855c2bf4db19997",
+    "mtime": 1791383438.6963139,
+    "ast_hash": "bfff7ee469f9c63e8d60b8fd0acfe8d3",
     "semantic_hash": ""
   },
   "rules/build-release.md": {
@@ -4465,13 +4465,13 @@
     "semantic_hash": ""
   },
   "Tests/KouenCLITests/HappyAdoptTests.swift": {
-    "mtime": 1791302963.6214862,
-    "ast_hash": "ba847b4592f3e7d964adc6d76033a0ec",
+    "mtime": 1791383374.5489056,
+    "ast_hash": "e35df68db658124f86c2dd9ef1305dcb",
     "semantic_hash": ""
   },
   "Tools/kouen/Sources/KouenCLI/KouenCLI+Happy.swift": {
-    "mtime": 1791302963.6297185,
-    "ast_hash": "3b5f5074fb99acf05dffc2d236d0b72d",
+    "mtime": 1791383374.5484056,
+    "ast_hash": "9d94c1fb28ccc3c725f51050c3a0362c",
     "semantic_hash": ""
   }
 }

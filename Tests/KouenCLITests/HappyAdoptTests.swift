@@ -28,4 +28,22 @@ final class HappyAdoptTests: XCTestCase {
                        "HAPPY_CLAUDE_PATH='/h/.local/bin/claude' happy resume cmu1")
         XCTAssertEqual(KouenCLI.happyResumeCommand("cmu1", path: "/a") { _ in false }, "happy resume cmu1")
     }
+
+    func testAgyAndCopilotAdoptResumeNatively() {
+        let sessions = Data(#"{"sessions":{"cmuagy":{"metadata":{"flavor":"agy","path":"/p"}}}}"#.utf8)
+        XCTAssertEqual(KouenCLI.happyLocalSession("cmuagy", sessionsJSON: sessions)?.flavor, "agy")
+        XCTAssertNil(KouenCLI.happyLocalSession("nope", sessionsJSON: sessions))
+        let cache = Data(#"{"/p":"conv-1"}"#.utf8)
+        XCTAssertEqual(KouenCLI.adoptResumeCommand(id: "x", flavor: "agy", path: "/p", agyCache: cache, copilotSessions: []),
+                       "agy --conversation conv-1")
+        XCTAssertNil(KouenCLI.adoptResumeCommand(id: "x", flavor: "agy", path: "/other", agyCache: cache, copilotSessions: []))
+
+        let a = KouenCLI.parseCopilotWorkspace("id: c1\ncwd: /p\nclient_name: happy-cli\nupdated_at: 2026-10-07T10:00:00Z\n")!
+        let b = KouenCLI.parseCopilotWorkspace("id: c2\ncwd: /p\nclient_name: happy-cli\nupdated_at: 2026-10-07T11:00:00Z\n")!
+        let manual = KouenCLI.parseCopilotWorkspace("id: c3\ncwd: /p\nclient_name: copilot\nupdated_at: 2026-10-07T12:00:00Z\n")!
+        XCTAssertEqual(KouenCLI.adoptResumeCommand(id: "x", flavor: "acp", path: "/p", agyCache: nil, copilotSessions: [a, b, manual]),
+                       "copilot --resume c2", "newest happy-cli session for the cwd; hand-started ones are ignored")
+        XCTAssertEqual(KouenCLI.adoptResumeCommand(id: "cmu9", flavor: "claude", path: "/p", agyCache: nil, copilotSessions: []),
+                       KouenCLI.happyResumeCommand("cmu9"))
+    }
 }

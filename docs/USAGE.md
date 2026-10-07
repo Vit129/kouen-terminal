@@ -81,7 +81,7 @@ kouen-cli install-hooks cursor
 
 ### Steering agents from a phone
 
-Each agent launches in `remote-control` mode by default (`agentSessionModes` in `settings.json`), so Claude Code shows up in the Claude app. For one cross-vendor phone app install [Happy](https://happy.engineering) (`npm i -g happy`, `happy auth login`) and set an agent's mode to `happy`; with Happy logged in, a hand-typed `claude` is reachable from both apps. A session started from the phone runs headless — `kouen-cli happy adopt <id>|--all` pulls it into a pane. Details: README § Mobile.
+Each agent launches in `remote-control` mode by default (`agentSessionModes` in `settings.json`), so Claude Code shows up in the Claude app. For one cross-vendor phone app install [Happy](https://happy.engineering) (`npm i -g happy`, `happy auth login`) and set an agent's mode to `happy`; with Happy logged in, a hand-typed `claude` is reachable from both apps. A session started from the phone runs headless — `kouen-cli happy adopt <id>|--all` pulls it into a pane. Claude/Codex resume through `happy resume`; Antigravity and Copilot resume natively (`agy --conversation`, `copilot --resume`) since Happy's `agy`/`acp` modes are headless. Details: README § Mobile.
 
 ## 5. Recommended Shell Tools
 
