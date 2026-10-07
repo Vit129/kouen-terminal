@@ -1,16 +1,16 @@
 # Graph Report - kouen-terminal  (2026-10-07)
 
 ## Corpus Check
-- 876 files · ~994,105 words
+- 876 files · ~993,899 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 21360 nodes · 56249 edges · 3993 communities (1576 shown, 2417 thin omitted)
+- 21357 nodes · 56249 edges · 3991 communities (1576 shown, 2415 thin omitted)
 - Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 8243 edges (avg confidence: 0.74)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `5f7f8013`
+- Built from commit: `583e9e7f`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -31,16 +31,16 @@ A high-degree node isn't always architecturally central - a widely-used
 utility/config file can rack up more edges than a real coupler while only
 ever touching one area. This ranks by how many DIFFERENT communities a
 node's neighbors span, not by raw edge count.
-1. `IPCRequest` - bridges 186 areas (208 edges)
+1. `IPCRequest` - bridges 185 areas (208 edges)
 2. `Command` - bridges 102 areas (108 edges)
 3. `AgentKind` - bridges 81 areas (167 edges)
-4. `IPCResponse` - bridges 78 areas (103 edges)
-5. `t()` - bridges 77 areas (253 edges)
+4. `t()` - bridges 78 areas (253 edges)
+5. `IPCResponse` - bridges 77 areas (103 edges)
 6. `KouenPaths` - bridges 74 areas (149 edges)
-7. `KouenTerminalSurfaceView` - bridges 70 areas (342 edges)
+7. `KouenTerminalSurfaceView` - bridges 72 areas (342 edges)
 8. `SurfaceRegistry` - bridges 69 areas (217 edges)
-9. `SessionCoordinator` - bridges 65 areas (235 edges)
-10. `AnyCodable` - bridges 65 areas (190 edges)
+9. `KouenGridTerminal` - bridges 66 areas (117 edges)
+10. `SessionCoordinator` - bridges 65 areas (235 edges)
 
 ## Surprising Connections (you probably didn't know these)
 - `.selectedHost` --references--> `RemoteHost`  [INFERRED]
@@ -57,7 +57,7 @@ node's neighbors span, not by raw edge count.
 ## Import Cycles
 - None detected.
 
-## Communities (3993 total, 2417 thin omitted)
+## Communities (3991 total, 2415 thin omitted)
 
 ### Community 0 - "CodingKey"
 Cohesion: 0.05
@@ -65,7 +65,7 @@ Nodes (35): AgentBrowserPaneTracker, SplitPaneCoordinator, .surfaceID(forPane:in
 
 ### Community 1 - "callingPaneTarget"
 Cohesion: 0.04
-Nodes (57): _5e(), agn(), ast(), bTn(), bvt(), cmn(), dst(), e5e() (+49 more)
+Nodes (64): ake(), aoe(), aXe(), b2t(), b6(), bee(), bR(), cvn() (+56 more)
 
 ### Community 2 - ".handleNormal"
 Cohesion: 0.10
@@ -100,8 +100,8 @@ Cohesion: 0.11
 Nodes (11): .agentColorBinding, colors, PerformanceBenchmarks, SurfaceMainThreadStallSample, SurfaceOffMainStallSample, Bool, Double, String (+3 more)
 
 ### Community 10 - "PerformanceBenchmarks"
-Cohesion: 0.05
-Nodes (54): RGBColor, DecodedImage, .byteCount, UInt8, Bool, CAMetalDrawable, String, RenderColorConversion (+46 more)
+Cohesion: 0.04
+Nodes (49): CGImage, DecodedImage, .byteCount, ImageLimits, Bool, UInt8, ImageDecoder, Bool (+41 more)
 
 ### Community 11 - "GitPanelView.swift"
 Cohesion: 0.13
@@ -141,19 +141,19 @@ Nodes (5): KouenBrowserTools, Bool, Double, String, TimeInterval
 
 ### Community 21 - "HarnessTerminalSurfaceView"
 Cohesion: 0.04
-Nodes (126): Ame(), aQ(), aQt(), aUe(), aXt(), AYt(), bme(), bqt() (+118 more)
+Nodes (131): a6(), aJ(), Ame(), aQ(), aQt(), aUe(), aXt(), AYt() (+123 more)
 
 ### Community 22 - "CopyModeAction"
 Cohesion: 0.01
-Nodes (642): _0t(), _1n(), _3e(), _3n(), _4e(), _5n(), _6e(), _7n() (+634 more)
+Nodes (636): _0t(), _1n(), _3e(), _3n(), _4e(), _5e(), _5n(), _6e() (+628 more)
 
 ### Community 23 - "SplitPaneCoordinator"
 Cohesion: 0.09
 Nodes (23): OptionStore, OptionStore.Value, .boolValue, .intValue, .statusLineCount, .stringValue, Scope, global (+15 more)
 
 ### Community 24 - ".request"
-Cohesion: 0.08
-Nodes (20): .init(coder:), BrowserProgressLine, .init(coder:), .init(frame:), BrowserTabButton, .init(coder:), DesignModePopoverViewController, .init(coder:) (+12 more)
+Cohesion: 0.09
+Nodes (18): .init(coder:), BrowserProgressLine, .init(coder:), .init(frame:), BrowserTabButton, .init(coder:), DesignModePopoverViewController, .init(coder:) (+10 more)
 
 ### Community 25 - "WorktreeManager"
 Cohesion: 0.16
@@ -164,7 +164,7 @@ Cohesion: 0.30
 Nodes (5): SettingsAdvancedView, .body, Bool, String, SwiftUI
 
 ### Community 27 - "RGBColor"
-Cohesion: 0.14
+Cohesion: 0.15
 Nodes (6): RenderScheduler, .hasPendingWork, Bool, Void, RenderSchedulerTests, Bool
 
 ### Community 28 - ".parse"
@@ -180,7 +180,7 @@ Cohesion: 0.14
 Nodes (12): CommandPromptController, .historyEntries, .historyURL, KeyablePanel, .canBecomeKey, Bool, NSControl, NSPanel (+4 more)
 
 ### Community 32 - ".addTab"
-Cohesion: 0.10
+Cohesion: 0.09
 Nodes (22): FleetRowView, .body, .statusColor, .statusDot, .subtitle, FleetView, .body, .emptyState (+14 more)
 
 ### Community 33 - "Equatable"
@@ -209,7 +209,7 @@ Nodes (12): BrowserOkAck, ConnectionState, .authorized, .browserPaneID, .deviceI
 
 ### Community 40 - "HarnessSettings"
 Cohesion: 0.02
-Nodes (281): a(), b(), c(), d(), e(), f(), g(), h() (+273 more)
+Nodes (290): a(), b(), c(), d(), e(), f(), g(), h() (+282 more)
 
 ### Community 41 - "CodingKeys"
 Cohesion: 0.08
@@ -228,7 +228,7 @@ Cohesion: 0.14
 Nodes (9): Process, SSHTunnelManager, .init(makeTunnelProcess:reachabilityProbe:), Bool, URL, Tunnel, SSHTunnelManagerTests, String (+1 more)
 
 ### Community 47 - ".normalizedKey"
-Cohesion: 0.09
+Cohesion: 0.10
 Nodes (12): Bool, String, UInt8, TerminalEmulator, .captureLines(fromLine:toLine:), .onResponse, .onSetClipboard, TerminalColorRole (+4 more)
 
 ### Community 48 - "HookEvent"
@@ -236,8 +236,8 @@ Cohesion: 0.13
 Nodes (14): Executor, Hook, HookEvent, HookRegistry, Bool, Command, URL, UUID (+6 more)
 
 ### Community 49 - "DaemonServer"
-Cohesion: 0.06
-Nodes (18): HintModeOverlay, Any, NSEvent, String, KouenTerminalKit, NSDraggingInfo, NSDragOperation, PasteController (+10 more)
+Cohesion: 0.08
+Nodes (14): KouenTerminalKit, NSDraggingInfo, NSDragOperation, PasteController, Bool, NSPasteboard, String, TimeInterval (+6 more)
 
 ### Community 51 - ".keyEvent"
 Cohesion: 0.11
@@ -269,7 +269,7 @@ Nodes (36): ArtifactKind, html, image, markdown, text, AutomationsFleetModel, .l
 
 ### Community 60 - "ViEngine"
 Cohesion: 0.02
-Nodes (377): pe(), r, X(), A(), code(), R(), a(), a6() (+369 more)
+Nodes (361): pe(), r, X(), A(), code(), R(), a(), ae() (+353 more)
 
 ### Community 61 - "FrecencyDirectoryStore"
 Cohesion: 0.14
@@ -284,8 +284,8 @@ Cohesion: 0.14
 Nodes (10): Buffer, .preview, Configuration, PasteBufferStore, Bool, Date, String, URL (+2 more)
 
 ### Community 64 - ".text"
-Cohesion: 0.07
-Nodes (25): AgentChipView, .init(coder:), .init(frame:), .intrinsicContentSize, ChromeBackdrop, .init(coder:), .init(role:), ChromeRole (+17 more)
+Cohesion: 0.05
+Nodes (50): AgentChipView, .init(coder:), .init(frame:), .intrinsicContentSize, ChromeBackdrop, .init(coder:), .init(role:), ChromeRole (+42 more)
 
 ### Community 65 - "PrefixKeymap"
 Cohesion: 0.08
@@ -352,8 +352,8 @@ Cohesion: 0.08
 Nodes (23): Error, LSPClient, LSPClientError, missingPipe, processNotRunning, requestFailed, serverNotExecutable, AsyncStream (+15 more)
 
 ### Community 84 - "LSPDiagnostic"
-Cohesion: 0.05
-Nodes (33): NSCursor, TerminalColorGamut, auto, displayP3, sRGB, TerminalColorRenderingMode, accurate, vivid (+25 more)
+Cohesion: 0.06
+Nodes (29): OSSignposter, FrameDropCause, encodeFailure, nilDrawable, FrameSignposter, .event(_:), .interval(_:_:), Bool (+21 more)
 
 ### Community 85 - "TerminalGridCell"
 Cohesion: 0.07
@@ -364,8 +364,8 @@ Cohesion: 0.12
 Nodes (11): FileEditorView, .init(frame:), Bool, NSEvent, NSHostingView, NSRect, String, URL (+3 more)
 
 ### Community 87 - "SessionCoordinator"
-Cohesion: 0.14
-Nodes (14): FindWindowMatcher, SearchScope, all, none, only, Bool, SessionGroup, SessionID (+6 more)
+Cohesion: 0.10
+Nodes (15): FindWindowMatcher, SearchScope, all, none, only, Bool, SessionGroup, SessionID (+7 more)
 
 ### Community 88 - "Harness as a terminal multiplexer"
 Cohesion: 0.09
@@ -384,8 +384,8 @@ Cohesion: 0.09
 Nodes (21): Agent Swarm Core — Fleet Orchestration (20–50 Agents), Context, Daemon: headless surface creation — CORRECTED during Slice 3 (2026-09-14), DAG signal for the Claude adapter specifically, Data model, Delta + coalesced push (not full-snapshot-per-status-change), Extended OSC 26 protocol (Lane B only) — Slice 3 implemented `identity=`/`status=` only, Lane A — Structured workers (Claude Code today, Codex/Agy/Copilot later): (+13 more)
 
 ### Community 92 - "P2 — Async IPC Refactor: Design Document"
-Cohesion: 0.12
-Nodes (12): FlippedView, .isFlipped, .removeWorktreeAction(_:), NSButton, NSColor, NSRect, NSScrollView, NSStackView (+4 more)
+Cohesion: 0.16
+Nodes (8): DataBox, FlippedView, .isFlipped, GitResult, Bool, ValidateOutcome, CoreServices, GitPanelViewToastErrorSummaryTests
 
 ### Community 93 - "code:bash (# Terminal 1: Create workspace with long-running job)"
 Cohesion: 0.09
@@ -460,8 +460,8 @@ Cohesion: 0.09
 Nodes (13): HistoryLine, ImagePlacement, Pen, RewrapResult, SavedCursor, Bool, ClosedRange, Range (+5 more)
 
 ### Community 112 - ".makeSnapshot"
-Cohesion: 0.17
-Nodes (12): .activeTab, .init(url:paneID:webView:), .webView(_:createWebViewWith:for:windowFeatures:), .webView(_:didFinish:), BrowserTab, URL, UUID, WKNavigationAction (+4 more)
+Cohesion: 0.21
+Nodes (11): .activeTab, .init(url:paneID:webView:), .webView(_:createWebViewWith:for:windowFeatures:), .webView(_:didFinish:), BrowserTab, UUID, WKNavigationAction, WKWebView (+3 more)
 
 ### Community 113 - "HarnessGridTerminal"
 Cohesion: 0.09
@@ -520,8 +520,8 @@ Cohesion: 0.09
 Nodes (20): Coordinator, DiffAnalysis, DiffFileItem, DiffFileStatus, added, .color, deleted, modified (+12 more)
 
 ### Community 129 - "SwiftUI"
-Cohesion: 0.16
-Nodes (5): FilePreviewCoordinator, FileTabID, Set, SplitDirection, String
+Cohesion: 0.12
+Nodes (12): FilePreviewCoordinator, FileTabID, Set, SplitDirection, String, FileTab, .title, FileTabManager (+4 more)
 
 ### Community 131 - ".install"
 Cohesion: 0.13
@@ -628,8 +628,8 @@ Cohesion: 0.16
 Nodes (12): ANSIPalette, CellColorResolver, MochaTheme, ResolvedCellColors, .init(hex:), .init(red:green:blue:alpha:), Bool, Double (+4 more)
 
 ### Community 160 - "AmbientBackground"
-Cohesion: 0.12
-Nodes (22): FileEditorTabBarBody, .body, FileEditorTabBarModel, FileEditorTabBarView, .init(coder:), .init(frame:), .onClose, .onSelect (+14 more)
+Cohesion: 0.13
+Nodes (18): NSEvent, WorktreeCardView, FileEditorTabBarBody, .body, FileEditorTabBarModel, FileEditorTabBarView, .init(coder:), .init(frame:) (+10 more)
 
 ### Community 161 - "What You Must Do When Invoked"
 Cohesion: 0.14
@@ -736,8 +736,8 @@ Cohesion: 0.09
 Nodes (15): PluginLoader, String, ScriptAPI, ScriptError, .errorDescription, evaluationError, unsupportedPlatform, ScriptRuntime (+7 more)
 
 ### Community 192 - "GlyphRasterizer"
-Cohesion: 0.10
-Nodes (20): CTFontSymbolicTraits, CellMetrics, GlyphRasterizer, .rasterize(cluster:bold:italic:), .rasterize(codepoint:bold:italic:), .rasterize(glyph:font:), .shapedRunStats, RasterizedGlyph (+12 more)
+Cohesion: 0.08
+Nodes (24): CTFontSymbolicTraits, CellMetrics, GlyphRasterizer, .rasterize(cluster:bold:italic:), .rasterize(codepoint:bold:italic:), .rasterize(glyph:font:), .shapedRunStats, RasterizedGlyph (+16 more)
 
 ### Community 193 - "BinaryInstaller"
 Cohesion: 0.16
@@ -752,8 +752,8 @@ Cohesion: 0.23
 Nodes (6): EnvironmentStore, Persisted, String, URL, EnvironmentStoreTests, URL
 
 ### Community 196 - "Feature Provenance — harness-terminal"
-Cohesion: 0.10
-Nodes (15): Kind, primary, secondary, KouenPillButton, .init(title:kind:), .isHovered, .isPressed, NSColor (+7 more)
+Cohesion: 0.08
+Nodes (19): Collection, .aggregateBoardStatus, .taskTooltipSummary, Kind, primary, secondary, KouenPillButton, .init(title:kind:) (+11 more)
 
 ### Community 197 - "AgentSessionSummary"
 Cohesion: 0.16
@@ -788,7 +788,7 @@ Cohesion: 0.14
 Nodes (11): NSCoder, NSEvent, NSImage, NSPanel, NSRect, String, Void, TabCell (+3 more)
 
 ### Community 206 - "HarnessCLI"
-Cohesion: 0.12
+Cohesion: 0.13
 Nodes (5): SessionPersistenceTests, Bool, String, TabID, URL
 
 ### Community 207 - "scheduleRender"
@@ -816,7 +816,7 @@ Cohesion: 0.09
 Nodes (9): String, WorkspaceID, CwdMetadataProvider, GitMetadataProvider, MetadataProvider, String, Tab, DaemonSyncServiceBranchNotifyTests (+1 more)
 
 ### Community 213 - "String"
-Cohesion: 0.13
+Cohesion: 0.14
 Nodes (7): TimeInterval, Logger, AgentHandoffBuilder, Bool, String, HandoffDirectoryTests, AgentHandoffBuilderTests
 
 ### Community 214 - "NotchLayoutMetrics"
@@ -824,7 +824,7 @@ Cohesion: 0.06
 Nodes (30): DefaultTerminalManager, DefaultTerminalOpener, DefaultTerminalRegistrationError, .errorDescription, failed, DefaultTerminalStatus, .isDefault, .summary (+22 more)
 
 ### Community 215 - ".lines"
-Cohesion: 0.15
+Cohesion: 0.14
 Nodes (4): CommandIPCTranslatorTests, Bool, PaneID, TabID
 
 ### Community 216 - "CellColorResolverTests"
@@ -872,7 +872,7 @@ Cohesion: 0.10
 Nodes (11): Bool, DispatchWorkItem, NSEvent, NSPopover, NSRange, NSString, Void, SyntaxTextView (+3 more)
 
 ### Community 228 - "sessionRow"
-Cohesion: 0.14
+Cohesion: 0.12
 Nodes (7): KeybindingsStore, .fileURL, URL, KeybindingsStoreTests, URL, Void, String
 
 ### Community 229 - ".decide"
@@ -940,8 +940,8 @@ Cohesion: 0.14
 Nodes (14): InstallError, daemonNotFound, .description, launchctlFailed, writeFailed, InstallReport, LaunchAgentInstaller, .isInstalled (+6 more)
 
 ### Community 249 - "ReflowPreviewTests"
-Cohesion: 0.12
-Nodes (10): ClientSummary, DaemonStats, Bool, Date, Double, Int32, String, UUID (+2 more)
+Cohesion: 0.16
+Nodes (9): ClientSummary, DaemonStats, Bool, Date, Double, Int32, String, UUID (+1 more)
 
 ### Community 250 - "HarnessTerminalSurfaceWorkerTests"
 Cohesion: 0.33
@@ -1016,8 +1016,8 @@ Cohesion: 0.09
 Nodes (11): PaneBorderStatus, Bool, Command, DispatchWorkItem, PaneID, PaneLeaf, PaneNode, PaneRect (+3 more)
 
 ### Community 271 - "StatusLineView.swift"
-Cohesion: 0.07
-Nodes (34): a2(), akn(), bYe(), cIn(), ew(), h3n(), ift(), jie() (+26 more)
+Cohesion: 0.15
+Nodes (22): ch(), cvt(), dV(), ew(), ik(), iPt(), jj(), kae() (+14 more)
 
 ### Community 272 - "SGRMouseEvent"
 Cohesion: 0.27
@@ -1084,12 +1084,12 @@ Cohesion: 0.42
 Nodes (6): InstallResult, ShellCompletionInstaller, Bool, String, URL, ShellIntegration
 
 ### Community 288 - "AgentHookStrategy"
-Cohesion: 0.16
-Nodes (8): String, UInt64, TerminalSelection, CellOverlayTests, IndexSet, NSWindow, String, UInt64
+Cohesion: 0.12
+Nodes (26): RGBColor, TerminalColorGamut, auto, displayP3, sRGB, TerminalColorRenderingMode, accurate, vivid (+18 more)
 
 ### Community 290 - "Process"
-Cohesion: 0.09
-Nodes (6): ContentAreaViewController, Bool, SplitDirection, String, TabID, Notification
+Cohesion: 0.11
+Nodes (4): ContentAreaViewController, Bool, SplitDirection, TabID
 
 ### Community 291 - "JSONDecoder"
 Cohesion: 0.20
@@ -1128,8 +1128,8 @@ Cohesion: 0.13
 Nodes (14): string, AgentNotification, OSCNotificationParser, DaemonSurfaceID, Date, String, SurfaceID, .snapshotPayload (+6 more)
 
 ### Community 301 - ".parse"
-Cohesion: 0.11
-Nodes (12): ParsedShortcut, .displayString, PrefixKeymap, Any, Bool, NSEvent, String, TimeInterval (+4 more)
+Cohesion: 0.12
+Nodes (9): ParsedShortcut, .displayString, PrefixKeymap, Any, Bool, NSEvent, String, TimeInterval (+1 more)
 
 ### Community 302 - "ThemeDiagnostics"
 Cohesion: 0.15
@@ -1144,8 +1144,8 @@ Cohesion: 0.11
 Nodes (17): CodingKey, CodingKeys, description, key, showInBanner, CodingKeys, createdAt, cwd (+9 more)
 
 ### Community 305 - ".script"
-Cohesion: 0.05
-Nodes (42): A1(), aAn(), aat(), bln(), bw(), bwt(), c2t(), c5n() (+34 more)
+Cohesion: 0.08
+Nodes (28): aat(), ap(), apn(), c5n(), d6(), f5n(), fle(), gPt() (+20 more)
 
 ### Community 306 - "RegressionBugFixTests"
 Cohesion: 0.12
@@ -1160,7 +1160,7 @@ Cohesion: 0.12
 Nodes (18): aDt(), Bpe(), cFe(), displayable(), Fpe(), jpe(), KBe(), mFe() (+10 more)
 
 ### Community 310 - "FrameSignposter"
-Cohesion: 0.06
+Cohesion: 0.07
 Nodes (32): KeybindingsService, Bool, Command, String, KeySpec, .init(from:), Decoder, Binding (+24 more)
 
 ### Community 311 - "Bug: Tab-Switch Black Screen"
@@ -1192,16 +1192,16 @@ Cohesion: 0.26
 Nodes (14): Agent Command Does Not Crash, Agent Waiting Filter Does Not Crash, Board Command Shows Board Panel, Cd Command Switches To Matching Tab, Copy Path Command Does Not Crash, Errors Command Does Not Crash, Find Command Opens Command Palette On Empty Query, Find Command Resolves Unique File (+6 more)
 
 ### Community 321 - "UInt64"
-Cohesion: 0.05
-Nodes (62): a7e(), al(), b1t(), bdn(), bIn(), c4n(), d7e(), dhn() (+54 more)
+Cohesion: 0.06
+Nodes (58): a7e(), al(), b1t(), bdn(), bIn(), c4n(), d7e(), dhn() (+50 more)
 
 ### Community 322 - "DesktopNotifier"
 Cohesion: 0.18
 Nodes (14): Array, SessionGroup, .activeTab, .init(from:), .init(id:name:tabs:activeTabID:lastActiveTabID:sortOrder:groupID:persistent:), .isWorktreeSession, .worktreePath, Bool (+6 more)
 
 ### Community 323 - "LayoutNode"
-Cohesion: 0.24
-Nodes (3): ShortcutRecorderSerializer, String, ShortcutRecorderSerializerTests
+Cohesion: 0.13
+Nodes (7): ControlKeyNormalizer, Bool, String, ShortcutRecorderSerializer, String, ControlKeyNormalizerTests, ShortcutRecorderSerializerTests
 
 ### Community 324 - "WorkspaceSymbolIndex"
 Cohesion: 0.09
@@ -1228,8 +1228,8 @@ Cohesion: 0.18
 Nodes (15): CellMetrics, ComposedFrame, CellMetrics, ComposedTerminalView, .body, .metrics, .pixelHeight, .pixelWidth (+7 more)
 
 ### Community 331 - ".recordReapedGenerationForTesting"
-Cohesion: 0.13
-Nodes (10): NSViewCornerConfiguration, String, TimeInterval, Toast, ToastBody, .body, ToastHostingView, .cornerConfiguration (+2 more)
+Cohesion: 0.19
+Nodes (9): NSViewCornerConfiguration, String, TimeInterval, Toast, ToastBody, .body, ToastHostingView, .cornerConfiguration (+1 more)
 
 ### Community 332 - "Added"
 Cohesion: 0.16
@@ -1260,8 +1260,8 @@ Cohesion: 0.16
 Nodes (9): AgentRemoteControlDaemonService, Bool, Set, String, Void, AgentRemoteControlDaemonServiceTests, LogBox, .count (+1 more)
 
 ### Community 339 - "Foundation"
-Cohesion: 0.12
-Nodes (22): AppKit, KouenCopyMode, KouenTerminalEngine, KouenTerminalRenderer, KouenTheme, Metal, PresentAttempt, encodeFailure (+14 more)
+Cohesion: 0.09
+Nodes (28): AppKit, CoreGraphics, CoreText, ImageIO, KouenCopyMode, KouenTerminalEngine, KouenTerminalRenderer, KouenTheme (+20 more)
 
 ### Community 340 - "code:bash (harness-cli install-hooks openclaw)"
 Cohesion: 0.19
@@ -1272,8 +1272,8 @@ Cohesion: 0.09
 Nodes (15): .effectiveResumeCommand(mode:), AgentLaunchCommands, String, AgentSessionMode, cloud, happy, .launchCommand, .launchFlags (+7 more)
 
 ### Community 342 - "Added"
-Cohesion: 0.30
-Nodes (7): Bool, NSPasteboard, NSString, String, URL, TerminalServicesProvider, AutoreleasingUnsafeMutablePointer
+Cohesion: 0.27
+Nodes (8): Bool, NSPasteboard, NSString, String, URL, TerminalServicesProvider, AutoreleasingUnsafeMutablePointer, NSObject
 
 ### Community 343 - "[2.2.3] - 2026-06-09"
 Cohesion: 0.09
@@ -1324,8 +1324,8 @@ Cohesion: 0.17
 Nodes (4): InputEncoder, InputEncoderTests, String, UInt8
 
 ### Community 357 - ".handleCat"
-Cohesion: 0.12
-Nodes (17): BrowserRequestPayload, close, cookies, evaluate, goBack, goForward, interact, navigate (+9 more)
+Cohesion: 0.13
+Nodes (10): NSPoint, NSView, DisplayPanesChipView, .cornerConfiguration, DisplayPanesOverlay, Any, NSEvent, NSViewCornerConfiguration (+2 more)
 
 ### Community 358 - "[3.5.1] - 2026-06-20"
 Cohesion: 0.20
@@ -1368,8 +1368,8 @@ Cohesion: 0.24
 Nodes (6): ScriptFileWatcher, DispatchSourceFileSystemObject, DispatchWorkItem, String, TimeInterval, Void
 
 ### Community 368 - "Tab"
-Cohesion: 0.10
-Nodes (8): Bool, NSDraggingInfo, NSDragOperation, NSPasteboard, URL, NSPasteboard, URL, KouenTerminalSurfaceDragDropTests
+Cohesion: 0.13
+Nodes (7): Bool, NSDraggingInfo, NSDragOperation, NSPasteboard, URL, NSPasteboard, KouenTerminalSurfaceDragDropTests
 
 ### Community 369 - "Git Panel"
 Cohesion: 0.39
@@ -1384,8 +1384,8 @@ Cohesion: 0.23
 Nodes (9): AttentionBeaconDotView, BeaconView, .init(coder:), .init(frame:), Bool, Context, NSCoder, NSColor (+1 more)
 
 ### Community 372 - "DynamicInstanceBuffer"
-Cohesion: 0.13
-Nodes (16): DataBox, .init(coder:), .init(frame:), HunkActionButton, .init(coder:), .init(title:onClick:), StageToggleButton, .init(coder:) (+8 more)
+Cohesion: 0.15
+Nodes (14): .init(coder:), .init(frame:), HunkActionButton, .init(coder:), .init(title:onClick:), StageToggleButton, .init(coder:), .init(frame:) (+6 more)
 
 ### Community 373 - "Prompt"
 Cohesion: 0.20
@@ -1412,8 +1412,8 @@ Cohesion: 0.13
 Nodes (11): ResizeHUDView, .cornerConfiguration, .init(coder:), .init(frame:), DispatchWorkItem, NSCoder, NSColor, NSPoint (+3 more)
 
 ### Community 379 - "MCPServer"
-Cohesion: 0.11
-Nodes (31): Codable, agentWaitChannel(), BrowserCookie, BrowserElement, BrowserElementBounds, BrowserNetworkEntry, BrowserResponsePayload, cookies (+23 more)
+Cohesion: 0.07
+Nodes (48): Codable, agentWaitChannel(), BrowserCookie, BrowserElement, BrowserElementBounds, BrowserNetworkEntry, BrowserRequestPayload, close (+40 more)
 
 ### Community 380 - "PromptQueue"
 Cohesion: 0.14
@@ -1434,10 +1434,6 @@ Nodes (17): OnboardingStep, complete, discover, .id, setup, shell, .title, welco
 ### Community 386 - "SKILL-LOG.md"
 Cohesion: 0.09
 Nodes (19): .webView(_:didCommit:), BrowserPaneViewTests, MockWebView, .isLoading, .url, Any, Bool, CGFloat (+11 more)
-
-### Community 387 - "User Profile"
-Cohesion: 0.13
-Nodes (6): CGImage, ImageLimits, Bool, ImageDecoder, ImageProtocolTests, String
 
 ### Community 388 - "Darwin"
 Cohesion: 0.12
@@ -1548,8 +1544,8 @@ Cohesion: 0.23
 Nodes (5): HappyAdoptTests, HappyDaemonSession, Bool, Int32, String
 
 ### Community 428 - "TaskDashboardView"
-Cohesion: 0.12
-Nodes (10): MainMenuBuilder, MenuTarget, Bool, NSMenu, NSMenuItem, Selector, String, SurfaceID (+2 more)
+Cohesion: 0.19
+Nodes (7): MainMenuBuilder, MenuTarget, NSMenu, NSMenuItem, Selector, String, MenuTargetForkConversationTests
 
 ### Community 429 - "Case: cwd "bleed" — session worktree jumps to wrong dir during builds"
 Cohesion: 0.18
@@ -1640,12 +1636,12 @@ Cohesion: 0.27
 Nodes (7): AgentCatalog, AgentConfig, DiskAgentConfig, Bool, String, .detectionSection, agents
 
 ### Community 452 - "tmux parity — status, adaptations, and deliberate divergences"
-Cohesion: 0.12
-Nodes (10): GitPanelView, .isHidden, .removeWorktreeAction(path:), GitResult, Bool, DispatchWorkItem, String, UnsafeMutableRawPointer (+2 more)
+Cohesion: 0.09
+Nodes (15): GitPanelView, .isHidden, .removeWorktreeAction(_:), .removeWorktreeAction(path:), DispatchWorkItem, NSButton, NSColor, NSRect (+7 more)
 
 ### Community 453 - ".deleteWorkspaceFromMenu"
 Cohesion: 0.21
-Nodes (6): BrowserPaneRegistry, .init(url:paneID:), DesignModeElementInfo, NSWindow, PaneID, WeakBrowserPaneView
+Nodes (8): BrowserPaneRegistry, .init(url:paneID:), DesignModeElementInfo, NSWindow, PaneID, WeakBrowserPaneView, WeakScriptMessageHandler, WKScriptMessageHandler
 
 ### Community 454 - ".recordReapedGenerationForTesting"
 Cohesion: 0.05
@@ -1664,7 +1660,7 @@ Cohesion: 0.25
 Nodes (8): AnimatablePair, NotchShape, .animatableData, CGFloat, CGPath, CGRect, Path, Shape
 
 ### Community 459 - ".encode"
-Cohesion: 0.17
+Cohesion: 0.18
 Nodes (6): JSONOutputFormatter, Bool, String, T, JSONOutputFormatterTests, T
 
 ### Community 460 - "RunState"
@@ -1704,7 +1700,7 @@ Cohesion: 0.14
 Nodes (11): Agent Memory Index — harness-terminal, Navigation, Edges, Files, Knowledge Index — Harness Terminal, Search Instructions, Source Map, Case Index (+3 more)
 
 ### Community 469 - "PresentAttempt"
-Cohesion: 0.17
+Cohesion: 0.12
 Nodes (10): .init(frame:), .webView(_:decidePolicyFor:decisionHandler:), .webView(_:didFinish:), MainActor, NSRect, WKNavigation, WKNavigationAction, WKWebView (+2 more)
 
 ### Community 470 - "DispatchTime"
@@ -1724,7 +1720,7 @@ Cohesion: 0.29
 Nodes (7): Toggle Sidebar, Sidebar Toggle Works, Board CLI Shows Columns, Board CLI Shows Running After Long Command, Board Columns Visible After Click, Board Tab Accessible In Sidebar, Split Pane And Resize
 
 ### Community 476 - ".steps"
-Cohesion: 0.20
+Cohesion: 0.22
 Nodes (3): Any, NSMenuItem, NSClickGestureRecognizer
 
 ### Community 477 - ".endFind"
@@ -1740,8 +1736,8 @@ Cohesion: 0.40
 Nodes (3): ReflowFastPathTests, .feeds, String
 
 ### Community 480 - "Command Prompt Architecture"
-Cohesion: 0.05
-Nodes (28): Tab, NSEvent, WorktreeCardView, BrowserIntegrationController, PaneID, PaneContainerView, .init(node:cwd:themeName:existingHosts:existingBrowserPanes:), NSPoint (+20 more)
+Cohesion: 0.07
+Nodes (20): Tab, AnyObject, TimeInterval, ZombieHoldRegistry, BrowserIntegrationController, PaneID, PaneContainerView, .init(node:cwd:themeName:existingHosts:existingBrowserPanes:) (+12 more)
 
 ### Community 481 - ".testKouenRendererFixtureDefaultTextReportsPlausibleGlyphStats"
 Cohesion: 0.20
@@ -1837,7 +1833,7 @@ Nodes (12): Architecture, Browser DevTools API (P28), Config, Key Bug Fixed: Rou
 
 ### Community 513 - "ThemeDocument"
 Cohesion: 0.13
-Nodes (7): BrowserPaneView, Any, NSPopover, Selector, String, TimeInterval, NSAppearance
+Nodes (8): BrowserPaneView, Any, NSPopover, Selector, String, TimeInterval, URL, NSAppearance
 
 ### Community 514 - "graphify reference: extra exports and benchmark"
 Cohesion: 0.27
@@ -1856,8 +1852,8 @@ Cohesion: 0.20
 Nodes (13): ern(), G4(), G7(), Jnn(), nrn(), Qnn(), sHe(), trn() (+5 more)
 
 ### Community 522 - "ShellCompletionInstallerTests"
-Cohesion: 0.07
-Nodes (34): Collection, .aggregateBoardStatus, .taskTooltipSummary, FontSize, IconSize, KouenMotion, Radius, Shadow (+26 more)
+Cohesion: 0.27
+Nodes (4): HintModeOverlay, Any, NSEvent, String
 
 ### Community 524 - "RealPtyLifecycleTests"
 Cohesion: 0.15
@@ -1912,8 +1908,8 @@ Cohesion: 0.20
 Nodes (4): SavedLayoutIPCDaemonTests, String, URL, UUID
 
 ### Community 540 - ".taskUpdate"
-Cohesion: 0.05
-Nodes (44): aoe(), ase(), aTn(), aV(), bb(), bR(), cce(), clamp() (+36 more)
+Cohesion: 0.06
+Nodes (38): bC(), c8e(), Cf(), clamp(), e9n(), ele(), ezt(), formatHsl() (+30 more)
 
 ### Community 544 - "Task Ledger Archive (Tasks 1–50)"
 Cohesion: 0.51
@@ -1936,8 +1932,8 @@ Cohesion: 0.18
 Nodes (11): State, csiEntry, csiIgnore, csiIntermediate, csiParam, escape, escapeIntermediate, ground (+3 more)
 
 ### Community 556 - "BrowserTab"
-Cohesion: 0.12
-Nodes (13): AssistantMessageLine, CopilotAdapter, ResultLine, String, UUID, HeadlessCLIAdapter, HeadlessRunEvent, assistantText (+5 more)
+Cohesion: 0.22
+Nodes (7): HeadlessRunEvent, assistantText, result, sessionID, Bool, Double, String
 
 ### Community 557 - ".viewWillMove"
 Cohesion: 0.26
@@ -1952,8 +1948,8 @@ Cohesion: 0.17
 Nodes (3): String, URL, TaskIPCDaemonTests
 
 ### Community 560 - "LayoutTemplate"
-Cohesion: 0.22
-Nodes (7): OSSignposter, FrameDropCause, encodeFailure, nilDrawable, FrameSignposter, Bool, UInt64
+Cohesion: 0.18
+Nodes (9): Bm(), Em(), jm(), kfn(), kIn(), lst(), vn(), ym (+1 more)
 
 ### Community 562 - "BrowserResponsePayload"
 Cohesion: 0.40
@@ -1996,7 +1992,7 @@ Cohesion: 0.12
 Nodes (19): KouenChrome, KouenChromePalette, Bool, CGFloat, NSColor, String, PaletteFooter, .body (+11 more)
 
 ### Community 574 - "generate-release-notes.swift"
-Cohesion: 0.10
+Cohesion: 0.09
 Nodes (13): UnsafeBufferPointer, TerminalCellWidth, UnsafeBufferPointer, .cursorVisible, CharacterWidth, Bool, ClosedRange, Unicode (+5 more)
 
 ### Community 575 - ".toastErrorSummary"
@@ -2009,7 +2005,7 @@ Nodes (5): RepoResolver, Bool, String, RepoResolverTests, String
 
 ### Community 578 - "TaskDashboardBody"
 Cohesion: 0.01
-Nodes (469): l, em(), _2t(), _4n(), _6n(), a1t(), a5n(), a7n() (+461 more)
+Nodes (490): l, em(), _2t(), _4n(), _6n(), a1t(), a5n(), a7n() (+482 more)
 
 ### Community 579 - "RunState"
 Cohesion: 0.26
@@ -2024,7 +2020,7 @@ Cohesion: 0.15
 Nodes (12): MouseButton, left, middle, right, wheelDown, wheelLeft, wheelRight, wheelUp (+4 more)
 
 ### Community 584 - ".configureEnvironment"
-Cohesion: 0.36
+Cohesion: 0.33
 Nodes (3): GitPanelViewHunkStagingTests, String, URL
 
 ### Community 586 - ".consumeInputCore"
@@ -2032,8 +2028,8 @@ Cohesion: 0.29
 Nodes (7): TabContextCommand, close, closeOthers, rename, splitHorizontal, splitVertical, togglePersistent
 
 ### Community 587 - "BrowserResponsePayload"
-Cohesion: 0.10
-Nodes (5): NSTextView, KouenApp, GitPanelViewDiffPopoverTests, GitPanelViewFSEventFilterTests, GitPanelViewWorktreeParsingTests
+Cohesion: 0.14
+Nodes (3): KouenApp, GitPanelViewFSEventFilterTests, GitPanelViewWorktreeParsingTests
 
 ### Community 589 - "Endpoint"
 Cohesion: 0.33
@@ -2069,7 +2065,7 @@ Nodes (3): bVe(), nJt(), pVe()
 
 ### Community 600 - "HarnessTerminalSurfaceView"
 Cohesion: 0.03
-Nodes (40): NSRangePointer, TerminalGridCell, NSEvent, Any, Bool, CGFloat, NSEvent, NSMenu (+32 more)
+Nodes (38): NSCursor, NSRangePointer, TerminalGridCell, NSEvent, Any, Bool, CGFloat, NSEvent (+30 more)
 
 ### Community 601 - "Hwe"
 Cohesion: 0.67
@@ -2100,16 +2096,16 @@ Cohesion: 0.18
 Nodes (10): Current architecture relevant to these gaps, P38 — Competitive Feature Gaps (cmux / Supacode / Superset / WezTerm / Zed), Phase A — Cross-agent diff/review dashboard (biggest gap vs Superset/Supacode) — ✅ DONE 2026-07-13, see p38-phase-a-diff-dashboard/{design.md,dev-task-progress.md}, Phase B — Subagent/teammate visibility as panes (vs cmux) — ✅ CLOSED 2026-07-16 (build/test/robot green, live check skipped per user decision), Phase C — Agent "thread" UX on top of existing block capture (vs Zed Terminal Threads) — ⚠️ pivoted 2026-07-15, ✅ CLOSED 2026-07-16 (build/test/robot green, cross-pane jump-to-block live check skipped per user decision), see p38-phase-c-thread-overlay/{design.md,dev-task-progress.md}, Phase D — Terminal image protocol (Kitty Graphics) — vs WezTerm — ✅ D1 DONE 2026-07-14 (finding: NOT deferred), D3 conformance slice built, ✅ CLOSED 2026-07-16 (build/test/robot green, real-client live check skipped per user decision), Phase E — Scripting hook parity (JS vs WezTerm's Lua) — low priority — ✅ DONE 2026-07-14, ✅ CLOSED 2026-07-16 (low-priority live check skipped per user decision), Phases (+2 more)
 
 ### Community 614 - "MainSplitViewController"
-Cohesion: 0.09
-Nodes (21): DisplayLinkTarget, MainSplitViewController, .setSidebarVisible(_:), .setSidebarVisible(_:animated:), SplitChromeDelegate, .splitView(_:constrainMaxCoordinate:ofSubviewAt:), .splitView(_:constrainMinCoordinate:ofSubviewAt:), .splitView(_:effectiveRect:forDrawnRect:ofDividerAt:) (+13 more)
+Cohesion: 0.08
+Nodes (22): DisplayLinkTarget, MainSplitViewController, .setSidebarVisible(_:), .setSidebarVisible(_:animated:), SplitChromeDelegate, .splitView(_:constrainMaxCoordinate:ofSubviewAt:), .splitView(_:constrainMinCoordinate:ofSubviewAt:), .splitView(_:effectiveRect:forDrawnRect:ofDividerAt:) (+14 more)
 
 ### Community 617 - "ScriptFileWatcher"
 Cohesion: 0.10
 Nodes (26): CodingKeys, activeSurfaceID, daemonSurfaceID, id, surfaceID, surfaces, PaneLeaf, .init(from:) (+18 more)
 
 ### Community 622 - "[1.3.0-vit] - 2026-06-06"
-Cohesion: 0.18
-Nodes (5): ClaudeCodeHarness, .hasAdapter(for:), Bool, UUID, ClaudeCodeHarnessTests
+Cohesion: 0.16
+Nodes (6): ClaudeCodeHarness, .hasAdapter(for:), Bool, UUID, HeadlessCLIAdapter, ClaudeCodeHarnessTests
 
 ### Community 623 - "BrowserResponsePayload"
 Cohesion: 0.13
@@ -2191,6 +2187,10 @@ Nodes (11): Action items, Fix, How it was found, Post-mortem: Cmd+\ sidebar togg
 Cohesion: 0.17
 Nodes (11): 1. `SessionLifecycleService.swift` (tab bar clicks, sidebar clicks), 2. `MainExecutor.swift` (keyboard shortcuts — the actual user path), Competitive research (from Agy), Data model (correct, no changes needed), Files to read before resuming, Fix applied (compiles, not fully tested), Focus Persistence — Per-Session-Tab Pane Focus (RL-043), Restoration flow (after fix) (+3 more)
 
+### Community 680 - ".recordReapedGenerationForTesting"
+Cohesion: 0.27
+Nodes (3): Bool, SurfaceID, MenuTargetPeerReviewTests
+
 ### Community 681 - ".tabIDsToNotify"
 Cohesion: 0.17
 Nodes (11): AgentHookStrategy, eventArrayJSON, eventMatcherJSON, .filename, namedGroupJSON, ownJSONFile, ownTextFile, regionEdit (+3 more)
@@ -2218,10 +2218,6 @@ Nodes (4): AgentScanner, Bool, DispatchSourceTimer, TimeInterval
 ### Community 687 - "FormatStringExtendedVariableTests"
 Cohesion: 0.18
 Nodes (10): AI / Agent Connectivity, Architecture Decisions — harness-terminal, Browser Pane, Config / Settings, File Preview / Split Panes, IPC / Daemon, Keybindings, Sessions / Tabs (+2 more)
-
-### Community 689 - ".hideFind"
-Cohesion: 0.13
-Nodes (10): CoreGraphics, CoreText, ImageIO, ShapedGlyphSignature, Bool, CGFloat, CGGlyph, String (+2 more)
 
 ### Community 690 - ".update"
 Cohesion: 0.40
@@ -2276,8 +2272,8 @@ Cohesion: 0.18
 Nodes (10): Burst Coalescing (cmux NotificationBurstCoalescer), CA Mask Pattern (Harness Notch), Combine → CA Bridge, Equality Guard (Zed layout phase), GPU Animation Pattern — Layout Once, GPU Paints, Layer Coordinate System, Principle, References (+2 more)
 
 ### Community 709 - "String"
-Cohesion: 0.04
-Nodes (63): aNt(), bCn(), Bm(), cc(), ch(), cOn(), cvt(), d1n() (+55 more)
+Cohesion: 0.03
+Nodes (71): _7n(), aNt(), bvt(), cc(), cOn(), CWt(), d1n(), d2() (+63 more)
 
 ### Community 710 - "MainWindowController"
 Cohesion: 0.10
@@ -2344,8 +2340,8 @@ Cohesion: 0.09
 Nodes (21): InputGate, .siblings, ReconnectLatch, .isTripped, SurfaceIO, .currentSubscription, Bool, CGFloat (+13 more)
 
 ### Community 729 - "Lf"
-Cohesion: 0.23
-Nodes (7): AboutPanelController, AboutView, .body, MonoPillButtonStyle, Configuration, NSWindow, NSObject
+Cohesion: 0.25
+Nodes (6): AboutPanelController, AboutView, .body, MonoPillButtonStyle, Configuration, NSWindow
 
 ### Community 730 - "ViInputMode"
 Cohesion: 0.31
@@ -2404,8 +2400,8 @@ Cohesion: 0.20
 Nodes (9): 1. Sidebar toggle (⌘\), 2. File preview open/close, 3. Tab switch (⌘1-9, ✕ close), 4. presentsWithTransaction order fix (ALL remaining flash cases) — v3.9.x+, Fixes Applied (v3.9.1+), Related Lessons, Root Cause Pattern, Rules (+1 more)
 
 ### Community 755 - "ym"
-Cohesion: 0.23
-Nodes (8): OverlayBackground, Context, OverlayBackground, Context, KouenOverlayBackground, OverlayBackground, Context, NSViewRepresentable
+Cohesion: 0.15
+Nodes (13): OverlayBackground, Context, OverlayBackground, Context, KouenOverlayBackground, .init(coder:), .init(coder:), .init(coder:) (+5 more)
 
 ### Community 756 - "Consumers"
 Cohesion: 0.20
@@ -2471,6 +2467,10 @@ Nodes (3): MobileBridgeSpawnTests, String, URL
 Cohesion: 0.29
 Nodes (8): AgentLaunchConfig, ResumeStyle, bare, flag, none, subcommand, Bool, Set
 
+### Community 953 - "Added"
+Cohesion: 0.33
+Nodes (5): AssistantMessageLine, CopilotAdapter, ResultLine, String, UUID
+
 ### Community 979 - "qLt"
 Cohesion: 0.20
 Nodes (7): BBe(), NBe(), PBe(), qLt(), sIt(), VBe(), zLt()
@@ -2527,6 +2527,10 @@ Nodes (8): AppKit + Metal Patterns, CADisplayLink Lifetime on macOS (CASE-031), 
 Cohesion: 0.22
 Nodes (8): Architecture, Infinite Recursion (CASE-006), Pane Drag-and-Drop (P27), Ratio Persistence (CASE-002), Split CWD Resolution — Worktree Priority (2026-06-21), Split Panes (NSSplitView), Subview Reorder (CASE-007), Two-Axis Split Parity (P13)
 
+### Community 1692 - "Changed"
+Cohesion: 0.25
+Nodes (5): Bool, NSEvent, ViInputMode, insert, normal
+
 ### Community 1740 - "headless-worker-followup — Phase 2 Architect (Gate 1)"
 Cohesion: 0.22
 Nodes (8): Context, Decision to confirm, Delivery, Design, headless-worker-followup — Phase 2 Architect (Gate 1), QA coverage (what deserves a test — scenarios in Phase 3), Reuse Table, Verification
@@ -2558,10 +2562,6 @@ Nodes (5): SpecialKeyMappingTests, Bool, NSEvent, String, UInt16
 ### Community 1930 - ".encodeLine"
 Cohesion: 0.22
 Nodes (4): JSONDecoder, JSONEncoder, Encoder, TerminalRecordingCodec
-
-### Community 1983 - "CopilotAdapter"
-Cohesion: 0.38
-Nodes (4): AnyObject, TimeInterval, ZombieHoldRegistry, ObjectIdentifier
 
 ### Community 2000 - "fFe"
 Cohesion: 0.22
@@ -2760,26 +2760,26 @@ Cohesion: 0.50
 Nodes (3): NSRect, .init(frame:), .thumbRect
 
 ## Knowledge Gaps
-- **4212 isolated node(s):** `AppIntents`, `noActivePane`, `.localizedStringResource`, `horizontal`, `vertical` (+4207 more)
+- **4209 isolated node(s):** `AppIntents`, `noActivePane`, `.localizedStringResource`, `horizontal`, `vertical` (+4204 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **2417 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **2415 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 - **15 possibly unreachable function(s):** `.addSurface(tabID:paneID:)`, `.agentInfo(forWorktreePath:tabs:)`, `.block(atPromptLine:)`, `.block(atPromptLine:)`, `.blocks` (+10 more)
   Not reached from any recognized entry point - could be dead code, or dynamically dispatched/decorator-registered.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Int` connect `.automationList` to `ThemeDocument`, `graphify reference: extra exports and benchmark`, `Changed`, `.handleNormal`, `IPCRequest`, `AgentNotchRootView`, `.jumpToBlock`, `LSPMessage`, `TerminalEmulator`, `PerformanceBenchmarks`, `GitPanelView.swift`, `FileTreeKeyboardNavigator`, `EngineConformanceTests`, `VTParser`, `HarnessTerminalSurfaceView`, `.applyPreedit`, `MetalRendererTests`, `HarnessUILibrary`, `.recordReapedGenerationForTesting`, `HarnessChrome`, `.init`, `ReplayStep`, `SplitPaneCoordinator`, `WorktreeManager`, `SessionGroupHeaderRowView`, `.readGrid(scrollbackOffset:)`, `RGBColor`, `.init`, `Notification`, `Sendable`, `.addTab`, `Equatable`, `.bufferLine`, `MenuTarget`, `.characterIndex`, `Task Ledger Archive (Tasks 1–50)`, `CodingKeys`, `HarnessSidebarPanelViewController.swift`, `BrowserTab`, `.viewWillMove`, `.sendInput`, `.normalizedKey`, `DaemonServer`, `.keyEvent`, `HarnessSplitView`, `TabCell`, `KouenOverlayBackground`, `CommandHistorySearchController`, `3.2 สิ่งที่ implement แล้ว`, `ShellIntegrationTests`, `main.swift`, `FrecencyDirectoryStore`, `HarnessCLI+Server.swift`, `generate-release-notes.swift`, `PasteBufferStore`, `ShellIntegration`, `Completed Plans Archive`, `worktree_isolation_cli.robot`, `FileTreeKeyboardNavigator`, `BrowserResponsePayload`, `.parse`, `Endpoint`, `HarnessDesign`, `.firstMatch`, `LSPClient`, `LSPDiagnostic`, `TerminalGridCell`, `HarnessPaths`, `.control`, `HarnessTerminalSurfaceView`, `P2 — Async IPC Refactor: Design Document`, `AttachInputBatcher`, `shim.c`, `PaneContainerView`, `.installCLI`, `.dispatch`, `ScriptRuntime.swift`, `Session Grouping and Split Session Plan`, `MainSplitViewController`, `DaemonLauncher`, `Recipe`, `AnyCodable`, `domain-design.md`, `DamageTrackingTests`, `SoftIconButton`, `code:text (:workbench start swift)`, `.makeSnapshot`, `[2.5.0] - 2026-06-12`, `HarnessGridTerminal`, `.encode`, `SessionGroup`, `.firstWaitingTab`, `ViEngine`, `HistoryRingBuffer`, `ClientSummary`, `GlyphAtlas`, `code:block1 (SessionCoordinator.snapshot ──┐)`, `SwiftUI`, `.install`, `AgentHookInstaller`, `.load`, `CommandTarget`, `.startWatching`, `PtyDrainCeilingBenchmark`, `User Story Mapping (MANDATORY)`, `แผนงานการสร้างระบบพรีวิวและแสดงผลไฟล์ (File Viewer & Preview Integration Plan)`, `.testPaneLeafLegacyDecodeBackfillsSurfaceTabs`, `CopyModeGridSource`, `PaneStyleSet`, `AsciiFastPathTests`, `DecodedImage`, `FileTreeWatcher`, `What You Must Do When Invoked`, `LiveResizeTests`, `Int`, `ThaiCombiningMarkTests`, `Harness Terminal — IDE Sidebar Feature Branch`, `MatchCategory`, `What You Must Do When Invoked`, `TerminalFindBar`, `Workspace`, `CommandPromptController`, `ActiveTabCloseDisposition`, `AgentTableEntry`, `URLDetection`, `[1.5.1] - 2026-06-06`, `BinaryRefresherTests`, `.hideFind`, `InlineAICompletionView`, `[3.13.1] - 2026-07-02`, `GridCompositorTests`, `LSPServerRegistry`, `SessionSnapshot`, `AppDelegate`, `main.swift`, `user-stories.md`, `.taskUpdate`, `GlyphRasterizer`, `Tab Bar (TerminalTabBarView) — Layout, Git Branch & Drag`, `BinaryInstaller`, `.classify`, `[3.9.5] - 2026-06-26`, `scheduleRender`, `AgentRoutingRuleSummary`, `PaneTarget`, `.lines`, `.handleUndo`, `CellColorResolverTests`, `TerminalServicesProvider`, `b1t`, `ImageTextureCache`, `ThaiGrid`, `SSHTunnelManagerTests`, `ExternalOpenKind`, `WorkbenchCommand`, `.make`, `PaneBorderStatus`, `[3.5.1] - 2026-06-20`, `FileNode`, `ThemeDocumentTests`, `Experience modes`, `ReflowPreviewTests`, `SessionCoordinator`, `NSViewRepresentable`, `workspace`, `.tabIDsToNotify`, `ThemeFileServiceTests`, `.welcome`, `HarnessSidebarPanelViewController`, `.path`, `DefaultTerminalManager`, `WindowSession`, `KeySpec`, `[2.5.0] - 2026-06-12`, `DisplayPanesOverlay`, `.menu`, `TerminalScrollbarView`, `FormatColor`, `DisplayWidth`, `After all done, come back and update agent-memory/memory.md and agent-memory/plans/p14-web-browser-pane.md.`, `code:bash (harness-cli install-hooks hermes)`, `click_ui_element`, `AgentHookStrategy`, `StatusLineWidthTests`, `Process`, `.compute`, `JSONDecoder`, `Fixes Applied (layered)`, `GitHubCLIClient`, `NotificationBus`, `settings.json`, `PaneNode`, `HarnessPaths.swift`, `ANSIPalette`, `BlockSummary`, `.handleCat`, `.selectAdjacentSession`, `Bug: Tab-Switch Black Screen`, `Terminal AI Chat (⌘I inline overlay)`, `AgentSnapshot`, `DesktopNotifier`, `worktree_isolation.robot`, `.theme`, `README.md`, `.drawGlyph`, `Added`, `CSIParams`, `Foundation`, `FileViewerViewController`, `Memory Leak Audit — 34 GB Long-Session Case (2026-06-26)`, `P10: Performance and Feature Roadmap (Terminal First, IDE Convenient)`, `[3.5.1] - 2026-06-20`, `FormatStyledSegment.swift`, `RGBColor`, `generate-cheatsheet.js`, `Consumers`, `Git Panel`, `ScrollReuseTests`, `Identifiable`, `SurfaceProgressTrackerTests.swift`, `MCPServer`, `NSTextField Leak in BoardViewController (P20 Performance)`, `User Profile`, `Darwin`, `HarnessCLITests`, `.cursorBackwardTabs`, `.init`, `PresentAttempt`, `Split Panes (NSSplitView)`, `AgentIconRenderer`, `.tabIndex(tabID:)`, `main.swift`, `.setCellPixelSize`, `Session/Tab/Pane Hierarchy & Top Bar (CASE-028)`, `javascript.json`, `markdown.json`, `.currentSize`, `SixelDecoder`, `.navigateCurrentFile`, `Competitive Position (as of v3.12.0, 2026-07-02)`, `BoardCardView`, `PathToken`, `LaunchdServiceInstaller`, `SessionEditor`, `RemoteHostStore`, `main.swift`, `PresentAttempt`, `SessionCoordinator.swift`, `tmux parity — status, adaptations, and deliberate divergences`, `.recordReapedGenerationForTesting`, `.deinit`, `.init`, `ReflowFastPathTests`, `.moveSelection`, `.resize`, `DispatchTime`, `HarnessOnboarding`, `Added`, `ScrollbackTests`, `Command Prompt Architecture`, `.testKouenRendererFixtureDefaultTextReportsPlausibleGlyphStats`, `ccRunGet`, `.testProceduralBoxAndBlockCellsDoNotEnterShapedRunCache`, `.bind`, `.routingRuleList`, `.delay`?**
+- **Why does `Int` connect `.automationList` to `ThemeDocument`, `graphify reference: extra exports and benchmark`, `Changed`, `.handleNormal`, `IPCRequest`, `AgentNotchRootView`, `.jumpToBlock`, `LSPMessage`, `TerminalEmulator`, `ShellCompletionInstallerTests`, `GitPanelView.swift`, `PerformanceBenchmarks`, `FileTreeKeyboardNavigator`, `VTParser`, `HarnessTerminalSurfaceView`, `.applyPreedit`, `MetalRendererTests`, `HarnessUILibrary`, `.recordReapedGenerationForTesting`, `HarnessChrome`, `.init`, `EngineConformanceTests`, `ReplayStep`, `SplitPaneCoordinator`, `WorktreeManager`, `SessionGroupHeaderRowView`, `.readGrid(scrollbackOffset:)`, `RGBColor`, `.init`, `Notification`, `Sendable`, `.addTab`, `Equatable`, `.bufferLine`, `MenuTarget`, `.characterIndex`, `Task Ledger Archive (Tasks 1–50)`, `CodingKeys`, `HarnessSidebarPanelViewController.swift`, `.viewWillMove`, `.sendInput`, `.normalizedKey`, `.keyEvent`, `HarnessSplitView`, `TabCell`, `KouenOverlayBackground`, `CommandHistorySearchController`, `3.2 สิ่งที่ implement แล้ว`, `ShellIntegrationTests`, `main.swift`, `FrecencyDirectoryStore`, `HarnessCLI+Server.swift`, `generate-release-notes.swift`, `PasteBufferStore`, `ShellIntegration`, `Changed`, `Completed Plans Archive`, `worktree_isolation_cli.robot`, `FileTreeKeyboardNavigator`, `.parse`, `Endpoint`, `HarnessDesign`, `.firstMatch`, `LSPClient`, `LSPDiagnostic`, `TerminalGridCell`, `HarnessPaths`, `.control`, `HarnessTerminalSurfaceView`, `AttachInputBatcher`, `shim.c`, `PaneContainerView`, `.installCLI`, `.dispatch`, `ScriptRuntime.swift`, `Session Grouping and Split Session Plan`, `MainSplitViewController`, `DaemonLauncher`, `Recipe`, `AnyCodable`, `domain-design.md`, `DamageTrackingTests`, `SoftIconButton`, `code:text (:workbench start swift)`, `.makeSnapshot`, `[2.5.0] - 2026-06-12`, `HarnessGridTerminal`, `.encode`, `SessionGroup`, `.firstWaitingTab`, `ViEngine`, `HistoryRingBuffer`, `ClientSummary`, `GlyphAtlas`, `code:block1 (SessionCoordinator.snapshot ──┐)`, `SwiftUI`, `.install`, `AgentHookInstaller`, `.load`, `CommandTarget`, `.startWatching`, `PtyDrainCeilingBenchmark`, `User Story Mapping (MANDATORY)`, `แผนงานการสร้างระบบพรีวิวและแสดงผลไฟล์ (File Viewer & Preview Integration Plan)`, `.testPaneLeafLegacyDecodeBackfillsSurfaceTabs`, `CopyModeGridSource`, `PaneStyleSet`, `AsciiFastPathTests`, `DecodedImage`, `FileTreeWatcher`, `What You Must Do When Invoked`, `LiveResizeTests`, `Int`, `ThaiCombiningMarkTests`, `Harness Terminal — IDE Sidebar Feature Branch`, `MatchCategory`, `What You Must Do When Invoked`, `TerminalFindBar`, `Workspace`, `CommandPromptController`, `ActiveTabCloseDisposition`, `AgentTableEntry`, `URLDetection`, `[1.5.1] - 2026-06-06`, `BinaryRefresherTests`, `.hideFind`, `InlineAICompletionView`, `[3.13.1] - 2026-07-02`, `GridCompositorTests`, `LSPServerRegistry`, `SessionSnapshot`, `AppDelegate`, `main.swift`, `user-stories.md`, `.taskUpdate`, `GlyphRasterizer`, `Tab Bar (TerminalTabBarView) — Layout, Git Branch & Drag`, `BinaryInstaller`, `.classify`, `[3.9.5] - 2026-06-26`, `scheduleRender`, `AgentRoutingRuleSummary`, `PaneTarget`, `.lines`, `.handleUndo`, `CellColorResolverTests`, `TerminalServicesProvider`, `b1t`, `ImageTextureCache`, `ThaiGrid`, `SSHTunnelManagerTests`, `ExternalOpenKind`, `WorkbenchCommand`, `.make`, `PaneBorderStatus`, `[3.5.1] - 2026-06-20`, `FileNode`, `ThemeDocumentTests`, `Experience modes`, `ReflowPreviewTests`, `SessionCoordinator`, `NSViewRepresentable`, `workspace`, `.tabIDsToNotify`, `ThemeFileServiceTests`, `.welcome`, `HarnessSidebarPanelViewController`, `.path`, `DefaultTerminalManager`, `WindowSession`, `KeySpec`, `[2.5.0] - 2026-06-12`, `DisplayPanesOverlay`, `.menu`, `TerminalScrollbarView`, `FormatColor`, `DisplayWidth`, `After all done, come back and update agent-memory/memory.md and agent-memory/plans/p14-web-browser-pane.md.`, `code:bash (harness-cli install-hooks hermes)`, `click_ui_element`, `AgentHookStrategy`, `StatusLineWidthTests`, `Process`, `.compute`, `JSONDecoder`, `Fixes Applied (layered)`, `GitHubCLIClient`, `NotificationBus`, `settings.json`, `PaneNode`, `HarnessPaths.swift`, `ANSIPalette`, `BlockSummary`, `.handleCat`, `.selectAdjacentSession`, `Bug: Tab-Switch Black Screen`, `Terminal AI Chat (⌘I inline overlay)`, `AgentSnapshot`, `DesktopNotifier`, `worktree_isolation.robot`, `.theme`, `README.md`, `.drawGlyph`, `Added`, `CSIParams`, `Foundation`, `FileViewerViewController`, `Memory Leak Audit — 34 GB Long-Session Case (2026-06-26)`, `P10: Performance and Feature Roadmap (Terminal First, IDE Convenient)`, `.handleCat`, `[3.5.1] - 2026-06-20`, `FormatStyledSegment.swift`, `RGBColor`, `generate-cheatsheet.js`, `Consumers`, `Git Panel`, `ScrollReuseTests`, `Identifiable`, `SurfaceProgressTrackerTests.swift`, `MCPServer`, `NSTextField Leak in BoardViewController (P20 Performance)`, `User Profile`, `Darwin`, `HarnessCLITests`, `.cursorBackwardTabs`, `.init`, `PresentAttempt`, `Split Panes (NSSplitView)`, `AgentIconRenderer`, `.tabIndex(tabID:)`, `main.swift`, `.setCellPixelSize`, `Session/Tab/Pane Hierarchy & Top Bar (CASE-028)`, `javascript.json`, `markdown.json`, `.currentSize`, `SixelDecoder`, `.navigateCurrentFile`, `Competitive Position (as of v3.12.0, 2026-07-02)`, `BoardCardView`, `PathToken`, `LaunchdServiceInstaller`, `SessionEditor`, `Added`, `RemoteHostStore`, `main.swift`, `CopilotAdapter`, `PresentAttempt`, `SessionCoordinator.swift`, `tmux parity — status, adaptations, and deliberate divergences`, `.recordReapedGenerationForTesting`, `.deinit`, `.init`, `ReflowFastPathTests`, `.moveSelection`, `.resize`, `DispatchTime`, `HarnessOnboarding`, `Added`, `ScrollbackTests`, `.testKouenRendererFixtureDefaultTextReportsPlausibleGlyphStats`, `ccRunGet`, `.testProceduralBoxAndBlockCellsDoNotEnterShapedRunCache`, `.bind`, `.routingRuleList`, `.delay`?**
   _High betweenness centrality (0.198) - this node is a cross-community bridge._
-- **Why does `AgentSessionSummary` connect `Terminal AI Chat (⌘I inline overlay)` to `Darwin`, `AgentSessionSummary.swift`, `worktree_isolation_cli.robot`, `IPCRequest`, `.recordReapedGenerationForTesting`, `Changelog`, `.agentName`, `.id`, `.parse`, `TerminalProtocolCompatibilityTests`, `Consumers`, `NotificationBus`, `.automationList`, `PaneNode`, `code:bash (harness-cli install-hooks pi)`, `MCPServer`?**
+- **Why does `AgentSessionSummary` connect `Terminal AI Chat (⌘I inline overlay)` to `Darwin`, `AgentSessionSummary.swift`, `worktree_isolation_cli.robot`, `IPCRequest`, `.agentName`, `Changelog`, `.id`, `NotificationBus`, `.parse`, `TerminalProtocolCompatibilityTests`, `Consumers`, `.automationList`, `PaneNode`, `code:bash (harness-cli install-hooks pi)`, `SessionCoordinator`, `MCPServer`?**
   _High betweenness centrality (0.175) - this node is a cross-community bridge._
 - **Why does `fbt()` connect `TaskDashboardBody` to `HarnessSettings`, `Changelog`, `String`, `CopyModeAction`?**
   _High betweenness centrality (0.090) - this node is a cross-community bridge._
 - **Are the 18 inferred relationships involving `KouenTerminalSurfaceView` (e.g. with `InputEncoder` and `RenderScheduler`) actually correct?**
   _`KouenTerminalSurfaceView` has 18 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `AppIntents`, `noActivePane`, `.localizedStringResource` to the rest of the system?**
-  _4232 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _4229 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `CodingKey` be split into smaller, more focused modules?**
   _Cohesion score 0.05339506172839506 - nodes in this community are weakly interconnected._
 - **Should `callingPaneTarget` be split into smaller, more focused modules?**
-  _Cohesion score 0.03822055137844611 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.04265873015873016 - nodes in this community are weakly interconnected._
