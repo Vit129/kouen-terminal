@@ -194,7 +194,7 @@ public enum ShellIntegration {
         __kouen_agy_next() { command agy "$@"; }
       fi
       agy() {
-        local a rc=0
+        local a n=0 rc=0
         case "$1" in
           auth|config|doctor|help|remote-control|status|update|version) __kouen_agy_next "$@"; return ;;
         esac
@@ -202,18 +202,13 @@ public enum ShellIntegration {
           case "$a" in
             -h|--help|-v|--version) __kouen_agy_next "$@"; return ;;
             --remote-control|--rc) rc=1 ;;
+            *) n=$((n+1)) ;;
           esac
         done
-        if (( ${+commands[happy]} )) && [[ -f "$HOME/.happy/access.key" ]]; then
-          if (( rc )); then happy agy "$@"; else happy agy --remote-control "$@"; fi
-          return
-        fi
-        if (( rc )); then __kouen_agy_next "$@"; return; fi
-        if [[ "$KOUEN_AGY_SESSION_MODE" == "happy" ]] && (( ${+commands[happy]} )); then
-          happy agy "$@"
-        else
-          __kouen_agy_next --remote-control "$@"
-        fi
+        if (( ${+commands[happy]} )) && [[ "$KOUEN_AGY_SESSION_MODE" == "happy" ]]; then happy agy "$@"; return; fi
+        # `happy agy` drops every argument (resume, prompt), so only a bare launch can go through it.
+        if (( ${+commands[happy]} )) && [[ -f "$HOME/.happy/access.key" ]] && (( n == 0 )); then happy agy; return; fi
+        if (( rc )); then __kouen_agy_next "$@"; else __kouen_agy_next --remote-control "$@"; fi
       }
     fi
     # GitHub Copilot session mode: a `copilot` typed by hand gets --remote when in remote-control mode ($KOUEN_COPILOT_SESSION_MODE), or happy acp when happy.
@@ -225,19 +220,19 @@ public enum ShellIntegration {
         __kouen_copilot_next() { command copilot "$@"; }
       fi
       copilot() {
+        local a n=0 rc=0
         case "$1" in
           auth|config|help|login|logout|status|version) __kouen_copilot_next "$@"; return ;;
         esac
         for a in "$@"; do
           case "$a" in
-            -h|--help|-v|--version|--remote) __kouen_copilot_next "$@"; return ;;
+            -h|--help|-v|--version) __kouen_copilot_next "$@"; return ;;
+            --remote) rc=1 ;;
           esac
         done
-        if [[ "$KOUEN_COPILOT_SESSION_MODE" == "happy" ]] && (( ${+commands[happy]} )); then
-          happy acp -- copilot --acp "$@"
-        else
-          __kouen_copilot_next --remote "$@"
-        fi
+        if (( ${+commands[happy]} )) && [[ "$KOUEN_COPILOT_SESSION_MODE" == "happy" ]]; then happy acp -- copilot --acp "$@"; return; fi
+        if (( ${+commands[happy]} )) && [[ -f "$HOME/.happy/access.key" ]]; then if (( rc )); then happy acp -- copilot --acp "$@"; else happy acp -- copilot --acp --remote "$@"; fi; return; fi
+        if (( rc )); then __kouen_copilot_next "$@"; else __kouen_copilot_next --remote "$@"; fi
       }
     fi
     # Hermes session mode: a `hermes` typed by hand gets --remote when in remote-control mode ($KOUEN_HERMES_SESSION_MODE).
@@ -358,7 +353,7 @@ public enum ShellIntegration {
         __kouen_agy_next() { command agy "$@"; }
       fi
       agy() {
-        local a rc=0
+        local a n=0 rc=0
         case "$1" in
           auth|config|doctor|help|remote-control|status|update|version) __kouen_agy_next "$@"; return ;;
         esac
@@ -366,18 +361,13 @@ public enum ShellIntegration {
           case "$a" in
             -h|--help|-v|--version) __kouen_agy_next "$@"; return ;;
             --remote-control|--rc) rc=1 ;;
+            *) n=$((n+1)) ;;
           esac
         done
-        if command -v happy >/dev/null 2>&1 && [ -f "$HOME/.happy/access.key" ]; then
-          if (( rc )); then happy agy "$@"; else happy agy --remote-control "$@"; fi
-          return
-        fi
-        if (( rc )); then __kouen_agy_next "$@"; return; fi
-        if [ "$KOUEN_AGY_SESSION_MODE" = "happy" ] && command -v happy >/dev/null 2>&1; then
-          happy agy "$@"
-        else
-          __kouen_agy_next --remote-control "$@"
-        fi
+        if command -v happy >/dev/null 2>&1 && [[ "$KOUEN_AGY_SESSION_MODE" == "happy" ]]; then happy agy "$@"; return; fi
+        # `happy agy` drops every argument (resume, prompt), so only a bare launch can go through it.
+        if command -v happy >/dev/null 2>&1 && [ -f "$HOME/.happy/access.key" ] && (( n == 0 )); then happy agy; return; fi
+        if (( rc )); then __kouen_agy_next "$@"; else __kouen_agy_next --remote-control "$@"; fi
       }
     fi
     # GitHub Copilot session mode: a `copilot` typed by hand gets --remote when in remote-control mode ($KOUEN_COPILOT_SESSION_MODE), or happy acp when happy.
@@ -389,19 +379,19 @@ public enum ShellIntegration {
         __kouen_copilot_next() { command copilot "$@"; }
       fi
       copilot() {
+        local a n=0 rc=0
         case "$1" in
           auth|config|help|login|logout|status|version) __kouen_copilot_next "$@"; return ;;
         esac
         for a in "$@"; do
           case "$a" in
-            -h|--help|-v|--version|--remote) __kouen_copilot_next "$@"; return ;;
+            -h|--help|-v|--version) __kouen_copilot_next "$@"; return ;;
+            --remote) rc=1 ;;
           esac
         done
-        if [ "$KOUEN_COPILOT_SESSION_MODE" = "happy" ] && command -v happy >/dev/null 2>&1; then
-          happy acp -- copilot --acp "$@"
-        else
-          __kouen_copilot_next --remote "$@"
-        fi
+        if command -v happy >/dev/null 2>&1 && [[ "$KOUEN_COPILOT_SESSION_MODE" == "happy" ]]; then happy acp -- copilot --acp "$@"; return; fi
+        if command -v happy >/dev/null 2>&1 && [ -f "$HOME/.happy/access.key" ]; then if (( rc )); then happy acp -- copilot --acp "$@"; else happy acp -- copilot --acp --remote "$@"; fi; return; fi
+        if (( rc )); then __kouen_copilot_next "$@"; else __kouen_copilot_next --remote "$@"; fi
       }
     fi
     # Hermes session mode
@@ -545,6 +535,7 @@ public enum ShellIntegration {
                 case auth config doctor help remote-control status update version
                     __kouen_agy_next $argv; return
             end
+            set -l n 0
             set -l rc 0
             for a in $argv
                 switch $a
@@ -552,19 +543,19 @@ public enum ShellIntegration {
                         __kouen_agy_next $argv; return
                     case --remote-control --rc
                         set rc 1
+                    case '*'
+                        set n (math $n + 1)
                 end
             end
-            if type -q happy; and test -f "$HOME/.happy/access.key"
-                if test $rc -eq 1
-                    happy agy $argv
-                else
-                    happy agy --remote-control $argv
-                end
-                return
-            end
-            if test $rc -eq 1; __kouen_agy_next $argv; return; end
             if test "$KOUEN_AGY_SESSION_MODE" = happy; and type -q happy
-                happy agy $argv
+                happy agy $argv; return
+            end
+            # `happy agy` drops every argument (resume, prompt), so only a bare launch can go through it.
+            if type -q happy; and test -f "$HOME/.happy/access.key"; and test $n -eq 0
+                happy agy; return
+            end
+            if test $rc -eq 1
+                __kouen_agy_next $argv
             else
                 __kouen_agy_next --remote-control $argv
             end
@@ -583,14 +574,28 @@ public enum ShellIntegration {
                 case auth config help login logout status version
                     __kouen_copilot_next $argv; return
             end
+            set -l rc 0
             for a in $argv
                 switch $a
-                    case -h --help -v --version --remote
+                    case -h --help -v --version
                         __kouen_copilot_next $argv; return
+                    case --remote
+                        set rc 1
                 end
             end
             if test "$KOUEN_COPILOT_SESSION_MODE" = happy; and type -q happy
-                happy acp -- copilot --acp $argv
+                happy acp -- copilot --acp $argv; return
+            end
+            if type -q happy; and test -f "$HOME/.happy/access.key"
+                if test $rc -eq 1
+                    happy acp -- copilot --acp $argv
+                else
+                    happy acp -- copilot --acp --remote $argv
+                end
+                return
+            end
+            if test $rc -eq 1
+                __kouen_copilot_next $argv
             else
                 __kouen_copilot_next --remote $argv
             end
