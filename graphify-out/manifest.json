@@ -970,8 +970,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/KouenVersion.swift": {
-    "mtime": 1791302963.6197085,
-    "ast_hash": "5cc24d3d71ef0ef74af3348f73df3772",
+    "mtime": 1791367764.399763,
+    "ast_hash": "8cb0002c571695f074528f5ddd7bb069",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Layouts/LayoutTemplate.swift": {
@@ -1060,8 +1060,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/GeneratedReleaseNotes.swift": {
-    "mtime": 1791302963.6199076,
-    "ast_hash": "dfb60ed8fb436919dd20a79085702e5c",
+    "mtime": 1791367765.0770338,
+    "ast_hash": "f7cd95b9eb0bd9e78a6e6aa92d3f4d18",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/ReleaseNotes.swift": {
@@ -1095,8 +1095,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Shell/ShellIntegration.swift": {
-    "mtime": 1791367500.8190975,
-    "ast_hash": "27921e994ee535de259e1d0d8bb56646",
+    "mtime": 1791368998.120105,
+    "ast_hash": "a490e64c167b7e72d93df06ee0c79a7e",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Tasks/TaskStore.swift": {
@@ -4472,6 +4472,541 @@
   "Tools/kouen/Sources/KouenCLI/KouenCLI+Happy.swift": {
     "mtime": 1791302963.6297185,
     "ast_hash": "3b5f5074fb99acf05dffc2d236d0b72d",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/p46-agentic-dev-env/preview-ade-terminal.html": {
+    "mtime": 1789872959.0,
+    "ast_hash": "fbb4ef8d02955722f11b02ea3641450d",
+    "semantic_hash": ""
+  },
+  "agent-memory/COMPLETED-TASKS-ARCHIVE.md": {
+    "mtime": 1785510867.0,
+    "ast_hash": "3ca8c340b3f05da3b4c826342bb2978a",
+    "semantic_hash": ""
+  },
+  "agent-memory/GATE-STATE.md": {
+    "mtime": 1788670505.0,
+    "ast_hash": "1a5181192e93f7d0cd0aeb6a1f5c7891",
+    "semantic_hash": ""
+  },
+  "agent-memory/INDEX.md": {
+    "mtime": 1784945193.0,
+    "ast_hash": "fffe0f336cc932c1fe6a5bacb6113fc5",
+    "semantic_hash": ""
+  },
+  "agent-memory/PLAYBOOK.md": {
+    "mtime": 1791368055.0118606,
+    "ast_hash": "df9c2077f5ba362ccdd318c7c57bf47e",
+    "semantic_hash": ""
+  },
+  "agent-memory/SKILL-LOG.md": {
+    "mtime": 1781446829.0,
+    "ast_hash": "ba34ac1f7d0838f1eb4ba8db16102de3",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/INDEX.md": {
+    "mtime": 1787116745.0,
+    "ast_hash": "7d39f8d7d2bd0acae38cfcf94812d15b",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/ai/terminal-chat.md": {
+    "mtime": 1782973050.0,
+    "ast_hash": "9524e41e933c0848f73fa84cafe3c2d8",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/architecture/background-polling.md": {
+    "mtime": 1781608286.0,
+    "ast_hash": "51220f23eea18cef9fde173fd77ea08d",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/architecture/browser-devtools-api.md": {
+    "mtime": 1784945193.0,
+    "ast_hash": "3eb08649f6594dd991655b9f0c609c29",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/architecture/command-prompt.md": {
+    "mtime": 1782008327.0,
+    "ast_hash": "b4a0d1c0f441f884fcdc914e4955cdb8",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/architecture/decisions.md": {
+    "mtime": 1784945193.0,
+    "ast_hash": "ea2700fd393ed04ef004dd6084a1e38f",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/architecture/feature-provenance.md": {
+    "mtime": 1784945193.0,
+    "ast_hash": "776f1e189bc4d1a1f80eed5441af5df2",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/architecture/ipc-architecture.md": {
+    "mtime": 1780884357.0,
+    "ast_hash": "c21bf470951acf37deb82dcc3a2dfb3d",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/architecture/mcp-server.md": {
+    "mtime": 1784945193.0,
+    "ast_hash": "d8dc0697df48ddb532c1fac33ec74c2b",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/architecture/orca-orchestrator-research.md": {
+    "mtime": 1789629465.0,
+    "ast_hash": "c61534162ff4ebdbc32fe520abd27cd8",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/architecture/service-decomposition.md": {
+    "mtime": 1781446870.0,
+    "ast_hash": "54e99491c1ded4e9e2009de235dfcbbf",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/architecture/session-tab-hierarchy.md": {
+    "mtime": 1781576658.0,
+    "ast_hash": "697b69885bfe7cf8cdb6709ef9ed34f6",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/bugs/browser-pane-local-daemon-merge.md": {
+    "mtime": 1785510867.0,
+    "ast_hash": "2e8a49e1726ed079fdab8f1f6a52ed13",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/bugs/browser-tab-close-unresponsive.md": {
+    "mtime": 1781937670.0,
+    "ast_hash": "0373c6002b331ecd28e990ba7baca8c5",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/bugs/cmd-backslash-sidebar-keywindow.md": {
+    "mtime": 1785510867.0,
+    "ast_hash": "014fd3d3f23e3a8d06da15132a2c8fef",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/bugs/cmd-backslash-sidebar-toggle-lag.md": {
+    "mtime": 1789834808.0,
+    "ast_hash": "109aaa78eb09e54883d70ecc3e6196b3",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/bugs/cmd-backslash-sidebar-zero-width.md": {
+    "mtime": 1785510867.0,
+    "ast_hash": "1a56a16f40d96902b86cd9e6e1bd6226",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/bugs/filetree-stale-children-after-create.md": {
+    "mtime": 1787116342.0,
+    "ast_hash": "dd9fe29c40a8d3e9970fb7f703a73daf",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/bugs/notch-approval-controls-broken-and-false-waiting.md": {
+    "mtime": 1787452682.0,
+    "ast_hash": "06d9d8c9fb72863948b389ec8e7f1f28",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/bugs/notch-cpu-animation.md": {
+    "mtime": 1784945193.0,
+    "ast_hash": "844ef31715c3db75de45ca05feb481e2",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/bugs/notification-sound-and-click-routing.md": {
+    "mtime": 1783149508.0,
+    "ast_hash": "4bb228593a6387589521b344ec93b6aa",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/bugs/nstextfield-leak-board.md": {
+    "mtime": 1781753910.0,
+    "ast_hash": "9c71f788d0de0e10ef40024af2fefc25",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/bugs/p8-liquid-glass-chrome-regressions.md": {
+    "mtime": 1785510867.0,
+    "ast_hash": "e4ff23238d84ae3404a7714d799b2aaa",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/bugs/sidebar-cmdbackslash-toggle.md": {
+    "mtime": 1785510867.0,
+    "ast_hash": "caadeb500f8e8ceaf2a8124ddd7d9042",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/bugs/tab-switch-black-screen.md": {
+    "mtime": 1787539311.0,
+    "ast_hash": "bd43d6cfc9a16db2eb97aa20ddb70370",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/bugs/terminal-flicker-fixes.md": {
+    "mtime": 1782136112.0,
+    "ast_hash": "61af4eb1b9d32d5971219b3e3563edf6",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/bugs/zombie-crash-macos26.md": {
+    "mtime": 1782035792.0,
+    "ast_hash": "2e1167680bf0de76c33e779e7d32dbcc",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/cases/appkit-ui.md": {
+    "mtime": 1785510867.0,
+    "ast_hash": "12adfac06b4360ac7314c8aa53db6355",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/cases/attention-fleet-hardening.md": {
+    "mtime": 1789976142.0,
+    "ast_hash": "27dbd95e8d44aab587d94530153e62f0",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/cases/cwd-worktree-bleed.md": {
+    "mtime": 1784945193.0,
+    "ast_hash": "bc6a10eb15cddf45a3346434f3a535f1",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/cases/file-preview-copy-quicklook.md": {
+    "mtime": 1785510867.0,
+    "ast_hash": "274fa61bc9e2f45cf8df8d84f6a805c7",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/cases/memory-leak-audit.md": {
+    "mtime": 1782446484.0,
+    "ast_hash": "6452cc4dd0208eac3b68fe9f21e8912c",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/cases/metal-displaylink.md": {
+    "mtime": 1782709901.0,
+    "ast_hash": "68ec72bfa5a04cc74d40f7c82bd0ab32",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/cases/misc.md": {
+    "mtime": 1782979112.0,
+    "ast_hash": "df345f507e2eba4453cf2b5dc3d76358",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/cases/release-daemon-restart.md": {
+    "mtime": 1787119765.0,
+    "ast_hash": "70d4d95b700fddc0f0aa5bb9e4a75a51",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/cases/remote-ssh.md": {
+    "mtime": 1782179289.0,
+    "ast_hash": "d9c0d10cc5239452ac0a8321d75d44e1",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/cases/swift6-concurrency.md": {
+    "mtime": 1785510867.0,
+    "ast_hash": "2c49967f2434e46032496186a11d4b7a",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/cases/testing-infra.md": {
+    "mtime": 1785510867.0,
+    "ast_hash": "8fddd0cf64d960f6c9f1b44717c99aec",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/cases/webview-js-swift-string-escape.md": {
+    "mtime": 1789465458.0,
+    "ast_hash": "bad16310797757a8fc60e671dafacefe",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/feedback_interview-gate-call-first.md": {
+    "mtime": 1785989063.0,
+    "ast_hash": "c993ec2a4e0a702ccee964d0913c19d8",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/focus-persistence.md": {
+    "mtime": 1781883221.0,
+    "ast_hash": "cb58eb384ce0ce01515c63c7a32d9d82",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/meta/competitive-position.md": {
+    "mtime": 1789376254.0,
+    "ast_hash": "82ca9d0e54bbe63c1b3de2e36f7b0bd3",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/meta/project-history.md": {
+    "mtime": 1781514917.0,
+    "ast_hash": "ab3be62cc3436d6d59e4f065d8ed4fe4",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/patterns/acp-client.md": {
+    "mtime": 1780884385.0,
+    "ast_hash": "b32d72775669144a63a3f612015e6b8c",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/patterns/build-self-kill-protection.md": {
+    "mtime": 1784945193.0,
+    "ast_hash": "dcfbe37d469a7c2bbbce41e39d47a0bc",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/patterns/fsevents-pattern.md": {
+    "mtime": 1781167622.0,
+    "ast_hash": "e36a05e176e42ef1d172c8745663a97d",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/patterns/gpu-animation-ca.md": {
+    "mtime": 1782710866.0,
+    "ast_hash": "6ddd2b70ba6fecfe4cfa72569469140f",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/patterns/process-pipe-deadlock.md": {
+    "mtime": 1787116716.0,
+    "ast_hash": "084ee39dd613824e8057dac5b60d4825",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/patterns/ui-automation.md": {
+    "mtime": 1781446886.0,
+    "ast_hash": "02c75a952274b2bd1cbf114f65707ec8",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/project_agents-tab-removed.md": {
+    "mtime": 1785989252.0,
+    "ast_hash": "2d20a4b94ca05223ab70269cac1c05e1",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/project_m2-m9-competitive-build-decision.md": {
+    "mtime": 1785989063.0,
+    "ast_hash": "4c56a4aac5482b30cac645a3f7f7df1f",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/project_no-gimmick-feature-policy.md": {
+    "mtime": 1785989063.0,
+    "ast_hash": "0fa6bee8bd3f1ef1eff22c336536bbe8",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/rl-lessons.md": {
+    "mtime": 1789834820.0,
+    "ast_hash": "cda75c84d94404cde315089cc4117459",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/sidebar-swiftui-migration.md": {
+    "mtime": 1782527077.0,
+    "ast_hash": "b25be6961b3bc51cffccaa4d41337536",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/ui/agent-session-board.md": {
+    "mtime": 1784945193.0,
+    "ast_hash": "f589513755f92f4455227d49488f189d",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/ui/appkit-metal.md": {
+    "mtime": 1781583713.0,
+    "ast_hash": "681abbf375b4fe591463daf0c2de833e",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/ui/browser-pane.md": {
+    "mtime": 1785510867.0,
+    "ast_hash": "b7b30117dde41965b13a230730543e0e",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/ui/git-panel.md": {
+    "mtime": 1781060746.0,
+    "ast_hash": "95461b194a83af881120797053de6a38",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/ui/split-panes.md": {
+    "mtime": 1784945193.0,
+    "ast_hash": "b0c6edb0b564e96ba0b1f16f6c320699",
+    "semantic_hash": ""
+  },
+  "agent-memory/knowledge/ui/tab-bar.md": {
+    "mtime": 1781937670.0,
+    "ast_hash": "78d3774375ccf9dc2fd0a6edb7510f32",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/INDEX.md": {
+    "mtime": 1790259076.0,
+    "ast_hash": "55565e40a914ceab18e0f0f420784f4d",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/agent-swarm-core/ai-sdlc-task-progress.md": {
+    "mtime": 1789378379.0,
+    "ast_hash": "254ae06e925997a643a4d5716593c306",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/agent-swarm-core/design.md": {
+    "mtime": 1789371729.0,
+    "ast_hash": "bbb7cd528c00c552fde05860b947880c",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/claude-code-harness/design.md": {
+    "mtime": 1786279887.0,
+    "ast_hash": "41cffb0b2e7d2a68b3775145a23f0abc",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/completed-archive.md": {
+    "mtime": 1785510867.0,
+    "ast_hash": "19e0435a9145f74d171d3820b1d5dc89",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/headless-worker-followup/ai-sdlc-task-progress.md": {
+    "mtime": 1791338007.6065695,
+    "ast_hash": "e60414f8ed93bc7531c90ba2fc03e99f",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/headless-worker-followup/headless-worker-followup-architecture.md": {
+    "mtime": 1790516366.2591953,
+    "ast_hash": "eac249261539e4256356a53efc0a8376",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/headless-worker-followup/test-scenarios.md": {
+    "mtime": 1790516389.539775,
+    "ast_hash": "193a8eecd69758eac7c75e636cad6e30",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/m2-agent-routing-rule/design.md": {
+    "mtime": 1785989063.0,
+    "ast_hash": "7d3b6cb84449a49c4f2e0599e64598e6",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/m2-agent-routing-rule/dev-task-progress.md": {
+    "mtime": 1785989063.0,
+    "ast_hash": "4469c3f66eacb2d11fad820d7cc47b0e",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/m2-m9-competitive-features/wayfinder-map.md": {
+    "mtime": 1785989063.0,
+    "ast_hash": "709422dde106907ee40a77f866751cf6",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/m3-browser-design-mode/design.md": {
+    "mtime": 1785989063.0,
+    "ast_hash": "b334d0ed6a0d429a0dd0e3d6cbfa1e44",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/m3-browser-design-mode/dev-task-progress.md": {
+    "mtime": 1785989063.0,
+    "ast_hash": "fcf249972bc3f882374a19dd1459ffea",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/m4-fork-conversation/design.md": {
+    "mtime": 1785989063.0,
+    "ast_hash": "af6ab806f71aa544231dc6f8ce72b2ce",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/m4-fork-conversation/dev-task-progress.md": {
+    "mtime": 1785989063.0,
+    "ast_hash": "21806cb67d2ba391cd7c6609353b4ee2",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/m5-saved-layouts/dev-task-progress.md": {
+    "mtime": 1785989063.0,
+    "ast_hash": "d2c8fcf75645c03b40265d1e92392dde",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/m6-risky-command-advisory/dev-task-progress.md": {
+    "mtime": 1785989063.0,
+    "ast_hash": "7829c6c6ac9fd0a15adc8f351a0d5c29",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/m7-request-peer-review/dev-task-progress.md": {
+    "mtime": 1785997029.0,
+    "ast_hash": "48a03b72594464f5b326f56c338e9173",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/m8-merge-waiver/dev-task-progress.md": {
+    "mtime": 1785989063.0,
+    "ast_hash": "82b743743ca63e8f9a5247a2c68af70b",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/m9-slash-command-picker/dev-task-progress.md": {
+    "mtime": 1785989063.0,
+    "ast_hash": "ae7d0d18818ba76a739ec236611d4670",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/p41-automations/design.md": {
+    "mtime": 1785510867.0,
+    "ast_hash": "85b86d585e6dd51db137e5500f326fd5",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/p41-automations/dev-task-progress.md": {
+    "mtime": 1785510867.0,
+    "ast_hash": "3ee2ce333ef53a8fcc8377feb9a01f44",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/p44-autonomous-orchestrator/wayfinder-map.md": {
+    "mtime": 1788184632.0,
+    "ast_hash": "123febb58320bc2980f895bd66d7dc8c",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/p44a-mcp-surface-expansion/design.md": {
+    "mtime": 1788180048.0,
+    "ast_hash": "20c8f67da37c328d635c7438ef14c8ee",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/p44a-mcp-surface-expansion/dev-task-progress.md": {
+    "mtime": 1788181384.0,
+    "ast_hash": "7008cc0d52c88276f5c12969ecceccbb",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/p44b-inline-ui-hide-dashboard/dev-task-progress.md": {
+    "mtime": 1788183431.0,
+    "ast_hash": "d9a62d3f6019a546f772c3fc02e12445",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/p44c-orchestrator-session-contract/dev-task-progress.md": {
+    "mtime": 1788184593.0,
+    "ast_hash": "413b50146a5444f3f20ee8cf20a20a84",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/p45-orca-worktree-sessions/ai-sdlc-task-progress.md": {
+    "mtime": 1791338007.5639157,
+    "ast_hash": "87d5aa5893d492260b083e65389a90ab",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/p45-orca-worktree-sessions/design.md": {
+    "mtime": 1789698435.0,
+    "ast_hash": "11484497c7e2fe2753953f8b3ee01413",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/p45-orca-worktree-sessions/p45-orca-worktree-sessions-architecture.md": {
+    "mtime": 1789829277.0,
+    "ast_hash": "f4a3e601ad6cf239b8fb3fb1708d7f0c",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/p46-agentic-dev-env/ai-sdlc-task-progress.md": {
+    "mtime": 1791338007.589399,
+    "ast_hash": "b13d8c86add8f5b8a817c80348088b5f",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/p46-agentic-dev-env/design.md": {
+    "mtime": 1789738107.0,
+    "ast_hash": "59fd3d84e189b0592f22deabff43b3f9",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/p46-agentic-dev-env/p46-agentic-dev-env-architecture.md": {
+    "mtime": 1789901379.0,
+    "ast_hash": "16dd2596eb85fea988ea785057abe8b2",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/p47-primary-branch-worktree-fix/ai-sdlc-task-progress.md": {
+    "mtime": 1790057546.0,
+    "ast_hash": "a8041acd2057beda54e6b4db399444bc",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/p47-primary-branch-worktree-fix/p47-primary-branch-worktree-fix-architecture.md": {
+    "mtime": 1790056803.0,
+    "ast_hash": "eaca7c2f4dacbb37da589c455986c8a5",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/p48-session-history-navigator/ai-sdlc-task-progress.md": {
+    "mtime": 1790058298.0,
+    "ast_hash": "fb14e822d8d7c8d78e1250bda8eab5d6",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/p48-session-history-navigator/p48-session-history-navigator-architecture.md": {
+    "mtime": 1790057950.0,
+    "ast_hash": "d2df904668ebb7e577b404a21f54a1be",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/p49-architectural-hardening/ai-sdlc-task-progress.md": {
+    "mtime": 1790146087.0,
+    "ast_hash": "f9d709649bbf4161a39acd3c44417c84",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/p49-architectural-hardening/p49-architectural-hardening-architecture.md": {
+    "mtime": 1790137979.0,
+    "ast_hash": "d26c00561180f54802ec0542a40f83d4",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/p50-multi-agent-remote-cloud/ai-sdlc-task-progress.md": {
+    "mtime": 1790605217.1480644,
+    "ast_hash": "cced5b33317f26b12682aebeef6f2e04",
+    "semantic_hash": ""
+  },
+  "agent-memory/plans/p50-multi-agent-remote-cloud/p50-multi-agent-remote-cloud-architecture.md": {
+    "mtime": 1790333083.3250136,
+    "ast_hash": "149434c50ece61fa86b8a9d323300825",
     "semantic_hash": ""
   }
 }
