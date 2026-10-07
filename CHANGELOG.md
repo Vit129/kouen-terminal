@@ -8,7 +8,13 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [4.20.12] - 2026-10-07
 
 ### Added
-- Release version bump to v4.20.12.
+- Enable dual remote access and add daemon mismatch prompt to release cycle ([`e536b9c`](https://github.com/Vit129/kouen-terminal/commit/e536b9c910363ae3e0e83410a7e6fc7eadb9f5aa))
+
+### Documentation
+- Sync README/ARCHITECTURE/PRODUCT/DESIGN/CONTEXT and docs/* with v4.20.11 ([`7abc33f`](https://github.com/Vit129/kouen-terminal/commit/7abc33fa36ceca84f348f53a8c1248d8823ce49a))
+
+### Fixed
+- Route Kouen-launched claude/agy remote-control sessions through Happy (release v4.20.12) ([`769ac24`](https://github.com/Vit129/kouen-terminal/commit/769ac241200c76ba8fa5e0d0e97393ac73857283))
 
 ## [4.20.11] - 2026-10-06
 
