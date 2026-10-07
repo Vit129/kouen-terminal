@@ -32,17 +32,20 @@ The maintainer (Vit129). Personal hard fork of `robzilla1738/harness-terminal`, 
 - **Worktree-first sessions** — worktree lineage/drift tracking, per-ticket isolated worktrees from the Issue Tracker, auto-isolate that no longer strands the primary checkout (P45, P47)
 - **History across agents** — Claude Code, Codex, Antigravity, Copilot and VS Code Copilot Chat sessions in one list, resume in place, or hand off between agents (v4.20.0); ◀ ▶ previous/next-session buttons beside the sidebar toggle (P48)
 - **Per-agent launch modes** — local, remote-control or cloud per agent via a data-driven launch table (P50); default is remote-control so sessions appear in the vendor's mobile/desktop app while staying on the Mac
-- **Agent Notch HUD** — menu-bar-notch summary of agent status (off by default)
+- **Agent Notch HUD** — menu-bar-notch summary of agent status (off by default; hidden while Vorssaint's notch is running)
+- **Happy session mode** — optional per-agent `happy` launch (Claude Code, Codex, Antigravity, Copilot) so one cross-vendor phone app can steer a Kouen pane; with Happy logged in, hand-typed `claude` is also vendor-remote-controllable (dual remote access) and `kouen-cli happy adopt` pulls phone-started sessions into a pane (v4.20.10–v4.20.11)
+- **Agent browser panes clean up after themselves** — a browser pane an agent opened closes when that agent goes idle (v4.20.9)
 - **`kouen-mcp` remote transport** — HTTP/SSE in addition to stdio, with secure defaults
 
 ## Out of Scope
 - General consumer distribution (personal fork, not shipped as a product)
 - Non-macOS GUI (daemon/CLI/core build headless on Linux; GUI is macOS 15+ only)
-- Own mobile app or relay. Mobile access relies on each vendor's remote-control app (Claude app / claude.ai/code, ChatGPT for Codex, Antigravity remote control); Codex and Antigravity coverage of CLI sessions launched inside Kouen is not yet verified. The earlier Mobile Connect bridge (P37) and native iOS app (P25) are closed; the bridge code remains, deprecated and off by default. See `ARCHITECTURE.md` § Architecture Decisions (2026-09-23).
+- Own mobile app or relay. Mobile access relies on each vendor's remote-control app, or the third-party Happy app via the optional `happy` mode (Claude app / claude.ai/code, ChatGPT for Codex, Antigravity remote control); Codex and Antigravity coverage of CLI sessions launched inside Kouen is not yet verified. The earlier Mobile Connect bridge (P37) and native iOS app (P25) are closed; the bridge code remains, deprecated and off by default. See `ARCHITECTURE.md` § Architecture Decisions (2026-09-23).
+- Quick Terminal (⌥Space) and inline AI completion — removed in v4.20.3–v4.20.4
 - IDE features: Run button, debug console, breakpoints, Problems panel
 
 ## Success Metrics
 - Multi-session agent workflows (task dashboard, MCP browser control) stay stable and usable as a daily driver
 
 ---
-Sourced from README.md and Package.swift as of 2026-07-18; extended 2026-09-21 with the P46 agent safety net and 2026-09-30 with P44–P50 (orchestrator/swarm, automations, worktree-first sessions, cross-agent history/handoff, launch modes) — see `ARCHITECTURE.md` § Architecture Decisions for the reasoning behind each.
+Sourced from README.md and Package.swift as of 2026-07-18; extended 2026-09-21 with the P46 agent safety net and 2026-09-30 with P44–P50 (orchestrator/swarm, automations, worktree-first sessions, cross-agent history/handoff, launch modes) — see `ARCHITECTURE.md` § Architecture Decisions for the reasoning behind each. Synced with code through v4.20.11 on 2026-10-07 (Happy mode, dual remote access, agent browser auto-close, removals).

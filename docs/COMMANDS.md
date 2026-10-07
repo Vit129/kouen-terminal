@@ -359,6 +359,7 @@ Usage lines below are taken from the CLI source (`Tools/kouen/Sources/KouenCLI/`
 | `kouen-cli context inject "<template>"` | Resolve `@diff`, `@file:<path>`, `@last`, `@error` mentions in a template (same tokens as the ⌘K injector). |
 | `kouen-cli memo set <key> <val>` / `get <key>` / `list [--json]` / `delete <key>` / `clear` | Shared key-value scratchpad for agents. |
 | `kouen-cli cc run "<prompt>" [--cwd <path>] [--profile edit\|readonly] [--model <name>] [--effort <level>] [--no-wait]` | Run `claude` headlessly; `cc status <runId>`, `cc list`, `cc cancel <runId>` manage runs. |
+| `kouen-cli happy adopt <happy-session-id-prefix>\|--all` | Pull a phone-started [Happy](https://happy.engineering) session into a new tab: stops Happy's headless process and `happy resume`s it in a pane. Needs `happy` installed and logged in (see README § Mobile). |
 | `kouen-cli notify --surface <uuid> [--title t] [--body b] [--from-hook] [--status done] [--subagent start\|stop]` | Post an agent notification for a surface (used by agent hooks). |
 | `kouen-cli detect-agent --surface <id>` | Print the agent kind, executable and activity for a surface. |
 | `kouen-cli mcp setup` / `status` / `remove` / `serve` | Write `kouen-mcp` into each installed agent's MCP config, show which agents have it, remove it, or launch it as a remote HTTP/SSE server. |

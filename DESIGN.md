@@ -26,7 +26,7 @@ Source: `KouenDesign.swift`
 - Agent status: "breathing halo" pulse animation for actively-working agents
 - Chrome metrics: `KouenDesign.tabBarHeight` 38, `tabPillHeight` 26; the sidebar header uses `tabBarHeight`
 - Draggable chrome (title strip, sidebar header, tab bar) all zoom the window on double-click via one helper, `NSView.zoomWindowIfDoubleClick(_:)`
-- Surfaces added since the original audit, all built from the same tokens: Agent Notch HUD (`UI/Notch/`, off by default), Attention Beacon dot, Agent Inbox panel, Automations/Jobs fleet view, session History view, Issue Tracker panel
+- Surfaces added since the original audit, all built from the same tokens: Agent Notch HUD (`UI/Notch/`, off by default, hidden while Vorssaint's notch is running), Attention Beacon dot, Agent Inbox panel, Automations/Jobs fleet view, session History view, Issue Tracker panel
 
 ## Avoid
 - System accent blue in chrome
@@ -35,3 +35,4 @@ Source: `KouenDesign.swift`
 
 ---
 Sourced from `KouenDesign.swift` (`UI/Shared/`), `KouenChrome.swift`, and Sidebar view files as of 2026-07-18; all tokens re-verified against source 2026-09-30 (spacing, radius, motion, font sizes, typography, shadow presets, palette tokens, status styles, glass-effect runtime lookup, `tabBarHeight`/`tabPillHeight`). Not verified: literal palette values per theme, and the Sidebar view files listed originally.
+Surface list re-checked 2026-10-07 against v4.20.11: Quick Terminal, the sidebar project-header context menu and the Files-tab inline preview no longer exist; the notch yields to Vorssaint. Token values were not re-verified since 2026-09-30.
