@@ -8,7 +8,7 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [4.20.15] - 2026-10-07
 
 ### Added
-- Release version bump to v4.20.15.
+- Happy adopt resumes phone-started agy and copilot sessions natively (release v4.20.15) ([`da92057`](https://github.com/Vit129/kouen-terminal/commit/da920577b81af94ffdcf4255ef848f92ceb1cb6e))
 
 ## [4.20.14] - 2026-10-07
 
