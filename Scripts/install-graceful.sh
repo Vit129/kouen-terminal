@@ -80,6 +80,7 @@ if launchctl print "gui/$UID_NUM/com.vit129.kouen.daemon" 2>/dev/null | grep -q 
     if [[ -n "$OLD_PROTO" && "$OLD_PROTO" == "$NEW_PROTO" ]]; then
       REUSE_DAEMON=1
       echo "==> IPC protocol unchanged ($OLD_PROTO) — daemon (and running tasks) will keep running."
+      echo "    💡 ต้องรัน \`kouen-cli install\` ด้วยเพื่อที่จะได้อัปเดต Daemon เป็นเวอร์ชันล่าสุด (รันเมื่อไม่มีงานค้าง)"
     else
       echo "==> IPC protocol changed ($OLD_PROTO -> $NEW_PROTO) — daemon must restart."
     fi

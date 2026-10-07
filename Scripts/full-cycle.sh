@@ -217,3 +217,40 @@ fi
 
 echo ""
 echo "✅ Full cycle complete. Version: $TAG"
+
+# Check daemon status and prompt user if version mismatch exists
+CLI_BIN="$HOME/Library/Application Support/Kouen/bin/kouen-cli"
+if [[ -x "$CLI_BIN" ]]; then
+  VER_JSON=$("$CLI_BIN" version --json 2>/dev/null || echo "")
+  if [[ -n "$VER_JSON" ]]; then
+    CLI_BUILD=$(echo "$VER_JSON" | grep -o '"cliBuild":[0-9]*' | cut -d: -f2)
+    DAEMON_BUILD=$(echo "$VER_JSON" | grep -o '"daemonBuild":[0-9]*' | cut -d: -f2)
+    DAEMON_VER=$(echo "$VER_JSON" | grep -o '"daemonVersion":"[^"]*"' | cut -d'"' -f4)
+    CLI_VER=$(echo "$VER_JSON" | grep -o '"cliVersion":"[^"]*"' | cut -d'"' -f4)
+    if [[ -n "$CLI_BUILD" && -n "$DAEMON_BUILD" && "$CLI_BUILD" != "$DAEMON_BUILD" ]]; then
+      echo ""
+      echo "⚠️  Daemon status check: Running daemon is on an older build"
+      echo "   Daemon: v${DAEMON_VER} (build ${DAEMON_BUILD})"
+      echo "   App:    v${CLI_VER} (build ${CLI_BUILD})"
+      echo ""
+      echo "   💡 Running tasks were kept alive. ต้องรัน \`kouen-cli install\` ด้วยเพื่อที่จะได้อัปเดต Daemon เป็นเวอร์ชันล่าสุด"
+      echo ""
+      if [ -t 0 ]; then
+        read -r -p "   Do you want to run 'kouen-cli install' now? (will reload background daemon) [y/N]: " restart_choice
+        case "$restart_choice" in
+          [yY][eE][sS]|[yY])
+            "$CLI_BIN" install
+            echo "   ✅ Daemon updated and reloaded to v${CLI_VER}."
+            ;;
+          *)
+            echo "   ⏭️  Skipped. You can run \`kouen-cli install\` anytime later."
+            ;;
+        esac
+      else
+        echo "   👉 รันคำสั่งนี้ได้เมื่อสะดวก: kouen-cli install"
+      fi
+    else
+      echo "ℹ️  Daemon is up to date (v${CLI_VER} matches running daemon)."
+    fi
+  fi
+fi
