@@ -1,6 +1,6 @@
 # Kouen Terminal — Domain Language
 
-Modern native macOS terminal multiplexer and AI coding workspace companion.
+An Agent Development Environment built around a native macOS terminal: daemon-owned sessions, a scriptable CLI, an MCP-controlled browser, and multi-agent orchestration. Terminal-first, not an IDE.
 
 ## Language
 
@@ -35,6 +35,38 @@ _Avoid_: Worktree, Project container
 **Host (MCP resource)**:
 An entry in the existing `RemoteHostStore` (SSH remote machine config), exposed read-only via `kouen-mcp`.
 _Avoid_: Remote Host
+
+**Session Mode**:
+How an agent is launched in a pane, per agent (`AgentSessionMode`, `agentSessionModes` in `settings.json`): `local`, `remote-control` (default; vendor mobile/desktop app), `cloud`, or `happy` (through the Happy wrapper). One launch table resolves agent + mode to a command.
+_Avoid_: Launch profile, Connection type
+
+**Happy**:
+A third-party cross-vendor mobile/web app and wrapper (`happy claude|codex|agy|acp`). Kouen runs no relay itself; Happy's daemon is started by the Kouen daemon whenever Happy is installed and logged in. A phone-started session is headless until adopted (`kouen-cli happy adopt`).
+_Avoid_: Mobile bridge (the deprecated built-in QR/Tailscale bridge)
+
+**Checkpoint**:
+An automatic per-agent-turn snapshot of the working tree stored as a `refs/kouen/checkpoints/<session>/<turn>` git ref (never the real index or `git stash`); `kouen undo` reverts to it.
+_Avoid_: Stash, Backup
+
+**Write-origin Guard**:
+Every PTY write is tagged `human` or `automation`; an automation write is refused when a human typed there within 1.5 s, or the tab sits on a protected branch or a dirty checkout without worktree isolation.
+_Avoid_: Permission prompt, Lock
+
+**History / Handoff**:
+History lists past Claude Code, Codex, Antigravity, Copilot and VS Code Copilot Chat sessions in one view. Resume reopens one in a new tab; Handoff has the source agent write a note, then continues the work in another agent.
+_Avoid_: Session restore, Fork Conversation (that splits a live pane)
+
+**Fleet**:
+Sidebar tab flattening every live session across every workspace, needs-attention first.
+_Avoid_: Task Dashboard
+
+**Agent Notch**:
+Menu-bar-notch HUD summarizing agent status; off by default, hidden while Vorssaint's notch is running.
+_Avoid_: Notification inbox (⌘⌃I)
+
+**Project**:
+A git repo root registered in the sidebar; auto-registered only from a real `.git` directory, shown as missing (Relocate/Remove) when its folder moves.
+_Avoid_: Workspace, Worktree
 
 **Shader Preset**:
 A pre-built, Kouen-authored GPU visual effect (e.g. CRT/scanline/bloom) toggled on/off in Settings.
@@ -87,5 +119,6 @@ _Avoid_: Terminal autocomplete, AI prompt popup
 - A **Host (MCP resource)** is read-only via MCP — creating/editing a Host remains a Settings-UI-only action.
 - An **Automation** is independent of Tasks, Worktrees, and Hosts.
 - An **Agent Routing Rule** resolves to an existing **AgentKind** value — it selects the binary to spawn, not the internal model.
+- A **Session Mode** is per agent, not per tab; `happy` and `remote-control` can both apply to a hand-typed `claude` when Happy is logged in.
 - An **Orchestrator** creates **Worker** sessions via `kouenSpawnWorker` — a Worker is an ordinary session whose lifecycle is managed by the Orchestrator.
 - An **Auto-Fix Loop** only ever retries the same **Worker** on its own **Worktree** — it never spawns a second Worker on the same Task, and never touches the **Merge Waiver** gate.
