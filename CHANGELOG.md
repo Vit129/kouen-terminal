@@ -7,8 +7,8 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
 ## [4.20.13] - 2026-10-07
 
-### Added
-- Release version bump to v4.20.13.
+### Fixed
+- Route agy/copilot remote-control launches through Happy without dropping args (release v4.20.13) ([`8213c4a`](https://github.com/Vit129/kouen-terminal/commit/8213c4a6d8305de45a2dafc54b9e839127927c3f))
 
 ## [4.20.12] - 2026-10-07
 
