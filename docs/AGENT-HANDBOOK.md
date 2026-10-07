@@ -1,8 +1,8 @@
 # Agent handbook — Kouen (extended reference)
 
-Entry point: [../claude.md](../claude.md) (slim agent context). **Not** loaded by default — open when editing the renderer, compositor, daemon IPC, UI chrome, or test matrix.
+Entry point: [../AGENTS.md](../AGENTS.md) (slim agent context). **Not** loaded by default — open when editing the renderer, compositor, daemon IPC, UI chrome, or test matrix.
 
-Update this file together with `claude.md` / `agents.md` when those sections change.
+Update this file together with `AGENTS.md` when those sections change.
 
 ## Table of contents
 
@@ -61,7 +61,7 @@ keys (`NSTextInputClient`).
 The opt-in config import (`TerminalConfigImporter`) reads compatible source-terminal configs so
 users moving in keep their colors/font — kept by product decision.
 
-**Before touching the terminal renderer or theme system, read the relevant package entry points under `Packages/` and keep [../claude.md](../claude.md) authority rules in mind:**
+**Before touching the terminal renderer or theme system, read the relevant package entry points under `Packages/` and keep [../AGENTS.md](../AGENTS.md) and `rules/concurrency.md` in mind:**
 `KouenTerminalEngine`, `KouenCopyMode`, `KouenTheme`, `KouenTerminalRenderer`,
 `KouenTerminalKit`.
 
@@ -205,64 +205,60 @@ users moving in keep their colors/font — kept by product decision.
 
 ```
 kouen/
-├── Package.swift, project.yml, Makefile, Kouen.entitlements
+├── Package.swift, project.yml, Makefile, Kouen.entitlements, version.json
 ├── Kouen.xcodeproj/             # generated via xcodegen
 ├── .github/workflows/ci.yml       # swift build/test + non-blocking benchmarks
-├── claude.md / agents.md          # slim agent entry (≤40k chars)
-├── docs/AGENT-HANDBOOK.md         # this file (extended reference)
-├── CHANGELOG.md, design-system.md # release notes; chrome design tokens (GUI)
-├── marketing/                     # HyperFrames promo video — see marketing/README.md (not app code)
-├── Apps/Kouen/
-│   ├── Resources/Assets.xcassets, Kouen.icns (generated)
-│   └── Sources/KouenApp/
-│       ├── AppDelegate.swift, main.swift, Resources/Info.plist
-│       ├── Services/              # SessionCoordinator, MainExecutor, KeybindingsService,
-│       │                          # TerminalPaneRegistry, TerminalPaneRegistryAccess,
-│       │                          # SurfaceShellTracker, CLIInstaller, DaemonLauncher,
-│       │                          # DefaultTerminalManager, DefaultTerminalOpener
-│       ├── Settings/              # SettingsViewController, KeyRecorderView, LiveTerminalPreview
-│       └── UI/                    # MainSplit, sidebar, tabs, PrefixKeymap, CommandPrompt,
-│                                  # CopyMode, StatusLine, notifications, CommandPalette, Chrome,
-│                                  # DisplayPanesOverlay, AboutPanelController, KouenControls,
-│                                  # Notch/ (Agent Notch HUD)
+├── CLAUDE.md / AGENTS.md          # slim agent entry (CLAUDE.md just imports AGENTS.md)
+├── README.md, PRODUCT.md, ARCHITECTURE.md, DESIGN.md, CONTEXT.md
+│                                  # overview · scope · system + decision log · visual tokens · domain terms
+├── CHANGELOG.md                   # release notes (older blocks roll into docs/CHANGELOG-archive.md)
+├── rules/                         # build-release, concurrency, ipc-protocol (read when triggered)
+├── Apps/Kouen/Sources/KouenApp/
+│   ├── AppDelegate.swift, main.swift, Resources/Info.plist
+│   ├── Services/              # SessionCoordinator, SplitPaneCoordinator, NotificationCoordinator,
+│   │                          # DaemonSyncService, KeybindingsService, TerminalPaneRegistry,
+│   │                          # WorktreeAutoIsolateService, CLIInstaller, DaemonLauncher, ...
+│   ├── Settings/              # settings window
+│   ├── Scripting/, AppIntents/
+│   └── UI/                    # Agents, Archive, Automations, Chrome, CommandPalette, Diff,
+│                              # FileEditor, FileTree, History, Issues, Notch, Notifications,
+│                              # Shared, Sidebar, Tasks, Terminal
 ├── Packages/
 │   ├── CKouenSys/               # C ioctl shim (variadic PTY sizing on Linux)
-│   ├── KouenCore/               # Models, IPC, SessionEditor, Commands, Keybindings,
-│   │                              # Options, Events, Format, Layouts, Buffers, Agents,
-│   │                              # ShellIntegration, Session/PaneRectSolver
+│   ├── KouenCore/               # Models, SessionEditor, Keybindings, Options, Events, Format,
+│   │                              # Layouts, Buffers, Agents, ShellIntegration, JSONRPC, release notes
+│   ├── KouenIPC/                # IPC wire contracts (IPCMessage, AgentSnapshot, AgentSessionMode)
+│   ├── KouenCommands/           # Command grammar, board columns, SGR mouse
+│   ├── KouenSettings/           # KouenSettings model, ExperienceMode, notch visibility
+│   ├── KouenLSP/                # LSP client for the built-in editor
+│   ├── KouenSyntaxResources/    # Bundled syntax resources
 │   ├── KouenTerminalEngine/     # VT parser, screen/scrollback, images, input encoder
 │   ├── KouenCopyMode/           # Shared copy-mode reducer for GUI + attach-window
-│   ├── KouenTheme/              # 490-theme catalog + .kouentheme import/export
+│   ├── KouenTheme/              # Theme catalog + .kouentheme import/export
 │   ├── KouenTerminalRenderer/   # FrameBuilder, CoreText glyph atlas, Metal renderer
 │   ├── KouenTerminalKit/        # TerminalHostView, ThemeManager, GridCompositor,
 │   │                              # KouenTerminalSurfaceView (native CAMetalLayer view)
 │   ├── KouenOnboarding/         # Embedded SwiftUI first-run wizard
 │   └── KouenDaemon/
-│       ├── Sources/KouenDaemon/ # KouenDaemonCore: SurfaceRegistry, DaemonServer,
-│       │                          # RealPty, AgentScanner
+│       ├── Sources/KouenDaemon/ # KouenDaemonCore: SurfaceRegistry, DaemonServer, RealPty,
+│       │                          # AgentScanner, AgentRemoteControlDaemonService
 │       └── Sources/KouenDaemonMain/main.swift
-├── Tools/kouen/Sources/KouenCLI/  # KouenCLI, AttachClient, WindowAttachClient,
-│                                      # AgentHookInstaller
-├── Tests/
-│   ├── KouenBenchmarks/
-│   ├── KouenCopyModeTests/
-│   ├── KouenCoreTests/
-│   ├── KouenDaemonTests/
-│   ├── KouenOnboardingTests/
-│   ├── KouenTerminalEngineTests/
-│   ├── KouenTerminalKitTests/
-│   ├── KouenTerminalRendererTests/
-│   └── KouenThemeTests/
-├── Scripts/                       # build-release, package-app, preview.sh, generate-app-icon.sh,
-│                                  # create-dmg.sh, sign-and-notarize.sh, generate-appcast.sh,
-│                                  # finalize-release.sh, completions/
+├── Tools/
+│   ├── kouen/Sources/KouenCLI/   # CLI: one KouenCLI+<Area>.swift per command group, AttachClient,
+│   │                               # WindowAttachClient, AgentHookInstaller
+│   └── kouen-mcp/Sources/KouenMCP/ # MCP server (77 tools): ToolRegistry, KouenBrowserTools,
+│                                     # KouenDaemonTools, stdio + SSE transports, ToolPolicy
+├── Tests/                         # one dir per package/tool + KouenAppTests, KouenCLITests,
+│                                  # KouenMCPTests, KouenRobotTests, robot/ (Robot Framework)
+├── Scripts/                       # build-release, package-app, preview.sh, install-graceful.sh,
+│                                  # full-cycle.sh, bump-version.sh, generate-release-notes.swift,
+│                                  # create-dmg.sh, sign-and-notarize.sh, finalize-release.sh, completions/
 └── docs/
-    ├── COMMANDS.md                # full command grammar
-    ├── KEYBINDINGS.md             # default bindings + FormatString tokens
-    ├── MODES.md, MIGRATION.md, MULTIPLEXER_GUIDE.md
+    ├── USAGE.md, COMMANDS.md, KEYBINDINGS.md, MODES.md, MIGRATION.md
+    ├── MULTIPLEXER_GUIDE.md, TMUX_PARITY.md, RELEASE.md, orchestrator-contract.md
     ├── shell-integration/         # OSC 133 bash/zsh/fish snippets
-    ├── THIRD-PARTY-NOTICES.md
-    └── agent-hooks/
+    ├── agent-hooks/               # per-agent notification setup
+    └── THIRD-PARTY-NOTICES.md
 ```
 
 ### SPM products
@@ -270,6 +266,11 @@ kouen/
 | Product | Target | Role |
 |---------|--------|------|
 | `KouenCore` | `KouenCore` | Shared library |
+| `KouenIPC` | `KouenIPC` | IPC wire contracts shared by app, daemon, CLI and MCP |
+| `KouenSettings` | `KouenSettings` | Settings model, experience modes, notch visibility |
+| `KouenCommands` | `KouenCommands` | Command grammar and shared command types |
+| `KouenLSP` | `KouenLSP` | LSP client for the built-in editor |
+| `KouenSyntaxResources` | `KouenSyntaxResources` | Bundled syntax resources |
 | `KouenTerminalEngine` | `KouenTerminalEngine` | Pure Swift VT engine + grid/scrollback/images |
 | `KouenCopyMode` | `KouenCopyMode` | Pure copy-mode state/reducer over engine grids |
 | `KouenTheme` | `KouenTheme` | Theme catalog + `.kouentheme` documents |
@@ -281,6 +282,7 @@ kouen/
 | `KouenDaemon` | `KouenDaemon` | Thin `main` over `KouenDaemonCore` |
 | — | `KouenDaemonCore` | Testable daemon logic |
 | `kouen-cli` | `KouenCLI` | CLI client (depends on terminal packages for attach/compositor) |
+| `kouen-mcp` | `KouenMCP` | MCP server (stdio + HTTP/SSE), 77 tools |
 
 **One external dependency.** Every library/daemon/CLI product is first-party pure Swift; the GUI app's **only** package dependency is **Sparkle** (macOS auto-update), pinned `.upToNextMinor(from: "2.9.2")` (the audited line; `Package.resolved` locks the exact revision). `Package.swift` lists Sparkle alone, so `git clone && swift build` fetches just that one package and builds on any machine. The terminal engine, theme system, renderer, daemon core, and CLI link nothing external. The whole package builds in the **Swift 6 language mode** (complete strict concurrency everywhere); the two foundational, dependency-free libraries — `KouenCore` and `KouenTerminalEngine` — additionally treat **warnings as errors** (`strictFoundationSettings`) so a Sendable/data-race/deprecation warning in the layer everything builds on can't rot.
 
@@ -290,7 +292,7 @@ kouen/
 
 JSON over `kouen.sock` via `IPCEnvelope` / `IPCReply` (`IPCCodec`). Clients: `DaemonClient` (CLI), `DaemonSessionService` (app). Server: `DaemonServer` → `SurfaceRegistry`.
 
-Extend in [`IPCMessage.swift`](Packages/KouenCore/Sources/KouenCore/IPC/IPCMessage.swift).
+Extend in [`IPCMessage.swift`](../Packages/KouenIPC/Sources/KouenIPC/IPCMessage.swift).
 
 | Group | Requests (representative) |
 |-------|---------------------------|
@@ -323,7 +325,7 @@ editor.setTabStatus(workspaceID: match.workspaceID, tabID: match.tabID, ...)
 
 Binary: `.build/{debug,release}/kouen-cli`, `Kouen.app/Contents/MacOS/kouen-cli`, or `~/Library/Application Support/Kouen/bin/kouen-cli` after `install`.
 
-Requires daemon running (app or launchd). Full flags: `kouen-cli` (no args) or [docs/COMMANDS.md](docs/COMMANDS.md).
+Requires daemon running (app or launchd). Full flags: `kouen-cli` (no args) or [docs/COMMANDS.md](COMMANDS.md).
 
 | Category | Examples |
 |----------|----------|
@@ -350,7 +352,7 @@ Requires daemon running (app or launchd). Full flags: `kouen-cli` (no args) or [
 
 **Note:** Marked `join-pane -h/-v` is a normal `Command` (prefix `j`). The explicit `kouen-cli join-pane --src --dst --direction` form bypasses `CommandParser` and calls IPC directly.
 
-**Remote socket path:** run `kouen-cli doctor` on the remote box to print its control-socket path for `remote add --socket`. Full grammar: [docs/COMMANDS.md](docs/COMMANDS.md) (Remote section) and [docs/MULTIPLEXER_GUIDE.md](docs/MULTIPLEXER_GUIDE.md).
+**Remote socket path:** run `kouen-cli doctor` on the remote box to print its control-socket path for `remote add --socket`. Full grammar: [docs/COMMANDS.md](COMMANDS.md) (Remote section) and [docs/MULTIPLEXER_GUIDE.md](MULTIPLEXER_GUIDE.md).
 
 ---
 
@@ -394,7 +396,7 @@ PaneNode tree ──PaneRectSolver──▶ [PaneRect] ────┤
 
 **Tests:** `GridCompositorTests` (borders/SGR/diff), `GridCompositorCopyModeTests`, `PaneRectSolverTests` (layout), `CommandIPCTranslatorTests` (verb mapping + split inversion), `KouenGridTerminalTests` (engine fidelity), `CopyModeReducerTests`, and renderer/engine conformance suites. Run AppKit-linked grid tests via `xcrun xctest` only if `swift test`'s parallel runner is flaky.
 
-**Parity:** the compositor now has copy-mode + SGR mouse, `-t session:window.pane` targeting, `wait-for`, the `bind -n` root table, and `switch-client -T` modal key tables — the broad tmux verb surface is captured in [docs/COMMANDS.md](docs/COMMANDS.md) and [docs/MULTIPLEXER_GUIDE.md](docs/MULTIPLEXER_GUIDE.md): control mode `-CC`, `link-window`, `display-popup`/`-menu`, `lock`/`clock-mode`, `command-prompt`, `choose-*`, `confirm-before`, `pipe-pane`, `capture-pane -S/-E/-e/-J`, command aliases. Deliberate architectural divergences are called out in [docs/MIGRATION.md](docs/MIGRATION.md); grouped sessions and session-lifecycle options should not be half-wired against Kouen's value-typed session-owned tabs + always-visible-sessions model.
+**Parity:** the compositor now has copy-mode + SGR mouse, `-t session:window.pane` targeting, `wait-for`, the `bind -n` root table, and `switch-client -T` modal key tables — the broad tmux verb surface is captured in [docs/COMMANDS.md](COMMANDS.md) and [docs/MULTIPLEXER_GUIDE.md](MULTIPLEXER_GUIDE.md): control mode `-CC`, `link-window`, `display-popup`/`-menu`, `lock`/`clock-mode`, `command-prompt`, `choose-*`, `confirm-before`, `pipe-pane`, `capture-pane -S/-E/-e/-J`, command aliases. Deliberate architectural divergences are called out in [docs/MIGRATION.md](MIGRATION.md); grouped sessions and session-lifecycle options should not be half-wired against Kouen's value-typed session-owned tabs + always-visible-sessions model.
 
 ---
 
@@ -413,7 +415,7 @@ PaneNode tree ──PaneRectSolver──▶ [PaneRect] ────┤
 | `offMainParserFramePipeline` | **Default ON**; moves terminal byte ingestion and frame building to a per-surface serial worker while AppKit and Metal presentation stay on the main actor. Race-guarded for production: `nextDrawable` keeps its timeout (a stalled GPU/occluded window can't block the main thread), the `lastPlainFrame` row-reuse cache is **generation-tagged** (a frame built against a superseded grid is dropped, never presented), frame builds coalesce **latest-wins** on the worker, a failed encode/present re-arms `needsRender`, and resize/first-paint render **synchronously** (`RenderScheduler.renderSynchronously`) so they land inside the `CATransaction` with no stretch flicker. An explicit stored `false` opts out (legacy byte-for-byte main-thread path) |
 | `showPromptGutter` | Draws the OSC 133 prompt gutter stripe (green/red success/failure) when shell integration marks are present |
 | `prefixKey` | Prefix binding (`ctrl-a`; empty disables); edited via `KeyRecorderView` in Settings |
-| `experienceMode` | `ExperienceMode` (plain/persistent/tmux/agent). Gates chrome + default persistence on the one daemon core. Fresh installs → `.plain`; pre-modes files migrate → `.tmux`. See [docs/MODES.md](docs/MODES.md) |
+| `experienceMode` | `ExperienceMode` (plain/persistent/tmux/agent). Gates chrome + default persistence on the one daemon core. Fresh installs → `.plain`; pre-modes files migrate → `.tmux`. See [docs/MODES.md](MODES.md) |
 | `tmuxControlsEnabled` | `Bool?` override for tmux chrome; nil derives from mode. `showsTmuxChrome` (mode default ⊕ override) is the single gate `PrefixKeymap`/`StatusLineView`/onboarding consult; `effectivePrefixKey` is nil when chrome is hidden or the key is blank |
 | `scrollbackLines` | Scrollback size |
 | `cursorStyle`, `cursorBlink`, `copyOnSelect` | Terminal behavior |
@@ -456,7 +458,7 @@ kouen-cli install-hooks claude-code
 kouen-cli notify --surface "$KOUEN_SURFACE" --body "Approval required"
 ```
 
-Per-agent guides: [docs/agent-hooks/](docs/agent-hooks/). Daemon hooks (`hooks.json`): `after-new-tab`, `after-new-session`, `after-kill-tab`, `after-split-pane`, `after-kill-pane`, `after-resize-pane`, `pane-exited`, `client-attached`, `client-detached`, `agent-state-changed`, `notification-posted` (full list in [docs/COMMANDS.md](docs/COMMANDS.md)).
+Per-agent guides: [docs/agent-hooks/](agent-hooks/). Daemon hooks (`hooks.json`): `after-new-tab`, `after-new-session`, `after-kill-tab`, `after-split-pane`, `after-kill-pane`, `after-resize-pane`, `pane-exited`, `client-attached`, `client-detached`, `agent-state-changed`, `notification-posted` (full list in [docs/COMMANDS.md](COMMANDS.md)).
 
 **UI:** `SessionCardRowView`, `TabPillView`, **`AgentChipView`** in sidebar/session rows when agent kind is detected or inferred (static chip, not activity-gated), `NotificationBellButton` / `NotificationDropdownPanelView`, `Cmd+Shift+I` toggles the Agent Notch for direct agent/session selection, and `Cmd+Shift+U` opens the notifications inbox (skips still-`working` agents when jumping). OS banners gated per-event by `notificationEvents` then by `systemNotificationsEnabled`, and presented in-process through `DesktopNotifier` so the banner is attributed to Kouen.
 
@@ -466,7 +468,7 @@ Per-agent guides: [docs/agent-hooks/](docs/agent-hooks/). Daemon hooks (`hooks.j
 
 **Chrome icon buttons (one source of truth):** every circular chrome button — `NotificationBellButton`, the sidebar toggle, footer gear/＋/palette, tab-strip ＋/overflow (all `SoftIconButton`) — paints through **`KouenDesign.applyIconButtonChrome(to:bounds:isHovered:)`**: a subtle `surfaceElevated` disc + `borderStrong` rim (the same as the adjacent search field), flat (no drop shadow), hover lifts toward foreground. They follow the theme like the session cards instead of floating as opaque near-black discs. The **active top-tab pill** (`TabPillView.applyChrome`) is painted identically to the **selected session card** (`SessionCardRowView`): accent-tinted fill + accent rim + `elevation1` + card radius, so the tab strip and the side tab read as one system.
 
-**Brand icons:** `AgentChipView`, `TabPillView`, the `MenuBarController` menu, and Settings ▸ Agents render each agent's mark from **`AgentIconArt`** via **`SVGPathParser`** → `CGPath` and **`AgentIconRenderer`** (`templateImage` tintable by `contentTintColor`; `coloredImage` baked for `NSMenuItem`; `monogramTemplate` for the text-only fallback). Sources (attribution in [docs/THIRD-PARTY-NOTICES.md](docs/THIRD-PARTY-NOTICES.md)): **lobe-icons** `@lobehub/icons-static-svg` (MIT) for `codex`, `claude`, `cursor`, `openclaw`, `opencode`, `gemini`, `goose`; a **vendor brand mark** (matching the Skillz app) for `pi` (Inflection). No bundled raster assets — vector, crisp at any size, the same procedural approach as the box-drawing. Agents with no mark (Hermes, Aider) fall back to a tinted two-letter monogram (`AgentIconRenderer.monogramTemplate`); the per-agent color override tints it. **Hermes** uses the monogram deliberately: its official mark is a detailed portrait that is illegible at the 14–18px sizes the icon is shown at.
+**Brand icons:** `AgentChipView`, `TabPillView`, the `MenuBarController` menu, and Settings ▸ Agents render each agent's mark from **`AgentIconArt`** via **`SVGPathParser`** → `CGPath` and **`AgentIconRenderer`** (`templateImage` tintable by `contentTintColor`; `coloredImage` baked for `NSMenuItem`; `monogramTemplate` for the text-only fallback). Sources (attribution in [docs/THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)): **lobe-icons** `@lobehub/icons-static-svg` (MIT) for `codex`, `claude`, `cursor`, `openclaw`, `opencode`, `gemini`, `goose`; a **vendor brand mark** (matching the Skillz app) for `pi` (Inflection). No bundled raster assets — vector, crisp at any size, the same procedural approach as the box-drawing. Agents with no mark (Hermes, Aider) fall back to a tinted two-letter monogram (`AgentIconRenderer.monogramTemplate`); the per-agent color override tints it. **Hermes** uses the monogram deliberately: its official mark is a detailed portrait that is illegible at the 14–18px sizes the icon is shown at.
 
 **MCP (Model Context Protocol):** `kouen-mcp` is a JSON-RPC 2.0 MCP server (stdin/stdout transport) that lets AI agents call Kouen as a tool provider — direction is **agent → Kouen**, opposite of the shelved ACP sidebar. 27 tools across 6 categories: session/pane control, file I/O, git, workbench, browser pane, and agent orchestration. The binary ships at `Kouen.app/Contents/MacOS/kouen-mcp` in production builds (alongside `kouen-cli` and `KouenDaemon`). Tool policy gating: dangerous tools (control, shell) are blocked by default; enable via `~/Library/Application Support/Kouen/mcp-policy.json` → `"allowControl": true` or `KOUEN_MCP_ALLOW_CONTROL=1` env var.
 
@@ -546,9 +548,9 @@ swift test                                    # fast, deterministic
 KOUEN_LIVE_DAEMON_TESTS=1 swift test        # + real shell / socket tests
 ```
 
-`make package` is an alias for `make release`. Optional marketing video targets (`video-dev`, `video-render`, …) live in the Makefile and run under `marketing/video` — see [marketing/README.md](marketing/README.md).
+`make package` is an alias for `make release`.
 
-**CI** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)): **Build & test (macOS)** on `macos-15` (Xcode 16) — full `swift test` + non-blocking benchmarks; **Build & test (Linux, headless daemon)** — daemon/CLI/core/engine only (no GUI/renderer/compositor).
+**CI** ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)): **Build & test (macOS)** on `macos-15` (Xcode 16) — full `swift test` + non-blocking benchmarks; **Build & test (Linux, headless daemon)** — daemon/CLI/core/engine only (no GUI/renderer/compositor).
 
 **Release prep:** after updating CHANGELOG.md, run `make release-notes` — it regenerates `GeneratedReleaseNotes.swift` (the post-update "what's new" terminal banner) from the top changelog block. `ReleaseNotesGuardTests` and a `package-app.sh` guard fail on stale notes.
 
@@ -604,7 +606,7 @@ kouen-cli notify --surface "$(kouen-cli list-surfaces | head -1)" --body test
 
 Global menu shortcuts are defined in `MainMenuBuilder`, not `KeyTableSet.root` (which only holds prefix/copy-mode tables).
 
-Full shortcut reference (global menu + prefix table + copy mode): [docs/KEYBINDINGS.md](docs/KEYBINDINGS.md)
+Full shortcut reference (global menu + prefix table + copy mode): [docs/KEYBINDINGS.md](KEYBINDINGS.md)
 
 ---
 

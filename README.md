@@ -40,10 +40,10 @@ Use this for a normal local install:
 ```bash
 git clone https://github.com/Vit129/kouen-terminal.git
 cd kouen-terminal
-make install
+make install-graceful
 ```
 
-`make install` builds Kouen, packages `Kouen.app`, copies it to `/Applications/Kouen.app`, refreshes the local daemon/CLI helper binaries, and opens the app.
+`make install-graceful` (`Scripts/install-graceful.sh`) builds first, then packages `Kouen.app`, copies it to `/Applications/Kouen.app`, refreshes the local daemon/CLI helper binaries and opens the app. Workspace/session state is preserved, and the daemon is only restarted when the IPC protocol changed, so running agents survive an update.
 
 After the app opens, install the CLI on your `PATH` if prompted, or run:
 
@@ -58,7 +58,7 @@ kouen-cli doctor
 kouen-cli ping
 ```
 
-Since Kouen is only ever built locally from this clone, launching the app also checks this repo's `version.json` on `main` once per launch and, on a clean working tree, asks whether to `git pull` when a newer version is available — never automatically. Decline and it won't ask again for that version; a dirty tree gets a notice instead of a prompt.
+The release helper `Scripts/full-cycle.sh` ends by comparing the running daemon's build with the app's and offering `kouen-cli install` when they differ. Since Kouen is only ever built locally from this clone, launching the app also checks this repo's `version.json` on `main` once per launch and, on a clean working tree, asks whether to `git pull` when a newer version is available — never automatically. Decline and it won't ask again for that version; a dirty tree gets a notice instead of a prompt.
 
 ### Development Builds
 
@@ -68,7 +68,7 @@ For an isolated dev/test app that does not touch production Kouen state:
 make preview
 ```
 
-See [USAGE.md](USAGE.md) for the full install, run, CLI, and remote/headless guide.
+See [docs/USAGE.md](docs/USAGE.md) for the full install, run, CLI, and remote/headless guide.
 
 ## Why Kouen
 
@@ -145,9 +145,10 @@ kouen-cli send-keys --surface <uuid> --keys "ls -la Enter"
 kouen-cli capture-pane --surface <uuid> --scrollback
 kouen-cli install-hooks codex
 kouen-cli cc run "summarize the last commit" --cwd ~/Code/myrepo
+kouen-cli happy adopt --all   # pull phone-started Happy sessions into panes
 ```
 
-More examples are in [USAGE.md](USAGE.md), [docs/COMMANDS.md](docs/COMMANDS.md), and [docs/MULTIPLEXER_GUIDE.md](docs/MULTIPLEXER_GUIDE.md).
+More examples are in [docs/USAGE.md](docs/USAGE.md), [docs/COMMANDS.md](docs/COMMANDS.md), and [docs/MULTIPLEXER_GUIDE.md](docs/MULTIPLEXER_GUIDE.md).
 
 ## AI Browser Control (kouen-mcp)
 
@@ -177,6 +178,8 @@ AI agents (Claude Code, Codex, Kiro) can see and interact with the embedded brow
 ```json
 { "browserHomePage": "https://www.google.com" }
 ```
+
+**Auto-close:** a browser pane an agent opened with `kouenBrowserOpen` closes itself when that agent goes idle (panes you opened, or that were reused, stay).
 
 **Token efficiency:** snapshot returns structured data (~200–500 tokens), not screenshots or raw HTML — significantly cheaper than vision-based browser automation.
 
@@ -303,7 +306,7 @@ Kouen does not ship its own mobile app or relay. To watch or steer an agent from
 | Codex | ChatGPT mobile app | Not yet confirmed for `codex` CLI sessions started inside Kouen |
 | Antigravity | Antigravity remote control / companion app | Not yet confirmed for `agy` CLI sessions |
 
-Optional: set an agent's mode to `happy` in `agentSessionModes` (`settings.json`) to launch it through [Happy](https://happy.engineering) (`happy claude`, `happy codex`, `happy agy`, `happy acp -- copilot --acp`) and steer it from one cross-vendor mobile/web app. Needs `npm i -g happy` and `happy auth login`. Whenever Happy is installed and logged in, the Kouen daemon keeps Happy's daemon running (`happy daemon start`) regardless of mode, so a phone can start or resume sessions with no pane open; `remote-control` mode is unchanged and stays the default. Claude Code, Codex and Copilot (`agent` mode) approvals work from the phone; `agy` runs one-shot with no per-tool approval.
+Optional: set an agent's mode to `happy` in `agentSessionModes` (`settings.json`) to launch it through [Happy](https://happy.engineering) (`happy claude`, `happy codex`, `happy agy`, `happy acp -- copilot --acp`) and steer it from one cross-vendor mobile/web app. Needs `npm i -g happy` and `happy auth login`. Whenever Happy is installed and logged in, the Kouen daemon keeps Happy's daemon running (`happy daemon start`) regardless of mode, so a phone can start or resume sessions with no pane open; `remote-control` stays the default launch mode, and with Happy logged in a hand-typed `claude` (`happy claude --remote-control`) is reachable from both the Claude app and Happy, and `codex` goes through Happy. Claude Code, Codex and Copilot (`agent` mode) approvals work from the phone; `agy` runs one-shot with no per-tool approval.
 
 Trade-off: no single cross-vendor mobile dashboard by default — Kouen's Fleet view is desktop-only. The earlier built-in Mobile Connect bridge (QR + Tailscale web client) is deprecated, off by default (`mobileBridgeEnabled`) and no longer developed. Reasoning: [ARCHITECTURE.md](ARCHITECTURE.md) § Architecture Decisions (2026-09-23).
 
@@ -333,7 +336,7 @@ kouen-cli capture-pane --host devbox --surface <id>
 ## Documentation
 
 - [PRODUCT.md](PRODUCT.md) / [ARCHITECTURE.md](ARCHITECTURE.md) / [DESIGN.md](DESIGN.md) - product scope, system architecture and decision log, visual system
-- [USAGE.md](USAGE.md) - install, run, CLI, remote/headless, IDE-like workflow, experience modes, migration, and troubleshooting
+- [docs/USAGE.md](docs/USAGE.md) - install, run, CLI, remote/headless, IDE-like workflow, experience modes, migration, and troubleshooting
 - [docs/MODES.md](docs/MODES.md) - Plain, Persistent, Full, and Agent Workspace modes (detail)
 - [docs/MIGRATION.md](docs/MIGRATION.md) - migrating from tmux or another terminal setup
 - [docs/COMMANDS.md](docs/COMMANDS.md) - full command reference including workbench commands (`:find`, `:grep`, `:make`, `:errors`, `:recent`) and the agent-safety CLI (`kouen history`, `kouen undo`, `kouen verify`, `kouen task pack-pr`)

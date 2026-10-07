@@ -17,100 +17,28 @@
    heading, then regenerate the in-app "what's new" banner:
    `swift Scripts/generate-release-notes.swift` (or `make release-notes`).
 2. `swift test`
-3. `make install` — builds, packages, ad-hoc signs, and installs
+3. `make install-graceful` — builds, packages, ad-hoc signs, and installs
    `/Applications/Kouen.app` locally, so you can sanity-check the actual
    build before tagging it.
 4. `git tag -a vX.Y.Z -m "..." && git push origin vX.Y.Z`
 5. `gh release create vX.Y.Z --latest --title "Kouen X.Y.Z" --notes "..."`
    — no DMG asset; this just marks the commit as the release point. Anyone
-   installing builds from source (`git clone` + `make install`), so there's
+   installing builds from source (`git clone` + `make install-graceful`), so there's
    nothing to sign or notarize for that path.
 
-## Full pipeline reference (not implemented in this fork)
+## Scripted flow
 
-The rest of this document describes the upstream project's own release
-pipeline — Developer ID signing, notarization, a `Release Kouen` GitHub
-Actions workflow, and a Sparkle appcast hosted at a website repo. None of
-it exists in this fork right now (the workflow file and its
-`Scripts/release-hotfix.sh` dispatcher were deleted). Kept as reference for
-what a real release pipeline would need if this fork ever stands up its own
-signing/hosting/auto-update — not a description of anything currently
-runnable here.
-
-Kouen could be released from GitHub Actions on a hosted macOS runner. A
-`Release Kouen` workflow would build the app, sign it with Developer ID,
-notarize the app and DMG, upload the DMG to GitHub Releases, generate a
-Sparkle appcast, and optionally commit that appcast to the website
-repository.
-
-## One-time GitHub setup
-
-Create a protected GitHub Environment named `release` and add required reviewers
-before storing release secrets there. That keeps the signing material unavailable
-until a human approves a release run.
-
-Required environment secrets:
-
-| Secret | Purpose |
-| --- | --- |
-| `SIGNING_CERTIFICATE_BASE64` | Base64-encoded `.p12` export for the Developer ID Application certificate. |
-| `SIGNING_CERTIFICATE_PASSWORD` | Password for the `.p12` export. |
-| `SIGNING_IDENTITY` | Exact codesign identity, for example `Developer ID Application: Name (TEAMID)`. |
-| `ASC_ISSUER_ID` | App Store Connect API issuer UUID. |
-| `ASC_KEY_ID` | App Store Connect API key ID. |
-| `ASC_PRIVATE_KEY` | Contents of the App Store Connect `AuthKey_<key-id>.p8` file. |
-| `SPARKLE_EDDSA_PRIVATE_KEY` | Sparkle EdDSA private key matching `SUPublicEDKey` in `Info.plist`. |
-
-Optional appcast deploy settings:
-
-| Setting | Purpose |
-| --- | --- |
-| Environment variable `WEBSITE_REPOSITORY` | Website repository in `owner/name` form. The workflow writes `public/appcast.xml` there. |
-| Secret `WEBSITE_DEPLOY_TOKEN` | Token with write access to `WEBSITE_REPOSITORY`. Use this only if `deploy_appcast` is enabled. |
-
-The website deploy path assumes the website repository owns `kouencli.dev` and
-deploys after a push, for example through Vercel's Git integration. The DMG does
-not need to be copied to the website: the generated appcast points Sparkle at
-the GitHub Release asset URL for the matching tag.
-
-## If the workflow existed: running a release
-
-1. Merge the code and version bump that should ship.
-2. Open **Actions -> Release Kouen -> Run workflow**.
-3. Select the release branch, normally `main`.
-4. Enter a tag matching `CFBundleShortVersionString`, for example `v1.0.4`.
-5. Enable `deploy_appcast` only after `WEBSITE_REPOSITORY` and
-   `WEBSITE_DEPLOY_TOKEN` are configured.
-6. Approve the `release` environment gate when GitHub asks.
-
-The workflow would validate that the tag version matches `Info.plist` before
-signing anything. If the version still said `1.0.3`, a `v1.0.4` run would fail
-fast and ask you to bump `CFBundleShortVersionString` / `CFBundleVersion`
-first — the same check `Scripts/package-app.sh` already does locally.
-
-After dispatching, verify the run's `headSha` equals the release-prep commit
-before approving the `release` environment (a push that failed on a network
-blip once left `workflow_dispatch` running from the OLD head). Known flake:
-`hdiutil` "Resource busy" during DMG creation — rerun failed jobs and
-re-approve the environment.
-
-## What that workflow would publish
-
-- A GitHub Release for the requested tag, created at the workflow commit if one
-  does not already exist.
-- `Kouen.dmg`, uploaded or replaced on that GitHub Release.
-- `dist/appcast.xml`, uploaded to the GitHub Release for audit/debugging.
-- Optionally, `public/appcast.xml` in the website repository.
-
-Installed apps would only see the update after `https://kouencli.dev/appcast.xml`
-serves the new appcast. If `deploy_appcast` were disabled, `dist/appcast.xml`
-would need publishing to the website manually before Sparkle auto-update
-could find the release.
+`Scripts/full-cycle.sh [patch|minor|major] [--version X.Y.Z] [--build N] [--no-bump]` (menu: `make start`)
+runs steps 1–5 above in order: verify the build, bump the version (rolled back if the build fails),
+commit/push/merge via `commit-push-merge.sh`, graceful install (`install-graceful.sh`), then regenerate
+`CHANGELOG.md` with git-cliff and create the tag and GitHub release. Older minor versions roll into
+`docs/CHANGELOG-archive.md` automatically. The run ends by comparing the running daemon's build with
+the app's; on mismatch it offers to run `kouen-cli install`.
 
 ## Full local signing path (needs a Developer ID cert; not currently used)
 
-If this fork ever gets a Developer ID cert, the full sign/notarize/DMG/appcast
-path can run entirely locally, no CI needed:
+The Makefile still carries the sign/notarize/DMG/appcast targets for a fork that gets a Developer ID
+cert. They run locally, no CI needed:
 
 ```bash
 make release
@@ -125,5 +53,6 @@ DOWNLOAD_URL_PREFIX="https://github.com/Vit129/kouen-terminal/releases/download/
   make finalize
 ```
 
-Without `SPARKLE_EDDSA_PRIVATE_KEY_FILE`, Sparkle falls back to the private key in
-the login keychain and may show an interactive "Allow" prompt.
+`sign`/`dmg` operate on the existing `Kouen.app` and must not re-run `release`. Without
+`SPARKLE_EDDSA_PRIVATE_KEY_FILE`, Sparkle falls back to the login-keychain key and may show an
+interactive "Allow" prompt.
