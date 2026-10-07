@@ -7,8 +7,8 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
 ## [4.20.14] - 2026-10-07
 
-### Added
-- Release version bump to v4.20.14.
+### Fixed
+- Keep agy/copilot interactive in remote-control mode; only claude routes through Happy (release v4.20.14) ([`e35285b`](https://github.com/Vit129/kouen-terminal/commit/e35285b7a598dd9e8166cba84fb724cf08b7dbba))
 
 ## [4.20.13] - 2026-10-07
 
