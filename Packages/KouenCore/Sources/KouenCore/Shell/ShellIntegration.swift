@@ -206,8 +206,6 @@ public enum ShellIntegration {
           esac
         done
         if (( ${+commands[happy]} )) && [[ "$KOUEN_AGY_SESSION_MODE" == "happy" ]]; then happy agy "$@"; return; fi
-        # `happy agy` drops every argument (resume, prompt), so only a bare launch can go through it.
-        if (( ${+commands[happy]} )) && [[ -f "$HOME/.happy/access.key" ]] && (( n == 0 )); then happy agy; return; fi
         if (( rc )); then __kouen_agy_next "$@"; else __kouen_agy_next --remote-control "$@"; fi
       }
     fi
@@ -231,7 +229,6 @@ public enum ShellIntegration {
           esac
         done
         if (( ${+commands[happy]} )) && [[ "$KOUEN_COPILOT_SESSION_MODE" == "happy" ]]; then happy acp -- copilot --acp "$@"; return; fi
-        if (( ${+commands[happy]} )) && [[ -f "$HOME/.happy/access.key" ]]; then if (( rc )); then happy acp -- copilot --acp "$@"; else happy acp -- copilot --acp --remote "$@"; fi; return; fi
         if (( rc )); then __kouen_copilot_next "$@"; else __kouen_copilot_next --remote "$@"; fi
       }
     fi
@@ -365,8 +362,6 @@ public enum ShellIntegration {
           esac
         done
         if command -v happy >/dev/null 2>&1 && [[ "$KOUEN_AGY_SESSION_MODE" == "happy" ]]; then happy agy "$@"; return; fi
-        # `happy agy` drops every argument (resume, prompt), so only a bare launch can go through it.
-        if command -v happy >/dev/null 2>&1 && [ -f "$HOME/.happy/access.key" ] && (( n == 0 )); then happy agy; return; fi
         if (( rc )); then __kouen_agy_next "$@"; else __kouen_agy_next --remote-control "$@"; fi
       }
     fi
@@ -390,7 +385,6 @@ public enum ShellIntegration {
           esac
         done
         if command -v happy >/dev/null 2>&1 && [[ "$KOUEN_COPILOT_SESSION_MODE" == "happy" ]]; then happy acp -- copilot --acp "$@"; return; fi
-        if command -v happy >/dev/null 2>&1 && [ -f "$HOME/.happy/access.key" ]; then if (( rc )); then happy acp -- copilot --acp "$@"; else happy acp -- copilot --acp --remote "$@"; fi; return; fi
         if (( rc )); then __kouen_copilot_next "$@"; else __kouen_copilot_next --remote "$@"; fi
       }
     fi
@@ -550,10 +544,6 @@ public enum ShellIntegration {
             if test "$KOUEN_AGY_SESSION_MODE" = happy; and type -q happy
                 happy agy $argv; return
             end
-            # `happy agy` drops every argument (resume, prompt), so only a bare launch can go through it.
-            if type -q happy; and test -f "$HOME/.happy/access.key"; and test $n -eq 0
-                happy agy; return
-            end
             if test $rc -eq 1
                 __kouen_agy_next $argv
             else
@@ -585,14 +575,6 @@ public enum ShellIntegration {
             end
             if test "$KOUEN_COPILOT_SESSION_MODE" = happy; and type -q happy
                 happy acp -- copilot --acp $argv; return
-            end
-            if type -q happy; and test -f "$HOME/.happy/access.key"
-                if test $rc -eq 1
-                    happy acp -- copilot --acp $argv
-                else
-                    happy acp -- copilot --acp --remote $argv
-                end
-                return
             end
             if test $rc -eq 1
                 __kouen_copilot_next $argv
