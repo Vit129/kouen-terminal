@@ -8,7 +8,18 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [4.20.16] - 2026-10-08
 
 ### Added
-- Release version bump to v4.20.16.
+- Update scopes, date grouping and compact two-line rows ([`f39f223`](https://github.com/Vit129/kouen-terminal/commit/f39f223fbabbf53c2dbcdc7311f43d1745d3cf10))
+- Add ranked loose search matching for sessions ([`e747aaf`](https://github.com/Vit129/kouen-terminal/commit/e747aaf58d514ad0d69352bccc3d66dce673e24f))
+- Add full transcript SQLite FTS5 index and incremental reindexing ([`598c894`](https://github.com/Vit129/kouen-terminal/commit/598c894d28d9ee6444dc8ff15588d67d243cdd99))
+- Share one ranker between the sidebar and `kouen history search` ([`9753581`](https://github.com/Vit129/kouen-terminal/commit/975358197748988d34617dab45454092240cbfb6))
+- Redesign ui and ux in ai session history tab and add kouen-preview when use make preview (release v4.20.16) ([`e6a835e`](https://github.com/Vit129/kouen-terminal/commit/e6a835e5b599b2e337749ea1271f3facc8490623))
+
+### Fixed
+- Address P52 review findings for repo root freeze, typing lag, FTS limit and tab disambiguation ([`e6a59f5`](https://github.com/Vit129/kouen-terminal/commit/e6a59f542cb895419e8fe971622dd959151181cd))
+- Weight query words by rarity so common words can't carry a match ([`4b9f016`](https://github.com/Vit129/kouen-terminal/commit/4b9f01662fe28d8ec241680e3e3be3c77a67a6f0))
+- Resume and hand-off open a new session, like Cmd+T ([`837afaf`](https://github.com/Vit129/kouen-terminal/commit/837afaf8cbe01c327f1a73fdc2448fa90de9608f))
+- Label preview builds "Kouen Preview" in the title bar ([`5f9b624`](https://github.com/Vit129/kouen-terminal/commit/5f9b624b2dbaa873d15a3b2483db53d4f7251eb4))
+- Expand sidebar width and floor for Kouen Preview header label ([`0b521f3`](https://github.com/Vit129/kouen-terminal/commit/0b521f36cea51505a267482f59adeb6f4eedc40f))
 
 ## [4.20.15] - 2026-10-07
 
