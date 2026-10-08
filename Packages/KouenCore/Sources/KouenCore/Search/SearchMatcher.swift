@@ -187,4 +187,145 @@ public struct SearchMatcher: Sendable {
     public static func isTokenSeparator(_ character: Character) -> Bool {
         character.isWhitespace || character == "/" || character == "." || character == "-" || character == "_"
     }
+
+    // MARK: - Ranked Loose History Search (Slice B)
+
+    public struct RankedHistoryMatchResult: Sendable, Equatable {
+        public let score: Double
+        public let matchedTokensCount: Int
+        public let snippet: String?
+        public let highlightedTerms: [String]
+
+        public init(
+            score: Double,
+            matchedTokensCount: Int,
+            snippet: String? = nil,
+            highlightedTerms: [String] = []
+        ) {
+            self.score = score
+            self.matchedTokensCount = matchedTokensCount
+            self.snippet = snippet
+            self.highlightedTerms = highlightedTerms
+        }
+    }
+
+    /// Evaluates if token `k` matches `word` either by prefix, substring (for k >= 4), or 1-edit typo tolerance (for k >= 4).
+    public static func tokenNear(_ k: String, in word: String) -> Bool {
+        if word.hasPrefix(k) { return true }
+        if k.count > 3 && word.contains(k) { return true }
+        if k.count < 4 || abs(k.count - word.count) > 1 { return false }
+
+        let kArr = Array(k)
+        let wArr = Array(word)
+        var i = 0
+        var j = 0
+        var edits = 0
+
+        while i < kArr.count && j < wArr.count {
+            if kArr[i] == wArr[j] {
+                i += 1
+                j += 1
+            } else {
+                edits += 1
+                if edits > 1 { return false }
+                if kArr.count > wArr.count {
+                    i += 1
+                } else if wArr.count > kArr.count {
+                    j += 1
+                } else {
+                    i += 1
+                    j += 1
+                }
+            }
+        }
+        return edits + (kArr.count - i) + (wArr.count - j) <= 1
+    }
+
+    /// Tests if a single token `token` matches a target text by exact containment or word-level prefix/typo tolerance.
+    public static func tokenHits(_ token: String, in text: String) -> Bool {
+        let norm = normalized(text)
+        if norm.contains(token) { return true }
+        let words = norm.split(whereSeparator: isTokenSeparator).map(String.init)
+        return words.contains(where: { tokenNear(token, in: $0) })
+    }
+
+    /// Evaluates a session candidate across multiple fields with weights:
+    /// - title: 3.0
+    /// - branch / files / tools: 2.5
+    /// - repo / agent: 1.5
+    /// - chat content: 1.0
+    ///
+    /// Requires at least `ceil(tokens.count / 2)` token matches.
+    public func matchHistory(
+        title: String,
+        branchFilesTools: String? = nil,
+        repoAgent: String? = nil,
+        chatContent: String? = nil,
+        tokenWeights: [String: Double]? = nil
+    ) -> RankedHistoryMatchResult? {
+        guard hasQuery, !tokens.isEmpty else { return nil }
+
+        // Without weights every token counts 1, i.e. "at least half the tokens" as before. With
+        // rarity weights, words present in most sessions can't carry a match on their own.
+        func weight(_ token: String) -> Double { tokenWeights?[token] ?? 1.0 }
+        let totalWeight = tokens.reduce(0.0) { $0 + weight($1) }
+        var matchedWeight = 0.0
+        var matchedTokensCount = 0
+        var totalScore: Double = 0.0
+        var matchedTerms: [String] = []
+
+        let normTitle = Self.normalized(title)
+        let normBranch = branchFilesTools.map(Self.normalized) ?? ""
+        let normRepo = repoAgent.map(Self.normalized) ?? ""
+        let normChat = chatContent.map(Self.normalized) ?? ""
+
+        for token in tokens {
+            if Self.tokenHits(token, in: normTitle) {
+                totalScore += 3.0 * weight(token)
+                matchedWeight += weight(token)
+                matchedTokensCount += 1
+                matchedTerms.append(token)
+            } else if !normBranch.isEmpty && Self.tokenHits(token, in: normBranch) {
+                totalScore += 2.5 * weight(token)
+                matchedWeight += weight(token)
+                matchedTokensCount += 1
+                matchedTerms.append(token)
+            } else if !normRepo.isEmpty && Self.tokenHits(token, in: normRepo) {
+                totalScore += 1.5 * weight(token)
+                matchedWeight += weight(token)
+                matchedTokensCount += 1
+                matchedTerms.append(token)
+            } else if !normChat.isEmpty && Self.tokenHits(token, in: normChat) {
+                totalScore += 1.0 * weight(token)
+                matchedWeight += weight(token)
+                matchedTokensCount += 1
+                matchedTerms.append(token)
+            }
+        }
+
+        guard totalWeight > 0, matchedWeight * 2 >= totalWeight - 1e-9 else { return nil }
+
+        let normalizedScore = totalScore / totalWeight
+
+        // Snippet extraction from chatContent or branchFilesTools
+        var snippet: String?
+        if let chatContent, !chatContent.isEmpty {
+            let targetToken = matchedTerms.first(where: { Self.tokenHits($0, in: normChat) })
+            if let targetToken {
+                snippet = extractSnippet(from: chatContent, targetQuery: targetToken)
+            }
+        } else if let branchFilesTools, !branchFilesTools.isEmpty {
+            let targetToken = matchedTerms.first(where: { Self.tokenHits($0, in: normBranch) })
+            if let targetToken {
+                snippet = extractSnippet(from: branchFilesTools, targetQuery: targetToken)
+            }
+        }
+
+        return RankedHistoryMatchResult(
+            score: normalizedScore,
+            matchedTokensCount: matchedTokensCount,
+            snippet: snippet,
+            highlightedTerms: matchedTerms
+        )
+    }
 }
