@@ -15,7 +15,9 @@ enum KouenDesign {
         return NSApp.applicationIconImage
     }
 
-    static let sidebarWidth: CGFloat = 220
+    static var sidebarWidth: CGFloat {
+        Bundle.main.bundleIdentifier == "com.vit129.kouen.preview" ? 275 : 220
+    }
     static let titlebarChromeHeight: CGFloat = 44
     static let tabBarHeight: CGFloat = 38
     static let workspaceBarHeight: CGFloat = 42

@@ -848,6 +848,7 @@ final class MainSplitViewController: NSViewController {
         guard NSEvent.pressedMouseButtons & 1 != 0,
               let panel = sidebarContainerView, !panel.isHidden
         else { return }
+        updateContentLeadingInset()
         // Never persist below the delegate's own floor — if `allowFullCollapse` is ever
         // left stuck true (e.g. an interrupted collapse/expand animation) a real drag can
         // reach 0 here, which then bricks every future toggle (see
@@ -902,7 +903,12 @@ private final class SplitChromeDelegate: NSObject, NSSplitViewDelegate {
     /// floor `MainSplitViewController` clamps a persisted `sidebarWidth` to before
     /// treating it as a toggle target — a width below this reaching disk is exactly how
     /// `cmd-backslash-sidebar-zero-width` bricked every future toggle.
-    static let sidebarMinWidth: CGFloat = 200
+    static var sidebarMinWidth: CGFloat {
+        Bundle.main.bundleIdentifier == "com.vit129.kouen.preview" ? 265 : 200
+    }
+    static var sidebarMaxWidth: CGFloat {
+        Bundle.main.bundleIdentifier == "com.vit129.kouen.preview" ? 380 : 320
+    }
     /// While a programmatic collapse/expand is running, let the divider reach 0 so the
     /// sidebar can fully disappear. At rest it's false, so a *user drag* still floors
     /// at `sidebarMinWidth` and can't shrink the sidebar to an unusable sliver.
@@ -928,7 +934,7 @@ private final class SplitChromeDelegate: NSObject, NSSplitViewDelegate {
         if right {
             guard index == 0 else { return proposedMinimum }
             let totalWidth = splitView.bounds.width
-            return totalWidth - 320
+            return totalWidth - Self.sidebarMaxWidth
         } else {
             guard index == 0 else { return proposedMinimum }
             return (allowFullCollapse || hidden) ? 0 : Self.sidebarMinWidth
@@ -943,7 +949,7 @@ private final class SplitChromeDelegate: NSObject, NSSplitViewDelegate {
             let totalWidth = splitView.bounds.width
             return (allowFullCollapse || hidden) ? totalWidth : (totalWidth - Self.sidebarMinWidth)
         } else {
-            return index == 0 ? 320 : proposedMaximum
+            return index == 0 ? Self.sidebarMaxWidth : proposedMaximum
         }
     }
 
