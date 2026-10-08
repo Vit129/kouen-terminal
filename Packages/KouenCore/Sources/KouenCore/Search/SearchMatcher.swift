@@ -260,11 +260,16 @@ public struct SearchMatcher: Sendable {
         title: String,
         branchFilesTools: String? = nil,
         repoAgent: String? = nil,
-        chatContent: String? = nil
+        chatContent: String? = nil,
+        tokenWeights: [String: Double]? = nil
     ) -> RankedHistoryMatchResult? {
         guard hasQuery, !tokens.isEmpty else { return nil }
 
-        let requiredMatches = Int(ceil(Double(tokens.count) / 2.0))
+        // Without weights every token counts 1, i.e. "at least half the tokens" as before. With
+        // rarity weights, words present in most sessions can't carry a match on their own.
+        func weight(_ token: String) -> Double { tokenWeights?[token] ?? 1.0 }
+        let totalWeight = tokens.reduce(0.0) { $0 + weight($1) }
+        var matchedWeight = 0.0
         var matchedTokensCount = 0
         var totalScore: Double = 0.0
         var matchedTerms: [String] = []
@@ -276,27 +281,31 @@ public struct SearchMatcher: Sendable {
 
         for token in tokens {
             if Self.tokenHits(token, in: normTitle) {
-                totalScore += 3.0
+                totalScore += 3.0 * weight(token)
+                matchedWeight += weight(token)
                 matchedTokensCount += 1
                 matchedTerms.append(token)
             } else if !normBranch.isEmpty && Self.tokenHits(token, in: normBranch) {
-                totalScore += 2.5
+                totalScore += 2.5 * weight(token)
+                matchedWeight += weight(token)
                 matchedTokensCount += 1
                 matchedTerms.append(token)
             } else if !normRepo.isEmpty && Self.tokenHits(token, in: normRepo) {
-                totalScore += 1.5
+                totalScore += 1.5 * weight(token)
+                matchedWeight += weight(token)
                 matchedTokensCount += 1
                 matchedTerms.append(token)
             } else if !normChat.isEmpty && Self.tokenHits(token, in: normChat) {
-                totalScore += 1.0
+                totalScore += 1.0 * weight(token)
+                matchedWeight += weight(token)
                 matchedTokensCount += 1
                 matchedTerms.append(token)
             }
         }
 
-        guard matchedTokensCount >= requiredMatches else { return nil }
+        guard totalWeight > 0, matchedWeight * 2 >= totalWeight - 1e-9 else { return nil }
 
-        let normalizedScore = totalScore / Double(tokens.count)
+        let normalizedScore = totalScore / totalWeight
 
         // Snippet extraction from chatContent or branchFilesTools
         var snippet: String?

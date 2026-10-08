@@ -173,8 +173,15 @@ final class AgentSessionHistoryModelTests: XCTestCase {
 
         // Type query - filteredRecords initially not updated synchronously
         model.searchQuery = "database"
-        // Wait for debounce ~150ms + background task completion
-        try? await Task.sleep(nanoseconds: 250_000_000)
+        XCTAssertNotEqual(model.filteredRecords.map(\.id), ["r1"], "results must not be applied synchronously")
+
+        // Poll for the debounced background result instead of a fixed sleep: the first search
+        // opens the FTS database, which can take well over the debounce on a cold run.
+        let deadline = Date().addingTimeInterval(5)
+        while model.filteredRecords.map(\.id) != ["r1"], Date() < deadline {
+            await Task.yield()
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
 
         XCTAssertEqual(model.filteredRecords.count, 1)
         XCTAssertEqual(model.filteredRecords.first?.id, "r1")
