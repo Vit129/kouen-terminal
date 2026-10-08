@@ -32,7 +32,7 @@ extension KouenCLI {
         fputs("""
         Usage:
           kouen history [list] [--limit N] [--json]   Recent agent sessions across every workspace
-          kouen history search <keyword> [--limit N]  Search prompts/output across all transcripts
+          kouen history search <words> [--limit N]    Ranked loose search across all transcripts
           kouen history show <id>                     Show one session's detail (prefix-matched)
           kouen history resume <id>                   Resume a session in a new tab
         \n
@@ -98,19 +98,9 @@ extension KouenCLI {
             exit(1)
         }
         let limit = Int(flagValue(args, flag: "--limit") ?? "20") ?? 20
-        let matcher = SearchMatcher(query: query)
         let records = await AgentHistoryScanner.shared.getOrScan()
-
-        let matched: [(AgentSessionRecord, String?)] = records.compactMap { record in
-            let turnsContent = record.latestTurns.map(\.content).joined(separator: "\n")
-            let fullContent = "\(record.firstPrompt)\n\(turnsContent)"
-            guard let result = matcher.match(
-                name: record.title,
-                relativePath: "\(record.projectName) \(record.agentKind.displayName)",
-                content: fullContent
-            ) else { return nil }
-            return (record, result.snippet)
-        }
+        // Same ranker as the History sidebar, so a query finds the same sessions in both.
+        let matched = AgentHistorySearch.rank(query: query, records: records).map { ($0.record, $0.snippet) }
 
         let limited = Array(matched.prefix(limit))
         guard !limited.isEmpty else {
