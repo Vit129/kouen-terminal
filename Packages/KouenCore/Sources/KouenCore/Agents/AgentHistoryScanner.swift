@@ -241,12 +241,14 @@ public actor AgentHistoryScanner {
     private let cloudSessionStore: ClaudeCloudSessionStore
     private var fileCache: [String: FileCacheEntry] = [:]
     private var lastScanAt: Date = .distantPast
+    private let ftsIndex: AgentHistoryFTSIndex
     #if canImport(SQLite3)
     private var copilotCache: (mtime: Date, size: Int, records: [AgentSessionRecord])?
     #endif
 
-    public init() {
-        cloudSessionStore = ClaudeCloudSessionStore()
+    public init(ftsIndex: AgentHistoryFTSIndex = .shared) {
+        self.cloudSessionStore = ClaudeCloudSessionStore()
+        self.ftsIndex = ftsIndex
     }
 
     /// Returns cached records if fresh (< 5s), otherwise rescans.
@@ -343,8 +345,10 @@ public actor AgentHistoryScanner {
                    let size = rv.fileSize,
                    let cached = fileCache[path],
                    cached.mtime == mtime && cached.size == size {
-                    records.append(cached.record)
-                    continue
+                    if !ftsIndex.needsReindex(sessionID: cached.record.id, mtime: mtime, fileSize: size) {
+                        records.append(cached.record)
+                        continue
+                    }
                 }
 
                 if let record = parseClaudeTranscript(fileURL: fileURL) {
@@ -448,10 +452,63 @@ public actor AgentHistoryScanner {
             }
         }
 
+        var fullTranscriptParts: [String] = []
+        var filesEdited: Set<String> = []
+        var toolsCalled: Set<String> = []
+
+        // Extract full conversation text, tools, and edited files across all lines
+        for line in lines {
+            guard let objData = line.data(using: .utf8),
+                  let json = try? JSONSerialization.jsonObject(with: objData) as? [String: Any],
+                  let msg = json["message"] as? [String: Any] else {
+                continue
+            }
+            if let contentStr = msg["content"] as? String {
+                let clean = contentStr.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !clean.isEmpty { fullTranscriptParts.append(clean) }
+            } else if let contentArr = msg["content"] as? [[String: Any]] {
+                for item in contentArr {
+                    if let type = item["type"] as? String {
+                        if type == "text", let text = item["text"] as? String {
+                            let clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                            if !clean.isEmpty { fullTranscriptParts.append(clean) }
+                        } else if type == "tool_use" {
+                            if let name = item["name"] as? String, !name.isEmpty {
+                                toolsCalled.insert(name)
+                            }
+                            if let input = item["input"] as? [String: Any] {
+                                for key in ["file_path", "path", "filePath", "TargetFile"] {
+                                    if let pathStr = input[key] as? String, !pathStr.isEmpty {
+                                        filesEdited.insert((pathStr as NSString).lastPathComponent)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         let finalCwd = cwd ?? FileManager.default.homeDirectoryForCurrentUser.path
         let projectName = (finalCwd as NSString).lastPathComponent
         let title = firstPrompt?.components(separatedBy: .newlines).first(where: { !$0.isEmpty }) ?? "Claude Session \(sessionID.prefix(8))"
         let modDate = (try? fileURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? timestamp ?? Date()
+        let fileSize = (try? fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? string.utf8.count
+
+        ftsIndex.indexSession(
+            sessionID: sessionID,
+            title: title,
+            firstPrompt: firstPrompt ?? "",
+            fullTranscript: fullTranscriptParts.joined(separator: "\n"),
+            gitBranch: gitBranch,
+            repoName: projectName,
+            agentName: AgentKind.claudeCode.displayName,
+            filesEdited: filesEdited.joined(separator: " "),
+            toolsCalled: toolsCalled.joined(separator: " "),
+            transcriptPath: fileURL.path,
+            mtime: modDate,
+            fileSize: fileSize
+        )
 
         return AgentSessionRecord(
             id: sessionID,
@@ -635,8 +692,10 @@ public actor AgentHistoryScanner {
                let size = rv.fileSize,
                let cached = fileCache[path],
                cached.mtime == mtime && cached.size == size {
-                records.append(cached.record)
-                continue
+                if !ftsIndex.needsReindex(sessionID: cached.record.id, mtime: mtime, fileSize: size) {
+                    records.append(cached.record)
+                    continue
+                }
             }
 
             if let record = parseAntigravityTranscript(sessionID: folder, fileURL: transcriptURL) {
@@ -738,11 +797,63 @@ public actor AgentHistoryScanner {
             }
         }
 
+        var fullTranscriptParts: [String] = []
+        var filesEdited: Set<String> = []
+        var toolsCalled: Set<String> = []
+
+        for line in lines {
+            guard let objData = line.data(using: .utf8),
+                  let json = try? JSONSerialization.jsonObject(with: objData) as? [String: Any] else {
+                continue
+            }
+            let type = json["type"] as? String ?? ""
+            let content = json["content"] as? String ?? ""
+            if !content.isEmpty, type == "USER_INPUT" || type == "PLANNER_RESPONSE" {
+                var clean = content
+                if let rangeStart = clean.range(of: "<USER_REQUEST>"),
+                   let rangeEnd = clean.range(of: "</USER_REQUEST>") {
+                    clean = String(clean[rangeStart.upperBound..<rangeEnd.lowerBound])
+                }
+                let trimmed = clean.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty { fullTranscriptParts.append(trimmed) }
+            }
+            if let toolCalls = json["tool_calls"] as? [[String: Any]] {
+                for tc in toolCalls {
+                    if let name = tc["name"] as? String, !name.isEmpty {
+                        toolsCalled.insert(name)
+                    }
+                    if let params = tc["parameters"] as? [String: Any] {
+                        for key in ["TargetFile", "AbsolutePath", "file_path", "path"] {
+                            if let f = params[key] as? String, !f.isEmpty {
+                                filesEdited.insert((f as NSString).lastPathComponent)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         let homePath = FileManager.default.homeDirectoryForCurrentUser.path
         let finalPath = projectPath ?? homePath
         let projectName = (finalPath as NSString).lastPathComponent
         let title = firstPrompt?.components(separatedBy: .newlines).first(where: { !$0.isEmpty }) ?? "\(AgentKind.antigravity.displayName) Session \(sessionID.prefix(8))"
         let modDate = (try? fileURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? Date()
+        let fileSize = (try? fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? string.utf8.count
+
+        ftsIndex.indexSession(
+            sessionID: sessionID,
+            title: title,
+            firstPrompt: firstPrompt ?? "",
+            fullTranscript: fullTranscriptParts.joined(separator: "\n"),
+            gitBranch: nil,
+            repoName: projectName,
+            agentName: AgentKind.antigravity.displayName,
+            filesEdited: filesEdited.joined(separator: " "),
+            toolsCalled: toolsCalled.joined(separator: " "),
+            transcriptPath: fileURL.path,
+            mtime: modDate,
+            fileSize: fileSize
+        )
 
         return AgentSessionRecord(
             id: sessionID,
@@ -790,8 +901,10 @@ public actor AgentHistoryScanner {
                let size = rv.fileSize,
                let cached = fileCache[path],
                cached.mtime == mtime && cached.size == size {
-                records.append(cached.record)
-                continue
+                if !ftsIndex.needsReindex(sessionID: cached.record.id, mtime: mtime, fileSize: size) {
+                    records.append(cached.record)
+                    continue
+                }
             }
 
             if let record = parseCodexTranscript(fileURL: fileURL) {
@@ -835,6 +948,10 @@ public actor AgentHistoryScanner {
             return out.trimmingCharacters(in: .whitespacesAndNewlines)
         }
 
+        var fullTranscriptParts: [String] = []
+        var filesEdited: Set<String> = []
+        var toolsCalled: Set<String> = []
+
         for line in lines {
             guard let objData = line.data(using: .utf8),
                   let json = try? JSONSerialization.jsonObject(with: objData) as? [String: Any],
@@ -850,6 +967,22 @@ public actor AgentHistoryScanner {
                 continue
             }
 
+            if type == "response_item", payload["type"] as? String == "function_call" {
+                if let name = payload["name"] as? String, !name.isEmpty {
+                    toolsCalled.insert(name)
+                }
+                if let args = payload["arguments"] as? String {
+                    if let argsData = args.data(using: .utf8),
+                       let argsObj = try? JSONSerialization.jsonObject(with: argsData) as? [String: Any] {
+                        for key in ["path", "file_path", "workdir"] {
+                            if let p = argsObj[key] as? String, !p.isEmpty {
+                                filesEdited.insert((p as NSString).lastPathComponent)
+                            }
+                        }
+                    }
+                }
+            }
+
             guard type == "response_item", payload["type"] as? String == "message" else { continue }
             let role = (payload["role"] as? String)?.lowercased() ?? ""
             guard role == "user" || role == "assistant" else { continue }
@@ -858,6 +991,7 @@ public actor AgentHistoryScanner {
             guard !text.isEmpty else { continue }
             if role == "user" && isCodexBoilerplatePrompt(text) { continue }
 
+            fullTranscriptParts.append(text)
             messageCount += 1
             if firstPrompt == nil && role == "user" { firstPrompt = text }
 
@@ -870,12 +1004,29 @@ public actor AgentHistoryScanner {
 
         let finalCwd = cwd ?? FileManager.default.homeDirectoryForCurrentUser.path
         let projectName = (finalCwd as NSString).lastPathComponent
+        let resolvedID = sessionID ?? fileURL.deletingPathExtension().lastPathComponent
         let title = firstPrompt?.components(separatedBy: .newlines).first(where: { !$0.isEmpty })
-            ?? "Codex Session \((sessionID ?? fileURL.deletingPathExtension().lastPathComponent).prefix(8))"
+            ?? "Codex Session \(resolvedID.prefix(8))"
         let modDate = (try? fileURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? Date()
+        let fileSize = (try? fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? string.utf8.count
+
+        ftsIndex.indexSession(
+            sessionID: resolvedID,
+            title: title,
+            firstPrompt: firstPrompt ?? "",
+            fullTranscript: fullTranscriptParts.joined(separator: "\n"),
+            gitBranch: nil,
+            repoName: projectName,
+            agentName: AgentKind.codex.displayName,
+            filesEdited: filesEdited.joined(separator: " "),
+            toolsCalled: toolsCalled.joined(separator: " "),
+            transcriptPath: fileURL.path,
+            mtime: modDate,
+            fileSize: fileSize
+        )
 
         return AgentSessionRecord(
-            id: sessionID ?? fileURL.deletingPathExtension().lastPathComponent,
+            id: resolvedID,
             agentKind: .codex,
             title: String(title.prefix(120)),
             projectPath: finalCwd,
@@ -934,12 +1085,14 @@ public actor AgentHistoryScanner {
                 guard let rv = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey]),
                       let mtime = rv.contentModificationDate, let size = rv.fileSize else { continue }
                 if let cached = fileCache[url.path], cached.mtime == mtime, cached.size == size {
-                    records.append(cached.record)
-                    continue
+                    if !ftsIndex.needsReindex(sessionID: cached.record.id, mtime: mtime, fileSize: size) {
+                        records.append(cached.record)
+                        continue
+                    }
                 }
                 guard let data = try? Data(contentsOf: url, options: .mappedIfSafe),
                       let session = VSCodeChatSession.parse(data, isJSONL: file.hasSuffix(".jsonl")),
-                      let record = Self.vscodeRecord(session, projectPath: projectPath, transcriptPath: url.path, fallbackDate: mtime)
+                      let record = Self.vscodeRecord(session, projectPath: projectPath, transcriptPath: url.path, fallbackDate: mtime, fileSize: size, ftsIndex: ftsIndex)
                 else { continue }
                 fileCache[url.path] = FileCacheEntry(mtime: mtime, size: size, record: record)
                 records.append(record)
@@ -960,26 +1113,55 @@ public actor AgentHistoryScanner {
         return FileManager.default.homeDirectoryForCurrentUser.path
     }
 
-    static func vscodeRecord(_ session: VSCodeChatSession, projectPath: String, transcriptPath: String, fallbackDate: Date) -> AgentSessionRecord? {
+    static func vscodeRecord(
+        _ session: VSCodeChatSession,
+        projectPath: String,
+        transcriptPath: String,
+        fallbackDate: Date,
+        fileSize: Int = 0,
+        ftsIndex: AgentHistoryFTSIndex? = nil
+    ) -> AgentSessionRecord? {
         guard let first = session.requests.first else { return nil }
         var turns: [AgentHistoryTurn] = []
+        var fullTranscriptParts: [String] = []
+
         for request in session.requests {
+            fullTranscriptParts.append(request.prompt)
             turns.append(AgentHistoryTurn(role: "YOU", content: String(request.prompt.prefix(turnContentLimit))))
             if !request.response.isEmpty {
+                fullTranscriptParts.append(request.response)
                 turns.append(AgentHistoryTurn(role: "AGENT", content: String(request.response.prefix(turnContentLimit))))
             }
         }
         let title = session.title
             ?? first.prompt.components(separatedBy: .newlines).first(where: { !$0.isEmpty })
             ?? "VS Code Chat \(session.sessionID.prefix(8))"
+        let modDate = session.lastMessageDate ?? fallbackDate
+        let repoName = URL(fileURLWithPath: projectPath).lastPathComponent
+
+        ftsIndex?.indexSession(
+            sessionID: session.sessionID,
+            title: title,
+            firstPrompt: first.prompt,
+            fullTranscript: fullTranscriptParts.joined(separator: "\n"),
+            gitBranch: nil,
+            repoName: repoName,
+            agentName: AgentKind.copilot.displayName,
+            filesEdited: "",
+            toolsCalled: "",
+            transcriptPath: transcriptPath,
+            mtime: modDate,
+            fileSize: fileSize
+        )
+
         return AgentSessionRecord(
             id: session.sessionID,
             agentKind: .copilot,
             title: String(title.prefix(120)),
             projectPath: projectPath,
-            projectName: URL(fileURLWithPath: projectPath).lastPathComponent,
+            projectName: repoName,
             messageCount: turns.count,
-            updatedAt: session.lastMessageDate ?? fallbackDate,
+            updatedAt: modDate,
             firstPrompt: first.prompt,
             latestTurns: Array(turns.suffix(maxLatestTurns)),
             transcriptPath: transcriptPath,
@@ -1008,14 +1190,14 @@ public actor AgentHistoryScanner {
             return cached.records
         }
 
-        let records = Self.readCopilotSessions(dbPath: dbURL.path)
+        let records = Self.readCopilotSessions(dbPath: dbURL.path, ftsIndex: ftsIndex)
         copilotCache = (mtime: mtime, size: size, records: records)
         return records
     }
 
     /// Synchronous SQLite read, isolated in its own function (never handed an `OpaquePointer`
     /// across an `await` boundary) so it stays simple under Swift 6 strict concurrency.
-    private static func readCopilotSessions(dbPath: String) -> [AgentSessionRecord] {
+    private static func readCopilotSessions(dbPath: String, ftsIndex: AgentHistoryFTSIndex? = nil) -> [AgentSessionRecord] {
         var db: OpaquePointer?
         guard sqlite3_open_v2(dbPath, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK, let db else {
             sqlite3_close(db)
@@ -1046,7 +1228,7 @@ public actor AgentHistoryScanner {
             let summary = sqlite3_column_text(sessionStmt, 4).map { String(cString: $0) }
             let updatedAtStr = sqlite3_column_text(sessionStmt, 5).map { String(cString: $0) }
 
-            let (firstPrompt, turns, messageCount) = readCopilotTurns(db: db, sessionID: id)
+            let (firstPrompt, turns, fullTranscript, messageCount) = readCopilotTurns(db: db, sessionID: id)
             guard messageCount > 0 || !(summary ?? "").isEmpty else { continue }
 
             let finalPath = (cwd?.isEmpty == false ? cwd : repository) ?? home.path
@@ -1054,6 +1236,22 @@ public actor AgentHistoryScanner {
             let title = (summary?.isEmpty == false ? summary : nil)
                 ?? firstPrompt?.components(separatedBy: .newlines).first(where: { !$0.isEmpty })
                 ?? "Copilot Session \(id.prefix(8))"
+            let modDate = parseDate(updatedAtStr) ?? Date()
+
+            ftsIndex?.indexSession(
+                sessionID: id,
+                title: title,
+                firstPrompt: firstPrompt ?? "",
+                fullTranscript: fullTranscript,
+                gitBranch: branch,
+                repoName: projectName,
+                agentName: AgentKind.copilot.displayName,
+                filesEdited: "",
+                toolsCalled: "",
+                transcriptPath: dbPath,
+                mtime: modDate,
+                fileSize: 0
+            )
 
             records.append(AgentSessionRecord(
                 id: id,
@@ -1064,7 +1262,7 @@ public actor AgentHistoryScanner {
                 gitBranch: (branch?.isEmpty == false) ? branch : nil,
                 modelName: nil,
                 messageCount: messageCount,
-                updatedAt: parseDate(updatedAtStr) ?? Date(),
+                updatedAt: modDate,
                 firstPrompt: firstPrompt ?? "",
                 latestTurns: turns,
                 transcriptPath: dbPath,
@@ -1076,16 +1274,17 @@ public actor AgentHistoryScanner {
 
     private static var home: URL { FileManager.default.homeDirectoryForCurrentUser }
 
-    /// Returns (firstPrompt, latestTurns, messageCount) for one session's `turns` rows.
-    private static func readCopilotTurns(db: OpaquePointer, sessionID: String) -> (String?, [AgentHistoryTurn], Int) {
+    /// Returns (firstPrompt, latestTurns, fullTranscript, messageCount) for one session's `turns` rows.
+    private static func readCopilotTurns(db: OpaquePointer, sessionID: String) -> (String?, [AgentHistoryTurn], String, Int) {
         var stmt: OpaquePointer?
         let sql = "SELECT user_message, assistant_response FROM turns WHERE session_id = ? ORDER BY turn_index ASC"
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return (nil, [], 0) }
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return (nil, [], "", 0) }
         defer { sqlite3_finalize(stmt) }
         sqlite3_bind_text(stmt, 1, sessionID, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
 
         var firstPrompt: String?
         var allTurns: [AgentHistoryTurn] = []
+        var fullTranscriptParts: [String] = []
         var messageCount = 0
 
         while sqlite3_step(stmt) == SQLITE_ROW {
@@ -1094,16 +1293,18 @@ public actor AgentHistoryScanner {
 
             if let userMsg, !userMsg.isEmpty {
                 if firstPrompt == nil { firstPrompt = userMsg }
+                fullTranscriptParts.append(userMsg)
                 allTurns.append(AgentHistoryTurn(role: "YOU", content: String(userMsg.prefix(turnContentLimit))))
                 messageCount += 1
             }
             if let assistantMsg, !assistantMsg.isEmpty {
+                fullTranscriptParts.append(assistantMsg)
                 allTurns.append(AgentHistoryTurn(role: "AGENT", content: String(assistantMsg.prefix(turnContentLimit))))
                 messageCount += 1
             }
         }
         let latest = Array(allTurns.suffix(maxLatestTurns))
-        return (firstPrompt, latest, messageCount)
+        return (firstPrompt, latest, fullTranscriptParts.joined(separator: "\n"), messageCount)
     }
     #else
     public func scanCopilot() async -> [AgentSessionRecord] { [] }

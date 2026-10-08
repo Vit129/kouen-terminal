@@ -123,16 +123,30 @@ public final class AgentSessionHistoryModel: ObservableObject {
 
         // When a search query is active, ignore scope entirely and search all repos using ranked loose search
         if matcher.hasQuery {
+            let ftsMatches = AgentHistoryFTSIndex.shared.search(query: searchQuery)
             var scored: [(record: AgentSessionRecord, score: Double)] = []
+
             for record in records {
                 let turnsContent = record.latestTurns.map(\.content).joined(separator: "\n")
-                let chatContent = "\(record.firstPrompt)\n\(turnsContent)"
-                let branchFiles = record.gitBranch ?? ""
+                let ftsMatch = ftsMatches[record.id]
+
+                // Combine latest turns with full transcript if indexed by FTS
+                let fullText = ftsMatch?.fullTranscript ?? ""
+                let chatContent = fullText.isEmpty ? "\(record.firstPrompt)\n\(turnsContent)" : "\(record.firstPrompt)\n\(turnsContent)\n\(fullText)"
+
+                var branchFilesTools = record.gitBranch ?? ""
+                if let files = ftsMatch?.filesEdited, !files.isEmpty {
+                    branchFilesTools += " " + files
+                }
+                if let tools = ftsMatch?.toolsCalled, !tools.isEmpty {
+                    branchFilesTools += " " + tools
+                }
+
                 let repoAgent = "\(record.projectName) \(record.agentKind.displayName)"
 
                 if let match = matcher.matchHistory(
                     title: record.title,
-                    branchFilesTools: branchFiles,
+                    branchFilesTools: branchFilesTools,
                     repoAgent: repoAgent,
                     chatContent: chatContent
                 ) {
