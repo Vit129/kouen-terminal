@@ -134,4 +134,112 @@ final class AgentHistorySearchTests: XCTestCase {
         let afterDelete = index.loadCachedEntries()
         XCTAssertEqual(afterDelete.count, 0)
     }
+
+    func testMeasureKeystrokeSearchLatency() async {
+        var entries = AgentHistoryFTSIndex.shared.loadCachedEntries()
+        if entries.isEmpty {
+            _ = await AgentHistoryScanner.shared.scanAll()
+            entries = AgentHistoryFTSIndex.shared.loadCachedEntries()
+        }
+        guard !entries.isEmpty else {
+            print("No real records to benchmark")
+            return
+        }
+        let records = entries.map(\.record)
+        print("Benchmarking with \(records.count) records")
+
+        let keystrokes = ["p", "pe", "per", "perf", "perfo", "perfor", "perform", "sw", "swift", "term", "claude"]
+        // Warm up
+        _ = AgentHistorySearch.rank(query: "perf", records: records)
+
+        var totalTime: Double = 0
+        for key in keystrokes {
+            let t0 = CFAbsoluteTimeGetCurrent()
+            let ftsMatches = AgentHistoryFTSIndex.shared.searchRanked(query: key, limit: 200)
+            let tFts = (CFAbsoluteTimeGetCurrent() - t0) * 1000.0
+
+            let start = CFAbsoluteTimeGetCurrent()
+            let hits = AgentHistorySearch.rank(query: key, records: records)
+            let elapsed = (CFAbsoluteTimeGetCurrent() - start) * 1000.0
+            print("Keystroke '\(key)': total=\(String(format: "%.2f", elapsed)) ms (fts=\(String(format: "%.2f", tFts)) ms, hits=\(hits.count), ftsMatches=\(ftsMatches.count))")
+            totalTime += elapsed
+        }
+        let avg = totalTime / Double(keystrokes.count)
+        print("AVERAGE_WARM_LATENCY: \(String(format: "%.2f", avg)) ms")
+        XCTAssertLessThan(avg, 50.0, "Average warm keystroke search latency must be under 50ms")
+    }
+
+    func testRepresentativeQueryRankingQuality() {
+        let (index, url) = tempIndex()
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        // Session with title match: "fix memory leak in audio engine" (weight 3.0)
+        let recTitle = record("sess-title", title: "fix memory leak in audio engine", project: "audio")
+        // Session with branch match: "perf/memory-leak-fix", title "audio improvements" (weight 2.5)
+        let recBranch = AgentSessionRecord(
+            id: "sess-branch", agentKind: .claudeCode, title: "audio improvements",
+            projectPath: "/p/audio", projectName: "audio", gitBranch: "memory-leak-fix",
+            messageCount: 1, updatedAt: Date(), firstPrompt: "", transcriptPath: "/tmp/sess-branch.jsonl",
+            worktreeAvailable: false
+        )
+        // Session with transcript-only match: "misc audio notes" (weight 1.0)
+        let recTranscript = record("sess-transcript", title: "misc audio notes", project: "audio")
+
+        index.indexSession(
+            sessionID: recTitle.id, title: recTitle.title, firstPrompt: "",
+            fullTranscript: "audio", gitBranch: "main", repoName: "audio",
+            agentName: "Claude", filesEdited: "", toolsCalled: "", transcriptPath: "/tmp/t1.jsonl",
+            mtime: Date(), fileSize: 10
+        )
+        index.indexSession(
+            sessionID: recBranch.id, title: recBranch.title, firstPrompt: "",
+            fullTranscript: "audio", gitBranch: recBranch.gitBranch, repoName: "audio",
+            agentName: "Claude", filesEdited: "", toolsCalled: "", transcriptPath: "/tmp/t2.jsonl",
+            mtime: Date(), fileSize: 10
+        )
+        index.indexSession(
+            sessionID: recTranscript.id, title: recTranscript.title, firstPrompt: "",
+            fullTranscript: "we observed a severe memory leak during stress testing", gitBranch: "main", repoName: "audio",
+            agentName: "Claude", filesEdited: "", toolsCalled: "", transcriptPath: "/tmp/t3.jsonl",
+            mtime: Date(), fileSize: 10
+        )
+
+        let records = [recTranscript, recBranch, recTitle]
+        let hits = AgentHistorySearch.rank(query: "memory leak", records: records, index: index)
+
+        XCTAssertEqual(hits.count, 3)
+        // Title weight (3.0) outranks branch weight (2.5), which outranks transcript (1.0)
+        XCTAssertEqual(hits[0].record.id, "sess-title")
+        XCTAssertEqual(hits[1].record.id, "sess-branch")
+        XCTAssertEqual(hits[2].record.id, "sess-transcript")
+    }
+
+    func testMultiTermMatchOutranksSingleTermMatch() {
+        let (index, url) = tempIndex()
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let recBoth = record("sess-both", title: "sqlite performance optimization", project: "db")
+        let recOne = record("sess-one", title: "sqlite database schema", project: "db")
+
+        index.indexSession(
+            sessionID: recBoth.id, title: recBoth.title, firstPrompt: "",
+            fullTranscript: "", gitBranch: "main", repoName: "db",
+            agentName: "Claude", filesEdited: "", toolsCalled: "", transcriptPath: "/tmp/b.jsonl",
+            mtime: Date(), fileSize: 10
+        )
+        index.indexSession(
+            sessionID: recOne.id, title: recOne.title, firstPrompt: "",
+            fullTranscript: "", gitBranch: "main", repoName: "db",
+            agentName: "Claude", filesEdited: "", toolsCalled: "", transcriptPath: "/tmp/o.jsonl",
+            mtime: Date(), fileSize: 10
+        )
+
+        let records = [recOne, recBoth]
+        let hits = AgentHistorySearch.rank(query: "sqlite optimization", records: records, index: index)
+
+        XCTAssertEqual(hits.count, 2)
+        XCTAssertEqual(hits[0].record.id, "sess-both")
+        XCTAssertEqual(hits[1].record.id, "sess-one")
+    }
 }
+

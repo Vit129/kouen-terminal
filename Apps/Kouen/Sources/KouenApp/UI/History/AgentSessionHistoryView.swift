@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import KouenCore
 import KouenIPC
 import SwiftUI
@@ -92,6 +93,7 @@ public final class AgentSessionHistoryModel: ObservableObject {
     private var repoRootCache: [String: String] = [:]
 
     private var filterTask: Task<Void, Never>?
+    private var updateCancellable: AnyCancellable?
 
     private let loadMoreBatchSize = 20
     private var minimumWindowStart: Date {
@@ -112,6 +114,18 @@ public final class AgentSessionHistoryModel: ObservableObject {
                 }
             }
         }
+
+        self.updateCancellable = NotificationCenter.default
+            .publisher(for: AgentHistoryScanner.didUpdateNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    let updated = await AgentHistoryScanner.shared.getOrScan(force: false)
+                    self.records = updated
+                    self.isLoading = false
+                }
+            }
     }
 
     public func refresh(force: Bool = true) {
