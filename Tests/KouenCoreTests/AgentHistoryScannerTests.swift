@@ -213,4 +213,115 @@ final class AgentHistoryScannerTests: XCTestCase {
             XCTAssertEqual(cloud?.resumeCommandOverride, "claude --teleport c1")
         }
     }
+
+    // MARK: - SQLite FTS5 Full-Transcript Index & Incremental Re-index (Slice C)
+
+    func testFTSIndexIncrementalReindexChecksMtimeAndSize() {
+        let tempDB = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("test_fts_\(UUID().uuidString).sqlite")
+        defer { try? FileManager.default.removeItem(at: tempDB) }
+
+        let index = AgentHistoryFTSIndex(dbPath: tempDB.path)
+        let initialDate = Date(timeIntervalSince1970: 1700000000)
+        let initialSize = 2048
+
+        // Initially not in DB, needs re-index
+        XCTAssertTrue(index.needsReindex(sessionID: "sess-1", mtime: initialDate, fileSize: initialSize))
+
+        // Index session
+        index.indexSession(
+            sessionID: "sess-1",
+            title: "Optimize network protocol",
+            firstPrompt: "Please optimize network protocol",
+            fullTranscript: "Turn 1: analyzing network buffers\nTurn 2: improved throughput by 40%",
+            gitBranch: "perf/network",
+            repoName: "kouen-terminal",
+            agentName: "Claude",
+            filesEdited: "NetworkOptimizer.swift BufferPool.swift",
+            toolsCalled: "Edit Read Bash",
+            transcriptPath: "/tmp/sess-1.jsonl",
+            mtime: initialDate,
+            fileSize: initialSize
+        )
+
+        // Same mtime and fileSize -> does NOT need re-index
+        XCTAssertFalse(index.needsReindex(sessionID: "sess-1", mtime: initialDate, fileSize: initialSize))
+
+        // Modified mtime -> needs re-index
+        let newDate = initialDate.addingTimeInterval(30)
+        XCTAssertTrue(index.needsReindex(sessionID: "sess-1", mtime: newDate, fileSize: initialSize))
+
+        // Modified fileSize -> needs re-index
+        XCTAssertTrue(index.needsReindex(sessionID: "sess-1", mtime: initialDate, fileSize: 4096))
+    }
+
+    func testFTSIndexMatchesDeepInLongTranscriptBeyondLast60Lines() {
+        let tempDB = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("test_fts_deep_\(UUID().uuidString).sqlite")
+        defer { try? FileManager.default.removeItem(at: tempDB) }
+
+        let index = AgentHistoryFTSIndex(dbPath: tempDB.path)
+
+        // Build a simulated long transcript where the special keyword appears ONLY
+        // in turn 15, and subsequent 80 turns are generic conversation
+        var transcriptLines: [String] = []
+        transcriptLines.append("Starting session on database migration.")
+        transcriptLines.append("Deep needle keyword: quantumTeleportationProtocol")
+        for i in 1...80 {
+            transcriptLines.append("Turn \(i): Discussing standard database indexes and caching layers.")
+        }
+        let fullTranscript = transcriptLines.joined(separator: "\n")
+
+        index.indexSession(
+            sessionID: "long-session-42",
+            title: "Database index tuning",
+            firstPrompt: "Tune database indexes",
+            fullTranscript: fullTranscript,
+            gitBranch: "main",
+            repoName: "database-core",
+            agentName: "Claude",
+            filesEdited: "IndexTuner.swift",
+            toolsCalled: "Edit Read",
+            transcriptPath: "/tmp/long-session-42.jsonl",
+            mtime: Date(),
+            fileSize: fullTranscript.utf8.count
+        )
+
+        // Search for the deep keyword that is beyond the last 60 lines
+        let hits = index.search(query: "quantumTeleportationProtocol")
+        XCTAssertEqual(hits.count, 1)
+        XCTAssertNotNil(hits["long-session-42"])
+        XCTAssertEqual(hits["long-session-42"]?.sessionID, "long-session-42")
+        XCTAssertTrue(hits["long-session-42"]?.snippet.contains("quantumTeleportationProtocol") == true)
+        XCTAssertEqual(hits["long-session-42"]?.filesEdited, "IndexTuner.swift")
+        XCTAssertEqual(hits["long-session-42"]?.toolsCalled, "Edit Read")
+    }
+
+    func testFTSIndexRespectsLimit() {
+        let tempDB = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("test_fts_limit_\(UUID().uuidString).sqlite")
+        defer { try? FileManager.default.removeItem(at: tempDB) }
+
+        let index = AgentHistoryFTSIndex(dbPath: tempDB.path)
+
+        for i in 1...10 {
+            index.indexSession(
+                sessionID: "sess-\(i)",
+                title: "Session \(i)",
+                firstPrompt: "prompt \(i)",
+                fullTranscript: "debugging issue number \(i) with commonSearchTerm",
+                gitBranch: "main",
+                repoName: "test-repo",
+                agentName: "Claude",
+                filesEdited: "File\(i).swift",
+                toolsCalled: "Bash",
+                transcriptPath: "/tmp/sess-\(i).jsonl",
+                mtime: Date(),
+                fileSize: 100
+            )
+        }
+
+        let hitsLimit3 = index.search(query: "commonSearchTerm", limit: 3)
+        XCTAssertEqual(hitsLimit3.count, 3)
+
+        let hitsLimit5 = index.search(query: "commonSearchTerm", limit: 5)
+        XCTAssertEqual(hitsLimit5.count, 5)
+    }
 }

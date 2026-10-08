@@ -613,6 +613,9 @@ final class KouenSidebarPanelViewController: NSViewController {
             },
             onHandoff: { [weak self] record, targetKind in
                 self?.handoffAgentSession(record, targetKind: targetKind)
+            },
+            onGoToTab: { [weak self] record in
+                self?.goToTabForAgentSession(record)
             }
         )
         let hosting = NSHostingView(rootView: historyView)
@@ -670,8 +673,68 @@ final class KouenSidebarPanelViewController: NSViewController {
         return record.effectiveResumeCommand(mode: mode)
     }
 
-    /// Resumes in a new tab inside the current session — the original one-button behavior.
-    /// Fastest option, but shares the current session's worktree/branch (if any).
+    /// Resolves the destination tab for an agent session record within the snapshot.
+    ///
+    /// 1. If an exact match for the session ID exists in tab metadata (e.g. notificationText or title containing the ID), jump directly.
+    /// 2. Otherwise fall back to cwd + effectiveAgentKind ONLY when exactly one tab matches.
+    /// 3. If multiple tabs match (ambiguous) or zero tabs match, returns nil to fall back to resuming in a new tab.
+    nonisolated static func resolveTargetTab(
+        for record: AgentSessionRecord,
+        in snapshot: SessionSnapshot
+    ) -> (workspaceID: WorkspaceID, tabID: TabID)? {
+        // 1. Direct session ID match if recorded on tab
+        for ws in snapshot.workspaces {
+            for session in ws.sessions {
+                for tab in session.tabs {
+                    if let notif = tab.notificationText, notif.contains(record.id) {
+                        return (workspaceID: ws.id, tabID: tab.id)
+                    }
+                    if tab.title.contains(record.id) {
+                        return (workspaceID: ws.id, tabID: tab.id)
+                    }
+                }
+            }
+        }
+
+        // 2. Candidate tabs matching path prefix and agent kind
+        var candidateTabs: [(workspaceID: WorkspaceID, tabID: TabID)] = []
+        for ws in snapshot.workspaces {
+            for session in ws.sessions {
+                for tab in session.tabs {
+                    let matchesPath = tab.cwd == record.projectPath || (!record.projectPath.isEmpty && tab.cwd.hasPrefix(record.projectPath))
+                    let matchesAgent = tab.effectiveAgentKind == record.agentKind
+                    if matchesPath && matchesAgent {
+                        candidateTabs.append((workspaceID: ws.id, tabID: tab.id))
+                    }
+                }
+            }
+        }
+
+        // Only return if exactly one tab matches without ambiguity
+        if candidateTabs.count == 1 {
+            return candidateTabs[0]
+        }
+        return nil
+    }
+
+    /// Navigates to the active tab matching a live session if one uniquely exists in the window.
+    /// Falls back to resumeAgentSession if no live tab matches or if multiple tabs match ambiguously.
+    private func goToTabForAgentSession(_ record: AgentSessionRecord) {
+        let coord = SessionCoordinator.shared
+        if let target = Self.resolveTargetTab(for: record, in: coord.snapshot) {
+            coord.selectWorkspace(target.workspaceID)
+            coord.selectTab(workspaceID: target.workspaceID, tabID: target.tabID)
+            if let surfaceID = coord.splitPaneCoordinator.firstSurfaceID(forTab: target.tabID) {
+                coord.setActiveSurface(surfaceID)
+                coord.terminalHosts.host(for: surfaceID)?.focusTerminal()
+            }
+            return
+        }
+        // Fallback: resume in a new tab
+        resumeAgentSession(record)
+    }
+
+    /// Resumes in a new session, the same as ⌘T, so it gets its own entry in the tab bar.
     private func resumeAgentSession(_ record: AgentSessionRecord) {
         let cmd = Self.resumeCommand(for: record)
         let req = DefaultTerminalLaunchRequest(
@@ -679,7 +742,7 @@ final class KouenSidebarPanelViewController: NSViewController {
             cwd: record.projectPath,
             title: "\(record.agentKind.displayName): \(record.projectName)"
         )
-        SessionCoordinator.shared.sessionLifecycleService.openDefaultTerminalLaunch(req)
+        SessionCoordinator.shared.sessionLifecycleService.openDefaultTerminalLaunch(req, inNewSession: true)
     }
 
     /// The session's original path, or — when it's gone (e.g. its worktree was removed) — the repo
@@ -742,11 +805,11 @@ final class KouenSidebarPanelViewController: NSViewController {
         let log = Logger(subsystem: "com.vit129.kouen", category: "handoff")
         log.info("handoff: \(record.agentKind.rawValue, privacy: .public) -> \(targetKind.rawValue, privacy: .public), mode \(mode.rawValue, privacy: .public), cwd \(cwd, privacy: .public)")
         Task { @MainActor in
-            guard case let .tabID(tabID)? = await coord.requestDaemon(.newTab(
+            guard let tabID = await coord.sessionLifecycleService.newSessionTab(
                 workspaceID: workspaceID,
                 cwd: cwd,
-                shell: coord.settings.defaultShell
-            )) else {
+                name: "Handoff: \(targetKind.displayName)"
+            ) else {
                 log.error("handoff: daemon did not create the new tab")
                 await coord.syncFromDaemon()
                 return

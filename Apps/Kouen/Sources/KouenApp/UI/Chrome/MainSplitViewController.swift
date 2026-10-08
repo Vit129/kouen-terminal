@@ -27,7 +27,7 @@ final class MainSplitViewController: NSViewController {
     private var sidebarWidthConstraint: NSLayoutConstraint?
     private var sidebarHorizontalConstraint: NSLayoutConstraint?
     private let headerGroup = NSView()
-    private let appTitleLabel = NSTextField(labelWithString: "Kouen")
+    private let appTitleLabel = NSTextField(labelWithString: Bundle.main.bundleIdentifier == "com.vit129.kouen.preview" ? "Kouen Preview" : "Kouen")
     private let sidebarToggle = SoftIconButton(frame: NSRect(x: 0, y: 0, width: 24, height: 24))
     private let previousSessionButton = SoftIconButton(frame: NSRect(x: 0, y: 0, width: 24, height: 24))
     private let nextSessionButton = SoftIconButton(frame: NSRect(x: 0, y: 0, width: 24, height: 24))
@@ -584,22 +584,21 @@ final class MainSplitViewController: NSViewController {
     }
 
     private var collapsedTabBarInset: CGFloat {
-        // 72 = title label + gap + sidebarToggle (the original single-button header cluster).
+        // title label (measured: "Kouen Preview" is wider than "Kouen") + 6pt gap + 26pt sidebarToggle.
         // +56 = previousSessionButton + nextSessionButton (26pt each + 2pt gap, ×2) — without
         // this, the collapsed-sidebar tab bar's leading inset stays too narrow and slides on top
         // of nextSessionButton, covering it and stealing its clicks.
-        effectiveHeaderLeading + 72 + 56 + 12
+        effectiveHeaderLeading + ceil(appTitleLabel.intrinsicContentSize.width) + 6 + 26 + 56 + 12
     }
 
-    /// Inset the tab bar proportionally to how collapsed the sidebar is: full inset
-    /// at width 0, none once the sidebar is wide enough to cover the top-left header group.
+    /// Inset the tab bar by however much of the top-left header group the sidebar doesn't cover:
+    /// full inset at width 0, none once the sidebar is wider than the header group.
     private func setContentLeadingInset(forSidebarWidth width: CGFloat) {
         if SessionCoordinator.shared.settings.sidebarOnRight {
             content.setTabBarLeadingInset(collapsedTabBarInset)
         } else {
-            let inset = collapsedTabBarInset
-            let t = max(0, min(1, 1 - width / inset))
-            content.setTabBarLeadingInset(inset * t)
+            // Only the part of the header group that sticks out past the sidebar needs clearing.
+            content.setTabBarLeadingInset(max(0, collapsedTabBarInset - width))
         }
     }
 
@@ -609,7 +608,7 @@ final class MainSplitViewController: NSViewController {
         if SessionCoordinator.shared.settings.sidebarOnRight {
             content.setTabBarLeadingInset(collapsedTabBarInset)
         } else {
-            content.setTabBarLeadingInset(visible ? 0 : collapsedTabBarInset)
+            content.setTabBarLeadingInset(max(0, collapsedTabBarInset - (visible ? sidebarContainerView?.frame.width ?? 0 : 0)))
         }
         sidebar.updateTrafficLightClearance()
         content.updateTrafficLightClearance()
