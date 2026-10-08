@@ -384,7 +384,7 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
                     let id = String(cString: idCStr)
                     let path = String(cString: pathCStr)
                     if !path.isEmpty && !path.hasPrefix("cloud://") {
-                        if !validTranscriptPaths.contains(path) || !FileManager.default.fileExists(atPath: path) {
+                        if !validTranscriptPaths.contains(path) && !FileManager.default.fileExists(atPath: path) {
                             deadIDs.insert(id)
                         }
                     }
@@ -402,7 +402,7 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
                     let id = String(cString: idCStr)
                     let path = String(cString: pathCStr)
                     if !path.isEmpty && !path.hasPrefix("cloud://") {
-                        if !validTranscriptPaths.contains(path) || !FileManager.default.fileExists(atPath: path) {
+                        if !validTranscriptPaths.contains(path) && !FileManager.default.fileExists(atPath: path) {
                             deadIDs.insert(id)
                         }
                     }

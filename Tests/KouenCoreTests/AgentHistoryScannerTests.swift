@@ -369,6 +369,30 @@ final class AgentHistoryScannerTests: XCTestCase {
         XCTAssertTrue(index.needsReindex(sessionID: rec.id, mtime: Date(), fileSize: 100))
     }
 
+    // A scan that misses a transcript (e.g. one agent's dir was unreadable this round) must not
+    // drop a session whose file still exists — only files gone from disk are ghosts.
+    func testPruneKeepsUnseenSessionWhoseTranscriptStillExists() {
+        let tempDB = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("test_prune_keep_\(UUID().uuidString).sqlite")
+        let tempTranscript = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("test_transcript_\(UUID().uuidString).jsonl")
+        defer {
+            try? FileManager.default.removeItem(at: tempDB)
+            try? FileManager.default.removeItem(at: tempTranscript)
+        }
+        try? "test data".write(to: tempTranscript, atomically: true, encoding: .utf8)
+
+        let index = AgentHistoryFTSIndex(dbPath: tempDB.path)
+        let rec = AgentSessionRecord(
+            id: "sess-keep", agentKind: .claudeCode, title: "t", projectPath: "/tmp/repo", projectName: "repo",
+            messageCount: 3, updatedAt: Date(), firstPrompt: "hi", transcriptPath: tempTranscript.path,
+            worktreeAvailable: true
+        )
+        index.saveRecord(rec, mtime: Date(), fileSize: 100)
+
+        index.pruneMissingSessions(validTranscriptPaths: [])
+
+        XCTAssertEqual(index.loadCachedEntries().map(\.record.id), ["sess-keep"])
+    }
+
     func testNoFabricatedRecordsPersistedWhenSessionRecordsEmpty() {
         let tempDB = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("test_no_fabricate_\(UUID().uuidString).sqlite")
         defer { try? FileManager.default.removeItem(at: tempDB) }
