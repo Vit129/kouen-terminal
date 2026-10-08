@@ -1,4 +1,5 @@
 import Foundation
+import KouenIPC
 #if canImport(SQLite3)
 import SQLite3
 #endif
@@ -38,6 +39,21 @@ public struct AgentHistoryFTSMatch: Sendable, Equatable {
         self.rank = rank
         self.filesEdited = filesEdited
         self.toolsCalled = toolsCalled
+    }
+}
+
+/// A cached session record entry retrieved from the SQLite index.
+public struct CachedSessionEntry: Sendable {
+    public let record: AgentSessionRecord
+    public let mtime: Date
+    public let fileSize: Int
+    public let transcriptPath: String
+
+    public init(record: AgentSessionRecord, mtime: Date, fileSize: Int, transcriptPath: String) {
+        self.record = record
+        self.mtime = mtime
+        self.fileSize = fileSize
+        self.transcriptPath = transcriptPath
     }
 }
 
@@ -92,6 +108,31 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
         """
         sqlite3_exec(db, createMetaSQL, nil, nil, nil)
 
+        let createRecordsSQL = """
+        CREATE TABLE IF NOT EXISTS session_records (
+            session_id TEXT PRIMARY KEY,
+            agent_kind TEXT NOT NULL,
+            title TEXT NOT NULL,
+            project_path TEXT NOT NULL,
+            project_name TEXT NOT NULL,
+            git_branch TEXT,
+            model_name TEXT,
+            message_count INTEGER NOT NULL,
+            updated_at REAL NOT NULL,
+            first_prompt TEXT NOT NULL,
+            latest_turns_json TEXT NOT NULL,
+            transcript_path TEXT NOT NULL,
+            worktree_available INTEGER NOT NULL,
+            placement TEXT NOT NULL,
+            live_status TEXT,
+            resume_command_override TEXT,
+            mtime REAL NOT NULL,
+            file_size INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_session_records_updated_at ON session_records(updated_at DESC);
+        """
+        sqlite3_exec(db, createRecordsSQL, nil, nil, nil)
+
         let createFtsSQL = """
         CREATE VIRTUAL TABLE IF NOT EXISTS session_fts USING fts5(
             session_id UNINDEXED,
@@ -130,6 +171,272 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
             }
         }
         return true
+    }
+
+    private func saveRecordLocked(_ record: AgentSessionRecord, mtime: Date, fileSize: Int) {
+        guard let db else { return }
+
+        let turnsData = try? JSONEncoder().encode(record.latestTurns)
+        let turnsJSON = turnsData.flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+
+        let sql = """
+        INSERT OR REPLACE INTO session_records (
+            session_id, agent_kind, title, project_path, project_name,
+            git_branch, model_name, message_count, updated_at, first_prompt,
+            latest_turns_json, transcript_path, worktree_available, placement,
+            live_status, resume_command_override, mtime, file_size
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
+        defer { sqlite3_finalize(stmt) }
+
+        sqlite3_bind_text(stmt, 1, record.id, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        sqlite3_bind_text(stmt, 2, record.agentKind.rawValue, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        sqlite3_bind_text(stmt, 3, record.title, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        sqlite3_bind_text(stmt, 4, record.projectPath, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        sqlite3_bind_text(stmt, 5, record.projectName, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        if let gitBranch = record.gitBranch {
+            sqlite3_bind_text(stmt, 6, gitBranch, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        } else {
+            sqlite3_bind_null(stmt, 6)
+        }
+        if let modelName = record.modelName {
+            sqlite3_bind_text(stmt, 7, modelName, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        } else {
+            sqlite3_bind_null(stmt, 7)
+        }
+        sqlite3_bind_int64(stmt, 8, Int64(record.messageCount))
+        sqlite3_bind_double(stmt, 9, record.updatedAt.timeIntervalSince1970)
+        sqlite3_bind_text(stmt, 10, record.firstPrompt, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        sqlite3_bind_text(stmt, 11, turnsJSON, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        sqlite3_bind_text(stmt, 12, record.transcriptPath, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        sqlite3_bind_int(stmt, 13, record.worktreeAvailable ? 1 : 0)
+        sqlite3_bind_text(stmt, 14, record.placement.rawValue, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        if let liveStatus = record.liveStatus {
+            sqlite3_bind_text(stmt, 15, liveStatus, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        } else {
+            sqlite3_bind_null(stmt, 15)
+        }
+        if let resumeOverride = record.resumeCommandOverride {
+            sqlite3_bind_text(stmt, 16, resumeOverride, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        } else {
+            sqlite3_bind_null(stmt, 16)
+        }
+        sqlite3_bind_double(stmt, 17, mtime.timeIntervalSince1970)
+        sqlite3_bind_int64(stmt, 18, Int64(fileSize))
+
+        sqlite3_step(stmt)
+    }
+
+    /// Persists an agent session record and its file metadata to SQLite.
+    public func saveRecord(_ record: AgentSessionRecord, mtime: Date, fileSize: Int) {
+        lock.lock()
+        defer { lock.unlock() }
+        saveRecordLocked(record, mtime: mtime, fileSize: fileSize)
+    }
+
+    /// Loads all cached session entries stored in SQLite.
+    /// Returns entries ordered by updatedAt descending.
+    public func loadCachedEntries() -> [CachedSessionEntry] {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let db else { return [] }
+
+        var entries: [CachedSessionEntry] = []
+        let sql = """
+        SELECT session_id, agent_kind, title, project_path, project_name,
+               git_branch, model_name, message_count, updated_at, first_prompt,
+               latest_turns_json, transcript_path, worktree_available, placement,
+               live_status, resume_command_override, mtime, file_size
+        FROM session_records
+        ORDER BY updated_at DESC;
+        """
+        var stmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+            defer { sqlite3_finalize(stmt) }
+            while sqlite3_step(stmt) == SQLITE_ROW {
+                guard let idCStr = sqlite3_column_text(stmt, 0),
+                      let kindCStr = sqlite3_column_text(stmt, 1),
+                      let titleCStr = sqlite3_column_text(stmt, 2),
+                      let projectPathCStr = sqlite3_column_text(stmt, 3),
+                      let projectNameCStr = sqlite3_column_text(stmt, 4),
+                      let firstPromptCStr = sqlite3_column_text(stmt, 9),
+                      let turnsJSONCStr = sqlite3_column_text(stmt, 10),
+                      let transcriptPathCStr = sqlite3_column_text(stmt, 11),
+                      let placementCStr = sqlite3_column_text(stmt, 13) else {
+                    continue
+                }
+
+                let id = String(cString: idCStr)
+                let kindRaw = String(cString: kindCStr)
+                let kind = AgentKind(rawValue: kindRaw) ?? .claudeCode
+                let title = String(cString: titleCStr)
+                let projectPath = String(cString: projectPathCStr)
+                let projectName = String(cString: projectNameCStr)
+                let gitBranch = sqlite3_column_text(stmt, 5).map { String(cString: $0) }
+                let modelName = sqlite3_column_text(stmt, 6).map { String(cString: $0) }
+                let messageCount = Int(sqlite3_column_int64(stmt, 7))
+                let updatedAt = Date(timeIntervalSince1970: sqlite3_column_double(stmt, 8))
+                let firstPrompt = String(cString: firstPromptCStr)
+                let turnsJSON = String(cString: turnsJSONCStr)
+                let transcriptPath = String(cString: transcriptPathCStr)
+                let worktreeAvailable = sqlite3_column_int(stmt, 12) != 0
+                let placementRaw = String(cString: placementCStr)
+                let placement = AgentSessionPlacement(rawValue: placementRaw) ?? .local
+                let liveStatus = sqlite3_column_text(stmt, 14).map { String(cString: $0) }
+                let resumeOverride = sqlite3_column_text(stmt, 15).map { String(cString: $0) }
+                let mtime = Date(timeIntervalSince1970: sqlite3_column_double(stmt, 16))
+                let fileSize = Int(sqlite3_column_int64(stmt, 17))
+
+                let turnsData = turnsJSON.data(using: .utf8) ?? Data()
+                let turns = (try? JSONDecoder().decode([AgentHistoryTurn].self, from: turnsData)) ?? []
+
+                let record = AgentSessionRecord(
+                    id: id,
+                    agentKind: kind,
+                    title: title,
+                    projectPath: projectPath,
+                    projectName: projectName,
+                    gitBranch: gitBranch,
+                    modelName: modelName,
+                    messageCount: messageCount,
+                    updatedAt: updatedAt,
+                    firstPrompt: firstPrompt,
+                    latestTurns: turns,
+                    transcriptPath: transcriptPath,
+                    worktreeAvailable: worktreeAvailable,
+                    placement: placement,
+                    liveStatus: liveStatus,
+                    resumeCommandOverride: resumeOverride
+                )
+                entries.append(CachedSessionEntry(
+                    record: record,
+                    mtime: mtime,
+                    fileSize: fileSize,
+                    transcriptPath: transcriptPath
+                ))
+            }
+        }
+
+        if !entries.isEmpty {
+            return entries
+        }
+
+        // If session_records was empty, synthesize entries from existing FTS & metadata tables.
+        return fallbackSynthesizedEntries(db: db)
+    }
+
+    private func fallbackSynthesizedEntries(db: OpaquePointer) -> [CachedSessionEntry] {
+        var entries: [CachedSessionEntry] = []
+        let sql = """
+        SELECT f.session_id, f.title, f.first_prompt, f.git_branch, f.repo_name, f.agent,
+               m.transcript_path, m.mtime, m.file_size
+        FROM session_fts f
+        JOIN session_index_meta m ON f.session_id = m.session_id
+        ORDER BY m.mtime DESC;
+        """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
+        defer { sqlite3_finalize(stmt) }
+
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            guard let idCStr = sqlite3_column_text(stmt, 0),
+                  let titleCStr = sqlite3_column_text(stmt, 1),
+                  let firstPromptCStr = sqlite3_column_text(stmt, 2),
+                  let repoNameCStr = sqlite3_column_text(stmt, 4),
+                  let agentCStr = sqlite3_column_text(stmt, 5),
+                  let pathCStr = sqlite3_column_text(stmt, 6) else {
+                continue
+            }
+
+            let id = String(cString: idCStr)
+            let title = String(cString: titleCStr)
+            let firstPrompt = String(cString: firstPromptCStr)
+            let gitBranch = sqlite3_column_text(stmt, 3).map { String(cString: $0) }
+            let repoName = String(cString: repoNameCStr)
+            let agentName = String(cString: agentCStr)
+            let transcriptPath = String(cString: pathCStr)
+            let mtimeDouble = sqlite3_column_double(stmt, 7)
+            let fileSize = Int(sqlite3_column_int64(stmt, 8))
+            let mtime = Date(timeIntervalSince1970: mtimeDouble)
+
+            let agentKind: AgentKind
+            let lowerAgent = agentName.lowercased()
+            if lowerAgent.contains("claude") {
+                agentKind = .claudeCode
+            } else if lowerAgent.contains("antigravity") {
+                agentKind = .antigravity
+            } else if lowerAgent.contains("codex") {
+                agentKind = .codex
+            } else if lowerAgent.contains("copilot") {
+                agentKind = .copilot
+            } else {
+                agentKind = .claudeCode
+            }
+
+            let projectPath = (transcriptPath as NSString).deletingLastPathComponent
+            let record = AgentSessionRecord(
+                id: id,
+                agentKind: agentKind,
+                title: title,
+                projectPath: projectPath,
+                projectName: repoName.isEmpty ? "Project" : repoName,
+                gitBranch: gitBranch,
+                modelName: nil,
+                messageCount: 1,
+                updatedAt: mtime,
+                firstPrompt: firstPrompt,
+                latestTurns: firstPrompt.isEmpty ? [] : [AgentHistoryTurn(role: "YOU", content: String(firstPrompt.prefix(200)))],
+                transcriptPath: transcriptPath,
+                worktreeAvailable: true,
+                placement: .local,
+                liveStatus: nil,
+                resumeCommandOverride: nil
+            )
+
+            entries.append(CachedSessionEntry(
+                record: record,
+                mtime: mtime,
+                fileSize: fileSize,
+                transcriptPath: transcriptPath
+            ))
+
+            saveRecordLocked(record, mtime: mtime, fileSize: fileSize)
+        }
+
+        return entries
+    }
+
+    /// Deletes a session from session_records, session_fts, and session_index_meta.
+    public func deleteSession(sessionID: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let db else { return }
+
+        let deleteRecordsSQL = "DELETE FROM session_records WHERE session_id = ?"
+        var delRecStmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, deleteRecordsSQL, -1, &delRecStmt, nil) == SQLITE_OK {
+            sqlite3_bind_text(delRecStmt, 1, sessionID, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+            sqlite3_step(delRecStmt)
+            sqlite3_finalize(delRecStmt)
+        }
+
+        let deleteFtsSQL = "DELETE FROM session_fts WHERE session_id = ?"
+        var delFtsStmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, deleteFtsSQL, -1, &delFtsStmt, nil) == SQLITE_OK {
+            sqlite3_bind_text(delFtsStmt, 1, sessionID, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+            sqlite3_step(delFtsStmt)
+            sqlite3_finalize(delFtsStmt)
+        }
+
+        let deleteMetaSQL = "DELETE FROM session_index_meta WHERE session_id = ?"
+        var delMetaStmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, deleteMetaSQL, -1, &delMetaStmt, nil) == SQLITE_OK {
+            sqlite3_bind_text(delMetaStmt, 1, sessionID, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+            sqlite3_step(delMetaStmt)
+            sqlite3_finalize(delMetaStmt)
+        }
     }
 
     /// Indexes or updates a session in the FTS5 virtual table and metadata table.
@@ -277,6 +584,9 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
         mtime: Date,
         fileSize: Int
     ) {}
+    public func saveRecord(_ record: AgentSessionRecord, mtime: Date, fileSize: Int) {}
+    public func loadCachedEntries() -> [CachedSessionEntry] { [] }
+    public func deleteSession(sessionID: String) {}
     public func search(query: String, limit: Int = 200) -> [String: AgentHistoryFTSMatch] { [:] }
     #endif
 }
