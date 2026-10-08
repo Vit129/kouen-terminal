@@ -147,6 +147,9 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
         mtime: Date,
         fileSize: Int
     ) {
+        // The scanner's in-memory cache is empty on every app launch / CLI run, so it re-parses
+        // every transcript; skip the FTS write when the stored mtime/size still match.
+        guard needsReindex(sessionID: sessionID, mtime: mtime, fileSize: fileSize) else { return }
         lock.lock()
         defer { lock.unlock() }
         guard let db else { return }
