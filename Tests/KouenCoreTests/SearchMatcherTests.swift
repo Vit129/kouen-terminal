@@ -51,4 +51,69 @@ final class SearchMatcherTests: XCTestCase {
         XCTAssertNotNil(match)
         XCTAssertEqual(match?.category, .fuzzy)
     }
+
+    // MARK: - History Ranked Loose Search (Slice B)
+
+    func testRankedHistoryMatchCrossField() {
+        // "kouen happy" matches a record whose repo is kouen-terminal and chat contains happy
+        let matcher = SearchMatcher(query: "kouen happy")
+        let result = matcher.matchHistory(
+            title: "General debugging session",
+            branchFilesTools: "main",
+            repoAgent: "kouen-terminal Claude",
+            chatContent: "The user was very happy with the quick response."
+        )
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result?.matchedTokensCount, 2)
+        XCTAssertEqual(result?.highlightedTerms.count, 2)
+        XCTAssertTrue(result?.highlightedTerms.contains("kouen") ?? false)
+        XCTAssertTrue(result?.highlightedTerms.contains("happy") ?? false)
+        XCTAssertNotNil(result?.snippet)
+    }
+
+    func testRankedHistoryMatchTypoTolerance() {
+        // "brwser clse" matches "close browser pane" (1-edit typo tolerance for >= 4 chars)
+        let matcher = SearchMatcher(query: "brwser clse")
+        let result = matcher.matchHistory(
+            title: "close browser pane",
+            branchFilesTools: "feat/browser-close",
+            repoAgent: "kouen-terminal Claude",
+            chatContent: "Closed all agent browser panes."
+        )
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result?.matchedTokensCount, 2)
+    }
+
+    func testRankedHistoryMatchPartialTokens() {
+        // Query with one unmatched word ("auto") still matches if at least ceil(tokens/2) hit
+        let matcher = SearchMatcher(query: "kouen close auto")
+        // 3 tokens, ceil(3/2) = 2 required
+        let result = matcher.matchHistory(
+            title: "close browser pane",
+            branchFilesTools: "feat/browser",
+            repoAgent: "kouen-terminal Claude",
+            chatContent: "Session finished"
+        )
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result?.matchedTokensCount, 2)
+        XCTAssertTrue(result?.highlightedTerms.contains("kouen") ?? false)
+        XCTAssertTrue(result?.highlightedTerms.contains("close") ?? false)
+        XCTAssertFalse(result?.highlightedTerms.contains("auto") ?? false)
+    }
+
+    func testRankedHistoryMatchFieldWeights() {
+        // title (weight 3.0) scores higher than chat content (weight 1.0)
+        let matcher = SearchMatcher(query: "refactor")
+        let titleResult = matcher.matchHistory(
+            title: "refactor auth logic",
+            chatContent: "done"
+        )
+        let chatResult = matcher.matchHistory(
+            title: "misc updates",
+            chatContent: "we should refactor this later"
+        )
+        XCTAssertNotNil(titleResult)
+        XCTAssertNotNil(chatResult)
+        XCTAssertGreaterThan(titleResult!.score, chatResult!.score)
+    }
 }

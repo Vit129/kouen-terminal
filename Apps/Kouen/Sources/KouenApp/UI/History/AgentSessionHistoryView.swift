@@ -121,17 +121,32 @@ public final class AgentSessionHistoryModel: ObservableObject {
     public var filteredRecords: [AgentSessionRecord] {
         let matcher = SearchMatcher(query: searchQuery)
 
-        // When a search query is active, ignore scope entirely and search all repos
+        // When a search query is active, ignore scope entirely and search all repos using ranked loose search
         if matcher.hasQuery {
-            return records.filter { record in
+            var scored: [(record: AgentSessionRecord, score: Double)] = []
+            for record in records {
                 let turnsContent = record.latestTurns.map(\.content).joined(separator: "\n")
-                let fullContent = "\(record.firstPrompt)\n\(turnsContent)"
-                return matcher.match(
-                    name: record.title,
-                    relativePath: "\(record.projectName) \(record.agentKind.displayName)",
-                    content: fullContent
-                ) != nil
+                let chatContent = "\(record.firstPrompt)\n\(turnsContent)"
+                let branchFiles = record.gitBranch ?? ""
+                let repoAgent = "\(record.projectName) \(record.agentKind.displayName)"
+
+                if let match = matcher.matchHistory(
+                    title: record.title,
+                    branchFilesTools: branchFiles,
+                    repoAgent: repoAgent,
+                    chatContent: chatContent
+                ) {
+                    scored.append((record: record, score: match.score))
+                }
             }
+            // Sort primarily by score descending, then by updatedAt descending (recency)
+            scored.sort { lhs, rhs in
+                if abs(lhs.score - rhs.score) > 0.001 {
+                    return lhs.score > rhs.score
+                }
+                return lhs.record.updatedAt > rhs.record.updatedAt
+            }
+            return scored.map(\.record)
         }
 
         // When search query is empty, apply the selected scope
@@ -161,13 +176,17 @@ public final class AgentSessionHistoryModel: ObservableObject {
         let matcher = SearchMatcher(query: searchQuery)
         guard matcher.hasQuery else { return nil }
         let turnsContent = record.latestTurns.map(\.content).joined(separator: "\n")
-        let fullContent = "\(record.firstPrompt)\n\(turnsContent)"
-        let result = matcher.match(
-            name: record.title,
-            relativePath: "\(record.projectName) \(record.agentKind.displayName)",
-            content: fullContent
+        let chatContent = "\(record.firstPrompt)\n\(turnsContent)"
+        let branchFiles = record.gitBranch ?? ""
+        let repoAgent = "\(record.projectName) \(record.agentKind.displayName)"
+
+        let match = matcher.matchHistory(
+            title: record.title,
+            branchFilesTools: branchFiles,
+            repoAgent: repoAgent,
+            chatContent: chatContent
         )
-        return result?.snippet
+        return match?.snippet
     }
 
     /// Records actually shown right now:
