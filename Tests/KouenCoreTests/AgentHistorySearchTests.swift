@@ -48,6 +48,24 @@ final class AgentHistorySearchTests: XCTestCase {
         XCTAssertEqual(hits.map(\.record.id), ["title", "chat"])
     }
 
+    func testRareWordsBeatCommonWords() {
+        let (index, url) = tempIndex()
+        defer { try? FileManager.default.removeItem(at: url) }
+        // "kouen" and "agent" appear in every session; only one session is about the browser pane.
+        var records = (0..<8).map { record("g\($0)", title: "kouen agent dev environment review \($0)", project: "kouen-terminal") }
+        records.append(record("target", title: "Close browser panes the agent opened", project: ".claude", age: 60 * 86_400))
+
+        let hits = AgentHistorySearch.rank(query: "kouen close agent browser auto", records: records, index: index)
+        XCTAssertEqual(hits.first?.record.id, "target")
+        XCTAssertFalse(hits.contains { $0.record.id.hasPrefix("g") }, "common words alone must not carry a match")
+    }
+
+    func testUnweightedMatchHistoryKeepsHalfTheTokensRule() {
+        let matcher = SearchMatcher(query: "alpha beta gamma delta")
+        XCTAssertNotNil(matcher.matchHistory(title: "alpha beta"))
+        XCTAssertNil(matcher.matchHistory(title: "alpha"))
+    }
+
     func testBm25BoostGrowsWithStrongerMatchAndStaysBelowOne() {
         XCTAssertEqual(AgentHistorySearch.bm25Boost(0), 0)
         XCTAssertGreaterThan(AgentHistorySearch.bm25Boost(-8), AgentHistorySearch.bm25Boost(-1))
