@@ -613,6 +613,9 @@ final class KouenSidebarPanelViewController: NSViewController {
             },
             onHandoff: { [weak self] record, targetKind in
                 self?.handoffAgentSession(record, targetKind: targetKind)
+            },
+            onGoToTab: { [weak self] record in
+                self?.goToTabForAgentSession(record)
             }
         )
         let hosting = NSHostingView(rootView: historyView)
@@ -668,6 +671,31 @@ final class KouenSidebarPanelViewController: NSViewController {
         let settings = KouenSettings.load()
         let mode = settings.sessionMode(for: record.agentKind)
         return record.effectiveResumeCommand(mode: mode)
+    }
+
+    /// Navigates to the active tab matching a live session if one exists in the window.
+    /// Falls back to resumeAgentSession if no live tab matches.
+    private func goToTabForAgentSession(_ record: AgentSessionRecord) {
+        let coord = SessionCoordinator.shared
+        for ws in coord.snapshot.workspaces {
+            for session in ws.sessions {
+                for tab in session.tabs {
+                    let matchesPath = tab.cwd == record.projectPath || (!record.projectPath.isEmpty && tab.cwd.hasPrefix(record.projectPath))
+                    let matchesAgent = tab.effectiveAgentKind == record.agentKind
+                    if matchesPath && matchesAgent {
+                        coord.selectWorkspace(ws.id)
+                        coord.selectTab(workspaceID: ws.id, tabID: tab.id)
+                        if let surfaceID = coord.splitPaneCoordinator.firstSurfaceID(forTab: tab.id) {
+                            coord.setActiveSurface(surfaceID)
+                            coord.terminalHosts.host(for: surfaceID)?.focusTerminal()
+                        }
+                        return
+                    }
+                }
+            }
+        }
+        // Fallback: resume in a new tab
+        resumeAgentSession(record)
     }
 
     /// Resumes in a new tab inside the current session — the original one-button behavior.

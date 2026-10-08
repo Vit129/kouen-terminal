@@ -4,30 +4,71 @@ import KouenIPC
 import SwiftUI
 
 public enum HistoryScope: String, CaseIterable, Identifiable {
-    case workspace = "Workspace"
-    case project = "Project"
-    case all = "All"
+    case repo = "This repo"
+    case all = "All repos"
 
     public var id: String { rawValue }
+}
+
+public enum AgentHistoryDateGroup: String, CaseIterable, Comparable {
+    case today = "Today"
+    case yesterday = "Yesterday"
+    case thisWeek = "This week"
+    case older = "Older"
+
+    private var sortOrder: Int {
+        switch self {
+        case .today: return 0
+        case .yesterday: return 1
+        case .thisWeek: return 2
+        case .older: return 3
+        }
+    }
+
+    public static func < (lhs: AgentHistoryDateGroup, rhs: AgentHistoryDateGroup) -> Bool {
+        lhs.sortOrder < rhs.sortOrder
+    }
+
+    public static func group(for date: Date, relativeTo now: Date = Date(), calendar: Calendar = .current) -> AgentHistoryDateGroup {
+        let startOfTarget = calendar.startOfDay(for: date)
+        let startOfNow = calendar.startOfDay(for: now)
+        let dayDiff = calendar.dateComponents([.day], from: startOfTarget, to: startOfNow).day ?? 0
+
+        if dayDiff <= 0 {
+            return .today
+        } else if dayDiff == 1 {
+            return .yesterday
+        } else if dayDiff < 7 {
+            return .thisWeek
+        } else {
+            return .older
+        }
+    }
 }
 
 @MainActor
 public final class AgentSessionHistoryModel: ObservableObject {
     @Published public var records: [AgentSessionRecord] = []
     @Published public var searchQuery: String = "" {
-        didSet { extraRecordsShown = 0 }
-    }
-    @Published public var selectedScope: HistoryScope = .all {
         didSet {
             extraRecordsShown = 0
-            // Switching Workspace/Project/All previously just re-filtered whatever was already
-            // in memory, with no re-sync from disk — `refresh` respects the 5s cache window
-            // (`AgentHistoryScanner.getOrScan`) so this doesn't force a rescan on every click.
+            if selectedIndex >= displayRecords.count {
+                selectedIndex = max(0, displayRecords.count - 1)
+            }
+        }
+    }
+    @Published public var selectedScope: HistoryScope = .repo {
+        didSet {
+            extraRecordsShown = 0
+            if selectedIndex >= displayRecords.count {
+                selectedIndex = max(0, displayRecords.count - 1)
+            }
             refresh(force: false)
         }
     }
+    @Published public var selectedIndex: Int = 0
     @Published public var expandedSessionIDs: Set<String> = []
-    @Published public var collapsedProjects: Set<String> = []
+    @Published public var collapsedSections: Set<String> = []
     @Published public var isLoading: Bool = false
 
     /// How many records beyond the default 14-day window are currently revealed via "Load More".
@@ -59,31 +100,30 @@ public final class AgentSessionHistoryModel: ObservableObject {
         }
     }
 
-    public func toggleProjectCollapse(projectName: String) {
-        if collapsedProjects.contains(projectName) {
-            collapsedProjects.remove(projectName)
+    public func toggleSectionCollapse(title: String) {
+        if collapsedSections.contains(title) {
+            collapsedSections.remove(title)
         } else {
-            collapsedProjects.insert(projectName)
+            collapsedSections.insert(title)
         }
     }
 
+    public func moveSelection(by delta: Int) {
+        let total = displayRecords.count
+        guard total > 0 else {
+            selectedIndex = 0
+            return
+        }
+        let next = selectedIndex + delta
+        selectedIndex = max(0, min(total - 1, next))
+    }
+
     public var filteredRecords: [AgentSessionRecord] {
-        let activeCWD = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd ?? ""
         let matcher = SearchMatcher(query: searchQuery)
 
-        return records.filter { record in
-            // Scope filter
-            switch selectedScope {
-            case .workspace, .project:
-                if !activeCWD.isEmpty && !record.projectPath.hasPrefix(activeCWD) && !activeCWD.hasPrefix(record.projectPath) {
-                    return false
-                }
-            case .all:
-                break
-            }
-
-            // Search query filter using centralized SearchMatcher (searching title, project, prompt, and turn messages)
-            if matcher.hasQuery {
+        // When a search query is active, ignore scope entirely and search all repos
+        if matcher.hasQuery {
+            return records.filter { record in
                 let turnsContent = record.latestTurns.map(\.content).joined(separator: "\n")
                 let fullContent = "\(record.firstPrompt)\n\(turnsContent)"
                 return matcher.match(
@@ -92,7 +132,27 @@ public final class AgentSessionHistoryModel: ObservableObject {
                     content: fullContent
                 ) != nil
             }
-            return true
+        }
+
+        // When search query is empty, apply the selected scope
+        let activeCWD = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd ?? ""
+        let activeRepoRoot = WorktreeManager().repoRoot(for: activeCWD) ?? activeCWD
+
+        return records.filter { record in
+            switch selectedScope {
+            case .repo:
+                guard !activeRepoRoot.isEmpty else { return true }
+                let recordRepoRoot = WorktreeManager().repoRoot(for: record.projectPath) ?? record.projectPath
+                if recordRepoRoot == activeRepoRoot {
+                    return true
+                }
+                if record.projectPath.hasPrefix(activeRepoRoot) || activeRepoRoot.hasPrefix(record.projectPath) {
+                    return true
+                }
+                return false
+            case .all:
+                return true
+            }
         }
     }
 
@@ -110,10 +170,13 @@ public final class AgentSessionHistoryModel: ObservableObject {
         return result?.snippet
     }
 
-    /// Records actually shown right now: always at least the last 14 days, plus whatever
-    /// extra batches "Load More" has revealed. `filteredRecords` is already sorted newest
-    /// first (the scanner sorts before caching), so a prefix cutoff is a straight slice.
+    /// Records actually shown right now:
+    /// When search is active, the 14-day window is ignored completely.
+    /// When empty query, always at least the last 14 days, plus whatever extra batches "Load More" revealed.
     public var windowedRecords: [AgentSessionRecord] {
+        if !searchQuery.isEmpty {
+            return filteredRecords
+        }
         let list = filteredRecords
         let withinMinimumWindow = list.prefix(while: { $0.updatedAt >= minimumWindowStart }).count
         let visibleCount = max(withinMinimumWindow, extraRecordsShown)
@@ -121,31 +184,48 @@ public final class AgentSessionHistoryModel: ObservableObject {
     }
 
     public var hasMoreToLoad: Bool {
-        windowedRecords.count < filteredRecords.count
+        guard searchQuery.isEmpty else { return false }
+        return windowedRecords.count < filteredRecords.count
     }
 
     public func loadMore() {
         extraRecordsShown = windowedRecords.count + loadMoreBatchSize
     }
 
-    public var groupedRecords: [(project: String, records: [AgentSessionRecord])] {
+    /// Flat list of currently displayed records in section order
+    public var displayRecords: [AgentSessionRecord] {
+        groupedRecords.flatMap(\.records)
+    }
+
+    public var selectedRecord: AgentSessionRecord? {
+        let list = displayRecords
+        guard selectedIndex >= 0, selectedIndex < list.count else { return nil }
+        return list[selectedIndex]
+    }
+
+    public var groupedRecords: [(title: String, records: [AgentSessionRecord])] {
         let list = windowedRecords
-        var groups: [String: [AgentSessionRecord]] = [:]
-        var order: [String] = []
 
+        // When search is active, all results are grouped under "Best matches"
+        if !searchQuery.isEmpty {
+            guard !list.isEmpty else { return [] }
+            return [(title: "Best matches", records: list)]
+        }
+
+        // When empty query, group by date: Today / Yesterday / This week / Older
+        var buckets: [AgentHistoryDateGroup: [AgentSessionRecord]] = [:]
         for record in list {
-            let key = record.projectName.isEmpty ? "Other" : record.projectName
-            if groups[key] == nil {
-                order.append(key)
-                groups[key] = []
-            }
-            groups[key]?.append(record)
+            let grp = AgentHistoryDateGroup.group(for: record.updatedAt)
+            buckets[grp, default: []].append(record)
         }
 
-        return order.compactMap { key in
-            guard let recs = groups[key], !recs.isEmpty else { return nil }
-            return (project: key, records: recs)
+        var result: [(title: String, records: [AgentSessionRecord])] = []
+        for grp in AgentHistoryDateGroup.allCases {
+            if let items = buckets[grp], !items.isEmpty {
+                result.append((title: grp.rawValue, records: items))
+            }
         }
+        return result
     }
 }
 
@@ -153,38 +233,26 @@ public struct AgentSessionHistoryView: View {
     @ObservedObject var model: AgentSessionHistoryModel
     var onResume: ((AgentSessionRecord) -> Void)?
     var onHandoff: ((AgentSessionRecord, AgentKind) -> Void)?
+    var onGoToTab: ((AgentSessionRecord) -> Void)?
+
+    @FocusState private var isSearchFocused: Bool
 
     public init(
         model: AgentSessionHistoryModel,
         onResume: ((AgentSessionRecord) -> Void)? = nil,
-        onHandoff: ((AgentSessionRecord, AgentKind) -> Void)? = nil
+        onHandoff: ((AgentSessionRecord, AgentKind) -> Void)? = nil,
+        onGoToTab: ((AgentSessionRecord) -> Void)? = nil
     ) {
         self.model = model
         self.onResume = onResume
         self.onHandoff = onHandoff
+        self.onGoToTab = onGoToTab
     }
 
     public var body: some View {
         let c = KouenDesign.chrome
         VStack(spacing: 0) {
-            // Header Section
-            headerView
-                .padding(.horizontal, KouenDesign.Spacing.sm)
-                .padding(.top, KouenDesign.Spacing.sm)
-                .padding(.bottom, KouenDesign.Spacing.xs)
-
-            // Scope Selector
-            Picker("", selection: $model.selectedScope) {
-                ForEach(HistoryScope.allCases) { scope in
-                    Text(scope.rawValue).tag(scope)
-                }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .padding(.horizontal, KouenDesign.Spacing.sm)
-            .padding(.bottom, KouenDesign.Spacing.xs)
-
-            // Search bar
+            // Search bar on top
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 11))
@@ -192,6 +260,7 @@ public struct AgentSessionHistoryView: View {
                 TextField("Search sessions", text: $model.searchQuery)
                     .textFieldStyle(.plain)
                     .font(.system(size: 11))
+                    .focused($isSearchFocused)
                 if !model.searchQuery.isEmpty {
                     Button {
                         model.searchQuery = ""
@@ -212,7 +281,24 @@ public struct AgentSessionHistoryView: View {
                     .stroke(Color(nsColor: c.border), lineWidth: 1)
             )
             .padding(.horizontal, KouenDesign.Spacing.sm)
-            .padding(.bottom, KouenDesign.Spacing.sm)
+            .padding(.top, KouenDesign.Spacing.sm)
+            .padding(.bottom, KouenDesign.Spacing.xs)
+
+            // Scope Selector (This repo / All repos)
+            Picker("", selection: $model.selectedScope) {
+                ForEach(HistoryScope.allCases) { scope in
+                    Text(scope.rawValue).tag(scope)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding(.horizontal, KouenDesign.Spacing.sm)
+            .padding(.bottom, KouenDesign.Spacing.xs)
+
+            // Sub-header with count and refresh
+            subHeaderView
+                .padding(.horizontal, KouenDesign.Spacing.sm)
+                .padding(.bottom, KouenDesign.Spacing.xs)
 
             Divider()
                 .overlay(Color(nsColor: c.border))
@@ -234,34 +320,44 @@ public struct AgentSessionHistoryView: View {
                     Image(systemName: "clock.arrow.circlepath")
                         .font(.system(size: 24))
                         .foregroundStyle(Color(nsColor: c.textTertiary))
-                    Text("No session history found")
+                    Text(model.searchQuery.isEmpty ? "No session history found" : "No sessions match \"\(model.searchQuery)\"")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(Color(nsColor: c.textSecondary))
                     Spacer()
                 }
             } else {
-                ScrollView {
-                    LazyVStack(spacing: 8) {
-                        ForEach(model.groupedRecords, id: \.project) { group in
-                            projectSection(group: group)
-                        }
-                        if model.hasMoreToLoad {
-                            Button {
-                                model.loadMore()
-                            } label: {
-                                Text("Load More")
-                                    .font(.system(size: 10.5, weight: .medium))
-                                    .foregroundStyle(Color(nsColor: c.textSecondary))
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 6)
-                                    .background(Color(nsColor: c.surfaceElevated))
-                                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(spacing: 6) {
+                            ForEach(model.groupedRecords, id: \.title) { group in
+                                historySection(group: group)
                             }
-                            .buttonStyle(.plain)
+                            if model.hasMoreToLoad {
+                                Button {
+                                    model.loadMore()
+                                } label: {
+                                    Text("Load More")
+                                        .font(.system(size: 10.5, weight: .medium))
+                                        .foregroundStyle(Color(nsColor: c.textSecondary))
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 6)
+                                        .background(Color(nsColor: c.surfaceElevated))
+                                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal, KouenDesign.Spacing.sm)
+                        .padding(.vertical, KouenDesign.Spacing.sm)
+                    }
+                    .onChange(of: model.selectedIndex) { _, newIndex in
+                        let list = model.displayRecords
+                        if newIndex >= 0 && newIndex < list.count {
+                            withAnimation(.easeInOut(duration: 0.1)) {
+                                proxy.scrollTo(list[newIndex].id, anchor: .center)
+                            }
                         }
                     }
-                    .padding(.horizontal, KouenDesign.Spacing.sm)
-                    .padding(.vertical, KouenDesign.Spacing.sm)
                 }
             }
         }
@@ -270,73 +366,68 @@ public struct AgentSessionHistoryView: View {
                 model.refresh(force: false)
             }
         }
-    }
-
-    // MARK: - Header
-    @ViewBuilder
-    private var headerView: some View {
-        let c = KouenDesign.chrome
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Agent Session History")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Color(nsColor: c.textPrimary))
-                Text("\(model.windowedRecords.count) shown · \(model.records.count) recent")
-                    .font(.system(size: 10))
-                    .foregroundStyle(Color(nsColor: c.textTertiary))
+        .onKeyPress(.upArrow) {
+            model.moveSelection(by: -1)
+            return .handled
+        }
+        .onKeyPress(.downArrow) {
+            model.moveSelection(by: 1)
+            return .handled
+        }
+        .onKeyPress(.return, phases: .down) { _ in
+            if let selected = model.selectedRecord {
+                triggerPrimaryAction(for: selected)
+                return .handled
             }
-            Spacer()
-            HStack(spacing: 6) {
-                // Host pill
-                HStack(spacing: 3) {
-                    Image(systemName: "server.rack")
-                        .font(.system(size: 9))
-                    Text("Local Mac")
-                        .font(.system(size: 9.5, weight: .medium))
-                }
-                .padding(.horizontal, 5)
-                .padding(.vertical, 2)
-                .background(Color(nsColor: c.surfaceElevated))
-                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-                .foregroundStyle(Color(nsColor: c.textSecondary))
-
-                Button {
-                    model.refresh(force: true)
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(Color(nsColor: c.textSecondary))
-                }
-                .buttonStyle(.plain)
-                .help("Refresh history from disk")
-            }
+            return .ignored
         }
     }
 
-    // MARK: - Project Group Section
+    // MARK: - Sub-header
     @ViewBuilder
-    private func projectSection(group: (project: String, records: [AgentSessionRecord])) -> some View {
+    private var subHeaderView: some View {
         let c = KouenDesign.chrome
-        let isCollapsed = model.collapsedProjects.contains(group.project)
+        HStack(alignment: .center) {
+            Text("\(model.windowedRecords.count) shown · \(model.records.count) recent")
+                .font(.system(size: 10))
+                .foregroundStyle(Color(nsColor: c.textTertiary))
+            Spacer()
+            Button {
+                model.refresh(force: true)
+            } label: {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(Color(nsColor: c.textSecondary))
+            }
+            .buttonStyle(.plain)
+            .help("Refresh history from disk")
+        }
+    }
 
-        VStack(spacing: 4) {
+    // MARK: - Section
+    @ViewBuilder
+    private func historySection(group: (title: String, records: [AgentSessionRecord])) -> some View {
+        let c = KouenDesign.chrome
+        let isCollapsed = model.collapsedSections.contains(group.title)
+
+        VStack(spacing: 3) {
             Button {
                 withAnimation(.easeInOut(duration: 0.15)) {
-                    model.toggleProjectCollapse(projectName: group.project)
+                    model.toggleSectionCollapse(title: group.title)
                 }
             } label: {
-                HStack(spacing: 6) {
+                HStack(spacing: 5) {
                     Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
-                        .font(.system(size: 9, weight: .semibold))
+                        .font(.system(size: 8, weight: .semibold))
                         .foregroundStyle(Color(nsColor: c.textTertiary))
-                    Text(group.project)
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Color(nsColor: c.textPrimary))
+                    Text(group.title.uppercased())
+                        .font(.system(size: 9.5, weight: .bold))
+                        .foregroundStyle(Color(nsColor: c.textTertiary))
                     Spacer()
                     Text("\(group.records.count)")
-                        .font(.system(size: 9.5, weight: .medium))
-                        .foregroundStyle(Color(nsColor: c.textSecondary))
-                        .padding(.horizontal, 5)
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(Color(nsColor: c.textTertiary))
+                        .padding(.horizontal, 4)
                         .padding(.vertical, 1)
                         .background(Color(nsColor: c.surfaceElevated))
                         .clipShape(Capsule())
@@ -344,342 +435,230 @@ public struct AgentSessionHistoryView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .padding(.vertical, 2)
+            .padding(.vertical, 3)
 
             if !isCollapsed {
-                VStack(spacing: 6) {
+                VStack(spacing: 4) {
                     ForEach(group.records) { record in
-                        sessionCard(record: record)
+                        sessionRow(record: record)
                     }
                 }
             }
         }
     }
 
-    // MARK: - Action Button (shared shape for the 2x2 resume/copy grid)
+    // MARK: - Compact Row (Two-line)
     @ViewBuilder
-    private func actionButton(icon: String, label: String, emphasized: Bool = false, action: @escaping () -> Void) -> some View {
+    private func sessionRow(record: AgentSessionRecord) -> some View {
         let c = KouenDesign.chrome
-        Button(action: action) {
-            HStack(spacing: 4) {
-                Image(systemName: icon)
-                    .font(.system(size: 9))
-                Text(label)
-                    .font(.system(size: 10, weight: emphasized ? .semibold : .regular))
+        let isSelected = model.selectedRecord?.id == record.id
+        let isLive = record.liveStatus != nil || record.placement == .cloud || record.placement == .background || record.placement == .remoteControl
+        let showRepo = model.selectedScope == .all || !model.searchQuery.isEmpty
+        let isNotMainBranch = record.gitBranch != nil && !record.gitBranch!.isEmpty && record.gitBranch != "main"
+
+        VStack(alignment: .leading, spacing: 3) {
+            Button {
+                if let idx = model.displayRecords.firstIndex(where: { $0.id == record.id }) {
+                    model.selectedIndex = idx
+                }
+            } label: {
+                VStack(alignment: .leading, spacing: 3) {
+                    // Line 1: Title (Truncated)
+                    Text(record.title.isEmpty ? "Untitled Session" : record.title)
+                        .font(.system(size: 11, weight: isSelected ? .semibold : .medium))
+                        .foregroundStyle(Color(nsColor: isSelected ? c.textPrimary : c.textSecondary))
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    // Line 2: Metadata (agent · live · msgs · age · repo · branch)
+                    HStack(spacing: 4) {
+                        AgentBadgeView(kind: record.agentKind, iconSize: 10, fontSize: 8.5, showName: false)
+
+                        if isLive {
+                            HStack(spacing: 2) {
+                                Circle()
+                                    .fill(Color(nsColor: c.success))
+                                    .frame(width: 5, height: 5)
+                                Text("live")
+                                    .font(.system(size: 9, weight: .medium))
+                                    .foregroundStyle(Color(nsColor: c.success))
+                            }
+                            Text("·")
+                                .font(.system(size: 8))
+                                .foregroundStyle(Color(nsColor: c.textTertiary))
+                        }
+
+                        Text("\(record.messageCount) msgs")
+                            .font(.system(size: 9))
+                            .foregroundStyle(Color(nsColor: c.textTertiary))
+
+                        Text("·")
+                            .font(.system(size: 8))
+                            .foregroundStyle(Color(nsColor: c.textTertiary))
+
+                        Text(relativeDate(record.updatedAt))
+                            .font(.system(size: 9))
+                            .foregroundStyle(Color(nsColor: c.textTertiary))
+
+                        if showRepo && !record.projectName.isEmpty {
+                            Text("·")
+                                .font(.system(size: 8))
+                                .foregroundStyle(Color(nsColor: c.textTertiary))
+                            Text(record.projectName)
+                                .font(.system(size: 9))
+                                .foregroundStyle(Color(nsColor: c.textSecondary))
+                                .lineLimit(1)
+                        }
+
+                        if isNotMainBranch, let branch = record.gitBranch {
+                            Text("·")
+                                .font(.system(size: 8))
+                                .foregroundStyle(Color(nsColor: c.textTertiary))
+                            HStack(spacing: 2) {
+                                Image(systemName: "arrow.triangle.branch")
+                                    .font(.system(size: 7.5))
+                                Text(branch)
+                                    .font(.system(size: 9))
+                                    .lineLimit(1)
+                            }
+                            .foregroundStyle(Color(nsColor: c.textTertiary))
+                        }
+
+                        Spacer(minLength: 0)
+                    }
+
+                    // Content snippet if matching query
+                    if let snippet = model.matchSnippet(for: record) {
+                        HStack(alignment: .top, spacing: 4) {
+                            Image(systemName: "text.magnifyingglass")
+                                .font(.system(size: 8))
+                                .foregroundStyle(Color.accentColor)
+                            Text(snippet)
+                                .font(.system(size: 9))
+                                .foregroundStyle(Color(nsColor: c.textSecondary))
+                                .lineLimit(1)
+                        }
+                        .padding(.top, 1)
+                    }
+                }
+                .contentShape(Rectangle())
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .frame(maxWidth: .infinity)
-            .background(emphasized ? Color.accentColor.opacity(0.15) : Color(nsColor: c.surfaceElevated))
-            .foregroundStyle(emphasized ? Color.accentColor : Color(nsColor: c.textSecondary))
-            .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+            .buttonStyle(.plain)
+
+            // Selected Row Actions (Single split button)
+            if isSelected {
+                HStack(spacing: 0) {
+                    Spacer()
+                    splitActionButton(for: record, isLive: isLive)
+                }
+                .padding(.top, 2)
+            }
         }
-        .buttonStyle(.plain)
+        .id(record.id)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 5)
+        .background(isSelected ? Color.accentColor.opacity(0.12) : Color(nsColor: c.surfaceElevated))
+        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .stroke(isSelected ? Color.accentColor.opacity(0.4) : Color(nsColor: c.border), lineWidth: 1)
+        )
     }
 
+    // MARK: - Split Action Button
     @ViewBuilder
-    private func handoffMenu(for record: AgentSessionRecord) -> some View {
-        let c = KouenDesign.chrome
+    private func splitActionButton(for record: AgentSessionRecord, isLive: Bool) -> some View {
+        let mainTitle = isLive ? "Go to tab" : "Resume"
+        let mainIcon = isLive ? "arrow.right.circle.fill" : "play.fill"
         let candidates = AgentLaunchCommands.configs.keys
             .filter { $0 != .cursor && $0 != record.agentKind }
             .sorted { $0.displayName < $1.displayName }
 
-        Menu {
-            ForEach(candidates, id: \.self) { target in
-                Button {
-                    onHandoff?(record, target)
-                } label: {
-                    Text("Handoff to \(target.displayName)")
-                }
-            }
-        } label: {
-            HStack(spacing: 3) {
-                Image(systemName: "arrowshape.turn.up.right.fill")
-                    .font(.system(size: 8.5))
-                Text("Handoff…")
-                    .font(.system(size: 10))
-            }
-            .padding(.horizontal, 6)
-            .padding(.vertical, 4)
-            .frame(maxWidth: .infinity)
-            .background(Color(nsColor: c.surfaceElevated))
-            .foregroundStyle(Color(nsColor: c.textSecondary))
-            .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
-        }
-        .menuStyle(.borderlessButton)
-        .help("Start a new session with another agent using a handoff brief from this session")
-    }
-
-    // MARK: - Session Card
-    @ViewBuilder
-    private func sessionCard(record: AgentSessionRecord) -> some View {
-        let c = KouenDesign.chrome
-        let isExpanded = model.expandedSessionIDs.contains(record.id)
-
-        VStack(alignment: .leading, spacing: 6) {
-            // Card Title & Expand toggle
-            HStack(alignment: .top, spacing: 6) {
-                Text(record.title)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Color(nsColor: c.textPrimary))
-                    .lineLimit(isExpanded ? 4 : 2)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                Button {
-                    withAnimation(.easeInOut(duration: 0.15)) {
-                        model.toggleExpanded(sessionID: record.id)
-                    }
-                } label: {
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundStyle(Color(nsColor: c.textTertiary))
-                        .padding(2)
-                }
-                .buttonStyle(.plain)
-            }
-
-            // Agent Badge Row
-            HStack(spacing: 5) {
-                AgentBadgeView(kind: record.agentKind)
-
-                if let placementLabel = placementLabel(record.placement) {
-                    Text(placementLabel)
-                        .font(.system(size: 9))
-                        .foregroundStyle(Color.accentColor)
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 1)
-                        .background(Color.accentColor.opacity(0.12))
-                        .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
-                }
-
-                Text("\(record.messageCount) msgs")
-                    .font(.system(size: 9.5))
-                    .foregroundStyle(Color(nsColor: c.textTertiary))
-
-                Text("·")
-                    .font(.system(size: 9))
-                    .foregroundStyle(Color(nsColor: c.textTertiary))
-
-                Text(relativeDate(record.updatedAt))
-                    .font(.system(size: 9.5))
-                    .foregroundStyle(Color(nsColor: c.textTertiary))
-            }
-
-            // Latest agent message, always visible on the collapsed card (not hidden behind
-            // the expand toggle) so the list reads like a task log at a glance — collapsed
-            // when the card itself is expanded (LATEST TURNS below already shows it in full).
-            if !isExpanded, model.searchQuery.isEmpty,
-               let latestAgentTurn = record.latestTurns.last(where: { $0.role == "AGENT" }) {
-                Text("Agent: \(latestAgentTurn.content)")
-                    .font(.system(size: 10))
-                    .foregroundStyle(Color(nsColor: c.textSecondary))
-                    .lineLimit(2)
-            }
-
-            // Matched Content Snippet (when query matches inside chat turns or prompt)
-            if let snippet = model.matchSnippet(for: record) {
-                HStack(alignment: .top, spacing: 5) {
-                    Image(systemName: "text.magnifyingglass")
-                        .font(.system(size: 8.5))
-                        .foregroundStyle(Color.accentColor)
-                    Text(snippet)
-                        .font(.system(size: 9.5))
-                        .foregroundStyle(Color(nsColor: c.textSecondary))
-                        .lineLimit(2)
-                }
-                .padding(5)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.accentColor.opacity(0.08))
-                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-            }
-
-            // Worktree & Project pills
-            HStack(spacing: 5) {
-                Text(record.worktreeAvailable ? "Active worktree" : "Unavailable worktree")
-                    .font(.system(size: 9))
-                    .foregroundStyle(Color(nsColor: record.worktreeAvailable ? c.success : c.textTertiary))
-                    .padding(.horizontal, 4)
-                    .padding(.vertical, 1)
-                    .background(Color(nsColor: c.surfaceElevated))
-                    .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
-
-                if let branch = record.gitBranch, !branch.isEmpty {
-                    HStack(spacing: 3) {
-                        Image(systemName: "arrow.triangle.branch")
-                            .font(.system(size: 8))
-                        Text(branch)
-                            .font(.system(size: 9))
-                    }
-                    .foregroundStyle(Color(nsColor: c.textSecondary))
-                    .padding(.horizontal, 4)
-                    .padding(.vertical, 1)
-                    .background(Color(nsColor: c.surfaceElevated))
-                    .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
-                }
-
+        HStack(spacing: 0) {
+            // Main button
+            Button {
+                triggerPrimaryAction(for: record)
+            } label: {
                 HStack(spacing: 3) {
-                    Image(systemName: "folder.fill")
-                        .font(.system(size: 8))
-                    Text(record.projectName)
-                        .font(.system(size: 9))
+                    Image(systemName: mainIcon)
+                        .font(.system(size: 8.5))
+                    Text(mainTitle)
+                        .font(.system(size: 9.5, weight: .semibold))
                 }
-                .foregroundStyle(Color(nsColor: c.textSecondary))
-                .padding(.horizontal, 4)
-                .padding(.vertical, 1)
-                .background(Color(nsColor: c.surfaceElevated))
-                .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3.5)
+                .background(Color.accentColor)
+                .foregroundStyle(Color.white)
             }
+            .buttonStyle(.plain)
 
-            // Action Buttons
-            HStack(spacing: 6) {
-                // VS Code chats live in VS Code's own store — the Copilot CLI can't resume them.
-                if record.placement != .vscode {
-                    actionButton(icon: "play.fill", label: "Resume", emphasized: true) {
+            Divider()
+                .frame(height: 12)
+                .overlay(Color.white.opacity(0.3))
+
+            // Caret dropdown menu
+            Menu {
+                Button {
+                    triggerPrimaryAction(for: record)
+                } label: {
+                    Label(mainTitle, systemImage: mainIcon)
+                }
+
+                if isLive {
+                    Button {
                         onResume?(record)
+                    } label: {
+                        Label("Resume in new tab", systemImage: "play.fill")
                     }
-                    .help("Resume this session in a new tab")
                 }
 
-                handoffMenu(for: record)
-
-                actionButton(icon: "doc.on.doc", label: "Copy") {
-                    copySessionSummary(record)
-                }
-                .help("Copy title, project path, prompt, and latest turns to clipboard")
-            }
-            .padding(.top, 2)
-
-            // Expanded Details
-            if isExpanded {
-                VStack(alignment: .leading, spacing: 8) {
-                    // First Prompt Box
-                    if !record.firstPrompt.isEmpty {
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack {
-                                Text("FIRST PROMPT")
-                                    .font(.system(size: 9, weight: .bold))
-                                    .foregroundStyle(Color(nsColor: c.textTertiary))
-                                Spacer()
-                                Button {
-                                    NSPasteboard.general.clearContents()
-                                    NSPasteboard.general.setString(record.firstPrompt, forType: .string)
-                                } label: {
-                                    HStack(spacing: 3) {
-                                        Image(systemName: "doc.on.doc")
-                                            .font(.system(size: 8))
-                                        Text("Copy")
-                                            .font(.system(size: 8.5))
-                                    }
-                                    .foregroundStyle(Color(nsColor: c.textTertiary))
-                                }
-                                .buttonStyle(.plain)
-                            }
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("YOU")
-                                    .font(.system(size: 8.5, weight: .bold))
-                                    .foregroundStyle(Color(nsColor: c.textSecondary))
-                                Text(record.firstPrompt)
-                                    .font(.system(size: 10))
-                                    .foregroundStyle(Color(nsColor: c.textPrimary))
-                                    .lineLimit(4)
-                            }
-                            .padding(6)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color(nsColor: c.surfaceElevated))
-                            .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                if !candidates.isEmpty {
+                    Divider()
+                    ForEach(candidates, id: \.self) { target in
+                        Button {
+                            onHandoff?(record, target)
+                        } label: {
+                            Text("Hand off to \(target.displayName)")
                         }
                     }
-
-                    // Latest Turns Box
-                    if !record.latestTurns.isEmpty {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("LATEST TURNS")
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundStyle(Color(nsColor: c.textTertiary))
-
-                            VStack(alignment: .leading, spacing: 4) {
-                                ForEach(Array(record.latestTurns.enumerated()), id: \.offset) { _, turn in
-                                    VStack(alignment: .leading, spacing: 1) {
-                                        Text(turn.role)
-                                            .font(.system(size: 8, weight: .bold))
-                                            .foregroundStyle(turn.role == "YOU" ? Color(nsColor: c.textSecondary) : Color.accentColor)
-                                        Text(turn.content)
-                                            .font(.system(size: 9.5))
-                                            .foregroundStyle(Color(nsColor: c.textPrimary))
-                                            .lineLimit(3)
-                                    }
-                                    .padding(5)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .background(Color(nsColor: c.surfaceElevated))
-                                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-                                }
-                            }
-                        }
-                    }
-
-                    // Worktree Details
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("WORKTREE")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(Color(nsColor: c.textTertiary))
-                        Text(record.projectPath)
-                            .font(.system(size: 9.5, design: .monospaced))
-                            .foregroundStyle(Color(nsColor: c.textSecondary))
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                    }
                 }
-                .padding(.top, 4)
+
+                Divider()
+
+                Button {
+                    copyResumeCommand(record)
+                } label: {
+                    Label("Copy resume command", systemImage: "doc.on.doc")
+                }
+            } label: {
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 7.5, weight: .bold))
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 3.5)
+                    .background(Color.accentColor)
+                    .foregroundStyle(Color.white)
             }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
         }
-        .padding(8)
-        .background(Color(nsColor: c.surfaceElevated))
-        .clipShape(RoundedRectangle(cornerRadius: KouenDesign.Radius.card, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: KouenDesign.Radius.card, style: .continuous)
-                .stroke(Color(nsColor: c.border), lineWidth: 1)
-        )
+        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
     }
 
+    private func triggerPrimaryAction(for record: AgentSessionRecord) {
+        let isLive = record.liveStatus != nil || record.placement == .cloud || record.placement == .background || record.placement == .remoteControl
+        if isLive, let onGoToTab {
+            onGoToTab(record)
+        } else {
+            onResume?(record)
+        }
+    }
 
-
-    /// Copies a plain-text summary of the whole session (title, project, agent, first
-    /// prompt, latest turns) — distinct from the "Copy" button inside the expanded First
-    /// Prompt box, which only copies that one prompt.
-    private func copySessionSummary(_ record: AgentSessionRecord) {
-        var lines: [String] = [
-            record.title,
-            "\(record.agentKind.displayName) · \(record.projectName) · \(record.messageCount) msgs",
-        ]
-        if let branch = record.gitBranch, !branch.isEmpty {
-            lines.append("Branch: \(branch)")
-        }
-        lines.append("Path: \(record.projectPath)")
-        if !record.firstPrompt.isEmpty {
-            lines.append("\nFirst prompt:\n\(record.firstPrompt)")
-        }
-        if !record.latestTurns.isEmpty {
-            lines.append("\nLatest turns:")
-            for turn in record.latestTurns {
-                lines.append("[\(turn.role)] \(turn.content)")
-            }
-        }
+    private func copyResumeCommand(_ record: AgentSessionRecord) {
+        let settings = KouenSettings.load()
+        let mode = settings.sessionMode(for: record.agentKind)
+        let cmd = record.effectiveResumeCommand(mode: mode)
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(lines.joined(separator: "\n"), forType: .string)
-    }
-
-    /// `nil` for `.local` — the ordinary case, where the badge would just be noise. Non-nil
-    /// values reflect what `AgentHistoryScanner.scanClaudeAgentsCLI` learned from `claude
-    /// agents --json`, not something Kouen itself launched or is tracking live.
-    private func placementLabel(_ placement: AgentSessionPlacement) -> String? {
-        switch placement {
-        case .local: return nil
-        case .cloud: return "☁️ Cloud"
-        case .remoteControl: return "📱 Remote Control"
-        case .background: return "⌁ Background"
-        case .vscode: return "VS Code"
-        }
+        NSPasteboard.general.setString(cmd, forType: .string)
     }
 
     private func relativeDate(_ date: Date) -> String {
