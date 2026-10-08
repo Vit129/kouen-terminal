@@ -75,4 +75,63 @@ final class AgentHistorySearchTests: XCTestCase {
     func testEmptyQueryReturnsNothing() {
         XCTAssertTrue(AgentHistorySearch.rank(query: "  ", records: [record("a", title: "x", project: "r")]).isEmpty)
     }
+
+    func testSaveAndLoadCachedSessionRecords() {
+        let (index, url) = tempIndex()
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let rec = AgentSessionRecord(
+            id: "cached-session-1",
+            agentKind: .claudeCode,
+            title: "Performance optimization for search",
+            projectPath: "/Users/test/kouen-terminal",
+            projectName: "kouen-terminal",
+            gitBranch: "perf/test",
+            modelName: "claude-sonnet-4-6",
+            messageCount: 5,
+            updatedAt: Date(),
+            firstPrompt: "optimize search latency",
+            latestTurns: [
+                AgentHistoryTurn(role: "YOU", content: "Optimize startup"),
+                AgentHistoryTurn(role: "AGENT", content: "Cached SQLite index applied")
+            ],
+            transcriptPath: "/tmp/cached-session-1.jsonl",
+            worktreeAvailable: true
+        )
+
+        let mtime = Date(timeIntervalSince1970: 1700000000)
+        let fileSize = 4096
+
+        XCTAssertTrue(index.needsReindex(sessionID: "cached-session-1", mtime: mtime, fileSize: fileSize))
+
+        index.saveRecord(rec, mtime: mtime, fileSize: fileSize)
+        index.indexSession(
+            sessionID: "cached-session-1",
+            title: rec.title,
+            firstPrompt: rec.firstPrompt,
+            fullTranscript: "full transcript text",
+            gitBranch: rec.gitBranch,
+            repoName: rec.projectName,
+            agentName: "Claude Code",
+            filesEdited: "",
+            toolsCalled: "",
+            transcriptPath: rec.transcriptPath,
+            mtime: mtime,
+            fileSize: fileSize
+        )
+
+        XCTAssertFalse(index.needsReindex(sessionID: "cached-session-1", mtime: mtime, fileSize: fileSize))
+
+        let loaded = index.loadCachedEntries()
+        XCTAssertEqual(loaded.count, 1)
+        XCTAssertEqual(loaded[0].record.id, "cached-session-1")
+        XCTAssertEqual(loaded[0].record.title, "Performance optimization for search")
+        XCTAssertEqual(loaded[0].record.latestTurns.count, 2)
+        XCTAssertEqual(loaded[0].record.latestTurns[1].content, "Cached SQLite index applied")
+        XCTAssertEqual(loaded[0].fileSize, fileSize)
+
+        index.deleteSession(sessionID: "cached-session-1")
+        let afterDelete = index.loadCachedEntries()
+        XCTAssertEqual(afterDelete.count, 0)
+    }
 }

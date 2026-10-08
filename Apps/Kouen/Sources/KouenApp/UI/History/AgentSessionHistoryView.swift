@@ -56,14 +56,13 @@ public final class AgentSessionHistoryModel: ObservableObject {
     @Published public var searchQuery: String = "" {
         didSet {
             extraRecordsShown = 0
-            scheduleFilter(debounceMs: 150)
+            scheduleFilter(debounceMs: 50)
         }
     }
     @Published public var selectedScope: HistoryScope = .repo {
         didSet {
             extraRecordsShown = 0
             scheduleFilter(debounceMs: 0)
-            refresh(force: false)
         }
     }
     @Published public var filteredRecords: [AgentSessionRecord] = [] {
@@ -170,8 +169,8 @@ public final class AgentSessionHistoryModel: ObservableObject {
     }
 
     /// Schedules an asynchronous recomputation of filteredRecords.
-    /// Debounced ~150ms for query typing; stale search tasks are cancelled immediately.
-    public func scheduleFilter(debounceMs: UInt64 = 150) {
+    /// Debounced ~50ms for query typing; stale search tasks are cancelled immediately.
+    public func scheduleFilter(debounceMs: UInt64 = 50) {
         filterTask?.cancel()
 
         let currentQuery = searchQuery
@@ -182,13 +181,13 @@ public final class AgentSessionHistoryModel: ObservableObject {
 
         let localCache = repoRootCache
 
-        filterTask = Task { [weak self] in
+        filterTask = Task.detached(priority: .userInitiated) { [weak self] in
             if debounceMs > 0 {
                 try? await Task.sleep(nanoseconds: debounceMs * 1_000_000)
             }
             if Task.isCancelled { return }
 
-            let (filtered, newCache, snippets) = await Self.runBackgroundFilter(
+            let (filtered, newCache, snippets) = Self.computeFiltered(
                 query: currentQuery,
                 scope: currentScope,
                 records: currentRecords,
@@ -199,9 +198,12 @@ public final class AgentSessionHistoryModel: ObservableObject {
 
             if Task.isCancelled { return }
 
-            self?.repoRootCache = newCache
-            self?.searchSnippets = snippets
-            self?.filteredRecords = filtered
+            await MainActor.run { [weak self] in
+                guard let self, !Task.isCancelled else { return }
+                self.repoRootCache = newCache
+                self.searchSnippets = snippets
+                self.filteredRecords = filtered
+            }
         }
     }
 

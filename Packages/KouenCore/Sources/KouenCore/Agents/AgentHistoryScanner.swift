@@ -246,23 +246,59 @@ public actor AgentHistoryScanner {
     private var copilotCache: (mtime: Date, size: Int, records: [AgentSessionRecord])?
     #endif
 
+    private var isScanning = false
+
     public init(ftsIndex: AgentHistoryFTSIndex = .shared) {
         self.cloudSessionStore = ClaudeCloudSessionStore()
         self.ftsIndex = ftsIndex
     }
 
-    /// Returns cached records if fresh (< 5s), otherwise rescans.
+    /// Returns cached records immediately if available (from memory or persisted SQLite index).
+    /// If stale (>5s) or forced, triggers a non-blocking incremental rescan in the background.
     public func getOrScan(force: Bool = false) async -> [AgentSessionRecord] {
-        if !force && !cachedRecords.isEmpty && Date().timeIntervalSince(lastScanAt) < 5.0 {
+        if cachedRecords.isEmpty {
+            let entries = ftsIndex.loadCachedEntries()
+            if !entries.isEmpty {
+                for entry in entries {
+                    fileCache[entry.transcriptPath] = FileCacheEntry(mtime: entry.mtime, size: entry.fileSize, record: entry.record)
+                }
+                cachedRecords = entries.map(\.record)
+                lastScanAt = Date()
+            }
+        }
+
+        if !cachedRecords.isEmpty {
+            if force || Date().timeIntervalSince(lastScanAt) >= 5.0 {
+                triggerBackgroundScan()
+            }
             return cachedRecords
         }
+
         return await scanAll()
+    }
+
+    private func triggerBackgroundScan() {
+        guard !isScanning else { return }
+        Task { [weak self] in
+            _ = await self?.scanAll()
+        }
     }
 
     /// Scans all supported agent transcripts on disk concurrently with mtime caching, then
     /// enriches/extends the Claude Code rows with live placement from `claude agents --json`
     /// (cloud/background/remote-control) — see `mergeLivePlacements`.
     public func scanAll() async -> [AgentSessionRecord] {
+        guard !isScanning else { return cachedRecords }
+        isScanning = true
+        defer { isScanning = false }
+
+        if fileCache.isEmpty {
+            let entries = ftsIndex.loadCachedEntries()
+            for entry in entries {
+                fileCache[entry.transcriptPath] = FileCacheEntry(mtime: entry.mtime, size: entry.fileSize, record: entry.record)
+            }
+        }
+
         async let claudeTask = scanClaude()
         async let antigravityTask = scanAntigravity()
         async let codexTask = scanCodex()
@@ -356,6 +392,7 @@ public actor AgentHistoryScanner {
                        let mtime = rv.contentModificationDate,
                        let size = rv.fileSize {
                         fileCache[path] = FileCacheEntry(mtime: mtime, size: size, record: record)
+                        ftsIndex.saveRecord(record, mtime: mtime, fileSize: size)
                     }
                     records.append(record)
                 }
@@ -703,6 +740,7 @@ public actor AgentHistoryScanner {
                    let mtime = rv.contentModificationDate,
                    let size = rv.fileSize {
                     fileCache[path] = FileCacheEntry(mtime: mtime, size: size, record: record)
+                    ftsIndex.saveRecord(record, mtime: mtime, fileSize: size)
                 }
                 records.append(record)
             }
@@ -912,6 +950,7 @@ public actor AgentHistoryScanner {
                    let mtime = rv.contentModificationDate,
                    let size = rv.fileSize {
                     fileCache[path] = FileCacheEntry(mtime: mtime, size: size, record: record)
+                    ftsIndex.saveRecord(record, mtime: mtime, fileSize: size)
                 }
                 records.append(record)
             }
@@ -1095,6 +1134,7 @@ public actor AgentHistoryScanner {
                       let record = Self.vscodeRecord(session, projectPath: projectPath, transcriptPath: url.path, fallbackDate: mtime, fileSize: size, ftsIndex: ftsIndex)
                 else { continue }
                 fileCache[url.path] = FileCacheEntry(mtime: mtime, size: size, record: record)
+                ftsIndex.saveRecord(record, mtime: mtime, fileSize: size)
                 records.append(record)
             }
         }
@@ -1253,7 +1293,7 @@ public actor AgentHistoryScanner {
                 fileSize: 0
             )
 
-            records.append(AgentSessionRecord(
+            let record = AgentSessionRecord(
                 id: id,
                 agentKind: .copilot,
                 title: String(title.prefix(120)),
@@ -1267,7 +1307,9 @@ public actor AgentHistoryScanner {
                 latestTurns: turns,
                 transcriptPath: dbPath,
                 worktreeAvailable: FileManager.default.fileExists(atPath: finalPath)
-            ))
+            )
+            ftsIndex?.saveRecord(record, mtime: modDate, fileSize: 0)
+            records.append(record)
         }
         return records
     }

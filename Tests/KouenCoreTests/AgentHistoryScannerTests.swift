@@ -5,7 +5,15 @@ import XCTest
 
 final class AgentHistoryScannerTests: XCTestCase {
     func testScanAllReturnsRecords() async {
-        let scanner = AgentHistoryScanner()
+        let tempDBPath = FileManager.default.temporaryDirectory
+            .appendingPathComponent("test_agent_history_\(UUID().uuidString).sqlite").path
+        defer {
+            try? FileManager.default.removeItem(atPath: tempDBPath)
+            try? FileManager.default.removeItem(atPath: tempDBPath + "-shm")
+            try? FileManager.default.removeItem(atPath: tempDBPath + "-wal")
+        }
+        let fts = AgentHistoryFTSIndex(dbPath: tempDBPath)
+        let scanner = AgentHistoryScanner(ftsIndex: fts)
         let records = await scanner.scanAll()
         // Scanner successfully runs and produces an array without crashing or throwing
         XCTAssertNotNil(records)
