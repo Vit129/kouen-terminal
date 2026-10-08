@@ -139,11 +139,34 @@ final class SessionLifecycleService {
         }
     }
 
-    func openDefaultTerminalLaunch(_ launch: DefaultTerminalLaunchRequest) {
+    /// Creates a new session — what ⌘T does — and returns its tab. The tab bar shows one entry
+    /// per session, so `.newTab` (a hidden tab inside the current session) looks like it replaced
+    /// the visible one.
+    func newSessionTab(workspaceID: WorkspaceID, cwd: String, name: String?) async -> TabID? {
+        guard case let .sessionID(sessionID)? = await coord.requestDaemon(.newSession(
+            workspaceID: workspaceID, cwd: cwd, name: name, shell: coord.settings.defaultShell
+        )) else {
+            await coord.syncFromDaemon()
+            return nil
+        }
+        await coord.syncFromDaemon()
+        return coord.snapshot.workspaces.first { $0.id == workspaceID }?
+            .sessions.first { $0.id == sessionID }?.tabs.first?.id
+    }
+
+    func openDefaultTerminalLaunch(_ launch: DefaultTerminalLaunchRequest, inNewSession: Bool = false) {
         guard let workspaceID = coord.snapshot.activeWorkspace?.id ?? coord.snapshot.workspaces.first?.id else { return }
         let cwd = launch.cwd ?? coord.settings.defaultCWD
         Task {
-            guard case let .tabID(tabID)? = await coord.requestDaemon(.newTab(workspaceID: workspaceID, cwd: cwd, shell: coord.settings.defaultShell)) else {
+            let created: TabID?
+            if inNewSession {
+                created = await newSessionTab(workspaceID: workspaceID, cwd: cwd, name: launch.title)
+            } else if case let .tabID(id)? = await coord.requestDaemon(.newTab(workspaceID: workspaceID, cwd: cwd, shell: coord.settings.defaultShell)) {
+                created = id
+            } else {
+                created = nil
+            }
+            guard let tabID = created else {
                 await coord.syncFromDaemon()
                 return
             }
