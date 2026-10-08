@@ -734,8 +734,7 @@ final class KouenSidebarPanelViewController: NSViewController {
         resumeAgentSession(record)
     }
 
-    /// Resumes in a new tab inside the current session — the original one-button behavior.
-    /// Fastest option, but shares the current session's worktree/branch (if any).
+    /// Resumes in a new session, the same as ⌘T, so it gets its own entry in the tab bar.
     private func resumeAgentSession(_ record: AgentSessionRecord) {
         let cmd = Self.resumeCommand(for: record)
         let req = DefaultTerminalLaunchRequest(
@@ -743,7 +742,7 @@ final class KouenSidebarPanelViewController: NSViewController {
             cwd: record.projectPath,
             title: "\(record.agentKind.displayName): \(record.projectName)"
         )
-        SessionCoordinator.shared.sessionLifecycleService.openDefaultTerminalLaunch(req)
+        SessionCoordinator.shared.sessionLifecycleService.openDefaultTerminalLaunch(req, inNewSession: true)
     }
 
     /// The session's original path, or — when it's gone (e.g. its worktree was removed) — the repo
@@ -806,11 +805,11 @@ final class KouenSidebarPanelViewController: NSViewController {
         let log = Logger(subsystem: "com.vit129.kouen", category: "handoff")
         log.info("handoff: \(record.agentKind.rawValue, privacy: .public) -> \(targetKind.rawValue, privacy: .public), mode \(mode.rawValue, privacy: .public), cwd \(cwd, privacy: .public)")
         Task { @MainActor in
-            guard case let .tabID(tabID)? = await coord.requestDaemon(.newTab(
+            guard let tabID = await coord.sessionLifecycleService.newSessionTab(
                 workspaceID: workspaceID,
                 cwd: cwd,
-                shell: coord.settings.defaultShell
-            )) else {
+                name: "Handoff: \(targetKind.displayName)"
+            ) else {
                 log.error("handoff: daemon did not create the new tab")
                 await coord.syncFromDaemon()
                 return
