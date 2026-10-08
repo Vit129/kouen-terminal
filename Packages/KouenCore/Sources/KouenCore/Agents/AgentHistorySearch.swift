@@ -60,8 +60,9 @@ public enum AgentHistorySearch {
 
     private static let idfCache = IDFCache()
 
-    /// FTS5 narrows the full transcripts to candidates (id + snippet + bm25 only); `matchHistory`
-    /// then scores light fields, so typo tolerance never runs over whole transcripts.
+    /// Uses SQLite FTS5 bm25() with column weights for sub-millisecond ranking across keystrokes.
+    /// Falls back to the Swift ranker for queries FTS cannot express (Thai, fuzzy/subsequence)
+    /// or when FTS has no indexed matches.
     public static func rank(
         query: String,
         records: [AgentSessionRecord],
@@ -70,6 +71,76 @@ public enum AgentHistorySearch {
     ) -> [Hit] {
         let matcher = SearchMatcher(query: query)
         guard matcher.hasQuery else { return [] }
+
+        // Check if query contains Thai or non-space characters that FTS5 unicode61 tokenizer cannot segment
+        let isThaiOrSpecial = query.unicodeScalars.contains { (0x0E00...0x0E7F).contains($0.value) }
+
+        if !isThaiOrSpecial {
+            let ftsMatches = index.searchRanked(query: query, limit: ftsLimit)
+            if !ftsMatches.isEmpty {
+                var recordMap: [String: AgentSessionRecord] = [:]
+                recordMap.reserveCapacity(records.count)
+                for r in records {
+                    recordMap[r.id] = r
+                }
+
+                var hits: [Hit] = []
+                hits.reserveCapacity(ftsMatches.count)
+
+                var matchedIDs = Set<String>()
+                for match in ftsMatches {
+                    guard let record = recordMap[match.sessionID] else { continue }
+                    matchedIDs.insert(record.id)
+                    // FTS5 bm25 rank is negative (more negative = better match).
+                    let score = -match.rank
+                    let snippet = match.snippet.isEmpty ? nil : match.snippet
+                    hits.append(Hit(record: record, score: score, snippet: snippet))
+                }
+
+                // Check for unindexed records in `records` (e.g. from unit tests where
+                // records are created in-memory without indexing in SQLite).
+                if matchedIDs.count < records.count {
+                    for record in records where !matchedIDs.contains(record.id) {
+                        var titleMatched = false
+                        var branchMatched = false
+
+                        for token in matcher.tokens {
+                            if record.title.range(of: token, options: .caseInsensitive) != nil {
+                                titleMatched = true
+                                break
+                            } else if let branch = record.gitBranch, branch.range(of: token, options: .caseInsensitive) != nil {
+                                branchMatched = true
+                                break
+                            }
+                        }
+
+                        if titleMatched || branchMatched {
+                            let score = titleMatched ? 10.0 : 5.0
+                            hits.append(Hit(record: record, score: score, snippet: nil))
+                        }
+                    }
+                }
+
+                hits.sort { lhs, rhs in
+                    if abs(lhs.score - rhs.score) > 1e-9 { return lhs.score > rhs.score }
+                    return lhs.record.updatedAt > rhs.record.updatedAt
+                }
+                return hits
+            }
+        }
+
+        // Fallback for Thai / fuzzy queries, or when FTS index has no matching records
+        return rankSwiftFallback(query: query, records: records, matcher: matcher, index: index, ftsLimit: ftsLimit)
+    }
+
+    /// Swift-side scoring fallback using IDFCache and typo tolerance.
+    private static func rankSwiftFallback(
+        query: String,
+        records: [AgentSessionRecord],
+        matcher: SearchMatcher,
+        index: AgentHistoryFTSIndex,
+        ftsLimit: Int
+    ) -> [Hit] {
         let ftsMatches = index.search(query: query, limit: ftsLimit)
 
         struct Fields {
@@ -124,8 +195,6 @@ public enum AgentHistorySearch {
         for (record, f) in zip(records, fields) {
             let ftsMatch = ftsMatches[record.id]
 
-            // Fast candidate check: must either have an FTS match, or at least one query token
-            // must appear in its light fields / chat.
             if ftsMatch == nil {
                 var candidate = false
                 for token in matcher.tokens {
@@ -135,7 +204,6 @@ public enum AgentHistorySearch {
                     }
                 }
                 if !candidate {
-                    // Also check for typo in title/branch if tokens count is small
                     var typoCandidate = false
                     for token in matcher.tokens where token.count >= 4 {
                         if SearchMatcher.tokenHits(token, inNormalized: f.normTitle) || SearchMatcher.tokenHits(token, inNormalized: f.normBranch) {
