@@ -3,7 +3,7 @@ import KouenCore
 import KouenIPC
 import SwiftUI
 
-public enum HistoryScope: String, CaseIterable, Identifiable {
+public enum HistoryScope: String, CaseIterable, Identifiable, Sendable {
     case repo = "This repo"
     case all = "All repos"
 
@@ -48,22 +48,29 @@ public enum AgentHistoryDateGroup: String, CaseIterable, Comparable {
 
 @MainActor
 public final class AgentSessionHistoryModel: ObservableObject {
-    @Published public var records: [AgentSessionRecord] = []
+    @Published public var records: [AgentSessionRecord] = [] {
+        didSet {
+            scheduleFilter(debounceMs: 0)
+        }
+    }
     @Published public var searchQuery: String = "" {
         didSet {
             extraRecordsShown = 0
-            if selectedIndex >= displayRecords.count {
-                selectedIndex = max(0, displayRecords.count - 1)
-            }
+            scheduleFilter(debounceMs: 150)
         }
     }
     @Published public var selectedScope: HistoryScope = .repo {
         didSet {
             extraRecordsShown = 0
+            scheduleFilter(debounceMs: 0)
+            refresh(force: false)
+        }
+    }
+    @Published public var filteredRecords: [AgentSessionRecord] = [] {
+        didSet {
             if selectedIndex >= displayRecords.count {
                 selectedIndex = max(0, displayRecords.count - 1)
             }
-            refresh(force: false)
         }
     }
     @Published public var selectedIndex: Int = 0
@@ -74,12 +81,39 @@ public final class AgentSessionHistoryModel: ObservableObject {
     /// How many records beyond the default 14-day window are currently revealed via "Load More".
     @Published public var extraRecordsShown: Int = 0
 
+    /// Snippets extracted during search scoring, keyed by session id.
+    private var searchSnippets: [String: String] = [:]
+
+    /// Repo root resolver injected for testing or production.
+    public var repoRootResolver: @Sendable (String) -> String?
+    /// Active CWD provider injected for testing or production.
+    public var activeCWDProvider: @Sendable () -> String
+
+    /// Memoized repo root cache keyed by projectPath.
+    private var repoRootCache: [String: String] = [:]
+
+    private var filterTask: Task<Void, Never>?
+
     private let loadMoreBatchSize = 20
     private var minimumWindowStart: Date {
         Calendar.current.date(byAdding: .day, value: -14, to: Date()) ?? .distantPast
     }
 
-    public init() {}
+    public init(
+        repoRootResolver: @escaping @Sendable (String) -> String? = { WorktreeManager().repoRoot(for: $0) },
+        activeCWDProvider: (@Sendable () -> String)? = nil
+    ) {
+        self.repoRootResolver = repoRootResolver
+        if let activeCWDProvider {
+            self.activeCWDProvider = activeCWDProvider
+        } else {
+            self.activeCWDProvider = {
+                MainActor.assumeIsolated {
+                    SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd ?? ""
+                }
+            }
+        }
+    }
 
     public func refresh(force: Bool = true) {
         isLoading = true
@@ -118,21 +152,113 @@ public final class AgentSessionHistoryModel: ObservableObject {
         selectedIndex = max(0, min(total - 1, next))
     }
 
-    public var filteredRecords: [AgentSessionRecord] {
-        let matcher = SearchMatcher(query: searchQuery)
+    /// Applies filtering synchronously immediately (useful for unit tests or immediate refreshes).
+    public func applyFilterNow() {
+        filterTask?.cancel()
+        filterTask = nil
+        let (filtered, newCache, snippets) = Self.computeFiltered(
+            query: searchQuery,
+            scope: selectedScope,
+            records: records,
+            activeCWD: activeCWDProvider(),
+            resolver: repoRootResolver,
+            initialCache: repoRootCache
+        )
+        self.repoRootCache = newCache
+        self.searchSnippets = snippets
+        self.filteredRecords = filtered
+    }
 
-        // When a search query is active, ignore scope entirely and search all repos using ranked loose search
+    /// Schedules an asynchronous recomputation of filteredRecords.
+    /// Debounced ~150ms for query typing; stale search tasks are cancelled immediately.
+    public func scheduleFilter(debounceMs: UInt64 = 150) {
+        filterTask?.cancel()
+
+        let currentQuery = searchQuery
+        let currentScope = selectedScope
+        let currentRecords = records
+        let activeCWD = activeCWDProvider()
+        let resolver = repoRootResolver
+
+        let localCache = repoRootCache
+
+        filterTask = Task { [weak self] in
+            if debounceMs > 0 {
+                try? await Task.sleep(nanoseconds: debounceMs * 1_000_000)
+            }
+            if Task.isCancelled { return }
+
+            let (filtered, newCache, snippets) = await Self.runBackgroundFilter(
+                query: currentQuery,
+                scope: currentScope,
+                records: currentRecords,
+                activeCWD: activeCWD,
+                resolver: resolver,
+                initialCache: localCache
+            )
+
+            if Task.isCancelled { return }
+
+            self?.repoRootCache = newCache
+            self?.searchSnippets = snippets
+            self?.filteredRecords = filtered
+        }
+    }
+
+    nonisolated private static func runBackgroundFilter(
+        query: String,
+        scope: HistoryScope,
+        records: [AgentSessionRecord],
+        activeCWD: String,
+        resolver: @Sendable (String) -> String?,
+        initialCache: [String: String]
+    ) async -> (filtered: [AgentSessionRecord], cache: [String: String], snippets: [String: String]) {
+        computeFiltered(
+            query: query,
+            scope: scope,
+            records: records,
+            activeCWD: activeCWD,
+            resolver: resolver,
+            initialCache: initialCache
+        )
+    }
+
+    nonisolated private static func computeFiltered(
+        query: String,
+        scope: HistoryScope,
+        records: [AgentSessionRecord],
+        activeCWD: String,
+        resolver: @Sendable (String) -> String?,
+        initialCache: [String: String]
+    ) -> (filtered: [AgentSessionRecord], cache: [String: String], snippets: [String: String]) {
+        var cache = initialCache
+        func resolveRoot(for path: String) -> String {
+            if let cached = cache[path] { return cached }
+            let root = resolver(path) ?? path
+            cache[path] = root
+            return root
+        }
+
+        let matcher = SearchMatcher(query: query)
+
+        // 1. When search query is active, ignore scope entirely and search all records using ranked search
         if matcher.hasQuery {
-            let ftsMatches = AgentHistoryFTSIndex.shared.search(query: searchQuery)
+            // FTS search returns only session_id + short snippet() + bm25() rank, ORDER BY rank LIMIT 200
+            let ftsMatches = AgentHistoryFTSIndex.shared.search(query: query, limit: 200)
             var scored: [(record: AgentSessionRecord, score: Double)] = []
+            var extractedSnippets: [String: String] = [:]
 
             for record in records {
                 let turnsContent = record.latestTurns.map(\.content).joined(separator: "\n")
                 let ftsMatch = ftsMatches[record.id]
 
-                // Combine latest turns with full transcript if indexed by FTS
-                let fullText = ftsMatch?.fullTranscript ?? ""
-                let chatContent = fullText.isEmpty ? "\(record.firstPrompt)\n\(turnsContent)" : "\(record.firstPrompt)\n\(turnsContent)\n\(fullText)"
+                // Chat content includes first prompt, latest turns, and short FTS snippet if present (never full transcript)
+                let chatContent: String
+                if let snippet = ftsMatch?.snippet, !snippet.isEmpty {
+                    chatContent = "\(record.firstPrompt)\n\(turnsContent)\n\(snippet)"
+                } else {
+                    chatContent = "\(record.firstPrompt)\n\(turnsContent)"
+                }
 
                 var branchFilesTools = record.gitBranch ?? ""
                 if let files = ftsMatch?.filesEdited, !files.isEmpty {
@@ -144,15 +270,26 @@ public final class AgentSessionHistoryModel: ObservableObject {
 
                 let repoAgent = "\(record.projectName) \(record.agentKind.displayName)"
 
+                // matchHistory runs on light fields only: title, branchFilesTools, repoAgent, chatContent
                 if let match = matcher.matchHistory(
                     title: record.title,
                     branchFilesTools: branchFilesTools,
                     repoAgent: repoAgent,
                     chatContent: chatContent
                 ) {
-                    scored.append((record: record, score: match.score))
+                    // Combine SearchMatcher score with bm25 rank if present (bm25 in SQLite is negative or smaller for better hits)
+                    var finalScore = match.score
+                    if let bm25Rank = ftsMatch?.rank {
+                        // bm25 produces lower/negative values for better matches; invert or boost
+                        finalScore += max(0.0, 1.0 / (1.0 + max(0.0, bm25Rank)))
+                    }
+                    scored.append((record: record, score: finalScore))
+                    if let snip = match.snippet ?? ftsMatch?.snippet, !snip.isEmpty {
+                        extractedSnippets[record.id] = snip
+                    }
                 }
             }
+
             // Sort primarily by score descending, then by updatedAt descending (recency)
             scored.sort { lhs, rhs in
                 if abs(lhs.score - rhs.score) > 0.001 {
@@ -160,18 +297,17 @@ public final class AgentSessionHistoryModel: ObservableObject {
                 }
                 return lhs.record.updatedAt > rhs.record.updatedAt
             }
-            return scored.map(\.record)
+            return (scored.map(\.record), cache, extractedSnippets)
         }
 
-        // When search query is empty, apply the selected scope
-        let activeCWD = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd ?? ""
-        let activeRepoRoot = WorktreeManager().repoRoot(for: activeCWD) ?? activeCWD
+        // 2. When search query is empty, apply the selected scope with cached repo roots
+        let activeRepoRoot = resolveRoot(for: activeCWD)
 
-        return records.filter { record in
-            switch selectedScope {
+        let filtered = records.filter { record in
+            switch scope {
             case .repo:
                 guard !activeRepoRoot.isEmpty else { return true }
-                let recordRepoRoot = WorktreeManager().repoRoot(for: record.projectPath) ?? record.projectPath
+                let recordRepoRoot = resolveRoot(for: record.projectPath)
                 if recordRepoRoot == activeRepoRoot {
                     return true
                 }
@@ -183,10 +319,14 @@ public final class AgentSessionHistoryModel: ObservableObject {
                 return true
             }
         }
+        return (filtered, cache, [:])
     }
 
     /// Extracts matching snippet in prompt or turns for content search display
     public func matchSnippet(for record: AgentSessionRecord) -> String? {
+        if let snip = searchSnippets[record.id], !snip.isEmpty {
+            return snip
+        }
         let matcher = SearchMatcher(query: searchQuery)
         guard matcher.hasQuery else { return nil }
         let turnsContent = record.latestTurns.map(\.content).joined(separator: "\n")

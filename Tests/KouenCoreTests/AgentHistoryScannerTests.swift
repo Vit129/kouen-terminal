@@ -290,8 +290,38 @@ final class AgentHistoryScannerTests: XCTestCase {
         XCTAssertEqual(hits.count, 1)
         XCTAssertNotNil(hits["long-session-42"])
         XCTAssertEqual(hits["long-session-42"]?.sessionID, "long-session-42")
-        XCTAssertTrue(hits["long-session-42"]?.fullTranscript.contains("quantumTeleportationProtocol") == true)
+        XCTAssertTrue(hits["long-session-42"]?.snippet.contains("quantumTeleportationProtocol") == true)
         XCTAssertEqual(hits["long-session-42"]?.filesEdited, "IndexTuner.swift")
         XCTAssertEqual(hits["long-session-42"]?.toolsCalled, "Edit Read")
+    }
+
+    func testFTSIndexRespectsLimit() {
+        let tempDB = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("test_fts_limit_\(UUID().uuidString).sqlite")
+        defer { try? FileManager.default.removeItem(at: tempDB) }
+
+        let index = AgentHistoryFTSIndex(dbPath: tempDB.path)
+
+        for i in 1...10 {
+            index.indexSession(
+                sessionID: "sess-\(i)",
+                title: "Session \(i)",
+                firstPrompt: "prompt \(i)",
+                fullTranscript: "debugging issue number \(i) with commonSearchTerm",
+                gitBranch: "main",
+                repoName: "test-repo",
+                agentName: "Claude",
+                filesEdited: "File\(i).swift",
+                toolsCalled: "Bash",
+                transcriptPath: "/tmp/sess-\(i).jsonl",
+                mtime: Date(),
+                fileSize: 100
+            )
+        }
+
+        let hitsLimit3 = index.search(query: "commonSearchTerm", limit: 3)
+        XCTAssertEqual(hitsLimit3.count, 3)
+
+        let hitsLimit5 = index.search(query: "commonSearchTerm", limit: 5)
+        XCTAssertEqual(hitsLimit5.count, 5)
     }
 }
