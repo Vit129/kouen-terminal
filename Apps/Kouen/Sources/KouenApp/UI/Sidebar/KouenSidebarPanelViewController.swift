@@ -673,26 +673,62 @@ final class KouenSidebarPanelViewController: NSViewController {
         return record.effectiveResumeCommand(mode: mode)
     }
 
-    /// Navigates to the active tab matching a live session if one exists in the window.
-    /// Falls back to resumeAgentSession if no live tab matches.
-    private func goToTabForAgentSession(_ record: AgentSessionRecord) {
-        let coord = SessionCoordinator.shared
-        for ws in coord.snapshot.workspaces {
+    /// Resolves the destination tab for an agent session record within the snapshot.
+    ///
+    /// 1. If an exact match for the session ID exists in tab metadata (e.g. notificationText or title containing the ID), jump directly.
+    /// 2. Otherwise fall back to cwd + effectiveAgentKind ONLY when exactly one tab matches.
+    /// 3. If multiple tabs match (ambiguous) or zero tabs match, returns nil to fall back to resuming in a new tab.
+    nonisolated static func resolveTargetTab(
+        for record: AgentSessionRecord,
+        in snapshot: SessionSnapshot
+    ) -> (workspaceID: WorkspaceID, tabID: TabID)? {
+        // 1. Direct session ID match if recorded on tab
+        for ws in snapshot.workspaces {
+            for session in ws.sessions {
+                for tab in session.tabs {
+                    if let notif = tab.notificationText, notif.contains(record.id) {
+                        return (workspaceID: ws.id, tabID: tab.id)
+                    }
+                    if tab.title.contains(record.id) {
+                        return (workspaceID: ws.id, tabID: tab.id)
+                    }
+                }
+            }
+        }
+
+        // 2. Candidate tabs matching path prefix and agent kind
+        var candidateTabs: [(workspaceID: WorkspaceID, tabID: TabID)] = []
+        for ws in snapshot.workspaces {
             for session in ws.sessions {
                 for tab in session.tabs {
                     let matchesPath = tab.cwd == record.projectPath || (!record.projectPath.isEmpty && tab.cwd.hasPrefix(record.projectPath))
                     let matchesAgent = tab.effectiveAgentKind == record.agentKind
                     if matchesPath && matchesAgent {
-                        coord.selectWorkspace(ws.id)
-                        coord.selectTab(workspaceID: ws.id, tabID: tab.id)
-                        if let surfaceID = coord.splitPaneCoordinator.firstSurfaceID(forTab: tab.id) {
-                            coord.setActiveSurface(surfaceID)
-                            coord.terminalHosts.host(for: surfaceID)?.focusTerminal()
-                        }
-                        return
+                        candidateTabs.append((workspaceID: ws.id, tabID: tab.id))
                     }
                 }
             }
+        }
+
+        // Only return if exactly one tab matches without ambiguity
+        if candidateTabs.count == 1 {
+            return candidateTabs[0]
+        }
+        return nil
+    }
+
+    /// Navigates to the active tab matching a live session if one uniquely exists in the window.
+    /// Falls back to resumeAgentSession if no live tab matches or if multiple tabs match ambiguously.
+    private func goToTabForAgentSession(_ record: AgentSessionRecord) {
+        let coord = SessionCoordinator.shared
+        if let target = Self.resolveTargetTab(for: record, in: coord.snapshot) {
+            coord.selectWorkspace(target.workspaceID)
+            coord.selectTab(workspaceID: target.workspaceID, tabID: target.tabID)
+            if let surfaceID = coord.splitPaneCoordinator.firstSurfaceID(forTab: target.tabID) {
+                coord.setActiveSurface(surfaceID)
+                coord.terminalHosts.host(for: surfaceID)?.focusTerminal()
+            }
+            return
         }
         // Fallback: resume in a new tab
         resumeAgentSession(record)

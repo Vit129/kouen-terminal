@@ -61,6 +61,7 @@ final class AgentSessionHistoryModelTests: XCTestCase {
         // Empty query with .repo scope filters out /repo/two if active repo doesn't match
         // But when searching for "older", it matches r2 regardless of scope AND 14-day cutoff
         model.searchQuery = "older"
+        model.applyFilterNow()
         XCTAssertEqual(model.filteredRecords.count, 1)
         XCTAssertEqual(model.filteredRecords.first?.id, "r2")
         XCTAssertEqual(model.windowedRecords.count, 1)
@@ -80,6 +81,7 @@ final class AgentSessionHistoryModelTests: XCTestCase {
         model.records = [r1, r2]
         model.selectedScope = .all
         model.searchQuery = ""
+        model.applyFilterNow()
 
         let groups = model.groupedRecords
         XCTAssertEqual(groups.count, 2)
@@ -94,6 +96,7 @@ final class AgentSessionHistoryModelTests: XCTestCase {
         let model = AgentSessionHistoryModel()
         model.records = [r1, r2]
         model.selectedScope = .all
+        model.applyFilterNow()
 
         XCTAssertEqual(model.selectedIndex, 0)
         model.moveSelection(by: 1)
@@ -106,5 +109,122 @@ final class AgentSessionHistoryModelTests: XCTestCase {
         // Clamped at top
         model.moveSelection(by: -1)
         XCTAssertEqual(model.selectedIndex, 0)
+    }
+
+    func testRepoRootResolutionNotCalledPerRender() {
+        final class Counter: @unchecked Sendable {
+            var count = 0
+            let lock = NSLock()
+            func increment() {
+                lock.lock()
+                defer { lock.unlock() }
+                count += 1
+            }
+            func get() -> Int {
+                lock.lock()
+                defer { lock.unlock() }
+                return count
+            }
+        }
+
+        let counter = Counter()
+        let resolver: @Sendable (String) -> String? = { path in
+            counter.increment()
+            return path
+        }
+
+        let r1 = makeRecord(id: "r1", title: "Task 1", projectPath: "/repo/one")
+        let r2 = makeRecord(id: "r2", title: "Task 2", projectPath: "/repo/one")
+        let r3 = makeRecord(id: "r3", title: "Task 3", projectPath: "/repo/two")
+
+        let model = AgentSessionHistoryModel(
+            repoRootResolver: resolver,
+            activeCWDProvider: { "/repo/one" }
+        )
+        model.records = [r1, r2, r3]
+        model.selectedScope = .repo
+        model.applyFilterNow()
+
+        let countAfterFilter = counter.get()
+        // /repo/one (active) + /repo/one (r1, cached for r2) + /repo/two (r3) -> exactly 2 distinct paths resolved
+        XCTAssertLessThanOrEqual(countAfterFilter, 3)
+
+        // Reading computed render properties repeatedly (windowedRecords, hasMoreToLoad, displayRecords, groupedRecords)
+        // MUST NOT invoke the resolver again!
+        for _ in 0..<10 {
+            _ = model.filteredRecords
+            _ = model.windowedRecords
+            _ = model.hasMoreToLoad
+            _ = model.displayRecords
+            _ = model.groupedRecords
+            _ = model.selectedRecord
+        }
+
+        XCTAssertEqual(counter.get(), countAfterFilter, "Repo root resolver must never be called during render property evaluation")
+    }
+
+    func testDebounceProducesResultsAsynchronously() async {
+        let r1 = makeRecord(id: "r1", title: "Refactor database engine")
+        let r2 = makeRecord(id: "r2", title: "Update web styling")
+
+        let model = AgentSessionHistoryModel()
+        model.records = [r1, r2]
+        model.selectedScope = .all
+
+        // Type query - filteredRecords initially not updated synchronously
+        model.searchQuery = "database"
+        // Wait for debounce ~150ms + background task completion
+        try? await Task.sleep(nanoseconds: 250_000_000)
+
+        XCTAssertEqual(model.filteredRecords.count, 1)
+        XCTAssertEqual(model.filteredRecords.first?.id, "r1")
+    }
+
+    func testGoToTabAmbiguityFallsBackToResume() {
+        let sessionID = UUID()
+        let tab1 = Tab(
+            id: UUID(),
+            title: "Claude Terminal 1",
+            cwd: "/Users/test/my-repo",
+            gitBranch: "main",
+            listeningPorts: [],
+            notificationText: nil,
+            status: .idle,
+            rootPane: .leaf(PaneLeaf()),
+            sortOrder: 0,
+            agent: AgentSnapshot(kind: .claudeCode, executable: "claude", pid: 101)
+        )
+        let tab2 = Tab(
+            id: UUID(),
+            title: "Claude Terminal 2",
+            cwd: "/Users/test/my-repo",
+            gitBranch: "main",
+            listeningPorts: [],
+            notificationText: nil,
+            status: .idle,
+            rootPane: .leaf(PaneLeaf()),
+            sortOrder: 1,
+            agent: AgentSnapshot(kind: .claudeCode, executable: "claude", pid: 102)
+        )
+        let session = SessionGroup(id: sessionID, name: "Dev", tabs: [tab1, tab2])
+        let workspaceID = UUID()
+        let workspace = Workspace(id: workspaceID, name: "Workspace", sessions: [session])
+        let snapshot = SessionSnapshot(workspaces: [workspace], activeWorkspaceID: workspaceID)
+
+        let record = makeRecord(id: "non-existent-session-id", title: "Work", projectPath: "/Users/test/my-repo")
+
+        // Two tabs match cwd + agentKind -> ambiguous -> must return nil (fall back to resume)
+        let resolved = KouenSidebarPanelViewController.resolveTargetTab(for: record, in: snapshot)
+        XCTAssertNil(resolved, "Ambiguous tabs (multiple matching same cwd and agent kind) must return nil to trigger resume in a new tab")
+
+        // Exact match by tab title containing session id succeeds unambiguously
+        let exactRecord = makeRecord(id: "match-me-123", title: "Specific", projectPath: "/Users/test/my-repo")
+        var tabWithID = tab1
+        tabWithID.title = "Agent [match-me-123]"
+        let snapshotWithExact = SessionSnapshot(workspaces: [Workspace(id: workspaceID, name: "W", sessions: [SessionGroup(id: sessionID, name: "S", tabs: [tabWithID, tab2])])])
+
+        let exactResolved = KouenSidebarPanelViewController.resolveTargetTab(for: exactRecord, in: snapshotWithExact)
+        XCTAssertNotNil(exactResolved)
+        XCTAssertEqual(exactResolved.map(\.tabID), tabWithID.id)
     }
 }

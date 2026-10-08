@@ -17,15 +17,25 @@ public struct ExtractedTranscriptContent: Sendable, Equatable {
 }
 
 /// A search hit from the SQLite FTS5 index.
+/// Note: Typo tolerance is evaluated on light fields by SearchMatcher; the FTS index
+/// performs fast token-prefix full-text searching over transcripts without loading them into memory.
 public struct AgentHistoryFTSMatch: Sendable, Equatable {
     public let sessionID: String
-    public let fullTranscript: String
+    public let snippet: String
+    public let rank: Double
     public let filesEdited: String
     public let toolsCalled: String
 
-    public init(sessionID: String, fullTranscript: String = "", filesEdited: String = "", toolsCalled: String = "") {
+    public init(
+        sessionID: String,
+        snippet: String = "",
+        rank: Double = 0.0,
+        filesEdited: String = "",
+        toolsCalled: String = ""
+    ) {
         self.sessionID = sessionID
-        self.fullTranscript = fullTranscript
+        self.snippet = snippet
+        self.rank = rank
         self.filesEdited = filesEdited
         self.toolsCalled = toolsCalled
     }
@@ -193,7 +203,11 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
 
     /// Searches the FTS5 index for sessions matching query tokens.
     /// Returns dictionary mapping session_id to its match metadata.
-    public func search(query: String) -> [String: AgentHistoryFTSMatch] {
+    ///
+    /// Note: Returns only session_id, short snippet, bm25 rank, and edited files / tools.
+    /// Does not load full transcripts into memory. Typo tolerance is handled on light fields
+    /// by SearchMatcher.
+    public func search(query: String, limit: Int = 200) -> [String: AgentHistoryFTSMatch] {
         lock.lock()
         defer { lock.unlock() }
         guard let db else { return [:] }
@@ -212,27 +226,32 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
         }.joined(separator: " OR ")
 
         let sql = """
-        SELECT session_id, full_transcript, files_edited, tools_called
+        SELECT session_id, snippet(session_fts, 3, '', '', '...', 15), bm25(session_fts), files_edited, tools_called
         FROM session_fts
         WHERE session_fts MATCH ?
+        ORDER BY rank
+        LIMIT ?
         """
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [:] }
         defer { sqlite3_finalize(stmt) }
 
         sqlite3_bind_text(stmt, 1, ftsQuery, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        sqlite3_bind_int(stmt, 2, Int32(limit))
 
         var results: [String: AgentHistoryFTSMatch] = [:]
         while sqlite3_step(stmt) == SQLITE_ROW {
             guard let idCStr = sqlite3_column_text(stmt, 0) else { continue }
             let id = String(cString: idCStr)
-            let fullTranscript = sqlite3_column_text(stmt, 1).map { String(cString: $0) } ?? ""
-            let filesEdited = sqlite3_column_text(stmt, 2).map { String(cString: $0) } ?? ""
-            let toolsCalled = sqlite3_column_text(stmt, 3).map { String(cString: $0) } ?? ""
+            let snippet = sqlite3_column_text(stmt, 1).map { String(cString: $0) } ?? ""
+            let rank = sqlite3_column_double(stmt, 2)
+            let filesEdited = sqlite3_column_text(stmt, 3).map { String(cString: $0) } ?? ""
+            let toolsCalled = sqlite3_column_text(stmt, 4).map { String(cString: $0) } ?? ""
 
             results[id] = AgentHistoryFTSMatch(
                 sessionID: id,
-                fullTranscript: fullTranscript,
+                snippet: snippet,
+                rank: rank,
                 filesEdited: filesEdited,
                 toolsCalled: toolsCalled
             )
@@ -255,6 +274,6 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
         mtime: Date,
         fileSize: Int
     ) {}
-    public func search(query: String) -> [String: AgentHistoryFTSMatch] { [:] }
+    public func search(query: String, limit: Int = 200) -> [String: AgentHistoryFTSMatch] { [:] }
     #endif
 }
