@@ -333,7 +333,7 @@ public actor FileTreeWatcher {
                 ? String(path.dropFirst(rootPrefix.count))
                 : path
 
-            if let directCategory = matcher.matchCategory(name: name, relativePath: relativePath, allowFuzzy: false) {
+            if let category = matcher.matchCategory(name: name, relativePath: relativePath, allowFuzzy: true) {
                 let node = FileNode(
                     id: path,
                     name: name,
@@ -342,17 +342,12 @@ public actor FileTreeWatcher {
                     children: nil,
                     gitStatus: .unmodified
                 )
-                directMatches.append(ScoredMatch(node: node, category: directCategory, relativePath: relativePath))
-            } else if let fuzzyCategory = matcher.matchCategory(name: name, relativePath: relativePath, allowFuzzy: true) {
-                let node = FileNode(
-                    id: path,
-                    name: name,
-                    path: path,
-                    isDirectory: isDirectory,
-                    children: nil,
-                    gitStatus: .unmodified
-                )
-                fuzzyMatches.append(ScoredMatch(node: node, category: fuzzyCategory, relativePath: relativePath))
+                let match = ScoredMatch(node: node, category: category, relativePath: relativePath)
+                if category == .fuzzy {
+                    fuzzyMatches.append(match)
+                } else {
+                    directMatches.append(match)
+                }
             }
         }
 

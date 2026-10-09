@@ -606,6 +606,7 @@ final class KouenSidebarPanelViewController: NSViewController {
     }
 
     private func setupSessionHistoryView() {
+        sessionHistoryModel.warmUp()
         let historyView = AgentSessionHistoryView(
             model: sessionHistoryModel,
             onResume: { [weak self] record in
