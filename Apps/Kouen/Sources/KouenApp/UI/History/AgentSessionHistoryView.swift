@@ -237,16 +237,70 @@ public final class AgentSessionHistoryModel: ObservableObject {
         selectedIndex = max(0, min(total - 1, next))
     }
 
+    /// Groups sessions across different repositories working on the same task into a single composite entry.
+    public static func groupCrossRepoTasks(_ records: [AgentSessionRecord]) -> [AgentSessionRecord] {
+        guard records.count > 1 else { return records }
+
+        // Find candidate branches that are not main/master and occur across multiple projects
+        var branchMap: [String: [AgentSessionRecord]] = [:]
+        for record in records {
+            guard let branch = record.gitBranch,
+                  !branch.isEmpty,
+                  branch != "main",
+                  branch != "master" else { continue }
+            branchMap[branch, default: []].append(record)
+        }
+
+        // Keep only branches where distinct project names > 1, picking the latest session per repo
+        var validGroups: [String: [AgentSessionRecord]] = [:]
+        for (branch, sessions) in branchMap {
+            let sorted = sessions.sorted { $0.updatedAt > $1.updatedAt }
+            var seenProjects = Set<String>()
+            var perRepoSessions: [AgentSessionRecord] = []
+            for s in sorted {
+                if !seenProjects.contains(s.projectName) {
+                    seenProjects.insert(s.projectName)
+                    perRepoSessions.append(s)
+                }
+            }
+            if perRepoSessions.count > 1 {
+                validGroups[branch] = perRepoSessions
+            }
+        }
+
+        guard !validGroups.isEmpty else { return records }
+
+        var seenGroupBranches = Set<String>()
+        var result: [AgentSessionRecord] = []
+
+        for record in records {
+            if let branch = record.gitBranch, let siblings = validGroups[branch] {
+                if seenGroupBranches.contains(branch) {
+                    continue
+                }
+                seenGroupBranches.insert(branch)
+                let primary = siblings.first ?? record
+                result.append(primary.withCrossRepoSiblings(siblings))
+            } else {
+                result.append(record)
+            }
+        }
+
+        return result
+    }
+
     private func recomputeDerivedLists() {
-        let windowed: [AgentSessionRecord]
+        let rawWindowed: [AgentSessionRecord]
         if !searchQuery.isEmpty {
-            windowed = filteredRecords
+            rawWindowed = filteredRecords
         } else {
             let list = filteredRecords
             let withinMinimumWindow = list.prefix(while: { $0.updatedAt >= minimumWindowStart }).count
             let visibleCount = max(withinMinimumWindow, extraRecordsShown)
-            windowed = Array(list.prefix(visibleCount))
+            rawWindowed = Array(list.prefix(visibleCount))
         }
+
+        let windowed = Self.groupCrossRepoTasks(rawWindowed)
         cachedWindowedRecords = windowed
 
         let grouped: [(title: String, records: [AgentSessionRecord])]
@@ -636,6 +690,13 @@ public struct AgentSessionHistoryView: View {
                     }
                 }
             }
+
+            // Footer bar
+            Divider()
+                .overlay(Color(nsColor: c.border))
+            footerView
+                .padding(.horizontal, KouenDesign.Spacing.sm)
+                .padding(.vertical, 5)
         }
         .onAppear {
             if model.records.isEmpty {
@@ -650,12 +711,15 @@ public struct AgentSessionHistoryView: View {
             model.moveSelection(by: 1)
             return .handled
         }
-        .onKeyPress(.return, phases: .down) { _ in
-            if let selected = model.selectedRecord {
+        .onKeyPress(.return, phases: .down) { press in
+            guard let selected = model.selectedRecord else { return .ignored }
+            if press.modifiers.contains(.option) {
+                showOptionMenu(for: selected)
+                return .handled
+            } else {
                 triggerPrimaryAction(for: selected)
                 return .handled
             }
-            return .ignored
         }
     }
 
@@ -782,14 +846,35 @@ public struct AgentSessionHistoryView: View {
         }
     }
 
-    // MARK: - Compact Row (Two-line)
+    // MARK: - Footer
+    @ViewBuilder
+    private var footerView: some View {
+        let c = KouenDesign.chrome
+        let totalCount = model.displayRecords.count
+        let repoSuffix = (model.selectedScope == .all || !model.searchQuery.isEmpty) ? " · all repos" : ""
+        let countText = "\(totalCount) session\(totalCount == 1 ? "" : "s")\(repoSuffix)"
+
+        HStack {
+            Text(countText)
+                .font(.system(size: 10))
+                .foregroundStyle(Color(nsColor: c.textTertiary))
+            Spacer()
+            Text("↑↓ · ⏎ resume · ⌥⏎ menu")
+                .font(.system(size: 9.5))
+                .foregroundStyle(Color(nsColor: c.textTertiary))
+        }
+    }
+
+    // MARK: - Compact Row (Two-line & Cross-Repo Grouping)
     @ViewBuilder
     private func sessionRow(record: AgentSessionRecord) -> some View {
         let c = KouenDesign.chrome
         let isSelected = model.selectedRecordID == record.id
         let isLive = record.liveStatus != nil || record.placement == .cloud || record.placement == .background || record.placement == .remoteControl
         let showRepo = model.selectedScope == .all || !model.searchQuery.isEmpty
-        let isNotMainBranch = record.gitBranch != nil && !record.gitBranch!.isEmpty && record.gitBranch != "main"
+        let isNotMainBranch = record.gitBranch != nil && !record.gitBranch!.isEmpty && record.gitBranch != "main" && record.gitBranch != "master"
+        let siblings = record.crossRepoSiblings ?? []
+        let isCrossRepoGroup = siblings.count > 1
 
         VStack(alignment: .leading, spacing: 3) {
             Button {
@@ -798,105 +883,261 @@ public struct AgentSessionHistoryView: View {
                 }
             } label: {
                 VStack(alignment: .leading, spacing: 3) {
-                    // Line 1: Title (Truncated)
-                    Text(record.title.isEmpty ? "Untitled Session" : record.title)
-                        .font(.system(size: 11, weight: isSelected ? .semibold : .medium))
-                        .foregroundStyle(Color(nsColor: isSelected ? c.textPrimary : c.textSecondary))
-                        .lineLimit(1)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    // Line 1: Title
+                    highlightedText(
+                        record.title.isEmpty ? "Untitled Session" : record.title,
+                        query: model.searchQuery,
+                        baseColor: isSelected ? c.textPrimary : c.textSecondary,
+                        highlightColor: NSColor.controlAccentColor,
+                        fontSize: 11,
+                        weight: isSelected ? .semibold : .medium
+                    )
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
-                    // Line 2: Metadata (agent · live · msgs · age · repo · branch)
-                    HStack(spacing: 4) {
-                        AgentBadgeView(kind: record.agentKind, iconSize: 10, fontSize: 8.5, showName: false)
-
-                        if let tag = record.surfaceTag {
-                            Text(tag)
-                                .font(.system(size: 8, weight: .semibold))
-                                .padding(.horizontal, 3)
-                                .padding(.vertical, 1)
-                                .background(Color(nsColor: c.surfaceElevated))
-                                .cornerRadius(3)
-                                .foregroundStyle(Color(nsColor: c.textSecondary))
-                        }
-
-                        if isLive {
-                            HStack(spacing: 2) {
-                                Circle()
-                                    .fill(Color(nsColor: c.success))
-                                    .frame(width: 5, height: 5)
-                                Text("live")
-                                    .font(.system(size: 9, weight: .medium))
-                                    .foregroundStyle(Color(nsColor: c.success))
-                            }
-                            Text("·")
-                                .font(.system(size: 8))
-                                .foregroundStyle(Color(nsColor: c.textTertiary))
-                        }
-
-                        Text("\(record.messageCount) msgs")
-                            .font(.system(size: 9))
-                            .foregroundStyle(Color(nsColor: c.textTertiary))
-
-                        Text("·")
-                            .font(.system(size: 8))
-                            .foregroundStyle(Color(nsColor: c.textTertiary))
-
-                        Text(relativeDate(record.updatedAt))
-                            .font(.system(size: 9))
-                            .foregroundStyle(Color(nsColor: c.textTertiary))
-
-                        if showRepo && !record.projectName.isEmpty {
-                            Text("·")
-                                .font(.system(size: 8))
-                                .foregroundStyle(Color(nsColor: c.textTertiary))
-                            Text(record.projectName)
+                    if isCrossRepoGroup {
+                        // Line 2 for Cross-Repo group: age · ⇄ same task in N repos
+                        HStack(spacing: 4) {
+                            Text(relativeDate(record.updatedAt))
                                 .font(.system(size: 9))
-                                .foregroundStyle(Color(nsColor: c.textSecondary))
-                                .lineLimit(1)
-                        }
+                                .foregroundStyle(Color(nsColor: c.textTertiary))
 
-                        if isNotMainBranch, let branch = record.gitBranch {
                             Text("·")
                                 .font(.system(size: 8))
                                 .foregroundStyle(Color(nsColor: c.textTertiary))
+
                             HStack(spacing: 2) {
-                                Image(systemName: "arrow.triangle.branch")
-                                    .font(.system(size: 7.5))
-                                Text(branch)
-                                    .font(.system(size: 9))
-                                    .lineLimit(1)
+                                Text("⇄")
+                                    .font(.system(size: 9, weight: .bold))
+                                Text("same task in \(siblings.count) repos")
+                                    .font(.system(size: 9, weight: .semibold))
                             }
-                            .foregroundStyle(Color(nsColor: c.textTertiary))
+                            .foregroundStyle(Color(nsColor: c.success))
+
+                            Spacer(minLength: 0)
                         }
 
-                        Spacer(minLength: 0)
-                    }
+                        // Sub-lines for each repo participating in the task
+                        VStack(alignment: .leading, spacing: 2) {
+                            ForEach(siblings) { sib in
+                                HStack(spacing: 4) {
+                                    AgentBadgeView(kind: sib.agentKind, iconSize: 9, fontSize: 8, showName: false)
 
-                    // Content snippet if matching query
-                    if let snippet = model.matchSnippet(for: record) {
-                        HStack(alignment: .top, spacing: 4) {
-                            Image(systemName: "text.magnifyingglass")
-                                .font(.system(size: 8))
-                                .foregroundStyle(Color.accentColor)
-                            Text(snippet)
-                                .font(.system(size: 9))
-                                .foregroundStyle(Color(nsColor: c.textSecondary))
-                                .lineLimit(1)
+                                    if let tag = sib.surfaceTag {
+                                        Text(tag)
+                                            .font(.system(size: 7.5, weight: .semibold))
+                                            .padding(.horizontal, 2.5)
+                                            .padding(.vertical, 0.5)
+                                            .background(Color(nsColor: c.surfaceElevated))
+                                            .cornerRadius(2.5)
+                                            .foregroundStyle(Color(nsColor: c.textSecondary))
+                                    }
+
+                                    highlightedText(
+                                        sib.projectName,
+                                        query: model.searchQuery,
+                                        baseColor: c.textPrimary,
+                                        highlightColor: NSColor.controlAccentColor,
+                                        fontSize: 9.5,
+                                        weight: .semibold
+                                    )
+
+                                    if let branch = sib.gitBranch {
+                                        HStack(spacing: 2) {
+                                            Image(systemName: "arrow.triangle.branch")
+                                                .font(.system(size: 7.5))
+                                            highlightedText(
+                                                branch,
+                                                query: model.searchQuery,
+                                                baseColor: c.textTertiary,
+                                                highlightColor: NSColor.controlAccentColor,
+                                                fontSize: 9,
+                                                weight: .regular
+                                            )
+                                        }
+                                    }
+                                    Spacer(minLength: 0)
+                                }
+                                .padding(.leading, 6)
+                                .overlay(
+                                    Rectangle()
+                                        .fill(Color(nsColor: c.border))
+                                        .frame(width: 2),
+                                    alignment: .leading
+                                )
+                            }
                         }
                         .padding(.top, 1)
+
+                    } else {
+                        // Line 2 for Standalone session: Metadata (agent · live · msgs · age · repo · branch)
+                        HStack(spacing: 4) {
+                            AgentBadgeView(kind: record.agentKind, iconSize: 10, fontSize: 8.5, showName: false)
+
+                            if let tag = record.surfaceTag {
+                                Text(tag)
+                                    .font(.system(size: 8, weight: .semibold))
+                                    .padding(.horizontal, 3)
+                                    .padding(.vertical, 1)
+                                    .background(Color(nsColor: c.surfaceElevated))
+                                    .cornerRadius(3)
+                                    .foregroundStyle(Color(nsColor: c.textSecondary))
+                            }
+
+                            if isLive {
+                                HStack(spacing: 2) {
+                                    Circle()
+                                        .fill(Color(nsColor: c.success))
+                                        .frame(width: 5, height: 5)
+                                    Text("live")
+                                        .font(.system(size: 9, weight: .medium))
+                                        .foregroundStyle(Color(nsColor: c.success))
+                                }
+                                Text("·")
+                                    .font(.system(size: 8))
+                                    .foregroundStyle(Color(nsColor: c.textTertiary))
+                            }
+
+                            Text("\(record.messageCount) msgs")
+                                .font(.system(size: 9))
+                                .foregroundStyle(Color(nsColor: c.textTertiary))
+
+                            Text("·")
+                                .font(.system(size: 8))
+                                .foregroundStyle(Color(nsColor: c.textTertiary))
+
+                            Text(relativeDate(record.updatedAt))
+                                .font(.system(size: 9))
+                                .foregroundStyle(Color(nsColor: c.textTertiary))
+
+                            if showRepo && !record.projectName.isEmpty {
+                                Text("·")
+                                    .font(.system(size: 8))
+                                    .foregroundStyle(Color(nsColor: c.textTertiary))
+                                highlightedText(
+                                    record.projectName,
+                                    query: model.searchQuery,
+                                    baseColor: c.textSecondary,
+                                    highlightColor: NSColor.controlAccentColor,
+                                    fontSize: 9,
+                                    weight: .regular
+                                )
+                                .lineLimit(1)
+                            }
+
+                            if isNotMainBranch, let branch = record.gitBranch {
+                                Text("·")
+                                    .font(.system(size: 8))
+                                    .foregroundStyle(Color(nsColor: c.textTertiary))
+                                HStack(spacing: 2) {
+                                    Image(systemName: "arrow.triangle.branch")
+                                        .font(.system(size: 7.5))
+                                    highlightedText(
+                                        branch,
+                                        query: model.searchQuery,
+                                        baseColor: c.textTertiary,
+                                        highlightColor: NSColor.controlAccentColor,
+                                        fontSize: 9,
+                                        weight: .regular
+                                    )
+                                    .lineLimit(1)
+                                }
+                                .foregroundStyle(Color(nsColor: c.textTertiary))
+                            }
+
+                            Spacer(minLength: 0)
+                        }
+
+                        // Content snippet if matching query
+                        if let snippet = model.matchSnippet(for: record) {
+                            HStack(alignment: .top, spacing: 4) {
+                                Image(systemName: "text.magnifyingglass")
+                                    .font(.system(size: 8))
+                                    .foregroundStyle(Color.accentColor)
+                                highlightedText(
+                                    snippet,
+                                    query: model.searchQuery,
+                                    baseColor: c.textSecondary,
+                                    highlightColor: NSColor.controlAccentColor,
+                                    fontSize: 9,
+                                    weight: .regular
+                                )
+                                .lineLimit(1)
+                            }
+                            .padding(.top, 1)
+                        }
                     }
                 }
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
 
-            // Selected Row Actions (Single split button)
+            // Selected Row Details & Actions
             if isSelected {
-                HStack(spacing: 0) {
-                    Spacer()
-                    splitActionButton(for: record, isLive: isLive)
+                if isCrossRepoGroup {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(siblings) { sib in
+                            let sibIsLive = sib.liveStatus != nil || sib.placement == .cloud || sib.placement == .background || sib.placement == .remoteControl
+                            VStack(alignment: .leading, spacing: 3) {
+                                HStack(spacing: 4) {
+                                    AgentBadgeView(kind: sib.agentKind, iconSize: 9, fontSize: 8, showName: false)
+                                    Text(sib.projectName)
+                                        .font(.system(size: 9.5, weight: .bold))
+                                        .foregroundStyle(Color(nsColor: c.textPrimary))
+                                    Text("·")
+                                        .font(.system(size: 8))
+                                        .foregroundStyle(Color(nsColor: c.textTertiary))
+                                    Text(relativeDate(sib.updatedAt))
+                                        .font(.system(size: 8.5))
+                                        .foregroundStyle(Color(nsColor: c.textTertiary))
+                                    Spacer()
+                                }
+                                if let snippet = latestTurnSnippet(for: sib) {
+                                    highlightedText(
+                                        snippet,
+                                        query: model.searchQuery,
+                                        baseColor: c.textSecondary,
+                                        highlightColor: NSColor.controlAccentColor,
+                                        fontSize: 9.5,
+                                        weight: .regular
+                                    )
+                                    .lineLimit(2)
+                                }
+                                HStack(spacing: 0) {
+                                    Spacer()
+                                    splitActionButton(for: sib, isLive: sibIsLive)
+                                }
+                            }
+                            .padding(.vertical, 2)
+
+                            if sib.id != siblings.last?.id {
+                                Divider().overlay(Color(nsColor: c.border).opacity(0.4))
+                            }
+                        }
+                    }
+                    .padding(.top, 4)
+                } else {
+                    VStack(alignment: .leading, spacing: 4) {
+                        if let snippet = latestTurnSnippet(for: record) {
+                            highlightedText(
+                                snippet,
+                                query: model.searchQuery,
+                                baseColor: c.textPrimary,
+                                highlightColor: NSColor.controlAccentColor,
+                                fontSize: 10,
+                                weight: .regular
+                            )
+                            .lineLimit(3)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 1)
+                        }
+                        HStack(spacing: 0) {
+                            Spacer()
+                            splitActionButton(for: record, isLive: isLive)
+                        }
+                    }
+                    .padding(.top, 2)
                 }
-                .padding(.top, 2)
             }
         }
         .id(record.id)
@@ -908,6 +1149,9 @@ public struct AgentSessionHistoryView: View {
             RoundedRectangle(cornerRadius: 6, style: .continuous)
                 .stroke(isSelected ? Color.accentColor.opacity(0.4) : Color(nsColor: c.border), lineWidth: 1)
         )
+        .contextMenu {
+            sessionContextMenuItems(for: record)
+        }
     }
 
     // MARK: - Split Action Button
@@ -915,9 +1159,6 @@ public struct AgentSessionHistoryView: View {
     private func splitActionButton(for record: AgentSessionRecord, isLive: Bool) -> some View {
         let mainTitle = isLive ? "Go to tab" : "Resume"
         let mainIcon = isLive ? "arrow.right.circle.fill" : "play.fill"
-        let candidates = AgentLaunchCommands.configs.keys
-            .filter { $0 != .cursor && $0 != record.agentKind }
-            .sorted { $0.displayName < $1.displayName }
 
         HStack(spacing: 0) {
             // Main button
@@ -943,38 +1184,7 @@ public struct AgentSessionHistoryView: View {
 
             // Caret dropdown menu
             Menu {
-                Button {
-                    triggerPrimaryAction(for: record)
-                } label: {
-                    Label(mainTitle, systemImage: mainIcon)
-                }
-
-                if isLive {
-                    Button {
-                        onResume?(record)
-                    } label: {
-                        Label("Resume in new tab", systemImage: "play.fill")
-                    }
-                }
-
-                if !candidates.isEmpty {
-                    Divider()
-                    ForEach(candidates, id: \.self) { target in
-                        Button {
-                            onHandoff?(record, target)
-                        } label: {
-                            Text("Hand off to \(target.displayName)")
-                        }
-                    }
-                }
-
-                Divider()
-
-                Button {
-                    copyResumeCommand(record)
-                } label: {
-                    Label("Copy resume command", systemImage: "doc.on.doc")
-                }
+                sessionContextMenuItems(for: record)
             } label: {
                 Image(systemName: "chevron.down")
                     .font(.system(size: 7.5, weight: .bold))
@@ -987,6 +1197,149 @@ public struct AgentSessionHistoryView: View {
             .menuIndicator(.hidden)
         }
         .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+    }
+
+    @ViewBuilder
+    private func sessionContextMenuItems(for record: AgentSessionRecord) -> some View {
+        let isLive = record.liveStatus != nil || record.placement == .cloud || record.placement == .background || record.placement == .remoteControl
+        let mainTitle = isLive ? "Go to tab" : "Resume"
+        let mainIcon = isLive ? "arrow.right.circle.fill" : "play.fill"
+        let candidates = AgentLaunchCommands.configs.keys
+            .filter { $0 != .cursor && $0 != record.agentKind }
+            .sorted { $0.displayName < $1.displayName }
+
+        Button {
+            triggerPrimaryAction(for: record)
+        } label: {
+            Label(mainTitle, systemImage: mainIcon)
+        }
+
+        if isLive {
+            Button {
+                onResume?(record)
+            } label: {
+                Label("Resume in new tab", systemImage: "play.fill")
+            }
+        }
+
+        if !candidates.isEmpty {
+            Divider()
+            ForEach(candidates, id: \.self) { target in
+                Button {
+                    onHandoff?(record, target)
+                } label: {
+                    Text("Hand off to \(target.displayName)")
+                }
+            }
+        }
+
+        Divider()
+
+        Button {
+            copyResumeCommand(record)
+        } label: {
+            Label("Copy resume command", systemImage: "doc.on.doc")
+        }
+    }
+
+    private func showOptionMenu(for record: AgentSessionRecord) {
+        let menu = NSMenu(title: "Session Options")
+        let isLive = record.liveStatus != nil || record.placement == .cloud || record.placement == .background || record.placement == .remoteControl
+        let mainTitle = isLive ? "Go to tab" : "Resume"
+        let mainIcon = isLive ? "arrow.right.circle.fill" : "play.fill"
+        let candidates = AgentLaunchCommands.configs.keys
+            .filter { $0 != .cursor && $0 != record.agentKind }
+            .sorted { $0.displayName < $1.displayName }
+
+        menu.addItem(makeMenuItem(title: mainTitle, systemImage: mainIcon) { [self] in
+            self.triggerPrimaryAction(for: record)
+        })
+
+        if isLive {
+            menu.addItem(makeMenuItem(title: "Resume in new tab", systemImage: "play.fill") { [self] in
+                self.onResume?(record)
+            })
+        }
+
+        if !candidates.isEmpty {
+            menu.addItem(NSMenuItem.separator())
+            for target in candidates {
+                menu.addItem(makeMenuItem(title: "Hand off to \(target.displayName)") { [self] in
+                    self.onHandoff?(record, target)
+                })
+            }
+        }
+
+        menu.addItem(NSMenuItem.separator())
+        menu.addItem(makeMenuItem(title: "Copy resume command", systemImage: "doc.on.doc") { [self] in
+            self.copyResumeCommand(record)
+        })
+
+        menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+    }
+
+    private func makeMenuItem(title: String, systemImage: String? = nil, action: @escaping () -> Void) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: #selector(HistoryMenuProxy.menuAction(_:)), keyEquivalent: "")
+        let proxy = HistoryMenuProxy(action: action)
+        item.target = proxy
+        item.representedObject = proxy
+        if let systemImage, let img = NSImage(systemSymbolName: systemImage, accessibilityDescription: nil) {
+            item.image = img
+        }
+        return item
+    }
+
+    private func latestTurnSnippet(for record: AgentSessionRecord) -> String? {
+        if let lastTurn = record.latestTurns.last?.content.trimmingCharacters(in: .whitespacesAndNewlines), !lastTurn.isEmpty {
+            return lastTurn
+        }
+        let prompt = record.firstPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        return prompt.isEmpty ? nil : prompt
+    }
+
+    private func highlightedText(
+        _ text: String,
+        query: String,
+        baseColor: NSColor,
+        highlightColor: NSColor = .controlAccentColor,
+        fontSize: CGFloat = 11,
+        weight: NSFont.Weight = .regular
+    ) -> Text {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return Text(text)
+        }
+        let tokens = trimmed.lowercased()
+            .split(whereSeparator: \.isWhitespace)
+            .map(String.init)
+            .filter { $0.count >= 2 }
+        guard !tokens.isEmpty else {
+            return Text(text)
+        }
+
+        let baseFont = NSFont.systemFont(ofSize: fontSize, weight: weight)
+        let boldFont = NSFont.systemFont(ofSize: fontSize, weight: .bold)
+
+        let mas = NSMutableAttributedString(string: text, attributes: [
+            .font: baseFont,
+            .foregroundColor: baseColor
+        ])
+
+        let lower = text.lowercased()
+        for token in tokens {
+            var searchStart = lower.startIndex
+            while searchStart < lower.endIndex,
+                  let range = lower.range(of: token, range: searchStart..<lower.endIndex) {
+                let nsRange = NSRange(range, in: text)
+                mas.addAttributes([
+                    .foregroundColor: highlightColor,
+                    .font: boldFont
+                ], range: nsRange)
+                searchStart = range.upperBound
+            }
+        }
+
+        return Text(AttributedString(mas))
     }
 
     private func triggerPrimaryAction(for record: AgentSessionRecord) {
@@ -1020,6 +1373,17 @@ public struct AgentSessionHistoryView: View {
             let days = max(1, Int(interval / 86400))
             return "\(days)d ago"
         }
+    }
+}
+
+@MainActor
+private final class HistoryMenuProxy: NSObject {
+    let action: () -> Void
+    init(action: @escaping () -> Void) {
+        self.action = action
+    }
+    @objc func menuAction(_ sender: Any?) {
+        action()
     }
 }
 
