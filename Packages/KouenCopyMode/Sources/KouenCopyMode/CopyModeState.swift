@@ -40,6 +40,7 @@ public struct CopyModeSearch: Equatable, Sendable {
     public var matches: [CopyModeMatch] = []
     public var currentIndex: Int?
     public var reverse: Bool = false
+    public var totalLinesSnapshot: Int?
 
     public init() {}
 }
