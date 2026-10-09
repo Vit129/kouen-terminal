@@ -62,7 +62,7 @@ public struct CachedSessionEntry: Sendable {
 public final class AgentHistoryFTSIndex: @unchecked Sendable {
     public static let shared = AgentHistoryFTSIndex()
 
-    public static let schemaVersion: Int32 = 1
+    public static let schemaVersion: Int32 = 2
 
     private let dbPath: String
     #if canImport(SQLite3)
@@ -150,6 +150,7 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
             placement TEXT NOT NULL,
             live_status TEXT,
             resume_command_override TEXT,
+            surface_tag TEXT,
             mtime REAL NOT NULL,
             file_size INTEGER NOT NULL
         );
@@ -209,8 +210,8 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
             session_id, agent_kind, title, project_path, project_name,
             git_branch, model_name, message_count, updated_at, first_prompt,
             latest_turns_json, transcript_path, worktree_available, placement,
-            live_status, resume_command_override, mtime, file_size
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            live_status, resume_command_override, surface_tag, mtime, file_size
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
@@ -262,8 +263,13 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
             } else {
                 sqlite3_bind_null(stmt, 16)
             }
-            sqlite3_bind_double(stmt, 17, entry.mtime.timeIntervalSince1970)
-            sqlite3_bind_int64(stmt, 18, Int64(entry.fileSize))
+            if let surfaceTag = record.surfaceTag {
+                sqlite3_bind_text(stmt, 17, surfaceTag, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+            } else {
+                sqlite3_bind_null(stmt, 17)
+            }
+            sqlite3_bind_double(stmt, 18, entry.mtime.timeIntervalSince1970)
+            sqlite3_bind_int64(stmt, 19, Int64(entry.fileSize))
 
             let stepRes = sqlite3_step(stmt)
             if stepRes != SQLITE_DONE {
@@ -290,7 +296,7 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
         SELECT session_id, agent_kind, title, project_path, project_name,
                git_branch, model_name, message_count, updated_at, first_prompt,
                latest_turns_json, transcript_path, worktree_available, placement,
-               live_status, resume_command_override, mtime, file_size
+               live_status, resume_command_override, surface_tag, mtime, file_size
         FROM session_records
         ORDER BY updated_at DESC;
         """
@@ -329,8 +335,9 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
                 let placement = AgentSessionPlacement(rawValue: placementRaw) ?? .local
                 let liveStatus = sqlite3_column_text(stmt, 14).map { String(cString: $0) }
                 let resumeOverride = sqlite3_column_text(stmt, 15).map { String(cString: $0) }
-                let mtime = Date(timeIntervalSince1970: sqlite3_column_double(stmt, 16))
-                let fileSize = Int(sqlite3_column_int64(stmt, 17))
+                let surfaceTag = sqlite3_column_text(stmt, 16).map { String(cString: $0) }
+                let mtime = Date(timeIntervalSince1970: sqlite3_column_double(stmt, 17))
+                let fileSize = Int(sqlite3_column_int64(stmt, 18))
 
                 let turnsData = turnsJSON.data(using: .utf8) ?? Data()
                 let turns = (try? decoder.decode([AgentHistoryTurn].self, from: turnsData)) ?? []
@@ -351,7 +358,8 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
                     worktreeAvailable: worktreeAvailable,
                     placement: placement,
                     liveStatus: liveStatus,
-                    resumeCommandOverride: resumeOverride
+                    resumeCommandOverride: resumeOverride,
+                    surfaceTag: surfaceTag
                 )
                 entries.append(CachedSessionEntry(
                     record: record,
@@ -498,7 +506,8 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
         toolsCalled: String,
         transcriptPath: String,
         mtime: Date,
-        fileSize: Int
+        fileSize: Int,
+        surfaceTag: String? = nil
     ) {
         // The scanner's in-memory cache is empty on every app launch / CLI run, so it re-parses
         // every transcript; skip the FTS write when the stored mtime/size still match.
@@ -531,13 +540,14 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
         """
         var insertFtsStmt: OpaquePointer?
         if sqlite3_prepare_v2(db, insertFtsSQL, -1, &insertFtsStmt, nil) == SQLITE_OK {
+            let ftsAgent = (surfaceTag?.isEmpty == false) ? "\(agentName) \(surfaceTag!)" : agentName
             sqlite3_bind_text(insertFtsStmt, 1, sessionID, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
             sqlite3_bind_text(insertFtsStmt, 2, title, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
             sqlite3_bind_text(insertFtsStmt, 3, firstPrompt, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
             sqlite3_bind_text(insertFtsStmt, 4, fullTranscript, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
             sqlite3_bind_text(insertFtsStmt, 5, gitBranch ?? "", -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
             sqlite3_bind_text(insertFtsStmt, 6, repoName, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-            sqlite3_bind_text(insertFtsStmt, 7, agentName, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+            sqlite3_bind_text(insertFtsStmt, 7, ftsAgent, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
             sqlite3_bind_text(insertFtsStmt, 8, filesEdited, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
             sqlite3_bind_text(insertFtsStmt, 9, toolsCalled, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
             let stepRes = sqlite3_step(insertFtsStmt)
