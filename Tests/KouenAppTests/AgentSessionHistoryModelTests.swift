@@ -281,5 +281,95 @@ final class AgentSessionHistoryModelTests: XCTestCase {
         model.applyFilterNow()
         XCTAssertEqual(model.filteredRecords.map(\.id), ["r4"])
     }
+
+    func testCrossRepoTaskGrouping() {
+        let now = Date()
+        let older = now.addingTimeInterval(-3600)
+
+        let r1 = makeRecord(
+            id: "r1",
+            title: "Blueprint compliance in repo A",
+            projectPath: "/repo/one",
+            projectName: "one",
+            gitBranch: "chore/blueprint-compliance",
+            updatedAt: older
+        )
+        let r2 = makeRecord(
+            id: "r2",
+            title: "Blueprint compliance in repo B",
+            projectPath: "/repo/two",
+            projectName: "two",
+            gitBranch: "chore/blueprint-compliance",
+            updatedAt: now
+        )
+
+        let grouped = AgentSessionHistoryModel.groupCrossRepoTasks([r2, r1])
+        XCTAssertEqual(grouped.count, 1)
+
+        let composite = grouped[0]
+        XCTAssertEqual(composite.id, "r2", "Most recent session must be the primary record")
+        XCTAssertEqual(composite.crossRepoSiblings?.count, 2)
+        XCTAssertEqual(composite.crossRepoSiblings?.map(\.projectName), ["two", "one"])
+    }
+
+    func testCrossRepoTaskGroupingIgnoresMainAndMaster() {
+        let r1 = makeRecord(id: "r1", title: "Main 1", projectPath: "/repo/one", projectName: "one", gitBranch: "main")
+        let r2 = makeRecord(id: "r2", title: "Main 2", projectPath: "/repo/two", projectName: "two", gitBranch: "main")
+        let r3 = makeRecord(id: "r3", title: "Master 1", projectPath: "/repo/one", projectName: "one", gitBranch: "master")
+        let r4 = makeRecord(id: "r4", title: "Master 2", projectPath: "/repo/two", projectName: "two", gitBranch: "master")
+
+        let grouped = AgentSessionHistoryModel.groupCrossRepoTasks([r1, r2, r3, r4])
+        XCTAssertEqual(grouped.count, 4)
+        for item in grouped {
+            XCTAssertNil(item.crossRepoSiblings, "main and master branches must never be grouped")
+        }
+    }
+
+    func testCrossRepoTaskGroupingSingleRepoNotGrouped() {
+        let r1 = makeRecord(id: "r1", title: "Task 1", projectPath: "/repo/one", projectName: "one", gitBranch: "feat/single-repo")
+        let r2 = makeRecord(id: "r2", title: "Task 2", projectPath: "/repo/one", projectName: "one", gitBranch: "feat/single-repo")
+
+        let grouped = AgentSessionHistoryModel.groupCrossRepoTasks([r1, r2])
+        XCTAssertEqual(grouped.count, 2)
+        XCTAssertNil(grouped[0].crossRepoSiblings)
+        XCTAssertNil(grouped[1].crossRepoSiblings)
+    }
+
+    func testCrossRepoTaskGroupingDeduplicatesSameRepo() {
+        let now = Date()
+        let mid = now.addingTimeInterval(-1800)
+        let old = now.addingTimeInterval(-3600)
+
+        // Two sessions in repo "one" and one session in repo "two"
+        let r1 = makeRecord(id: "r1", title: "New in one", projectPath: "/repo/one", projectName: "one", gitBranch: "feat/sync", updatedAt: now)
+        let r2 = makeRecord(id: "r2", title: "Old in one", projectPath: "/repo/one", projectName: "one", gitBranch: "feat/sync", updatedAt: old)
+        let r3 = makeRecord(id: "r3", title: "Mid in two", projectPath: "/repo/two", projectName: "two", gitBranch: "feat/sync", updatedAt: mid)
+
+        let grouped = AgentSessionHistoryModel.groupCrossRepoTasks([r1, r2, r3])
+        XCTAssertEqual(grouped.count, 1)
+
+        let composite = grouped[0]
+        XCTAssertEqual(composite.id, "r1")
+        XCTAssertEqual(composite.crossRepoSiblings?.count, 2, "Only latest session per distinct repo is kept in crossRepoSiblings")
+        XCTAssertEqual(composite.crossRepoSiblings?.map(\.id), ["r1", "r3"])
+    }
+
+    func testCrossRepoTaskGroupingWindowedIntegration() {
+        let r1 = makeRecord(id: "r1", title: "Fix A", projectPath: "/repo/one", projectName: "one", gitBranch: "fix/cross-fix")
+        let r2 = makeRecord(id: "r2", title: "Fix B", projectPath: "/repo/two", projectName: "two", gitBranch: "fix/cross-fix")
+        let r3 = makeRecord(id: "r3", title: "Other", projectPath: "/repo/three", projectName: "three", gitBranch: "feat/other")
+
+        let model = AgentSessionHistoryModel()
+        model.records = [r1, r2, r3]
+        model.selectedScope = .all
+        model.applyFilterNow()
+
+        // r1 & r2 grouped into 1 item; r3 is standalone -> 2 total windowed records
+        XCTAssertEqual(model.windowedRecords.count, 2)
+        XCTAssertEqual(model.displayRecords.count, 2)
+        let groupedItem = model.windowedRecords.first { $0.gitBranch == "fix/cross-fix" }
+        XCTAssertNotNil(groupedItem)
+        XCTAssertEqual(groupedItem?.crossRepoSiblings?.count, 2)
+    }
 }
 
