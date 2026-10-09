@@ -346,11 +346,11 @@ struct FileTreeSwiftUIView: View {
                 process.currentDirectoryURL = URL(fileURLWithPath: path)
                 let pipe = Pipe()
                 process.standardOutput = pipe
-                process.standardError = Pipe()
+                process.standardError = FileHandle.nullDevice
                 do {
                     try process.run()
+                    let data = (try? pipe.fileHandleForReading.readToEnd()) ?? Data()
                     process.waitUntilExit()
-                    let data = pipe.fileHandleForReading.readDataToEndOfFile()
                     let output = String(data: data, encoding: .utf8) ?? ""
                     let branches = output.components(separatedBy: "\n").filter { !$0.isEmpty }
                     continuation.resume(returning: branches)
@@ -371,15 +371,15 @@ struct FileTreeSwiftUIView: View {
                 process.currentDirectoryURL = URL(fileURLWithPath: path)
                 let pipe = Pipe()
                 process.standardOutput = pipe
-                process.standardError = Pipe()
+                process.standardError = FileHandle.nullDevice
                 do {
                     try process.run()
+                    let data = (try? pipe.fileHandleForReading.readToEnd()) ?? Data()
                     process.waitUntilExit()
                     guard process.terminationStatus == 0 else {
                         continuation.resume(returning: nil)
                         return
                     }
-                    let data = pipe.fileHandleForReading.readDataToEndOfFile()
                     let output = String(data: data, encoding: .utf8) ?? ""
                     let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
                     continuation.resume(returning: trimmed.isEmpty ? nil : trimmed)
