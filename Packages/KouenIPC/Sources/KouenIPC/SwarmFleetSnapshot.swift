@@ -5,7 +5,7 @@ import Foundation
 /// `ClaudeRunSummary` is: `KouenIPC` cannot import `KouenDaemon`. `lane`/`status` cross the
 /// wire as raw strings (matching `ClaudeRunSummary.state`'s precedent) rather than
 /// duplicating `SwarmLane`/`SwarmTaskStatus` as parallel enums here.
-public struct SwarmTaskNodeWire: Codable, Sendable, Identifiable {
+public struct SwarmTaskNodeWire: Codable, Sendable, Identifiable, Equatable {
     public let id: UUID
     public let parentID: UUID?
     public let lane: String
@@ -42,7 +42,7 @@ public struct SwarmTaskNodeWire: Codable, Sendable, Identifiable {
 }
 
 /// Wire shape for the fleet dashboard snapshot. Mirrors `KouenDaemon`'s `SwarmFleetSnapshot`.
-public struct SwarmFleetSnapshotWire: Codable, Sendable {
+public struct SwarmFleetSnapshotWire: Codable, Sendable, Equatable {
     public let nodes: [SwarmTaskNodeWire]
     public let generation: Int
 

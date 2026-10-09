@@ -26,6 +26,10 @@ public final class AgentScanner: @unchecked Sendable {
     private static let activeScanInterval: TimeInterval = 5
     private var isFastScanCadence = false
 
+    private static let idlePortScanInterval: TimeInterval = 30
+    private static let activePortScanInterval: TimeInterval = 5
+    private var isFastPortScanCadence = false
+
     public func start(registry: SurfaceRegistry) {
         self.registry = registry
         metadataTimer?.cancel()
@@ -56,12 +60,10 @@ public final class AgentScanner: @unchecked Sendable {
         cwdTimer.resume()
         self.cwdTimer = cwdTimer
 
-        // Listening-port scan (batched `lsof`) — every 5s. Slower than the syscall-only
-        // timers above since it forks a process; still fast enough that a dev server shows
-        // up in the sidebar within one tick of starting.
+        // Listening-port scan (batched `lsof`) — adaptive: 5s when dev candidate active, 30s idle baseline
         let pt = DispatchSource.makeTimerSource(queue: queue)
-        pt.schedule(deadline: .now() + 5, repeating: 5)
-        pt.setEventHandler { [weak self] in self?.registry?.refreshListeningPorts() }
+        pt.schedule(deadline: .now() + 5, repeating: Self.idlePortScanInterval)
+        pt.setEventHandler { [weak self] in self?.scanPorts() }
         pt.resume()
         portScanTimer = pt
     }
@@ -95,5 +97,19 @@ public final class AgentScanner: @unchecked Sendable {
         isFastScanCadence = hasActiveAgent
         let interval = hasActiveAgent ? Self.activeScanInterval : Self.idleScanInterval
         agentScanTimer?.schedule(deadline: .now() + interval, repeating: interval)
+    }
+
+    private func scanPorts() {
+        guard let registry else { return }
+        registry.refreshListeningPorts()
+        let hasCandidate = registry.hasAnyActiveSubprocessOrAgent()
+        adjustPortScanCadence(hasCandidate: hasCandidate)
+    }
+
+    private func adjustPortScanCadence(hasCandidate: Bool) {
+        guard hasCandidate != isFastPortScanCadence else { return }
+        isFastPortScanCadence = hasCandidate
+        let interval = hasCandidate ? Self.activePortScanInterval : Self.idlePortScanInterval
+        portScanTimer?.schedule(deadline: .now() + interval, repeating: interval)
     }
 }

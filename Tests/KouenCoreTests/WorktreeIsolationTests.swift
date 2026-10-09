@@ -60,6 +60,11 @@ final class WorktreeIsolationTests: XCTestCase {
         XCTAssertEqual(actual, expected)
     }
 
+    func testRepoRootNonExistentPathReturnsNil() throws {
+        let nonExistent = repoPath + "/non_existent_dir_12345/child"
+        XCTAssertNil(mgr.repoRoot(for: nonExistent), "Non-existent path must return nil, not walk up to parent repo")
+    }
+
     // MARK: - SessionEditor worktree metadata
 
     func testSetWorktreeTagsTab() throws {
