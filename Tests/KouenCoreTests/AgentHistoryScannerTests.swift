@@ -1,8 +1,10 @@
 import Foundation
 @testable import KouenCore
 import KouenIPC
-import SQLite3
 import XCTest
+#if canImport(SQLite3)
+import SQLite3
+#endif
 
 final class AgentHistoryScannerTests: XCTestCase {
     func testScanAllReturnsRecords() async {
@@ -411,6 +413,7 @@ final class AgentHistoryScannerTests: XCTestCase {
         XCTAssertEqual(entries.count, 0, "No fabricated records should be returned or saved to session_records")
     }
 
+    #if canImport(SQLite3)
     func testSchemaVersioningDropsAndRecreatesOnMismatch() {
         let tempDB = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("test_schema_\(UUID().uuidString).sqlite")
         defer { try? FileManager.default.removeItem(at: tempDB) }
@@ -431,6 +434,7 @@ final class AgentHistoryScannerTests: XCTestCase {
         XCTAssertEqual(loaded.count, 1)
         XCTAssertEqual(loaded[0].record.id, "sess-v1")
     }
+    #endif
 
     func testScanAllReentrancyAndForceSemantics() async {
         let tempDB = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("test_reentrancy_\(UUID().uuidString).sqlite")
