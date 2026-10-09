@@ -112,9 +112,15 @@ final class AgentNotchViewModel: ObservableObject {
 
     func refreshFromCoordinator() {
         let coordinator = SessionCoordinator.shared
-        openOnHover = coordinator.settings.notchOpenOnHover
+        let newOpenOnHover = coordinator.settings.notchOpenOnHover
+        if openOnHover != newOpenOnHover {
+            openOnHover = newOpenOnHover
+        }
         let currentAgents = coordinator.agentsList()
-        agents = AgentNotchProjection.sortedAgents(currentAgents)
+        let newAgents = AgentNotchProjection.sortedAgents(currentAgents)
+        if agents != newAgents {
+            agents = newAgents
+        }
         var updatedRows = AgentNotchProjection.rows(from: coordinator.snapshot, agents: currentAgents)
         // Reconcile OSC 9;4 progress state with detector-driven activity. The projection
         // derives agentActivity from the daemon snapshot (AgentDetector), which Claude Code
@@ -138,9 +144,16 @@ final class AgentNotchViewModel: ObservableObject {
                 progress[updatedRows[i].id] = percent
             }
         }
-        rows = updatedRows
-        rowProgress = progress
-        sessionCount = Set(rows.map(\.sessionID)).count
+        if rows != updatedRows {
+            rows = updatedRows
+        }
+        if rowProgress != progress {
+            rowProgress = progress
+        }
+        let newSessionCount = Set(updatedRows.map(\.sessionID)).count
+        if sessionCount != newSessionCount {
+            sessionCount = newSessionCount
+        }
         recomputeOpenContentHeight()
         considerPeek()
     }

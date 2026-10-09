@@ -63,6 +63,7 @@ public actor GitStatusProvider {
             let first = await group.next() ?? nil
             if first == nil {
                 process.terminate()
+                try? stdoutPipe.fileHandleForReading.close()
             }
             group.cancelAll()
             return first

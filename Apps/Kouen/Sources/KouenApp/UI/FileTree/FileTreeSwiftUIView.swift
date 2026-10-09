@@ -247,8 +247,8 @@ struct FileTreeSwiftUIView: View {
         // key change (session/path switch) or view disappearance.
         .task(id: "\(taskID)|watcher") {
             await watcher.startWatching(rootPath: rootPath) {
-                // Called on @MainActor after 500ms debounce.
-                Task { await loadRoot() }
+                // Coalesce rapid filesystem changes via debounced load
+                scheduleLoadRoot()
             }
             // Task is cancelled when view disappears or taskID changes.
             // Await cancellation so we stay alive while the view is visible.

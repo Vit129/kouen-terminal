@@ -573,7 +573,7 @@ final class DaemonSyncService {
 
     func startMetadataRefresh() {
         metadataTask?.cancel()
-        metadataTask = Task { [weak self] in
+        metadataTask = Task.detached(priority: .utility) { [weak self] in
             let git = GitMetadataProvider()
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 5_000_000_000)
@@ -599,15 +599,17 @@ final class DaemonSyncService {
                 }
                 guard !updates.isEmpty else { continue }
                 await MainActor.run { [weak self] in
-                    guard let self else { return }
-                    for update in updates {
-                        self.logIfFailed(.updateTabGitBranch(
-                            workspaceID: update.0,
-                            tabID: update.1,
-                            branch: update.2
-                        ))
+                    Task { [weak self] in
+                        guard let self else { return }
+                        for update in updates {
+                            await self.logIfFailed(.updateTabGitBranch(
+                                workspaceID: update.0,
+                                tabID: update.1,
+                                branch: update.2
+                            ))
+                        }
+                        await self.coord.syncFromDaemon(metadataOnly: true)
                     }
-                    self.coord.syncFromDaemon(metadataOnly: true)
                     let changedTabIDs = Self.tabIDsToNotify(forChanges: updates)
                     if !changedTabIDs.isEmpty {
                         NotificationCenter.default.post(

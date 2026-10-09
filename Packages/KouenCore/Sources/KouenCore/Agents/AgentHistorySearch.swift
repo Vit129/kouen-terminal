@@ -60,6 +60,13 @@ public enum AgentHistorySearch {
 
     private static let idfCache = IDFCache()
 
+    private static func containsNonSegmentedScript(_ text: String) -> Bool {
+        text.unicodeScalars.contains { scalar in
+            // Thai Unicode block: 0x0E00...0x0E7F
+            (0x0E00...0x0E7F).contains(scalar.value)
+        }
+    }
+
     /// Uses SQLite FTS5 bm25() with column weights for sub-millisecond ranking across keystrokes.
     /// Falls back to the Swift ranker for queries FTS cannot express (Thai, fuzzy/subsequence)
     /// or when FTS has no indexed matches.
@@ -72,8 +79,12 @@ public enum AgentHistorySearch {
         let matcher = SearchMatcher(query: query)
         guard matcher.hasQuery else { return [] }
 
-        // Always attempt fast SQLite FTS5 search first (including Thai and non-ASCII)
-        let ftsMatches = index.searchRanked(query: query, limit: ftsLimit, includeSnippet: false)
+        let isNonSegmented = containsNonSegmentedScript(query)
+
+        // For standard alphanumeric queries, try fast SQLite FTS5 search first.
+        // For non-segmented scripts (Thai), standard FTS tokenizer does not segment words,
+        // so we route directly to Swift ranker with full substring coverage.
+        let ftsMatches = isNonSegmented ? [] : index.searchRanked(query: query, limit: ftsLimit, includeSnippet: false)
         if !ftsMatches.isEmpty {
             var recordMap: [String: AgentSessionRecord] = [:]
             recordMap.reserveCapacity(records.count)
@@ -94,9 +105,8 @@ public enum AgentHistorySearch {
                 hits.append(Hit(record: record, score: score, snippet: snippet))
             }
 
-            // Check for unindexed records in `records` (e.g. from unit tests where
-            // records are created in-memory without indexing in SQLite).
-            if matchedIDs.count < records.count && records.count <= ftsLimit {
+            // Check for unindexed records in `records` (regardless of records.count limit)
+            if matchedIDs.count < records.count {
                 for record in records where !matchedIDs.contains(record.id) {
                     var titleMatched = false
                     var branchMatched = false
@@ -125,8 +135,8 @@ public enum AgentHistorySearch {
             return hits
         }
 
-        // Fallback for fuzzy queries, or when FTS index has no matching records
-        return rankSwiftFallback(query: query, records: records, matcher: matcher, index: index, ftsLimit: ftsLimit)
+        // Fallback for non-segmented scripts (Thai), fuzzy queries, or when FTS index has no matching records
+        return rankSwiftFallback(query: query, records: records, matcher: matcher, index: index, ftsLimit: ftsLimit, isNonSegmented: isNonSegmented)
     }
 
     /// Swift-side scoring fallback using IDFCache and typo tolerance.
@@ -135,7 +145,8 @@ public enum AgentHistorySearch {
         records: [AgentSessionRecord],
         matcher: SearchMatcher,
         index: AgentHistoryFTSIndex,
-        ftsLimit: Int
+        ftsLimit: Int,
+        isNonSegmented: Bool = false
     ) -> [Hit] {
         let ftsMatches = index.search(query: query, limit: ftsLimit)
 
@@ -155,7 +166,7 @@ public enum AgentHistorySearch {
                     isCandidate = true
                     break
                 }
-                if records.count <= ftsLimit {
+                if records.count <= ftsLimit || isNonSegmented {
                     if record.projectName.range(of: token, options: .caseInsensitive) != nil ||
                        record.firstPrompt.range(of: token, options: .caseInsensitive) != nil {
                         isCandidate = true
@@ -163,9 +174,8 @@ public enum AgentHistorySearch {
                     }
                 }
             }
-            // Only search transcript turns if FTS matches were empty and records are few (e.g. unindexed in-memory test records);
-            // when full history is present, transcript matches were already indexed and captured in ftsMatches.
-            if !isCandidate && ftsMatches.isEmpty && records.count <= ftsLimit {
+            // Only search transcript turns if FTS matches were empty or non-segmented script
+            if !isCandidate && (ftsMatches.isEmpty || isNonSegmented || records.count <= ftsLimit) {
                 for turn in record.latestTurns {
                     for token in matcher.tokens {
                         if turn.content.range(of: token, options: .caseInsensitive) != nil {

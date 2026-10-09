@@ -117,6 +117,16 @@ public actor FileTreeWatcher {
 
     private var watchBox: FSEventStreamBox?
 
+    static func isExcludedPath(_ p: String) -> Bool {
+        let excluded = [
+            "/.git", "/node_modules", "/.build", "/DerivedData", "/.gradle", "/target", "/.next", "/Pods", "/.terraform", "/.venv", "/__pycache__"
+        ]
+        for ex in excluded {
+            if p.contains(ex + "/") || p.hasSuffix(ex) { return true }
+        }
+        return false
+    }
+
     /// Start watching `rootPath` for filesystem changes recursively using FSEvents.
     /// Fires `onChange` on the **main actor** after events are received.
     public func startWatching(rootPath: String, onChange: @MainActor @escaping () -> Void) {
@@ -135,11 +145,11 @@ public actor FileTreeWatcher {
 
         let callback: FSEventStreamCallback = { (streamRef, clientInfo, numEvents, eventPaths, eventFlags, eventIds) in
             guard let clientInfo = clientInfo else { return }
-            // Skip events inside .git/ — only working tree changes matter for file tree.
+            // Skip events inside .git/, node_modules/, build artifacts, etc.
             let cfPaths = Unmanaged<CFArray>.fromOpaque(eventPaths).takeUnretainedValue()
             for i in 0..<numEvents {
                 let p = unsafeBitCast(CFArrayGetValueAtIndex(cfPaths, i), to: CFString.self) as String
-                if !p.contains("/.git/") {
+                if !FileTreeWatcher.isExcludedPath(p) {
                     let wrapper = Unmanaged<WatcherContext>.fromOpaque(clientInfo).takeUnretainedValue()
                     Task { @MainActor in wrapper.onChange() }
                     return

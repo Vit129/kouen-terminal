@@ -37,6 +37,7 @@ final class SyntaxTextView: NSView {
     var onDirtyChange: (() -> Void)?
 
     var onHover: ((LSPPosition) async -> String?)?
+    private var hoverTask: Task<Void, Never>?
     var onDefinition: ((LSPPosition) async -> SyntaxDefinitionTarget?)?
 
     var onCurrentFile: (() -> String?)? {
@@ -309,9 +310,21 @@ final class SyntaxTextView: NSView {
     }
 
     override func mouseMoved(with event: NSEvent) {
-        guard let position = lspPosition(for: event), let onHover else { return }
-        Task {
-            guard let text = await onHover(position), !text.isEmpty else { return }
+        hoverTask?.cancel()
+        guard let position = lspPosition(for: event), let onHover else {
+            hoverPopover?.close()
+            return
+        }
+        hoverTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 200_000_000)
+            guard !Task.isCancelled else { return }
+            guard let text = await onHover(position), !text.isEmpty else {
+                await MainActor.run { [weak self] in
+                    self?.hoverPopover?.close()
+                }
+                return
+            }
+            guard !Task.isCancelled else { return }
             await MainActor.run { [weak self] in
                 self?.showHover(text, for: event)
             }
@@ -829,16 +842,32 @@ final class SyntaxTextViewInner: NSTextView {
     /// UTF-16 offsets of each line start, built lazily and dropped on any storage edit.
     /// The gutter/diff drawing used to re-count lines from offset 0 on every redraw
     /// (every scroll frame), which is O(file size) per frame on large files.
+    private final class ObserverToken: @unchecked Sendable {
+        private var observer: (any NSObjectProtocol)?
+        init(_ observer: any NSObjectProtocol) { self.observer = observer }
+        func cancel() {
+            if let obs = observer {
+                NotificationCenter.default.removeObserver(obs)
+                observer = nil
+            }
+        }
+    }
+
     private var lineStarts: [Int]?
-    private var storageObserver: NSObjectProtocol?
+    private var storageObserver: ObserverToken?
+
+    deinit {
+        storageObserver?.cancel()
+    }
 
     /// 1-based line number containing `charIndex`.
     /// ponytail: only `\n` counts as a line break (lone `\r` / U+2028 files mis-number); fine for source files.
     func lineNumber(at charIndex: Int) -> Int {
         if storageObserver == nil, let textStorage {
-            storageObserver = NotificationCenter.default.addObserver(
+            let obs = NotificationCenter.default.addObserver(
                 forName: NSTextStorage.didProcessEditingNotification, object: textStorage, queue: nil
             ) { [weak self] _ in MainActor.assumeIsolated { self?.lineStarts = nil } }
+            storageObserver = ObserverToken(obs)
         }
         let starts = lineStarts ?? {
             var result = [0]

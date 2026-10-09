@@ -35,7 +35,9 @@ final class AppIdleThrottle {
         isSuspended = false
         // Single sync picks up all state changes at once instead of replaying every
         // queued snapshot notification individually (which causes the post-unlock stutter).
-        SessionCoordinator.shared.syncFromDaemon()
+        Task { @MainActor in
+            await SessionCoordinator.shared.syncFromDaemon()
+        }
         NotificationCenter.default.post(name: Self.didResume, object: nil)
     }
 
