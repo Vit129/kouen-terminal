@@ -333,1228 +333,671 @@ public final class MobileBridgeServer: @unchecked Sendable {
     /// it to `DaemonClient.resize`.
     private static let embeddedPageHTML = #"""
     <!doctype html>
-    <title>Kouen Mobile</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <style>
-    \#(MobileBridgeWebAssets.xtermCSS)
-    </style>
-    <style>
-      :root {
-        --bg: #100d0b; --surface: #1a1613; --surface-3: #241f1b;
-        --text: #ede8e2; --muted: #9b8f80; --border: #322a23;
-        --accent: #d77757; --accent-cyan: #5ec4c1; --live: #7fb878;
-        --code-font: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-        --ui-font: -apple-system, "SF Pro Text", system-ui, sans-serif;
+    <html lang="en">
+    <head>
+      <meta charset="utf-8">
+      <title>Kouen Companion</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+      <meta name="theme-color" content="#2f6b4f">
+      <meta name="apple-mobile-web-app-capable" content="yes">
+      <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+      <link rel="manifest" href="/manifest.json">
+      <link rel="icon" href="/icon.svg" type="image/svg+xml">
+      <link rel="preconnect" href="https://fonts.googleapis.com">
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+      <style>
+      :root{
+        --bg:#eef1ee; --surface:#ffffff; --ink:#18201c; --muted:#5d6a63; --line:#d8dfda;
+        --accent:#2f6b4f; --accent-ink:#ffffff; --accent-soft:#e2efe8;
+        --add:#e3f4e8; --add-ink:#1d6b3a; --del:#fbe6e4; --del-ink:#a2342a;
+        --warn:#b86e00; --warn-soft:#fff1dc; --run:#2f6b4f; --idle:#8a958f;
+        --frame:#cfd7d2; --code-bg:#f5f7f5;
+        --f-body:"Atkinson Hyperlegible",-apple-system,system-ui,sans-serif;
+        --f-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
       }
-      * { box-sizing: border-box; }
-      html, body { height: 100%; margin: 0; }
-      body {
-        background: var(--bg); color: var(--text); font-family: var(--ui-font);
-        display: flex; flex-direction: column; overflow: hidden;
+      @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+        --bg:#0f1412; --surface:#171d1a; --ink:#e4ebe7; --muted:#93a19a; --line:#2a332e;
+        --accent:#7cc4a0; --accent-ink:#0c1a13; --accent-soft:#1d2e25;
+        --add:#16301f; --add-ink:#8fdcab; --del:#3a1d1a; --del-ink:#f2a097;
+        --warn:#f0b357; --warn-soft:#3a2b12; --run:#7cc4a0; --idle:#6c7a73;
+        --frame:#2a332e; --code-bg:#111714; color-scheme:dark}}
+      :root[data-theme="dark"]{
+        --bg:#0f1412; --surface:#171d1a; --ink:#e4ebe7; --muted:#93a19a; --line:#2a332e;
+        --accent:#7cc4a0; --accent-ink:#0c1a13; --accent-soft:#1d2e25;
+        --add:#16301f; --add-ink:#8fdcab; --del:#3a1d1a; --del-ink:#f2a097;
+        --warn:#f0b357; --warn-soft:#3a2b12; --run:#7cc4a0; --idle:#6c7a73;
+        --frame:#2a332e; --code-bg:#111714; color-scheme:dark}
+      *{box-sizing:border-box}
+      html,body{height:100%}
+      body{background:var(--bg);color:var(--ink);font:15px/1.45 var(--f-body);margin:0}
+      .stage{min-height:100%;display:flex;justify-content:center;align-items:flex-start;gap:32px;padding-block:24px;padding-inline:16px;flex-wrap:wrap}
+      .phone{width:100%;max-width:390px;height:780px;max-height:calc(100vh - 48px);min-height:560px;background:var(--surface);border:1px solid var(--frame);border-radius:28px;overflow:hidden;display:flex;flex-direction:column;position:relative}
+      @media (max-width:480px){
+        .stage{padding:0;gap:0}
+        .phone{max-width:none;height:100%;max-height:none;border:0;border-radius:0}
+        .stage{height:100%}
       }
-      .view { flex: 1; display: none; flex-direction: column; min-height: 0; }
-      .view.active { display: flex; }
+      header.bar{display:flex;align-items:center;gap:10px;padding:14px 16px 10px;border-bottom:1px solid var(--line)}
+      header.bar h2{font-size:17px;margin:0;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .sub{color:var(--muted);font-size:12px;font-family:var(--f-mono)}
+      button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+      button:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+      .icon-btn{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-size:18px}
+      .icon-btn:hover{background:var(--accent-soft)}
+      .scroll{flex:1;overflow-y:auto;min-height:0}
 
-      #view-home, #view-paired {
-        align-items: center; justify-content: center; text-align: center; padding: 0 2rem; gap: 1rem;
-      }
-      .mark { font-family: var(--code-font); font-size: 1.6rem; color: var(--accent); }
-      #view-home h4, #view-paired h4 { margin: 0; font-size: 1rem; font-weight: 600; }
-      #view-home p, #view-paired p { margin: 0; color: var(--muted); font-size: 0.85rem; max-width: 26ch; }
-      #token {
-        font: inherit; font-family: var(--code-font); text-align: center; letter-spacing: 0.1em;
-        background: var(--surface-3); border: 1px solid var(--border); color: var(--text);
-        border-radius: 8px; padding: 0.6rem 0.8rem; width: 10rem;
-      }
-      .btn {
-        appearance: none; border: none; cursor: pointer; background: var(--accent); color: #100d0b;
-        font-family: var(--ui-font); font-weight: 600; font-size: 0.9rem;
-        padding: 0.65rem 1.3rem; border-radius: 20px; margin-top: 0.4rem;
-      }
-      .btn:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 2px; }
-      .check {
-        width: 44px; height: 44px; border-radius: 50%; background: var(--live); color: #0a0807;
-        display: flex; align-items: center; justify-content: center; font-size: 1.3rem; font-weight: 700;
-      }
+      /* Pairing View */
+      #scr-pairing{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:24px;text-align:center;gap:14px}
+      #scr-pairing h3{margin:0;font-size:19px;font-weight:700}
+      #scr-pairing p{margin:0;color:var(--muted);font-size:13px;max-width:280px}
+      .token-input{font-family:var(--f-mono);font-size:22px;letter-spacing:0.18em;text-align:center;width:180px;padding:10px;border-radius:12px;border:1px solid var(--line);background:var(--code-bg);color:var(--ink)}
 
-      .list-header {
-        padding: 0.9rem 1.1rem 0.8rem; border-bottom: 1px solid var(--surface-3); flex-shrink: 0;
-        display: flex; align-items: flex-end; justify-content: space-between; gap: 0.6rem;
-      }
-      .list-header .host { font-family: var(--code-font); font-size: 0.68rem; color: var(--muted); letter-spacing: 0.03em; }
-      .list-header h4 { margin: 0.15rem 0 0; font-size: 1.05rem; }
-      .list-header-text { min-width: 0; }
-      .sessions { flex: 1; overflow-y: auto; padding: 0.6rem 0.8rem; display: flex; flex-direction: column; gap: 0.5rem; }
-      .session-card {
-        display: flex; align-items: center; gap: 0.7rem; background: var(--surface); border: 1px solid var(--surface-3);
-        border-radius: 12px; padding: 0.7rem 0.8rem; cursor: pointer; text-align: left; width: 100%;
-        color: inherit; font-family: inherit;
-      }
-      .session-card:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 1px; }
-      .session-card .glyph { color: var(--accent); font-size: 1rem; width: 1.1rem; flex-shrink: 0; }
-      .session-card .meta { min-width: 0; flex: 1; }
-      .session-card .title { font-size: 0.87rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .session-card .cwd { font-family: var(--code-font); font-size: 0.7rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 0.15rem; }
-      .pill { flex-shrink: 0; width: 7px; height: 7px; border-radius: 50%; background: var(--live); }
-      .empty { color: var(--muted); font-size: 0.85rem; text-align: center; padding: 2rem 1rem; }
+      /* Sessions */
+      .list{display:flex;flex-direction:column}
+      .sess{display:grid;grid-template-columns:auto 1fr auto;gap:4px 12px;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line);text-align:left;width:100%}
+      .sess:hover{background:var(--accent-soft)}
+      .dot{width:10px;height:10px;border-radius:50%;grid-row:span 2}
+      .dot.run{background:var(--run);box-shadow:0 0 0 4px var(--accent-soft)}
+      .dot.wait{background:var(--warn);box-shadow:0 0 0 4px var(--warn-soft)}
+      .dot.idle{background:var(--idle)}
+      .sess .name{font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .sess .meta{grid-column:2;color:var(--muted);font-size:12px;font-family:var(--f-mono);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .pill{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;letter-spacing:.03em;grid-row:span 2}
+      .pill.wait{background:var(--warn-soft);color:var(--warn)}
+      .pill.run{background:var(--accent-soft);color:var(--accent)}
+      .pill.idle{background:var(--code-bg);color:var(--muted)}
+      .agent{font-family:var(--f-mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:0 5px;margin-left:6px;font-weight:400}
+      .section-label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:14px 16px 6px}
 
-      .add-btn {
-        appearance: none; border: none; cursor: pointer; flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%;
-        background: var(--surface-3); color: var(--text); font-size: 1.1rem; line-height: 1;
-        display: flex; align-items: center; justify-content: center;
-      }
-      .add-btn:active { transform: scale(0.94); }
+      /* Output */
+      .out{padding:12px 16px;display:flex;flex-direction:column;gap:10px;font-size:14px}
+      .msg{min-width:0}
+      .msg.user{align-self:flex-end;background:var(--accent);color:var(--accent-ink);padding:8px 12px;border-radius:14px 14px 4px 14px;max-width:85%}
+      .tool{font-family:var(--f-mono);font-size:12px;color:var(--muted);background:var(--code-bg);border:1px solid var(--line);border-radius:8px;padding:6px 10px;overflow-x:auto;white-space:pre}
+      .ask{border:1px solid var(--warn);background:var(--warn-soft);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+      .ask strong{color:var(--warn)}
+      .ask .row{display:flex;gap:8px}
+      .btn{padding:8px 14px;border-radius:10px;font-weight:700;font-size:14px}
+      .btn.primary{background:var(--accent);color:var(--accent-ink)}
+      .btn.ghost{border:1px solid var(--line);background:var(--surface)}
 
-      .term-header {
-        display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0.7rem;
-        border-bottom: 1px solid var(--surface-3); flex-shrink: 0;
-      }
-      .iconbtn { appearance: none; background: none; border: none; color: var(--text); font-size: 1.1rem; padding: 0.2rem 0.4rem; cursor: pointer; line-height: 1; }
-      .term-header .title { font-size: 0.85rem; font-weight: 600; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      #term-body { flex: 1; min-height: 0; overflow: hidden; padding: 0.4rem; background: #100d0b; }
-      #xterm-container { height: 100%; }
-      /* Base state: hidden everywhere, including phone (<768px), which never had a base rule of
-         its own before this fix — the only `display` rule lived inside the tablet media query,
-         so this tablet-only "select a session" label was rendering above the live terminal on
-         every phone session too. Found via code review. Tablet's own visible state
-         (`body.tablet-unattached #term-empty`) still lives in the media query below. */
-      #term-empty { display: none; }
+      /* Cards */
+      .card{border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;align-items:center;gap:10px;text-align:left;width:100%;background:var(--surface);color:inherit;text-decoration:none}
+      .card:hover{background:var(--accent-soft)}
+      .card .ic{width:30px;height:30px;border-radius:8px;background:var(--code-bg);display:grid;place-items:center;font-family:var(--f-mono);font-size:13px;flex:none}
+      .card .tx{flex:1;min-width:0}
+      .card .tx b{display:block;font-size:14px}
+      .card .tx span{font-size:12px;color:var(--muted);font-family:var(--f-mono);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .card .go{color:var(--accent);font-weight:700;font-size:13px}
 
-      /* P37 Phase F2: quick-tap row for keys the iOS soft keyboard doesn't expose (Esc/Tab/Ctrl
-         combos/arrows) — pinned above the keyboard, same idea Termius/Blink Shell ship. Hidden
-         via the same `tablet-unattached` class the terminal itself uses (set on load, cleared by
-         mountTerminal, added back by disposeTerminal) so it only shows while a session is live. */
-      .kbd-toolbar {
-        display: flex; gap: 0.4rem; padding: 0.4rem 0.6rem; overflow-x: auto; flex-shrink: 0;
-        background: var(--surface); border-top: 1px solid var(--surface-3);
-      }
-      .kbd-toolbar button {
-        appearance: none; border: 1px solid var(--border); background: var(--surface-3); color: var(--text);
-        border-radius: 6px; padding: 0.35rem 0.7rem; font-size: 0.78rem; font-family: var(--code-font);
-        cursor: pointer; flex-shrink: 0; line-height: 1;
-      }
-      .kbd-toolbar button:active { background: var(--accent); color: #100d0b; }
-      body.tablet-unattached .kbd-toolbar { display: none; }
+      /* Diff */
+      .files{display:flex;flex-direction:column}
+      .file{border-bottom:1px solid var(--line)}
+      .file summary{list-style:none;display:flex;gap:8px;align-items:center;padding:12px 16px;cursor:pointer}
+      .file summary::-webkit-details-marker{display:none}
+      .file .path{font-family:var(--f-mono);font-size:13px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:rtl;text-align:left}
+      .stat{font-family:var(--f-mono);font-size:12px;white-space:nowrap}
+      .stat .a{color:var(--add-ink)} .stat .d{color:var(--del-ink)}
+      .hunk{font-family:var(--f-mono);font-size:12px;line-height:1.55;overflow-x:auto;background:var(--code-bg)}
+      .hunk div{padding:0 12px;white-space:pre}
+      .hunk .h{color:var(--muted);padding-block:4px}
+      .hunk .add{background:var(--add);color:var(--add-ink)}
+      .hunk .del{background:var(--del);color:var(--del-ink)}
+      .badge{font-size:10px;font-weight:700;letter-spacing:.05em;padding:1px 6px;border-radius:6px;background:var(--warn-soft);color:var(--warn)}
 
-      /* P37 Phase G2: shell tab-completion suggestion strip — shared component, G3's AI
-         suggestion reuses this same class rather than a second near-identical strip. Hidden by
-         default; JS toggles `.show` only when a detection actually fires. */
-      .suggest-strip {
-        display: none; gap: 0.4rem; padding: 0.4rem 0.6rem; overflow-x: auto; flex-shrink: 0;
-        background: var(--surface); border-top: 1px solid var(--surface-3);
-      }
-      .suggest-strip.show { display: flex; }
-      .suggest-strip button {
-        appearance: none; border: 1px solid var(--accent); background: var(--surface-3); color: var(--accent-cyan);
-        border-radius: 6px; padding: 0.35rem 0.7rem; font-size: 0.78rem; font-family: var(--code-font);
-        cursor: pointer; flex-shrink: 0; line-height: 1;
-      }
-      body.tablet-unattached .suggest-strip { display: none !important; }
-      .suggest-loading { padding: 0.35rem 0.7rem; font-size: 0.78rem; color: var(--muted); font-family: var(--code-font); }
+      /* Preview */
+      .pv-src{display:flex;gap:6px;padding:10px 16px;overflow-x:auto}
+      .chip{padding:6px 12px;border-radius:999px;border:1px solid var(--line);font-size:13px;white-space:nowrap}
+      .chip[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+      .urlbar{margin:0 16px;font-family:var(--f-mono);font-size:12px;color:var(--muted);background:var(--code-bg);border-radius:8px;padding:6px 10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .mock{margin:10px 16px 16px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--bg)}
+      .mock .hero{padding:22px 16px;background:var(--accent);color:var(--accent-ink)}
+      .mock .hero b{display:block;font-size:20px}
+      .caption{font-size:12px;color:var(--muted);padding:0 16px 12px}
 
-      .sheet-backdrop {
-        position: fixed; inset: 0; background: rgba(0,0,0,0.45); opacity: 0; pointer-events: none;
-        transition: opacity 0.2s ease; z-index: 5;
-      }
-      .sheet-backdrop.open { opacity: 1; pointer-events: auto; }
-      .sheet {
-        position: fixed; left: 0; right: 0; bottom: 0; background: var(--surface);
-        border-radius: 18px 18px 0 0; border-top: 1px solid var(--border);
-        transform: translateY(100%); transition: transform 0.25s ease; max-height: 70%;
-        display: flex; flex-direction: column; z-index: 6;
-      }
-      .sheet.open { transform: translateY(0); }
-      .sheet-handle { width: 32px; height: 4px; background: var(--border); border-radius: 2px; margin: 0.6rem auto; flex-shrink: 0; }
-      .sheet .list-header { padding: 0 0.4rem 0.6rem; border-bottom: none; }
+      /* Composer */
+      .composer{border-top:1px solid var(--line);padding:8px 10px calc(10px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:6px;background:var(--surface)}
+      .inrow{display:flex;gap:6px;align-items:flex-end}
+      .inrow textarea{flex:1;min-width:0;resize:none;border:1px solid var(--line);border-radius:14px;padding:9px 12px;font:inherit;background:var(--bg);color:var(--ink);max-height:120px}
+      .send{background:var(--accent);color:var(--accent-ink);border-radius:12px;width:40px;height:40px;font-size:18px}
+      .send.stopping{background:var(--del);color:var(--del-ink);font-size:14px}
+      .attach-list{display:flex;gap:6px;flex-wrap:wrap}
+      .att{font-size:12px;background:var(--accent-soft);color:var(--accent);border-radius:8px;padding:2px 8px}
 
-      .error-banner {
-        position: fixed; top: 0; left: 0; right: 0; background: #c0392b; color: #fff; font-size: 0.8rem;
-        padding: 0.5rem 1rem; text-align: center; z-index: 10; display: none;
-      }
-      .error-banner.show { display: block; }
+      /* Slide-up Panels & Sheets */
+      .panel-bg{position:absolute;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:flex-end;z-index:5}
+      .panel{background:var(--surface);width:100%;height:88%;border-radius:20px 20px 0 0;display:flex;flex-direction:column;min-height:0}
+      .grab{width:40px;height:5px;border-radius:3px;background:var(--line);margin:8px auto 2px}
+      .panel-h{display:flex;align-items:center;gap:8px;padding:6px 12px 10px 16px;border-bottom:1px solid var(--line)}
+      .panel-h h3{margin:0;font-size:16px;flex:1}
+      @media (prefers-reduced-motion:no-preference){.panel{animation:up .22s ease-out}}
+      .edit-link{cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}
 
+      .menu{position:absolute;top:56px;right:12px;z-index:4;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:4px;display:flex;flex-direction:column;min-width:190px;box-shadow:0 8px 24px rgba(0,0,0,.18)}
+      .menu button{text-align:left;padding:10px 12px;border-radius:8px;display:flex;justify-content:space-between;gap:12px}
+      .menu button:hover{background:var(--accent-soft)}
+      .menu button:disabled{opacity:.4}
 
-      /* P37 Phase D2: the attach affordance is a leading row in the files sheet, not a 4th
-         toolbar icon (the header already has back/title/files/switch — no room to spare on a
-         narrow phone) — same call the design mockup landed on. */
-      .attach-row {
-        display: flex; align-items: center; gap: 0.7rem; background: transparent; border: 1px dashed var(--border);
-        border-radius: 12px; padding: 0.65rem 0.75rem; width: calc(100% - 1.6rem); margin: 0.6rem 0.8rem 0;
-        color: var(--accent); font-family: inherit; font-weight: 600; font-size: 0.85rem; flex-shrink: 0;
-      }
-      .attach-row .glyph { width: 1.1rem; text-align: center; flex-shrink: 0; }
+      .sheet-bg{position:absolute;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:flex-end;z-index:6}
+      .sheet{background:var(--surface);width:100%;border-radius:20px 20px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:12px}
+      .sheet h3{margin:0;font-size:17px}
+      .field{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
+      .field input{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:9px 10px}
+      .toast{position:absolute;left:16px;right:16px;bottom:96px;background:var(--ink);color:var(--surface);border-radius:12px;padding:10px 14px;font-size:14px;display:flex;justify-content:space-between;gap:10px;z-index:10}
+      .toast span:last-child{font-family:var(--f-mono);font-size:12px;opacity:.8;white-space:nowrap}
+      @media (prefers-reduced-motion:no-preference){.sheet{animation:up .18s ease-out}@keyframes up{from{transform:translateY(30px);opacity:.6}}}
+      </style>
+    </head>
+    <body>
+    <div class="stage">
+      <div class="phone" id="phone">
+        <!-- Pairing screen -->
+        <section id="scr-pairing" hidden>
+          <div class="dot wait" style="width:24px;height:24px;margin-bottom:8px"></div>
+          <h3>Pair Kouen Companion</h3>
+          <p>Scan the QR code in Kouen or enter the 6-digit pairing code from the desktop app.</p>
+          <input type="text" id="pair-token" class="token-input" maxlength="6" placeholder="000000" autofocus>
+          <button class="btn primary" id="pair-btn" style="width:180px">Pair Device</button>
+        </section>
 
-      /* P37 Phase D3 (browser mirror) — deliberately minimal chrome for this MVP, NOT the
-         tab-strip/webview redesign (that's a separate, larger, not-yet-built phase). */
-      .browser-toolbar {
-        display: flex; gap: 0.5rem; padding: 0.5rem 0.7rem; border-bottom: 1px solid var(--surface-3); flex-shrink: 0;
-      }
-      .browser-toolbar button {
-        appearance: none; border: 1px solid var(--border); background: var(--surface); color: var(--muted);
-        border-radius: 8px; padding: 0.3rem 0.6rem; font-size: 0.72rem; font-family: inherit; cursor: pointer;
-      }
-      /* Retargeted from D1's #file-body (Phase E folded the single-file view into this shared
-         preview pane) rather than left dead — deleting outright would have shipped file-preview
-         text with no padding/code-font/wrap, falling back to the browser's bare <pre> default. */
-      #preview-body { flex: 1; min-height: 0; overflow: auto; padding: 0.8rem; }
-      #preview-body pre {
-        margin: 0; font-family: var(--code-font); font-size: 0.8rem; white-space: pre-wrap;
-        word-break: break-word; color: var(--text);
-      }
-      #preview-body img { max-width: 100%; display: block; border-radius: 8px; }
-      #preview-body .empty { padding-top: 2rem; }
-      .browser-el {
-        display: flex; flex-direction: column; gap: 0.1rem; padding: 0.6rem 0.8rem;
-        border-bottom: 1px solid var(--surface-3); text-align: left; width: 100%; background: none; border-left: none; border-right: none; border-top: none;
-        color: inherit; font-family: inherit;
-      }
-      .browser-el .tag { font-family: var(--code-font); font-size: 0.65rem; color: var(--accent-cyan); }
-      .browser-el .label { font-size: 0.82rem; }
-
-      /* P37 Phase E: preview chrome (tab strip + webview toolbar), ported visually from the
-         desktop's own FileTabPillView (pill tabs, accent top-edge on active) and BrowserPaneView's
-         toolbar (back/forward/reload/path field) — reusing this page's existing tokens, not new
-         ones. Locked design: tab-strip replaces D1's single #view-file and D3's single #view-browser
-         with one shared pane type; nav buttons are only meaningful (and only shown) on a browser tab. */
-      .tabstrip {
-        display: flex; gap: 1px; padding: 4px 6px 0; border-bottom: 1px solid var(--surface-3);
-        overflow-x: auto; flex-shrink: 0; background: var(--surface);
-      }
-      .filetab {
-        display: flex; align-items: center; gap: 5px; height: 26px; padding: 0 6px 0 10px;
-        border-radius: 5px 5px 0 0; font-size: 0.72rem; color: var(--muted); white-space: nowrap;
-        flex-shrink: 0; cursor: pointer;
-      }
-      .filetab.active { background: var(--bg); color: var(--text); box-shadow: inset 0 1px 0 var(--accent); font-weight: 600; }
-      .filetab .x { opacity: 0.6; font-size: 0.65rem; margin-left: 2px; }
-      .webbar {
-        display: flex; align-items: center; gap: 6px; padding: 6px 8px; background: var(--bg);
-        border-bottom: 1px solid var(--surface-3); flex-shrink: 0;
-      }
-      .webbar .nav { color: var(--muted); font-size: 0.9rem; cursor: pointer; padding: 0 2px; }
-      .webbar .nav.hidden-nav { visibility: hidden; }
-      .webbar .reload { color: var(--muted); font-size: 0.78rem; cursor: pointer; }
-      #preview-pathfield {
-        flex: 1; min-width: 0; font: inherit; font-family: var(--code-font); font-size: 0.72rem;
-        background: var(--surface); border: 1px solid var(--surface-3); color: var(--text);
-        border-radius: 6px; padding: 3px 9px;
-      }
-      #preview-pathfield[readonly] { color: var(--muted); background: var(--surface-3); }
-
-      /* ---- Tablet (>=768px): persistent session rail, replacing the phone's full-screen
-         list view + bottom switcher sheet. Additive only — the <768px phone layout below
-         this breakpoint is untouched. */
-      #app-layout { display: flex; flex: 1; min-height: 0; }
-      #main-content { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-      #tablet-rail { display: none; }
-      @media (min-width: 768px) {
-        #tablet-rail {
-          display: flex; flex-direction: column; width: 260px; flex-shrink: 0;
-          border-right: 1px solid var(--surface-3); background: var(--bg); position: relative;
-        }
-        #tablet-rail.collapsed { width: 40px; align-items: center; padding-top: 0.7rem; }
-        #tablet-rail.collapsed .list-header, #tablet-rail.collapsed .sessions { display: none; }
-        #rail-collapse-btn {
-          appearance: none; background: none; border: none; color: var(--muted); font-size: 1rem;
-          padding: 0.3rem; cursor: pointer; line-height: 1; position: absolute; top: 0.6rem; right: 0.5rem;
-        }
-        #tablet-rail.collapsed #rail-collapse-btn { position: static; margin: 0 auto; }
-        /* Opening a file/browser tab is a full-screen takeover on tablet too — rail hidden,
-           same as the terminal it replaces (locked design, frame 06). */
-        body.preview-active #tablet-rail { display: none; }
-        body.tablet-unattached #term-empty { display: flex; }
-        body.tablet-unattached #xterm-container { display: none; }
-      }
-    </style>
-
-    <div id="app-layout">
-      <div id="tablet-rail">
-        <div class="list-header">
-          <div class="list-header-text">
-            <div class="host" id="rail-host"></div>
-            <h4 id="rail-count">0 sessions</h4>
+        <!-- Sessions screen -->
+        <section id="scr-list" style="display:contents">
+          <header class="bar">
+            <h2>Kouen</h2>
+            <span class="sub" id="header-host">tailnet</span>
+          </header>
+          <div class="scroll">
+            <div class="section-label">Needs you</div>
+            <div class="list" id="list-wait"></div>
+            <div class="section-label">Working</div>
+            <div class="list" id="list-run"></div>
+            <div class="section-label">Idle</div>
+            <div class="list" id="list-idle"></div>
           </div>
-          <button class="add-btn" onclick="spawnSession()" aria-label="New session">+</button>
-        </div>
-        <div class="sessions" id="sessions-rail"></div>
-        <button class="iconbtn" id="rail-collapse-btn" onclick="toggleRailCollapse()" aria-label="Collapse sidebar">&#8676;</button>
-      </div>
+        </section>
 
-      <div id="main-content">
-        <div id="view-home" class="view active">
-          <div class="mark">⌁ kouen</div>
-          <h4>Not paired</h4>
-          <p>Open this page via the QR code shown in Kouen's Settings ▸ Remote panel.</p>
-          <input id="token" placeholder="or paste code" autocomplete="off" inputmode="numeric">
-          <button class="btn" onclick="connect()">Connect</button>
-        </div>
-
-        <div id="view-paired" class="view">
-          <div class="check">&#10003;</div>
-          <h4>Paired</h4>
-          <p id="paired-sub"></p>
-        </div>
-
-        <div id="view-list" class="view">
-          <div class="list-header">
-            <div class="list-header-text">
-              <div class="host" id="list-host"></div>
-              <h4 id="list-count">0 sessions</h4>
+        <!-- Session screen -->
+        <section id="scr-sess" hidden style="display:none">
+          <header class="bar">
+            <button class="icon-btn" id="back" aria-label="Back to sessions">‹</button>
+            <div style="flex:1;min-width:0">
+              <h2 id="s-name"></h2>
+              <div class="sub" id="s-meta"></div>
             </div>
-            <button class="add-btn" onclick="spawnSession()" aria-label="New session">+</button>
+            <button class="icon-btn" id="more" aria-label="More actions" aria-expanded="false">⋯</button>
+            <div class="menu" id="menu" hidden>
+              <button id="diff-btn">Diff <span class="stat"><span class="a" id="d-add">+0</span> <span class="d" id="d-del">−0</span></span></button>
+              <button id="pv-btn">Preview</button>
+              <button id="pr-btn">Draft PR → GitHub</button>
+            </div>
+          </header>
+          <div class="scroll" id="pane"></div>
+          <div class="composer">
+            <div class="attach-list" id="atts"></div>
+            <div class="inrow">
+              <label class="icon-btn" for="file" aria-label="Attach file" style="cursor:pointer">📎</label>
+              <input type="file" id="file" hidden multiple>
+              <textarea id="msg" rows="1" placeholder="Message the agent…"></textarea>
+              <button class="send" id="send" aria-label="Send">↑</button>
+            </div>
           </div>
-          <div class="sessions" id="sessions-main"></div>
-        </div>
+        </section>
 
-        <div id="view-term" class="view">
-          <div class="term-header">
-            <button class="iconbtn" onclick="detach()" aria-label="Back to sessions">&larr;</button>
-            <div class="title" id="term-title">—</div>
-            <button class="iconbtn" onclick="openFilesSheet()" aria-label="Browse files">&#128193;</button>
-            <button class="iconbtn" onclick="openBrowserView()" aria-label="Browse the web">&#127760;</button>
-            <button class="iconbtn" onclick="openSheet()" aria-label="Switch session">&#8645;</button>
-          </div>
-          <div id="term-body">
-            <div id="term-empty" class="empty">Select a session from the sidebar</div>
-            <div id="xterm-container"></div>
-          </div>
-          <div class="suggest-strip" id="completion-strip"></div>
-          <div class="kbd-toolbar" id="kbd-toolbar">
-            <button onclick="sendKeySeq('\x1b')" aria-label="Escape">Esc</button>
-            <button onclick="sendTab()" aria-label="Tab">Tab</button>
-            <button onclick="sendKeySeq('\x03')" aria-label="Ctrl-C">^C</button>
-            <button onclick="sendKeySeq('\x04')" aria-label="Ctrl-D">^D</button>
-            <button onclick="sendKeySeq('\x1b[A')" aria-label="Up arrow">&uarr;</button>
-            <button onclick="sendKeySeq('\x1b[B')" aria-label="Down arrow">&darr;</button>
-            <button onclick="sendKeySeq('\x1b[D')" aria-label="Left arrow">&larr;</button>
-            <button onclick="sendKeySeq('\x1b[C')" aria-label="Right arrow">&rarr;</button>
-            <button onclick="openFilesPicker()" aria-label="Insert file path">@</button>
-            <button onclick="requestAISuggestion()" aria-label="Suggest a command">AI</button>
+        <!-- Slide-up Panel (Diff / Preview) -->
+        <div class="panel-bg" id="panel" hidden>
+          <div class="panel" role="dialog" aria-labelledby="panel-t">
+            <div class="grab"></div>
+            <div class="panel-h"><h3 id="panel-t"></h3><button class="icon-btn" id="panel-x" aria-label="Close">✕</button></div>
+            <div class="scroll" id="panel-body"></div>
           </div>
         </div>
 
-        <div id="view-preview" class="view">
-          <div class="term-header">
-            <button class="iconbtn" onclick="closePreview()" aria-label="Back to terminal">&larr;</button>
-            <div class="title" id="preview-title">—</div>
+        <!-- PR Sheet -->
+        <div class="sheet-bg" id="sheet" hidden>
+          <div class="sheet" role="dialog" aria-labelledby="pr-h">
+            <h3 id="pr-h">Open draft pull request</h3>
+            <div class="field"><label for="pr-title">Title</label><input id="pr-title"></div>
+            <div class="field"><span>Branch</span><span class="sub" id="pr-branch" style="color:var(--ink)"></span></div>
+            <div class="sub" id="pr-stat"></div>
+            <div style="display:flex;gap:8px">
+              <button class="btn ghost" id="pr-cancel" style="flex:1">Cancel</button>
+              <button class="btn primary" id="pr-go" style="flex:2">Create draft &amp; open in GitHub</button>
+            </div>
           </div>
-          <div class="tabstrip" id="preview-tabstrip"></div>
-          <div class="webbar">
-            <span class="nav" id="preview-back" onclick="previewNavBack()">&#8249;</span>
-            <span class="nav" id="preview-forward" onclick="previewNavForward()">&#8250;</span>
-            <span class="reload" id="preview-reload" onclick="previewNavReload()">&#8635;</span>
-            <span class="nav" id="preview-copy" onclick="copyPreviewPath()" aria-label="Copy path" title="Copy path">&#128203;</span>
-            <input id="preview-pathfield" autocomplete="off" autocapitalize="off" spellcheck="false">
-          </div>
-          <div class="browser-toolbar" id="preview-browser-toolbar">
-            <button onclick="browserRefreshSnapshot()">Refresh elements</button>
-            <button onclick="browserRefreshFrame()">Refresh screenshot</button>
-          </div>
-          <div id="preview-body"></div>
         </div>
+
+        <!-- Toast -->
+        <div class="toast" id="toast" hidden><span id="toast-t"></span><span id="toast-s"></span></div>
       </div>
     </div>
 
-    <div class="sheet-backdrop" id="sheet-backdrop" onclick="closeSheet()">
-      <div class="sheet" id="sheet" onclick="event.stopPropagation()">
-        <div class="sheet-handle"></div>
-        <div class="list-header">
-          <div class="list-header-text"><h4 id="sheet-count" style="font-size:0.9rem;">0 sessions</h4></div>
-          <button class="add-btn" onclick="spawnSession()" aria-label="New session">+</button>
-        </div>
-        <div class="sessions" id="sessions-sheet"></div>
-      </div>
-    </div>
-
-    <div class="sheet-backdrop" id="files-sheet-backdrop" onclick="closeFilesSheet()">
-      <div class="sheet" id="files-sheet" onclick="event.stopPropagation()">
-        <div class="sheet-handle"></div>
-        <div class="list-header">
-          <div class="list-header-text">
-            <div class="host" id="files-path"></div>
-            <h4 id="files-count" style="font-size:0.9rem;">0 items</h4>
-          </div>
-          <button class="add-btn" onclick="filesGoUp()" aria-label="Up one level">&uarr;</button>
-        </div>
-        <button class="attach-row" onclick="document.getElementById('attach-input').click()">
-          <span class="glyph">&#8593;</span>
-          Upload photo or file
-        </button>
-        <div class="sessions" id="files-list"></div>
-      </div>
-    </div>
-    <!-- `display:none` on a file input is a known WebKit/mobile-Safari trap: `.click()` can
-         silently no-op (no picker, no error) even from a real trusted tap. Standard cross-browser
-         hidden-file-input pattern instead: out of flow but still laid out, so the picker fires. -->
-    <input type="file" id="attach-input"
-           style="position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;"
-           onchange="attachSelectedFile(this)">
-
-    <div class="error-banner" id="error-banner"></div>
-
     <script>
-    \#(MobileBridgeWebAssets.xtermJS)
-    </script>
-    <script>
-    \#(MobileBridgeWebAssets.addonFitJS)
-    </script>
-    <script>
-      let ws, term, fitAddon;
-      let currentSurfaceID = null;
-      // Survives a dropped socket (unlike `currentSurfaceID`, which `disposeTerminal` clears on
-      // every close) so a reconnect can resume the same terminal instead of dumping the user
-      // back to the session list. Cleared only on an intentional detach/session-end, not on a
-      // connection drop.
-      let lastAttachedSurfaceID = null;
-      // Guards against a feedback loop: attaching selects the tab on the Mac, which bumps the
-      // daemon's snapshot revision, which re-pushes `{sessions:...}` to this same connection
-      // (the live session-list subscription) — without this flag, the resume branch below would
-      // see that push, re-send `{attach}`, get re-selected, re-bump, forever.
-      let resumeAttachInFlight = false;
-      let sessionsCache = [];
-      // P37 Phase D1: the directory currently shown in the files sheet — null until the sheet
-      // is opened for the first time, at which point it defaults to the attached session's cwd.
-      let filesCwd = null;
-      // P37 Phase G1: reuses the D1 files sheet wholesale instead of building a second picker —
-      // same sheet/CSS/state, just a different terminal action on file tap (insert path vs.
-      // open preview) and the D2 upload row hidden since it's not relevant here.
-      let filesPickerMode = false;
-      let authed = false;
-      let hasShownPairedToast = false;
-      // P37 Phase F4: backoff state for auto-reconnect after a previously-established session
-      // drops while the tab stays foregrounded (e.g. a wifi/cellular handoff mid-session) — the
-      // existing visibilitychange/pageshow path only covers backgrounding, not an active drop.
-      let reconnectAttempt = 0;
-      let reconnectTimer = null;
-      const params = new URLSearchParams(location.search);
-      // WS and the page are the same listener/port now (P37: a real phone could reach this
-      // page over Tailscale but never a separate WS-only port) — `location.port` is the
-      // correct fallback if `wsport` is ever missing from the URL, not a hardcoded guess.
-      const wsPort = params.get('wsport') || location.port;
-      // P37 A2: a returning device re-auths with the credentials it was issued on its first
-      // pairing (persisted in localStorage), so it never needs another QR scan. keyed per
-      // host so credentials from one Mac aren't replayed against another.
-      const credKey = 'kouenDeviceCreds:' + location.hostname;
-      function storedCreds() { try { return JSON.parse(localStorage.getItem(credKey)); } catch { return null; } }
+    const LABEL = { wait: "WAITING", run: "WORKING", idle: "IDLE" };
+    const $ = id => document.getElementById(id);
+    let ws = null, sessions = [], cur = null, atts = [], pv = "local", authed = false;
+    const params = new URLSearchParams(location.search);
+    const wsPort = params.get('wsport') || location.port;
+    const credKey = 'kouenDeviceCreds:' + location.hostname;
+    function storedCreds() { try { return JSON.parse(localStorage.getItem(credKey)); } catch { return null; } }
 
-      function showError(msg) {
-        const el = document.getElementById('error-banner');
-        el.textContent = msg;
-        el.classList.add('show');
-        setTimeout(() => el.classList.remove('show'), 4000);
-      }
+    function esc(t) { return (t || '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
+    function stripANSI(str) {
+      return (str || '')
+        .replace(/\x1b\][^\x07\x1b]*(\x07|\x1b\\)/g, '')
+        .replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '')
+        .replace(/\x1b[@-Z\\-_]/g, '')
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '');
+    }
 
-      function goto(name) {
-        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-        document.getElementById('view-' + name).classList.add('active');
-        // P37 Phase E: opening a file/browser tab is a full-screen takeover on tablet too —
-        // drives the `body.preview-active #tablet-rail{display:none}` rule, one call site
-        // instead of every place that navigates in/out of the preview view remembering to do it.
-        document.body.classList.toggle('preview-active', name === 'preview');
-      }
-
-      // P37 Phase E: tablet breakpoint matches the CSS media query exactly (768px) — used to
-      // decide whether the session-switch flow lands on the persistent rail (tablet) or the
-      // full-screen list/sheet (phone), not just for styling.
-      function isTabletLayout() { return window.matchMedia('(min-width: 768px)').matches; }
-
-      let railCollapsed = false;
-      function toggleRailCollapse() {
-        railCollapsed = !railCollapsed;
-        document.getElementById('tablet-rail').classList.toggle('collapsed', railCollapsed);
-        document.getElementById('rail-collapse-btn').innerHTML = railCollapsed ? '&#8677;' : '&#8676;';
-        // The rail's own width change is a container resize, not a viewport resize — xterm's
-        // FitAddon only listens for the latter (see the existing `window.addEventListener('resize'...)`
-        // below), so it has to be told explicitly. Deferred past the CSS width transition so it
-        // measures the settled size, not mid-animation.
-        if (fitAddon && currentSurfaceID) setTimeout(() => fitAddon.fit(), 260);
-      }
-
-      function sessionCard(s) {
-        const btn = document.createElement('button');
-        btn.className = 'session-card';
-        btn.onclick = () => attach(s.surfaceID);
-        const glyph = document.createElement('span'); glyph.className = 'glyph'; glyph.textContent = '›';
-        const meta = document.createElement('span'); meta.className = 'meta';
-        const title = document.createElement('div'); title.className = 'title'; title.textContent = s.tabTitle || '(untitled)';
-        const cwd = document.createElement('div'); cwd.className = 'cwd'; cwd.textContent = s.cwd;
-        meta.append(title, cwd);
-        const pill = document.createElement('span'); pill.className = 'pill';
-        btn.append(glyph, meta, pill);
-        return btn;
-      }
-
-      // Built via DOM (not innerHTML interpolation) so a tab title/cwd containing HTML-like
-      // text from the user's own shell can never inject markup into this page.
-      function renderSessions(sessions) {
-        sessionsCache = sessions;
-        document.getElementById('list-host').textContent = location.hostname + ' · via tailscale';
-        document.getElementById('rail-host').textContent = location.hostname + ' · via tailscale';
-        for (const id of ['sessions-main', 'sessions-sheet', 'sessions-rail']) {
-          const container = document.getElementById(id);
-          container.innerHTML = '';
-          if (sessions.length === 0) {
-            const empty = document.createElement('div');
-            empty.className = 'empty';
-            empty.textContent = 'No sessions yet — tap + to start one';
-            container.appendChild(empty);
-          } else {
-            sessions.forEach(s => container.appendChild(sessionCard(s)));
-          }
-        }
-        const label = sessions.length + (sessions.length === 1 ? ' session' : ' sessions');
-        document.getElementById('list-count').textContent = label;
-        document.getElementById('sheet-count').textContent = label;
-        document.getElementById('rail-count').textContent = label;
-      }
-
-      function sendResize() {
-        if (!term || !ws || ws.readyState !== WebSocket.OPEN) return;
-        ws.send(JSON.stringify({ resize: { cols: term.cols, rows: term.rows } }));
-      }
-
-      function sendKeySeq(seq) {
-        if (ws && ws.readyState === WebSocket.OPEN) ws.send(new TextEncoder().encode(seq));
-        clearCompletionStrip();
-      }
-
-      // Snapshot a fixed window of rows below the cursor BEFORE sending Tab, diff against the
-      // same rows after — a content diff, not a cursor-position check. Found live: zsh's default
-      // completion listing prints candidates below the prompt line then restores the cursor to
-      // its original position (terminal cursor save/restore), so the cursor never visibly moves;
-      // an earlier cursor-position-based version of this heuristic missed every real menu because
-      // of exactly that.
-      const COMPLETION_WATCH_ROWS = 8;
-      function snapshotRowsBelowCursor() {
-        if (!term) return null;
-        const buf = term.buffer.active;
-        const row = buf.baseY + buf.cursorY;
-        const rows = [];
-        for (let i = 1; i <= COMPLETION_WATCH_ROWS; i++) {
-          const line = buf.getLine(row + i);
-          rows.push(line ? line.translateToString(true).trim() : '');
-        }
-        return { row, rows };
-      }
-
-      function sendTab() {
-        const before = snapshotRowsBelowCursor();
-        sendKeySeq('\t');
-        watchForCompletion(before);
-      }
-
-      // P37 Phase G2: heuristic completion-menu detection — no shell-side setup, so this reads
-      // xterm.js's own rendered screen buffer after a Tab byte was sent rather than a structured
-      // completion protocol. Explicitly best-effort: tuned against zsh's default menu-listing
-      // shape (candidates print as short whitespace-separated tokens on rows that were blank
-      // immediately below the cursor before Tab was sent). Hard rule: any ambiguity shows
-      // nothing — a missed detection is fine, a wrong/garbage suggestion is not.
-      let completionWatchTimer = null;
-      function watchForCompletion(before) {
-        clearTimeout(completionWatchTimer);
-        if (!before) return;
-        completionWatchTimer = setTimeout(() => detectCompletionMenu(before), 150);
-      }
-
-      function detectCompletionMenu(before) {
-        if (!term) return;
-        const buf = term.buffer.active;
-        const candidateLines = [];
-        for (let i = 0; i < before.rows.length; i++) {
-          const line = buf.getLine(before.row + 1 + i);
-          const text = line ? line.translateToString(true).trim() : '';
-          // A row only counts as fresh completion output if it was blank before Tab and has
-          // content now — this is what makes the diff resilient to cursor-restore. Stop at the
-          // first gap once collection has started (trailing blank rows aren't more candidates).
-          if (text && !before.rows[i]) {
-            candidateLines.push(text);
-          } else if (candidateLines.length) {
-            break;
-          }
-        }
-        if (!candidateLines.length) return;
-
-        const tokens = [];
-        for (const line of candidateLines) {
-          for (const part of line.split(/\s{2,}|\t+/)) {
-            const token = part.trim();
-            // Reject anything containing an internal single space (reads as prose/output, not
-            // a completion token) or implausibly long (not a filename/command-fragment).
-            if (!token || token.length > 40 || /\s/.test(token)) continue;
-            tokens.push(token);
-          }
-        }
-        // A real completion menu lists multiple short candidates. Too few or an implausibly
-        // large count both read as "this isn't actually a completion menu" — stay silent.
-        if (tokens.length < 2 || tokens.length > 60) return;
-        renderCompletionStrip(tokens.slice(0, 20));
-      }
-
-      function renderCompletionStrip(tokens) {
-        const el = document.getElementById('completion-strip');
-        el.innerHTML = '';
-        tokens.forEach(t => {
-          const btn = document.createElement('button');
-          btn.textContent = t;
-          btn.onclick = () => sendKeySeq(t + ' ');
-          el.appendChild(btn);
-        });
-        el.classList.add('show');
-      }
-
-      function clearCompletionStrip() {
-        const el = document.getElementById('completion-strip');
-        if (el) { el.classList.remove('show'); el.innerHTML = ''; }
-      }
-
-      // P37 Phase G3: non-interactive variant of the strip, used only for the "thinking"
-      // placeholder while the subprocess round trip is in flight — a stray tap during that
-      // window must not send literal placeholder text into the shell (renderCompletionStrip's
-      // buttons would do exactly that).
-      function renderLoadingStrip(text) {
-        const el = document.getElementById('completion-strip');
-        el.innerHTML = '';
-        const span = document.createElement('span');
-        span.textContent = text;
-        span.className = 'suggest-loading';
-        el.appendChild(span);
-        el.classList.add('show');
-      }
-
-      // Best-effort read of "what the user has typed so far" — xterm.js has no concept of an
-      // input-line buffer (the shell's own readline/zle owns that), so this reads the currently
-      // rendered cursor row instead. On custom prompt themes this may include prompt decoration
-      // alongside the typed command; the AI prompt template is written to tolerate that rather
-      // than assuming a clean extraction is possible client-side.
-      function currentLineText() {
-        if (!term) return '';
-        const buf = term.buffer.active;
-        const line = buf.getLine(buf.baseY + buf.cursorY);
-        return line ? line.translateToString(true).trim() : '';
-      }
-
-      let aiSuggestPending = false;
-      function requestAISuggestion() {
-        if (aiSuggestPending || !ws || ws.readyState !== WebSocket.OPEN) return;
-        const commandBuffer = currentLineText();
-        if (!commandBuffer) { showError('Type something first, then tap AI.'); return; }
-        const meta = sessionsCache.find(s => s.surfaceID === currentSurfaceID);
-        const cwd = (meta && meta.cwd) || '/';
-        aiSuggestPending = true;
-        renderLoadingStrip('Asking claude…');
-        ws.send(JSON.stringify({ aiSuggest: { commandBuffer, cwd } }));
-      }
-
-      function mountTerminal(surfaceID) {
-        if (term) { term.dispose(); term = null; }
-        currentSurfaceID = surfaceID;
-        lastAttachedSurfaceID = surfaceID;
-        resumeAttachInFlight = false;
-        // A pending G3 request from the PREVIOUS session must not render into this one — found
-        // via code review: `aiSuggestPending` was only ever cleared by the response handler, so
-        // switching sessions mid-request left it stuck true (blocking the AI button forever if
-        // the old request errored silently) and a late-arriving suggestion would pop into
-        // whichever session happened to be active when it finally landed.
-        aiSuggestPending = false;
-        clearCompletionStrip();
-        document.body.classList.remove('tablet-unattached');
-        const meta = sessionsCache.find(s => s.surfaceID === surfaceID);
-        document.getElementById('term-title').textContent = meta ? meta.tabTitle : surfaceID;
-        term = new Terminal({
-          fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace',
-          fontSize: 13,
-          theme: { background: '#100d0b', foreground: '#ede8e2', cursor: '#ede8e2' },
-          scrollback: 5000,
-          convertEol: true,
-        });
-        fitAddon = new FitAddon.FitAddon();
-        term.loadAddon(fitAddon);
-        const container = document.getElementById('xterm-container');
-        container.innerHTML = '';
-        term.open(container);
-        // xterm.js's hidden input textarea ships with autocorrect off (it doesn't want the OS
-        // rewriting what you type into a terminal). iOS Safari also gates its predictive/QuickType
-        // suggestion bar (and the swipe-right-to-accept gesture) on that same attribute, so typing
-        // in the terminal on a phone/tablet never showed suggestions at all. Flipped on by request
-        // — trade-off: iOS may now also silently auto-replace a typed word on space/punctuation,
-        // which can mangle a shell command mid-type.
-        const helperTextarea = container.querySelector('textarea');
-        if (helperTextarea) helperTextarea.setAttribute('autocorrect', 'on');
-        // `goto`/`closeSheet` must run BEFORE `fitAddon.fit()` — `#view-term` is `display:none`
-        // until `goto` adds `.active`, and FitAddon measuring a hidden (0-width) container is a
-        // no-op, so `fit()` silently keeps the fresh `Terminal`'s untouched 80x24 default. On a
-        // real phone that default is way wider than the actual viewport: the shell wraps its
-        // output assuming 80 real columns, then xterm re-wraps that already-wrapped output a
-        // second time to fit the true narrow width, producing double-wrapped/interleaved text.
-        goto('term');
-        closeSheet();
-        fitAddon.fit();
-        sendResize();
-        term.onData(data => {
-          const before = data === '\t' ? snapshotRowsBelowCursor() : null;
-          sendKeySeq(data);
-          if (data === '\t') watchForCompletion(before);
-        });
-        term.onResize(() => sendResize());
-      }
-
-      function disposeTerminal() {
-        if (term) { term.dispose(); term = null; }
-        currentSurfaceID = null;
-        aiSuggestPending = false;
-        clearCompletionStrip();
-        document.body.classList.add('tablet-unattached');
-      }
-
-      window.addEventListener('resize', () => { if (fitAddon && currentSurfaceID) fitAddon.fit(); });
-
-      function connect() {
-        ws = new WebSocket(`ws://${location.hostname}:${wsPort}/`);
-        ws.binaryType = 'arraybuffer';
-        // Set the moment the server's `{"error":...}` text arrives, so `onclose` doesn't
-        // show a second, less specific banner on top of it (see `onclose` below).
-        let sawServerError = false;
-        ws.onopen = () => {
-          reconnectAttempt = 0; // a live connection again — reset the backoff below
-          const creds = storedCreds();
-          // Returning device: send deviceAuth instead of the token. On failure (revoked /
-          // stale secret) the daemon closes the socket; onclose falls back to a token pairing.
-          if (creds) ws.send(JSON.stringify({ deviceAuth: creds }));
-          else ws.send(document.getElementById('token').value.trim());
-          // P37 Phase E: a fresh WS connection means a fresh server-side ConnectionState, so
-          // any previously-open browser-mirror tab's paneID is gone (the daemon's own
-          // .browserPaneID guard now reports "open a page first" instead of resuming). Clear
-          // the cached snapshot/frame so the tab doesn't keep showing stale content as if it
-          // were still live — the next interaction naturally re-opens a fresh pane via
-          // handleBrowserNavigate's existing fallback. File tabs are untouched: their content
-          // is static and survives a socket drop fine.
-          const browserTab = findBrowserTab();
-          if (browserTab) {
-            browserTab.snapshot = null;
-            browserTab.frame = null;
-            if (browserTab.id === activePreviewTabId) renderActivePreviewTab();
-          }
-        };
-        // `onerror` never carries a reason (browsers withhold it deliberately — MDN/WHATWG:
-        // an error event here is not supposed to be used to relay information about why the
-        // error occurred). Log only; `onclose`'s close code is the actual signal.
-        ws.onerror = () => console.error('[kouen mobile] websocket error');
-        ws.onclose = (ev) => {
-          resumeAttachInFlight = false;
-          disposeTerminal();
-          // A deviceAuth that got rejected (device revoked, or a stale secret) closes the
-          // socket before we ever saw a sessions list — the stored secret is dead, so drop it
-          // and reload to the plain token field for a fresh pairing.
-          if (storedCreds() && !authed) { localStorage.removeItem(credKey); location.reload(); }
-          // Otherwise, only show a banner if the server didn't already send a specific
-          // `{"error":...}` message for this close (rejectAndClose on the daemon side sends
-          // one before every deliberate close) — this is the fallback for closes with no
-          // prior message: watchdog timeout, or the connection genuinely dropping.
-          else if (!authed && !sawServerError) {
-            showError(ev.code === 1008
-              ? 'Pairing rejected — rescan the QR code.'
-              : 'Connection lost — check the daemon is running and try again.');
-          }
-          // A session that was genuinely up before (not a rejected pairing attempt — that path
-          // above already reloads or shows a fixed error) dropped for some other reason: retry
-          // with backoff instead of leaving the user stuck on a dead tab until they manually
-          // reload. Covers a wifi/cellular handoff happening while the tab stays foregrounded the
-          // whole time, which visibilitychange/pageshow's own reconnect never sees since the tab
-          // never left the foreground.
-          if (authed) scheduleAutoReconnect();
-        };
-        ws.onmessage = (ev) => {
-          if (typeof ev.data === 'string') {
-            let msg;
-            try { msg = JSON.parse(ev.data); } catch { return; }
-            if (msg.deviceCredentials) { localStorage.setItem(credKey, JSON.stringify(msg.deviceCredentials)); return; }
-            if (msg.sessions) {
-              authed = true;
-              renderSessions(msg.sessions);
-              if (currentSurfaceID) {
-                // Live background update (the session list changed elsewhere) while already
-                // attached and viewing a terminal — the cache above is refreshed for whenever the
-                // switcher sheet opens next; do not navigate or touch the attach, or a selection
-                // side-effect of attaching (Mac focus-follow bumps the snapshot revision) would
-                // re-trigger this same push and loop forever.
-              } else if (!hasShownPairedToast) {
-                hasShownPairedToast = true;
-                const n = msg.sessions.length;
-                document.getElementById('paired-sub').textContent = n + (n === 1 ? ' session available' : ' sessions available');
-                goto('paired');
-                // Tablet: the rail is the session switcher (persistent, always visible) — the
-                // full-screen list view's whole job on phone, so tablet skips straight to the
-                // terminal (its own empty state prompts "select from the sidebar" until attached).
-                setTimeout(() => goto(isTabletLayout() ? 'term' : 'list'), 700);
-              } else if (!resumeAttachInFlight && lastAttachedSurfaceID && msg.sessions.some(s => s.surfaceID === lastAttachedSurfaceID)) {
-                // A reconnect (iOS dropped the socket on screen-lock/app-switch, see the
-                // visibilitychange handler below) lands here with the same session list request
-                // every fresh connect sends — resume the terminal the user was actually looking
-                // at instead of dumping them back to the list. `resumeAttachInFlight` covers the
-                // case where the AttachedAck (which would set currentSurfaceID and end this
-                // branch) hasn't landed yet but another sessions push already has.
-                resumeAttachInFlight = true;
-                ws.send(JSON.stringify({ attach: lastAttachedSurfaceID }));
-              } else {
-                goto(isTabletLayout() ? 'term' : 'list');
-              }
-            } else if (msg.ok === 'attached') {
-              mountTerminal(msg.surfaceID);
-            } else if (msg.ok === 'detached' || msg.detached) {
-              lastAttachedSurfaceID = null;
-              disposeTerminal();
-              goto(isTabletLayout() ? 'term' : 'list');
-            } else if (msg.directory) {
-              renderFileEntries(msg.directory);
-            } else if (msg.file) {
-              // Routed by path (the response's own natural key), not a wire-protocol tab id —
-              // re-render only if this is still the visible tab, never force-switch to it (a
-              // late response for a background tab must not steal focus from whatever the user
-              // is actually looking at).
-              const fileTab = findFileTab(msg.file.path);
-              if (fileTab) {
-                fileTab.content = msg.file;
-                if (fileTab.id === activePreviewTabId) renderActivePreviewTab();
-              }
-            } else if (msg.browserSnapshot) {
-              const browserTab = findBrowserTab();
-              if (browserTab) {
-                browserTab.snapshot = msg.browserSnapshot;
-                browserTab.url = msg.browserSnapshot.url;
-                browserTab.title = msg.browserSnapshot.title || 'Web';
-                if (browserTab.id === activePreviewTabId) { renderActivePreviewTab(); renderPreviewTabstrip(); }
-              }
-            } else if (msg.browserFrame) {
-              const browserTab = findBrowserTab();
-              if (browserTab) {
-                browserTab.frame = msg.browserFrame.png;
-                if (browserTab.id === activePreviewTabId) renderActivePreviewTab();
-              }
-            } else if (msg.ok === 'browserOpened' || msg.ok === 'browserNavigated' || msg.ok === 'browserInteracted') {
-              // Auto-refresh the element list after anything that could have changed the page —
-              // one fewer tap than making the user hit "Refresh elements" every time.
-              ws.send(JSON.stringify({ browserSnapshot: true }));
-            } else if (msg.suggestion) {
-              aiSuggestPending = false;
-              renderCompletionStrip([msg.suggestion]);
-            } else if (msg.error) {
-              aiSuggestPending = false;
-              sawServerError = true;
-              showError(msg.error);
-            }
-          } else if (term) {
-            term.write(new Uint8Array(ev.data));
-          }
-        };
-      }
-
-      function attach(id) { closeSheet(); ws.send(JSON.stringify({ attach: id })); }
-      function spawnSession() { closeSheet(); ws.send(JSON.stringify({ spawn: {} })); }
-      function detach() { ws.send(JSON.stringify({ detach: true })); }
-      function openSheet() { document.getElementById('sheet-backdrop').classList.add('open'); document.getElementById('sheet').classList.add('open'); }
-      function closeSheet() { document.getElementById('sheet-backdrop').classList.remove('open'); document.getElementById('sheet').classList.remove('open'); }
-
-      // P37 Phase D1: file preview. Reuses .session-card (styled as a plain row here, glyph
-      // doubles as a folder/file icon) so no new list styling was needed for the files sheet.
-      function listFiles(path) {
-        filesCwd = path;
-        ws.send(JSON.stringify({ listDirectory: { path } }));
-      }
-
-      function openFilesSheet() {
-        // Defaults to the attached session's cwd on first open; a later open reuses whatever
-        // directory was last browsed, matching how the session switcher sheet keeps its state.
-        if (filesCwd === null) {
-          const meta = sessionsCache.find(s => s.surfaceID === currentSurfaceID);
-          listFiles((meta && meta.cwd) || '/');
-        } else {
-          listFiles(filesCwd);
-        }
-        document.getElementById('files-sheet-backdrop').classList.add('open');
-        document.getElementById('files-sheet').classList.add('open');
-      }
-      function closeFilesSheet() {
-        document.getElementById('files-sheet-backdrop').classList.remove('open');
-        document.getElementById('files-sheet').classList.remove('open');
-        filesPickerMode = false;
-        document.querySelector('.attach-row').style.display = 'flex';
-      }
-
-      function openFilesPicker() {
-        filesPickerMode = true;
-        document.querySelector('.attach-row').style.display = 'none';
-        openFilesSheet();
-      }
-
-      // Minimal client-side shell quoting for path insertion — single-quote wrap, escape
-      // embedded `'` as `'\''`. Mirrors the desktop's `ShellQuoting.quote` convention (can't
-      // import it directly here, this is plain JS in a Swift string literal).
-      function shellQuotePath(path) {
-        return "'" + path.replace(/'/g, "'\\''") + "'";
-      }
-
-      function insertFilePath(path) {
-        closeFilesSheet();
-        sendKeySeq(shellQuotePath(path));
-      }
-      function filesGoUp() {
-        if (!filesCwd) return;
-        const trimmed = filesCwd.replace(/\/+$/, '');
-        const parent = trimmed.slice(0, trimmed.lastIndexOf('/'));
-        listFiles(parent || '/');
-      }
-
-      function joinPath(base, name) {
-        return base.replace(/\/+$/, '') + '/' + name;
-      }
-
-      // Built via DOM (not innerHTML interpolation), same reasoning as `sessionCard` above —
-      // a file/directory name comes straight from the filesystem the user's own shell can write to.
-      function fileEntryRow(entry) {
-        const btn = document.createElement('button');
-        btn.className = 'session-card';
-        btn.onclick = () => entry.isDirectory
-          ? listFiles(joinPath(filesCwd, entry.name))
-          : (filesPickerMode ? insertFilePath(joinPath(filesCwd, entry.name)) : openFileTab(joinPath(filesCwd, entry.name)));
-        const glyph = document.createElement('span'); glyph.className = 'glyph';
-        glyph.textContent = entry.isDirectory ? '\u{1F4C1}' : '\u{1F4C4}';
-        const meta = document.createElement('span'); meta.className = 'meta';
-        const title = document.createElement('div'); title.className = 'title'; title.textContent = entry.name;
-        meta.appendChild(title);
-        btn.append(glyph, meta);
-        return btn;
-      }
-
-      function renderFileEntries(directory) {
-        filesCwd = directory.path;
-        document.getElementById('files-path').textContent = directory.path;
-        const n = directory.entries.length;
-        document.getElementById('files-count').textContent = n + (n === 1 ? ' item' : ' items');
-        const container = document.getElementById('files-list');
-        container.innerHTML = '';
-        if (n === 0) {
-          const empty = document.createElement('div');
-          empty.className = 'empty';
-          empty.textContent = 'Empty directory';
-          container.appendChild(empty);
-        } else {
-          directory.entries.forEach(e => container.appendChild(fileEntryRow(e)));
-        }
-      }
-
-      // P37 Phase E: unified tab model — replaces D1's single #view-file and D3's single
-      // #view-browser with one shared tab-strip + webview-chrome pane (locked design). Multiple
-      // file tabs can be open at once; at most ONE browser tab exists per connection (locked
-      // scope decision — opening a second URL reuses/renavigates the existing browser tab rather
-      // than spawning a second `BrowserPaneView` pane on the Mac).
-      let previewTabs = [];
-      let activePreviewTabId = null;
-      let previewTabSeq = 0;
-
-      function activePreviewTab() { return previewTabs.find(t => t.id === activePreviewTabId) || null; }
-      function findFileTab(path) { return previewTabs.find(t => t.kind === 'file' && t.path === path); }
-      function findBrowserTab() { return previewTabs.find(t => t.kind === 'browser'); }
-
-      function openFileTab(path) {
-        let tab = findFileTab(path);
-        if (!tab) {
-          tab = { id: 'tab' + (++previewTabSeq), kind: 'file', title: path.slice(path.lastIndexOf('/') + 1), path, content: null };
-          previewTabs.push(tab);
-        }
-        activatePreviewTab(tab.id);
-        ws.send(JSON.stringify({ readFile: { path } }));
-        closeFilesSheet();
-        goto('preview');
-      }
-
-      function openBrowserTab(url) {
-        let tab = findBrowserTab();
-        if (!tab) {
-          tab = { id: 'tab' + (++previewTabSeq), kind: 'browser', title: 'Web', url, snapshot: null, frame: null };
-          previewTabs.push(tab);
-        } else {
-          tab.url = url;
-        }
-        activatePreviewTab(tab.id);
-        ws.send(JSON.stringify({ browserNavigate: { url } }));
-        goto('preview');
-      }
-
-      // The 🌐 toolbar button: reopen the existing browser tab if one is already open (no
-      // re-navigate — just switch back to it), otherwise prompt for a starting URL.
-      function openBrowserView() {
-        const existing = findBrowserTab();
-        if (existing) { activatePreviewTab(existing.id); goto('preview'); return; }
-        const url = window.prompt('Open URL', 'https://');
-        if (!url || url === 'https://') return;
-        openBrowserTab(normalizeURL(url));
-      }
-
-      function normalizeURL(raw) {
-        const url = raw.trim();
-        return /^[a-z][a-z0-9+.-]*:\/\//i.test(url) ? url : 'https://' + url;
-      }
-
-      function activatePreviewTab(id) {
-        activePreviewTabId = id;
-        renderPreviewTabstrip();
-        renderActivePreviewTab();
-      }
-
-      function closePreviewTab(id) {
-        const tab = previewTabs.find(t => t.id === id);
-        if (!tab) return;
-        previewTabs = previewTabs.filter(t => t.id !== id);
-        if (tab.kind === 'browser') ws.send(JSON.stringify({ browserClose: true }));
-        if (activePreviewTabId === id) {
-          const next = previewTabs[previewTabs.length - 1];
-          if (next) { activatePreviewTab(next.id); } else { activePreviewTabId = null; closePreview(); }
-        } else {
-          renderPreviewTabstrip();
-        }
-      }
-
-      // Back button: return to the terminal, tabs stay open (re-tap 📁/🌐 to come back to them)
-      // — a full close-everything would throw away file scroll position/browser state for no
-      // reason the locked design asked for.
-      function closePreview() { goto('term'); }
-
-      // Built via DOM (not innerHTML), same reasoning as `sessionCard`/`fileEntryRow` above.
-      function renderPreviewTabstrip() {
-        const container = document.getElementById('preview-tabstrip');
-        container.innerHTML = '';
-        previewTabs.forEach(t => {
-          const el = document.createElement('div');
-          el.className = 'filetab' + (t.id === activePreviewTabId ? ' active' : '');
-          const label = document.createElement('span'); label.textContent = t.title;
-          const x = document.createElement('span'); x.className = 'x'; x.textContent = '×';
-          x.onclick = (e) => { e.stopPropagation(); closePreviewTab(t.id); };
-          el.append(label, x);
-          el.onclick = () => activatePreviewTab(t.id);
-          container.appendChild(el);
-        });
-      }
-
-      function renderActivePreviewTab() {
-        const tab = activePreviewTab();
-        const pathfield = document.getElementById('preview-pathfield');
-        const browserToolbar = document.getElementById('preview-browser-toolbar');
-        const navEls = [document.getElementById('preview-back'), document.getElementById('preview-forward'), document.getElementById('preview-reload')];
-        const body = document.getElementById('preview-body');
-        if (!tab) { body.innerHTML = ''; return; }
-        document.getElementById('preview-title').textContent = tab.title;
-        if (tab.kind === 'file') {
-          pathfield.value = tab.path;
-          pathfield.readOnly = true;
-          browserToolbar.style.display = 'none';
-          navEls.forEach(n => n.classList.add('hidden-nav'));
-          renderFileTabBody(tab, body);
-        } else {
-          pathfield.value = tab.url || '';
-          pathfield.readOnly = false;
-          browserToolbar.style.display = 'flex';
-          navEls.forEach(n => n.classList.remove('hidden-nav'));
-          renderBrowserTabBody(tab, body);
-        }
-      }
-
-      function renderFileTabBody(tab, body) {
-        body.innerHTML = '';
-        if (!tab.content) {
-          const loading = document.createElement('div'); loading.className = 'empty'; loading.textContent = 'Loading…';
-          body.appendChild(loading);
+    function renderList() {
+      $("header-host").textContent = location.hostname + " · tailnet";
+      ["wait", "run", "idle"].forEach(st => {
+        const box = $("list-" + st);
+        box.innerHTML = "";
+        const matched = sessions.filter(s => s.state === st);
+        if (matched.length === 0) {
+          const empty = document.createElement("div");
+          empty.style.padding = "10px 16px";
+          empty.style.color = "var(--muted)";
+          empty.style.fontSize = "13px";
+          empty.textContent = "No " + LABEL[st].toLowerCase() + " sessions";
+          box.appendChild(empty);
           return;
         }
-        const file = tab.content;
-        if (file.encoding === 'utf8') {
-          const pre = document.createElement('pre');
-          pre.textContent = file.content + (file.truncated ? '\n\n… (truncated)' : '');
-          body.appendChild(pre);
-        } else if (file.mimeType.startsWith('image/')) {
-          const img = document.createElement('img');
-          img.src = 'data:' + file.mimeType + ';base64,' + file.content;
-          body.appendChild(img);
-        } else {
-          const empty = document.createElement('div'); empty.className = 'empty';
-          empty.textContent = 'Cannot preview this file type (' + file.mimeType + ').';
-          body.appendChild(empty);
+        matched.forEach(s => {
+          const add = s.files ? s.files.reduce((a, f) => a + f[1], 0) : 0;
+          const del = s.files ? s.files.reduce((a, f) => a + f[2], 0) : 0;
+          const b = document.createElement("button");
+          b.className = "sess";
+          b.innerHTML = `<span class="dot ${st}"></span><span class="name">${esc(s.name)}<span class="agent">${esc(s.agent)}</span></span><span class="pill ${st}">${LABEL[st]}</span><span class="meta">${esc(s.branch)} · ${s.files ? s.files.length : 0} files +${add} −${del}</span>`;
+          b.onclick = () => openSession(s);
+          box.appendChild(b);
+        });
+      });
+    }
+
+    function openSession(s) {
+      cur = s;
+      $("scr-list").hidden = true; $("scr-list").style.display = "none";
+      $("scr-sess").hidden = false; $("scr-sess").style.display = "contents";
+      $("s-name").textContent = s.name;
+      $("s-meta").textContent = s.agent + " · " + s.branch;
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ attach: s.id }));
+        ws.send(JSON.stringify({ gitDiff: { path: s.cwd } }));
+      }
+      renderPane();
+    }
+
+    function back() {
+      $("scr-sess").hidden = true; $("scr-sess").style.display = "none";
+      $("scr-list").hidden = false; $("scr-list").style.display = "contents";
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ detach: true }));
+      }
+      cur = null;
+      renderList();
+    }
+    $("back").onclick = back;
+
+    function renderPane() {
+      if (!cur) return;
+      const p = $("pane");
+      const wasAtBottom = (p.scrollHeight - p.scrollTop - p.clientHeight) < 60;
+      const items = [...cur.out];
+
+      if (cur.files && cur.files.length > 0 && !items.some(x => x[0] === 'diff')) {
+        items.push(["diff"]);
+      }
+      const port = (cur.ports && cur.ports[0]) || (cur.rawOutput && cur.rawOutput.includes('localhost:') ? (cur.rawOutput.match(/localhost:(\d+)/) || [])[1] : null);
+      if (port && !items.some(x => x[0] === 'preview')) {
+        items.push(["preview", "http://localhost:" + port + "/"]);
+      }
+      if (cur.branch && cur.branch !== 'main' && cur.branch !== 'master' && !items.some(x => x[0] === 'pr' || x[0] === 'prdone')) {
+        if (cur.pr) items.push(["prdone"]);
+        else items.push(["pr"]);
+      }
+
+      p.innerHTML = '<div class="out">' + items.map(([k, t]) => {
+        if (k === "user") return `<div class="msg user">${esc(t)}</div>`;
+        if (k === "tool") return `<div class="tool${t.startsWith("Edit") ? " edit-link" : ""}">${esc(t)}</div>`;
+        if (k === "diff") {
+          const a = cur.files.reduce((x, f) => x + f[1], 0), d = cur.files.reduce((x, f) => x + f[2], 0);
+          return `<button class="card" data-c="diff"><span class="ic">±</span><span class="tx"><b>${cur.files.length} files changed</b><span>+${a} −${d} · ${cur.files.map(f => f[0].split("/").pop()).join(", ")}</span></span><span class="go">Diff</span></button>`;
         }
-      }
+        if (k === "preview") return `<button class="card" data-c="pv"><span class="ic">◳</span><span class="tx"><b>Dev server running</b><span>${esc(t)}</span></span><span class="go">Open</span></button>`;
+        if (k === "pr") return `<button class="card" data-c="pr"><span class="ic">⇡</span><span class="tx"><b>Ready for review</b><span>${esc(cur.branch)} → main</span></span><span class="go">Create draft PR</span></button>`;
+        if (k === "prdone") return `<a class="card" href="${cur.pr.url}" target="_blank" rel="noopener"><span class="ic">⇡</span><span class="tx"><b>Draft PR #${cur.pr.n} opened</b><span>${esc(cur.pr.url.replace('https://',''))}</span></span><span class="go">GitHub ↗</span></a>`;
+        if (k === "ask") return `<div class="ask"><div><strong>Approval needed</strong></div><div class="tool">${esc(t)}</div><div class="row"><button class="btn primary" data-a="y">Allow</button><button class="btn ghost" data-a="n">Deny</button></div></div>`;
+        return `<div class="msg">${esc(t)}</div>`;
+      }).join("") + '</div>';
 
-      function browserInteract(ref, action, text) {
-        ws.send(JSON.stringify({ browserInteract: { ref, action, text: text || null } }));
-      }
-
-      // Built via DOM (not innerHTML), same reasoning as `sessionCard`/`fileEntryRow` above —
-      // page text/labels come straight from whatever site is loaded.
-      function browserElementRow(el) {
-        const btn = document.createElement('button');
-        btn.className = 'browser-el';
-        const tag = document.createElement('span'); tag.className = 'tag';
-        tag.textContent = el.tag + (el.role ? ' · ' + el.role : '');
-        const label = document.createElement('span'); label.className = 'label';
-        label.textContent = el.text || el.placeholder || el.value || '(no label)';
-        btn.append(tag, label);
-        const isTextInput = el.tag === 'input' || el.tag === 'textarea';
-        btn.onclick = () => {
-          if (isTextInput) {
-            const text = window.prompt('Type into "' + label.textContent + '"', el.value || '');
-            if (text !== null) browserInteract(el.id, 'type', text);
-          } else {
-            browserInteract(el.id, 'click');
-          }
+      p.querySelectorAll("[data-a]").forEach(b => {
+        b.onclick = () => {
+          const ans = b.dataset.a;
+          if (ws && ws.readyState === WebSocket.OPEN) ws.send(new TextEncoder().encode(ans + '\n'));
+          cur.out.push(["tool", (ans === "y" ? "✓ allowed" : "✗ denied")]);
+          renderPane();
         };
-        return btn;
-      }
-
-      function renderBrowserTabBody(tab, body) {
-        body.innerHTML = '';
-        if (tab.frame) {
-          const img = document.createElement('img');
-          img.src = 'data:image/png;base64,' + tab.frame;
-          body.appendChild(img);
-        }
-        if (tab.snapshot) {
-          if (!tab.snapshot.elements || tab.snapshot.elements.length === 0) {
-            const empty = document.createElement('div'); empty.className = 'empty';
-            empty.textContent = 'No interactive elements found on this page.';
-            body.appendChild(empty);
-          } else {
-            tab.snapshot.elements.forEach(el => body.appendChild(browserElementRow(el)));
-          }
-        }
-      }
-
-      function browserRefreshSnapshot() { ws.send(JSON.stringify({ browserSnapshot: true })); }
-      function browserRefreshFrame() { ws.send(JSON.stringify({ browserScreenshot: true })); }
-
-      // P37 Phase E: real back/forward/reload for the ported webview toolbar — only shown
-      // (see `renderActivePreviewTab`'s `hidden-nav` toggle) on a browser-kind tab.
-      function previewNavBack() { if (activePreviewTab()?.kind === 'browser') ws.send(JSON.stringify({ browserGoBack: true })); }
-      function previewNavForward() { if (activePreviewTab()?.kind === 'browser') ws.send(JSON.stringify({ browserGoForward: true })); }
-      function previewNavReload() { if (activePreviewTab()?.kind === 'browser') ws.send(JSON.stringify({ browserReload: true })); }
-
-      // Copies whatever `preview-pathfield` currently shows — a real file path (file tab,
-      // readonly) or the current URL (browser tab) — works for both, no `kind` branch needed.
-      // `navigator.clipboard` requires a secure context; this page is normally served over plain
-      // http (LAN/Tailscale, not localhost), where Safari/Chrome don't expose it at all — the
-      // `execCommand('copy')` fallback below is the actual path most real deployments hit.
-      function copyPreviewPath() {
-        const field = document.getElementById('preview-pathfield');
-        const text = field.value;
-        if (!text) return;
-        const flash = () => {
-          const btn = document.getElementById('preview-copy');
-          const prev = btn.innerHTML;
-          btn.innerHTML = '&#10003;';
-          setTimeout(() => { btn.innerHTML = prev; }, 900);
-        };
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(text).then(flash, () => legacyCopy(field, flash));
-        } else {
-          legacyCopy(field, flash);
-        }
-      }
-
-      function legacyCopy(field, onDone) {
-        const wasReadOnly = field.readOnly;
-        field.readOnly = true; // avoid popping the OS keyboard on a phone just to copy
-        field.focus();
-        field.select();
-        field.setSelectionRange(0, field.value.length);
-        try { document.execCommand('copy'); onDone(); } catch (e) { showError('Could not copy path.'); }
-        field.readOnly = wasReadOnly;
-      }
-
-      document.getElementById('preview-pathfield').addEventListener('keydown', e => {
-        if (e.key !== 'Enter') return;
-        const tab = activePreviewTab();
-        if (!tab || tab.kind !== 'browser') return; // readonly on a file tab, nothing to submit
-        const url = normalizeURL(e.target.value);
-        if (!url) return;
-        tab.url = url;
-        ws.send(JSON.stringify({ browserNavigate: { url } }));
+      });
+      p.querySelectorAll(".edit-link").forEach(x => x.onclick = openDiff);
+      p.querySelectorAll("[data-c]").forEach(c => {
+        c.onclick = () => ({ diff: openDiff, pv: openPreview, pr: openPR })[c.dataset.c]();
       });
 
-      // P37 Phase D2: mirrors the server's own `maxFileReadBytes` (5 MiB) so an oversized pick
-      // fails fast client-side instead of wasting a slow mobile upload before the server rejects it.
-      const MAX_ATTACH_BYTES = 5 * 1024 * 1024;
+      if (wasAtBottom) p.scrollTop = p.scrollHeight;
+      const add = cur.files ? cur.files.reduce((x, f) => x + f[1], 0) : 0;
+      const del = cur.files ? cur.files.reduce((x, f) => x + f[2], 0) : 0;
+      $("d-add").textContent = "+" + add;
+      $("d-del").textContent = "−" + del;
+      $("diff-btn").disabled = !cur.files || !cur.files.length;
+      syncSend();
+    }
 
-      function attachSelectedFile(input) {
-        const file = input.files && input.files[0];
-        input.value = ''; // so picking the same file again still fires 'change'
-        if (!file) return;
-        if (file.size > MAX_ATTACH_BYTES) { showError('File is too large (max 5 MB).'); return; }
-        const reader = new FileReader();
-        reader.onload = () => {
-          // readAsDataURL yields "data:<mime>;base64,<content>" — only the part after the
-          // comma is the base64 payload the server expects.
-          const base64 = reader.result.slice(reader.result.indexOf(',') + 1);
-          ws.send(JSON.stringify({ attachFile: { name: file.name, mimeType: file.type, content: base64 } }));
-          closeFilesSheet();
-        };
-        reader.onerror = () => showError('Could not read the selected file.');
-        reader.readAsDataURL(file);
-      }
+    function panel(title, html) {
+      $("panel-t").textContent = title;
+      $("panel-body").innerHTML = html;
+      $("panel").hidden = false;
+    }
+    $("panel-x").onclick = () => { $("panel").hidden = true; };
+    $("panel").onclick = e => { if (e.target.id === "panel") $("panel").hidden = true; };
 
-      document.getElementById('token').addEventListener('keydown', e => { if (e.key === 'Enter') connect(); });
+    function openDiff() {
+      if (!cur || !cur.files || !cur.files.length) return;
+      panel(`Diff · ${cur.files.length} files`,
+        '<div class="files">' + cur.files.map(([path, a, d, unc, h], i) => `
+          <details class="file" ${i === 0 ? "open" : ""}>
+            <summary>
+              <span class="path">${esc(path)}</span>
+              ${unc ? '<span class="badge">UNCOMMITTED</span>' : ''}
+              <span class="stat"><span class="a">+${a}</span> <span class="d">−${d}</span></span>
+            </summary>
+            <div class="hunk">${(h || []).map(l => `<div class="${l.startsWith("@@") ? "h" : l[0] === "+" ? "add" : l[0] === "-" ? "del" : ""}">${esc(l)}</div>`).join("")}</div>
+          </details>
+        `).join("") + '</div>'
+      );
+    }
 
-      // P37 Phase E: the page always starts with nothing attached — drives view-term's tablet
-      // empty state ("select a session from the sidebar") from the very first render, not just
-      // after a `disposeTerminal()` call (which never runs before a first attach).
-      document.body.classList.add('tablet-unattached');
+    function openPreview() {
+      if (!cur) return;
+      const port = (cur.ports && cur.ports[0]) || 5173;
+      const src = {
+        local: ["Dev server", `http://localhost:${port}/`],
+        html: ["HTML file", "docs/companion-mockup.html"],
+        art: ["Artifact", "claude.ai/artifact/…"]
+      };
+      const url = src[pv] ? src[pv][1] : src.local[1];
+      panel("Preview", `
+        <div class="pv-src">${Object.entries(src).map(([k, v]) => `<button class="chip" data-pv="${k}" aria-pressed="${k === pv}">${v[0]}</button>`).join("")}</div>
+        <div class="urlbar">${esc(url)}</div>
+        <div class="mock">
+          ${pv === 'local' ? `<iframe src="${esc(url)}" style="width:100%;height:280px;border:0;background:white"></iframe>` : `<div class="hero"><b>Preview</b><span>${esc(url)}</span></div>`}
+        </div>
+        <p class="caption">${pv === "local" ? "Live mirror of your running dev server." : pv === "html" ? "Renders straight from your workspace." : "External artifact link."}</p>
+      `);
+      $("panel-body").querySelectorAll("[data-pv]").forEach(b => {
+        b.onclick = () => { pv = b.dataset.pv; openPreview(); };
+      });
+    }
 
-      // Auto-connect when we can do it without a tap: a stored device credential (returning
-      // device, P37 A2) needs no token at all; otherwise a token in the URL (QR scan) — the
-      // token expires in pairingLifetime (120s) and the server also honors the previous
-      // token for one grace window, so an auto-connect that races a rotation still lands.
-      if (storedCreds()) {
-        connect();
-      } else if (params.get('token')) {
-        document.getElementById('token').value = params.get('token');
-        connect();
-      }
+    function syncSend() {
+      const stop = cur && cur.state === "run" && !$("msg").value.trim() && !atts.length;
+      const b = $("send");
+      b.textContent = stop ? "■" : "↑";
+      b.classList.toggle("stopping", stop);
+      b.setAttribute("aria-label", stop ? "Stop agent" : "Send");
+    }
 
-      // iOS Safari closes a background tab's WebSocket on screen-lock/app-switch to save power,
-      // without ever running this page's JS to notice — so without this, coming back to the tab
-      // silently shows a dead session until the user manually reloads. `visibilitychange` fires
-      // the moment the tab is foregrounded again; `pageshow` with `persisted` additionally covers
-      // Safari restoring the page straight from its back-forward cache instead of re-running the
-      // script at all (a separate iOS-specific path that skips the code above entirely).
-      // P37 Phase F4: backoff retry for a connection that dropped while the tab stayed
-      // foregrounded (`ws.onclose` schedules this directly) or that's about to be forced closed
-      // by `reconnectIfDropped` below. Capped at 30s; reset to 0 on a successful `onopen`.
-      function scheduleAutoReconnect() {
-        if (reconnectTimer) return; // already scheduled, don't stack timers
-        const delay = Math.min(30000, 1000 * (2 ** reconnectAttempt));
-        reconnectAttempt++;
-        reconnectTimer = setTimeout(() => {
-          reconnectTimer = null;
-          if (document.visibilityState === 'visible') connect();
-        }, delay);
-      }
-
-      function reconnectIfDropped() {
-        if (!authed && !storedCreds()) return; // never paired yet — nothing to resume
-        if (ws && ws.readyState === WebSocket.CONNECTING) return; // already reconnecting
-        if (ws && ws.readyState === WebSocket.OPEN) {
-          // Don't trust a reported-OPEN socket here: after the *Mac* sleeps (not just the phone
-          // backgrounding), the underlying TCP can sit frozen for the whole nap with the browser
-          // never told it died — `readyState` keeps reporting OPEN until a send/receive actually
-          // times out. Foregrounding is cheap and infrequent enough that forcing a fresh connect
-          // unconditionally is simpler and more correct than trying to detect staleness.
-          // Detach handlers first so the dying socket's async close event can't touch app state
-          // (dispose the terminal, schedule a redundant reconnect) once the fresh one below is
-          // already mounting.
-          ws.onopen = ws.onclose = ws.onerror = ws.onmessage = null;
-          ws.close();
+    function send(text) {
+      if (!text.trim() && !atts.length) {
+        if (cur && cur.state === "run") {
+          cur.state = "idle";
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ stop: true }));
+          }
+          cur.out.push(["tool", "■ stopped (Esc sent to pane)"]);
+          renderPane();
+          toast("Stopped " + cur.name, "Esc sent");
         }
-        connect();
+        return;
       }
-      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reconnectIfDropped(); });
-      window.addEventListener('pageshow', e => { if (e.persisted) reconnectIfDropped(); });
+      const fullText = text + (atts.length ? "\n📎 " + atts.join(", ") : "");
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(new TextEncoder().encode(fullText + '\n'));
+      }
+      cur.out.push(["user", fullText]);
+      atts = [];
+      $("atts").innerHTML = "";
+      $("msg").value = "";
+      renderPane();
+    }
+
+    function toast(t, s) {
+      $("toast-t").textContent = t;
+      $("toast-s").textContent = s || '';
+      $("toast").hidden = false;
+      clearTimeout(toast.h);
+      toast.h = setTimeout(() => { $("toast").hidden = true; }, 3200);
+    }
+
+    function closeMenu() { $("menu").hidden = true; $("more").setAttribute("aria-expanded", "false"); }
+    $("more").onclick = e => {
+      e.stopPropagation();
+      const m = $("menu");
+      m.hidden = !m.hidden;
+      $("more").setAttribute("aria-expanded", String(!m.hidden));
+    };
+    document.addEventListener("click", e => { if (!e.target.closest("#menu") && !e.target.closest("#more")) closeMenu(); });
+    $("diff-btn").onclick = () => { closeMenu(); openDiff(); };
+    $("pv-btn").onclick = () => { closeMenu(); openPreview(); };
+    $("pr-btn").onclick = () => { closeMenu(); openPR(); };
+
+    function openPR() {
+      if (!cur) return;
+      if (cur.pr) { window.open(cur.pr.url, '_blank'); return; }
+      $("pr-title").value = cur.name || "Draft PR";
+      $("pr-branch").textContent = cur.branch || "feat";
+      const add = cur.files ? cur.files.reduce((x, f) => x + f[1], 0) : 0;
+      const del = cur.files ? cur.files.reduce((x, f) => x + f[2], 0) : 0;
+      $("pr-stat").textContent = `${cur.files ? cur.files.length : 0} files changed (+${add} −${del})`;
+      $("sheet").hidden = false;
+    }
+    $("pr-cancel").onclick = () => { $("sheet").hidden = true; };
+    $("pr-go").onclick = () => {
+      const title = $("pr-title").value.trim() || cur.name || "Draft PR";
+      $("sheet").hidden = true;
+      toast("Creating draft PR…", "gh pr create --draft");
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ createDraftPR: { title, path: cur.cwd } }));
+      }
+    };
+
+    $("msg").addEventListener("input", syncSend);
+    $("send").onclick = () => send($("msg").value);
+    $("msg").addEventListener("keydown", e => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        send($("msg").value);
+      }
+    });
+
+    $("file").onchange = e => {
+      const files = Array.from(e.target.files);
+      for (const f of files) {
+        atts.push(f.name);
+        const reader = new FileReader();
+        reader.onload = ev => {
+          const b64 = ev.target.result.split(',')[1];
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+              attachFile: {
+                name: f.name,
+                mimeType: f.type || "application/octet-stream",
+                content: b64
+              }
+            }));
+          }
+        };
+        reader.readAsDataURL(f);
+      }
+      $("atts").innerHTML = atts.map(a => `<span class="att">📎 ${esc(a)}</span>`).join("");
+      e.target.value = "";
+      syncSend();
+    };
+
+    function showPairing() {
+      $("scr-pairing").hidden = false;
+      $("scr-list").hidden = true; $("scr-list").style.display = "none";
+      $("scr-sess").hidden = true; $("scr-sess").style.display = "none";
+    }
+    function hidePairing() {
+      $("scr-pairing").hidden = true;
+      if (!cur) {
+        $("scr-list").hidden = false; $("scr-list").style.display = "contents";
+      }
+    }
+    $("pair-btn").onclick = () => {
+      const val = $("pair-token").value.trim();
+      if (val && ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(val);
+      }
+    };
+
+    function handleWSJSON(msg) {
+      if (msg.deviceCredentials) {
+        localStorage.setItem(credKey, JSON.stringify(msg.deviceCredentials));
+        authed = true;
+        hidePairing();
+      }
+      if (msg.sessions) {
+        authed = true;
+        hidePairing();
+        sessions = msg.sessions.map(s => {
+          const existing = (cur && cur.id === s.surfaceID) ? cur : (sessions.find(x => x.id === s.surfaceID) || {});
+          return {
+            id: s.surfaceID,
+            name: s.tabTitle || s.cwd.split('/').pop() || 'Session',
+            agent: s.agent || (s.tabTitle && s.tabTitle.toLowerCase().includes('claude') ? 'claude' : 'agent'),
+            state: s.state || (s.waiting ? 'wait' : 'idle'),
+            cwd: s.cwd,
+            branch: s.branch || 'main',
+            ports: s.ports || [],
+            files: existing.files || [],
+            out: existing.out || [["text", "Attached to session " + (s.tabTitle || s.surfaceID.slice(0, 8))]],
+            rawOutput: existing.rawOutput || "",
+            pr: existing.pr || null
+          };
+        });
+        renderList();
+        if (cur) {
+          const updated = sessions.find(s => s.id === cur.id);
+          if (updated) {
+            cur.state = updated.state;
+            cur.branch = updated.branch;
+            cur.agent = updated.agent;
+            syncSend();
+          }
+        }
+      }
+      if (msg.ok === "attached") {
+        if (cur) ws.send(JSON.stringify({ gitDiff: { path: cur.cwd } }));
+      }
+      if (msg.gitDiff && msg.gitDiff.files) {
+        if (cur) {
+          cur.files = msg.gitDiff.files.map(f => [f.path, f.additions, f.deletions, f.uncommitted, f.lines]);
+          renderPane();
+        }
+      }
+      if (msg.draftPRCreated) {
+        if (cur) {
+          cur.pr = { n: msg.draftPRCreated.number || 1, url: msg.draftPRCreated.url };
+          renderPane();
+          toast(`Draft PR #${cur.pr.n} opened`, 'launching GitHub…');
+          window.open(cur.pr.url, '_blank');
+        }
+      }
+      if (msg.fileAttached) {
+        toast('File attached', msg.fileAttached.path.split('/').pop());
+      }
+      if (msg.error) {
+        toast('Error', msg.error);
+        if (!authed && msg.error.includes('token')) showPairing();
+      }
+    }
+
+    function handleTerminalBytes(raw) {
+      if (!cur) return;
+      const clean = stripANSI(raw);
+      if (!clean.trim()) return;
+      cur.rawOutput += clean;
+      const lines = clean.split('\n').filter(l => l.trim().length > 0);
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('> ') || trimmed.startsWith('$ ')) {
+          cur.out.push(["user", trimmed.slice(2)]);
+        } else if (trimmed.startsWith('Edit ') || trimmed.startsWith('Read ') || trimmed.startsWith('Bash: ') || trimmed.startsWith('Running ') || trimmed.startsWith('View ')) {
+          cur.out.push(["tool", trimmed]);
+          if (trimmed.startsWith('Edit ')) {
+            ws.send(JSON.stringify({ gitDiff: { path: cur.cwd } }));
+          }
+        } else if (trimmed.includes('(y/n)') || trimmed.includes('[y/n]') || trimmed.toLowerCase().includes('approval needed') || trimmed.toLowerCase().includes('permission to')) {
+          cur.out.push(["ask", trimmed]);
+        } else {
+          cur.out.push(["text", trimmed]);
+        }
+      }
+      if (cur.out.length > 200) cur.out = cur.out.slice(-200);
+      renderPane();
+    }
+
+    let sawServerError = false;
+    function showError(msg) { toast('Notice', msg); }
+
+    function connectWS() {
+      if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = proto + '//' + location.hostname + (wsPort ? ':' + wsPort : '') + location.pathname + location.search;
+      ws = new WebSocket(wsUrl);
+      ws.binaryType = 'arraybuffer';
+      ws.onopen = () => {
+        const creds = storedCreds();
+        if (creds) {
+          ws.send(JSON.stringify({ deviceAuth: creds }));
+        } else if (params.get('token')) {
+          ws.send(params.get('token'));
+        } else {
+          showPairing();
+        }
+      };
+      ws.onmessage = e => {
+        if (typeof e.data === 'string') {
+          try { handleWSJSON(JSON.parse(e.data)); } catch (err) {}
+        } else if (e.data instanceof ArrayBuffer) {
+          handleTerminalBytes(new TextDecoder().decode(e.data));
+        }
+      };
+      ws.onclose = (ev) => {
+        if (!sawServerError) {
+          showError(ev.code === 1008
+            ? 'Pairing rejected — rescan the QR code.'
+            : 'Connection lost — check the daemon is running and try again.');
+        }
+        setTimeout(connectWS, 2000);
+      };
+      ws.onerror = () => console.error('[kouen mobile] websocket error');
+    }
+
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && (!ws || ws.readyState === WebSocket.CLOSED)) connectWS(); });
+    window.addEventListener('pageshow', e => { if (e.persisted && (!ws || ws.readyState === WebSocket.CLOSED)) connectWS(); });
+    connectWS();
+    renderList();
     </script>
+    </body>
+    </html>
     """#
+
 
     /// One connection can be either a plain page load OR a WS upgrade — both now share the
     /// same port/listener (see the framing section's doc comment for why), so every accepted
@@ -1586,6 +1029,78 @@ public final class MobileBridgeServer: @unchecked Sendable {
     /// `Connection: ... Upgrade ...` + `Sec-WebSocket-Key`) versus a plain page GET. The
     /// request line and path are ignored either way: this listener only ever serves the one
     /// page or the one bridge protocol, regardless of what path a client asks for.
+    private static let manifestJSON = """
+    {
+      "name": "Kouen Companion",
+      "short_name": "Kouen",
+      "description": "Mobile companion for Kouen Terminal and AI Agents",
+      "start_url": "/",
+      "display": "standalone",
+      "background_color": "#171d1a",
+      "theme_color": "#2f6b4f",
+      "icons": [
+        {
+          "src": "/icon.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
+        }
+      ]
+    }
+    """
+
+    static let manifestResponse: Data = {
+        let body = manifestJSON
+        return Data("""
+        HTTP/1.1 200 OK\r
+        Content-Type: application/manifest+json; charset=utf-8\r
+        Content-Length: \(body.utf8.count)\r
+        Connection: close\r
+        \r
+        \(body)
+        """.utf8)
+    }()
+
+    private static let serviceWorkerJS = """
+    const CACHE_NAME = 'kouen-companion-v1';
+    self.addEventListener('install', e => { self.skipWaiting(); });
+    self.addEventListener('activate', e => { e.waitUntil(clients.claim()); });
+    self.addEventListener('fetch', e => {
+      if (e.request.url.includes('/?') || e.request.headers.get('Upgrade') === 'websocket') return;
+      e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+    });
+    """
+
+    static let serviceWorkerResponse: Data = {
+        let body = serviceWorkerJS
+        return Data("""
+        HTTP/1.1 200 OK\r
+        Content-Type: application/javascript; charset=utf-8\r
+        Content-Length: \(body.utf8.count)\r
+        Connection: close\r
+        \r
+        \(body)
+        """.utf8)
+    }()
+
+    private static let iconSVG = """
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+      <rect width="100" height="100" rx="22" fill="#2f6b4f"/>
+      <path d="M28 25 L40 25 L40 45 L58 25 L74 25 L52 48 L76 75 L60 75 L40 52 L40 75 L28 75 Z" fill="#ffffff"/>
+    </svg>
+    """
+
+    static let iconResponse: Data = {
+        let body = iconSVG
+        return Data("""
+        HTTP/1.1 200 OK\r
+        Content-Type: image/svg+xml; charset=utf-8\r
+        Content-Length: \(body.utf8.count)\r
+        Connection: close\r
+        \r
+        \(body)
+        """.utf8)
+    }()
+
     private func handleParsedRequest(headerData: Data, leftover: Data, connection: NWConnection, state: ConnectionState, pageResponse: Data) {
         guard let headerText = String(data: headerData, encoding: .utf8) else { connection.cancel(); return }
         // `.components(separatedBy:)` (Foundation), not `.split(separator:)` — the latter's
@@ -1629,7 +1144,21 @@ public final class MobileBridgeServer: @unchecked Sendable {
             })
         } else {
             state.pageServed = true
-            connection.send(content: pageResponse, completion: .contentProcessed { _ in
+            let requestLine = lines.first ?? ""
+            let parts = requestLine.split(separator: " ")
+            let path = parts.count >= 2 ? String(parts[1]) : "/"
+
+            let responseToSend: Data
+            if path == "/manifest.json" || path.hasPrefix("/manifest.json?") {
+                responseToSend = Self.manifestResponse
+            } else if path == "/sw.js" || path.hasPrefix("/sw.js?") {
+                responseToSend = Self.serviceWorkerResponse
+            } else if path == "/icon.svg" || path.hasPrefix("/icon.svg?") {
+                responseToSend = Self.iconResponse
+            } else {
+                responseToSend = pageResponse
+            }
+            connection.send(content: responseToSend, completion: .contentProcessed { _ in
                 connection.cancel()
             })
         }
@@ -1838,6 +1367,12 @@ public final class MobileBridgeServer: @unchecked Sendable {
         /// only (client never auto-sends this while typing). `cwd` comes from the client's own
         /// already-tracked session metadata, not a server-side lookup.
         var aiSuggest: AISuggestRequest?
+        var gitDiff: GitDiffRequest?
+        var createDraftPR: CreateDraftPRRequest?
+        var stop: Bool?
+
+        struct GitDiffRequest: Decodable { var path: String? }
+        struct CreateDraftPRRequest: Decodable { var title: String?; var path: String? }
         struct SpawnPayload: Decodable { var cwd: String? }
         struct ResizePayload: Decodable { var cols: Int; var rows: Int }
         struct FileReadRequest: Decodable { var path: String }
@@ -1855,6 +1390,14 @@ public final class MobileBridgeServer: @unchecked Sendable {
             var surfaceID: String
             var tabTitle: String
             var cwd: String
+            var agent: String?
+            var branch: String?
+            var state: String?
+            var waiting: Bool?
+            var ports: [Int]?
+            var filesAdditions: Int?
+            var filesDeletions: Int?
+            var filesCount: Int?
         }
         var sessions: [Entry]
     }
@@ -2117,8 +1660,35 @@ public final class MobileBridgeServer: @unchecked Sendable {
             sendText(#"{"sessions":[]}"#, on: connection)
             return
         }
-        let push = SessionsPush(sessions: surfaces.map {
-            SessionsPush.Entry(surfaceID: $0.surfaceID, tabTitle: $0.tabTitle, cwd: $0.cwd)
+        var agentsBySurfaceID: [String: AgentSessionSummary] = [:]
+        if let agentResp = try? client.request(.listAgents), case let .agents(agents) = agentResp {
+            for agent in agents {
+                agentsBySurfaceID[agent.surfaceID] = agent
+            }
+        }
+        let push = SessionsPush(sessions: surfaces.map { s in
+            let agent = agentsBySurfaceID[s.surfaceID]
+            let state: String
+            if agent?.waiting == true || agent?.activity == .awaiting {
+                state = "wait"
+            } else if agent?.activity == .working {
+                state = "run"
+            } else {
+                state = "idle"
+            }
+            return SessionsPush.Entry(
+                surfaceID: s.surfaceID,
+                tabTitle: s.tabTitle,
+                cwd: s.cwd,
+                agent: agent?.agentName.lowercased() ?? (s.tabTitle.lowercased().contains("claude") ? "claude" : nil),
+                branch: agent?.gitBranch,
+                state: state,
+                waiting: agent?.waiting,
+                ports: agent?.listeningPorts,
+                filesAdditions: nil,
+                filesDeletions: nil,
+                filesCount: nil
+            )
         })
         sendJSON(push, on: connection)
     }
@@ -2749,6 +2319,197 @@ public final class MobileBridgeServer: @unchecked Sendable {
         return .failure(StringError(errText.isEmpty ? "claude CLI failed" : errText))
     }
 
+    public struct GitDiffFile: Encodable, Sendable, Equatable {
+        public var path: String
+        public var additions: Int
+        public var deletions: Int
+        public var uncommitted: Bool
+        public var lines: [String]
+
+        public init(path: String, additions: Int, deletions: Int, uncommitted: Bool, lines: [String]) {
+            self.path = path
+            self.additions = additions
+            self.deletions = deletions
+            self.uncommitted = uncommitted
+            self.lines = lines
+        }
+    }
+
+    public static func parseGitDiffOutput(_ diffOutput: String) -> [GitDiffFile] {
+        var results: [GitDiffFile] = []
+        if diffOutput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return []
+        }
+
+        let lines = diffOutput.components(separatedBy: "\n")
+        var currentFile: String?
+        var currentAdditions = 0
+        var currentDeletions = 0
+        var currentHunkLines: [String] = []
+
+        func flushCurrent() {
+            if let file = currentFile {
+                results.append(GitDiffFile(
+                    path: file,
+                    additions: currentAdditions,
+                    deletions: currentDeletions,
+                    uncommitted: true,
+                    lines: currentHunkLines
+                ))
+            }
+            currentFile = nil
+            currentAdditions = 0
+            currentDeletions = 0
+            currentHunkLines = []
+        }
+
+        for line in lines {
+            if line.hasPrefix("diff --git ") {
+                flushCurrent()
+                let parts = line.components(separatedBy: " ")
+                if parts.count >= 4 {
+                    let bPart = parts[3]
+                    currentFile = bPart.hasPrefix("b/") ? String(bPart.dropFirst(2)) : bPart
+                }
+            } else if line.hasPrefix("@@") {
+                currentHunkLines.append(line)
+            } else if currentFile != nil {
+                if line.hasPrefix("+") && !line.hasPrefix("+++") {
+                    currentAdditions += 1
+                    currentHunkLines.append(line)
+                } else if line.hasPrefix("-") && !line.hasPrefix("---") {
+                    currentDeletions += 1
+                    currentHunkLines.append(line)
+                } else if line.hasPrefix(" ") {
+                    currentHunkLines.append(line)
+                }
+            }
+        }
+        flushCurrent()
+        return results
+    }
+
+    public static func parseGitDiff(in cwd: String) -> [GitDiffFile] {
+        let pipe = Pipe()
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        process.currentDirectoryURL = URL(fileURLWithPath: cwd)
+        process.arguments = ["diff", "HEAD"]
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+
+        var diffOutput = ""
+        do {
+            try process.run()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            diffOutput = String(data: data, encoding: .utf8) ?? ""
+            if diffOutput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                let fallbackPipe = Pipe()
+                let fallbackProc = Process()
+                fallbackProc.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+                fallbackProc.currentDirectoryURL = URL(fileURLWithPath: cwd)
+                fallbackProc.arguments = ["diff"]
+                fallbackProc.standardOutput = fallbackPipe
+                fallbackProc.standardError = FileHandle.nullDevice
+                try? fallbackProc.run()
+                let fbData = fallbackPipe.fileHandleForReading.readDataToEndOfFile()
+                fallbackProc.waitUntilExit()
+                diffOutput = String(data: fbData, encoding: .utf8) ?? ""
+            }
+        } catch {
+            return []
+        }
+
+        return parseGitDiffOutput(diffOutput)
+    }
+
+    private func handleGitDiff(path: String?, connection: NWConnection, state: ConnectionState) {
+        var targetCwd = path
+        if targetCwd == nil || targetCwd?.isEmpty == true {
+            if let surfaceID = state.surfaceID {
+                let client = DaemonClient()
+                if let response = try? client.request(.listSurfaces), case let .surfaces(surfaces) = response {
+                    targetCwd = surfaces.first { $0.surfaceID == surfaceID }?.cwd
+                }
+            }
+        }
+        guard let cwd = targetCwd, !cwd.isEmpty else {
+            sendText(#"{"error":"missing worktree or session cwd for gitDiff"}"#, on: connection)
+            return
+        }
+
+        let files = Self.parseGitDiff(in: cwd)
+        struct GitDiffPayload: Encodable {
+            var files: [GitDiffFile]
+        }
+        struct GitDiffAck: Encodable {
+            var gitDiff: GitDiffPayload
+        }
+        sendJSON(GitDiffAck(gitDiff: GitDiffPayload(files: files)), on: connection)
+    }
+
+    private func handleCreateDraftPR(title: String?, path: String?, connection: NWConnection, state: ConnectionState) {
+        var targetCwd = path
+        if targetCwd == nil || targetCwd?.isEmpty == true {
+            if let surfaceID = state.surfaceID {
+                let client = DaemonClient()
+                if let response = try? client.request(.listSurfaces), case let .surfaces(surfaces) = response {
+                    targetCwd = surfaces.first { $0.surfaceID == surfaceID }?.cwd
+                }
+            }
+        }
+        guard let cwd = targetCwd, !cwd.isEmpty else {
+            sendText(#"{"error":"missing cwd for PR creation"}"#, on: connection)
+            return
+        }
+
+        let prTitle = (title?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false) ? title! : "Draft PR"
+        let pipe = Pipe()
+        let errPipe = Pipe()
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.currentDirectoryURL = URL(fileURLWithPath: cwd)
+        process.arguments = ["gh", "pr", "create", "--draft", "--title", prTitle, "--fill"]
+        process.standardOutput = pipe
+        process.standardError = errPipe
+
+        do {
+            try process.run()
+            let outData = pipe.fileHandleForReading.readDataToEndOfFile()
+            let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+
+            let output = (String(data: outData, encoding: .utf8) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let errOutput = (String(data: errData, encoding: .utf8) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+
+            if process.terminationStatus == 0 && output.contains("github.com") {
+                let prUrl = output.components(separatedBy: .whitespacesAndNewlines).last { $0.hasPrefix("http") } ?? output
+                let prNum = Int(prUrl.components(separatedBy: "/").last ?? "")
+                struct DraftPRAck: Encodable {
+                    var ok = "draftPRCreated"
+                    var url: String
+                    var number: Int?
+                }
+                sendJSON(DraftPRAck(url: prUrl, number: prNum), on: connection)
+            } else {
+                let errMsg = !errOutput.isEmpty ? errOutput : (!output.isEmpty ? output : "gh command failed")
+                sendJSON(ErrorAck(error: errMsg), on: connection)
+            }
+        } catch {
+            sendJSON(ErrorAck(error: "failed to execute gh: \(error.localizedDescription)"), on: connection)
+        }
+    }
+
+    private func handleStop(connection: NWConnection, state: ConnectionState) {
+        guard let surfaceID = state.surfaceID, let subscription = state.subscription else {
+            sendText(#"{"error":"no active session attached to stop"}"#, on: connection)
+            return
+        }
+        _ = subscription.sendInput(Data([0x1b]), surfaceID: surfaceID)
+        sendText(#"{"ok":"stopped"}"#, on: connection)
+    }
+
     private func handleControlMessage(_ text: String, connection: NWConnection, state: ConnectionState) {
         guard let data = text.data(using: .utf8),
               let message = try? JSONDecoder().decode(ControlMessage.self, from: data)
@@ -2818,6 +2579,18 @@ public final class MobileBridgeServer: @unchecked Sendable {
         } else if let aiSuggest = message.aiSuggest {
             state.controlQueue.async { [weak self] in
                 self?.handleAISuggest(commandBuffer: aiSuggest.commandBuffer, cwd: aiSuggest.cwd, connection: connection)
+            }
+        } else if let gitDiff = message.gitDiff {
+            state.controlQueue.async { [weak self] in
+                self?.handleGitDiff(path: gitDiff.path, connection: connection, state: state)
+            }
+        } else if let pr = message.createDraftPR {
+            state.controlQueue.async { [weak self] in
+                self?.handleCreateDraftPR(title: pr.title, path: pr.path, connection: connection, state: state)
+            }
+        } else if message.stop == true {
+            state.controlQueue.async { [weak self] in
+                self?.handleStop(connection: connection, state: state)
             }
         } else {
             sendText(#"{"error":"unrecognized control message"}"#, on: connection)
