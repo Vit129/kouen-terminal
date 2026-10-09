@@ -57,6 +57,77 @@ public struct CachedSessionEntry: Sendable {
     }
 }
 
+/// In-memory cache for graphify symbols and god nodes per project repository.
+/// Reads `.graphify_labels.json` and `GRAPH_SUMMARY.md` at index-time to enrich FTS search terms
+/// without any runtime overhead during search queries.
+public final class GraphifyIndexCache: @unchecked Sendable {
+    public static let shared = GraphifyIndexCache()
+    private var cache: [String: Set<String>] = [:]
+    private let lock = NSLock()
+
+    public func symbols(for projectPath: String) -> Set<String> {
+        lock.lock()
+        defer { lock.unlock() }
+        if let cached = cache[projectPath] { return cached }
+
+        var result = Set<String>()
+        let labelsURL = URL(fileURLWithPath: projectPath).appendingPathComponent("graphify-out/.graphify_labels.json")
+        if let data = try? Data(contentsOf: labelsURL),
+           let dict = try? JSONSerialization.jsonObject(with: data) as? [String: String] {
+            for label in dict.values {
+                let clean = label.trimmingCharacters(in: .whitespacesAndNewlines)
+                if clean.count >= 4 && !clean.hasPrefix("code:") && !clean.hasPrefix(".") {
+                    result.insert(clean)
+                }
+            }
+        }
+
+        let summaryURL = URL(fileURLWithPath: projectPath).appendingPathComponent("graphify-out/GRAPH_SUMMARY.md")
+        if let content = try? String(contentsOf: summaryURL, encoding: .utf8) {
+            for line in content.components(separatedBy: .newlines) {
+                if line.range(of: #"^\d+\.\s+`([^`]+)`"#, options: .regularExpression) != nil {
+                    let sym = line.replacingOccurrences(of: #"^\d+\.\s+`"#, with: "", options: .regularExpression)
+                                  .replacingOccurrences(of: #"`.*$"#, with: "", options: .regularExpression)
+                    if sym.count >= 4 {
+                        result.insert(sym)
+                    }
+                }
+            }
+        }
+
+        cache[projectPath] = result
+        return result
+    }
+
+    /// Enriches touched file paths with relevant symbol and god node names from graphify.
+    public func enrich<S: Sequence>(files: S, projectPath: String) -> [String] where S.Element == String {
+        let allSymbols = symbols(for: projectPath)
+        guard !allSymbols.isEmpty else { return [] }
+
+        var enriched = Set<String>()
+        for file in files {
+            let base = URL(fileURLWithPath: file).deletingPathExtension().lastPathComponent
+            guard base.count >= 4 else { continue }
+            if allSymbols.contains(base) {
+                enriched.insert(base)
+            }
+            for s in allSymbols {
+                if s.count >= 5 && (s.contains(base) || (base.count >= 8 && base.contains(s))) {
+                    enriched.insert(s)
+                    if enriched.count >= 20 { break }
+                }
+            }
+        }
+        return Array(enriched)
+    }
+
+    public func clear() {
+        lock.lock()
+        defer { lock.unlock() }
+        cache.removeAll()
+    }
+}
+
 /// SQLite FTS5 full-text search index for agent sessions.
 /// Manages indexing session metadata, transcripts, edited files, and tool names.
 public final class AgentHistoryFTSIndex: @unchecked Sendable {
@@ -507,7 +578,8 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
         transcriptPath: String,
         mtime: Date,
         fileSize: Int,
-        surfaceTag: String? = nil
+        surfaceTag: String? = nil,
+        topicSegments: [String]? = nil
     ) {
         // The scanner's in-memory cache is empty on every app launch / CLI run, so it re-parses
         // every transcript; skip the FTS write when the stored mtime/size still match.
@@ -541,10 +613,16 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
         var insertFtsStmt: OpaquePointer?
         if sqlite3_prepare_v2(db, insertFtsSQL, -1, &insertFtsStmt, nil) == SQLITE_OK {
             let ftsAgent = (surfaceTag?.isEmpty == false) ? "\(agentName) \(surfaceTag!)" : agentName
+            let transcriptToStore: String
+            if let topicSegments, !topicSegments.isEmpty {
+                transcriptToStore = "\(fullTranscript)\nMilestones: " + topicSegments.joined(separator: " · ")
+            } else {
+                transcriptToStore = fullTranscript
+            }
             sqlite3_bind_text(insertFtsStmt, 1, sessionID, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
             sqlite3_bind_text(insertFtsStmt, 2, title, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
             sqlite3_bind_text(insertFtsStmt, 3, firstPrompt, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-            sqlite3_bind_text(insertFtsStmt, 4, fullTranscript, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+            sqlite3_bind_text(insertFtsStmt, 4, transcriptToStore, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
             sqlite3_bind_text(insertFtsStmt, 5, gitBranch ?? "", -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
             sqlite3_bind_text(insertFtsStmt, 6, repoName, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
             sqlite3_bind_text(insertFtsStmt, 7, ftsAgent, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
@@ -672,7 +750,9 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
         toolsCalled: String,
         transcriptPath: String,
         mtime: Date,
-        fileSize: Int
+        fileSize: Int,
+        surfaceTag: String? = nil,
+        topicSegments: [String]? = nil
     ) {}
     public func saveRecordsBatch(_ entries: [(record: AgentSessionRecord, mtime: Date, fileSize: Int)]) {}
     public func saveRecord(_ record: AgentSessionRecord, mtime: Date, fileSize: Int) {}

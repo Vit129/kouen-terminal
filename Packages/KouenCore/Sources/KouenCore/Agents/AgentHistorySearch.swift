@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(NaturalLanguage)
+import NaturalLanguage
+#endif
 
 /// Ranked loose search over agent session records, shared by the History sidebar and
 /// `kouen history search` so both return the same results for the same query.
@@ -7,6 +10,22 @@ public enum AgentHistorySearch {
         public let record: AgentSessionRecord
         public let score: Double
         public let snippet: String?
+        public let matchLocation: AgentSessionRecord.MatchLocationInfo?
+        public let isSemanticMatch: Bool
+
+        public init(
+            record: AgentSessionRecord,
+            score: Double,
+            snippet: String?,
+            matchLocation: AgentSessionRecord.MatchLocationInfo? = nil,
+            isSemanticMatch: Bool = false
+        ) {
+            self.record = record
+            self.score = score
+            self.snippet = snippet
+            self.matchLocation = matchLocation ?? record.matchLocation(for: snippet ?? "")
+            self.isSemanticMatch = isSemanticMatch
+        }
     }
 
     final class IDFCache: @unchecked Sendable {
@@ -102,7 +121,7 @@ public enum AgentHistorySearch {
                 // FTS5 bm25 rank is negative (more negative = better match).
                 let score = -match.rank
                 let snippet = match.snippet.isEmpty ? nil : match.snippet
-                hits.append(Hit(record: record, score: score, snippet: snippet))
+                hits.append(Hit(record: record, score: score, snippet: snippet, matchLocation: record.matchLocation(for: query), isSemanticMatch: false))
             }
 
             // Check for unindexed records in `records` (regardless of records.count limit)
@@ -123,7 +142,7 @@ public enum AgentHistorySearch {
 
                     if titleMatched || branchMatched {
                         let score = titleMatched ? 10.0 : 5.0
-                        hits.append(Hit(record: record, score: score, snippet: nil))
+                        hits.append(Hit(record: record, score: score, snippet: nil, matchLocation: record.matchLocation(for: query), isSemanticMatch: false))
                     }
                 }
             }
@@ -132,11 +151,17 @@ public enum AgentHistorySearch {
                 if abs(lhs.score - rhs.score) > 1e-9 { return lhs.score > rhs.score }
                 return lhs.record.updatedAt > rhs.record.updatedAt
             }
-            return hits
+            if !hits.isEmpty {
+                return hits
+            }
         }
 
         // Fallback for non-segmented scripts (Thai), fuzzy queries, or when FTS index has no matching records
-        return rankSwiftFallback(query: query, records: records, matcher: matcher, index: index, ftsLimit: ftsLimit, isNonSegmented: isNonSegmented)
+        let fallbackHits = rankSwiftFallback(query: query, records: records, matcher: matcher, index: index, ftsLimit: ftsLimit, isNonSegmented: isNonSegmented)
+        if fallbackHits.isEmpty {
+            return semanticSearchFallback(query: query, records: records)
+        }
+        return fallbackHits
     }
 
     /// Swift-side scoring fallback using IDFCache and typo tolerance.
@@ -267,7 +292,13 @@ public enum AgentHistorySearch {
             if let rank = ftsMatch?.rank {
                 score += bm25Boost(rank)
             }
-            hits.append(Hit(record: record, score: score, snippet: match.snippet ?? ftsMatch?.snippet))
+            hits.append(Hit(
+                record: record,
+                score: score,
+                snippet: match.snippet ?? ftsMatch?.snippet,
+                matchLocation: record.matchLocation(for: query),
+                isSemanticMatch: false
+            ))
         }
 
         hits.sort { lhs, rhs in
@@ -275,6 +306,91 @@ public enum AgentHistorySearch {
             return lhs.record.updatedAt > rhs.record.updatedAt
         }
         return hits
+    }
+
+    /// Zero-dependency semantic fallback using macOS NaturalLanguage sentence/word embeddings.
+    /// Only invoked when exact keyword, token, and FTS5 search return 0 hits.
+    public static func semanticSearchFallback(
+        query: String,
+        records: [AgentSessionRecord],
+        limit: Int = 10,
+        distanceThreshold: Double = 0.95
+    ) -> [Hit] {
+        #if canImport(NaturalLanguage)
+        guard let embedding = NLEmbedding.sentenceEmbedding(for: .english) ?? NLEmbedding.wordEmbedding(for: .english) else {
+            return []
+        }
+        let cleanQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard cleanQuery.count >= 3 else { return [] }
+
+        var results: [(record: AgentSessionRecord, score: Double, snippet: String?)] = []
+
+        for record in records {
+            var minDistance = Double.greatestFiniteMagnitude
+            var bestSnippet: String?
+
+            // Test title
+            let titleDist = embedding.distance(between: cleanQuery, and: record.title)
+            if titleDist < minDistance {
+                minDistance = titleDist
+                bestSnippet = record.title
+            }
+
+            // Test first prompt (shortened)
+            if !record.firstPrompt.isEmpty {
+                let firstLine = record.firstPrompt.components(separatedBy: .newlines).first ?? record.firstPrompt
+                let promptDist = embedding.distance(between: cleanQuery, and: String(firstLine.prefix(120)))
+                if promptDist < minDistance {
+                    minDistance = promptDist
+                    bestSnippet = String(firstLine.prefix(100))
+                }
+            }
+
+            // Test topic segments if available
+            if let segments = record.topicSegments {
+                for seg in segments {
+                    let segDist = embedding.distance(between: cleanQuery, and: seg)
+                    if segDist < minDistance {
+                        minDistance = segDist
+                        bestSnippet = seg
+                    }
+                }
+            }
+
+            // Test recent turns
+            for turn in record.latestTurns.prefix(5) {
+                let turnSnippet = String(turn.content.prefix(100))
+                let turnDist = embedding.distance(between: cleanQuery, and: turnSnippet)
+                if turnDist < minDistance {
+                    minDistance = turnDist
+                    bestSnippet = turnSnippet
+                }
+            }
+
+            if minDistance <= distanceThreshold {
+                let score = max(0.1, (1.0 - minDistance) * 10.0)
+                results.append((record: record, score: score, snippet: bestSnippet))
+            }
+        }
+
+        results.sort { lhs, rhs in
+            if abs(lhs.score - rhs.score) > 0.001 { return lhs.score > rhs.score }
+            return lhs.record.updatedAt > rhs.record.updatedAt
+        }
+
+        let prefix = results.prefix(limit)
+        return prefix.map { item in
+            Hit(
+                record: item.record,
+                score: item.score,
+                snippet: item.snippet,
+                matchLocation: item.record.matchLocation(for: item.snippet ?? query),
+                isSemanticMatch: true
+            )
+        }
+        #else
+        return []
+        #endif
     }
 
     /// IDF per query token over the candidate sessions: a word found in nearly every session
