@@ -347,8 +347,12 @@ public struct WorktreeManager: Sendable {
     /// Fast filesystem traversal to find git repo root (worktree or repo) without spawning git processes.
     public static func fastRepoRoot(for path: String) -> String? {
         guard !path.isEmpty else { return nil }
-        var current = URL(fileURLWithPath: path).resolvingSymlinksInPath()
         let fileManager = FileManager.default
+        let initialURL = URL(fileURLWithPath: path).resolvingSymlinksInPath()
+        // If the path does not exist on disk, return nil immediately to preserve git rev-parse semantics
+        // and avoid ascending into parent git repositories.
+        guard fileManager.fileExists(atPath: initialURL.path) else { return nil }
+        var current = initialURL
 
         while current.pathComponents.count > 1 {
             let gitDir = current.appendingPathComponent(".git")
@@ -406,9 +410,10 @@ public struct WorktreeManager: Sendable {
         process.standardError = FileHandle.nullDevice
         do {
             try process.run()
+            // Read to EOF BEFORE waitUntilExit() to avoid deadlock when output exceeds pipe buffer (>64KB).
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
             process.waitUntilExit()
             guard process.terminationStatus == 0 else { return nil }
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
             return String(data: data, encoding: .utf8)
         } catch { return nil }
     }
