@@ -444,13 +444,16 @@ final class AgentHistoryScannerTests: XCTestCase {
         let scanner = AgentHistoryScanner(ftsIndex: index)
 
         // Expect notification when scan completes
-        var notificationReceived = false
+        final class Box: @unchecked Sendable {
+            var value = false
+        }
+        let box = Box()
         let observer = NotificationCenter.default.addObserver(
             forName: AgentHistoryScanner.didUpdateNotification,
             object: nil,
             queue: nil
         ) { _ in
-            notificationReceived = true
+            box.value = true
         }
         defer { NotificationCenter.default.removeObserver(observer) }
 
@@ -460,6 +463,6 @@ final class AgentHistoryScannerTests: XCTestCase {
 
         let (res1, res2) = await (scan1, scan2)
         XCTAssertEqual(res1.count, res2.count)
-        XCTAssertTrue(notificationReceived)
+        XCTAssertTrue(box.value)
     }
 }
