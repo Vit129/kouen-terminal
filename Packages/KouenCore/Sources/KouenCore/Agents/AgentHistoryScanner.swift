@@ -62,6 +62,9 @@ public struct AgentSessionRecord: Identifiable, Sendable, Equatable {
     /// Surface descriptor for multi-surface agents (e.g. `"2.0"`, `"Web"`, `"IDE"`, `"CLI"`,
     /// `"Archived"`, `"ChatGPT"`, `"VS Code"`, `"Insiders"`, `"ADO"`, `"GitHub"`).
     public let surfaceTag: String?
+    /// Sibling sessions across different repositories working on the same task.
+    /// `nil` for single standalone sessions; when non-nil with count > 1, this represents a cross-repo task group.
+    public let crossRepoSiblings: [AgentSessionRecord]?
 
     public init(
         id: String,
@@ -80,7 +83,8 @@ public struct AgentSessionRecord: Identifiable, Sendable, Equatable {
         placement: AgentSessionPlacement = .local,
         liveStatus: String? = nil,
         resumeCommandOverride: String? = nil,
-        surfaceTag: String? = nil
+        surfaceTag: String? = nil,
+        crossRepoSiblings: [AgentSessionRecord]? = nil
     ) {
         self.id = id
         self.agentKind = agentKind
@@ -99,6 +103,7 @@ public struct AgentSessionRecord: Identifiable, Sendable, Equatable {
         self.liveStatus = liveStatus
         self.resumeCommandOverride = resumeCommandOverride
         self.surfaceTag = surfaceTag
+        self.crossRepoSiblings = crossRepoSiblings
     }
 
     /// The command History resume should type into a fresh pane: `resumeCommandOverride` when
@@ -122,7 +127,20 @@ public struct AgentSessionRecord: Identifiable, Sendable, Equatable {
             firstPrompt: firstPrompt, latestTurns: latestTurns, transcriptPath: transcriptPath,
             worktreeAvailable: worktreeAvailable, placement: placement, liveStatus: status,
             resumeCommandOverride: AgentSessionRecord.resumeOverride(placement: placement, sessionID: id),
-            surfaceTag: surfaceTag
+            surfaceTag: surfaceTag,
+            crossRepoSiblings: crossRepoSiblings
+        )
+    }
+
+    /// Returns a copy of this record with cross-repo siblings attached.
+    public func withCrossRepoSiblings(_ siblings: [AgentSessionRecord]) -> AgentSessionRecord {
+        AgentSessionRecord(
+            id: id, agentKind: agentKind, title: title, projectPath: projectPath, projectName: projectName,
+            gitBranch: gitBranch, modelName: modelName, messageCount: messageCount, updatedAt: updatedAt,
+            firstPrompt: firstPrompt, latestTurns: latestTurns, transcriptPath: transcriptPath,
+            worktreeAvailable: worktreeAvailable, placement: placement, liveStatus: liveStatus,
+            resumeCommandOverride: resumeCommandOverride, surfaceTag: surfaceTag,
+            crossRepoSiblings: siblings
         )
     }
 
