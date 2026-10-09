@@ -108,8 +108,13 @@ struct SwarmFleetBody: View {
 
     private func refresh() async {
         let snapshot = await SwarmDaemonBridge.list()
-        nodes = snapshot.nodes.sorted { $0.startedAt > $1.startedAt }
-        isLoading = false
+        let newNodes = snapshot.nodes.sorted { $0.startedAt > $1.startedAt }
+        if nodes != newNodes {
+            nodes = newNodes
+        }
+        if isLoading {
+            isLoading = false
+        }
     }
 
     private func terminate(_ node: SwarmTaskNodeWire) async {

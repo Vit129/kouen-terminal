@@ -10,18 +10,24 @@ private let historySignposter = OSSignposter(subsystem: "com.vit129.kouen", cate
 final class RepoRootCache: @unchecked Sendable {
     static let shared = RepoRootCache()
     private let lock = NSLock()
-    private var cache: [String: String] = [:]
+    private var cache: [String: (root: String, cachedAt: Date)] = [:]
+    private static let ttl: TimeInterval = 60.0
 
     func get(_ path: String) -> String? {
         lock.lock()
         defer { lock.unlock() }
-        return cache[path]
+        guard let entry = cache[path] else { return nil }
+        if Date().timeIntervalSince(entry.cachedAt) < Self.ttl {
+            return entry.root
+        }
+        cache.removeValue(forKey: path)
+        return nil
     }
 
     func set(_ root: String, for path: String) {
         lock.lock()
         defer { lock.unlock() }
-        cache[path] = root
+        cache[path] = (root, Date())
     }
 
     func clear() {
@@ -160,11 +166,6 @@ public final class AgentSessionHistoryModel: ObservableObject {
             }
         }
 
-        // Pre-warm scanner cache in background so tab open is instant
-        Task.detached(priority: .utility) {
-            _ = await AgentHistoryScanner.shared.getOrScan(force: false)
-        }
-
         self.updateCancellable = NotificationCenter.default
             .publisher(for: AgentHistoryScanner.didUpdateNotification)
             .receive(on: DispatchQueue.main)
@@ -179,6 +180,9 @@ public final class AgentSessionHistoryModel: ObservableObject {
     }
 
     public func refresh(force: Bool = true) {
+        if force {
+            RepoRootCache.shared.clear()
+        }
         isLoading = true
         Task { [weak self] in
             let scanned = await AgentHistoryScanner.shared.getOrScan(force: force)
