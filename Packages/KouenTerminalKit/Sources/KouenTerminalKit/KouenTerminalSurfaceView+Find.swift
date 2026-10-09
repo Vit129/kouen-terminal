@@ -14,6 +14,8 @@ extension KouenTerminalSurfaceView {
 
     /// Close the find bar: drop matches + highlights (the bar stays a host concern).
     public func endFind() {
+        findDebounceTask?.cancel()
+        findDebounceTask = nil
         guard findActive else { return }
         findActive = false
         findMatches = []
@@ -25,18 +27,27 @@ extension KouenTerminalSurfaceView {
     /// Run/refresh the search for `query` (incremental as the user types). Empty clears matches.
     public func updateFind(query: String) {
         findActive = true
+        findDebounceTask?.cancel()
         if query.isEmpty {
             findMatches = []
             findCurrentIndex = 0
-        } else {
-            findMatches = emulatorSync { emulator in
+            onFindResultsChanged?(0, 0)
+            scheduleRender()
+            return
+        }
+        findDebounceTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 120_000_000)
+            guard !Task.isCancelled, let self else { return }
+            let matches = self.emulatorSync { emulator in
                 TerminalBufferSearch.matches(query: query, lineCount: emulator.bufferLineCount) { emulator.bufferLine($0) }
             }
-            findCurrentIndex = 0
-            if !findMatches.isEmpty { scrollToCurrentMatch() }
+            guard !Task.isCancelled else { return }
+            self.findMatches = matches
+            self.findCurrentIndex = 0
+            if !matches.isEmpty { self.scrollToCurrentMatch() }
+            self.onFindResultsChanged?(matches.isEmpty ? 0 : self.findCurrentIndex + 1, matches.count)
+            self.scheduleRender()
         }
-        onFindResultsChanged?(findMatches.isEmpty ? 0 : findCurrentIndex + 1, findMatches.count)
-        scheduleRender()
     }
 
     public func findNext() { advanceFind(by: 1) }

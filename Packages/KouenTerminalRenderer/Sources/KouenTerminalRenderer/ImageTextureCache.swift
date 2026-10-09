@@ -7,12 +7,16 @@ import Metal
 final class ImageTextureCache {
     private let device: MTLDevice
     private let maxEntries: Int
+    private let maxBytes: Int
     private var textures: [Int: MTLTexture] = [:]
+    private var textureBytes: [Int: Int] = [:]
+    private var currentBytes: Int = 0
     private var lru: [Int] = [] // ids, most-recent last
 
-    init(device: MTLDevice, maxEntries: Int = 64) {
+    init(device: MTLDevice, maxEntries: Int = 64, maxBytes: Int = 64 * 1024 * 1024) {
         self.device = device
         self.maxEntries = maxEntries
+        self.maxBytes = maxBytes
     }
 
     /// Texture for image `id`, uploading `pixels` (RGBA8, row-major top-to-bottom) on first sight.
@@ -21,7 +25,8 @@ final class ImageTextureCache {
             touch(id)
             return existing
         }
-        guard width > 0, height > 0, rgba.count >= width * height * 4 else { return nil }
+        let byteCount = width * height * 4
+        guard width > 0, height > 0, rgba.count >= byteCount else { return nil }
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
             pixelFormat: .rgba8Unorm, width: width, height: height, mipmapped: false)
         descriptor.usage = .shaderRead
@@ -35,9 +40,32 @@ final class ImageTextureCache {
                 bytesPerRow: width * 4)
         }
         textures[id] = texture
+        textureBytes[id] = byteCount
+        currentBytes += byteCount
         touch(id)
         evictIfNeeded()
         return texture
+    }
+
+    func removeAll() {
+        textures.removeAll()
+        textureBytes.removeAll()
+        currentBytes = 0
+        lru.removeAll()
+    }
+
+    func prune(keeping activeIds: Set<Int>) {
+        for id in Array(textures.keys) {
+            if !activeIds.contains(id) {
+                textures.removeValue(forKey: id)
+                if let bytes = textureBytes.removeValue(forKey: id) {
+                    currentBytes -= bytes
+                }
+                if let i = lru.firstIndex(of: id) {
+                    lru.remove(at: i)
+                }
+            }
+        }
     }
 
     private func touch(_ id: Int) {
@@ -46,9 +74,12 @@ final class ImageTextureCache {
     }
 
     private func evictIfNeeded() {
-        while textures.count > maxEntries, let oldest = lru.first {
+        while let oldest = lru.first, (textures.count > maxEntries || currentBytes > maxBytes) {
             lru.removeFirst()
             textures.removeValue(forKey: oldest)
+            if let bytes = textureBytes.removeValue(forKey: oldest) {
+                currentBytes -= bytes
+            }
         }
     }
 }
