@@ -116,6 +116,7 @@ public enum CopyModeReducer {
         s.search.query = query
         s.search.reverse = reverse
         s.search.matches = computeMatches(query, grid: grid)
+        s.search.totalLinesSnapshot = grid.totalLines
         s.search.currentIndex = nil
         guard !s.search.matches.isEmpty,
               let idx = matchIndex(after: s.cursor, forward: !reverse, matches: s.search.matches)
@@ -254,9 +255,12 @@ public enum CopyModeReducer {
         var s = state
         guard !s.search.query.isEmpty else { return s }
         // Scrollback eviction shifts virtual line numbers under the stored matches, so n/N on a
-        // cached list would jump to (or highlight) the wrong rows. Recompute from the live grid —
-        // the same scan the initial search commit already does, at a human keypress cadence.
-        s.search.matches = computeMatches(s.search.query, grid: grid)
+        // cached list would jump to (or highlight) the wrong rows if the line count shifted.
+        // Recompute only when line count changes or matches are empty.
+        if s.search.matches.isEmpty || s.search.totalLinesSnapshot != grid.totalLines {
+            s.search.matches = computeMatches(s.search.query, grid: grid)
+            s.search.totalLinesSnapshot = grid.totalLines
+        }
         guard !s.search.matches.isEmpty else {
             s.search.currentIndex = nil
             return s

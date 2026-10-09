@@ -83,8 +83,10 @@ extension SessionCoordinator {
     }
 
     func clearNotification(for surfaceID: SurfaceID) {
-        requestDaemon(.clearNotification(surfaceID: surfaceID.uuidString))
-        syncFromDaemon()
+        Task { @MainActor in
+            await requestDaemon(.clearNotification(surfaceID: surfaceID.uuidString))
+            await syncFromDaemon()
+        }
     }
 
     /// On every CWD change, read `.git/HEAD` directly (no subprocess) and push an

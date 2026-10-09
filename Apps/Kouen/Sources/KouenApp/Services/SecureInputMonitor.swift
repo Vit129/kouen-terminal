@@ -19,6 +19,7 @@ final class SecureInputMonitor {
 
     // Substrings covering sudo, ssh, gpg, git, and VT conceal-mode (ESC[8m).
     private let patterns: [String] = ["assword", "assphrase", "Enter PIN", "sudo:", "\u{1b}[8m"]
+    private lazy var rawPatterns: [Data] = patterns.map { Data($0.utf8) }
 
     private init() {}
 
@@ -32,8 +33,7 @@ final class SecureInputMonitor {
 
         surface.onRawOutput = { [weak self] data in
             guard let self,
-                  let text = String(data: data, encoding: .utf8),
-                  self.patterns.contains(where: { text.contains($0) }) else { return }
+                  self.rawPatterns.contains(where: { data.range(of: $0) != nil }) else { return }
             if self.active.insert(id).inserted { EnableSecureEventInput() }
             self.armTimer(for: id)
         }

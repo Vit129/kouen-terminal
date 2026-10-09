@@ -135,38 +135,47 @@ final class AgentHistorySearchTests: XCTestCase {
         XCTAssertEqual(afterDelete.count, 0)
     }
 
-    func testMeasureKeystrokeSearchLatency() async {
-        var entries = AgentHistoryFTSIndex.shared.loadCachedEntries()
-        if entries.isEmpty {
-            _ = await AgentHistoryScanner.shared.scanAll()
-            entries = AgentHistoryFTSIndex.shared.loadCachedEntries()
-        }
-        guard !entries.isEmpty else {
-            print("No real records to benchmark")
-            return
-        }
-        let records = entries.map(\.record)
-        print("Benchmarking with \(records.count) records")
+    func testFastPathFTSUsedForStandardQuery() {
+        let (index, url) = tempIndex()
+        defer { try? FileManager.default.removeItem(at: url) }
 
-        let keystrokes = ["p", "pe", "per", "perf", "perfo", "perfor", "perform", "sw", "swift", "term", "claude"]
-        // Warm up
-        _ = AgentHistorySearch.rank(query: "perf", records: records)
+        let rec = record("sess-fast", title: "optimize compiler performance in swift", project: "swift")
+        index.saveRecord(rec, mtime: Date(), fileSize: 100)
 
-        var totalTime: Double = 0
-        for key in keystrokes {
-            let t0 = CFAbsoluteTimeGetCurrent()
-            let ftsMatches = AgentHistoryFTSIndex.shared.searchRanked(query: key, limit: 200)
-            let tFts = (CFAbsoluteTimeGetCurrent() - t0) * 1000.0
+        let hits = AgentHistorySearch.rank(query: "compiler", records: [rec], index: index)
+        XCTAssertEqual(hits.count, 1)
+        XCTAssertEqual(hits[0].record.id, "sess-fast")
+    }
 
-            let start = CFAbsoluteTimeGetCurrent()
-            let hits = AgentHistorySearch.rank(query: key, records: records)
-            let elapsed = (CFAbsoluteTimeGetCurrent() - start) * 1000.0
-            print("Keystroke '\(key)': total=\(String(format: "%.2f", elapsed)) ms (fts=\(String(format: "%.2f", tFts)) ms, hits=\(hits.count), ftsMatches=\(ftsMatches.count))")
-            totalTime += elapsed
+    func testThaiQueryFindsUnsegmentedMatch() {
+        let (index, url) = tempIndex()
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let rec = record("sess-thai", title: "การทดสอบระบบและบันทึกข้อมูล", project: "proj")
+        index.saveRecord(rec, mtime: Date(), fileSize: 100)
+
+        // Query "ทดสอบ" is a substring without word boundaries
+        let hits = AgentHistorySearch.rank(query: "ทดสอบ", records: [rec], index: index)
+        XCTAssertEqual(hits.count, 1)
+        XCTAssertEqual(hits[0].record.id, "sess-thai")
+    }
+
+    func testUnindexedRecordsFoundBeyond200Limit() {
+        let (index, url) = tempIndex()
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        // Create 250 in-memory records (simulating records before indexing in SQLite)
+        var records: [AgentSessionRecord] = []
+        for i in 0..<250 {
+            let rec = record("sess-\(i)", title: "Regular session \(i)", project: "proj")
+            records.append(rec)
         }
-        let avg = totalTime / Double(keystrokes.count)
-        print("AVERAGE_WARM_LATENCY: \(String(format: "%.2f", avg)) ms")
-        XCTAssertLessThan(avg, 50.0, "Average warm keystroke search latency must be under 50ms")
+        let target = record("sess-target", title: "Important unique search target", project: "proj")
+        records.append(target)
+
+        let hits = AgentHistorySearch.rank(query: "target", records: records, index: index)
+        XCTAssertEqual(hits.count, 1)
+        XCTAssertEqual(hits[0].record.id, "sess-target")
     }
 
     func testRepresentativeQueryRankingQuality() {

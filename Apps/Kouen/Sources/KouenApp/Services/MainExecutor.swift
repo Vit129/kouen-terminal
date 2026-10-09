@@ -534,11 +534,24 @@ final class MainExecutor: CommandExecutor {
         proc.arguments = ["query", "--", query]
         let pipe = Pipe()
         proc.standardOutput = pipe
-        proc.standardError = Pipe()
+        proc.standardError = FileHandle.nullDevice
         guard (try? proc.run()) != nil else { return nil }
+
+        let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.global(qos: .utility))
+        timer.schedule(deadline: .now() + .seconds(1))
+        timer.setEventHandler {
+            if proc.isRunning {
+                proc.terminate()
+            }
+        }
+        timer.resume()
+
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
         proc.waitUntilExit()
+        timer.cancel()
+
         guard proc.terminationStatus == 0 else { return nil }
-        let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
+        let output = String(data: data, encoding: .utf8)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
         return output?.isEmpty == false ? output : nil
     }

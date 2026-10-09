@@ -47,8 +47,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         PrefixKeymap.shared.install()
         FloatingPaneController.shared.install()
         AppIdleThrottle.shared.install()
-        WorktreeAutoIsolateService.shared.start()
-        BrowserPaneRegistry.shared.prewarm()
 
         // Fix #8 (RL-040): Swallow key/mouse events targeting views that lost their window.
         // On macOS 26.5 + Swift 6.3, the @objc thunk crashes with EXC_BAD_ACCESS
@@ -60,7 +58,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             return event
         }
-        ScriptHookCoordinator.shared.start()
+
+        // Defer non-critical startup services (WebKit prewarm, WorktreeAutoIsolate, ScriptHookCoordinator)
+        // until after the first frame renders, eliminating contention on the launch critical path.
+        DispatchQueue.main.async {
+            BrowserPaneRegistry.shared.prewarm()
+            WorktreeAutoIsolateService.shared.start()
+            ScriptHookCoordinator.shared.start()
+        }
         // Follow the macOS system appearance for auto light/dark theme switching. The startup
         // application happens post-daemon-sync below (so the theme change reaches a ready daemon);
         // this observer handles every later Light/Dark flip.

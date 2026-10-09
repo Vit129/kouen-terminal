@@ -1188,6 +1188,9 @@ public final class RealPty: @unchecked Sendable {
     /// against. Add that once the binding exists — don't trust a bare `task_id` from a worker's
     /// own stdout as authoritative even then (see the design doc's Lane B security rules).
     private func scanForAgentStatusOSC(_ chunk: Data) {
+        if oscScanBuffer.isEmpty && !chunk.contains(0x1b) {
+            return
+        }
         oscScanBuffer.append(chunk)
         if oscScanBuffer.count > Self.oscScanBufferCap {
             oscScanBuffer.removeFirst(oscScanBuffer.count - Self.oscScanBufferCap)
@@ -1215,6 +1218,14 @@ public final class RealPty: @unchecked Sendable {
                 applyOSC94Payload(payloadString)
             }
             oscScanBuffer.removeSubrange(oscScanBuffer.startIndex..<terminatorIndex.consumedEnd)
+        }
+        // If buffer has no ESC byte, no future marker can start before a new ESC
+        if let lastEsc = oscScanBuffer.lastIndex(of: 0x1b) {
+            if lastEsc > oscScanBuffer.startIndex {
+                oscScanBuffer.removeSubrange(oscScanBuffer.startIndex..<lastEsc)
+            }
+        } else {
+            oscScanBuffer.removeAll(keepingCapacity: true)
         }
     }
 

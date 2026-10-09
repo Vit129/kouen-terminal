@@ -14,6 +14,7 @@ public actor LSPClient {
     private var process: Process?
     private var stdinPipe: Pipe?
     private var stdoutPipe: Pipe?
+    private var readBuffer = LSPTransportBuffer()
     private var readerTask: Task<Void, Never>?
     private var nextRequestID = 1
     private var pending: [Int: CheckedContinuation<AnyCodable?, Error>] = [:]
@@ -39,7 +40,7 @@ public actor LSPClient {
         proc.currentDirectoryURL = configuration.rootURL
         proc.standardInput = input
         proc.standardOutput = output
-        proc.standardError = Pipe()
+        proc.standardError = FileHandle.nullDevice
         try proc.run()
         process = proc
         stdinPipe = input
@@ -99,6 +100,7 @@ public actor LSPClient {
             _ = try? await request(method: "shutdown", params: nil)
             try? await notify(method: "exit", params: nil)
         }
+        stdoutPipe?.fileHandleForReading.readabilityHandler = nil
         readerTask?.cancel()
         process?.terminate()
         process = nil
@@ -134,25 +136,43 @@ public actor LSPClient {
     }
 
     private func startReading(fileHandle: FileHandle) {
-        let continuation = continuation
+        // One unstructured Task per chunk is NOT order-preserving onto the actor; a
+        // Content-Length frame split across chunks would then re-join out of order and kill
+        // the stream. Funnel chunks through one AsyncStream drained by a single task instead.
+        let (chunks, chunkContinuation) = AsyncStream<Data>.makeStream()
+        fileHandle.readabilityHandler = { handle in
+            let data = handle.availableData
+            if data.isEmpty {
+                handle.readabilityHandler = nil
+                chunkContinuation.finish()
+            } else {
+                chunkContinuation.yield(data)
+            }
+        }
         readerTask?.cancel()
         readerTask = Task { [weak self] in
-            let buffer = LSPTransportBuffer()
-            while !Task.isCancelled {
-                let data = fileHandle.availableData
-                if data.isEmpty { break }
-                buffer.append(data)
-                do {
-                    while let message = try buffer.nextMessage() {
-                        continuation.yield(message)
-                        await self?.handle(message)
-                    }
-                } catch {
-                    break
-                }
+            for await data in chunks {
+                await self?.processIncomingData(data)
             }
-            continuation.finish()
+            await self?.finishReading()
         }
+    }
+
+    private func processIncomingData(_ data: Data) {
+        readBuffer.append(data)
+        do {
+            while let message = try readBuffer.nextMessage() {
+                continuation.yield(message)
+                handle(message)
+            }
+        } catch {
+            finishReading()
+        }
+    }
+
+    private func finishReading() {
+        stdoutPipe?.fileHandleForReading.readabilityHandler = nil
+        continuation.finish()
     }
 
     private func handle(_ message: LSPMessage) {

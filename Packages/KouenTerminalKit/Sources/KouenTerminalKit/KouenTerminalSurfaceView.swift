@@ -575,6 +575,8 @@ public final class KouenTerminalSurfaceView: NSView {
     var findMatches: [TerminalBufferMatch] = []
     /// Index of the "current" match within `findMatches` (the one we scrolled to).
     var findCurrentIndex = 0
+    /// Debounce task for incremental search typing.
+    var findDebounceTask: Task<Void, Never>?
     /// Reports `(current, total)` to the host so the find bar can show "n of m" (0,0 = none).
     public var onFindResultsChanged: ((_ current: Int, _ total: Int) -> Void)?
 

@@ -58,6 +58,45 @@ public enum TerminalBufferSearch {
         let needle = needleUnits.map { $0.precomposedStringWithCanonicalMapping.lowercased() }
         guard !needle.isEmpty, lineCount > 0 else { return [] }
         var out: [TerminalBufferMatch] = []
+
+        // Fast path for ASCII queries (single ASCII bytes, no combining marks):
+        // Compares cell codepoints directly without allocating [String] or lowercasing strings.
+        let isAsciiNeedle = needle.allSatisfy { $0.utf8.count == 1 && $0.utf8.first! < 128 }
+        if isAsciiNeedle {
+            let needleBytes = needle.map { $0.utf8.first! }
+            let needleCount = needleBytes.count
+            for i in 0 ..< lineCount {
+                let cells = line(i)
+                guard cells.count >= needleCount else { continue }
+                var c = 0
+                let last = cells.count - needleCount
+                while c <= last {
+                    var k = 0
+                    while k < needleCount {
+                        let cell = cells[c + k]
+                        let byte: UInt8
+                        if cell.width == .spacerTail || cell.codepoint == 0 {
+                            byte = 0x20
+                        } else if cell.combining0 == 0 && cell.codepoint < 128 {
+                            let cp = UInt8(cell.codepoint)
+                            byte = (cp >= 0x41 && cp <= 0x5A) ? (cp | 0x20) : cp
+                        } else {
+                            break
+                        }
+                        if byte != needleBytes[k] { break }
+                        k += 1
+                    }
+                    if k == needleCount {
+                        out.append(TerminalBufferMatch(bufferLine: i, columns: c ..< (c + needleCount)))
+                        c += needleCount
+                    } else {
+                        c += 1
+                    }
+                }
+            }
+            return out
+        }
+
         for i in 0 ..< lineCount {
             let cells = line(i)
             guard cells.count >= needle.count else { continue }

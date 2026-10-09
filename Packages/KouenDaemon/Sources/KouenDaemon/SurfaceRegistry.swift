@@ -105,6 +105,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
     /// Per-cwd cache backing the Dirty Tree half of the write-origin guard (P46 Phase 3 follow-up)
     /// — `monitorLock`-guarded alongside the other small per-surface caches.
     private var dirtyTreeCache: [String: (dirty: Bool, checkedAt: Date)] = [:]
+    private var dirtyCheckInProgress: Set<String> = []
 
     /// Full Tier 1 verification failure output per surface (P46 Phase 4 follow-up) —
     /// `monitorLock`-guarded alongside the other small per-surface caches. `tab.notificationText`
@@ -117,6 +118,21 @@ public final class SurfaceRegistry: @unchecked Sendable {
     /// arbitrates a human keystroke against a concurrent automation `send`/`sendKeys` on the
     /// same surface, so they can't interleave into one broken command.
     private var lastHumanWriteAt: [String: Date] = [:]
+
+    private func pruneSurfaceStateLocked(surfaceID: String) {
+        monitors.removeValue(forKey: surfaceID)
+        lastVerificationOutput.removeValue(forKey: surfaceID)
+        lastHumanWriteAt.removeValue(forKey: surfaceID)
+    }
+
+    private func pruneStaleDirtyTreeCacheLocked() {
+        let now = Date()
+        for (cwd, cached) in dirtyTreeCache {
+            if now.timeIntervalSince(cached.checkedAt) > 60 {
+                dirtyTreeCache.removeValue(forKey: cwd)
+            }
+        }
+    }
 
     /// How long an automation write is rejected after the surface's last human keystroke —
     /// long enough to cover natural gaps mid-burst of typing, short enough that automation
@@ -317,7 +333,8 @@ public final class SurfaceRegistry: @unchecked Sendable {
         for (event, key) in fired { fireHookLocked(event, surfaceKey: key) }
         if !orphans.isEmpty {
             monitorLock.lock()
-            for key in orphans { monitors.removeValue(forKey: key) }
+            for key in orphans { pruneSurfaceStateLocked(surfaceID: key) }
+            pruneStaleDirtyTreeCacheLocked()
             monitorLock.unlock()
         }
     }
@@ -1521,6 +1538,23 @@ public final class SurfaceRegistry: @unchecked Sendable {
         }
     }
 
+    /// True if any tab is currently running an active command or agent (dev server candidate).
+    public func hasAnyActiveSubprocessOrAgent() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        for workspace in editor.snapshot.workspaces {
+            for session in workspace.sessions {
+                for tab in session.tabs {
+                    if tab.agent != nil { return true }
+                    if let cmd = tab.currentCommand, !["zsh", "bash", "fish", "sh"].contains(cmd) {
+                        return true
+                    }
+                }
+            }
+        }
+        return false
+    }
+
     /// Clear a surface's accumulated trailing-output buffer under `monitorLock` — shared by the
     /// mark-waiting and clear-waiting transitions so neither leaves stale prompt text sitting in
     /// the tail for the other to re-match against.
@@ -1579,16 +1613,36 @@ public final class SurfaceRegistry: @unchecked Sendable {
     private static let dirtyCheckTTL: TimeInterval = 2
     private func isDirtyCached(cwd: String) -> Bool {
         monitorLock.lock()
-        if let cached = dirtyTreeCache[cwd], Date().timeIntervalSince(cached.checkedAt) < Self.dirtyCheckTTL {
+        if let cached = dirtyTreeCache[cwd] {
+            if Date().timeIntervalSince(cached.checkedAt) >= Self.dirtyCheckTTL {
+                triggerDirtyCheckBackgroundLocked(cwd: cwd)
+            }
             monitorLock.unlock()
             return cached.dirty
         }
         monitorLock.unlock()
+
+        // Cold miss: compute once synchronously, cache it, and future checks stay non-blocking
         let dirty = WorktreeManager().isDirty(worktreePath: cwd)
-        monitorLock.lock()
-        dirtyTreeCache[cwd] = (dirty, Date())
-        monitorLock.unlock()
+        recordDirtyCheckResult(cwd: cwd, dirty: dirty)
         return dirty
+    }
+
+    private func triggerDirtyCheckBackgroundLocked(cwd: String) {
+        if dirtyCheckInProgress.insert(cwd).inserted {
+            Task.detached(priority: .utility) { [weak self] in
+                guard let self else { return }
+                let dirty = WorktreeManager().isDirty(worktreePath: cwd)
+                self.recordDirtyCheckResult(cwd: cwd, dirty: dirty)
+            }
+        }
+    }
+
+    private func recordDirtyCheckResult(cwd: String, dirty: Bool) {
+        monitorLock.lock()
+        defer { monitorLock.unlock() }
+        dirtyTreeCache[cwd] = (dirty, Date())
+        dirtyCheckInProgress.remove(cwd)
     }
 
     /// Reset a `waiting` tab back to idle (clearing its notification text). No-op — and no
@@ -1673,7 +1727,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
                 changed = true
             }
         }
-        if changed { commit() }
+        if changed { commit(immediate: false) }
     }
 
     /// TCP-listening-port refresh (P39 G1): one batched `lsof` across every surface's process
@@ -1719,7 +1773,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
                 changed = true
             }
         }
-        if changed { commit() }
+        if changed { commit(immediate: false) }
     }
 
     /// Lightweight CWD-only refresh: reads each surface's direct shell PID cwd via a single
@@ -1973,12 +2027,18 @@ public final class SurfaceRegistry: @unchecked Sendable {
         onAgentStatusReachedTerminal?(surfaceKey)
     }
 
-    private func commit() {
+    /// Structural changes save synchronously; the per-command metadata refreshes pass `false` to
+    /// ride the store's 0.5s debounce instead of a full JSON write under the lock each prompt.
+    private func commit(immediate: Bool = true) {
         let revision = editor.snapshot.revision
-        do {
-            try store.saveImmediately(editor.snapshot)
-        } catch {
-            fputs("KouenDaemon snapshot save failed: \(error)\n", kouenStderr)
+        if immediate {
+            do {
+                try store.saveImmediately(editor.snapshot)
+            } catch {
+                fputs("KouenDaemon snapshot save failed: \(error)\n", kouenStderr)
+            }
+        } else {
+            store.save(editor.snapshot)
         }
         NotificationBus.shared.postSnapshotChanged(revision: revision)
         onSnapshotCommitted?(revision)
@@ -2202,8 +2262,11 @@ public final class SurfaceRegistry: @unchecked Sendable {
             // The RealPty (and its ScrollbackFile) is gone in that case, so this can't be resurrected.
             try? FileManager.default.removeItem(at: KouenPaths.scrollbackFileURL(forSurfaceID: surfaceID))
             stopPipe(surfaceID: surfaceID)
-            // Drop the output monitor too, else it leaks across tab/session/pane churn.
-            monitorLock.lock(); monitors.removeValue(forKey: surfaceID); monitorLock.unlock()
+            // Drop per-surface state (monitors, verification output, human writes), else it leaks across tab/session/pane churn.
+            monitorLock.lock()
+            pruneSurfaceStateLocked(surfaceID: surfaceID)
+            pruneStaleDirtyTreeCacheLocked()
+            monitorLock.unlock()
         }
     }
 
@@ -2419,7 +2482,10 @@ public final class SurfaceRegistry: @unchecked Sendable {
         lock.lock()
         guard let session, sessions[surfaceID] === session else { lock.unlock(); return }
         sessions.removeValue(forKey: surfaceID)
-        monitorLock.lock(); monitors.removeValue(forKey: surfaceID); monitorLock.unlock()
+        monitorLock.lock()
+        pruneSurfaceStateLocked(surfaceID: surfaceID)
+        pruneStaleDirtyTreeCacheLocked()
+        monitorLock.unlock()
         // Natural shell exit must also tear down an active pipe-pane tap, else its `/bin/sh`
         // consumer + write-FD leak (every other close path already calls stopPipe).
         stopPipe(surfaceID: surfaceID)

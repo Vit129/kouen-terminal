@@ -96,7 +96,11 @@ public struct KouenSettings: Codable, Sendable, Equatable {
     /// where mod is `ctrl|cmd|opt|shift`. Set empty string to disable.
     public var prefixKey: String
     /// Number of lines kept in scrollback per pane (passed to the renderer + RealPty).
-    public var scrollbackLines: Int
+    public var scrollbackLines: Int {
+        didSet {
+            scrollbackLines = KouenSettings.clampedScrollback(scrollbackLines)
+        }
+    }
     /// Cursor shape: `block`, `bar`, or `underline` (`cursor-style`).
     public var cursorStyle: String
     /// Whether the text cursor blinks (`cursor-style-blink`).
@@ -454,7 +458,7 @@ public struct KouenSettings: Codable, Sendable, Equatable {
         self.customCursorHex = customCursorHex
         self.importedConfigSignature = importedConfigSignature
         self.prefixKey = prefixKey
-        self.scrollbackLines = scrollbackLines
+        self.scrollbackLines = KouenSettings.clampedScrollback(scrollbackLines)
         self.cursorStyle = cursorStyle
         self.cursorBlink = cursorBlink
         self.copyOnSelect = copyOnSelect
@@ -621,7 +625,8 @@ public struct KouenSettings: Codable, Sendable, Equatable {
         customCursorHex = try container.decodeIfPresent(String.self, forKey: .customCursorHex) ?? fallback.customCursorHex
         importedConfigSignature = try container.decodeIfPresent(String.self, forKey: .importedConfigSignature)
         prefixKey = try container.decodeIfPresent(String.self, forKey: .prefixKey) ?? fallback.prefixKey
-        scrollbackLines = try container.decodeIfPresent(Int.self, forKey: .scrollbackLines) ?? fallback.scrollbackLines
+        let decodedScrollback = try container.decodeIfPresent(Int.self, forKey: .scrollbackLines) ?? fallback.scrollbackLines
+        scrollbackLines = KouenSettings.clampedScrollback(decodedScrollback)
         cursorStyle = try container.decodeIfPresent(String.self, forKey: .cursorStyle) ?? fallback.cursorStyle
         cursorBlink = try container.decodeIfPresent(Bool.self, forKey: .cursorBlink) ?? fallback.cursorBlink
         copyOnSelect = try container.decodeIfPresent(Bool.self, forKey: .copyOnSelect) ?? fallback.copyOnSelect
@@ -759,6 +764,13 @@ public struct KouenSettings: Codable, Sendable, Equatable {
     /// this is belt-and-braces — it keeps the persisted value sane regardless of the read site.
     public static func clampedPadding(_ value: Float) -> Float {
         max(0, value)
+    }
+
+    public static let maxScrollbackLines = 100_000
+
+    /// Scrollback lines per pane is clamped between 0 and 100,000 to prevent unbounded memory allocation.
+    public static func clampedScrollback(_ value: Int) -> Int {
+        min(max(0, value), maxScrollbackLines)
     }
 
     /// Builds a default settings instance, layering imported config values over hardcoded defaults.

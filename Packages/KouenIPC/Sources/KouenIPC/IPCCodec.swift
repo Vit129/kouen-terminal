@@ -28,10 +28,9 @@ public enum IPCCodec {
     }
 
     public static func decodeRequest(from buffer: inout Data) throws -> IPCEnvelope? {
-        guard let payload = try extractPayload(from: &buffer) else { return nil }
-        // A frame that de-frames cleanly but won't decode is `undecodable`, not "need more bytes":
-        // the buffer already advanced past it, so swallowing it to nil would silently drop the
-        // request and hang the client. Throw so the server can reply with an error and move on.
+        var offset = 0
+        guard let payload = try extractPayload(from: buffer, at: &offset) else { return nil }
+        buffer.removeFirst(offset)
         do {
             return try JSONDecoder().decode(IPCEnvelope.self, from: payload)
         } catch {
@@ -40,10 +39,9 @@ public enum IPCCodec {
     }
 
     public static func decodeReply(from buffer: inout Data) throws -> IPCReply? {
-        guard let payload = try extractPayload(from: &buffer) else { return nil }
-        // The frame de-framed cleanly (length-prefixed) but the payload won't decode — a
-        // malformed/skewed reply. Throw rather than returning nil: the frame is already consumed,
-        // so nil would read as "need more bytes" and hang the caller until it times out.
+        var offset = 0
+        guard let payload = try extractPayload(from: buffer, at: &offset) else { return nil }
+        buffer.removeFirst(offset)
         do {
             return try JSONDecoder().decode(IPCReply.self, from: payload)
         } catch {
@@ -51,22 +49,28 @@ public enum IPCCodec {
         }
     }
 
-    /// Pull one length-prefixed payload off the front of `buffer`. Returns nil when a full
-    /// frame isn't buffered yet (caller reads more). Throws `FrameError.tooLarge` on an
-    /// out-of-bounds declared length so the caller can drop the (unrecoverable) connection
-    /// instead of silently clearing the buffer and mis-framing everything after it.
-    private static func extractPayload(from buffer: inout Data) throws -> Data? {
-        guard buffer.count >= 4 else { return nil }
-        let header = Array(buffer.prefix(4))
-        let length = (UInt32(header[0]) << 24)
-            | (UInt32(header[1]) << 16)
-            | (UInt32(header[2]) << 8)
-            | UInt32(header[3])
+    /// Pull one length-prefixed payload from `buffer` at `offset`, advancing `offset`.
+    /// Returns nil when a full frame isn't buffered yet.
+    public static func extractPayload(from buffer: Data, at offset: inout Int) throws -> Data? {
+        let remaining = buffer.count - offset
+        guard remaining >= 4 else { return nil }
+        let b = buffer.startIndex + offset
+        let length = (UInt32(buffer[b]) << 24)
+            | (UInt32(buffer[b + 1]) << 16)
+            | (UInt32(buffer[b + 2]) << 8)
+            | UInt32(buffer[b + 3])
         guard length <= UInt32(maxPayloadLength) else { throw FrameError.tooLarge(Int(length)) }
         let total = 4 + Int(length)
-        guard buffer.count >= total else { return nil }
-        let payload = Data(buffer.dropFirst(4).prefix(Int(length)))
-        buffer.removeFirst(total)
+        guard remaining >= total else { return nil }
+        let payload = buffer.subdata(in: (b + 4)..<(b + total))
+        offset += total
+        return payload
+    }
+
+    private static func extractPayload(from buffer: inout Data) throws -> Data? {
+        var offset = 0
+        guard let payload = try extractPayload(from: buffer, at: &offset) else { return nil }
+        buffer.removeFirst(offset)
         return payload
     }
 
@@ -123,22 +127,19 @@ public enum IPCCodec {
         case output(Data, sequence: UInt64)
     }
 
-    /// Decode the next reply OR binary output frame off `buffer`. nil = a full frame isn't buffered
-    /// yet. Throws `tooLarge` on an out-of-bounds declared length (unrecoverable — drop the
-    /// connection), matching `decodeReply`.
-    public static func decodeReplyOrData(from buffer: inout Data) throws -> DecodedReplyFrame? {
-        guard let first = buffer.first else { return nil }
+    /// Decode the next reply OR binary output frame off `buffer` at `offset`, advancing `offset`.
+    public static func decodeReplyOrData(from buffer: Data, at offset: inout Int) throws -> DecodedReplyFrame? {
+        guard offset < buffer.count else { return nil }
+        let b = buffer.startIndex + offset
+        let first = buffer[b]
         if first == outputFrameMagic {
-            guard let body = try extractBinaryFrame(from: &buffer) else { return nil }
+            guard let body = try extractBinaryFrame(from: buffer, at: &offset) else { return nil }
             guard body.count >= 8 else { throw FrameError.undecodable }
             let sequence = readUInt64BE(body, 0)
             let payload = body.subdata(in: (body.startIndex + 8) ..< body.endIndex)
             return .output(payload, sequence: sequence)
         }
-        guard let payload = try extractPayload(from: &buffer) else { return nil }
-        // Same contract as `decodeReply`: a consumed-but-undecodable frame throws (the stream read
-        // loop treats it as fatal and tears down) rather than returning nil and silently dropping
-        // a reply the caller is still waiting on.
+        guard let payload = try extractPayload(from: buffer, at: &offset) else { return nil }
         do {
             let reply = try JSONDecoder().decode(IPCReply.self, from: payload)
             return .reply(reply.response)
@@ -147,20 +148,29 @@ public enum IPCCodec {
         }
     }
 
+    /// Decode the next reply OR binary output frame off `buffer`. nil = a full frame isn't buffered
+    /// yet. Throws `tooLarge` on an out-of-bounds declared length (unrecoverable — drop the
+    /// connection), matching `decodeReply`.
+    public static func decodeReplyOrData(from buffer: inout Data) throws -> DecodedReplyFrame? {
+        var offset = 0
+        guard let frame = try decodeReplyOrData(from: buffer, at: &offset) else { return nil }
+        buffer.removeFirst(offset)
+        return frame
+    }
+
     /// One decoded frame on a request/input stream (the daemon's client connections).
     public enum DecodedRequestFrame {
         case request(IPCRequest?)
         case input(surfaceID: String, payload: Data)
     }
 
-    /// Decode the next request OR binary input frame off `buffer`. nil = incomplete. Throws
-    /// `undecodable` on a framed-but-unknown JSON request (the stream stays in sync; the caller
-    /// errors and continues) and `tooLarge` on an out-of-bounds length (drop the connection) — the
-    /// same contract as `decodeRequest`.
-    public static func decodeRequestOrInput(from buffer: inout Data) throws -> DecodedRequestFrame? {
-        guard let first = buffer.first else { return nil }
+    /// Decode the next request OR binary input frame off `buffer` at `offset`, advancing `offset`.
+    public static func decodeRequestOrInput(from buffer: Data, at offset: inout Int) throws -> DecodedRequestFrame? {
+        guard offset < buffer.count else { return nil }
+        let b = buffer.startIndex + offset
+        let first = buffer[b]
         if first == inputFrameMagic {
-            guard let body = try extractBinaryFrame(from: &buffer) else { return nil }
+            guard let body = try extractBinaryFrame(from: buffer, at: &offset) else { return nil }
             guard body.count >= 2 else { throw FrameError.undecodable }
             let surfaceLength = Int(readUInt16BE(body, 0))
             guard body.count >= 2 + surfaceLength else { throw FrameError.undecodable }
@@ -169,7 +179,7 @@ public enum IPCCodec {
             let payload = body.subdata(in: (sidStart + surfaceLength) ..< body.endIndex)
             return .input(surfaceID: surfaceID, payload: payload)
         }
-        guard let payload = try extractPayload(from: &buffer) else { return nil }
+        guard let payload = try extractPayload(from: buffer, at: &offset) else { return nil }
         do {
             return .request(try JSONDecoder().decode(IPCEnvelope.self, from: payload).request)
         } catch {
@@ -177,21 +187,38 @@ public enum IPCCodec {
         }
     }
 
-    /// Pull one `[magic][len:4 BE][body]` frame's body off the front of `buffer`. Returns nil when
-    /// the full frame isn't buffered yet. The caller must have verified `buffer.first` is a binary
-    /// magic. Throws `tooLarge` on an out-of-bounds declared length (matches `extractPayload`).
-    private static func extractBinaryFrame(from buffer: inout Data) throws -> Data? {
-        guard buffer.count >= 5 else { return nil }
-        let b = buffer.startIndex
+    /// Decode the next request OR binary input frame off `buffer`. nil = incomplete. Throws
+    /// `undecodable` on a framed-but-unknown JSON request (the stream stays in sync; the caller
+    /// errors and continues) and `tooLarge` on an out-of-bounds length (drop the connection) — the
+    /// same contract as `decodeRequest`.
+    public static func decodeRequestOrInput(from buffer: inout Data) throws -> DecodedRequestFrame? {
+        var offset = 0
+        guard let frame = try decodeRequestOrInput(from: buffer, at: &offset) else { return nil }
+        buffer.removeFirst(offset)
+        return frame
+    }
+
+    /// Pull one `[magic][len:4 BE][body]` frame's body from `buffer` at `offset`, advancing `offset`.
+    public static func extractBinaryFrame(from buffer: Data, at offset: inout Int) throws -> Data? {
+        let remaining = buffer.count - offset
+        guard remaining >= 5 else { return nil }
+        let b = buffer.startIndex + offset
         let length = (UInt32(buffer[b + 1]) << 24)
             | (UInt32(buffer[b + 2]) << 16)
             | (UInt32(buffer[b + 3]) << 8)
             | UInt32(buffer[b + 4])
         guard length <= UInt32(maxPayloadLength) else { throw FrameError.tooLarge(Int(length)) }
         let total = 5 + Int(length)
-        guard buffer.count >= total else { return nil }
-        let body = Data(buffer[(b + 5) ..< (b + total)])
-        buffer.removeFirst(total)
+        guard remaining >= total else { return nil }
+        let body = buffer.subdata(in: (b + 5) ..< (b + total))
+        offset += total
+        return body
+    }
+
+    private static func extractBinaryFrame(from buffer: inout Data) throws -> Data? {
+        var offset = 0
+        guard let body = try extractBinaryFrame(from: buffer, at: &offset) else { return nil }
+        buffer.removeFirst(offset)
         return body
     }
 

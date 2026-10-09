@@ -285,29 +285,41 @@ public final class DaemonServer: @unchecked Sendable {
             source.cancel()
             return
         }
-        var data = clientBuffers[fd] ?? Data()
+        var data = clientBuffers.removeValue(forKey: fd) ?? Data()
         data.append(contentsOf: buffer.prefix(count))
-        clientBuffers[fd] = data
+        var offset = 0
+
+        defer {
+            if clientSources[fd] != nil {
+                if offset >= data.count {
+                    clientBuffers[fd] = Data()
+                } else if offset > 0 {
+                    data.removeSubrange(0..<offset)
+                    clientBuffers[fd] = data
+                } else {
+                    clientBuffers[fd] = data
+                }
+            }
+        }
 
         while true {
             let frame: IPCCodec.DecodedRequestFrame?
             do {
-                frame = try IPCCodec.decodeRequestOrInput(from: &data)
+                frame = try IPCCodec.decodeRequestOrInput(from: data, at: &offset)
             } catch IPCCodec.FrameError.undecodable {
                 // A well-framed request this build doesn't understand (version skew). The stream
                 // is still in sync, so reply with an error and keep going rather than hanging the
                 // client; the frame was already consumed, so persist the advanced buffer.
-                clientBuffers[fd] = data
                 send(.error("unrecognized request"), to: fd)
                 continue
             } catch {
                 // Oversized/garbage frame — the stream can't be re-synced. Drop the client.
-                clientBuffers[fd] = Data()
+                data = Data()
+                offset = 0
                 source.cancel()
                 return
             }
             guard let frame else { break }
-            clientBuffers[fd] = data
             // Binary input frame on a persistent (subscription) connection: write straight to the
             // PTY, fire-and-forget — no reply (the echo comes back on the output stream). This IS
             // the primary human-keystroke path (`SurfaceIO.send`'s fast path rides this, falling
@@ -616,7 +628,6 @@ public final class DaemonServer: @unchecked Sendable {
             }
             send(response, to: fd)
         }
-        clientBuffers[fd] = data
     }
 
     /// `wait-for`: register/wake fds on a named channel. `wait`/`lock` defer the reply (the
@@ -764,8 +775,8 @@ public final class DaemonServer: @unchecked Sendable {
     /// cap, and flush what the non-blocking socket takes now. The single owner of `writeBuffers`
     /// growth — both JSON replies and binary frames go through here.
     private func enqueue(_ data: Data, to fd: Int32) {
-        if var pending = writeBuffers[fd] {
-            pending.data.append(data) // amortized O(1) (Data grows by doubling)
+        if var pending = writeBuffers.removeValue(forKey: fd) {
+            pending.data.append(data) // amortized O(1) (unique reference avoids CoW copy)
             writeBuffers[fd] = pending
         } else {
             writeBuffers[fd] = PendingWrite(data: data)

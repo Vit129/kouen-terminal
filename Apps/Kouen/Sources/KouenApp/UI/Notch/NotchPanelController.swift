@@ -71,8 +71,12 @@ final class NotchPanelController: NSObject {
         }
     }
 
-    private static var isVorssaintRunning: Bool {
+    private static var cachedIsVorssaintRunning: Bool = {
         !NSRunningApplication.runningApplications(withBundleIdentifier: "com.vorssaint.utils").isEmpty
+    }()
+
+    private static var isVorssaintRunning: Bool {
+        cachedIsVorssaintRunning
     }
 
     func openFromMenu() {
@@ -210,6 +214,7 @@ final class NotchPanelController: NSObject {
     @objc private func workspaceAppsChanged(_ note: Notification) {
         guard (note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?
             .bundleIdentifier == "com.vorssaint.utils" else { return }
+        Self.cachedIsVorssaintRunning = !NSRunningApplication.runningApplications(withBundleIdentifier: "com.vorssaint.utils").isEmpty
         refreshVisibility()
     }
 

@@ -385,6 +385,10 @@ public final class TerminalMetalRenderer {
         self.sampler = sampler
     }
 
+    public func purgeImageCache() {
+        imageCache.removeAll()
+    }
+
     private static func makePipeline(
         device: MTLDevice, library: MTLLibrary,
         vertex: String, fragment: String, blending: Bool
@@ -1581,6 +1585,7 @@ public final class TerminalMetalRenderer {
         oy: Float
     ) -> Int {
         guard !images.isEmpty else { return 0 }
+        imageCache.prune(keeping: Set(images.map { $0.id }))
         let cellW = Float(cellPixelWidth), cellH = Float(cellPixelHeight)
         var drawn = 0
         encoder.setRenderPipelineState(imagePipeline)

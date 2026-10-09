@@ -14,19 +14,27 @@ extension KouenTerminalSurfaceView {
     // block cursor's glyph inversion re-encodes exactly its own row (`previousCursor` key diff),
     // so each toggle costs ≤1 encoded row + one present — never a grid rebuild. Pinned by
     // `testCursorBlinkReencodesAtMostTheCursorRow`.
-    func restartBlinkTimer() {
+    func stopBlinkTimer() {
+        blinkGeneration &+= 1
         blinkTimer?.invalidate()
         blinkTimer = nil
         cursorBlinkVisible = true
-        guard cursorBlinkEnabled else { return }
+    }
+
+    func restartBlinkTimer() {
+        stopBlinkTimer()
+        guard cursorBlinkEnabled, effectivelyFocused else { return }
         // Capture a generation token so the closure can bail out immediately if the timer
         // was invalidated (and the view possibly deallocated) between scheduling and fire.
-        blinkGeneration &+= 1
         let expectedGen = blinkGeneration
         let timer = Timer(timeInterval: 0.53, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 guard let self, self.blinkGeneration == expectedGen else { return }
-                guard self.effectivelyFocused else { return }
+                guard self.effectivelyFocused else {
+                    self.stopBlinkTimer()
+                    self.scheduleRender()
+                    return
+                }
                 self.cursorBlinkVisible.toggle()
                 self.scheduleRender()
             }

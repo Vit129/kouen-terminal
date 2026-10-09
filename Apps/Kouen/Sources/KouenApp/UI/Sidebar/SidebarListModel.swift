@@ -108,15 +108,46 @@ final class SidebarListModel {
     private var lastWorktreeFetchTime: [String: Date] = [:]
     @ObservationIgnored private var pendingRebuild: Task<Void, Never>?
 
+    private var gitStatusFetchedAt: [String: Date] = [:]
+    private var gitStatusFetchInProgress: Set<String> = []
+    private static let gitStatusTTL: TimeInterval = 60.0
+
     // MARK: - Main update
 
     func update(from snapshot: SessionSnapshot) {
-        sessions = snapshot.activeWorkspace?.sessions ?? []
-        activeSessionID = snapshot.activeWorkspace?.activeSessionID
-        activeWorkspaceID = snapshot.activeWorkspaceID
+        let newSessions = snapshot.activeWorkspace?.sessions ?? []
+        let newActiveSessionID = snapshot.activeWorkspace?.activeSessionID
+        let newActiveWorkspaceID = snapshot.activeWorkspaceID
+
+        if newSessions == sessions,
+           newActiveSessionID == activeSessionID,
+           newActiveWorkspaceID == activeWorkspaceID {
+            return
+        }
+
+        sessions = newSessions
+        activeSessionID = newActiveSessionID
+        activeWorkspaceID = newActiveWorkspaceID
 
         registerSessionProjects()
+        pruneCachesIfNeeded()
         rebuildRows()
+    }
+
+    private func pruneCachesIfNeeded() {
+        let now = Date()
+        if repoRootCache.count > 100 {
+            repoRootCache = repoRootCache.filter { now.timeIntervalSince($0.value.fetchedAt) < 300 }
+        }
+        if gitMetadataCache.count > 100 {
+            gitMetadataCache = gitMetadataCache.filter { now.timeIntervalSince($0.value.fetchedAt) < 300 }
+        }
+        if gitStatusFetchedAt.count > 100 {
+            gitStatusFetchedAt = gitStatusFetchedAt.filter { now.timeIntervalSince($0.value) < 300 }
+        }
+        if lastWorktreeFetchTime.count > 100 {
+            lastWorktreeFetchTime = lastWorktreeFetchTime.filter { now.timeIntervalSince($0.value) < 300 }
+        }
     }
 
     // MARK: - Collapse toggles
@@ -408,13 +439,21 @@ final class SidebarListModel {
     }
 
     private func fetchGitStatusForProject(_ path: String) {
-        guard gitStatuses[path] == nil else { return }
+        let now = Date()
+        if let lastFetch = gitStatusFetchedAt[path], now.timeIntervalSince(lastFetch) < Self.gitStatusTTL {
+            return
+        }
+        guard gitStatusFetchInProgress.insert(path).inserted else { return }
         Task { [weak self] in
-            guard let status = await fetchGitStatus(for: path) else { return }
+            let status = await fetchGitStatus(for: path)
             await MainActor.run {
                 guard let self else { return }
-                self.gitStatuses[path] = status
-                self.scheduleRebuild()
+                self.gitStatusFetchInProgress.remove(path)
+                self.gitStatusFetchedAt[path] = Date()
+                if let status {
+                    self.gitStatuses[path] = status
+                    self.scheduleRebuild()
+                }
             }
         }
     }
@@ -501,24 +540,44 @@ final class SidebarListModel {
 
     // MARK: - Async git fetches
 
-    private static var cachedGhPath: String? = {
-        let paths = ["/opt/homebrew/bin/gh", "/usr/local/bin/gh", "/usr/bin/gh"]
-        for path in paths where FileManager.default.fileExists(atPath: path) { return path }
-        let p = Process()
-        p.executableURL = URL(fileURLWithPath: "/usr/bin/which")
-        p.arguments = ["gh"]
-        let pipe = Pipe()
-        p.standardOutput = pipe
-        do {
-            try p.run()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            p.waitUntilExit()
-            if p.terminationStatus == 0,
-               let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-               !path.isEmpty, FileManager.default.fileExists(atPath: path) { return path }
-        } catch {}
-        return nil
-    }()
+    private static let knownGhPaths = [
+        "/opt/homebrew/bin/gh",
+        "/usr/local/bin/gh",
+        "/usr/bin/gh",
+        ("~/.local/bin/gh" as NSString).expandingTildeInPath
+    ]
+    private static var resolvedGhPath: String?
+    private static var hasAttemptedGhResolve = false
+
+    private static func resolveGhPath() async -> String? {
+        if hasAttemptedGhResolve { return resolvedGhPath }
+        hasAttemptedGhResolve = true
+        for path in knownGhPaths where FileManager.default.fileExists(atPath: path) {
+            resolvedGhPath = path
+            return path
+        }
+        let fallback = await Task.detached(priority: .utility) { () -> String? in
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: "/usr/bin/which")
+            p.arguments = ["gh"]
+            let pipe = Pipe()
+            p.standardOutput = pipe
+            p.standardError = FileHandle.nullDevice
+            do {
+                try p.run()
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                p.waitUntilExit()
+                if p.terminationStatus == 0,
+                   let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   !path.isEmpty, FileManager.default.fileExists(atPath: path) {
+                    return path
+                }
+            } catch {}
+            return nil
+        }.value
+        resolvedGhPath = fallback
+        return fallback
+    }
 
     private func fetchHasRemote(for path: String) async -> Bool {
         await Task.detached(priority: .utility) {
@@ -543,7 +602,7 @@ final class SidebarListModel {
 
     private func fetchGitMetadata(for path: String, branch: String) async -> RepoGitMetadata {
         let empty = RepoGitMetadata(prNumber: nil, prURL: nil, prTitle: nil, prBaseBranch: nil, prChecksStatus: nil, prMergeable: nil, prReviewDecision: nil, aheadCount: nil, behindCount: nil)
-        guard Self.cachedGhPath != nil, await fetchHasRemote(for: path) else { return empty }
+        guard await Self.resolveGhPath() != nil, await fetchHasRemote(for: path) else { return empty }
 
         return await Task.detached(priority: .utility) {
             let pr = GitHubCLIClient().prForCurrentBranch(repoPath: path)

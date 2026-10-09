@@ -475,14 +475,24 @@ public final class DaemonSubscription: @unchecked Sendable {
     ) {
         queue.async { [weak self, fd] in
             var buffer = Data()
+            var offset = 0
             var temp = [UInt8](repeating: 0, count: 65_536)
             outer: while true {
                 let count = read(fd, &temp, temp.count)
                 if count <= 0 { break }
+                if offset > 0 {
+                    if offset >= buffer.count {
+                        buffer.removeAll(keepingCapacity: true)
+                        offset = 0
+                    } else if offset > 32_768 || offset > buffer.count / 2 {
+                        buffer.removeSubrange(0..<offset)
+                        offset = 0
+                    }
+                }
                 buffer.append(contentsOf: temp.prefix(count))
                 while true {
                     let decoded: IPCCodec.DecodedReplyFrame?
-                    do { decoded = try IPCCodec.decodeReplyOrData(from: &buffer) }
+                    do { decoded = try IPCCodec.decodeReplyOrData(from: buffer, at: &offset) }
                     catch { break outer } // oversized/garbage frame — unrecoverable on a stream
                     guard let decoded else { break }
                     switch decoded {

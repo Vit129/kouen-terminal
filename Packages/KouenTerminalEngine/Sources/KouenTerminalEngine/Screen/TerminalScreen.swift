@@ -597,6 +597,15 @@ final class TerminalScreen {
     /// trim trailing padding so reflow doesn't manufacture spurious blank rows.
     private func isBlank(_ cell: TerminalGridCell) -> Bool { cell == .blank }
 
+    /// Trim trailing default-blank cells from a row before storing into history.
+    private static func trimmedTrailingBlanks(_ cells: [TerminalGridCell]) -> [TerminalGridCell] {
+        var end = cells.count
+        while end > 0 && cells[end - 1] == .blank {
+            end -= 1
+        }
+        return (end == cells.count) ? cells : Array(cells[0 ..< end])
+    }
+
     /// How many trailing cells of a soft-wrapped row are wrap *padding* (0 or 1), to drop when
     /// re-joining the logical line. The ONLY padding a soft wrap produces is the single gap left
     /// when a wide glyph couldn't fit the right margin and was deferred to the next row (`wrapLine`)
@@ -667,6 +676,9 @@ final class TerminalScreen {
                 if idx < historyCount {
                     let line = history[idx]
                     newCells.append(contentsOf: line.cells)
+                    if line.cells.count < cols {
+                        newCells.append(contentsOf: repeatElement(blank, count: cols - line.cells.count))
+                    }
                     newWrapped[slot] = line.wrapped
                     newMarks[slot] = line.mark
                 } else {
@@ -684,7 +696,9 @@ final class TerminalScreen {
         //    recent history tail down (already copied into the viewport above).
         if boundary > historyCount {
             for r in 0 ..< (boundary - historyCount) {
-                history.append(HistoryLine(cells: viewportRowCells(r), wrapped: rowWrapped[r], mark: rowMarks[r]))
+                let rawCells = viewportRowCells(r)
+                let lineCells = rowWrapped[r] ? rawCells : Self.trimmedTrailingBlanks(rawCells)
+                history.append(HistoryLine(cells: lineCells, wrapped: rowWrapped[r], mark: rowMarks[r]))
             }
         } else if boundary < historyCount {
             history.removeLast(historyCount - boundary)
@@ -1046,7 +1060,10 @@ final class TerminalScreen {
             newHistory.append(self.history[i])
         }
         if viewportTop > 0 {
-            for i in 0 ..< viewportTop { newHistory.append(HistoryLine(cells: out[i], wrapped: outWrapped[i], mark: outMarks[i])) }
+            for i in 0 ..< viewportTop {
+                let lineCells = outWrapped[i] ? out[i] : Self.trimmedTrailingBlanks(out[i])
+                newHistory.append(HistoryLine(cells: lineCells, wrapped: outWrapped[i], mark: outMarks[i]))
+            }
         }
         if newHistory.count > maxHistoryLines {
             newHistory.removeFirst(newHistory.count - maxHistoryLines)
@@ -1554,7 +1571,9 @@ final class TerminalScreen {
         if growsHistory {
             for k in 0 ..< count {
                 let r = scrollTop + k
-                history.append(HistoryLine(cells: Array(cells[r * cols ..< (r + 1) * cols]),
+                let rawCells = Array(cells[r * cols ..< (r + 1) * cols])
+                let lineCells = rowWrapped[r] ? rawCells : Self.trimmedTrailingBlanks(rawCells)
+                history.append(HistoryLine(cells: lineCells,
                                            wrapped: rowWrapped[r], mark: rowMarks[r]))
             }
             // `removeFirst` is O(history.count) — trimming every scrolled line would make a

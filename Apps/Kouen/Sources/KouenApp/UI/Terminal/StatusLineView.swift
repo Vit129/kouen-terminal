@@ -83,7 +83,6 @@ final class StatusLineView: NSView {
             name: NotificationBus.shared.snapshotChanged,
             object: nil
         )
-        startTimer()
         DispatchQueue.main.async { [weak self] in self?.refresh() }
         NotificationCenter.default.addObserver(
             self, selector: #selector(throttleDidSuspend), name: AppIdleThrottle.didSuspend, object: nil)
@@ -97,7 +96,6 @@ final class StatusLineView: NSView {
     }
 
     @objc private func throttleDidResume() {
-        startTimer()
         refresh()
     }
 
@@ -148,6 +146,32 @@ final class StatusLineView: NSView {
         }
     }
 
+    private func usesTimeFormat(count: Int, options: OptionStore) -> Bool {
+        guard count > 0, !isHidden else { return false }
+        let fmtLeft   = options.get("status-left",   scope: .global)?.stringValue ?? ""
+        let fmtRight  = options.get("status-right",  scope: .global)?.stringValue ?? ""
+        let fmtCenter = options.get("status-center", scope: .global)?.stringValue ?? ""
+        if fmtLeft.contains("time") || fmtRight.contains("time") || fmtCenter.contains("time") {
+            return true
+        }
+        for i in 0..<max(0, count - 1) {
+            let fmt = options.get("status-format-\(i + 1)", scope: .global)?.stringValue ?? ""
+            if fmt.contains("time") { return true }
+        }
+        return false
+    }
+
+    private func updateTimerState(count: Int, options: OptionStore) {
+        if usesTimeFormat(count: count, options: options) {
+            if refreshTimer == nil {
+                startTimer()
+            }
+        } else {
+            refreshTimer?.invalidate()
+            refreshTimer = nil
+        }
+    }
+
     private func startTimer() {
         refreshTimer?.invalidate()
         // 1s tick so `#{time:%H:%M}` updates without us needing per-second
@@ -171,6 +195,7 @@ final class StatusLineView: NSView {
             heightConstraint.constant = newHeight
             lastHeight = newHeight
         }
+        updateTimerState(count: count, options: options)
         guard count > 0 else { return }
         let context = buildContext()
         let fmtLeft   = options.get("status-left",   scope: .global)?.stringValue ?? ""

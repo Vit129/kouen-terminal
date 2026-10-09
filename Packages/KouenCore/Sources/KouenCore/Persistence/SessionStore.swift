@@ -60,7 +60,7 @@ public final class SessionStore: @unchecked Sendable {
         var copy = snapshot
         copy.savedAt = .now
         let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.outputFormatting = [.sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
         let data = try encoder.encode(copy)
         try data.write(to: KouenPaths.snapshotURL, options: .atomic)
