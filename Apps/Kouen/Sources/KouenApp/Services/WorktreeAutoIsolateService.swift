@@ -10,6 +10,7 @@ final class WorktreeAutoIsolateService {
     static let shared = WorktreeAutoIsolateService()
     private let manager = WorktreeManager()
     private var observation: NSObjectProtocol?
+    private var inFlightRepos: Set<String> = []
 
     private init() {}
 
@@ -38,7 +39,6 @@ final class WorktreeAutoIsolateService {
     }
 
     private func isolate(tab: Tab, workspace: Workspace) {
-        let coord = SessionCoordinator.shared
         guard let branch = tab.gitBranch, !branch.isEmpty else { return }
         guard !WorktreeManager.protectedBranches.contains(branch) else { return }
 
@@ -46,71 +46,70 @@ final class WorktreeAutoIsolateService {
         if tab.worktreePath != nil { return }
 
         let cwd = tab.cwd
-        // Check if cwd is the PARENT repo root (not already inside a worktree).
-        // git rev-parse --show-toplevel returns the worktree root if inside one,
-        // so we also check --git-common-dir to detect worktree vs main repo.
-        guard manager.repoRoot(for: cwd) == cwd else { return }
-        guard !isInsideWorktree(cwd) else { return }
+        let tabID = tab.id
+        let surfaceID = tab.rootPane.allSurfaceIDs().first
 
-        // Dirty primary tree guard: a `git checkout <default>` below would carry any
-        // uncommitted edit onto the default branch while the fresh worktree (created at the
-        // branch tip) wouldn't have it — strictly worse than leaving the tab unisolated. Bail
-        // out untouched; this tab is retried on the next branch-change notification once clean.
-        guard !manager.isDirty(worktreePath: cwd) else { return }
+        // Git work runs off-main now, so two quick branch-change polls could both pass the
+        // "not isolated yet" check and race to create the same worktree — one in flight per repo.
+        guard inFlightRepos.insert(cwd).inserted else { return }
+        let manager = manager
+
+        Task.detached(priority: .utility) { [weak self] in
+            let prepared = Self.prepareWorktree(cwd: cwd, branch: branch, manager: manager)
+            await MainActor.run {
+                guard let self else { return }
+                self.inFlightRepos.remove(cwd)
+                guard let (wtPath, featureSlug) = prepared else { return }
+                let coord = SessionCoordinator.shared
+                if let surfaceID {
+                    coord.requestDaemon(.sendData(
+                        surfaceID: surfaceID.uuidString,
+                        data: Data(("cd \(wtPath)\r").utf8),
+                        origin: .automation
+                    ))
+                }
+                coord.requestDaemon(.setTabWorktree(tabID: tabID, worktreePath: wtPath, parentRepoPath: cwd, taskName: featureSlug))
+            }
+        }
+    }
+
+    /// Blocking git half of `isolate`: returns the worktree path (and bound feature slug), or nil
+    /// when the tab must stay unisolated.
+    nonisolated private static func prepareWorktree(cwd: String, branch: String, manager: WorktreeManager) -> (String, String?)? {
+        // Check if cwd is the PARENT repo root (not already inside a worktree).
+        guard manager.repoRoot(for: cwd) == cwd else { return nil }
+        guard !isInsideWorktree(cwd) else { return nil }
+
+        // Dirty primary tree guard
+        guard !manager.isDirty(worktreePath: cwd) else { return nil }
 
         // P46: Check FeatureStore first to bind to canonical worktree and avoid duplicates!
         let featureStore = FeatureStore()
         let matchingFeature = featureStore.find(branch: branch, repoPath: cwd)
 
-        let wtPath: String
         if let canonicalPath = matchingFeature?.worktreePath,
            FileManager.default.fileExists(atPath: canonicalPath) {
-            // Reuse the feature's ONE canonical worktree path — no duplicate -1, -2 folders
-            wtPath = canonicalPath
-        } else {
-            // Free the branch name in the primary tree first, then check it out for real in the
-            // worktree (never --detach) — one branch can only be checked out in one worktree at a
-            // time, so this makes branch↔worktree strictly 1:1 and keeps the primary tree from
-            // ever being left parked on a feature branch (P47 — see architecture doc for the
-            // incident this replaces: a detached worktree frozen at the branch tip while the
-            // primary tree silently kept living on, and committing to, the feature branch).
-            let config = ProjectConfig.load(from: cwd)
-            let resolvedBaseRef = config?.baseRef ?? manager.defaultBaseBranch(repoPath: cwd) ?? branch
-            guard checkoutLocked(ref: resolvedBaseRef, in: cwd) else { return }
-
-            // `checkoutExisting: true` — the branch already exists (it's the one the tab was just
-            // on), so this must be a plain `git worktree add <path> <branch>`, never `-b <branch>`
-            // (which errors "branch already exists").
-            let sessionID = matchingFeature?.slug ?? branch.replacingOccurrences(of: "/", with: "-")
-            guard let created = manager.create(repoPath: cwd, sessionID: sessionID, branch: branch, baseRef: resolvedBaseRef, checkoutExisting: true) else { return }
-            wtPath = created
-
-            // Register/bind the canonical worktree to the feature if present
-            if let matchingFeature {
-                featureStore.setWorktree(slug: matchingFeature.slug, worktreePath: wtPath)
-            }
+            // Reuse the feature's ONE canonical worktree path
+            return (canonicalPath, matchingFeature?.slug)
         }
+        let config = ProjectConfig.load(from: cwd)
+        let resolvedBaseRef = config?.baseRef ?? manager.defaultBaseBranch(repoPath: cwd) ?? branch
+        guard checkoutLocked(ref: resolvedBaseRef, in: cwd) else { return nil }
 
-        // Move shell to the worktree path — this is the `cd <wtPath>` that appears in the tab's
-        // terminal (and, for agent sessions, arrives as an injected steering command) the moment
-        // a branch switch is detected.
-        if let surfaceID = tab.rootPane.allSurfaceIDs().first {
-            coord.requestDaemon(.sendData(
-                surfaceID: surfaceID.uuidString,
-                data: Data(("cd \(wtPath)\r").utf8),
-                origin: .automation
-            ))
+        let sessionID = matchingFeature?.slug ?? branch.replacingOccurrences(of: "/", with: "-")
+        guard let created = manager.create(repoPath: cwd, sessionID: sessionID, branch: branch, baseRef: resolvedBaseRef, checkoutExisting: true) else { return nil }
+
+        // Register/bind the canonical worktree to the feature if present
+        if let matchingFeature {
+            featureStore.setWorktree(slug: matchingFeature.slug, worktreePath: created)
         }
-
-        // Tag the tab so sidebar grouping/`isStableEqual` and the "already isolated" guard above
-        // (`tab.worktreePath != nil`) see this tab as isolated, same as an explicit task tab.
-        coord.requestDaemon(.setTabWorktree(tabID: tab.id, worktreePath: wtPath, parentRepoPath: cwd, taskName: matchingFeature?.slug))
+        return (created, matchingFeature?.slug)
     }
 
     /// Checks out `ref` (a branch name) in the primary tree at `path` — frees that branch name so
     /// the isolated worktree below can claim it for a real (non-detached) checkout instead of a
     /// `--detach`ed snapshot. Returns false (caller bails, nothing else is touched) on any failure.
-    private func checkoutLocked(ref: String, in path: String) -> Bool {
+    nonisolated private static func checkoutLocked(ref: String, in path: String) -> Bool {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
         process.arguments = ["checkout", ref]
@@ -126,7 +125,7 @@ final class WorktreeAutoIsolateService {
 
     /// Returns true if the path is inside a git linked worktree (not the main working tree).
     /// Uses `git rev-parse --git-common-dir` vs `--git-dir` — if they differ, it's a worktree.
-    private func isInsideWorktree(_ path: String) -> Bool {
+    nonisolated private static func isInsideWorktree(_ path: String) -> Bool {
         let process = Process()
         let pipe = Pipe()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
@@ -136,9 +135,10 @@ final class WorktreeAutoIsolateService {
         process.standardError = FileHandle.nullDevice
         do {
             try process.run()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
             process.waitUntilExit()
             guard process.terminationStatus == 0 else { return false }
-            let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+            let output = String(data: data, encoding: .utf8) ?? ""
             let lines = output.split(separator: "\n")
             guard lines.count == 2 else { return false }
             // In a linked worktree, git-dir != git-common-dir

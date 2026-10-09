@@ -548,6 +548,28 @@ public struct FrameBuilder {
     private func appendRow(_ row: Int, snapshot: TerminalGridSnapshot,
                            region: SelectionRegion?, searchHighlights: [TerminalSelection],
                            into cells: inout [RenderCell]) {
+        let searchHitMask: [Bool]?
+        if searchHighlights.isEmpty {
+            searchHitMask = nil
+        } else {
+            let rowHighlights = searchHighlights.filter { $0.startRow <= row && row <= $0.endRow }
+            if rowHighlights.isEmpty {
+                searchHitMask = nil
+            } else {
+                var mask = [Bool](repeating: false, count: snapshot.cols)
+                for h in rowHighlights {
+                    let startCol = (h.startRow == row) ? max(0, h.startColumn) : 0
+                    let endCol = (h.endRow == row) ? min(snapshot.cols - 1, h.endColumn) : (snapshot.cols - 1)
+                    if startCol <= endCol {
+                        for c in startCol...endCol {
+                            mask[c] = true
+                        }
+                    }
+                }
+                searchHitMask = mask
+            }
+        }
+
         for column in 0 ..< snapshot.cols {
             let cell = snapshot.cell(row: row, col: column) ?? .blank
             let colors = resolver.resolve(cell)
@@ -559,8 +581,7 @@ public struct FrameBuilder {
             let isCanvasBackground = cell.background == .none && !cell.inverse
             // Precedence: primary selection (opaque) > search hit > normal.
             let selected = region?.contains(row: row, column: column) ?? false
-            let isSearchHit = !selected && !searchHighlights.isEmpty
-                && searchHighlights.contains { $0.contains(row: row, column: column) }
+            let isSearchHit = !selected && (searchHitMask?[column] ?? false)
             let foreground: RenderColor
             let background: RenderColor
             // Skip the cell's background fill only when it resolves to the default canvas

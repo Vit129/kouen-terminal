@@ -86,6 +86,23 @@ final class BoardViewController: NSViewController {
 
     /// PBI-BOARD-006: dismissed card IDs (runtime-only, not persisted).
     private var dismissedCardIDs: Set<TabID> = []
+    private var needsReloadWhenShown = false
+
+    private var isVisible: Bool {
+        guard isViewLoaded else { return false }
+        if NSClassFromString("XCTestCase") != nil {
+            return !view.isHidden
+        }
+        return !view.isHidden && view.window != nil
+    }
+
+    override func viewWillAppear() {
+        super.viewWillAppear()
+        if needsReloadWhenShown {
+            needsReloadWhenShown = false
+            reload(force: true)
+        }
+    }
 
     @objc private func snapshotChanged(_ note: Notification) {
         guard note.userInfo?["payload"] is SnapshotChangedPayload else { return }
@@ -106,6 +123,12 @@ final class BoardViewController: NSViewController {
     ///   the stale size, which is what squashed the first column header into a
     ///   sliver on the Sessions → Board switch.
     @objc func reload(force: Bool = false) {
+        if !force && !isVisible {
+            needsReloadWhenShown = true
+            return
+        }
+        needsReloadWhenShown = false
+
         let newColumns = BoardModel.classify(snapshot: SessionCoordinator.shared.snapshot)
             .map { col in
                 // Filter dismissed cards from Needs Attention column only.

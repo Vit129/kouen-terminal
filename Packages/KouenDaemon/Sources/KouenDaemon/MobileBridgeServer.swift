@@ -297,6 +297,25 @@ public final class MobileBridgeServer: @unchecked Sendable {
             set { lock.lock(); _browserPaneID = newValue; lock.unlock() }
         }
         private var _browserPaneID: UUID?
+
+        private var _inFlightBytes: Int = 0
+        static let maxInFlightBytes: Int = 1 * 1024 * 1024 // 1 MB backpressure cap
+
+        func canSend(bytes: Int) -> Bool {
+            lock.lock()
+            defer { lock.unlock() }
+            if _inFlightBytes + bytes > Self.maxInFlightBytes {
+                return false
+            }
+            _inFlightBytes += bytes
+            return true
+        }
+
+        func didCompleteSend(bytes: Int) {
+            lock.lock()
+            defer { lock.unlock() }
+            _inFlightBytes = max(0, _inFlightBytes - bytes)
+        }
     }
 
     /// The pairing page, served by this process itself (see `makeUnifiedListener`) — not a
@@ -2072,8 +2091,19 @@ public final class MobileBridgeServer: @unchecked Sendable {
         }
     }
 
-    private func sendBinary(_ data: Data, on connection: NWConnection) {
-        connection.send(content: Self.encodeWSFrame(opcode: 0x2, payload: data), completion: .contentProcessed { _ in })
+    private func sendBinary(_ data: Data, on connection: NWConnection, state: ConnectionState? = nil) {
+        let count = data.count
+        if let state, !state.canSend(bytes: count) {
+            // Never drop bytes mid-stream: the phone's emulator would desync (half an escape
+            // sequence, missing redraws). Drop the stalled client instead; on reconnect it
+            // re-attaches and gets a clean scrollback replay.
+            connection.cancel()
+            return
+        }
+        let frame = Self.encodeWSFrame(opcode: 0x2, payload: data)
+        connection.send(content: frame, completion: .contentProcessed { [weak state] _ in
+            state?.didCompleteSend(bytes: count)
+        })
     }
 
     private func sendJSON<T: Encodable>(_ value: T, on connection: NWConnection) {
@@ -2131,13 +2161,19 @@ public final class MobileBridgeServer: @unchecked Sendable {
             let subscription = try client.attachReplayingSurfaceOutput(
                 surfaceID: surfaceID,
                 label: Self.clientLabel, // marks this size vote as mobile (Feature B floor)
-                onReplay: { [weak self] text in self?.sendBinary(Data(text.utf8), on: connection) },
-                onData: { [weak self] data, _ in self?.sendBinary(data, on: connection) },
-                onEnd: { [weak self] in
+                onReplay: { [weak self, weak connection, weak state] text in
+                    guard let connection, let state else { return }
+                    self?.sendBinary(Data(text.utf8), on: connection, state: state)
+                },
+                onData: { [weak self, weak connection, weak state] data, _ in
+                    guard let connection, let state else { return }
+                    self?.sendBinary(data, on: connection, state: state)
+                },
+                onEnd: { [weak self, weak connection, weak state] in
                     // Only announce a real end — an intentional detach/re-attach already
                     // cleared `state.subscription` to nil before cancelling (see above),
                     // so a nil here means this callback is the echo of that, not news.
-                    guard state.subscription != nil else { return }
+                    guard let state, let connection, state.subscription != nil else { return }
                     state.subscription = nil
                     state.surfaceID = nil
                     self?.sendText(#"{"detached":"surface ended"}"#, on: connection)
@@ -2997,9 +3033,11 @@ public final class MobileBridgeServer: @unchecked Sendable {
                         self?.log?("mobile bridge: connection from \(connection.endpoint) cancelled — authorized=\(state.authorized) pageServed=\(state.pageServed) deviceID=\(state.deviceID ?? "nil")")
                     }
                     state.subscription?.cancel()
+                    state.subscription = nil
                     // Connection is going away for good (unlike a per-attach detach), so the
                     // whole-connection session-list subscription dies with it too.
                     state.snapshotSubscription?.cancel()
+                    state.snapshotSubscription = nil
                     // Found via code review: iOS Safari drops the WS on screen-lock/backgrounding
                     // (the existing `reconnectIfDropped` client logic exists exactly because of
                     // this), and each reconnect that navigates again opens a brand-new

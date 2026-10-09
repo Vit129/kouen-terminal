@@ -159,7 +159,13 @@ extension KouenTerminalSurfaceView {
         let now = effectivelyFocused
         if lastReportedFocus != now {
             lastReportedFocus = now
-            if now { cursorBlinkVisible = true; onBecameFocused?() }
+            if now {
+                cursorBlinkVisible = true
+                restartBlinkTimer()
+                onBecameFocused?()
+            } else {
+                stopBlinkTimer()
+            }
             if inputModes().focusReporting {
                 emit([0x1B, 0x5B, now ? 0x49 : 0x4F]) // ESC [ I / ESC [ O
             }

@@ -38,10 +38,20 @@ enum GitCloneUpdateChecker {
         let dirty: Bool
     }
 
+    private static let lastCheckKey = "KouenLastGitCloneUpdateCheckDate"
+    private static let checkInterval: TimeInterval = 86400 // 24 hours
+
     /// Best-effort, non-blocking: never throws to the caller, never touches the UI itself — the
     /// caller (`AppDelegate`) decides what to show. Returns `nil` whenever there's nothing to do:
     /// not a git checkout, fetch failed, already current, or the remote version was dismissed.
-    static func check() async -> CheckResult? {
+    static func check(force: Bool = false) async -> CheckResult? {
+        if !force, let lastCheck = UserDefaults.standard.object(forKey: lastCheckKey) as? Date,
+           Date().timeIntervalSince(lastCheck) < checkInterval {
+            return nil
+        }
+        defer {
+            UserDefaults.standard.set(Date(), forKey: lastCheckKey)
+        }
         guard let gitRoot = await Task.detached(priority: .utility, operation: { findGitRoot() }).value else {
             return nil
         }

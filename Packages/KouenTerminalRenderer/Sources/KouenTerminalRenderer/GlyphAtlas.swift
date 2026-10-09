@@ -194,7 +194,15 @@ final class GlyphAtlas {
     /// from scratch (the atlas-full self-heal path). The just-returned entry may show stale UVs for
     /// at most one frame, then heals on re-rasterization — exactly the `resetPacker` contract.
     private func capCachesIfNeeded() {
-        if cache.count + shapedCache.count + clusterCache.count > maxCacheEntries { resetPacker() }
+        let total = cache.count + shapedCache.count + clusterCache.count
+        guard total > maxCacheEntries else { return }
+        // Prune nil (non-inked/blank) entries first without wiping the packed GPU texture
+        cache = cache.filter { $0.value != nil }
+        shapedCache = shapedCache.filter { $0.value != nil }
+        clusterCache = clusterCache.filter { $0.value != nil }
+        if cache.count + shapedCache.count + clusterCache.count > maxCacheEntries {
+            resetPacker()
+        }
     }
 
     /// Shape a run for ligatures (delegates to the rasterizer's CoreText shaper).

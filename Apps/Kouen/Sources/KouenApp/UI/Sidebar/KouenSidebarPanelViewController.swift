@@ -58,11 +58,32 @@ final class KouenSidebarPanelViewController: NSViewController {
     var lastFileTreeCWD: String?
     private var lastRepoHeaderPath = ""
     private var lastRepoHeaderFetch = Date.distantPast
+    private var repoRootCache: [String: String] = [:]
+
+    private func resolveRepoRoot(for cwd: String, completion: @escaping @MainActor (String) -> Void) {
+        if let cached = repoRootCache[cwd] {
+            completion(cached)
+            return
+        }
+        Task.detached(priority: .utility) { [weak self] in
+            let root = WorktreeManager.fastRepoRoot(for: cwd) ?? cwd
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                if self.repoRootCache.count > 100 {
+                    self.repoRootCache.removeAll()
+                }
+                self.repoRootCache[cwd] = root
+                completion(root)
+            }
+        }
+    }
 
     deinit {
         if let monitor = workspaceDropdownMonitor { NSEvent.removeMonitor(monitor) }
         if let monitor = notificationsDropdownMonitor { NSEvent.removeMonitor(monitor) }
         if let monitor = agentsInboxMonitor { NSEvent.removeMonitor(monitor) }
+        if let monitor = swarmFleetDashboardMonitor { NSEvent.removeMonitor(monitor) }
+        if let monitor = taskDashboardMonitor { NSEvent.removeMonitor(monitor) }
     }
 
     override func loadView() {
@@ -1240,9 +1261,12 @@ final class KouenSidebarPanelViewController: NSViewController {
                 lastFileTreeCWD = nil
             }
 
-            NSLog("[DBG-activestate] reload() cwd=\(cwd) activeSessionID=\(activeSessionID?.uuidString ?? "nil") sessionChanged=\(sessionChanged)")
-            let root = WorktreeManager().repoRoot(for: cwd) ?? cwd
-            fileTreeView.updateRoot(path: root, sessionID: activeSessionID)
+            resolveRepoRoot(for: cwd) { [weak self] root in
+                guard let self else { return }
+                if self.lastFileTreeSessionID == activeSessionID {
+                    self.fileTreeView.updateRoot(path: root, sessionID: activeSessionID)
+                }
+            }
             if cwd != lastFileTreeCWD {
                 fileTreeView.revealFileInTree(path: cwd)
                 lastFileTreeCWD = cwd
@@ -1272,7 +1296,6 @@ final class KouenSidebarPanelViewController: NSViewController {
         let snap = SessionCoordinator.shared.snapshot
         let newSessions = snap.activeWorkspace?.sessions ?? []
         let activeID = snap.activeWorkspace?.activeSessionID
-        NSLog("[DBG-activestate] refreshMetadata() cwd=\(snap.activeWorkspace?.activeTab?.cwd ?? "nil") activeSessionID=\(activeID?.uuidString ?? "nil")")
         // Structural changes still take the full reload path.
         if newSessions.map(\.id) != sessions.map(\.id) {
             reload()
@@ -1294,8 +1317,12 @@ final class KouenSidebarPanelViewController: NSViewController {
             }
             let branchChanged = gitBranch != lastFileTreeGitBranch
             if sessionChanged || branchChanged {
-                let root = WorktreeManager().repoRoot(for: cwd) ?? cwd
-                fileTreeView.updateRoot(path: root, sessionID: activeSessionID)
+                resolveRepoRoot(for: cwd) { [weak self] root in
+                    guard let self else { return }
+                    if self.lastFileTreeSessionID == activeSessionID {
+                        self.fileTreeView.updateRoot(path: root, sessionID: activeSessionID)
+                    }
+                }
             }
             if cwd != lastFileTreeCWD {
                 fileTreeView.revealFileInTree(path: cwd)

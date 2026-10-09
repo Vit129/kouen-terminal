@@ -834,17 +834,51 @@ public final class TerminalHostView: NSView {
         }
     }
 
+    private final class OutputCoalescer: @unchecked Sendable {
+        private let lock = NSLock()
+        private var pendingBatch = Data()
+        private var isScheduled = false
+
+        func append(_ data: Data, schedule: () -> Void) {
+            lock.lock()
+            pendingBatch.append(data)
+            if !isScheduled {
+                isScheduled = true
+                lock.unlock()
+                schedule()
+            } else {
+                lock.unlock()
+            }
+        }
+
+        func drain() -> Data {
+            lock.lock()
+            let batch = pendingBatch
+            pendingBatch = Data()
+            isScheduled = false
+            lock.unlock()
+            return batch
+        }
+    }
+
+    private let outputCoalescer = OutputCoalescer()
+
     /// Output-stream data handler, shared by the initial connect and the off-main reconnect. Feeds
     /// the emulator on the main thread IN ORDER: the subscription read loop is serial (frames decode
     /// in the daemon's byte order) and `DispatchQueue.main.async` is strict FIFO, so byte order is
-    /// preserved end to end. An unstructured `Task { @MainActor in }` is NOT order-preserving — under
-    /// fast/bursty output (the binary transport makes decode far faster, so chunks arrive
-    /// back-to-back) two tasks could run on the main actor out of order, feeding a TUI's
-    /// cursor-positioned redraws to the emulator scrambled (overlapping, interleaved text).
+    /// preserved end to end. Coalesces rapid bursts into a single main-thread feed to eliminate
+    /// thousands of runloop hops during heavy stdout floods.
     private func makeOutputDataHandler() -> @Sendable (Data, UInt64) -> Void {
-        { [weak self] data, _ in
-            DispatchQueue.main.async {
-                MainActor.assumeIsolated { self?.nativeView.receive(data) }
+        let coalescer = self.outputCoalescer
+        return { [weak self] data, _ in
+            coalescer.append(data) {
+                DispatchQueue.main.async { [weak self] in
+                    guard let self else { return }
+                    let batch = coalescer.drain()
+                    if !batch.isEmpty {
+                        self.nativeView.receive(batch)
+                    }
+                }
             }
         }
     }

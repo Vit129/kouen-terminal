@@ -7,13 +7,23 @@ final class WorkspaceSymbolIndex {
     private(set) var symbols: Set<String> = []
     private(set) var currentFileSymbols: Set<String> = []
     private var scanTask: Task<Void, Never>?
+    private var rootCache: [String: Set<String>] = [:]
 
     func scan(root: String) {
         scanTask?.cancel()
+        if let cached = rootCache[root] {
+            self.symbols = cached
+        }
         scanTask = Task.detached(priority: .utility) {
             let result = Self.extractSymbols(root: root)
+            guard !Task.isCancelled else { return }
             await MainActor.run { [weak self] in
-                self?.symbols = result
+                guard let self, !Task.isCancelled else { return }
+                if self.rootCache.count > 20 {
+                    self.rootCache.removeAll()
+                }
+                self.rootCache[root] = result
+                self.symbols = result
             }
         }
     }
@@ -30,16 +40,20 @@ final class WorkspaceSymbolIndex {
         return result
     }
 
+    nonisolated private static let excludedDirNames: Set<String> = [
+        "node_modules", "build", "dist", "Pods", "DerivedData", "target", "vendor", ".build", ".gradle", ".next", ".terraform", ".venv", "__pycache__"
+    ]
+
     nonisolated private static func crawl(url: URL, depth: Int, maxDepth: Int, allowedExtensions: Set<String>, symbols: inout Set<String>) {
-        guard depth <= maxDepth else { return }
+        guard depth <= maxDepth, !Task.isCancelled else { return }
         let fm = FileManager.default
         guard let contents = try? fm.contentsOfDirectory(at: url, includingPropertiesForKeys: [.isDirectoryKey, .isRegularFileKey], options: []) else {
             return
         }
         for fileURL in contents {
+            guard !Task.isCancelled else { return }
             let name = fileURL.lastPathComponent
-            if name.hasPrefix(".") { continue }
-            if name == "node_modules" || name == "build" || name == "dist" { continue }
+            if name.hasPrefix(".") || excludedDirNames.contains(name) { continue }
             
             var isDir: ObjCBool = false
             if fm.fileExists(atPath: fileURL.path, isDirectory: &isDir) {
@@ -59,7 +73,7 @@ final class WorkspaceSymbolIndex {
                     }
                 }
             }
-            if symbols.count >= 10_000 {
+            if symbols.count >= 10_000 || Task.isCancelled {
                 return
             }
         }

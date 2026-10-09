@@ -175,8 +175,16 @@ final class NotificationCoordinator {
     }
 
     func syncWaitingRings() {
+        var waitingSurfaces = Set<SurfaceID>()
+        for workspace in coord.snapshot.workspaces {
+            for session in workspace.sessions {
+                for tab in session.tabs where tab.status == .waiting {
+                    waitingSurfaces.formUnion(tab.rootPane.allSurfaceIDs())
+                }
+            }
+        }
         for host in coord.terminalHosts.allHosts() {
-            host.isWaiting = coord.isSurfaceWaiting(host.surfaceID)
+            host.isWaiting = waitingSurfaces.contains(host.surfaceID)
         }
     }
 
@@ -228,15 +236,20 @@ final class NotificationCoordinator {
     }
 
     func clearNotification(surfaceID: SurfaceID) {
-        coord.requestDaemon(.clearNotification(surfaceID: surfaceID.uuidString))
-        coord.syncFromDaemon()
+        Task { @MainActor in
+            await coord.requestDaemon(.clearNotification(surfaceID: surfaceID.uuidString))
+            await coord.syncFromDaemon()
+        }
     }
 
     func clearAllNotifications() {
-        for entry in notificationsList() {
-            coord.requestDaemon(.clearNotification(surfaceID: entry.surfaceID.uuidString))
+        let entries = notificationsList()
+        Task { @MainActor in
+            for entry in entries {
+                await coord.requestDaemon(.clearNotification(surfaceID: entry.surfaceID.uuidString))
+            }
+            await coord.syncFromDaemon()
         }
-        coord.syncFromDaemon()
     }
 
     func jumpToLatestNotification() {
@@ -265,16 +278,18 @@ final class NotificationCoordinator {
     func handleNotification(for surfaceID: SurfaceID, event: NotificationEvent, title: String, body: String) {
         let key = "\(canonicalNotificationSurface(for: surfaceID).uuidString)|\(body)"
         guard !pushedNotificationKeys.contains(key) else { return }
-        coord.requestDaemon(.notify(
-            surfaceID: surfaceID.uuidString,
-            title: title,
-            body: body
-        ))
         pushedNotificationKeys.insert(key)
         if NSApp.isActive == false {
             deliverAgentAlert(event: event, title: title, body: body, surfaceID: surfaceID)
         }
-        coord.syncFromDaemon()
+        Task { @MainActor in
+            await coord.requestDaemon(.notify(
+                surfaceID: surfaceID.uuidString,
+                title: title,
+                body: body
+            ))
+            await coord.syncFromDaemon()
+        }
     }
 
     /// Routes a clicked macOS notification to the same place as clicking its notch/inbox entry:
