@@ -3,6 +3,13 @@ import Observation
 import KouenCore
 import KouenIPC
 
+public enum ProjectTabFilter: String, CaseIterable, Identifiable, Sendable {
+    case all = "All"
+    case agents = "Agents"
+    case waiting = "Waiting"
+    public var id: String { rawValue }
+}
+
 /// One live tab, flattened out of the workspace/session tree for `FleetView`'s single
 /// cross-session list. P46 Pillar 6 gap 6: today, seeing what six agents across six
 /// worktrees are doing means clicking through six tabs one at a time — this is the one
@@ -54,6 +61,17 @@ public final class FleetViewModel {
     }
 
     public var waitingCount: Int { items.count { $0.isWaiting } }
+
+    public func itemsFor(filter: ProjectTabFilter) -> [FleetSessionItem] {
+        switch filter {
+        case .all:
+            return filteredItems
+        case .agents:
+            return filteredItems.filter { $0.agentName != nil }
+        case .waiting:
+            return filteredItems.filter { $0.isWaiting }
+        }
+    }
 
     /// Rebuild the flat list from the current cross-workspace snapshot. Cheap enough (plain
     /// array walk + sort, no I/O) to call on every `snapshotChanged` notification, the same

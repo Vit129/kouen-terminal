@@ -78,6 +78,16 @@ final class ShellIntegrationTests: XCTestCase {
         }
     }
 
+    func testScriptsOpenGoogleChromeOnRemoteControl() {
+        for shell in ShellIntegration.Shell.allCases {
+            let s = ShellIntegration.script(for: shell)
+            XCTAssertTrue(s.contains("Google Chrome"), "\(shell) wrapper must reference Google Chrome")
+            XCTAssertTrue(s.contains("https://claude.ai/code"), "\(shell) wrapper must contain claude remote URL")
+            XCTAssertTrue(s.contains("https://antigravity.google.com"), "\(shell) wrapper must contain antigravity remote URL")
+            XCTAssertTrue(s.contains("https://chatgpt.com"), "\(shell) wrapper must contain codex remote URL")
+        }
+    }
+
     func testInstallWritesScriptAndWiresRCIdempotently() throws {
         let home = tempHome()
         defer { try? FileManager.default.removeItem(at: home) }

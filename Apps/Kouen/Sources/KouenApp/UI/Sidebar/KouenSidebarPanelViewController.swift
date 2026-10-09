@@ -40,7 +40,6 @@ final class KouenSidebarPanelViewController: NSViewController {
     private var sessionHistoryHostingView: NSView?
     let sessionHistoryModel = AgentSessionHistoryModel()
     // private var issueTrackerHostingView: NSView?  // Issues tab disabled across the system
-    private var fleetHostingView: NSView?
     let fleetModel = FleetViewModel()
     // Project & Workspace Storage (Orca Session == Project)
     let projectStore = ProjectStore()
@@ -106,7 +105,6 @@ final class KouenSidebarPanelViewController: NSViewController {
         setupFileViewer()
         setupJobsView()
         setupSessionHistoryView()
-        setupFleetView()
         // TODO: Issues tab disabled — re-enable with setupIssuesView() once Jira domain config UI + Azure impl are complete
         // setupIssuesView()
         selectSidebarTab(index: 0)
@@ -506,9 +504,13 @@ final class KouenSidebarPanelViewController: NSViewController {
     private func setupSessionList() {
         let listView = SidebarSessionListView(
             model: sidebarListModel,
+            fleetModel: fleetModel,
             onSelect: { [weak self] id in
                 guard let self, let wsID = self.activeWorkspaceID else { return }
                 SessionCoordinator.shared.selectSession(workspaceID: wsID, sessionID: id)
+            },
+            onSelectFleetItem: { [weak self] item in
+                self?.focusFleetSession(item)
             },
             onOpenProject: { [weak self] path in
                 self?.openRecentPath(path)
@@ -653,25 +655,6 @@ final class KouenSidebarPanelViewController: NSViewController {
         ])
     }
 
-    private func setupFleetView() {
-        let fleetView = FleetView(
-            model: fleetModel,
-            onSelect: { [weak self] item in
-                self?.focusFleetSession(item)
-            }
-        )
-        let hosting = NSHostingView(rootView: fleetView)
-        hosting.translatesAutoresizingMaskIntoConstraints = false
-        hosting.isHidden = true
-        fleetHostingView = hosting
-        view.addSubview(hosting)
-        NSLayoutConstraint.activate([
-            hosting.topAnchor.constraint(equalTo: sectionLabelHostingView.bottomAnchor),
-            hosting.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            hosting.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            hosting.bottomAnchor.constraint(equalTo: footerHostingView.topAnchor),
-        ])
-    }
 
     /// Same jump sequence `NotificationCoordinator.jumpToLatestNotification()` uses for the
     /// Attention Beacon's own 1-click jump — reused here for a fleet row click.
@@ -758,6 +741,11 @@ final class KouenSidebarPanelViewController: NSViewController {
 
     /// Resumes in a new session, the same as ⌘T, so it gets its own entry in the tab bar.
     private func resumeAgentSession(_ record: AgentSessionRecord) {
+        let settings = KouenSettings.load()
+        let mode = settings.sessionMode(for: record.agentKind)
+        if mode == .remoteControl {
+            RemoteControlURLProvider.openInGoogleChrome(for: record.agentKind)
+        }
         let cmd = Self.resumeCommand(for: record)
         let req = DefaultTerminalLaunchRequest(
             command: cmd,
@@ -820,6 +808,9 @@ final class KouenSidebarPanelViewController: NSViewController {
         guard let workspaceID = SessionCoordinator.shared.snapshot.activeWorkspace?.id ?? SessionCoordinator.shared.snapshot.workspaces.first?.id else { return }
         let settings = KouenSettings.load()
         let mode = settings.sessionMode(for: targetKind)
+        if mode == .remoteControl {
+            RemoteControlURLProvider.openInGoogleChrome(for: targetKind)
+        }
         let cwd = Self.handoffDirectory(for: record.projectPath)
         let launchCmd = AgentLaunchCommands.launch(kind: targetKind, mode: mode, cwd: cwd)
 
@@ -1046,7 +1037,6 @@ final class KouenSidebarPanelViewController: NSViewController {
         jobsHostingView?.isHidden = index != 2
         sessionHistoryHostingView?.isHidden = index != 3
         // issueTrackerHostingView?.isHidden = index != 4  // Issues tab disabled — see TODO in viewDidLoad
-        fleetHostingView?.isHidden = index != 5
         switch index {
         case 1:
             sidebarSectionModel.text = "FILES"
@@ -1070,13 +1060,13 @@ final class KouenSidebarPanelViewController: NSViewController {
         // case 4:
         //     sidebarSectionModel.text = "ISSUES"
         //     sidebarSectionModel.isRepoHeader = false
-        case 5:
-            sidebarSectionModel.text = "FLEET"
-            sidebarSectionModel.isRepoHeader = false
-            fleetModel.refresh(from: SessionCoordinator.shared.snapshot, activeSurfaceID: SessionCoordinator.shared.activeSurfaceID)
         default:
             sidebarSectionModel.isRepoHeader = true
             updateRepoSectionHeader()
+            fleetModel.refresh(from: SessionCoordinator.shared.snapshot, activeSurfaceID: SessionCoordinator.shared.activeSurfaceID)
+            Task { [weak self] in
+                await self?.projectStore.syncAllWatchedCategories()
+            }
         }
     }
 
@@ -1282,10 +1272,9 @@ final class KouenSidebarPanelViewController: NSViewController {
         }
         updateRepoSectionHeader()
 
-        // Fleet tab has no other refresh trigger — sessionHistory/jobs only refresh on
-        // tab-select, but a new/closed tab while Fleet is the visible tab should show up
-        // immediately, the same way the Sessions list itself does via this same reload().
-        if sidebarSectionModel.selectedTab == 5 {
+        // Projects tab embeds Fleet cards under Agents/Waiting filter chips — refresh
+        // when visible so waiting badge and status cards stay in sync.
+        if sidebarSectionModel.selectedTab == 0 {
             fleetModel.refresh(from: snap, activeSurfaceID: SessionCoordinator.shared.activeSurfaceID)
         }
     }
