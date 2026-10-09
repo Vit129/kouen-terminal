@@ -65,6 +65,30 @@ public struct AgentSessionRecord: Identifiable, Sendable, Equatable {
     /// Sibling sessions across different repositories working on the same task.
     /// `nil` for single standalone sessions; when non-nil with count > 1, this represents a cross-repo task group.
     public let crossRepoSiblings: [AgentSessionRecord]?
+    /// Topic segments / milestones detected in this session (e.g. `["Happy vs Orca", "P51 Mobile Companion", "P52 History"]`).
+    public let topicSegments: [String]?
+
+    public struct MatchLocationInfo: Sendable, Equatable {
+        public let turnIndex: Int? // 0-based
+        public let totalTurns: Int
+        public let relativePosition: String // "early in session", "mid session", "late in session", or "start of session"
+        public let description: String // e.g. "late in session · turn 42/50"
+        public let matchedTurnContent: String?
+
+        public init(
+            turnIndex: Int?,
+            totalTurns: Int,
+            relativePosition: String,
+            description: String,
+            matchedTurnContent: String?
+        ) {
+            self.turnIndex = turnIndex
+            self.totalTurns = totalTurns
+            self.relativePosition = relativePosition
+            self.description = description
+            self.matchedTurnContent = matchedTurnContent
+        }
+    }
 
     public init(
         id: String,
@@ -84,7 +108,8 @@ public struct AgentSessionRecord: Identifiable, Sendable, Equatable {
         liveStatus: String? = nil,
         resumeCommandOverride: String? = nil,
         surfaceTag: String? = nil,
-        crossRepoSiblings: [AgentSessionRecord]? = nil
+        crossRepoSiblings: [AgentSessionRecord]? = nil,
+        topicSegments: [String]? = nil
     ) {
         self.id = id
         self.agentKind = agentKind
@@ -104,6 +129,112 @@ public struct AgentSessionRecord: Identifiable, Sendable, Equatable {
         self.resumeCommandOverride = resumeCommandOverride
         self.surfaceTag = surfaceTag
         self.crossRepoSiblings = crossRepoSiblings
+        self.topicSegments = topicSegments ?? Self.detectTopicSegments(title: title, firstPrompt: firstPrompt, turns: latestTurns)
+    }
+
+    /// Breadcrumbs for mixed-topic sessions (e.g. `"Happy vs Orca → P51 Companion → P52 History"`).
+    public var topicBreadcrumbs: String? {
+        guard let topicSegments, topicSegments.count > 1 else { return nil }
+        return topicSegments.joined(separator: " → ")
+    }
+
+    /// Calculates where in the session a query matched (turn index and early/mid/late position).
+    public func matchLocation(for query: String) -> MatchLocationInfo? {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let lowerTrimmed = trimmed.lowercased()
+        let tokens = lowerTrimmed.split(whereSeparator: \.isWhitespace).map(String.init).filter { $0.count >= 2 }
+        guard !tokens.isEmpty else { return nil }
+
+        let total = latestTurns.count
+        if total > 0 {
+            for (i, turn) in latestTurns.enumerated() {
+                let lower = turn.content.lowercased()
+                if tokens.contains(where: { lower.contains($0) }) {
+                    let ratio = Double(i + 1) / Double(total)
+                    let pos = ratio <= 0.33 ? "early in session" : (ratio <= 0.67 ? "mid session" : "late in session")
+                    return MatchLocationInfo(
+                        turnIndex: i,
+                        totalTurns: total,
+                        relativePosition: pos,
+                        description: "\(pos) · turn \(i + 1)/\(total)",
+                        matchedTurnContent: turn.content
+                    )
+                }
+            }
+        }
+
+        let lowerTitle = title.lowercased()
+        if lowerTitle.contains(lowerTrimmed) || (!lowerTrimmed.isEmpty && lowerTrimmed.contains(lowerTitle)) {
+            return MatchLocationInfo(
+                turnIndex: nil,
+                totalTurns: total,
+                relativePosition: "title",
+                description: "title match",
+                matchedTurnContent: nil
+            )
+        }
+
+        let lowerPrompt = firstPrompt.lowercased()
+        if lowerPrompt.contains(lowerTrimmed) || tokens.contains(where: { lowerPrompt.contains($0) }) {
+            return MatchLocationInfo(
+                turnIndex: 0,
+                totalTurns: max(1, total),
+                relativePosition: "start of session",
+                description: "start of session · prompt",
+                matchedTurnContent: firstPrompt
+            )
+        }
+
+        if tokens.contains(where: { lowerTitle.contains($0) }) {
+            return MatchLocationInfo(
+                turnIndex: nil,
+                totalTurns: total,
+                relativePosition: "title",
+                description: "title match",
+                matchedTurnContent: nil
+            )
+        }
+
+        return nil
+    }
+
+    /// Automatically detects topic milestones in longer sessions based on prompt shifts and planning steps.
+    public static func detectTopicSegments(title: String, firstPrompt: String, turns: [AgentHistoryTurn]) -> [String]? {
+        guard turns.count >= 6 else { return nil }
+
+        var segments: [String] = []
+        let initialTopic = cleanTopicSnippet(title.isEmpty ? firstPrompt : title)
+        if !initialTopic.isEmpty {
+            segments.append(initialTopic)
+        }
+
+        for (i, turn) in turns.enumerated() where i > 0 {
+            let roleUpper = turn.role.uppercased()
+            if roleUpper == "YOU" || roleUpper == "USER" {
+                let snippet = cleanTopicSnippet(turn.content)
+                if !snippet.isEmpty && !segments.contains(where: { isSimilarTopic($0, snippet) }) {
+                    segments.append(snippet)
+                    if segments.count >= 4 { break }
+                }
+            }
+        }
+
+        return segments.count > 1 ? segments : nil
+    }
+
+    private static func cleanTopicSnippet(_ text: String) -> String {
+        let firstLine = text.components(separatedBy: .newlines).first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let clean = firstLine.replacingOccurrences(of: "^(/ai-sdlc|/plan|/goal|feat:|fix:|chore:)\\s*", with: "", options: .regularExpression)
+        if clean.count > 35 {
+            return String(clean.prefix(32)) + "…"
+        }
+        return clean
+    }
+
+    private static func isSimilarTopic(_ a: String, _ b: String) -> Bool {
+        let la = a.lowercased(), lb = b.lowercased()
+        return la == lb || la.contains(lb) || lb.contains(la)
     }
 
     /// The command History resume should type into a fresh pane: `resumeCommandOverride` when
@@ -128,7 +259,8 @@ public struct AgentSessionRecord: Identifiable, Sendable, Equatable {
             worktreeAvailable: worktreeAvailable, placement: placement, liveStatus: status,
             resumeCommandOverride: AgentSessionRecord.resumeOverride(placement: placement, sessionID: id),
             surfaceTag: surfaceTag,
-            crossRepoSiblings: crossRepoSiblings
+            crossRepoSiblings: crossRepoSiblings,
+            topicSegments: topicSegments
         )
     }
 
@@ -140,7 +272,8 @@ public struct AgentSessionRecord: Identifiable, Sendable, Equatable {
             firstPrompt: firstPrompt, latestTurns: latestTurns, transcriptPath: transcriptPath,
             worktreeAvailable: worktreeAvailable, placement: placement, liveStatus: liveStatus,
             resumeCommandOverride: resumeCommandOverride, surfaceTag: surfaceTag,
-            crossRepoSiblings: siblings
+            crossRepoSiblings: siblings,
+            topicSegments: topicSegments
         )
     }
 
@@ -594,6 +727,10 @@ public actor AgentHistoryScanner {
         let modDate = (try? fileURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? timestamp ?? Date()
         let fileSize = (try? fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? string.utf8.count
 
+        let topicSegments = AgentSessionRecord.detectTopicSegments(title: title, firstPrompt: firstPrompt ?? "", turns: turns)
+        let graphifySymbols = GraphifyIndexCache.shared.enrich(files: filesEdited, projectPath: finalCwd)
+        let allFilesEdited = filesEdited.union(graphifySymbols).joined(separator: " ")
+
         ftsIndex.indexSession(
             sessionID: sessionID,
             title: title,
@@ -602,11 +739,12 @@ public actor AgentHistoryScanner {
             gitBranch: gitBranch,
             repoName: projectName,
             agentName: AgentKind.claudeCode.displayName,
-            filesEdited: filesEdited.joined(separator: " "),
+            filesEdited: allFilesEdited,
             toolsCalled: toolsCalled.joined(separator: " "),
             transcriptPath: fileURL.path,
             mtime: modDate,
-            fileSize: fileSize
+            fileSize: fileSize,
+            topicSegments: topicSegments
         )
 
         return AgentSessionRecord(
@@ -622,7 +760,8 @@ public actor AgentHistoryScanner {
             firstPrompt: firstPrompt ?? "",
             latestTurns: turns,
             transcriptPath: fileURL.path,
-            worktreeAvailable: FileManager.default.fileExists(atPath: finalCwd)
+            worktreeAvailable: FileManager.default.fileExists(atPath: finalCwd),
+            topicSegments: topicSegments
         )
     }
 
@@ -1173,6 +1312,10 @@ public actor AgentHistoryScanner {
         let modDate = (try? fileURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? Date()
         let fileSize = (try? fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? string.utf8.count
 
+        let topicSegments = AgentSessionRecord.detectTopicSegments(title: title, firstPrompt: firstPrompt ?? "", turns: turns)
+        let graphifySymbols = GraphifyIndexCache.shared.enrich(files: filesEdited, projectPath: finalPath)
+        let allFilesEdited = filesEdited.union(graphifySymbols).joined(separator: " ")
+
         ftsIndex.indexSession(
             sessionID: sessionID,
             title: title,
@@ -1181,11 +1324,12 @@ public actor AgentHistoryScanner {
             gitBranch: nil,
             repoName: projectName,
             agentName: AgentKind.antigravity.displayName,
-            filesEdited: filesEdited.joined(separator: " "),
+            filesEdited: allFilesEdited,
             toolsCalled: toolsCalled.joined(separator: " "),
             transcriptPath: fileURL.path,
             mtime: modDate,
-            fileSize: fileSize
+            fileSize: fileSize,
+            topicSegments: topicSegments
         )
 
         return AgentSessionRecord(
@@ -1201,7 +1345,8 @@ public actor AgentHistoryScanner {
             firstPrompt: firstPrompt ?? "",
             latestTurns: turns,
             transcriptPath: fileURL.path,
-            worktreeAvailable: FileManager.default.fileExists(atPath: finalPath)
+            worktreeAvailable: FileManager.default.fileExists(atPath: finalPath),
+            topicSegments: topicSegments
         )
     }
 
@@ -1392,6 +1537,10 @@ public actor AgentHistoryScanner {
         let modDate = (try? fileURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? Date()
         let fileSize = (try? fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? string.utf8.count
 
+        let topicSegments = AgentSessionRecord.detectTopicSegments(title: title, firstPrompt: firstPrompt ?? "", turns: turns)
+        let graphifySymbols = GraphifyIndexCache.shared.enrich(files: filesEdited, projectPath: finalCwd)
+        let allFilesEdited = filesEdited.union(graphifySymbols).joined(separator: " ")
+
         ftsIndex?.indexSession(
             sessionID: resolvedID,
             title: title,
@@ -1400,12 +1549,13 @@ public actor AgentHistoryScanner {
             gitBranch: gitBranch,
             repoName: projectName,
             agentName: AgentKind.codex.displayName,
-            filesEdited: filesEdited.joined(separator: " "),
+            filesEdited: allFilesEdited,
             toolsCalled: toolsCalled.joined(separator: " "),
             transcriptPath: fileURL.path,
             mtime: modDate,
             fileSize: fileSize,
-            surfaceTag: surfaceTag
+            surfaceTag: surfaceTag,
+            topicSegments: topicSegments
         )
 
         return AgentSessionRecord(
@@ -1422,7 +1572,8 @@ public actor AgentHistoryScanner {
             latestTurns: turns,
             transcriptPath: fileURL.path,
             worktreeAvailable: FileManager.default.fileExists(atPath: finalCwd),
-            surfaceTag: surfaceTag
+            surfaceTag: surfaceTag,
+            topicSegments: topicSegments
         )
     }
 
