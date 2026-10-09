@@ -5,6 +5,32 @@ All notable changes to Kouen are documented here. The format is based on
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
+## [4.21.0] - 2026-10-09
+
+### Added
+- Add multi-select AI filter chips to history tab ([`b430be0`](https://github.com/Vit129/kouen-terminal/commit/b430be0cdce4b250d941563b0759006e6d431bf5))
+- Project folder auto-sync, fold fleet into projects & auto-open chrome on rc (P54) ([`d1ab7f8`](https://github.com/Vit129/kouen-terminal/commit/d1ab7f868e483875e2f377276d434d220a307b3e))
+
+### Changed
+- Optimize startup cold scan, keystroke search latency, and file matching ([`e39e891`](https://github.com/Vit129/kouen-terminal/commit/e39e891143424012abf019a2aa0f840ff9ffaf62))
+- Eliminate tab-open lag and search keystroke render bottlenecks ([`6a2dc1d`](https://github.com/Vit129/kouen-terminal/commit/6a2dc1d10a473461f9c759432a1bd22b639be3fb))
+- Stop git and IPC work from stalling the daemon (P53 Tier 1/3/4) ([`7de2d80`](https://github.com/Vit129/kouen-terminal/commit/7de2d800128bfaf31c5051e24ceb395993a6bef8))
+- Cut per-chunk and per-keystroke work in the terminal (P53 Tier 2-4) ([`c2bdcc6`](https://github.com/Vit129/kouen-terminal/commit/c2bdcc6ede698df75336b4f0d8d9393ae99393a1))
+- Move git and daemon round-trips off the main thread (P53 Tier 1/2/5) ([`2b72cf3`](https://github.com/Vit129/kouen-terminal/commit/2b72cf37e0233efc586fbc6e156553c5eba53e63))
+
+### Fixed
+- Resolve code review defects in history scanner, search ranking, and session cache ([`a8be384`](https://github.com/Vit129/kouen-terminal/commit/a8be38425972c441f8f2b8e29501fb5ef81aaf0c))
+- Only prune sessions whose transcript is gone from disk ([`7842c89`](https://github.com/Vit129/kouen-terminal/commit/7842c89562078f4bd119b0a5d09b2c2291d05149))
+- Regenerate notes so they match the v4.20.16 CHANGELOG block ([`666b20c`](https://github.com/Vit129/kouen-terminal/commit/666b20c9a1790fa181a347b6aa8c793fd1af3c08))
+- Guard SQLite3 import and test with canImport(SQLite3) for Linux headless CI ([`8cde11a`](https://github.com/Vit129/kouen-terminal/commit/8cde11a047edbfb6a49559f6bc554af72ad4f39d))
+- Use Sendable box for notification check on Linux & increase timeout in GitStatusProvider test ([`77a1e51`](https://github.com/Vit129/kouen-terminal/commit/77a1e513334952c550b5daa457ae0fcb7d11b638))
+- Stop new panes landing in .kouen-worktrees after a worktree is removed ([`9a80861`](https://github.com/Vit129/kouen-terminal/commit/9a808615f3a937ccfb6f70e53433b821d01f839f))
+- Stop the git status timeout from crashing the app ([`fd9aa12`](https://github.com/Vit129/kouen-terminal/commit/fd9aa123daa0ad8c9a46296d068e3f9518b1d8c5))
+- Refresh installed wrapper scripts on launch ([`a754dd5`](https://github.com/Vit129/kouen-terminal/commit/a754dd561069d1dfbab95dc14088a9a3e493e4df))
+- Don't touch UNUserNotificationCenter from an unbundled binary ([`c400452`](https://github.com/Vit129/kouen-terminal/commit/c400452bd39aadf06d6421f205d5645ca7a6d747))
+- Build the What's New block from real commits, not a placeholder ([`626404a`](https://github.com/Vit129/kouen-terminal/commit/626404a7a27ad3d0a8b2ae3b4095df5a1007508b))
+
+
 ## [4.20.16] - 2026-10-08
 
 ### Added
