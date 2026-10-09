@@ -25,11 +25,10 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 - Guard SQLite3 import and test with canImport(SQLite3) for Linux headless CI ([`8cde11a`](https://github.com/Vit129/kouen-terminal/commit/8cde11a047edbfb6a49559f6bc554af72ad4f39d))
 - Use Sendable box for notification check on Linux & increase timeout in GitStatusProvider test ([`77a1e51`](https://github.com/Vit129/kouen-terminal/commit/77a1e513334952c550b5daa457ae0fcb7d11b638))
 - Stop new panes landing in .kouen-worktrees after a worktree is removed ([`9a80861`](https://github.com/Vit129/kouen-terminal/commit/9a808615f3a937ccfb6f70e53433b821d01f839f))
-- Stop the git status timeout from crashing the app ([`fd9aa12`](https://github.com/Vit129/kouen-terminal/commit/fd9aa123daa0ad8c9a46296d068e3f9518b1d8c5))
-- Refresh installed wrapper scripts on launch ([`a754dd5`](https://github.com/Vit129/kouen-terminal/commit/a754dd561069d1dfbab95dc14088a9a3e493e4df))
-- Don't touch UNUserNotificationCenter from an unbundled binary ([`c400452`](https://github.com/Vit129/kouen-terminal/commit/c400452bd39aadf06d6421f205d5645ca7a6d747))
-- Build the What's New block from real commits, not a placeholder ([`626404a`](https://github.com/Vit129/kouen-terminal/commit/626404a7a27ad3d0a8b2ae3b4095df5a1007508b))
-
+- Stop the git status timeout from crashing the app ([`0309852`](https://github.com/Vit129/kouen-terminal/commit/0309852150fb99643c37c2afe3158e1d247f6075))
+- Refresh installed wrapper scripts on launch ([`5a930f6`](https://github.com/Vit129/kouen-terminal/commit/5a930f68dbb0dcef572d6429c5450e4aa7b29bb3))
+- Don't touch UNUserNotificationCenter from an unbundled binary ([`1e8114d`](https://github.com/Vit129/kouen-terminal/commit/1e8114d6c0eb6107397783e29e72c78a06df640b))
+- Build the What's New block from real commits, not a placeholder ([`81ec5e7`](https://github.com/Vit129/kouen-terminal/commit/81ec5e7a78b16fc3f54f06a2cc0e33872dbf523d))
 
 ## [4.20.16] - 2026-10-08
 
