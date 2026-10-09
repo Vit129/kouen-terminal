@@ -2,7 +2,34 @@ import AppKit
 import Combine
 import KouenCore
 import KouenIPC
+import os.signpost
 import SwiftUI
+
+private let historySignposter = OSSignposter(subsystem: "com.vit129.kouen", category: "history")
+
+final class RepoRootCache: @unchecked Sendable {
+    static let shared = RepoRootCache()
+    private let lock = NSLock()
+    private var cache: [String: String] = [:]
+
+    func get(_ path: String) -> String? {
+        lock.lock()
+        defer { lock.unlock() }
+        return cache[path]
+    }
+
+    func set(_ root: String, for path: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        cache[path] = root
+    }
+
+    func clear() {
+        lock.lock()
+        defer { lock.unlock() }
+        cache.removeAll()
+    }
+}
 
 public enum HistoryScope: String, CaseIterable, Identifiable, Sendable {
     case repo = "This repo"
@@ -68,18 +95,29 @@ public final class AgentSessionHistoryModel: ObservableObject {
     }
     @Published public var filteredRecords: [AgentSessionRecord] = [] {
         didSet {
-            if selectedIndex >= displayRecords.count {
-                selectedIndex = max(0, displayRecords.count - 1)
-            }
+            recomputeDerivedLists()
         }
     }
-    @Published public var selectedIndex: Int = 0
+    @Published public var selectedIndex: Int = 0 {
+        didSet {
+            updateSelectedRecordID()
+        }
+    }
     @Published public var expandedSessionIDs: Set<String> = []
     @Published public var collapsedSections: Set<String> = []
     @Published public var isLoading: Bool = false
+    @Published public private(set) var selectedRecordID: String?
 
     /// How many records beyond the default 14-day window are currently revealed via "Load More".
-    @Published public var extraRecordsShown: Int = 0
+    @Published public var extraRecordsShown: Int = 0 {
+        didSet {
+            recomputeDerivedLists()
+        }
+    }
+
+    private var cachedWindowedRecords: [AgentSessionRecord] = []
+    private var cachedGroupedRecords: [(title: String, records: [AgentSessionRecord])] = []
+    private var cachedDisplayRecords: [AgentSessionRecord] = []
 
     /// Snippets extracted during search scoring, keyed by session id.
     private var searchSnippets: [String: String] = [:]
@@ -113,6 +151,11 @@ public final class AgentSessionHistoryModel: ObservableObject {
                     SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.cwd ?? ""
                 }
             }
+        }
+
+        // Pre-warm scanner cache in background so tab open is instant
+        Task.detached(priority: .utility) {
+            _ = await AgentHistoryScanner.shared.getOrScan(force: false)
         }
 
         self.updateCancellable = NotificationCenter.default
@@ -165,10 +208,74 @@ public final class AgentSessionHistoryModel: ObservableObject {
         selectedIndex = max(0, min(total - 1, next))
     }
 
+    private func recomputeDerivedLists() {
+        let windowed: [AgentSessionRecord]
+        if !searchQuery.isEmpty {
+            windowed = filteredRecords
+        } else {
+            let list = filteredRecords
+            let withinMinimumWindow = list.prefix(while: { $0.updatedAt >= minimumWindowStart }).count
+            let visibleCount = max(withinMinimumWindow, extraRecordsShown)
+            windowed = Array(list.prefix(visibleCount))
+        }
+        cachedWindowedRecords = windowed
+
+        let grouped: [(title: String, records: [AgentSessionRecord])]
+        if !searchQuery.isEmpty {
+            if windowed.isEmpty {
+                grouped = []
+            } else {
+                grouped = [(title: "Best matches", records: windowed)]
+            }
+        } else {
+            var buckets: [AgentHistoryDateGroup: [AgentSessionRecord]] = [:]
+            for record in windowed {
+                let grp = AgentHistoryDateGroup.group(for: record.updatedAt)
+                buckets[grp, default: []].append(record)
+            }
+            var result: [(title: String, records: [AgentSessionRecord])] = []
+            for grp in AgentHistoryDateGroup.allCases {
+                if let items = buckets[grp], !items.isEmpty {
+                    result.append((title: grp.rawValue, records: items))
+                }
+            }
+            grouped = result
+        }
+        cachedGroupedRecords = grouped
+        cachedDisplayRecords = grouped.flatMap(\.records)
+
+        if selectedIndex >= cachedDisplayRecords.count {
+            selectedIndex = max(0, cachedDisplayRecords.count - 1)
+        }
+        updateSelectedRecordID()
+    }
+
+    private func updateSelectedRecordID() {
+        if selectedIndex >= 0 && selectedIndex < cachedDisplayRecords.count {
+            selectedRecordID = cachedDisplayRecords[selectedIndex].id
+        } else {
+            selectedRecordID = nil
+        }
+    }
+
+    /// Pre-warms the session history by loading cached records from SQLite in the background
+    /// without waiting for the user to click the History tab.
+    public func warmUp() {
+        guard records.isEmpty else { return }
+        Task { [weak self] in
+            let cached = await AgentHistoryScanner.shared.getOrScan(force: false)
+            await MainActor.run { [weak self] in
+                guard let self, self.records.isEmpty else { return }
+                self.records = cached
+            }
+        }
+    }
+
     /// Applies filtering synchronously immediately (useful for unit tests or immediate refreshes).
     public func applyFilterNow() {
         filterTask?.cancel()
         filterTask = nil
+        let state = historySignposter.beginInterval("applyFilterNow")
         let (filtered, newCache, snippets) = Self.computeFiltered(
             query: searchQuery,
             scope: selectedScope,
@@ -177,6 +284,7 @@ public final class AgentSessionHistoryModel: ObservableObject {
             resolver: repoRootResolver,
             initialCache: repoRootCache
         )
+        historySignposter.endInterval("applyFilterNow", state)
         self.repoRootCache = newCache
         self.searchSnippets = snippets
         self.filteredRecords = filtered
@@ -201,6 +309,7 @@ public final class AgentSessionHistoryModel: ObservableObject {
             }
             if Task.isCancelled { return }
 
+            let state = historySignposter.beginInterval("computeFiltered")
             let (filtered, newCache, snippets) = Self.computeFiltered(
                 query: currentQuery,
                 scope: currentScope,
@@ -209,6 +318,7 @@ public final class AgentSessionHistoryModel: ObservableObject {
                 resolver: resolver,
                 initialCache: localCache
             )
+            historySignposter.endInterval("computeFiltered", state)
 
             if Task.isCancelled { return }
 
@@ -221,25 +331,7 @@ public final class AgentSessionHistoryModel: ObservableObject {
         }
     }
 
-    nonisolated private static func runBackgroundFilter(
-        query: String,
-        scope: HistoryScope,
-        records: [AgentSessionRecord],
-        activeCWD: String,
-        resolver: @Sendable (String) -> String?,
-        initialCache: [String: String]
-    ) async -> (filtered: [AgentSessionRecord], cache: [String: String], snippets: [String: String]) {
-        computeFiltered(
-            query: query,
-            scope: scope,
-            records: records,
-            activeCWD: activeCWD,
-            resolver: resolver,
-            initialCache: initialCache
-        )
-    }
-
-    nonisolated private static func computeFiltered(
+    nonisolated package static func computeFiltered(
         query: String,
         scope: HistoryScope,
         records: [AgentSessionRecord],
@@ -250,8 +342,13 @@ public final class AgentSessionHistoryModel: ObservableObject {
         var cache = initialCache
         func resolveRoot(for path: String) -> String {
             if let cached = cache[path] { return cached }
+            if let cached = RepoRootCache.shared.get(path) {
+                cache[path] = cached
+                return cached
+            }
             let root = resolver(path) ?? path
             cache[path] = root
+            RepoRootCache.shared.set(root, for: path)
             return root
         }
 
@@ -261,8 +358,24 @@ public final class AgentSessionHistoryModel: ObservableObject {
         if matcher.hasQuery {
             let hits = AgentHistorySearch.rank(query: query, records: records)
             var snippets: [String: String] = [:]
-            for hit in hits {
-                if let snip = hit.snippet, !snip.isEmpty { snippets[hit.record.id] = snip }
+            // Pre-extract snippets on the background thread for top visible results so UI render doesn't block MainActor
+            for hit in hits.prefix(50) {
+                if let snip = hit.snippet, !snip.isEmpty {
+                    snippets[hit.record.id] = snip
+                } else {
+                    let turnsContent = hit.record.latestTurns.map(\.content).joined(separator: "\n")
+                    let chatContent = "\(hit.record.firstPrompt)\n\(turnsContent)"
+                    let branchFiles = hit.record.gitBranch ?? ""
+                    let repoAgent = "\(hit.record.projectName) \(hit.record.agentKind.displayName)"
+                    if let match = matcher.matchHistory(
+                        title: hit.record.title,
+                        branchFilesTools: branchFiles,
+                        repoAgent: repoAgent,
+                        chatContent: chatContent
+                    ), let snippet = match.snippet {
+                        snippets[hit.record.id] = snippet
+                    }
+                }
             }
             return (hits.map(\.record), cache, snippets)
         }
@@ -274,6 +387,10 @@ public final class AgentSessionHistoryModel: ObservableObject {
             switch scope {
             case .repo:
                 guard !activeRepoRoot.isEmpty else { return true }
+                if record.projectPath == activeRepoRoot ||
+                   record.projectPath.hasPrefix(activeRepoRoot + "/") {
+                    return true
+                }
                 let recordRepoRoot = resolveRoot(for: record.projectPath)
                 if recordRepoRoot == activeRepoRoot {
                     return true
@@ -289,10 +406,10 @@ public final class AgentSessionHistoryModel: ObservableObject {
         return (filtered, cache, [:])
     }
 
-    /// Extracts matching snippet in prompt or turns for content search display
+    /// Extracts matching snippet in prompt or turns for content search display (O(1) dictionary read).
     public func matchSnippet(for record: AgentSessionRecord) -> String? {
-        if let snip = searchSnippets[record.id], !snip.isEmpty {
-            return snip
+        if let snip = searchSnippets[record.id] {
+            return snip.isEmpty ? nil : snip
         }
         let matcher = SearchMatcher(query: searchQuery)
         guard matcher.hasQuery else { return nil }
@@ -307,65 +424,39 @@ public final class AgentSessionHistoryModel: ObservableObject {
             repoAgent: repoAgent,
             chatContent: chatContent
         )
-        return match?.snippet
+        let snippet = match?.snippet ?? ""
+        searchSnippets[record.id] = snippet
+        return snippet.isEmpty ? nil : snippet
     }
 
     /// Records actually shown right now:
     /// When search is active, the 14-day window is ignored completely.
     /// When empty query, always at least the last 14 days, plus whatever extra batches "Load More" revealed.
     public var windowedRecords: [AgentSessionRecord] {
-        if !searchQuery.isEmpty {
-            return filteredRecords
-        }
-        let list = filteredRecords
-        let withinMinimumWindow = list.prefix(while: { $0.updatedAt >= minimumWindowStart }).count
-        let visibleCount = max(withinMinimumWindow, extraRecordsShown)
-        return Array(list.prefix(visibleCount))
+        cachedWindowedRecords
     }
 
     public var hasMoreToLoad: Bool {
         guard searchQuery.isEmpty else { return false }
-        return windowedRecords.count < filteredRecords.count
+        return cachedWindowedRecords.count < filteredRecords.count
     }
 
     public func loadMore() {
-        extraRecordsShown = windowedRecords.count + loadMoreBatchSize
+        extraRecordsShown = cachedWindowedRecords.count + loadMoreBatchSize
     }
 
     /// Flat list of currently displayed records in section order
     public var displayRecords: [AgentSessionRecord] {
-        groupedRecords.flatMap(\.records)
+        cachedDisplayRecords
     }
 
     public var selectedRecord: AgentSessionRecord? {
-        let list = displayRecords
-        guard selectedIndex >= 0, selectedIndex < list.count else { return nil }
-        return list[selectedIndex]
+        guard selectedIndex >= 0, selectedIndex < cachedDisplayRecords.count else { return nil }
+        return cachedDisplayRecords[selectedIndex]
     }
 
     public var groupedRecords: [(title: String, records: [AgentSessionRecord])] {
-        let list = windowedRecords
-
-        // When search is active, all results are grouped under "Best matches"
-        if !searchQuery.isEmpty {
-            guard !list.isEmpty else { return [] }
-            return [(title: "Best matches", records: list)]
-        }
-
-        // When empty query, group by date: Today / Yesterday / This week / Older
-        var buckets: [AgentHistoryDateGroup: [AgentSessionRecord]] = [:]
-        for record in list {
-            let grp = AgentHistoryDateGroup.group(for: record.updatedAt)
-            buckets[grp, default: []].append(record)
-        }
-
-        var result: [(title: String, records: [AgentSessionRecord])] = []
-        for grp in AgentHistoryDateGroup.allCases {
-            if let items = buckets[grp], !items.isEmpty {
-                result.append((title: grp.rawValue, records: items))
-            }
-        }
-        return result
+        cachedGroupedRecords
     }
 }
 
@@ -578,7 +669,7 @@ public struct AgentSessionHistoryView: View {
             .padding(.vertical, 3)
 
             if !isCollapsed {
-                VStack(spacing: 4) {
+                LazyVStack(spacing: 4) {
                     ForEach(group.records) { record in
                         sessionRow(record: record)
                     }
@@ -591,7 +682,7 @@ public struct AgentSessionHistoryView: View {
     @ViewBuilder
     private func sessionRow(record: AgentSessionRecord) -> some View {
         let c = KouenDesign.chrome
-        let isSelected = model.selectedRecord?.id == record.id
+        let isSelected = model.selectedRecordID == record.id
         let isLive = record.liveStatus != nil || record.placement == .cloud || record.placement == .background || record.placement == .remoteControl
         let showRepo = model.selectedScope == .all || !model.searchQuery.isEmpty
         let isNotMainBranch = record.gitBranch != nil && !record.gitBranch!.isEmpty && record.gitBranch != "main"

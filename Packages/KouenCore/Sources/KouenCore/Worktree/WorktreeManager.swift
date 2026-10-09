@@ -341,8 +341,32 @@ public struct WorktreeManager: Sendable {
 
     /// Finds the git repo root for a given path (works for both repos and worktrees).
     public func repoRoot(for path: String) -> String? {
-        runGitOutput(["rev-parse", "--show-toplevel"], in: path)?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        Self.fastRepoRoot(for: path)
+    }
+
+    /// Fast filesystem traversal to find git repo root (worktree or repo) without spawning git processes.
+    public static func fastRepoRoot(for path: String) -> String? {
+        guard !path.isEmpty else { return nil }
+        var current = URL(fileURLWithPath: path).resolvingSymlinksInPath()
+        let fileManager = FileManager.default
+
+        while current.pathComponents.count > 1 {
+            let gitDir = current.appendingPathComponent(".git")
+            var isDir: ObjCBool = false
+            if fileManager.fileExists(atPath: gitDir.path, isDirectory: &isDir) {
+                if isDir.boolValue {
+                    return current.path
+                } else {
+                    // Check if gitdir file (worktree or submodule)
+                    if let content = try? String(contentsOf: gitDir, encoding: .utf8),
+                       content.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("gitdir:") {
+                        return current.path
+                    }
+                }
+            }
+            current = current.deletingLastPathComponent()
+        }
+        return nil
     }
 
     /// Prunes stale worktree entries (e.g. after manual directory deletion).

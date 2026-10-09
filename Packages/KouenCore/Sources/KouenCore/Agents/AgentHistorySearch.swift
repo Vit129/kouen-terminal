@@ -72,64 +72,60 @@ public enum AgentHistorySearch {
         let matcher = SearchMatcher(query: query)
         guard matcher.hasQuery else { return [] }
 
-        // Check if query contains Thai or non-space characters that FTS5 unicode61 tokenizer cannot segment
-        let isThaiOrSpecial = query.unicodeScalars.contains { (0x0E00...0x0E7F).contains($0.value) }
+        // Always attempt fast SQLite FTS5 search first (including Thai and non-ASCII)
+        let ftsMatches = index.searchRanked(query: query, limit: ftsLimit, includeSnippet: false)
+        if !ftsMatches.isEmpty {
+            var recordMap: [String: AgentSessionRecord] = [:]
+            recordMap.reserveCapacity(records.count)
+            for r in records {
+                recordMap[r.id] = r
+            }
 
-        if !isThaiOrSpecial {
-            let ftsMatches = index.searchRanked(query: query, limit: ftsLimit)
-            if !ftsMatches.isEmpty {
-                var recordMap: [String: AgentSessionRecord] = [:]
-                recordMap.reserveCapacity(records.count)
-                for r in records {
-                    recordMap[r.id] = r
-                }
+            var hits: [Hit] = []
+            hits.reserveCapacity(ftsMatches.count)
 
-                var hits: [Hit] = []
-                hits.reserveCapacity(ftsMatches.count)
+            var matchedIDs = Set<String>()
+            for match in ftsMatches {
+                guard let record = recordMap[match.sessionID] else { continue }
+                matchedIDs.insert(record.id)
+                // FTS5 bm25 rank is negative (more negative = better match).
+                let score = -match.rank
+                let snippet = match.snippet.isEmpty ? nil : match.snippet
+                hits.append(Hit(record: record, score: score, snippet: snippet))
+            }
 
-                var matchedIDs = Set<String>()
-                for match in ftsMatches {
-                    guard let record = recordMap[match.sessionID] else { continue }
-                    matchedIDs.insert(record.id)
-                    // FTS5 bm25 rank is negative (more negative = better match).
-                    let score = -match.rank
-                    let snippet = match.snippet.isEmpty ? nil : match.snippet
-                    hits.append(Hit(record: record, score: score, snippet: snippet))
-                }
+            // Check for unindexed records in `records` (e.g. from unit tests where
+            // records are created in-memory without indexing in SQLite).
+            if matchedIDs.count < records.count && records.count <= ftsLimit {
+                for record in records where !matchedIDs.contains(record.id) {
+                    var titleMatched = false
+                    var branchMatched = false
 
-                // Check for unindexed records in `records` (e.g. from unit tests where
-                // records are created in-memory without indexing in SQLite).
-                if matchedIDs.count < records.count {
-                    for record in records where !matchedIDs.contains(record.id) {
-                        var titleMatched = false
-                        var branchMatched = false
-
-                        for token in matcher.tokens {
-                            if record.title.range(of: token, options: .caseInsensitive) != nil {
-                                titleMatched = true
-                                break
-                            } else if let branch = record.gitBranch, branch.range(of: token, options: .caseInsensitive) != nil {
-                                branchMatched = true
-                                break
-                            }
-                        }
-
-                        if titleMatched || branchMatched {
-                            let score = titleMatched ? 10.0 : 5.0
-                            hits.append(Hit(record: record, score: score, snippet: nil))
+                    for token in matcher.tokens {
+                        if record.title.range(of: token, options: .caseInsensitive) != nil {
+                            titleMatched = true
+                            break
+                        } else if let branch = record.gitBranch, branch.range(of: token, options: .caseInsensitive) != nil {
+                            branchMatched = true
+                            break
                         }
                     }
-                }
 
-                hits.sort { lhs, rhs in
-                    if abs(lhs.score - rhs.score) > 1e-9 { return lhs.score > rhs.score }
-                    return lhs.record.updatedAt > rhs.record.updatedAt
+                    if titleMatched || branchMatched {
+                        let score = titleMatched ? 10.0 : 5.0
+                        hits.append(Hit(record: record, score: score, snippet: nil))
+                    }
                 }
-                return hits
             }
+
+            hits.sort { lhs, rhs in
+                if abs(lhs.score - rhs.score) > 1e-9 { return lhs.score > rhs.score }
+                return lhs.record.updatedAt > rhs.record.updatedAt
+            }
+            return hits
         }
 
-        // Fallback for Thai / fuzzy queries, or when FTS index has no matching records
+        // Fallback for fuzzy queries, or when FTS index has no matching records
         return rankSwiftFallback(query: query, records: records, matcher: matcher, index: index, ftsLimit: ftsLimit)
     }
 
@@ -143,6 +139,59 @@ public enum AgentHistorySearch {
     ) -> [Hit] {
         let ftsMatches = index.search(query: query, limit: ftsLimit)
 
+        // Fast candidate pre-filtering to avoid normalizing hundreds of unrelated sessions
+        var candidates: [AgentSessionRecord] = []
+        candidates.reserveCapacity(records.count)
+
+        for record in records {
+            if ftsMatches[record.id] != nil {
+                candidates.append(record)
+                continue
+            }
+            var isCandidate = false
+            for token in matcher.tokens {
+                if record.title.range(of: token, options: .caseInsensitive) != nil ||
+                   (record.gitBranch != nil && record.gitBranch!.range(of: token, options: .caseInsensitive) != nil) {
+                    isCandidate = true
+                    break
+                }
+                if records.count <= ftsLimit {
+                    if record.projectName.range(of: token, options: .caseInsensitive) != nil ||
+                       record.firstPrompt.range(of: token, options: .caseInsensitive) != nil {
+                        isCandidate = true
+                        break
+                    }
+                }
+            }
+            // Only search transcript turns if FTS matches were empty and records are few (e.g. unindexed in-memory test records);
+            // when full history is present, transcript matches were already indexed and captured in ftsMatches.
+            if !isCandidate && ftsMatches.isEmpty && records.count <= ftsLimit {
+                for turn in record.latestTurns {
+                    for token in matcher.tokens {
+                        if turn.content.range(of: token, options: .caseInsensitive) != nil {
+                            isCandidate = true
+                            break
+                        }
+                    }
+                    if isCandidate { break }
+                }
+            }
+            if !isCandidate {
+                for token in matcher.tokens where token.count >= 4 && token.count <= 16 {
+                    if SearchMatcher.tokenHits(token, inNormalized: SearchMatcher.normalized(record.title)) ||
+                       SearchMatcher.tokenHits(token, inNormalized: SearchMatcher.normalized(record.gitBranch ?? "")) {
+                        isCandidate = true
+                        break
+                    }
+                }
+            }
+            if isCandidate {
+                candidates.append(record)
+            }
+        }
+
+        guard !candidates.isEmpty else { return [] }
+
         struct Fields {
             let title: String
             let normTitle: String
@@ -155,12 +204,12 @@ public enum AgentHistorySearch {
         }
 
         var fields: [Fields] = []
-        fields.reserveCapacity(records.count)
+        fields.reserveCapacity(candidates.count)
 
         var normalizedFieldsForIDF: [String] = []
-        normalizedFieldsForIDF.reserveCapacity(records.count)
+        normalizedFieldsForIDF.reserveCapacity(candidates.count)
 
-        for record in records {
+        for record in candidates {
             let ftsMatch = ftsMatches[record.id]
             var chat = "\(record.firstPrompt)\n" + record.latestTurns.map(\.content).joined(separator: "\n")
             if let snippet = ftsMatch?.snippet, !snippet.isEmpty { chat += "\n\(snippet)" }
@@ -187,36 +236,13 @@ public enum AgentHistorySearch {
             normalizedFieldsForIDF.append("\(normTitle) \(normBranch) \(normRepo) \(normChat)")
         }
 
-        let weights = idfCache.getWeights(tokens: matcher.tokens, records: records) {
+        let weights = idfCache.getWeights(tokens: matcher.tokens, records: candidates) {
             normalizedFieldsForIDF
         }
 
         var hits: [Hit] = []
-        for (record, f) in zip(records, fields) {
+        for (record, f) in zip(candidates, fields) {
             let ftsMatch = ftsMatches[record.id]
-
-            if ftsMatch == nil {
-                var candidate = false
-                for token in matcher.tokens {
-                    if f.normTitle.contains(token) || f.normBranch.contains(token) || f.normRepo.contains(token) || f.normChat.contains(token) {
-                        candidate = true
-                        break
-                    }
-                }
-                if !candidate {
-                    var typoCandidate = false
-                    for token in matcher.tokens where token.count >= 4 {
-                        if SearchMatcher.tokenHits(token, inNormalized: f.normTitle) || SearchMatcher.tokenHits(token, inNormalized: f.normBranch) {
-                            typoCandidate = true
-                            break
-                        }
-                    }
-                    if !typoCandidate {
-                        continue
-                    }
-                }
-            }
-
             guard let match = matcher.matchHistory(
                 normalizedTitle: f.normTitle,
                 normalizedBranchFilesTools: f.normBranch,
