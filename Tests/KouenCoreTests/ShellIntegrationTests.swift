@@ -121,4 +121,21 @@ final class ShellIntegrationTests: XCTestCase {
         XCTAssertTrue(updated.contains("alias ll='ls -la'"))
         XCTAssertTrue(updated.contains("Kouen shell integration"))
     }
+
+    // Wrapper changes must reach users who installed earlier: only the CLI wrote the script,
+    // so P54's remote-control auto-open never landed in an existing ~/.zshrc setup.
+    func testRefreshRewritesOnlyInstalledStaleScripts() throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("si-refresh-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: home) }
+        let dir = home.appendingPathComponent("Library/Application Support/Kouen/shell-integration")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let zsh = dir.appendingPathComponent("kouen.zsh")
+        try "# old wrapper".write(to: zsh, atomically: true, encoding: .utf8)
+
+        XCTAssertEqual(ShellIntegration.refreshInstalledScripts(homeOverride: home), [.zsh])
+        XCTAssertEqual(try String(contentsOf: zsh, encoding: .utf8), ShellIntegration.script(for: .zsh))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: dir.appendingPathComponent("kouen.bash").path),
+                       "never installs a shell the user didn't opt into")
+        XCTAssertEqual(ShellIntegration.refreshInstalledScripts(homeOverride: home), [], "already current")
+    }
 }
