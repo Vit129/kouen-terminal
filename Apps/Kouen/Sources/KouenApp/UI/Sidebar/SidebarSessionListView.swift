@@ -11,7 +11,9 @@ fileprivate func agentColor(for kind: AgentKind) -> Color {
 
 struct SidebarSessionListView: View {
     var model: SidebarListModel
+    var fleetModel: FleetViewModel? = nil
     var onSelect: (SessionID) -> Void
+    var onSelectFleetItem: ((FleetSessionItem) -> Void)? = nil
     var onOpenProject: (String) -> Void
     var onAddInGroup: (String, String?) -> Void
     var onCloseSession: (SessionID) -> Void
@@ -19,15 +21,90 @@ struct SidebarSessionListView: View {
     var onPRClick: (String) -> Void
     var onWorktreeActivate: (SidebarWorktreeEntry, WorkspaceID?) -> Void
 
+    @State private var selectedFilter: ProjectTabFilter = .all
+
     var body: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            LazyVStack(spacing: 0) {
-                ForEach(model.rows) { row in
-                    rowContent(row)
+        VStack(spacing: 0) {
+            filterChipsHeader
+            Divider()
+                .overlay(Color.primary.opacity(0.06))
+
+            if selectedFilter == .all {
+                ScrollView(.vertical, showsIndicators: false) {
+                    LazyVStack(spacing: 0) {
+                        ForEach(model.rows) { row in
+                            rowContent(row)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+            } else if let fleetModel {
+                let items = fleetModel.itemsFor(filter: selectedFilter)
+                if items.isEmpty {
+                    VStack(spacing: 6) {
+                        Spacer()
+                        Text(selectedFilter == .agents ? "No active agents" : "No waiting sessions")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ScrollView(.vertical, showsIndicators: false) {
+                        LazyVStack(spacing: 0) {
+                            ForEach(items) { item in
+                                Button {
+                                    onSelectFleetItem?(item)
+                                } label: {
+                                    FleetRowView(item: item)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
                 }
             }
-            .padding(.vertical, 4)
         }
+    }
+
+    private var filterChipsHeader: some View {
+        HStack(spacing: 4) {
+            ForEach(ProjectTabFilter.allCases) { filter in
+                Button {
+                    selectedFilter = filter
+                } label: {
+                    HStack(spacing: 3) {
+                        Text(filter.rawValue)
+                            .font(.system(size: 10.5, weight: selectedFilter == filter ? .semibold : .regular))
+                        if filter == .waiting, let count = fleetModel?.waitingCount, count > 0 {
+                            Text("\(count)")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 1)
+                                .background(Capsule().fill(Color.orange))
+                        }
+                    }
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2.5)
+                    .background(
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .fill(selectedFilter == filter
+                                  ? Color.primary.opacity(0.10)
+                                  : Color.clear)
+                    )
+                    .foregroundStyle(selectedFilter == filter ? Color.primary : Color.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+            Spacer()
+        }
+        .padding(.horizontal, KouenDesign.horizontalInset)
+        .padding(.vertical, 4)
     }
 
     @ViewBuilder

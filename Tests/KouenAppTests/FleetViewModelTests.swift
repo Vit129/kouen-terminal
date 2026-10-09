@@ -68,4 +68,45 @@ final class FleetViewModelTests: XCTestCase {
         model.filterText = "no-match-xyz"
         XCTAssertTrue(model.filteredItems.isEmpty)
     }
+
+    // MARK: - [TS-P54-007] [FE-UT] Filter by Agents and Waiting
+    @MainActor
+    func testProjectTabFiltersAgentsAndWaiting() {
+        let waitingAgentTab = Tab(
+            title: "agent-waiting",
+            cwd: "/tmp/a",
+            status: .waiting,
+            agent: AgentSnapshot(kind: .claudeCode, executable: "/bin/claude", pid: 1, activity: .awaiting)
+        )
+        let busyAgentTab = Tab(
+            title: "agent-busy",
+            cwd: "/tmp/b",
+            status: .running,
+            agent: AgentSnapshot(kind: .codex, executable: "/bin/codex", pid: 2, activity: .working)
+        )
+        let shellTab = Tab(title: "idle-shell", cwd: "/tmp/c")
+
+        let session = SessionGroup(id: UUID(), name: "s", tabs: [waitingAgentTab, busyAgentTab, shellTab], activeTabID: shellTab.id, sortOrder: 0)
+        let ws = Workspace(id: UUID(), name: "W", sessions: [session], activeSessionID: session.id)
+        let snap = SessionSnapshot(workspaces: [ws], activeWorkspaceID: ws.id)
+
+        let model = FleetViewModel()
+        model.refresh(from: snap)
+
+        XCTAssertEqual(model.items.count, 3)
+
+        // All items
+        XCTAssertEqual(model.itemsFor(filter: .all).count, 3)
+
+        // Agents only (agentName != nil)
+        let agentItems = model.itemsFor(filter: .agents)
+        XCTAssertEqual(agentItems.count, 2)
+        XCTAssertTrue(agentItems.allSatisfy { $0.agentName != nil })
+
+        // Waiting only (isWaiting == true)
+        let waitingItems = model.itemsFor(filter: .waiting)
+        XCTAssertEqual(waitingItems.count, 1)
+        XCTAssertEqual(waitingItems.first?.title, "agent-waiting")
+    }
 }
+

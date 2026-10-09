@@ -9,6 +9,27 @@ import SwiftUI
 struct ProjectCategory: Codable, Hashable, Identifiable {
     var id: String          // stable UUID string
     var name: String
+    var sourceFolder: String?
+    var excludedPaths: Set<String>
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, sourceFolder, excludedPaths
+    }
+
+    init(id: String, name: String, sourceFolder: String? = nil, excludedPaths: Set<String> = []) {
+        self.id = id
+        self.name = name
+        self.sourceFolder = sourceFolder
+        self.excludedPaths = excludedPaths
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        sourceFolder = try container.decodeIfPresent(String.self, forKey: .sourceFolder)
+        excludedPaths = try container.decodeIfPresent(Set<String>.self, forKey: .excludedPaths) ?? []
+    }
 }
 
 /// Per-project metadata persisted alongside the path list.
@@ -30,20 +51,48 @@ final class ProjectStore {
 
     var categories: [ProjectCategory] = []
     var projects: [ProjectEntry] = []
+    private let userDefaults: UserDefaults
+    private(set) var watcher: ProjectGroupWatcher?
 
-    init() {
+    init(userDefaults: UserDefaults = .standard) {
+        self.userDefaults = userDefaults
         load()
         absorbLegacyRecents()
+        setupWatcher()
+    }
+
+    convenience init(userDefaultsSuite suiteName: String) {
+        let defaults = UserDefaults(suiteName: suiteName) ?? .standard
+        self.init(userDefaults: defaults)
+    }
+
+    private func setupWatcher() {
+        let w = ProjectGroupWatcher()
+        self.watcher = w
+        updateWatchedFolders()
+    }
+
+    func updateWatchedFolders() {
+        guard let watcher else { return }
+        let validFolders = categories.compactMap { cat -> (id: String, folder: String)? in
+            guard let folder = cat.sourceFolder, !folder.isEmpty else { return nil }
+            return (id: cat.id, folder: folder)
+        }
+        watcher.update(folders: validFolders) { [weak self] catID in
+            Task { @MainActor [weak self] in
+                await self?.syncCategory(id: catID)
+            }
+        }
     }
 
     // MARK: - Persistence
 
     private func load() {
-        if let data = UserDefaults.standard.data(forKey: Self.categoriesKey),
+        if let data = userDefaults.data(forKey: Self.categoriesKey),
            let decoded = try? JSONDecoder().decode([ProjectCategory].self, from: data) {
             categories = decoded
         }
-        if let data = UserDefaults.standard.data(forKey: Self.projectsKey),
+        if let data = userDefaults.data(forKey: Self.projectsKey),
            let decoded = try? JSONDecoder().decode([ProjectEntry].self, from: data) {
             let home = FileManager.default.homeDirectoryForCurrentUser.path
             projects = decoded.filter {
@@ -54,17 +103,17 @@ final class ProjectStore {
 
     func save() {
         if let data = try? JSONEncoder().encode(categories) {
-            UserDefaults.standard.set(data, forKey: Self.categoriesKey)
+            userDefaults.set(data, forKey: Self.categoriesKey)
         }
         if let data = try? JSONEncoder().encode(projects) {
-            UserDefaults.standard.set(data, forKey: Self.projectsKey)
+            userDefaults.set(data, forKey: Self.projectsKey)
         }
     }
 
     private func absorbLegacyRecents() {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         let existing = Set(projects.map(\.path))
-        let legacyPaths = (UserDefaults.standard.stringArray(forKey: "RecentProjectPaths") ?? [])
+        let legacyPaths = (userDefaults.stringArray(forKey: "RecentProjectPaths") ?? [])
             .filter { path in
                 var isDir: ObjCBool = false
                 // Same rule as SidebarListModel.update: only a real repo root (`.git` directory),
@@ -84,6 +133,9 @@ final class ProjectStore {
     func addProject(_ path: String, categoryID: String? = nil) {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         guard !path.isEmpty, !path.hasSuffix("/.git"), (path as NSString).lastPathComponent != ".git", path != home else { return }
+        if let categoryID, let catIdx = categories.firstIndex(where: { $0.id == categoryID }) {
+            categories[catIdx].excludedPaths.remove(path)
+        }
         guard !projects.contains(where: { $0.path == path }) else {
             if let categoryID, let idx = projects.firstIndex(where: { $0.path == path }) {
                 projects[idx].categoryID = categoryID
@@ -108,6 +160,14 @@ final class ProjectStore {
     }
 
     func removeProject(_ path: String) {
+        // If this project belonged to a category with a sourceFolder, add to excludedPaths
+        if let project = projects.first(where: { $0.path == path }),
+           let catID = project.categoryID,
+           let catIdx = categories.firstIndex(where: { $0.id == catID }) {
+            if let sourceFolder = categories[catIdx].sourceFolder, path.hasPrefix(sourceFolder) {
+                categories[catIdx].excludedPaths.insert(path)
+            }
+        }
         projects.removeAll { $0.path == path }
         save()
     }
@@ -118,11 +178,20 @@ final class ProjectStore {
         save()
     }
 
-    func addCategory(name: String) -> ProjectCategory {
-        let cat = ProjectCategory(id: UUID().uuidString, name: name)
+    @discardableResult
+    func addCategory(name: String, sourceFolder: String? = nil) -> ProjectCategory {
+        let cat = ProjectCategory(id: UUID().uuidString, name: name, sourceFolder: sourceFolder)
         categories.append(cat)
         save()
+        updateWatchedFolders()
         return cat
+    }
+
+    func setCategorySourceFolder(categoryID: String, sourceFolder: String?) {
+        guard let idx = categories.firstIndex(where: { $0.id == categoryID }) else { return }
+        categories[idx].sourceFolder = sourceFolder
+        save()
+        updateWatchedFolders()
     }
 
     func removeCategory(_ id: String) {
@@ -131,18 +200,80 @@ final class ProjectStore {
             projects[idx].categoryID = nil
         }
         save()
+        updateWatchedFolders()
     }
 
     func removeCategoryAndProjects(_ id: String) {
         categories.removeAll { $0.id == id }
         projects.removeAll { $0.categoryID == id }
         save()
+        updateWatchedFolders()
     }
 
     func renameCategory(_ id: String, to name: String) {
         guard let idx = categories.firstIndex(where: { $0.id == id }) else { return }
         categories[idx].name = name
         save()
+    }
+
+    // MARK: - Auto-Sync (P54)
+
+    func syncCategory(id: String) async {
+        guard let catIdx = categories.firstIndex(where: { $0.id == id }) else { return }
+        let category = categories[catIdx]
+        guard let sourceFolder = category.sourceFolder, !sourceFolder.isEmpty else { return }
+
+        // Edge case: sourceFolder itself missing/unmounted -> do nothing, preserve entries
+        var isDir: ObjCBool = false
+        let folderExists = FileManager.default.fileExists(atPath: sourceFolder, isDirectory: &isDir) && isDir.boolValue
+        guard folderExists else { return }
+
+        let excluded = category.excludedPaths
+
+        // Perform scan off-main thread (P53 rule: no FS walk on main)
+        let discoveredItems = await Task.detached(priority: .utility) {
+            let scan = FolderScanner.inspect(path: sourceFolder, maxDepth: 1)
+            return scan.items
+        }.value
+
+        var changed = false
+        var currentProjects = self.projects
+
+        // 1. Add new items under sourceFolder that are not excluded
+        for item in discoveredItems {
+            if excluded.contains(item.path) { continue }
+            if !currentProjects.contains(where: { $0.path == item.path }) {
+                currentProjects.append(ProjectEntry(path: item.path, categoryID: id))
+                changed = true
+            } else if let pIdx = currentProjects.firstIndex(where: { $0.path == item.path }),
+                      currentProjects[pIdx].categoryID == nil {
+                currentProjects[pIdx].categoryID = id
+                changed = true
+            }
+        }
+
+        // 2. Remove items under sourceFolder that no longer exist on disk
+        let fm = FileManager.default
+        currentProjects.removeAll { entry in
+            guard entry.categoryID == id, entry.path.hasPrefix(sourceFolder) else { return false }
+            let exists = fm.fileExists(atPath: entry.path)
+            if !exists {
+                changed = true
+                return true
+            }
+            return false
+        }
+
+        if changed {
+            self.projects = currentProjects
+            save()
+        }
+    }
+
+    func syncAllWatchedCategories() async {
+        for cat in categories where cat.sourceFolder != nil {
+            await syncCategory(id: cat.id)
+        }
     }
 
     // MARK: - Queries
@@ -195,7 +326,7 @@ func fetchGitStatus(for path: String) async -> ProjectGitStatus? {
 
 // MARK: - Folder Scanner (Auto-detecting Multi-Repo / Group vs Per-Project)
 
-struct DiscoveredRepoItem: Identifiable, Hashable {
+struct DiscoveredRepoItem: Identifiable, Hashable, Sendable {
     let id: String           // Path
     let name: String         // Component name
     let path: String
@@ -204,8 +335,7 @@ struct DiscoveredRepoItem: Identifiable, Hashable {
     var isSelected: Bool = true
 }
 
-@MainActor
-enum FolderScanner {
+enum FolderScanner: Sendable {
     private static let ignoredDirNames: Set<String> = [
         ".DS_Store", ".git", ".Trash", ".build", "node_modules", "DerivedData",
         ".gradle", ".idea", ".vscode", "Pods", "Carthage", "target", "dist",
@@ -525,8 +655,11 @@ struct AddToWorkspaceSheet: View {
                     if !trimmedGroup.isEmpty {
                         if let existing = store.categories.first(where: { $0.name.lowercased() == trimmedGroup.lowercased() }) {
                             targetCatID = existing.id
+                            if existing.sourceFolder == nil {
+                                store.setCategorySourceFolder(categoryID: existing.id, sourceFolder: folderPath)
+                            }
                         } else {
-                            let newCat = store.addCategory(name: trimmedGroup)
+                            let newCat = store.addCategory(name: trimmedGroup, sourceFolder: folderPath)
                             targetCatID = newCat.id
                         }
                     }
