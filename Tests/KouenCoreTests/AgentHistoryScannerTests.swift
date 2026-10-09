@@ -465,4 +465,30 @@ final class AgentHistoryScannerTests: XCTestCase {
         XCTAssertEqual(res1.count, res2.count)
         XCTAssertTrue(box.value)
     }
+
+    // A schema bump drops session_records; if session_index_meta survived, needsReindex()
+    // would skip unchanged transcripts and those sessions would vanish from History.
+    func testFTSSchemaBumpForcesReindexOfUnchangedSessions() {
+        let tempDB = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("test_fts_migrate_\(UUID().uuidString).sqlite")
+        defer { try? FileManager.default.removeItem(at: tempDB) }
+        let mtime = Date(timeIntervalSince1970: 1700000000)
+
+        do {
+            let index = AgentHistoryFTSIndex(dbPath: tempDB.path)
+            index.indexSession(
+                sessionID: "old", title: "t", firstPrompt: "p", fullTranscript: "x", gitBranch: nil,
+                repoName: "r", agentName: "Claude", filesEdited: "", toolsCalled: "",
+                transcriptPath: "/tmp/old.jsonl", mtime: mtime, fileSize: 10
+            )
+            XCTAssertFalse(index.needsReindex(sessionID: "old", mtime: mtime, fileSize: 10))
+        }
+
+        var raw: OpaquePointer?
+        XCTAssertEqual(sqlite3_open(tempDB.path, &raw), SQLITE_OK)
+        sqlite3_exec(raw, "PRAGMA user_version = 1;", nil, nil, nil)
+        sqlite3_close(raw)
+
+        let reopened = AgentHistoryFTSIndex(dbPath: tempDB.path)
+        XCTAssertTrue(reopened.needsReindex(sessionID: "old", mtime: mtime, fileSize: 10))
+    }
 }
