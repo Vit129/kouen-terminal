@@ -23,7 +23,9 @@ enum NotificationPermission {
     /// `UNUserNotificationCenter` is known-bad on this machine (see `NotificationCenterProbe` in
     /// KouenApp — corrupted-database crash on some macOS 26 installs).
     static func current(_ completion: @escaping @MainActor @Sendable (State) -> Void) {
-        guard !NotificationCenterProbe.isKnownBad else {
+        // An unbundled binary (e.g. `.build/debug/Kouen` run directly) has no bundle id, and
+        // `UNUserNotificationCenter.current()` asserts on that — SIGABRT from onboarding.
+        guard !NotificationCenterProbe.isKnownBad, Bundle.main.bundleIdentifier != nil else {
             deliver(.undetermined, to: completion)
             return
         }
@@ -36,7 +38,7 @@ enum NotificationPermission {
     /// Prompt when undecided; open System Settings ▸ Notifications when already denied. Falls
     /// back to opening Settings + `.undetermined` when `UNUserNotificationCenter` is known-bad.
     static func request(_ completion: @escaping @MainActor @Sendable (State) -> Void) {
-        guard !NotificationCenterProbe.isKnownBad else {
+        guard !NotificationCenterProbe.isKnownBad, Bundle.main.bundleIdentifier != nil else {
             openSystemSettings()
             deliver(.undetermined, to: completion)
             return

@@ -66,6 +66,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             WorktreeAutoIsolateService.shared.start()
             ScriptHookCoordinator.shared.start()
         }
+        DispatchQueue.global(qos: .utility).async {
+            ShellIntegration.refreshInstalledScripts()
+        }
         // Follow the macOS system appearance for auto light/dark theme switching. The startup
         // application happens post-daemon-sync below (so the theme change reaches a ready daemon);
         // this observer handles every later Light/Dark flip.

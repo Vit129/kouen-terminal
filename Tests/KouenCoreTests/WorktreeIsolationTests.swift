@@ -111,6 +111,32 @@ final class WorktreeIsolationTests: XCTestCase {
         XCTAssertFalse(editor.setTabWorktree(UUID(), worktreePath: "/tmp/x", parentRepoPath: nil))
     }
 
+    // A worktree removed after its branch merged must not keep the tab pinned to a dead
+    // path: new panes inherited it and the cwd fallback stranded them in `.kouen-worktrees`.
+    func testClearStaleWorktreeTagsMovesTabBackToRepo() throws {
+        let repo = FileManager.default.temporaryDirectory.appendingPathComponent("stale-wt-\(UUID().uuidString)")
+        let live = repo.appendingPathComponent(".kouen-worktrees/live")
+        try FileManager.default.createDirectory(at: live, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: repo) }
+        let dead = repo.appendingPathComponent(".kouen-worktrees/merged").path
+
+        var editor = SessionEditor()
+        let ws = try XCTUnwrap(editor.snapshot.activeWorkspace)
+        let deadSession = try XCTUnwrap(editor.addSession(to: ws.id, cwd: repo.path, name: nil))
+        let liveSession = try XCTUnwrap(editor.addSession(to: ws.id, cwd: repo.path, name: nil))
+        func tab(_ id: SessionID) throws -> Tab {
+            try XCTUnwrap(editor.snapshot.activeWorkspace?.sessions.first(where: { $0.id == id })?.tabs.first)
+        }
+        editor.setTabWorktree(try tab(deadSession).id, worktreePath: dead, parentRepoPath: repo.path)
+        editor.setTabWorktree(try tab(liveSession).id, worktreePath: live.path, parentRepoPath: repo.path)
+
+        XCTAssertTrue(editor.clearStaleWorktreeTags())
+        XCTAssertNil(try tab(deadSession).worktreePath)
+        XCTAssertNil(try tab(deadSession).parentRepoPath)
+        XCTAssertEqual(try tab(liveSession).worktreePath, live.path)
+        XCTAssertFalse(editor.clearStaleWorktreeTags(), "second pass has nothing left to clear")
+    }
+
     // MARK: - Tab model persistence
 
     func testTabWorktreeFieldsRoundTrip() throws {
