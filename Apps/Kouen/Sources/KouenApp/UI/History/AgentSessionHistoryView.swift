@@ -93,6 +93,13 @@ public final class AgentSessionHistoryModel: ObservableObject {
             scheduleFilter(debounceMs: 0)
         }
     }
+    /// Selected agent filters for multi-selection. If empty, all agents are shown.
+    @Published public var selectedAgents: Set<AgentKind> = [] {
+        didSet {
+            extraRecordsShown = 0
+            scheduleFilter(debounceMs: 0)
+        }
+    }
     @Published public var filteredRecords: [AgentSessionRecord] = [] {
         didSet {
             recomputeDerivedLists()
@@ -198,6 +205,24 @@ public final class AgentSessionHistoryModel: ObservableObject {
         }
     }
 
+    public func toggleAgentFilter(_ kind: AgentKind) {
+        if selectedAgents.contains(kind) {
+            selectedAgents.remove(kind)
+        } else {
+            selectedAgents.insert(kind)
+        }
+    }
+
+    public var availableAgentKinds: [AgentKind] {
+        let distinct = Set(records.map(\.agentKind))
+        let canonical: [AgentKind] = [.claudeCode, .codex, .copilot, .antigravity]
+        var result = canonical.filter { distinct.contains($0) }
+        for kind in distinct where !canonical.contains(kind) {
+            result.append(kind)
+        }
+        return result.isEmpty ? canonical : result
+    }
+
     public func moveSelection(by delta: Int) {
         let total = displayRecords.count
         guard total > 0 else {
@@ -279,6 +304,7 @@ public final class AgentSessionHistoryModel: ObservableObject {
         let (filtered, newCache, snippets) = Self.computeFiltered(
             query: searchQuery,
             scope: selectedScope,
+            selectedAgents: selectedAgents,
             records: records,
             activeCWD: activeCWDProvider(),
             resolver: repoRootResolver,
@@ -297,6 +323,7 @@ public final class AgentSessionHistoryModel: ObservableObject {
 
         let currentQuery = searchQuery
         let currentScope = selectedScope
+        let currentAgents = selectedAgents
         let currentRecords = records
         let activeCWD = activeCWDProvider()
         let resolver = repoRootResolver
@@ -313,6 +340,7 @@ public final class AgentSessionHistoryModel: ObservableObject {
             let (filtered, newCache, snippets) = Self.computeFiltered(
                 query: currentQuery,
                 scope: currentScope,
+                selectedAgents: currentAgents,
                 records: currentRecords,
                 activeCWD: activeCWD,
                 resolver: resolver,
@@ -334,11 +362,19 @@ public final class AgentSessionHistoryModel: ObservableObject {
     nonisolated package static func computeFiltered(
         query: String,
         scope: HistoryScope,
+        selectedAgents: Set<AgentKind> = [],
         records: [AgentSessionRecord],
         activeCWD: String,
         resolver: @Sendable (String) -> String?,
         initialCache: [String: String]
     ) -> (filtered: [AgentSessionRecord], cache: [String: String], snippets: [String: String]) {
+        let baseRecords: [AgentSessionRecord]
+        if selectedAgents.isEmpty {
+            baseRecords = records
+        } else {
+            baseRecords = records.filter { selectedAgents.contains($0.agentKind) }
+        }
+
         var cache = initialCache
         func resolveRoot(for path: String) -> String {
             if let cached = cache[path] { return cached }
@@ -356,7 +392,7 @@ public final class AgentSessionHistoryModel: ObservableObject {
 
         // 1. When search query is active, ignore scope entirely and search all records using ranked search
         if matcher.hasQuery {
-            let hits = AgentHistorySearch.rank(query: query, records: records)
+            let hits = AgentHistorySearch.rank(query: query, records: baseRecords)
             var snippets: [String: String] = [:]
             // Pre-extract snippets on the background thread for top visible results so UI render doesn't block MainActor
             for hit in hits.prefix(50) {
@@ -383,7 +419,7 @@ public final class AgentSessionHistoryModel: ObservableObject {
         // 2. When search query is empty, apply the selected scope with cached repo roots
         let activeRepoRoot = resolveRoot(for: activeCWD)
 
-        let filtered = records.filter { record in
+        let filtered = baseRecords.filter { record in
             switch scope {
             case .repo:
                 guard !activeRepoRoot.isEmpty else { return true }
@@ -526,6 +562,11 @@ public struct AgentSessionHistoryView: View {
             .padding(.horizontal, KouenDesign.Spacing.sm)
             .padding(.bottom, KouenDesign.Spacing.xs)
 
+            // Agent Filter Chips (Claude / Codex / Copilot / Antigravity)
+            agentChipsView
+                .padding(.horizontal, KouenDesign.Spacing.sm)
+                .padding(.bottom, KouenDesign.Spacing.xs)
+
             // Sub-header with count and refresh
             subHeaderView
                 .padding(.horizontal, KouenDesign.Spacing.sm)
@@ -611,6 +652,65 @@ public struct AgentSessionHistoryView: View {
                 return .handled
             }
             return .ignored
+        }
+    }
+
+    // MARK: - Agent Filter Chips
+    @ViewBuilder
+    private var agentChipsView: some View {
+        let c = KouenDesign.chrome
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 4) {
+                ForEach(model.availableAgentKinds, id: \.self) { kind in
+                    let isSelected = model.selectedAgents.contains(kind)
+                    let brandColor = Color(nsColor: NSColor.fromHex(kind.dotHex) ?? .secondaryLabelColor)
+                    Button {
+                        model.toggleAgentFilter(kind)
+                    } label: {
+                        HStack(spacing: 3.5) {
+                            Image(nsImage: AgentIconRenderer.templateOrMonogramImage(for: kind, size: 9))
+                                .resizable()
+                                .frame(width: 9, height: 9)
+                                .foregroundStyle(isSelected ? brandColor : Color(nsColor: c.textTertiary))
+
+                            Text(kind.filterChipName)
+                                .font(.system(size: 10, weight: isSelected ? .semibold : .regular))
+                                .foregroundStyle(isSelected ? Color(nsColor: c.textPrimary) : Color(nsColor: c.textSecondary))
+                        }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2.5)
+                        .background(
+                            isSelected
+                                ? brandColor.opacity(0.14)
+                                : Color(nsColor: c.surfaceElevated)
+                        )
+                        .clipShape(Capsule())
+                        .overlay(
+                            Capsule()
+                                .stroke(
+                                    isSelected
+                                        ? brandColor.opacity(0.55)
+                                        : Color(nsColor: c.border),
+                                    lineWidth: 1
+                                )
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                if !model.selectedAgents.isEmpty {
+                    Button {
+                        model.selectedAgents.removeAll()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 10))
+                            .foregroundStyle(Color(nsColor: c.textTertiary))
+                    }
+                    .buttonStyle(.plain)
+                    .help("Clear AI filter")
+                }
+            }
+            .padding(.horizontal, 1)
         }
     }
 
@@ -908,3 +1008,16 @@ public struct AgentSessionHistoryView: View {
         }
     }
 }
+
+private extension AgentKind {
+    var filterChipName: String {
+        switch self {
+        case .claudeCode: return "Claude"
+        case .copilot: return "Copilot"
+        case .codex: return "Codex"
+        case .antigravity: return "Antigravity"
+        default: return displayName
+        }
+    }
+}
+
