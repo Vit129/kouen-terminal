@@ -1727,6 +1727,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
                 changed = true
             }
         }
+        if editor.clearStaleWorktreeTags() { changed = true }
         if changed { commit(immediate: false) }
     }
 
@@ -2170,7 +2171,10 @@ public final class SurfaceRegistry: @unchecked Sendable {
         }
         var candidate = (expanded as NSString).deletingLastPathComponent
         while !candidate.isEmpty {
-            if FileManager.default.fileExists(atPath: candidate, isDirectory: &isDirectory), isDirectory.boolValue {
+            // A removed worktree must land on its repo, never on the `.kouen-worktrees`
+            // container itself (no Makefile, no project files — looks like a broken checkout).
+            if (candidate as NSString).lastPathComponent != WorktreeManager.worktreeDir,
+               FileManager.default.fileExists(atPath: candidate, isDirectory: &isDirectory), isDirectory.boolValue {
                 return candidate
             }
             let parent = (candidate as NSString).deletingLastPathComponent
