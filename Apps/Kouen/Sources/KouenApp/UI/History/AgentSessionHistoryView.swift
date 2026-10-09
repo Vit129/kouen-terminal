@@ -809,6 +809,16 @@ public struct AgentSessionHistoryView: View {
                     HStack(spacing: 4) {
                         AgentBadgeView(kind: record.agentKind, iconSize: 10, fontSize: 8.5, showName: false)
 
+                        if let tag = record.surfaceTag {
+                            Text(tag)
+                                .font(.system(size: 8, weight: .semibold))
+                                .padding(.horizontal, 3)
+                                .padding(.vertical, 1)
+                                .background(Color(nsColor: c.surfaceElevated))
+                                .cornerRadius(3)
+                                .foregroundStyle(Color(nsColor: c.textSecondary))
+                        }
+
                         if isLive {
                             HStack(spacing: 2) {
                                 Circle()
