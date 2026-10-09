@@ -15,7 +15,6 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ### Fixed
 - Keep sessions visible after schema bumps and cross-repo grouping (P52-P55 review) ([`5c62a87`](https://github.com/Vit129/kouen-terminal/commit/5c62a870954617ce9dfc02a901a779a95840a575))
 
-
 ## [4.21.0] - 2026-10-09
 
 ### Added
