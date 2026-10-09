@@ -88,6 +88,23 @@ public enum ShellIntegration {
                              alreadyWired: wired.alreadyWired, rcBackedUp: wired.backedUp)
     }
 
+    /// Rewrites every already-installed integration script whose content is stale. The rc file
+    /// only `source`s the script, so wrapper changes in a new build (e.g. P54's auto-open of the
+    /// remote-control dashboard) never reached anyone who installed before — the script was only
+    /// written by `kouen shell-integration install`. Never installs where the user hasn't opted in.
+    @discardableResult
+    public static func refreshInstalledScripts(homeOverride: URL? = nil) -> [Shell] {
+        Shell.allCases.filter { shell in
+            let url = homeOverride.map {
+                $0.appendingPathComponent("Library/Application Support/Kouen/shell-integration/kouen.\(shell.rawValue)")
+            } ?? scriptURL(for: shell)
+            guard let current = try? String(contentsOf: url, encoding: .utf8) else { return false }
+            let latest = script(for: shell)
+            guard current != latest else { return false }
+            return (try? Data(latest.utf8).write(to: url, options: .atomic)) != nil
+        }
+    }
+
     /// The `source` line for a shell (fish has no `[ -f ]` test syntax).
     public static func sourceLine(for shell: Shell, scriptPath: URL) -> String {
         switch shell {
