@@ -5,6 +5,17 @@ All notable changes to Kouen are documented here. The format is based on
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
+## [4.21.1] - 2026-10-09
+
+### Added
+- Full session coverage and surface tagging across Antigravity, Codex and Copilot (P55) ([`9ed39f5`](https://github.com/Vit129/kouen-terminal/commit/9ed39f5a36e0219593da53daea38b5d51911d2a3))
+- Cross-repo task grouping, selected row detail expansion, and search highlighting (P52 Phase 2) ([`7dd5763`](https://github.com/Vit129/kouen-terminal/commit/7dd57639586f35411d59305ba3890b68df0cb643))
+- Advanced search (position indicators, topic segments, semantic fallback, graphify enrichment) ([#85](https://github.com/Vit129/kouen-terminal/pull/85)) ([`52337e1`](https://github.com/Vit129/kouen-terminal/commit/52337e180ee7896b28d40d31edff8985b1bb718a))
+
+### Fixed
+- Keep sessions visible after schema bumps and cross-repo grouping (P52-P55 review) ([`5c62a87`](https://github.com/Vit129/kouen-terminal/commit/5c62a870954617ce9dfc02a901a779a95840a575))
+
+
 ## [4.21.0] - 2026-10-09
 
 ### Added
