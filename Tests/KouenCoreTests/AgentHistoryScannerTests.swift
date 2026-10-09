@@ -1,11 +1,20 @@
 import Foundation
 @testable import KouenCore
 import KouenIPC
+import SQLite3
 import XCTest
 
 final class AgentHistoryScannerTests: XCTestCase {
     func testScanAllReturnsRecords() async {
-        let scanner = AgentHistoryScanner()
+        let tempDBPath = FileManager.default.temporaryDirectory
+            .appendingPathComponent("test_agent_history_\(UUID().uuidString).sqlite").path
+        defer {
+            try? FileManager.default.removeItem(atPath: tempDBPath)
+            try? FileManager.default.removeItem(atPath: tempDBPath + "-shm")
+            try? FileManager.default.removeItem(atPath: tempDBPath + "-wal")
+        }
+        let fts = AgentHistoryFTSIndex(dbPath: tempDBPath)
+        let scanner = AgentHistoryScanner(ftsIndex: fts)
         let records = await scanner.scanAll()
         // Scanner successfully runs and produces an array without crashing or throwing
         XCTAssertNotNil(records)
@@ -323,5 +332,130 @@ final class AgentHistoryScannerTests: XCTestCase {
 
         let hitsLimit5 = index.search(query: "commonSearchTerm", limit: 5)
         XCTAssertEqual(hitsLimit5.count, 5)
+    }
+
+    // MARK: - Regression Tests for Defects 1-4
+
+    func testGhostSessionsPrunedWhenTranscriptDeletedOnDisk() {
+        let tempDB = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("test_prune_\(UUID().uuidString).sqlite")
+        let tempTranscript = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("test_transcript_\(UUID().uuidString).jsonl")
+        defer {
+            try? FileManager.default.removeItem(at: tempDB)
+            try? FileManager.default.removeItem(at: tempTranscript)
+        }
+
+        try? "test data".write(to: tempTranscript, atomically: true, encoding: .utf8)
+
+        let index = AgentHistoryFTSIndex(dbPath: tempDB.path)
+        let rec = makeRecord(id: "sess-to-prune")
+        index.saveRecord(rec, mtime: Date(), fileSize: 100)
+        index.indexSession(
+            sessionID: rec.id, title: rec.title, firstPrompt: rec.firstPrompt,
+            fullTranscript: "content", gitBranch: "main", repoName: "repo",
+            agentName: "Claude", filesEdited: "", toolsCalled: "",
+            transcriptPath: tempTranscript.path, mtime: Date(), fileSize: 100
+        )
+
+        XCTAssertEqual(index.loadCachedEntries().count, 1)
+
+        // Delete the transcript file on disk
+        try? FileManager.default.removeItem(at: tempTranscript)
+
+        // Pruning with an empty set of seen paths (or missing path) must delete it across all tables
+        index.pruneMissingSessions(validTranscriptPaths: [])
+
+        XCTAssertEqual(index.loadCachedEntries().count, 0)
+        XCTAssertTrue(index.search(query: "content").isEmpty)
+        XCTAssertTrue(index.needsReindex(sessionID: rec.id, mtime: Date(), fileSize: 100))
+    }
+
+    // A scan that misses a transcript (e.g. one agent's dir was unreadable this round) must not
+    // drop a session whose file still exists — only files gone from disk are ghosts.
+    func testPruneKeepsUnseenSessionWhoseTranscriptStillExists() {
+        let tempDB = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("test_prune_keep_\(UUID().uuidString).sqlite")
+        let tempTranscript = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("test_transcript_\(UUID().uuidString).jsonl")
+        defer {
+            try? FileManager.default.removeItem(at: tempDB)
+            try? FileManager.default.removeItem(at: tempTranscript)
+        }
+        try? "test data".write(to: tempTranscript, atomically: true, encoding: .utf8)
+
+        let index = AgentHistoryFTSIndex(dbPath: tempDB.path)
+        let rec = AgentSessionRecord(
+            id: "sess-keep", agentKind: .claudeCode, title: "t", projectPath: "/tmp/repo", projectName: "repo",
+            messageCount: 3, updatedAt: Date(), firstPrompt: "hi", transcriptPath: tempTranscript.path,
+            worktreeAvailable: true
+        )
+        index.saveRecord(rec, mtime: Date(), fileSize: 100)
+
+        index.pruneMissingSessions(validTranscriptPaths: [])
+
+        XCTAssertEqual(index.loadCachedEntries().map(\.record.id), ["sess-keep"])
+    }
+
+    func testNoFabricatedRecordsPersistedWhenSessionRecordsEmpty() {
+        let tempDB = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("test_no_fabricate_\(UUID().uuidString).sqlite")
+        defer { try? FileManager.default.removeItem(at: tempDB) }
+
+        let index = AgentHistoryFTSIndex(dbPath: tempDB.path)
+        // Manually insert into session_fts and session_index_meta without session_records (legacy database scenario)
+        index.indexSession(
+            sessionID: "legacy-sess", title: "Legacy Session", firstPrompt: "prompt",
+            fullTranscript: "full transcript", gitBranch: "main", repoName: "repo",
+            agentName: "Claude Code", filesEdited: "", toolsCalled: "",
+            transcriptPath: "/tmp/legacy.jsonl", mtime: Date(), fileSize: 100
+        )
+
+        // loadCachedEntries must NOT fabricate synthesized records or persist fake records
+        let entries = index.loadCachedEntries()
+        XCTAssertEqual(entries.count, 0, "No fabricated records should be returned or saved to session_records")
+    }
+
+    func testSchemaVersioningDropsAndRecreatesOnMismatch() {
+        let tempDB = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("test_schema_\(UUID().uuidString).sqlite")
+        defer { try? FileManager.default.removeItem(at: tempDB) }
+
+        // Create database with old user_version = 999
+        var db: OpaquePointer?
+        XCTAssertEqual(sqlite3_open(tempDB.path, &db), SQLITE_OK)
+        sqlite3_exec(db, "PRAGMA user_version = 999;", nil, nil, nil)
+        sqlite3_exec(db, "CREATE TABLE session_records (dummy_col TEXT);", nil, nil, nil)
+        sqlite3_close(db)
+
+        // Opening index must detect mismatch, drop outdated table, recreate correct schema, and set user_version = 1
+        let index = AgentHistoryFTSIndex(dbPath: tempDB.path)
+        let rec = makeRecord(id: "sess-v1")
+        index.saveRecord(rec, mtime: Date(), fileSize: 42)
+
+        let loaded = index.loadCachedEntries()
+        XCTAssertEqual(loaded.count, 1)
+        XCTAssertEqual(loaded[0].record.id, "sess-v1")
+    }
+
+    func testScanAllReentrancyAndForceSemantics() async {
+        let tempDB = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("test_reentrancy_\(UUID().uuidString).sqlite")
+        defer { try? FileManager.default.removeItem(at: tempDB) }
+
+        let index = AgentHistoryFTSIndex(dbPath: tempDB.path)
+        let scanner = AgentHistoryScanner(ftsIndex: index)
+
+        // Expect notification when scan completes
+        var notificationReceived = false
+        let observer = NotificationCenter.default.addObserver(
+            forName: AgentHistoryScanner.didUpdateNotification,
+            object: nil,
+            queue: nil
+        ) { _ in
+            notificationReceived = true
+        }
+        defer { NotificationCenter.default.removeObserver(observer) }
+
+        // Run concurrent scans
+        async let scan1 = scanner.scanAll()
+        async let scan2 = scanner.getOrScan(force: true)
+
+        let (res1, res2) = await (scan1, scan2)
+        XCTAssertEqual(res1.count, res2.count)
+        XCTAssertTrue(notificationReceived)
     }
 }

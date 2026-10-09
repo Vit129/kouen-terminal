@@ -245,24 +245,81 @@ public actor AgentHistoryScanner {
     #if canImport(SQLite3)
     private var copilotCache: (mtime: Date, size: Int, records: [AgentSessionRecord])?
     #endif
+    public static let didUpdateNotification = Notification.Name("KouenAgentHistoryDidUpdate")
+
+    private var inFlightScanTask: Task<[AgentSessionRecord], Never>?
 
     public init(ftsIndex: AgentHistoryFTSIndex = .shared) {
         self.cloudSessionStore = ClaudeCloudSessionStore()
         self.ftsIndex = ftsIndex
     }
 
-    /// Returns cached records if fresh (< 5s), otherwise rescans.
+    /// Returns cached records immediately if available (from memory or persisted SQLite index).
+    /// If force is true, awaits a fresh scan.
+    /// If stale (>5s) and not forced, returns cached data and triggers a rescan in the background.
     public func getOrScan(force: Bool = false) async -> [AgentSessionRecord] {
-        if !force && !cachedRecords.isEmpty && Date().timeIntervalSince(lastScanAt) < 5.0 {
+        if force {
+            return await scanAll()
+        }
+
+        if cachedRecords.isEmpty {
+            let entries = ftsIndex.loadCachedEntries()
+            if !entries.isEmpty {
+                for entry in entries {
+                    fileCache[entry.transcriptPath] = FileCacheEntry(mtime: entry.mtime, size: entry.fileSize, record: entry.record)
+                }
+                cachedRecords = entries.map(\.record)
+                lastScanAt = Date()
+            }
+        }
+
+        if !cachedRecords.isEmpty {
+            if Date().timeIntervalSince(lastScanAt) >= 5.0 {
+                triggerBackgroundScan()
+            }
             return cachedRecords
         }
+
         return await scanAll()
     }
 
-    /// Scans all supported agent transcripts on disk concurrently with mtime caching, then
-    /// enriches/extends the Claude Code rows with live placement from `claude agents --json`
-    /// (cloud/background/remote-control) — see `mergeLivePlacements`.
+    private func triggerBackgroundScan() {
+        guard inFlightScanTask == nil else { return }
+        let task = Task { [weak self] () -> [AgentSessionRecord] in
+            guard let self else { return [] }
+            return await self.performScanAll()
+        }
+        inFlightScanTask = task
+        Task {
+            _ = await task.value
+        }
+    }
+
+    /// Scans all supported agent transcripts on disk.
+    /// If a scan is already in progress, awaits the in-flight scan instead of returning stale data.
     public func scanAll() async -> [AgentSessionRecord] {
+        if let existing = inFlightScanTask {
+            return await existing.value
+        }
+
+        let task = Task { [weak self] () -> [AgentSessionRecord] in
+            guard let self else { return [] }
+            return await self.performScanAll()
+        }
+        inFlightScanTask = task
+        let results = await task.value
+        inFlightScanTask = nil
+        return results
+    }
+
+    private func performScanAll() async -> [AgentSessionRecord] {
+        if fileCache.isEmpty {
+            let entries = ftsIndex.loadCachedEntries()
+            for entry in entries {
+                fileCache[entry.transcriptPath] = FileCacheEntry(mtime: entry.mtime, size: entry.fileSize, record: entry.record)
+            }
+        }
+
         async let claudeTask = scanClaude()
         async let antigravityTask = scanAntigravity()
         async let codexTask = scanCodex()
@@ -288,6 +345,19 @@ public actor AgentHistoryScanner {
         results.sort { $0.updatedAt > $1.updatedAt }
         cachedRecords = results
         lastScanAt = Date()
+
+        // Prune ghost sessions from SQLite and in-memory fileCache inside a single transaction
+        var seenPaths = Set<String>()
+        for record in results {
+            if !record.transcriptPath.isEmpty && !record.transcriptPath.hasPrefix("cloud://") {
+                seenPaths.insert(record.transcriptPath)
+            }
+        }
+        ftsIndex.pruneMissingSessions(validTranscriptPaths: seenPaths)
+        fileCache = fileCache.filter { seenPaths.contains($0.key) }
+
+        NotificationCenter.default.post(name: Self.didUpdateNotification, object: nil)
+
         return results
     }
 
@@ -327,6 +397,7 @@ public actor AgentHistoryScanner {
         guard FileManager.default.fileExists(atPath: claudeProjectsDir.path) else { return [] }
 
         var records: [AgentSessionRecord] = []
+        var toSave: [(record: AgentSessionRecord, mtime: Date, fileSize: Int)] = []
         guard let projectFolders = try? FileManager.default.contentsOfDirectory(atPath: claudeProjectsDir.path) else {
             return []
         }
@@ -356,10 +427,14 @@ public actor AgentHistoryScanner {
                        let mtime = rv.contentModificationDate,
                        let size = rv.fileSize {
                         fileCache[path] = FileCacheEntry(mtime: mtime, size: size, record: record)
+                        toSave.append((record: record, mtime: mtime, fileSize: size))
                     }
                     records.append(record)
                 }
             }
+        }
+        if !toSave.isEmpty {
+            ftsIndex.saveRecordsBatch(toSave)
         }
         return records
     }
@@ -668,6 +743,7 @@ public actor AgentHistoryScanner {
         guard FileManager.default.fileExists(atPath: brainDir.path) else { return [] }
 
         var records: [AgentSessionRecord] = []
+        var toSave: [(record: AgentSessionRecord, mtime: Date, fileSize: Int)] = []
         guard let sessionFolders = try? FileManager.default.contentsOfDirectory(atPath: brainDir.path) else {
             return []
         }
@@ -703,9 +779,13 @@ public actor AgentHistoryScanner {
                    let mtime = rv.contentModificationDate,
                    let size = rv.fileSize {
                     fileCache[path] = FileCacheEntry(mtime: mtime, size: size, record: record)
+                    toSave.append((record: record, mtime: mtime, fileSize: size))
                 }
                 records.append(record)
             }
+        }
+        if !toSave.isEmpty {
+            ftsIndex.saveRecordsBatch(toSave)
         }
         return records
     }
@@ -893,6 +973,7 @@ public actor AgentHistoryScanner {
         )
 
         var records: [AgentSessionRecord] = []
+        var toSave: [(record: AgentSessionRecord, mtime: Date, fileSize: Int)] = []
         for fileURL in rolloutFiles {
             let path = fileURL.path
 
@@ -912,9 +993,13 @@ public actor AgentHistoryScanner {
                    let mtime = rv.contentModificationDate,
                    let size = rv.fileSize {
                     fileCache[path] = FileCacheEntry(mtime: mtime, size: size, record: record)
+                    toSave.append((record: record, mtime: mtime, fileSize: size))
                 }
                 records.append(record)
             }
+        }
+        if !toSave.isEmpty {
+            ftsIndex.saveRecordsBatch(toSave)
         }
         return records
     }
@@ -1075,6 +1160,7 @@ public actor AgentHistoryScanner {
         guard let workspaces = try? fm.contentsOfDirectory(atPath: storage.path) else { return [] }
 
         var records: [AgentSessionRecord] = []
+        var toSave: [(record: AgentSessionRecord, mtime: Date, fileSize: Int)] = []
         for workspace in workspaces {
             let dir = storage.appendingPathComponent(workspace)
             guard let files = try? fm.contentsOfDirectory(atPath: dir.appendingPathComponent("chatSessions").path),
@@ -1095,8 +1181,12 @@ public actor AgentHistoryScanner {
                       let record = Self.vscodeRecord(session, projectPath: projectPath, transcriptPath: url.path, fallbackDate: mtime, fileSize: size, ftsIndex: ftsIndex)
                 else { continue }
                 fileCache[url.path] = FileCacheEntry(mtime: mtime, size: size, record: record)
+                toSave.append((record: record, mtime: mtime, fileSize: size))
                 records.append(record)
             }
+        }
+        if !toSave.isEmpty {
+            ftsIndex.saveRecordsBatch(toSave)
         }
         return records
     }
@@ -1214,6 +1304,7 @@ public actor AgentHistoryScanner {
         }
 
         var records: [AgentSessionRecord] = []
+        var toSave: [(record: AgentSessionRecord, mtime: Date, fileSize: Int)] = []
         var sessionStmt: OpaquePointer?
         let sessionSQL = "SELECT id, cwd, repository, branch, summary, updated_at FROM sessions ORDER BY updated_at DESC"
         guard sqlite3_prepare_v2(db, sessionSQL, -1, &sessionStmt, nil) == SQLITE_OK else { return [] }
@@ -1253,7 +1344,7 @@ public actor AgentHistoryScanner {
                 fileSize: 0
             )
 
-            records.append(AgentSessionRecord(
+            let record = AgentSessionRecord(
                 id: id,
                 agentKind: .copilot,
                 title: String(title.prefix(120)),
@@ -1267,7 +1358,12 @@ public actor AgentHistoryScanner {
                 latestTurns: turns,
                 transcriptPath: dbPath,
                 worktreeAvailable: FileManager.default.fileExists(atPath: finalPath)
-            ))
+            )
+            toSave.append((record: record, mtime: modDate, fileSize: 0))
+            records.append(record)
+        }
+        if !toSave.isEmpty {
+            ftsIndex?.saveRecordsBatch(toSave)
         }
         return records
     }

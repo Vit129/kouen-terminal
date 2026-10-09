@@ -9,6 +9,7 @@ final class AgentSessionHistoryModelTests: XCTestCase {
     private func makeRecord(
         id: String,
         title: String,
+        agentKind: AgentKind = .claudeCode,
         projectPath: String = "/Users/test/my-repo",
         projectName: String = "my-repo",
         gitBranch: String? = "main",
@@ -18,7 +19,7 @@ final class AgentSessionHistoryModelTests: XCTestCase {
     ) -> AgentSessionRecord {
         AgentSessionRecord(
             id: id,
-            agentKind: .claudeCode,
+            agentKind: agentKind,
             title: title,
             projectPath: projectPath,
             projectName: projectName,
@@ -32,6 +33,7 @@ final class AgentSessionHistoryModelTests: XCTestCase {
             worktreeAvailable: true
         )
     }
+
 
     func testDateGrouping() {
         let calendar = Calendar.current
@@ -234,4 +236,50 @@ final class AgentSessionHistoryModelTests: XCTestCase {
         XCTAssertNotNil(exactResolved)
         XCTAssertEqual(exactResolved.map(\.tabID), tabWithID.id)
     }
+
+    func testAgentKindFilter() {
+        let r1 = makeRecord(id: "r1", title: "Claude Task", agentKind: .claudeCode)
+        let r2 = makeRecord(id: "r2", title: "Codex Task", agentKind: .codex)
+        let r3 = makeRecord(id: "r3", title: "Copilot Task", agentKind: .copilot)
+        let r4 = makeRecord(id: "r4", title: "Antigravity Task", agentKind: .antigravity)
+
+        let model = AgentSessionHistoryModel()
+        model.records = [r1, r2, r3, r4]
+        model.selectedScope = .all
+        model.applyFilterNow()
+
+        // 1. Default: empty selectedAgents -> all records shown
+        XCTAssertEqual(model.filteredRecords.count, 4)
+        XCTAssertEqual(model.availableAgentKinds, [.claudeCode, .codex, .copilot, .antigravity])
+
+        // 2. Single selection: toggle claudeCode -> only r1
+        model.toggleAgentFilter(.claudeCode)
+        XCTAssertEqual(model.selectedAgents, [.claudeCode])
+        model.applyFilterNow()
+        XCTAssertEqual(model.filteredRecords.map(\.id), ["r1"])
+
+        // 3. Multi-selection: toggle copilot -> r1 and r3
+        model.toggleAgentFilter(.copilot)
+        XCTAssertEqual(model.selectedAgents, [.claudeCode, .copilot])
+        model.applyFilterNow()
+        XCTAssertEqual(Set(model.filteredRecords.map(\.id)), ["r1", "r3"])
+
+        // 4. Toggle off claudeCode -> only copilot (r3)
+        model.toggleAgentFilter(.claudeCode)
+        XCTAssertEqual(model.selectedAgents, [.copilot])
+        model.applyFilterNow()
+        XCTAssertEqual(model.filteredRecords.map(\.id), ["r3"])
+
+        // 5. Clear all -> all records restored
+        model.selectedAgents.removeAll()
+        model.applyFilterNow()
+        XCTAssertEqual(model.filteredRecords.count, 4)
+
+        // 6. Agent filter combined with search query
+        model.toggleAgentFilter(.antigravity)
+        model.searchQuery = "Task"
+        model.applyFilterNow()
+        XCTAssertEqual(model.filteredRecords.map(\.id), ["r4"])
+    }
 }
+

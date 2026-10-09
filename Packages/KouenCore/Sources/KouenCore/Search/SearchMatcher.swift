@@ -166,6 +166,26 @@ public struct SearchMatcher: Sendable {
 
     public static func isSubsequence(_ query: String, in haystack: String) -> Bool {
         if query.isEmpty { return true }
+        if query.count > haystack.count { return false }
+        var isQueryAscii = true
+        for b in query.utf8 { if b >= 0x80 { isQueryAscii = false; break } }
+        var isHaystackAscii = true
+        for b in haystack.utf8 { if b >= 0x80 { isHaystackAscii = false; break } }
+        if isQueryAscii && isHaystackAscii {
+            var qIter = query.utf8.makeIterator()
+            guard var currentQ = qIter.next() else { return true }
+            for b in haystack.utf8 {
+                if b == currentQ {
+                    if let nextQ = qIter.next() {
+                        currentQ = nextQ
+                    } else {
+                        return true
+                    }
+                }
+            }
+            return false
+        }
+
         var queryIdx = query.startIndex
         for char in haystack {
             if char == query[queryIdx] {
@@ -179,7 +199,17 @@ public struct SearchMatcher: Sendable {
     }
 
     public static func normalized(_ value: String) -> String {
-        value.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+        var isAscii = true
+        for byte in value.utf8 {
+            if byte >= 0x80 {
+                isAscii = false
+                break
+            }
+        }
+        if isAscii {
+            return value.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return value.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
             .lowercased()
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -211,42 +241,55 @@ public struct SearchMatcher: Sendable {
 
     /// Evaluates if token `k` matches `word` either by prefix, substring (for k >= 4), or 1-edit typo tolerance (for k >= 4).
     public static func tokenNear(_ k: String, in word: String) -> Bool {
+        tokenNear(k, in: Substring(word))
+    }
+
+    public static func tokenNear(_ k: String, in word: Substring) -> Bool {
         if word.hasPrefix(k) { return true }
         if k.count > 3 && word.contains(k) { return true }
-        if k.count < 4 || abs(k.count - word.count) > 1 { return false }
+        let kCount = k.count
+        let wCount = word.count
+        if kCount < 4 || abs(kCount - wCount) > 1 { return false }
 
-        let kArr = Array(k)
-        let wArr = Array(word)
-        var i = 0
-        var j = 0
+        var i = k.startIndex
+        var j = word.startIndex
         var edits = 0
 
-        while i < kArr.count && j < wArr.count {
-            if kArr[i] == wArr[j] {
-                i += 1
-                j += 1
+        while i < k.endIndex && j < word.endIndex {
+            if k[i] == word[j] {
+                i = k.index(after: i)
+                j = word.index(after: j)
             } else {
                 edits += 1
                 if edits > 1 { return false }
-                if kArr.count > wArr.count {
-                    i += 1
-                } else if wArr.count > kArr.count {
-                    j += 1
+                if kCount > wCount {
+                    i = k.index(after: i)
+                } else if wCount > kCount {
+                    j = word.index(after: j)
                 } else {
-                    i += 1
-                    j += 1
+                    i = k.index(after: i)
+                    j = word.index(after: j)
                 }
             }
         }
-        return edits + (kArr.count - i) + (wArr.count - j) <= 1
+        let remainingK = k.distance(from: i, to: k.endIndex)
+        let remainingW = word.distance(from: j, to: word.endIndex)
+        return edits + remainingK + remainingW <= 1
     }
 
     /// Tests if a single token `token` matches a target text by exact containment or word-level prefix/typo tolerance.
     public static func tokenHits(_ token: String, in text: String) -> Bool {
         let norm = normalized(text)
+        return tokenHits(token, inNormalized: norm)
+    }
+
+    public static func tokenHits(_ token: String, inNormalized norm: String) -> Bool {
         if norm.contains(token) { return true }
-        let words = norm.split(whereSeparator: isTokenSeparator).map(String.init)
-        return words.contains(where: { tokenNear(token, in: $0) })
+        let words = norm.split(whereSeparator: isTokenSeparator)
+        for w in words {
+            if tokenNear(token, in: w) { return true }
+        }
+        return false
     }
 
     /// Evaluates a session candidate across multiple fields with weights:
@@ -263,6 +306,27 @@ public struct SearchMatcher: Sendable {
         chatContent: String? = nil,
         tokenWeights: [String: Double]? = nil
     ) -> RankedHistoryMatchResult? {
+        matchHistory(
+            normalizedTitle: Self.normalized(title),
+            normalizedBranchFilesTools: branchFilesTools.map(Self.normalized) ?? "",
+            normalizedRepoAgent: repoAgent.map(Self.normalized) ?? "",
+            normalizedChatContent: chatContent.map(Self.normalized) ?? "",
+            rawChatContent: chatContent,
+            rawBranchFilesTools: branchFilesTools,
+            tokenWeights: tokenWeights
+        )
+    }
+
+    /// Fast path accepting pre-normalized strings.
+    public func matchHistory(
+        normalizedTitle normTitle: String,
+        normalizedBranchFilesTools normBranch: String,
+        normalizedRepoAgent normRepo: String,
+        normalizedChatContent normChat: String,
+        rawChatContent chatContent: String? = nil,
+        rawBranchFilesTools branchFilesTools: String? = nil,
+        tokenWeights: [String: Double]? = nil
+    ) -> RankedHistoryMatchResult? {
         guard hasQuery, !tokens.isEmpty else { return nil }
 
         // Without weights every token counts 1, i.e. "at least half the tokens" as before. With
@@ -274,28 +338,23 @@ public struct SearchMatcher: Sendable {
         var totalScore: Double = 0.0
         var matchedTerms: [String] = []
 
-        let normTitle = Self.normalized(title)
-        let normBranch = branchFilesTools.map(Self.normalized) ?? ""
-        let normRepo = repoAgent.map(Self.normalized) ?? ""
-        let normChat = chatContent.map(Self.normalized) ?? ""
-
         for token in tokens {
-            if Self.tokenHits(token, in: normTitle) {
+            if Self.tokenHits(token, inNormalized: normTitle) {
                 totalScore += 3.0 * weight(token)
                 matchedWeight += weight(token)
                 matchedTokensCount += 1
                 matchedTerms.append(token)
-            } else if !normBranch.isEmpty && Self.tokenHits(token, in: normBranch) {
+            } else if !normBranch.isEmpty && Self.tokenHits(token, inNormalized: normBranch) {
                 totalScore += 2.5 * weight(token)
                 matchedWeight += weight(token)
                 matchedTokensCount += 1
                 matchedTerms.append(token)
-            } else if !normRepo.isEmpty && Self.tokenHits(token, in: normRepo) {
+            } else if !normRepo.isEmpty && Self.tokenHits(token, inNormalized: normRepo) {
                 totalScore += 1.5 * weight(token)
                 matchedWeight += weight(token)
                 matchedTokensCount += 1
                 matchedTerms.append(token)
-            } else if !normChat.isEmpty && Self.tokenHits(token, in: normChat) {
+            } else if !normChat.isEmpty && normChat.contains(token) {
                 totalScore += 1.0 * weight(token)
                 matchedWeight += weight(token)
                 matchedTokensCount += 1
@@ -310,12 +369,12 @@ public struct SearchMatcher: Sendable {
         // Snippet extraction from chatContent or branchFilesTools
         var snippet: String?
         if let chatContent, !chatContent.isEmpty {
-            let targetToken = matchedTerms.first(where: { Self.tokenHits($0, in: normChat) })
+            let targetToken = matchedTerms.first(where: { Self.tokenHits($0, inNormalized: normChat) })
             if let targetToken {
                 snippet = extractSnippet(from: chatContent, targetQuery: targetToken)
             }
         } else if let branchFilesTools, !branchFilesTools.isEmpty {
-            let targetToken = matchedTerms.first(where: { Self.tokenHits($0, in: normBranch) })
+            let targetToken = matchedTerms.first(where: { Self.tokenHits($0, inNormalized: normBranch) })
             if let targetToken {
                 snippet = extractSnippet(from: branchFilesTools, targetQuery: targetToken)
             }
