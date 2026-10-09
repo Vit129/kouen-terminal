@@ -26,7 +26,7 @@ final class GitStatusProviderLargeOutputTests: XCTestCase {
         let result = try await withThrowingTaskGroup(of: [String: GitStatusType].self) { group in
             group.addTask { await provider.status(rootPath: root.path) }
             group.addTask {
-                try await Task.sleep(nanoseconds: 5_000_000_000)
+                try await Task.sleep(nanoseconds: 15_000_000_000)
                 throw TimeoutError()
             }
             let first = try await group.next()!

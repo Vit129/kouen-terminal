@@ -1,8 +1,10 @@
 import Foundation
 @testable import KouenCore
 import KouenIPC
-import SQLite3
 import XCTest
+#if canImport(SQLite3)
+import SQLite3
+#endif
 
 final class AgentHistoryScannerTests: XCTestCase {
     func testScanAllReturnsRecords() async {
@@ -411,6 +413,7 @@ final class AgentHistoryScannerTests: XCTestCase {
         XCTAssertEqual(entries.count, 0, "No fabricated records should be returned or saved to session_records")
     }
 
+    #if canImport(SQLite3)
     func testSchemaVersioningDropsAndRecreatesOnMismatch() {
         let tempDB = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("test_schema_\(UUID().uuidString).sqlite")
         defer { try? FileManager.default.removeItem(at: tempDB) }
@@ -431,6 +434,7 @@ final class AgentHistoryScannerTests: XCTestCase {
         XCTAssertEqual(loaded.count, 1)
         XCTAssertEqual(loaded[0].record.id, "sess-v1")
     }
+    #endif
 
     func testScanAllReentrancyAndForceSemantics() async {
         let tempDB = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("test_reentrancy_\(UUID().uuidString).sqlite")
@@ -440,13 +444,16 @@ final class AgentHistoryScannerTests: XCTestCase {
         let scanner = AgentHistoryScanner(ftsIndex: index)
 
         // Expect notification when scan completes
-        var notificationReceived = false
+        final class Box: @unchecked Sendable {
+            var value = false
+        }
+        let box = Box()
         let observer = NotificationCenter.default.addObserver(
             forName: AgentHistoryScanner.didUpdateNotification,
             object: nil,
             queue: nil
         ) { _ in
-            notificationReceived = true
+            box.value = true
         }
         defer { NotificationCenter.default.removeObserver(observer) }
 
@@ -456,6 +463,6 @@ final class AgentHistoryScannerTests: XCTestCase {
 
         let (res1, res2) = await (scan1, scan2)
         XCTAssertEqual(res1.count, res2.count)
-        XCTAssertTrue(notificationReceived)
+        XCTAssertTrue(box.value)
     }
 }
