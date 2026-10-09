@@ -92,8 +92,21 @@ extension KouenCLI {
         }
     }
 
+    /// Joins every bare word (`kouen history search kouen happy`) so the CLI ranks the same
+    /// multi-word query the GUI does; skips each flag and its value.
+    static func historySearchQuery(_ args: [String]) -> String {
+        var words: [String] = []
+        var i = 0
+        while i < args.count {
+            if args[i].hasPrefix("--") { i += 2; continue }
+            words.append(args[i]); i += 1
+        }
+        return words.joined(separator: " ")
+    }
+
     private static func handleHistorySearch(_ args: [String]) async throws {
-        guard let query = args.first(where: { !$0.hasPrefix("--") }) else {
+        let query = historySearchQuery(args)
+        guard !query.isEmpty else {
             printHistoryUsage()
             exit(1)
         }
