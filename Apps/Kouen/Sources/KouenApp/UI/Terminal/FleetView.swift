@@ -76,7 +76,7 @@ public struct FleetView: View {
     }
 }
 
-private struct FleetRowView: View {
+struct FleetRowView: View {
     let item: FleetSessionItem
 
     var body: some View {

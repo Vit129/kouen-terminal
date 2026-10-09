@@ -146,12 +146,16 @@ public enum ShellIntegration {
           esac
         done
         if (( rc )); then
+          /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
           if (( ${+commands[happy]} )) && [[ -f "$HOME/.happy/access.key" ]]; then HAPPY_CLAUDE_PATH="${HAPPY_CLAUDE_PATH:-${commands[claude]}}" happy claude "$@"; else __kouen_claude_next "$@"; fi
           return
         fi
         if [[ "$KOUEN_CLAUDE_SESSION_MODE" == cloud && $resume -eq 0 ]]; then
           __kouen_claude_next --cloud "$@"
         elif [[ "$KOUEN_CLAUDE_SESSION_MODE" == cloud || "$KOUEN_CLAUDE_SESSION_MODE" == remote-control ]]; then
+          if [[ "$KOUEN_CLAUDE_SESSION_MODE" == remote-control ]]; then
+            /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
+          fi
           if (( ${+commands[happy]} )) && [[ -f "$HOME/.happy/access.key" ]]; then
             HAPPY_CLAUDE_PATH="${HAPPY_CLAUDE_PATH:-${commands[claude]}}" happy claude --remote-control --remote-control-session-name-prefix kouen "$@"
           else
@@ -173,15 +177,19 @@ public enum ShellIntegration {
         __kouen_codex_next() { command codex "$@"; }
       fi
       codex() {
-        local a
+        local a rc=0
         case "$1" in
           agents|exec|e|review|login|logout|mcp|plugin|app-server|remote-control|app|completion|update|doctor|sandbox|debug|apply|a|resume|queue|archive|delete|migrate-rollouts|unarchive|fork|cloud|exec-server|features|help) __kouen_codex_next "$@"; return ;;
         esac
         for a in "$@"; do
           case "$a" in
             -h|--help|-V|--version) __kouen_codex_next "$@"; return ;;
+            --remote-control|--rc) rc=1 ;;
           esac
         done
+        if [[ "$KOUEN_CODEX_SESSION_MODE" == "remote-control" || $rc -eq 1 ]]; then
+          /usr/bin/open -a "Google Chrome" "https://chatgpt.com" >/dev/null 2>&1 &
+        fi
         if (( ${+commands[happy]} )) && [[ -f "$HOME/.happy/access.key" ]]; then happy codex "$@"; else __kouen_codex_next "$@"; fi
       }
     fi
@@ -205,6 +213,9 @@ public enum ShellIntegration {
             *) n=$((n+1)) ;;
           esac
         done
+        if [[ "$KOUEN_AGY_SESSION_MODE" == "remote-control" || $rc -eq 1 ]]; then
+          /usr/bin/open -a "Google Chrome" "https://antigravity.google.com" >/dev/null 2>&1 &
+        fi
         if (( ${+commands[happy]} )) && [[ "$KOUEN_AGY_SESSION_MODE" == "happy" ]]; then happy agy "$@"; return; fi
         if (( rc )); then __kouen_agy_next "$@"; else __kouen_agy_next --remote-control "$@"; fi
       }
@@ -302,12 +313,16 @@ public enum ShellIntegration {
           esac
         done
         if (( rc )); then
+          /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
           if command -v happy >/dev/null 2>&1 && [ -f "$HOME/.happy/access.key" ]; then HAPPY_CLAUDE_PATH="${HAPPY_CLAUDE_PATH:-$(type -P claude)}" happy claude "$@"; else __kouen_claude_next "$@"; fi
           return
         fi
         if [[ "$KOUEN_CLAUDE_SESSION_MODE" == cloud && $resume -eq 0 ]]; then
           __kouen_claude_next --cloud "$@"
         elif [[ "$KOUEN_CLAUDE_SESSION_MODE" == cloud || "$KOUEN_CLAUDE_SESSION_MODE" == remote-control ]]; then
+          if [[ "$KOUEN_CLAUDE_SESSION_MODE" == remote-control ]]; then
+            /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
+          fi
           if command -v happy >/dev/null 2>&1 && [ -f "$HOME/.happy/access.key" ]; then
             HAPPY_CLAUDE_PATH="${HAPPY_CLAUDE_PATH:-$(type -P claude)}" happy claude --remote-control --remote-control-session-name-prefix kouen "$@"
           else
@@ -329,15 +344,19 @@ public enum ShellIntegration {
         __kouen_codex_next() { command codex "$@"; }
       fi
       codex() {
-        local a
+        local a rc=0
         case "$1" in
           agents|exec|e|review|login|logout|mcp|plugin|app-server|remote-control|app|completion|update|doctor|sandbox|debug|apply|a|resume|queue|archive|delete|migrate-rollouts|unarchive|fork|cloud|exec-server|features|help) __kouen_codex_next "$@"; return ;;
         esac
         for a in "$@"; do
           case "$a" in
             -h|--help|-V|--version) __kouen_codex_next "$@"; return ;;
+            --remote-control|--rc) rc=1 ;;
           esac
         done
+        if [[ "$KOUEN_CODEX_SESSION_MODE" == "remote-control" || $rc -eq 1 ]]; then
+          /usr/bin/open -a "Google Chrome" "https://chatgpt.com" >/dev/null 2>&1 &
+        fi
         if command -v happy >/dev/null 2>&1 && [ -f "$HOME/.happy/access.key" ]; then happy codex "$@"; else __kouen_codex_next "$@"; fi
       }
     fi
@@ -361,6 +380,9 @@ public enum ShellIntegration {
             *) n=$((n+1)) ;;
           esac
         done
+        if [[ "$KOUEN_AGY_SESSION_MODE" == "remote-control" || $rc -eq 1 ]]; then
+          /usr/bin/open -a "Google Chrome" "https://antigravity.google.com" >/dev/null 2>&1 &
+        fi
         if command -v happy >/dev/null 2>&1 && [[ "$KOUEN_AGY_SESSION_MODE" == "happy" ]]; then happy agy "$@"; return; fi
         if (( rc )); then __kouen_agy_next "$@"; else __kouen_agy_next --remote-control "$@"; fi
       }
@@ -462,6 +484,7 @@ public enum ShellIntegration {
                 end
             end
             if test $rc -eq 1
+                /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
                 if type -q happy; and test -f "$HOME/.happy/access.key"
                     set -l claude_path $HAPPY_CLAUDE_PATH
                     test -n "$claude_path"; or set claude_path (type -p claude)
@@ -472,6 +495,9 @@ public enum ShellIntegration {
             else if test "$KOUEN_CLAUDE_SESSION_MODE" = cloud; and test $resume -eq 0
                 __kouen_claude_next --cloud $argv
             else if test "$KOUEN_CLAUDE_SESSION_MODE" = cloud; or test "$KOUEN_CLAUDE_SESSION_MODE" = remote-control
+                if test "$KOUEN_CLAUDE_SESSION_MODE" = remote-control
+                    /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
+                end
                 if type -q happy; and test -f "$HOME/.happy/access.key"
                     set -l claude_path $HAPPY_CLAUDE_PATH
                     test -n "$claude_path"; or set claude_path (type -p claude)
@@ -503,11 +529,17 @@ public enum ShellIntegration {
                 case agents exec e review login logout mcp plugin app-server remote-control app completion update doctor sandbox debug apply a resume queue archive delete migrate-rollouts unarchive fork cloud exec-server features help
                     __kouen_codex_next $argv; return
             end
+            set -l rc 0
             for a in $argv
                 switch $a
                     case -h --help -V --version
                         __kouen_codex_next $argv; return
+                    case --remote-control --rc
+                        set rc 1
                 end
+            end
+            if test "$KOUEN_CODEX_SESSION_MODE" = remote-control; or test $rc -eq 1
+                /usr/bin/open -a "Google Chrome" "https://chatgpt.com" >/dev/null 2>&1 &
             end
             if type -q happy; and test -f "$HOME/.happy/access.key"
                 happy codex $argv
@@ -540,6 +572,9 @@ public enum ShellIntegration {
                     case '*'
                         set n (math $n + 1)
                 end
+            end
+            if test "$KOUEN_AGY_SESSION_MODE" = remote-control; or test $rc -eq 1
+                /usr/bin/open -a "Google Chrome" "https://antigravity.google.com" >/dev/null 2>&1 &
             end
             if test "$KOUEN_AGY_SESSION_MODE" = happy; and type -q happy
                 happy agy $argv; return
