@@ -17,6 +17,7 @@ public actor GitStatusProvider {
     /// time. There was no bound on that wait before — one slow/contended call could
     /// stall its tab's file tree (and starve other work) indefinitely.
     nonisolated static let statusTimeout: Duration = .seconds(3)
+    nonisolated static let statusTimeoutSeconds: TimeInterval = 3
 
     public init() {}
 
@@ -44,29 +45,24 @@ public actor GitStatusProvider {
         // buffer, its `write()` blocks forever and the process never exits. GCD's pool
         // auto-scales instead of sharing Swift concurrency's fixed thread budget.
         //
-        // Raced against a timeout: if the read hasn't finished by then, `terminate()`
-        // the process so its pipe closes — the abandoned read-task closure then drains
-        // whatever partial output exists and exits quickly on its own GCD thread rather
-        // than blocking forever; we don't wait for it.
-        let data: Data? = await withTaskGroup(of: Data?.self) { group in
-            group.addTask {
-                await withCheckedContinuation { (continuation: CheckedContinuation<Data, Never>) in
-                    DispatchQueue.global(qos: .utility).async {
-                        continuation.resume(returning: stdoutPipe.fileHandleForReading.readDataToEndOfFile())
-                    }
+        // Raced against a timeout through a one-shot continuation, NOT a task group: a group
+        // waits for every child, and the blocking read can't be cancelled, so a git whose
+        // pipe stays open (an inherited fd in an fsmonitor/gc grandchild) hung the caller
+        // forever. On timeout we terminate and return; the abandoned read finishes on its own
+        // GCD thread whenever the pipe closes. Never close() the read handle here — closing
+        // it under a thread blocked in a read raises NSFileHandleOperationException (SIGABRT).
+        let once = OnceResume()
+        let data: Data? = await withCheckedContinuation { (continuation: CheckedContinuation<Data?, Never>) in
+            DispatchQueue.global(qos: .utility).async {
+                let readData = (try? stdoutPipe.fileHandleForReading.readToEnd()) ?? Data()
+                if once.claim() { continuation.resume(returning: readData) }
+            }
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + Self.statusTimeoutSeconds) {
+                if once.claim() {
+                    process.terminate()
+                    continuation.resume(returning: nil)
                 }
             }
-            group.addTask {
-                try? await Task.sleep(for: Self.statusTimeout)
-                return nil
-            }
-            let first = await group.next() ?? nil
-            if first == nil {
-                process.terminate()
-                try? stdoutPipe.fileHandleForReading.close()
-            }
-            group.cancelAll()
-            return first
         }
 
         guard let data else { return [:] }
@@ -119,5 +115,19 @@ public actor GitStatusProvider {
             result[path] = status
         }
         return result
+    }
+}
+
+/// First caller of `claim()` wins; lets a read and a timeout race to resume one continuation.
+private final class OnceResume: @unchecked Sendable {
+    private let lock = NSLock()
+    private var claimed = false
+
+    func claim() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        if claimed { return false }
+        claimed = true
+        return true
     }
 }
