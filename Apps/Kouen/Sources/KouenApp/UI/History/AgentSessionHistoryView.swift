@@ -274,11 +274,14 @@ public final class AgentSessionHistoryModel: ObservableObject {
 
         guard !validGroups.isEmpty else { return records }
 
+        // Only the per-repo latest sessions fold into the composite row; older sessions on the
+        // same branch stay as their own rows (grouping suggests, it never hides history).
+        let foldedIDs = Set(validGroups.values.flatMap { $0.map(\.id) })
         var seenGroupBranches = Set<String>()
         var result: [AgentSessionRecord] = []
 
         for record in records {
-            if let branch = record.gitBranch, let siblings = validGroups[branch] {
+            if let branch = record.gitBranch, let siblings = validGroups[branch], foldedIDs.contains(record.id) {
                 if seenGroupBranches.contains(branch) {
                     continue
                 }
@@ -689,6 +692,10 @@ public struct AgentSessionHistoryView: View {
                     Text(model.searchQuery.isEmpty ? "No session history found" : "No sessions match \"\(model.searchQuery)\"")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(Color(nsColor: c.textSecondary))
+                    // Cloud Agents started on the web leave no local transcript to scan (P55).
+                    Text("Antigravity Cloud Agents live on antigravity.google.com")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Color(nsColor: c.textTertiary))
                     Spacer()
                 }
             } else {
@@ -1325,6 +1332,12 @@ public struct AgentSessionHistoryView: View {
         } label: {
             Label("Copy resume command", systemImage: "doc.on.doc")
         }
+
+        Button {
+            copyToPasteboard(record.id)
+        } label: {
+            Label("Copy session ID", systemImage: "number")
+        }
     }
 
     private func showOptionMenu(for record: AgentSessionRecord) {
@@ -1363,6 +1376,10 @@ public struct AgentSessionHistoryView: View {
         }
         menu.addItem(makeMenuItem(title: "Copy resume command", systemImage: "doc.on.doc") { [self] in
             self.copyResumeCommand(record)
+        })
+        // Antigravity 2.0 / summary-only rows have no CLI resume; the ID is what the app needs.
+        menu.addItem(makeMenuItem(title: "Copy session ID", systemImage: "number") { [self] in
+            self.copyToPasteboard(record.id)
         })
 
         menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
@@ -1451,8 +1468,12 @@ public struct AgentSessionHistoryView: View {
         } else {
             cmd = baseCmd
         }
+        copyToPasteboard(cmd)
+    }
+
+    private func copyToPasteboard(_ text: String) {
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(cmd, forType: .string)
+        NSPasteboard.general.setString(text, forType: .string)
     }
 
     private func relativeDate(_ date: Date) -> String {

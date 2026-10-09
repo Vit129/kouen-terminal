@@ -164,6 +164,43 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
         print("[AgentHistoryFTSIndex] \(context) failed with code \(stepResult): \(errMsg)")
     }
 
+    /// Runs a statement, logging (not ignoring) any failure. Returns false on failure.
+    @discardableResult
+    private func exec(_ sql: String, context: String) -> Bool {
+        let rc = sqlite3_exec(db, sql, nil, nil, nil)
+        if rc != SQLITE_OK { logStepFailure(rc, context: context) }
+        return rc == SQLITE_OK
+    }
+
+    /// Wraps `body` in a transaction; rolls back if COMMIT fails. Caller holds `lock`.
+    private func inTransaction(_ context: String, _ body: () -> Void) {
+        guard exec("BEGIN TRANSACTION;", context: "\(context) BEGIN") else { return }
+        body()
+        if !exec("COMMIT;", context: "\(context) COMMIT") {
+            exec("ROLLBACK;", context: "\(context) ROLLBACK")
+        }
+    }
+
+    /// Deletes `id`'s rows from each of `tables` (all keyed by session_id). Caller holds `lock`.
+    private func deleteRows(_ ids: some Sequence<String>, from tables: [String], context: String) {
+        for table in tables {
+            var stmt: OpaquePointer?
+            guard sqlite3_prepare_v2(db, "DELETE FROM \(table) WHERE session_id = ?;", -1, &stmt, nil) == SQLITE_OK else {
+                logStepFailure(SQLITE_ERROR, context: "prepare \(context) \(table)")
+                continue
+            }
+            for id in ids {
+                sqlite3_reset(stmt)
+                sqlite3_bind_text(stmt, 1, id, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+                let rc = sqlite3_step(stmt)
+                if rc != SQLITE_DONE { logStepFailure(rc, context: "\(context) \(table)") }
+            }
+            sqlite3_finalize(stmt)
+        }
+    }
+
+    private static let sessionTables = ["session_records", "session_fts", "session_index_meta"]
+
     private func openDatabase() {
         lock.lock()
         defer { lock.unlock() }
@@ -173,6 +210,9 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
         }
 
         if sqlite3_open(dbPath, &db) != SQLITE_OK {
+            logStepFailure(SQLITE_CANTOPEN, context: "open \(dbPath)")
+            sqlite3_close(db)  // sqlite3_open allocates a handle even on failure
+            db = nil
             return
         }
 
@@ -187,10 +227,13 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
         }
 
         if currentVersion != Self.schemaVersion {
-            // Drop cache table on version mismatch
-            sqlite3_exec(db, "DROP TABLE IF EXISTS session_records;", nil, nil, nil)
-            sqlite3_exec(db, "DROP INDEX IF EXISTS idx_session_records_updated_at;", nil, nil, nil)
-            sqlite3_exec(db, "PRAGMA user_version = \(Self.schemaVersion);", nil, nil, nil)
+            // Drop every table on version mismatch. Keeping session_index_meta would make
+            // needsReindex() skip unchanged transcripts, so they'd vanish from the dropped records.
+            exec("DROP TABLE IF EXISTS session_records;", context: "migrate")
+            exec("DROP INDEX IF EXISTS idx_session_records_updated_at;", context: "migrate")
+            exec("DROP TABLE IF EXISTS session_fts;", context: "migrate")
+            exec("DROP TABLE IF EXISTS session_index_meta;", context: "migrate")
+            exec("PRAGMA user_version = \(Self.schemaVersion);", context: "migrate")
         }
 
         let createMetaSQL = """
@@ -201,7 +244,7 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
             file_size INTEGER
         );
         """
-        sqlite3_exec(db, createMetaSQL, nil, nil, nil)
+        exec(createMetaSQL, context: "create session_index_meta")
 
         let createRecordsSQL = """
         CREATE TABLE IF NOT EXISTS session_records (
@@ -227,7 +270,7 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
         );
         CREATE INDEX IF NOT EXISTS idx_session_records_updated_at ON session_records(updated_at DESC);
         """
-        sqlite3_exec(db, createRecordsSQL, nil, nil, nil)
+        exec(createRecordsSQL, context: "create session_records")
 
         let createFtsSQL = """
         CREATE VIRTUAL TABLE IF NOT EXISTS session_fts USING fts5(
@@ -243,7 +286,7 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
             tokenize = 'unicode61'
         );
         """
-        sqlite3_exec(db, createFtsSQL, nil, nil, nil)
+        exec(createFtsSQL, context: "create session_fts")
     }
 
     /// Checks if a session needs to be re-indexed based on mtime and file size.
@@ -291,9 +334,8 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
         }
         defer { sqlite3_finalize(stmt) }
 
-        sqlite3_exec(db, "BEGIN TRANSACTION;", nil, nil, nil)
         let encoder = JSONEncoder()
-
+        inTransaction("saveRecordsBatch") {
         for entry in entries {
             let record = entry.record
             let turnsData = try? encoder.encode(record.latestTurns)
@@ -347,7 +389,7 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
                 logStepFailure(stepRes, context: "step saveRecordsBatch for session \(record.id)")
             }
         }
-        sqlite3_exec(db, "COMMIT;", nil, nil, nil)
+        }
     }
 
     /// Persists an agent session record and its file metadata to SQLite.
@@ -447,121 +489,43 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
     /// Prunes session_records, session_fts, and session_index_meta rows whose transcript_path
     /// no longer exists on disk or was not seen in the scan, executed in a single transaction.
     public func pruneMissingSessions(validTranscriptPaths: Set<String>) {
+        // Read candidates under the lock, but stat the disk outside it so main-thread callers
+        // (loadCachedEntries / needsReindex) never wait on per-row file-system I/O.
+        var candidates: [(id: String, path: String)] = []
         lock.lock()
-        defer { lock.unlock() }
-        guard let db else { return }
-
-        var deadIDs = Set<String>()
-
-        // 1. Scan session_records
-        let checkRecordsSQL = "SELECT session_id, transcript_path FROM session_records;"
-        var stmt: OpaquePointer?
-        if sqlite3_prepare_v2(db, checkRecordsSQL, -1, &stmt, nil) == SQLITE_OK {
-            while sqlite3_step(stmt) == SQLITE_ROW {
-                if let idCStr = sqlite3_column_text(stmt, 0),
-                   let pathCStr = sqlite3_column_text(stmt, 1) {
-                    let id = String(cString: idCStr)
-                    let path = String(cString: pathCStr)
-                    if !path.isEmpty && !path.hasPrefix("cloud://") {
-                        if !validTranscriptPaths.contains(path) && !FileManager.default.fileExists(atPath: path) {
-                            deadIDs.insert(id)
-                        }
-                    }
+        if let db {
+            let sql = "SELECT session_id, transcript_path FROM session_records UNION SELECT session_id, transcript_path FROM session_index_meta;"
+            var stmt: OpaquePointer?
+            if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+                while sqlite3_step(stmt) == SQLITE_ROW {
+                    guard let idC = sqlite3_column_text(stmt, 0), let pathC = sqlite3_column_text(stmt, 1) else { continue }
+                    candidates.append((String(cString: idC), String(cString: pathC)))
                 }
+                sqlite3_finalize(stmt)
             }
-            sqlite3_finalize(stmt)
         }
+        lock.unlock()
 
-        // 2. Scan session_index_meta
-        let checkMetaSQL = "SELECT session_id, transcript_path FROM session_index_meta;"
-        if sqlite3_prepare_v2(db, checkMetaSQL, -1, &stmt, nil) == SQLITE_OK {
-            while sqlite3_step(stmt) == SQLITE_ROW {
-                if let idCStr = sqlite3_column_text(stmt, 0),
-                   let pathCStr = sqlite3_column_text(stmt, 1) {
-                    let id = String(cString: idCStr)
-                    let path = String(cString: pathCStr)
-                    if !path.isEmpty && !path.hasPrefix("cloud://") {
-                        if !validTranscriptPaths.contains(path) && !FileManager.default.fileExists(atPath: path) {
-                            deadIDs.insert(id)
-                        }
-                    }
-                }
-            }
-            sqlite3_finalize(stmt)
-        }
-
+        let deadIDs = Set(candidates.lazy.filter { c in
+            !c.path.isEmpty && !c.path.hasPrefix("cloud://")
+                && !validTranscriptPaths.contains(c.path) && !FileManager.default.fileExists(atPath: c.path)
+        }.map(\.id))
         guard !deadIDs.isEmpty else { return }
 
-        sqlite3_exec(db, "BEGIN TRANSACTION;", nil, nil, nil)
-
-        var delRecStmt: OpaquePointer?
-        var delFtsStmt: OpaquePointer?
-        var delMetaStmt: OpaquePointer?
-
-        sqlite3_prepare_v2(db, "DELETE FROM session_records WHERE session_id = ?;", -1, &delRecStmt, nil)
-        sqlite3_prepare_v2(db, "DELETE FROM session_fts WHERE session_id = ?;", -1, &delFtsStmt, nil)
-        sqlite3_prepare_v2(db, "DELETE FROM session_index_meta WHERE session_id = ?;", -1, &delMetaStmt, nil)
-
-        for id in deadIDs {
-            if let delRecStmt {
-                sqlite3_reset(delRecStmt)
-                sqlite3_bind_text(delRecStmt, 1, id, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-                let stepRes = sqlite3_step(delRecStmt)
-                if stepRes != SQLITE_DONE { logStepFailure(stepRes, context: "prune delete session_records") }
-            }
-            if let delFtsStmt {
-                sqlite3_reset(delFtsStmt)
-                sqlite3_bind_text(delFtsStmt, 1, id, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-                let stepRes = sqlite3_step(delFtsStmt)
-                if stepRes != SQLITE_DONE { logStepFailure(stepRes, context: "prune delete session_fts") }
-            }
-            if let delMetaStmt {
-                sqlite3_reset(delMetaStmt)
-                sqlite3_bind_text(delMetaStmt, 1, id, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-                let stepRes = sqlite3_step(delMetaStmt)
-                if stepRes != SQLITE_DONE { logStepFailure(stepRes, context: "prune delete session_index_meta") }
-            }
+        lock.lock()
+        defer { lock.unlock() }
+        guard db != nil else { return }
+        inTransaction("prune") {
+            deleteRows(deadIDs, from: Self.sessionTables, context: "prune delete")
         }
-
-        sqlite3_finalize(delRecStmt)
-        sqlite3_finalize(delFtsStmt)
-        sqlite3_finalize(delMetaStmt)
-
-        sqlite3_exec(db, "COMMIT;", nil, nil, nil)
     }
 
     /// Deletes a session from session_records, session_fts, and session_index_meta.
     public func deleteSession(sessionID: String) {
         lock.lock()
         defer { lock.unlock() }
-        guard let db else { return }
-
-        let deleteRecordsSQL = "DELETE FROM session_records WHERE session_id = ?"
-        var delRecStmt: OpaquePointer?
-        if sqlite3_prepare_v2(db, deleteRecordsSQL, -1, &delRecStmt, nil) == SQLITE_OK {
-            sqlite3_bind_text(delRecStmt, 1, sessionID, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-            let stepRes = sqlite3_step(delRecStmt)
-            if stepRes != SQLITE_DONE { logStepFailure(stepRes, context: "delete session_records") }
-            sqlite3_finalize(delRecStmt)
-        }
-
-        let deleteFtsSQL = "DELETE FROM session_fts WHERE session_id = ?"
-        var delFtsStmt: OpaquePointer?
-        if sqlite3_prepare_v2(db, deleteFtsSQL, -1, &delFtsStmt, nil) == SQLITE_OK {
-            sqlite3_bind_text(delFtsStmt, 1, sessionID, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-            let stepRes = sqlite3_step(delFtsStmt)
-            if stepRes != SQLITE_DONE { logStepFailure(stepRes, context: "delete session_fts") }
-            sqlite3_finalize(delFtsStmt)
-        }
-
-        let deleteMetaSQL = "DELETE FROM session_index_meta WHERE session_id = ?"
-        var delMetaStmt: OpaquePointer?
-        if sqlite3_prepare_v2(db, deleteMetaSQL, -1, &delMetaStmt, nil) == SQLITE_OK {
-            sqlite3_bind_text(delMetaStmt, 1, sessionID, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-            let stepRes = sqlite3_step(delMetaStmt)
-            if stepRes != SQLITE_DONE { logStepFailure(stepRes, context: "delete session_index_meta") }
-            sqlite3_finalize(delMetaStmt)
-        }
+        guard db != nil else { return }
+        deleteRows([sessionID], from: Self.sessionTables, context: "delete")
     }
 
     /// Indexes or updates a session in the FTS5 virtual table and metadata table.
@@ -589,21 +553,7 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
         guard let db else { return }
 
         // Remove old entries if any
-        let deleteFtsSQL = "DELETE FROM session_fts WHERE session_id = ?"
-        var delFtsStmt: OpaquePointer?
-        if sqlite3_prepare_v2(db, deleteFtsSQL, -1, &delFtsStmt, nil) == SQLITE_OK {
-            sqlite3_bind_text(delFtsStmt, 1, sessionID, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-            sqlite3_step(delFtsStmt)
-            sqlite3_finalize(delFtsStmt)
-        }
-
-        let deleteMetaSQL = "DELETE FROM session_index_meta WHERE session_id = ?"
-        var delMetaStmt: OpaquePointer?
-        if sqlite3_prepare_v2(db, deleteMetaSQL, -1, &delMetaStmt, nil) == SQLITE_OK {
-            sqlite3_bind_text(delMetaStmt, 1, sessionID, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-            sqlite3_step(delMetaStmt)
-            sqlite3_finalize(delMetaStmt)
-        }
+        deleteRows([sessionID], from: ["session_fts", "session_index_meta"], context: "reindex delete")
 
         // Insert into FTS
         let insertFtsSQL = """

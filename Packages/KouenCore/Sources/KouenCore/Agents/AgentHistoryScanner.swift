@@ -1030,15 +1030,15 @@ public actor AgentHistoryScanner {
                 if let rv = try? transcriptURL.resourceValues(forKeys: [.fileSizeKey]), let size = rv.fileSize {
                     fileSize = size
                 }
-                if let content = try? String(contentsOf: transcriptURL, encoding: .utf8) {
-                    let lines = content.components(separatedBy: .newlines).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+                // Memory-mapped and split on newline bytes: no whole-file String copy.
+                if let content = try? Data(contentsOf: transcriptURL, options: .mappedIfSafe) {
+                    let lines = content.split(separator: UInt8(ascii: "\n"))
                     if !lines.isEmpty {
                         messageCount = max(messageCount, lines.count)
                         var promptFound = false
                         var parts: [String] = []
                         for line in lines {
-                            guard let data = line.data(using: .utf8),
-                                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { continue }
+                            guard let json = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else { continue }
                             let type = json["type"] as? String ?? ""
                             let text = json["content"] as? String ?? ""
                             if type == "USER_INPUT" || type == "PLANNER_RESPONSE" {
