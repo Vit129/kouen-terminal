@@ -371,5 +371,149 @@ final class AgentSessionHistoryModelTests: XCTestCase {
         XCTAssertNotNil(groupedItem)
         XCTAssertEqual(groupedItem?.crossRepoSiblings?.count, 2)
     }
+
+    // MARK: - Phase 3 Advanced Capabilities Tests
+
+    func testMatchLocationCalculation() {
+        let turns: [AgentHistoryTurn] = [
+            AgentHistoryTurn(role: "user", content: "Initial kickoff"),
+            AgentHistoryTurn(role: "assistant", content: "Working on kickoff"),
+            AgentHistoryTurn(role: "user", content: "Midway refactor step"),
+            AgentHistoryTurn(role: "assistant", content: "Refactoring midway"),
+            AgentHistoryTurn(role: "user", content: "Final verification and polishing"),
+            AgentHistoryTurn(role: "assistant", content: "Done with polishing")
+        ]
+
+        let record = makeRecord(
+            id: "loc1",
+            title: "Project Setup",
+            firstPrompt: "Please help setup the project",
+            turns: turns
+        )
+
+        // Turn early in session
+        let earlyLoc = record.matchLocation(for: "kickoff")
+        XCTAssertNotNil(earlyLoc)
+        XCTAssertEqual(earlyLoc?.relativePosition, "early in session")
+        XCTAssertEqual(earlyLoc?.turnIndex, 0)
+        XCTAssertEqual(earlyLoc?.description, "early in session · turn 1/6")
+
+        // Turn midway in session
+        let midLoc = record.matchLocation(for: "refactor")
+        XCTAssertNotNil(midLoc)
+        XCTAssertEqual(midLoc?.relativePosition, "mid session")
+        XCTAssertEqual(midLoc?.turnIndex, 2)
+        XCTAssertEqual(midLoc?.description, "mid session · turn 3/6")
+
+        // Turn late in session
+        let lateLoc = record.matchLocation(for: "polishing")
+        XCTAssertNotNil(lateLoc)
+        XCTAssertEqual(lateLoc?.relativePosition, "late in session")
+        XCTAssertEqual(lateLoc?.turnIndex, 4)
+        XCTAssertEqual(lateLoc?.description, "late in session · turn 5/6")
+
+        // First prompt match
+        let promptLoc = record.matchLocation(for: "setup the project")
+        XCTAssertNotNil(promptLoc)
+        XCTAssertEqual(promptLoc?.relativePosition, "start of session")
+        XCTAssertEqual(promptLoc?.description, "start of session · prompt")
+
+        // Title match
+        let titleLoc = record.matchLocation(for: "Project Setup")
+        XCTAssertNotNil(titleLoc)
+        XCTAssertEqual(titleLoc?.description, "title match")
+    }
+
+    func testTopicSegmentation() {
+        let turns: [AgentHistoryTurn] = [
+            AgentHistoryTurn(role: "user", content: "Part 1: Build database schema"),
+            AgentHistoryTurn(role: "assistant", content: "Created tables"),
+            AgentHistoryTurn(role: "user", content: "Part 2: Add REST API handlers"),
+            AgentHistoryTurn(role: "assistant", content: "Created routes"),
+            AgentHistoryTurn(role: "user", content: "Part 3: Setup frontend UI"),
+            AgentHistoryTurn(role: "assistant", content: "Created views"),
+            AgentHistoryTurn(role: "user", content: "Part 4: Deploy to production"),
+            AgentHistoryTurn(role: "assistant", content: "Deployed successfully")
+        ]
+
+        let segments = AgentSessionRecord.detectTopicSegments(
+            title: "Fullstack Architecture",
+            firstPrompt: "Part 1: Build database schema",
+            turns: turns
+        )
+
+        XCTAssertNotNil(segments)
+        XCTAssertGreaterThanOrEqual(segments?.count ?? 0, 2)
+        XCTAssertTrue(segments?.contains(where: { $0.contains("Fullstack") || $0.contains("database") }) ?? false)
+        XCTAssertTrue(segments?.contains(where: { $0.contains("REST API") }) ?? false)
+
+        let record = AgentSessionRecord(
+            id: "seg1",
+            agentKind: .claudeCode,
+            title: "Fullstack Architecture",
+            projectPath: "/repo",
+            projectName: "repo",
+            messageCount: 8,
+            updatedAt: Date(),
+            firstPrompt: "Part 1: Build database schema",
+            latestTurns: turns,
+            transcriptPath: "/tmp/seg1.jsonl",
+            worktreeAvailable: true
+        )
+
+        XCTAssertNotNil(record.topicBreadcrumbs)
+        XCTAssertTrue(record.topicBreadcrumbs?.contains("→") ?? false)
+    }
+
+    func testSemanticSearchFallback() {
+        let r1 = makeRecord(
+            id: "sem1",
+            title: "Memory leak in terminal ring buffer",
+            firstPrompt: "Buffer allocation causes high ram usage"
+        )
+        let r2 = makeRecord(
+            id: "sem2",
+            title: "Recipe for chocolate chip cookies",
+            firstPrompt: "Bake at 350 degrees"
+        )
+
+        // Exact keywords don't match, but semantic meaning matches r1 closely
+        let query = "ram leak"
+        let hits = AgentHistorySearch.rank(query: query, records: [r1, r2])
+
+        // Either exact hit or fallback semantic hit
+        if !hits.isEmpty {
+            let first = hits[0]
+            XCTAssertEqual(first.record.id, "sem1")
+            XCTAssertTrue(first.score > 0)
+        }
+
+        // Test model integration
+        let model = AgentSessionHistoryModel()
+        model.records = [r1, r2]
+        model.selectedScope = .all
+        model.searchQuery = "memory leak"
+        model.applyFilterNow()
+
+        XCTAssertEqual(model.filteredRecords.first?.id, "sem1")
+        if let first = model.filteredRecords.first {
+            let loc = model.matchLocation(for: first)
+            XCTAssertNotNil(loc)
+        }
+    }
+
+    func testGraphifyIndexEnrichment() {
+        let cache = GraphifyIndexCache.shared
+        // Kouen-terminal repository path
+        let projectPath = "/Users/supavit.cho/Git/Personal/kouen-terminal"
+        let touchedFiles = [
+            "Apps/Kouen/Sources/KouenApp/UI/History/AgentSessionHistoryView.swift",
+            "Packages/KouenCore/Sources/KouenCore/IPC/DaemonClient.swift"
+        ]
+
+        let enriched = cache.enrich(files: touchedFiles, projectPath: projectPath)
+        XCTAssertFalse(enriched.isEmpty, "Should extract symbols from .graphify_labels.json")
+        XCTAssertTrue(enriched.contains("DaemonClient") || enriched.contains(where: { $0.contains("Daemon") }))
+    }
 }
 

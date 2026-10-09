@@ -134,6 +134,10 @@ public final class AgentSessionHistoryModel: ObservableObject {
 
     /// Snippets extracted during search scoring, keyed by session id.
     private var searchSnippets: [String: String] = [:]
+    /// Match locations extracted during search scoring, keyed by session id.
+    private var searchMatchLocations: [String: AgentSessionRecord.MatchLocationInfo] = [:]
+    /// Set of session IDs that were matched via semantic search fallback.
+    private var semanticMatchIDs: Set<String> = []
 
     /// Repo root resolver injected for testing or production.
     public var repoRootResolver: @Sendable (String) -> String?
@@ -359,7 +363,7 @@ public final class AgentSessionHistoryModel: ObservableObject {
         filterTask?.cancel()
         filterTask = nil
         let state = historySignposter.beginInterval("applyFilterNow")
-        let (filtered, newCache, snippets) = Self.computeFiltered(
+        let (filtered, newCache, snippets, matchLocations, semanticIDs) = Self.computeFiltered(
             query: searchQuery,
             scope: selectedScope,
             selectedAgents: selectedAgents,
@@ -371,6 +375,8 @@ public final class AgentSessionHistoryModel: ObservableObject {
         historySignposter.endInterval("applyFilterNow", state)
         self.repoRootCache = newCache
         self.searchSnippets = snippets
+        self.searchMatchLocations = matchLocations
+        self.semanticMatchIDs = semanticIDs
         self.filteredRecords = filtered
     }
 
@@ -395,7 +401,7 @@ public final class AgentSessionHistoryModel: ObservableObject {
             if Task.isCancelled { return }
 
             let state = historySignposter.beginInterval("computeFiltered")
-            let (filtered, newCache, snippets) = Self.computeFiltered(
+            let (filtered, newCache, snippets, matchLocations, semanticIDs) = Self.computeFiltered(
                 query: currentQuery,
                 scope: currentScope,
                 selectedAgents: currentAgents,
@@ -412,6 +418,8 @@ public final class AgentSessionHistoryModel: ObservableObject {
                 guard let self, !Task.isCancelled else { return }
                 self.repoRootCache = newCache
                 self.searchSnippets = snippets
+                self.searchMatchLocations = matchLocations
+                self.semanticMatchIDs = semanticIDs
                 self.filteredRecords = filtered
             }
         }
@@ -425,7 +433,13 @@ public final class AgentSessionHistoryModel: ObservableObject {
         activeCWD: String,
         resolver: @Sendable (String) -> String?,
         initialCache: [String: String]
-    ) -> (filtered: [AgentSessionRecord], cache: [String: String], snippets: [String: String]) {
+    ) -> (
+        filtered: [AgentSessionRecord],
+        cache: [String: String],
+        snippets: [String: String],
+        matchLocations: [String: AgentSessionRecord.MatchLocationInfo],
+        semanticMatchIDs: Set<String>
+    ) {
         let baseRecords: [AgentSessionRecord]
         if selectedAgents.isEmpty {
             baseRecords = records
@@ -452,6 +466,18 @@ public final class AgentSessionHistoryModel: ObservableObject {
         if matcher.hasQuery {
             let hits = AgentHistorySearch.rank(query: query, records: baseRecords)
             var snippets: [String: String] = [:]
+            var matchLocations: [String: AgentSessionRecord.MatchLocationInfo] = [:]
+            var semanticMatchIDs = Set<String>()
+
+            for hit in hits {
+                if let loc = hit.matchLocation {
+                    matchLocations[hit.record.id] = loc
+                }
+                if hit.isSemanticMatch {
+                    semanticMatchIDs.insert(hit.record.id)
+                }
+            }
+
             // Pre-extract snippets on the background thread for top visible results so UI render doesn't block MainActor
             for hit in hits.prefix(50) {
                 if let snip = hit.snippet, !snip.isEmpty {
@@ -471,7 +497,7 @@ public final class AgentSessionHistoryModel: ObservableObject {
                     }
                 }
             }
-            return (hits.map(\.record), cache, snippets)
+            return (hits.map(\.record), cache, snippets, matchLocations, semanticMatchIDs)
         }
 
         // 2. When search query is empty, apply the selected scope with cached repo roots
@@ -497,7 +523,17 @@ public final class AgentSessionHistoryModel: ObservableObject {
                 return true
             }
         }
-        return (filtered, cache, [:])
+        return (filtered, cache, [:], [:], [])
+    }
+
+    /// Match location info (e.g. "late in session · turn 42/50") for active query (O(1) dictionary read).
+    public func matchLocation(for record: AgentSessionRecord) -> AgentSessionRecord.MatchLocationInfo? {
+        searchMatchLocations[record.id] ?? (searchQuery.isEmpty ? nil : record.matchLocation(for: searchQuery))
+    }
+
+    /// Whether this hit was returned by local semantic search fallback.
+    public func isSemanticMatch(for record: AgentSessionRecord) -> Bool {
+        semanticMatchIDs.contains(record.id)
     }
 
     /// Extracts matching snippet in prompt or turns for content search display (O(1) dictionary read).
@@ -895,6 +931,24 @@ public struct AgentSessionHistoryView: View {
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
+                    if !isCrossRepoGroup, let breadcrumbs = record.topicBreadcrumbs {
+                        HStack(spacing: 3) {
+                            Image(systemName: "signpost.right.and.left")
+                                .font(.system(size: 8))
+                                .foregroundStyle(Color(nsColor: c.textTertiary))
+                            highlightedText(
+                                breadcrumbs,
+                                query: model.searchQuery,
+                                baseColor: c.textTertiary,
+                                highlightColor: NSColor.controlAccentColor,
+                                fontSize: 8.5,
+                                weight: .regular
+                            )
+                            .lineLimit(1)
+                        }
+                        .padding(.top, 0.5)
+                    }
+
                     if isCrossRepoGroup {
                         // Line 2 for Cross-Repo group: age · ⇄ same task in N repos
                         HStack(spacing: 4) {
@@ -1043,6 +1097,29 @@ public struct AgentSessionHistoryView: View {
                                     .lineLimit(1)
                                 }
                                 .foregroundStyle(Color(nsColor: c.textTertiary))
+                            }
+
+                            if model.isSemanticMatch(for: record) {
+                                Text("·")
+                                    .font(.system(size: 8))
+                                    .foregroundStyle(Color(nsColor: c.textTertiary))
+                                Text("Semantic")
+                                    .font(.system(size: 7.5, weight: .semibold))
+                                    .padding(.horizontal, 3.5)
+                                    .padding(.vertical, 0.5)
+                                    .background(Color.purple.opacity(0.18))
+                                    .foregroundStyle(Color.purple)
+                                    .clipShape(RoundedRectangle(cornerRadius: 2.5))
+                            }
+
+                            if !model.searchQuery.isEmpty, let loc = model.matchLocation(for: record) {
+                                Text("·")
+                                    .font(.system(size: 8))
+                                    .foregroundStyle(Color(nsColor: c.textTertiary))
+                                Text(loc.description)
+                                    .font(.system(size: 8.5, weight: .medium))
+                                    .foregroundStyle(Color.accentColor)
+                                    .lineLimit(1)
                             }
 
                             Spacer(minLength: 0)
@@ -1235,6 +1312,14 @@ public struct AgentSessionHistoryView: View {
 
         Divider()
 
+        if let loc = model.matchLocation(for: record), let turn = loc.turnIndex {
+            Button {
+                copyResumeCommand(record, turnIndex: turn)
+            } label: {
+                Label("Copy command for turn #\(turn + 1) (\(loc.relativePosition))", systemImage: "arrow.turn.down.right")
+            }
+        }
+
         Button {
             copyResumeCommand(record)
         } label: {
@@ -1271,6 +1356,11 @@ public struct AgentSessionHistoryView: View {
         }
 
         menu.addItem(NSMenuItem.separator())
+        if let loc = model.matchLocation(for: record), let turn = loc.turnIndex {
+            menu.addItem(makeMenuItem(title: "Copy command for turn #\(turn + 1) (\(loc.relativePosition))", systemImage: "arrow.turn.down.right") { [self] in
+                self.copyResumeCommand(record, turnIndex: turn)
+            })
+        }
         menu.addItem(makeMenuItem(title: "Copy resume command", systemImage: "doc.on.doc") { [self] in
             self.copyResumeCommand(record)
         })
@@ -1351,10 +1441,16 @@ public struct AgentSessionHistoryView: View {
         }
     }
 
-    private func copyResumeCommand(_ record: AgentSessionRecord) {
+    private func copyResumeCommand(_ record: AgentSessionRecord, turnIndex: Int? = nil) {
         let settings = KouenSettings.load()
         let mode = settings.sessionMode(for: record.agentKind)
-        let cmd = record.effectiveResumeCommand(mode: mode)
+        let baseCmd = record.effectiveResumeCommand(mode: mode)
+        let cmd: String
+        if let turnIndex {
+            cmd = "\(baseCmd) # turn \(turnIndex + 1)"
+        } else {
+            cmd = baseCmd
+        }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(cmd, forType: .string)
     }
