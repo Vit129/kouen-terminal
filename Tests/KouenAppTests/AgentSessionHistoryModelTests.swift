@@ -346,12 +346,14 @@ final class AgentSessionHistoryModelTests: XCTestCase {
         let r3 = makeRecord(id: "r3", title: "Mid in two", projectPath: "/repo/two", projectName: "two", gitBranch: "feat/sync", updatedAt: mid)
 
         let grouped = AgentSessionHistoryModel.groupCrossRepoTasks([r1, r2, r3])
-        XCTAssertEqual(grouped.count, 1)
+        XCTAssertEqual(grouped.count, 2, "Older same-repo session must stay visible as its own row")
 
         let composite = grouped[0]
         XCTAssertEqual(composite.id, "r1")
         XCTAssertEqual(composite.crossRepoSiblings?.count, 2, "Only latest session per distinct repo is kept in crossRepoSiblings")
         XCTAssertEqual(composite.crossRepoSiblings?.map(\.id), ["r1", "r3"])
+        XCTAssertEqual(grouped[1].id, "r2")
+        XCTAssertNil(grouped[1].crossRepoSiblings)
     }
 
     func testCrossRepoTaskGroupingWindowedIntegration() {
