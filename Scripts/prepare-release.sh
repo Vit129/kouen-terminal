@@ -194,12 +194,20 @@ if [[ "$cl_version" != "$version" ]]; then
     echo "Prepending new release block to CHANGELOG.md..."
     date_str="$(date +%Y-%m-%d)"
     tmp_block="$(mktemp)"
-    cat <<EOF > "$tmp_block"
+    # Build the block from the real unreleased commits so `make release-notes` below (the
+    # in-app What's New) lists them. A placeholder here shipped "Release version bump" as the
+    # whole changelog in v4.20.16 -- full-cycle's git-cliff only rewrites CHANGELOG.md later,
+    # after the notes are already baked into the build.
+    if ! { command -v git-cliff >/dev/null 2>&1 \
+        && git-cliff "$(git describe --tags --abbrev=0)..HEAD" --tag "v$version" --strip header 2>/dev/null | sed -e '/./,$!d' > "$tmp_block" \
+        && grep -q '^## \[' "$tmp_block"; }; then
+      cat <<EOF > "$tmp_block"
 ## [$version] - $date_str
 
 ### Added
 - Release version bump to v$version.
 EOF
+    fi
     tmp_cl="$(mktemp)"
     awk -v block_file="$tmp_block" '
       BEGIN { inserted = 0 }
