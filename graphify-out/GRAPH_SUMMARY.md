@@ -3,13 +3,13 @@ _Auto-generated from GRAPH_REPORT.md · do not edit manually_
 _Regen: `graphify update .`_
 
 ## Summary
-- 21529 nodes · 56937 edges · 3978 communities (1583 shown, 2395 thin omitted)
-- Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 8344 edges (avg confidence: 0.74)
+- 21599 nodes · 57143 edges · 3957 communities (1593 shown, 2364 thin omitted)
+- Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 8382 edges (avg confidence: 0.74)
 - Token cost: 0 input · 0 output
 
 
 ## Graph Freshness
-- Built from commit: `ccfbd573`
+- Built from commit: `a754dd56`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -32,15 +32,15 @@ A high-degree node isn't always architecturally central - a widely-used
 utility/config file can rack up more edges than a real coupler while only
 ever touching one area. This ranks by how many DIFFERENT communities a
 node's neighbors span, not by raw edge count.
-1. `IPCRequest` - bridges 191 areas (208 edges)
-2. `Command` - bridges 102 areas (108 edges)
-3. `IPCResponse` - bridges 83 areas (103 edges)
-4. `AgentKind` - bridges 82 areas (175 edges)
-5. `KouenTerminalSurfaceView` - bridges 78 areas (345 edges)
-6. `t()` - bridges 74 areas (253 edges)
-7. `KouenPaths` - bridges 74 areas (150 edges)
-8. `NSView` - bridges 66 areas (189 edges)
-9. `KouenGridTerminal` - bridges 66 areas (117 edges)
+1. `IPCRequest` - bridges 189 areas (208 edges)
+2. `Command` - bridges 101 areas (108 edges)
+3. `AgentKind` - bridges 82 areas (177 edges)
+4. `t()` - bridges 81 areas (253 edges)
+5. `IPCResponse` - bridges 80 areas (103 edges)
+6. `KouenTerminalSurfaceView` - bridges 75 areas (345 edges)
+7. `KouenPaths` - bridges 71 areas (150 edges)
+8. `SessionCoordinator` - bridges 67 areas (236 edges)
+9. `KouenGridTerminal` - bridges 67 areas (117 edges)
 
 ## Surprising Connections (you probably didn't know these)
 - `.selectedHost` --references--> `RemoteHost`  [INFERRED]

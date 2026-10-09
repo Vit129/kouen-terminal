@@ -518,6 +518,31 @@ public struct SessionEditor: Sendable {
         return true
     }
 
+    /// Drops worktree tags whose directory no longer exists (worktree removed after its branch
+    /// merged) and moves those tabs back to their parent repo. Otherwise every new pane/split in
+    /// the tab inherits the dead path and the cwd fallback strands the shell outside the repo.
+    @discardableResult
+    public mutating func clearStaleWorktreeTags() -> Bool {
+        var changed = false
+        for w in snapshot.workspaces.indices {
+            for s in snapshot.workspaces[w].sessions.indices {
+                for t in snapshot.workspaces[w].sessions[s].tabs.indices {
+                    let tab = snapshot.workspaces[w].sessions[s].tabs[t]
+                    guard let wt = tab.worktreePath, !FileManager.default.fileExists(atPath: wt) else { continue }
+                    if let repo = tab.parentRepoPath, tab.cwd == wt || tab.cwd.hasPrefix(wt + "/") {
+                        snapshot.workspaces[w].sessions[s].tabs[t].cwd = repo
+                    }
+                    snapshot.workspaces[w].sessions[s].tabs[t].worktreePath = nil
+                    snapshot.workspaces[w].sessions[s].tabs[t].parentRepoPath = nil
+                    snapshot.workspaces[w].sessions[s].tabs[t].taskName = nil
+                    changed = true
+                }
+            }
+        }
+        if changed { bumpRevision() }
+        return changed
+    }
+
     // Persistence precedence on a clean GUI quit (a daemon/GUI crash never reaps — survival
     // across a crash is always a feature):
     //   A tab survives iff `keepSessionsOnQuit || session.persistent || tab.persistent`.
@@ -1761,7 +1786,10 @@ public struct SessionEditor: Sendable {
         }
         var candidate = (expanded as NSString).deletingLastPathComponent
         while !candidate.isEmpty {
-            if FileManager.default.fileExists(atPath: candidate, isDirectory: &isDirectory), isDirectory.boolValue {
+            // A removed worktree must land on its repo, never on the `.kouen-worktrees`
+            // container itself (no Makefile, no project files — looks like a broken checkout).
+            if (candidate as NSString).lastPathComponent != WorktreeManager.worktreeDir,
+               FileManager.default.fileExists(atPath: candidate, isDirectory: &isDirectory), isDirectory.boolValue {
                 return candidate
             }
             let parent = (candidate as NSString).deletingLastPathComponent
