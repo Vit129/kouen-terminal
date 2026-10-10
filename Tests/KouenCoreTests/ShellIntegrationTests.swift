@@ -148,4 +148,35 @@ final class ShellIntegrationTests: XCTestCase {
                        "never installs a shell the user didn't opt into")
         XCTAssertEqual(ShellIntegration.refreshInstalledScripts(homeOverride: home), [], "already current")
     }
+
+    private static var repoRoot: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+    }
+
+    /// Regenerator — gated. Rewrites docs/shell-integration/kouen.<shell> from ShellIntegration.script(for:).
+    /// Run via: SYNC_SHELL_DOCS=1 swift test --filter ShellIntegrationTests/testRegenerateDocsShellIntegration
+    func testRegenerateDocsShellIntegration() throws {
+        try XCTSkipUnless(
+            ProcessInfo.processInfo.environment["SYNC_SHELL_DOCS"] == "1",
+            "Set SYNC_SHELL_DOCS=1 to regenerate docs/shell-integration/ from ShellIntegration.swift."
+        )
+        for shell in ShellIntegration.Shell.allCases {
+            let docURL = Self.repoRoot.appendingPathComponent("docs/shell-integration/kouen.\(shell.rawValue)")
+            try Data(ShellIntegration.script(for: shell).utf8).write(to: docURL, options: .atomic)
+        }
+    }
+
+    /// Drift guard — ungated, always runs when docs/shell-integration exists. Fails if docs diverge from runtime scripts.
+    func testDocsShellIntegrationMatchesRuntimeScripts() throws {
+        for shell in ShellIntegration.Shell.allCases {
+            let docURL = Self.repoRoot.appendingPathComponent("docs/shell-integration/kouen.\(shell.rawValue)")
+            guard FileManager.default.fileExists(atPath: docURL.path) else { continue }
+            let docContent = try String(contentsOf: docURL, encoding: .utf8)
+            XCTAssertEqual(docContent, ShellIntegration.script(for: shell),
+                           "docs/shell-integration/kouen.\(shell.rawValue) drifted from ShellIntegration.script(for: .\(shell.rawValue))")
+        }
+    }
 }
