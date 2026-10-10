@@ -85,6 +85,16 @@ final class ShellIntegrationTests: XCTestCase {
             XCTAssertTrue(s.contains("https://claude.ai/code"), "\(shell) wrapper must contain claude remote URL")
             XCTAssertTrue(s.contains("https://antigravity.google.com"), "\(shell) wrapper must contain antigravity remote URL")
             XCTAssertTrue(s.contains("https://chatgpt.com"), "\(shell) wrapper must contain codex remote URL")
+            XCTAssertTrue(s.contains("http://localhost:7777"), "\(shell) wrapper must contain kouen companion remote URL")
+        }
+    }
+
+    func testScriptsWrapKouenCLI() {
+        for shell in ShellIntegration.Shell.allCases {
+            let s = ShellIntegration.script(for: shell)
+            XCTAssertTrue(s.contains("__kouen_cli_wrapped"), "\(shell) wrapper must guard re-sourcing")
+            XCTAssertTrue(s.contains("__kouen_next"), "\(shell) wrapper must chain kouen")
+            XCTAssertTrue(s.contains("kouen-cli"), "\(shell) wrapper must delegate to kouen-cli")
         }
     }
 

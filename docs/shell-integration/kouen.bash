@@ -116,3 +116,41 @@ if [ -n "$KOUEN" ] && [ "$KOUEN_HERMES_SESSION_MODE" = "remote-control" ] && [ -
     __kouen_hermes_next --remote "$@"
   }
 fi
+
+# Kouen CLI wrapper: `kouen` command that supports `rc`/`--rc` to auto-open Chrome
+# and delegates any other commands to `kouen-cli`.
+if [ -n "$KOUEN" ] && [ -z "$__kouen_cli_wrapped" ]; then
+  __kouen_cli_wrapped=1
+  if declare -F kouen >/dev/null 2>&1; then
+    eval "$(declare -f kouen | sed '1s/^kouen /__kouen_next /')"
+  else
+    __kouen_next() {
+      if command -v kouen-cli >/dev/null 2>&1; then
+        command kouen-cli "$@"
+      elif [ -n "$KOUEN_CLI" ] && [ -x "$KOUEN_CLI" ]; then
+        "$KOUEN_CLI" "$@"
+      elif [ -x "$HOME/Library/Application Support/Kouen/bin/kouen-cli" ]; then
+        "$HOME/Library/Application Support/Kouen/bin/kouen-cli" "$@"
+      else
+        echo "kouen-cli: command not found" >&2
+        return 1
+      fi
+    }
+  fi
+  kouen() {
+    local a rc=0
+    if [ "$1" = "rc" ] || [ "$1" = "companion" ]; then
+      rc=1
+    fi
+    for a in "$@"; do
+      case "$a" in
+        --rc|--remote-control) rc=1 ;;
+      esac
+    done
+    if [ $rc -eq 1 ]; then
+      export KOUEN_RC_OPENED=1
+      /usr/bin/open -a "Google Chrome" "http://localhost:7777" >/dev/null 2>&1 &
+    fi
+    __kouen_next "$@"
+  }
+fi
