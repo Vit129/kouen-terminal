@@ -85,6 +85,13 @@ final class MobileBridgeContractTests: XCTestCase {
         XCTAssertTrue(html.contains("readyPaths"))
     }
 
+    func testEmbeddedPageHTMLOneTapPRHasNoModalSheet() {
+        let html = MobileBridgeServer.embeddedPageHTML
+        XCTAssertFalse(html.contains(#"id="sheet""#))
+        XCTAssertFalse(html.contains(#"id="pr-title""#))
+        XCTAssertTrue(html.contains(#"ws.send(JSON.stringify({ createDraftPR: { title: cur.name || "Draft PR", path: cur.cwd } }))"#))
+    }
+
     func testRunProcessSuccessAndOutputs() {
         let res = MobileBridgeServer.runProcess(
             executableURL: URL(fileURLWithPath: "/bin/echo"),
