@@ -77,6 +77,12 @@ if [[ "$git_dir" == *"worktrees"* ]]; then
   common_dir="$(git rev-parse --git-common-dir)"
   main_repo="$(cd "$(dirname "$common_dir")" && pwd)"
   echo "Code merged to main."
+  if [[ -n "$(git -C "$main_repo" status --porcelain)" ]]; then
+    echo "❌ Cannot sync main repo at $main_repo — working tree has uncommitted changes:" >&2
+    git -C "$main_repo" status -s >&2
+    echo "Commit or stash changes in the main repo before releasing." >&2
+    exit 1
+  fi
   cd "$main_repo"
   git pull --ff-only origin main
 elif [[ "$prior_branch" != "main" ]]; then
