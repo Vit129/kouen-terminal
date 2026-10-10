@@ -31,7 +31,14 @@ if [[ -n "$(git status --porcelain)" ]]; then
     echo "Empty commit message — aborting." >&2
     exit 1
   fi
-  git add -A
+  if git status --porcelain | grep -q "Info.plist"; then
+    git add Apps/Kouen/Sources/KouenApp/Resources/Info.plist \
+            Packages/KouenCore/Sources/KouenCore/KouenVersion.swift \
+            Packages/KouenCore/Sources/KouenCore/ReleaseNotes/GeneratedReleaseNotes.swift \
+            CHANGELOG.md docs/CHANGELOG-archive.md 2>/dev/null || true
+  else
+    git add -A ':!graphify-out'
+  fi
 
   # A release commit (full-cycle.sh's Step 2 stages Info.plist on every bump) needs a
   # version/bump/release/build keyword or .githooks/commit-msg rejects it — auto-tag so
