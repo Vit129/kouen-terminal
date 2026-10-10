@@ -683,7 +683,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
       p.querySelectorAll("[data-a]").forEach(b => {
         b.onclick = () => {
           const ans = b.dataset.a;
-          if (ws && ws.readyState === WebSocket.OPEN) ws.send(new TextEncoder().encode(ans + '\n'));
+          if (ws && ws.readyState === WebSocket.OPEN) ws.send(new TextEncoder().encode(ans + '\r'));
           cur.out.push(["tool", (ans === "y" ? "✓ allowed" : "✗ denied")]);
           renderPane();
         };
@@ -756,26 +756,36 @@ public final class MobileBridgeServer: @unchecked Sendable {
       b.setAttribute("aria-label", stop ? "Stop agent" : "Send");
     }
 
+    function renderAtts() {
+      $("atts").innerHTML = atts.map(a => {
+        const name = typeof a === 'object' ? a.name : a;
+        const loading = typeof a === 'object' && a.loading;
+        return `<span class="att">${loading ? '⏳' : '📎'} ${esc(name)}</span>`;
+      }).join("");
+    }
+
     function send(text) {
       if (!text.trim() && !atts.length) {
         if (cur && cur.state === "run") {
-          cur.state = "idle";
           if (ws && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ stop: true }));
           }
-          cur.out.push(["tool", "■ stopped (Esc sent to pane)"]);
+          cur.out.push(["tool", "■ stopping (Esc sent to pane)"]);
           renderPane();
-          toast("Stopped " + cur.name, "Esc sent");
+          toast("Stopping " + cur.name, "Esc sent");
         }
         return;
       }
-      const fullText = text + (atts.length ? "\n📎 " + atts.join(", ") : "");
+      const readyPaths = atts.map(a => typeof a === 'object' ? (a.path || a.name) : a).filter(Boolean);
+      const toSend = text.trim() + (readyPaths.length ? (text.trim() ? " " : "") + readyPaths.join(" ") : "");
       if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(new TextEncoder().encode(fullText + '\n'));
+        ws.send(new TextEncoder().encode(toSend + '\r'));
       }
-      cur.out.push(["user", fullText]);
+      const attNames = atts.map(a => typeof a === 'object' ? a.name : a);
+      const fullDisplay = text + (attNames.length ? (text ? "\n" : "") + "📎 " + attNames.join(", ") : "");
+      cur.out.push(["user", fullDisplay]);
       atts = [];
-      $("atts").innerHTML = "";
+      renderAtts();
       $("msg").value = "";
       renderPane();
     }
@@ -837,7 +847,8 @@ public final class MobileBridgeServer: @unchecked Sendable {
     $("file").onchange = e => {
       const files = Array.from(e.target.files);
       for (const f of files) {
-        atts.push(f.name);
+        const item = { name: f.name, path: null, loading: true };
+        atts.push(item);
         const reader = new FileReader();
         reader.onload = ev => {
           const b64 = ev.target.result.split(',')[1];
@@ -853,7 +864,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
         };
         reader.readAsDataURL(f);
       }
-      $("atts").innerHTML = atts.map(a => `<span class="att">📎 ${esc(a)}</span>`).join("");
+      renderAtts();
       e.target.value = "";
       syncSend();
     };
@@ -935,7 +946,16 @@ public final class MobileBridgeServer: @unchecked Sendable {
       }
       if (msg.ok === "fileAttached" || msg.fileAttached) {
         const filePath = msg.path || (msg.fileAttached && msg.fileAttached.path) || '';
-        toast('File attached', filePath.split('/').pop());
+        const fileName = msg.name || (msg.fileAttached && msg.fileAttached.name);
+        const item = atts.find(a => typeof a === 'object' && a.loading && (!fileName || a.name === fileName))
+                  || atts.find(a => typeof a === 'object' && a.loading);
+        if (item) {
+          item.path = filePath;
+          item.loading = false;
+        }
+        renderAtts();
+        syncSend();
+        toast('File attached', (fileName || filePath.split('/').pop()));
       }
       if (msg.error) {
         toast('Error', msg.error);
@@ -1444,7 +1464,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
     }
     /// P37 Phase D2. `path` is the temp path the file was written to, mainly for the client to
     /// display — the actual delivery already happened via the shell-quoted paste into the PTY.
-    struct FileAttachedAck: Codable, Equatable, Sendable { var ok = "fileAttached"; var path: String }
+    struct FileAttachedAck: Codable, Equatable, Sendable { var ok = "fileAttached"; var path: String; var name: String? = nil }
     /// P51 Phase 1. Draft PR created ack sent to mobile client.
     struct DraftPRAck: Codable, Equatable, Sendable { var ok = "draftPRCreated"; var url: String; var number: Int? }
 
@@ -1979,9 +1999,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
             sendText(#"{"error":"failed to save the uploaded file"}"#, on: connection)
             return
         }
-        let quoted = ShellQuoting.quote(path)
-        _ = subscription.sendInput(Data(quoted.utf8), surfaceID: surfaceID)
-        sendJSON(FileAttachedAck(path: path), on: connection)
+        sendJSON(FileAttachedAck(path: path, name: name), on: connection)
     }
 
     /// P37 Phase D3 (browser mirror). Opens the mirrored `BrowserPaneView` tab on first use

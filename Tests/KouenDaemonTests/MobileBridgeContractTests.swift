@@ -15,12 +15,13 @@ final class MobileBridgeContractTests: XCTestCase {
     }
 
     func testFileAttachedAckJSONShapeMatchesClientExpectations() throws {
-        let ack = MobileBridgeServer.FileAttachedAck(path: "/tmp/uploads/test.png")
+        let ack = MobileBridgeServer.FileAttachedAck(path: "/tmp/uploads/test.png", name: "test.png")
         let data = try JSONEncoder().encode(ack)
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
 
         XCTAssertEqual(json["ok"] as? String, "fileAttached")
         XCTAssertEqual(json["path"] as? String, "/tmp/uploads/test.png")
+        XCTAssertEqual(json["name"] as? String, "test.png")
     }
 
     func testResolveAuthorizedCwdRejectsForeignPath() {
@@ -75,6 +76,13 @@ final class MobileBridgeContractTests: XCTestCase {
         XCTAssertTrue(html.contains(#"replace(/[&<>"']/g"#))
         XCTAssertTrue(html.contains("&quot;"))
         XCTAssertTrue(html.contains("&#39;"))
+    }
+
+    func testEmbeddedPageHTMLSubmitsWithCarriageReturnAndSendsAttachedPaths() {
+        let html = MobileBridgeServer.embeddedPageHTML
+        XCTAssertTrue(html.contains(#"encode(ans + '\r')"#))
+        XCTAssertTrue(html.contains(#"encode(toSend + '\r')"#))
+        XCTAssertTrue(html.contains("readyPaths"))
     }
 
     func testRunProcessSuccessAndOutputs() {
