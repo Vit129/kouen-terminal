@@ -709,24 +709,82 @@ public final class MobileBridgeServer: @unchecked Sendable {
 
     function openPreview() {
       if (!cur) return;
-      const port = (cur.ports && cur.ports[0]) || 5173;
-      const src = {
-        local: ["Dev server", `http://localhost:${port}/`],
-        html: ["HTML file", "docs/companion-mockup.html"],
-        art: ["Artifact", "claude.ai/artifact/…"]
-      };
+      const port = (cur.ports && cur.ports[0]) || (cur.rawOutput && cur.rawOutput.includes('localhost:') ? (cur.rawOutput.match(/localhost:(\d+)/) || [])[1] : null);
+      const htmlFile = cur.files ? cur.files.find(f => f[0].toLowerCase().endsWith('.html')) : null;
+      const artMatch = cur.rawOutput ? cur.rawOutput.match(/https?:\/\/[^\s<>"']*(?:artifact|preview|page)[^\s<>"']*/i) : null;
+
+      const src = {};
+      if (port) {
+        src.local = ["Dev server", `http://localhost:${port}/`];
+      } else {
+        src.local = ["Dev server", "http://localhost:5173/"];
+      }
+      if (htmlFile) {
+        src.html = ["HTML file", htmlFile[0]];
+      }
+      if (artMatch) {
+        src.art = ["Artifact", artMatch[0]];
+      }
+
+      if (!src[pv]) pv = Object.keys(src)[0] || 'local';
       const url = src[pv] ? src[pv][1] : src.local[1];
+
+      let bodyHTML = "";
+      let captionText = "";
+      if (pv === "local") {
+        bodyHTML = `
+          <div class="pv-viewport" style="background:#fff;border-radius:8px;overflow:hidden;border:1px solid var(--line);min-height:240px;display:flex;align-items:center;justify-content:center;position:relative">
+            <div id="pv-loading" style="padding:40px 16px;text-align:center;color:var(--muted);font-size:13px">Connecting to browser mirror…</div>
+            <img id="pv-frame" style="width:100%;display:none;object-fit:contain" alt="Preview frame" />
+          </div>
+          <div class="pv-bar" style="display:flex;gap:8px;margin-top:8px">
+            <button class="btn ghost" id="pv-reload" style="padding:6px 12px;font-size:12px">↻ Reload</button>
+            <button class="btn ghost" id="pv-snap" style="padding:6px 12px;font-size:12px">📸 Capture</button>
+          </div>
+        `;
+        captionText = "Mirrored live from Mac via Kouen browser mirror.";
+      } else if (pv === "html") {
+        bodyHTML = `
+          <div id="pv-html-content" style="background:#fff;border-radius:8px;min-height:200px;border:1px solid var(--line);padding:12px">
+            <div style="color:var(--muted);font-size:13px;text-align:center;padding:24px 0">Loading workspace file…</div>
+          </div>
+        `;
+        captionText = "Rendered from workspace file.";
+      } else {
+        bodyHTML = `
+          <div style="background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:20px;text-align:center">
+            <p style="margin:0 0 12px 0;font-size:14px;color:var(--ink)">External artifact detected</p>
+            <a class="btn primary" href="${esc(url)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:8px 16px;text-decoration:none">Open artifact ↗</a>
+          </div>
+        `;
+        captionText = "External link.";
+      }
+
       panel("Preview", `
-        <div class="pv-src">${Object.entries(src).map(([k, v]) => `<button class="chip" data-pv="${k}" aria-pressed="${k === pv}">${v[0]}</button>`).join("")}</div>
+        <div class="pv-src">${Object.entries(src).map(([k, v]) => `<button class="chip" data-pv="${k}" aria-pressed="${k === pv}">${esc(v[0])}</button>`).join("")}</div>
         <div class="urlbar">${esc(url)}</div>
-        <div class="mock">
-          ${pv === 'local' ? `<iframe src="${esc(url)}" style="width:100%;height:280px;border:0;background:white"></iframe>` : `<div class="hero"><b>Preview</b><span>${esc(url)}</span></div>`}
-        </div>
-        <p class="caption">${pv === "local" ? "Live mirror of your running dev server." : pv === "html" ? "Renders straight from your workspace." : "External artifact link."}</p>
+        <div class="mock">${bodyHTML}</div>
+        <p class="caption">${esc(captionText)}</p>
       `);
+
       $("panel-body").querySelectorAll("[data-pv]").forEach(b => {
         b.onclick = () => { pv = b.dataset.pv; openPreview(); };
       });
+
+      if (pv === "local") {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ browserNavigate: { url } }));
+        }
+        const rBtn = $("pv-reload");
+        if (rBtn) rBtn.onclick = () => { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ browserReload: true })); };
+        const sBtn = $("pv-snap");
+        if (sBtn) sBtn.onclick = () => { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ browserScreenshot: true })); };
+      } else if (pv === "html") {
+        const fullPath = cur.cwd ? (cur.cwd.replace(/\/$/, '') + '/' + url) : url;
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ readFile: { path: fullPath } }));
+        }
+      }
     }
 
     function syncSend() {
@@ -926,6 +984,26 @@ public final class MobileBridgeServer: @unchecked Sendable {
         renderAtts();
         syncSend();
         toast('File attached', (fileName || filePath.split('/').pop()));
+      }
+      if (msg.ok === "browserOpened" || msg.ok === "browserNavigated") {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ browserScreenshot: true }));
+        }
+      }
+      if (msg.browserFrame) {
+        const frameImg = $("pv-frame");
+        if (frameImg) {
+          frameImg.src = "data:image/png;base64," + msg.browserFrame.png;
+          frameImg.style.display = "block";
+          const loading = $("pv-loading");
+          if (loading) loading.style.display = "none";
+        }
+      }
+      if (msg.file) {
+        const container = $("pv-html-content");
+        if (container) {
+          container.innerHTML = `<iframe sandbox srcdoc="${esc(msg.file.content)}" style="width:100%;height:320px;border:0;background:#fff;border-radius:8px"></iframe>`;
+        }
       }
       if (msg.error) {
         toast('Error', msg.error);
