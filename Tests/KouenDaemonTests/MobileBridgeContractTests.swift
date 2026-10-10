@@ -92,6 +92,18 @@ final class MobileBridgeContractTests: XCTestCase {
         XCTAssertTrue(html.contains(#"ws.send(JSON.stringify({ createDraftPR: { title: cur.name || "Draft PR", path: cur.cwd } }))"#))
     }
 
+    func testEmbeddedPageHTMLPreviewUsesRealBrowserMirrorAndNoMockupCaptions() {
+        let html = MobileBridgeServer.embeddedPageHTML
+        XCTAssertFalse(html.contains("docs/companion-mockup.html"))
+        XCTAssertFalse(html.contains("Renders straight from your workspace"))
+        XCTAssertFalse(html.contains("claude.ai/artifact/…"))
+        XCTAssertTrue(html.contains("browserNavigate"))
+        XCTAssertTrue(html.contains("browserScreenshot"))
+        XCTAssertTrue(html.contains("browserFrame"))
+        XCTAssertTrue(html.contains("pv-frame"))
+        XCTAssertTrue(html.contains("readFile"))
+    }
+
     func testRunProcessSuccessAndOutputs() {
         let res = MobileBridgeServer.runProcess(
             executableURL: URL(fileURLWithPath: "/bin/echo"),
