@@ -2,13 +2,13 @@
 
 ## Agent Memory
 
-`agent-memory/` is gitignored here (2026-08-16+) — not tracked in this repo, centrally backed up instead to the private `github.com/Vit129/agent-memory-private` repo (`agent-memory/kouen-terminal/`). Files stay physically in place; only git tracking changed. Missing on a fresh clone? Restore via `~/.claude/scripts/bootstrap-new-machine.sh`, or manually: `rsync -a ~/Git/Personal/agent-memory-private/agent-memory/kouen-terminal/ agent-memory/`.
+Per-project memory lives centrally in `~/Git/Personal/agent-memory-private/agent-memory/kouen-terminal/` (never in this repo). Resolve path via `python3 ~/.claude/scripts/lib/memory_root.py .` or search via `python3 ~/.claude/scripts/recall.py "<query>"`.
 
 ## Session Start
 
 - Continuation → read `CONTEXT.md` → invoke `macos-swiftui` skill
 - Code navigation → `graphify-out/GRAPH_SUMMARY.md`
-- Bug/pattern → `grep -rn "<keyword>" agent-memory/knowledge/cases/ agent-memory/MEMORY.md`
+- Bug/pattern → `python3 ~/.claude/scripts/recall.py "<keyword>"`
 
 ## Skills & Rules
 
