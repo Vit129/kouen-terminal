@@ -145,5 +145,36 @@ final class MobileBridgeContractTests: XCTestCase {
         XCTAssertEqual(files.first?.additions, 1)
         XCTAssertEqual(files.first?.deletions, 0)
     }
+
+    func testBuildPairingURLGeneratesHTTPSWhenServeIsActive() {
+        let httpsURL = MobileBridgeServer.buildPairingURL(
+            host: "100.94.236.66",
+            pageURLPort: 7777,
+            wsPort: 7777,
+            token: "123456",
+            magicDNSName: "supavits-macbook-pro.tail454c08.ts.net",
+            isServeActive: true
+        )
+        XCTAssertEqual(httpsURL, "https://supavits-macbook-pro.tail454c08.ts.net/?token=123456")
+
+        let httpFallback = MobileBridgeServer.buildPairingURL(
+            host: "100.94.236.66",
+            pageURLPort: 7777,
+            wsPort: 7777,
+            token: "123456",
+            magicDNSName: "supavits-macbook-pro.tail454c08.ts.net",
+            isServeActive: false
+        )
+        XCTAssertEqual(httpFallback, "http://100.94.236.66:7777/?token=123456&wsport=7777")
+    }
+
+    func testEmbeddedPageHTMLHasNoGoogleFontsAndUsesSystemFonts() {
+        let html = MobileBridgeServer.embeddedPageHTML
+        XCTAssertFalse(html.contains("fonts.googleapis.com"))
+        XCTAssertFalse(html.contains("fonts.gstatic.com"))
+        XCTAssertTrue(html.contains("-apple-system"))
+        XCTAssertTrue(html.contains("scheduleGitDiff"))
+        XCTAssertTrue(html.contains("65536"))
+    }
 }
 #endif
