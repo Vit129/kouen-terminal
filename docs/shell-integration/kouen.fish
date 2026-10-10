@@ -128,3 +128,42 @@ if set -q KOUEN; and test "$KOUEN_HERMES_SESSION_MODE" = remote-control; and not
         __kouen_hermes_next --remote $argv
     end
 end
+
+# Kouen CLI wrapper: `kouen` command that supports `rc`/`--rc` to auto-open Chrome
+# and delegates any other commands to `kouen-cli`.
+if set -q KOUEN; and not set -q __kouen_cli_wrapped
+    set -g __kouen_cli_wrapped 1
+    if functions -q kouen
+        functions -c kouen __kouen_next
+    else
+        function __kouen_next
+            if type -q kouen-cli
+                command kouen-cli $argv
+            else if test -n "$KOUEN_CLI"; and test -x "$KOUEN_CLI"
+                $KOUEN_CLI $argv
+            else if test -x "$HOME/Library/Application Support/Kouen/bin/kouen-cli"
+                "$HOME/Library/Application Support/Kouen/bin/kouen-cli" $argv
+            else
+                echo "kouen-cli: command not found" >&2
+                return 1
+            end
+        end
+    end
+    function kouen
+        set -l rc 0
+        if test "$argv[1]" = "rc"; or test "$argv[1]" = "companion"
+            set rc 1
+        end
+        for a in $argv
+            switch $a
+                case --remote-control --rc
+                    set rc 1
+            end
+        end
+        if test $rc -eq 1
+            set -x KOUEN_RC_OPENED 1
+            /usr/bin/open -a "Google Chrome" "http://localhost:7777" >/dev/null 2>&1 &
+        end
+        __kouen_next $argv
+    end
+end

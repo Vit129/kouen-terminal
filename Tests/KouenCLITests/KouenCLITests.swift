@@ -103,7 +103,7 @@ final class KouenCLITests: XCTestCase {
         "rotate-window", "break-pane", "join-pane", "move-pane", "renumber-windows",
         "respawn-pane", "select-pane", "set-option", "show-options", "set-environment",
         "show-environment", "bind-hook", "unbind-hook", "list-hooks", "display-message",
-        "kill-server", "start-server", "show-messages",
+        "kill-server", "start-server", "rc", "show-messages",
     ]
 
     /// Catalog verbs that are *intentionally* not dispatch cases (e.g. a completion-only stub for a
@@ -319,4 +319,15 @@ final class KouenCLITests: XCTestCase {
         let (emacs, _) = KouenCLI.parseKeyTableArgs(["list-keys", "-T", "copy-mode-emacs"])
         XCTAssertEqual(emacs, "copy-mode-emacs")
     }
+
+    func testHandleRCWithNoOpenReturnsZero() {
+        let code = KouenCLI.handleRC(["rc", "--no-open"])
+        XCTAssertEqual(code, 0)
+    }
+
+    func testHandleRCHelpReturnsZero() {
+        let code = KouenCLI.handleRC(["rc", "--help"])
+        XCTAssertEqual(code, 0)
+    }
 }
+
