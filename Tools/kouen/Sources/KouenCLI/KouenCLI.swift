@@ -510,6 +510,8 @@ struct KouenCLI {
         }
         print("Tip: run 'kouen-cli install-shell-integration' to enable OSC 133 prompt marks, "
             + "the success/failure gutter, and prompt jumping.")
+        print("Note: If KouenDaemon is already running, run 'kouen-cli kill-server' (or restart Kouen.app) "
+            + "to reload the daemon with the newly installed binary.")
     }
 
     static func copyExecutable(source: URL, destination: URL) throws {
