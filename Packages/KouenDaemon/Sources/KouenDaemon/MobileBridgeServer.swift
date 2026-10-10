@@ -343,8 +343,6 @@ public final class MobileBridgeServer: @unchecked Sendable {
       <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
       <link rel="manifest" href="/manifest.json">
       <link rel="icon" href="/icon.svg" type="image/svg+xml">
-      <link rel="preconnect" href="https://fonts.googleapis.com">
-      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
       <style>
       :root{
         --bg:#eef1ee; --surface:#ffffff; --ink:#18201c; --muted:#5d6a63; --line:#d8dfda;
@@ -352,8 +350,8 @@ public final class MobileBridgeServer: @unchecked Sendable {
         --add:#e3f4e8; --add-ink:#1d6b3a; --del:#fbe6e4; --del-ink:#a2342a;
         --warn:#b86e00; --warn-soft:#fff1dc; --run:#2f6b4f; --idle:#8a958f;
         --frame:#cfd7d2; --code-bg:#f5f7f5;
-        --f-body:"Atkinson Hyperlegible",-apple-system,system-ui,sans-serif;
-        --f-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+        --f-body:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+        --f-mono:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace;
       }
       @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
         --bg:#0f1412; --surface:#171d1a; --ink:#e4ebe7; --muted:#93a19a; --line:#2a332e;
@@ -591,7 +589,11 @@ public final class MobileBridgeServer: @unchecked Sendable {
           const del = s.files ? s.files.reduce((a, f) => a + f[2], 0) : 0;
           const b = document.createElement("button");
           b.className = "sess";
-          b.innerHTML = `<span class="dot ${st}"></span><span class="name">${esc(s.name)}<span class="agent">${esc(s.agent)}</span></span><span class="pill ${st}">${LABEL[st]}</span><span class="meta">${esc(s.branch)} · ${s.files ? s.files.length : 0} files +${add} −${del}</span>`;
+          const fileStat = (s.files && s.files.length)
+            ? `${s.files.length} files +${add} −${del}`
+            : (s.filesCount ? `${s.filesCount} files +${s.filesAdditions || 0} −${s.filesDeletions || 0}` : 'clean');
+          const branchDisplay = s.branch ? esc(s.branch) : '—';
+          b.innerHTML = `<span class="dot ${st}"></span><span class="name">${esc(s.name)}<span class="agent">${esc(s.agent)}</span></span><span class="pill ${st}">${LABEL[st]}</span><span class="meta">${branchDisplay} · ${fileStat}</span>`;
           b.onclick = () => openSession(s);
           box.appendChild(b);
         });
@@ -626,19 +628,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
       if (!cur) return;
       const p = $("pane");
       const wasAtBottom = (p.scrollHeight - p.scrollTop - p.clientHeight) < 60;
-      const items = [...cur.out];
-
-      if (cur.files && cur.files.length > 0 && !items.some(x => x[0] === 'diff')) {
-        items.push(["diff"]);
-      }
-      const port = (cur.ports && cur.ports[0]) || (cur.rawOutput && cur.rawOutput.includes('localhost:') ? (cur.rawOutput.match(/localhost:(\d+)/) || [])[1] : null);
-      if (port && !items.some(x => x[0] === 'preview')) {
-        items.push(["preview", "http://localhost:" + port + "/"]);
-      }
-      if (cur.branch && cur.branch !== 'main' && cur.branch !== 'master' && !items.some(x => x[0] === 'pr' || x[0] === 'prdone')) {
-        if (cur.pr) items.push(["prdone"]);
-        else items.push(["pr"]);
-      }
+      const items = cur.out;
 
       p.innerHTML = '<div class="out">' + items.map(([k, t]) => {
         if (k === "user") return `<div class="msg user">${esc(t)}</div>`;
@@ -932,9 +922,12 @@ public final class MobileBridgeServer: @unchecked Sendable {
             agent: s.agent || (s.tabTitle && s.tabTitle.toLowerCase().includes('claude') ? 'claude' : 'agent'),
             state: s.state || (s.waiting ? 'wait' : 'idle'),
             cwd: s.cwd,
-            branch: s.branch || 'main',
+            branch: s.branch || '—',
             ports: s.ports || [],
             files: existing.files || [],
+            filesCount: s.filesCount,
+            filesAdditions: s.filesAdditions,
+            filesDeletions: s.filesDeletions,
             out: existing.out || [["text", "Attached to session " + (s.tabTitle || s.surfaceID.slice(0, 8))]],
             rawOutput: existing.rawOutput || "",
             pr: existing.pr || null
@@ -947,6 +940,10 @@ public final class MobileBridgeServer: @unchecked Sendable {
             cur.state = updated.state;
             cur.branch = updated.branch;
             cur.agent = updated.agent;
+            if (cur.state === "idle" && cur.files && cur.files.length > 0 && cur.branch && cur.branch !== 'main' && cur.branch !== 'master' && cur.branch !== '—' && !cur.out.some(x => x[0] === 'pr' || x[0] === 'prdone')) {
+              cur.out.push(["pr"]);
+              renderPane();
+            }
             syncSend();
           }
         }
@@ -957,6 +954,12 @@ public final class MobileBridgeServer: @unchecked Sendable {
       if (msg.gitDiff && msg.gitDiff.files) {
         if (cur) {
           cur.files = msg.gitDiff.files.map(f => [f.path, f.additions, f.deletions, f.uncommitted, f.lines]);
+          if (cur.files.length > 0 && !cur.out.some(x => x[0] === 'diff')) {
+            cur.out.push(["diff"]);
+          }
+          if (cur.state === "idle" && cur.files.length > 0 && cur.branch && cur.branch !== 'main' && cur.branch !== 'master' && cur.branch !== '—' && !cur.out.some(x => x[0] === 'pr' || x[0] === 'prdone')) {
+            cur.out.push(["pr"]);
+          }
           renderPane();
         }
       }
@@ -965,6 +968,9 @@ public final class MobileBridgeServer: @unchecked Sendable {
           const prUrl = msg.url || (msg.draftPRCreated && msg.draftPRCreated.url);
           const prNum = msg.number || (msg.draftPRCreated && msg.draftPRCreated.number) || 1;
           cur.pr = { n: prNum, url: prUrl };
+          const prIdx = cur.out.findIndex(x => x[0] === 'pr');
+          if (prIdx >= 0) cur.out[prIdx] = ["prdone"];
+          else if (!cur.out.some(x => x[0] === 'prdone')) cur.out.push(["prdone"]);
           renderPane();
           toast(`Draft PR #${cur.pr.n} opened`, 'launching GitHub…');
           if (prUrl && prUrl.startsWith('https://github.com/')) {
@@ -1011,11 +1017,30 @@ public final class MobileBridgeServer: @unchecked Sendable {
       }
     }
 
+    let gitDiffTimer = null;
+    function scheduleGitDiff() {
+      if (!cur) return;
+      clearTimeout(gitDiffTimer);
+      gitDiffTimer = setTimeout(() => {
+        if (cur && ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ gitDiff: { path: cur.cwd } }));
+        }
+      }, 1000);
+    }
+
     function handleTerminalBytes(raw) {
       if (!cur) return;
       const clean = stripANSI(raw);
       if (!clean.trim()) return;
       cur.rawOutput += clean;
+      if (cur.rawOutput.length > 65536) cur.rawOutput = cur.rawOutput.slice(-65536);
+      const portMatch = clean.match(/localhost:(\d+)/);
+      if (portMatch) {
+        const pUrl = "http://localhost:" + portMatch[1] + "/";
+        if (!cur.out.some(x => x[0] === 'preview' && x[1] === pUrl)) {
+          cur.out.push(["preview", pUrl]);
+        }
+      }
       const lines = clean.split('\n').filter(l => l.trim().length > 0);
       for (const line of lines) {
         const trimmed = line.trim();
@@ -1024,7 +1049,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
         } else if (trimmed.startsWith('Edit ') || trimmed.startsWith('Read ') || trimmed.startsWith('Bash: ') || trimmed.startsWith('Running ') || trimmed.startsWith('View ')) {
           cur.out.push(["tool", trimmed]);
           if (trimmed.startsWith('Edit ')) {
-            ws.send(JSON.stringify({ gitDiff: { path: cur.cwd } }));
+            scheduleGitDiff();
           }
         } else if (trimmed.includes('(y/n)') || trimmed.includes('[y/n]') || trimmed.toLowerCase().includes('approval needed') || trimmed.toLowerCase().includes('permission to')) {
           cur.out.push(["ask", trimmed]);
@@ -1041,8 +1066,12 @@ public final class MobileBridgeServer: @unchecked Sendable {
 
     function connectWS() {
       if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
-      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = proto + '//' + location.hostname + (wsPort ? ':' + wsPort : '') + location.pathname + location.search;
+      const isHttps = location.protocol === 'https:';
+      const proto = isHttps ? 'wss:' : 'ws:';
+      const portPart = (location.port && location.port !== "80" && location.port !== "443")
+        ? ':' + location.port
+        : (isHttps ? '' : (wsPort ? ':' + wsPort : ''));
+      const wsUrl = proto + '//' + location.hostname + portPart + location.pathname + location.search;
       ws = new WebSocket(wsUrl);
       ws.binaryType = 'arraybuffer';
       ws.onopen = () => {
@@ -1201,12 +1230,6 @@ public final class MobileBridgeServer: @unchecked Sendable {
         }
         let isUpgrade = headers["upgrade"]?.lowercased() == "websocket"
             && (headers["connection"]?.lowercased().contains("upgrade") ?? false)
-        // Temporary diagnostic (P37 Phase C real-device WS debugging): log exactly what a
-        // real client sent, since every automated test so far (loopback python/WebKit) has
-        // passed while a real phone over Tailscale still fails the same way port
-        // consolidation was supposed to fix — the request itself is the one thing not yet
-        // observed from a real failing attempt.
-        log?("mobile bridge: request from \(connection.endpoint) — upgrade=\(headers["upgrade"] ?? "nil") connection=\(headers["connection"] ?? "nil") key=\(headers["sec-websocket-key"] != nil) isUpgrade=\(isUpgrade)")
         if isUpgrade, let key = headers["sec-websocket-key"] {
             let accept = Self.webSocketAcceptValue(for: key)
             let response = Data("""
@@ -1345,23 +1368,66 @@ public final class MobileBridgeServer: @unchecked Sendable {
         return nil
     }
 
+    public static func buildPairingURL(
+        host: String,
+        pageURLPort: Int,
+        wsPort: UInt16,
+        token: String,
+        magicDNSName: String? = nil,
+        isServeActive: Bool = false
+    ) -> String {
+        if isServeActive, let dns = magicDNSName, !dns.isEmpty {
+            return "https://\(dns)/?token=\(token)"
+        }
+        return "http://\(host):\(pageURLPort)/?token=\(token)&wsport=\(wsPort)"
+    }
+
+    public static func isTailscaleServeConfigured(port: Int) -> Bool {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/local/bin/tailscale")
+        process.arguments = ["serve", "status", "--json"]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = Pipe()
+        do {
+            try process.run()
+            process.waitUntilExit()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any], !json.isEmpty else {
+                return false
+            }
+            if let web = json["Web"] as? [String: Any], !web.isEmpty {
+                return true
+            }
+            if let tcp = json["TCP"] as? [String: Any], !tcp.isEmpty {
+                return true
+            }
+            return true
+        } catch {
+            return false
+        }
+    }
+
     /// Generates a fresh pairing token, prints its QR, and waits it out before generating
     /// the next one — runs on a background thread until `stop()` flips `isRunning` false.
     /// No longer needs an interactive console prompt (the old "pick a session" step): since
     /// a token now grants the whole daemon rather than one surface, there's nothing left to
     /// ask the operator to choose. This also lifts the earlier "must run in a real foreground
     /// terminal" constraint.
-    private func runPairingLoop(wsPort: UInt16, pageURLPort: Int, tailscaleHost: String?, log: @escaping @Sendable (String) -> Void) {
+    private func runPairingLoop(
+        wsPort: UInt16,
+        pageURLPort: Int,
+        tailscaleHost: String?,
+        magicDNSName: String?,
+        log: @escaping @Sendable (String) -> Void
+    ) {
         let host = tailscaleHost ?? "127.0.0.1"
+        let serveActive = magicDNSName != nil && Self.isTailscaleServeConfigured(port: pageURLPort)
         if tailscaleHost == nil {
             log("mobile bridge: Tailscale IP not detected — QR will use loopback (same-Mac testing only)")
+        } else if !serveActive {
+            log("mobile bridge: Tailscale Serve HTTPS not detected — run 'tailscale serve --bg \(pageURLPort)' to enable HTTPS for PWA installation")
         }
-        // Ticks (at the 0.25s granularity below) the listener has been not-ready, and whether
-        // the one-shot warning has already fired for the current not-ready stretch. Both reset
-        // the moment a listener goes ready again. The threshold (8 ticks ~= 2s) rides out the
-        // normal async startup race — `listener.start()` returns immediately but `.ready` lands
-        // a few ms later on `bridgeQueue` — without misreporting a real bind failure (e.g. port
-        // already held by another Kouen daemon instance) as if pairing were merely slow.
         var notReadyTicks = 0
         var warnedNoListener = false
         while isRunning {
@@ -1378,25 +1444,19 @@ public final class MobileBridgeServer: @unchecked Sendable {
             notReadyTicks = 0
             warnedNoListener = false
             let token = String(format: "%06d", Int.random(in: 0..<1_000_000))
-            // The unified listener serves `embeddedPageHTML` for any non-upgrade path, so the root
-            // is enough here. `wsport` lets the page know which port to open the WS
-            // connection on, since it can differ from the page-serving port.
-            let url = "http://\(host):\(pageURLPort)/?token=\(token)&wsport=\(wsPort)"
+            let url = Self.buildPairingURL(
+                host: host,
+                pageURLPort: pageURLPort,
+                wsPort: wsPort,
+                token: token,
+                magicDNSName: magicDNSName,
+                isServeActive: serveActive
+            )
             pairingBox.current = PendingPairing(token: token, url: url, expiresAt: Date().addingTimeInterval(pairingLifetime))
-            // P37 B3 (log hygiene): the URL is NOT logged per rotation any more — that wrote
-            // ~5,760 lines/day to daemon.log whether or not anyone was pairing. The GUI reads
-            // the live URL over IPC (`mobilePairingInfo`) instead; daemon.log now only records
-            // bridge start/stop/error/lockout. The stdout QR/print below stays: it's the
-            // dev-console pairing surface (nil in the GUI-spawned daemon, harmless there).
             print("\nScan with your iPhone's Camera app — valid \(Int(pairingLifetime))s, grants access to every session on this Mac:\n")
             print(qrAsciiArt(for: url) ?? "(QR generation failed — open this URL manually)")
             print("\n\(url)\n")
-            // stdout is fully buffered (not line-buffered) once it's not a TTY — e.g.
-            // redirected to a log file, or the daemon launched detached — so without an
-            // explicit flush this can sit unseen for the entire `pairingLifetime` sleep.
             fflush(stdout)
-            // Slept in small increments (not one `Thread.sleep(pairingLifetime)`) so `stop()`
-            // is noticed within a fraction of a second instead of up to 45s later.
             var slept: TimeInterval = 0
             while slept < pairingLifetime && isRunning {
                 Thread.sleep(forTimeInterval: 0.25)
@@ -2565,13 +2625,33 @@ public final class MobileBridgeServer: @unchecked Sendable {
         }
 
         let files = Self.parseGitDiff(in: cwd)
+        var isTruncated = false
+        var cappedFiles = files
+        if cappedFiles.count > 200 {
+            cappedFiles = Array(cappedFiles.prefix(200))
+            isTruncated = true
+        }
+        cappedFiles = cappedFiles.map { file in
+            if file.lines.count > 500 {
+                isTruncated = true
+                return GitDiffFile(
+                    path: file.path,
+                    additions: file.additions,
+                    deletions: file.deletions,
+                    uncommitted: file.uncommitted,
+                    lines: Array(file.lines.prefix(500))
+                )
+            }
+            return file
+        }
         struct GitDiffPayload: Encodable {
             var files: [GitDiffFile]
+            var truncated: Bool?
         }
         struct GitDiffAck: Encodable {
             var gitDiff: GitDiffPayload
         }
-        sendJSON(GitDiffAck(gitDiff: GitDiffPayload(files: files)), on: connection)
+        sendJSON(GitDiffAck(gitDiff: GitDiffPayload(files: cappedFiles, truncated: isTruncated ? true : nil)), on: connection)
     }
 
     private func handleCreateDraftPR(title: String?, path: String?, connection: NWConnection, state: ConnectionState) {
@@ -3039,10 +3119,13 @@ public final class MobileBridgeServer: @unchecked Sendable {
         log("mobile bridge: listening on \(bindHosts.map { "\($0):\(pageURLPort)" }.joined(separator: ", "))")
 
         DispatchQueue.global().async { [weak self] in
-            // `wsport=` in the QR/URL is the SAME port as the page now — pass `pageURLPort`
-            // (not the unused `wsPort` param) so the client's `new WebSocket(...)` call
-            // actually targets the port something is listening on.
-            self?.runPairingLoop(wsPort: UInt16(clamping: pageURLPort), pageURLPort: pageURLPort, tailscaleHost: tailscaleMagicDNSName ?? tailscaleHost, log: log)
+            self?.runPairingLoop(
+                wsPort: UInt16(clamping: pageURLPort),
+                pageURLPort: pageURLPort,
+                tailscaleHost: tailscaleMagicDNSName ?? tailscaleHost,
+                magicDNSName: tailscaleMagicDNSName,
+                log: log
+            )
         }
     }
 
