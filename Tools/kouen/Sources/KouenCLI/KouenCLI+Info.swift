@@ -267,6 +267,7 @@ extension KouenCLI {
           detach-client --client <uuid>
           mobile-list-clients [--json] [--pretty]     (devices paired to the mobile WS bridge)
           mobile-revoke-client --device <id>
+          rc [--url] [--no-open] [--json]             (open the Kouen Companion in Google Chrome)
           bind-key [-T <table>] <spec> <command...>
           unbind-key [-T <table>] <spec>
           list-keys [-T <table>]
