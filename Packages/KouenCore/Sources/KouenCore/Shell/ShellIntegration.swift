@@ -280,6 +280,43 @@ public enum ShellIntegration {
         __kouen_hermes_next --remote "$@"
       }
     fi
+    # Kouen CLI wrapper: `kouen` command that supports `rc`/`--rc` to auto-open Chrome
+    # and delegates any other commands to `kouen-cli`.
+    if [[ -n "$KOUEN" && -z "$__kouen_cli_wrapped" ]]; then
+      __kouen_cli_wrapped=1
+      if (( ${+functions[kouen]} )); then
+        functions[__kouen_next]=$functions[kouen]
+      else
+        __kouen_next() {
+          if (( ${+commands[kouen-cli]} )); then
+            command kouen-cli "$@"
+          elif [[ -n "$KOUEN_CLI" && -x "$KOUEN_CLI" ]]; then
+            "$KOUEN_CLI" "$@"
+          elif [[ -x "$HOME/Library/Application Support/Kouen/bin/kouen-cli" ]]; then
+            "$HOME/Library/Application Support/Kouen/bin/kouen-cli" "$@"
+          else
+            echo "kouen-cli: command not found" >&2
+            return 1
+          fi
+        }
+      fi
+      kouen() {
+        local a rc=0
+        if [[ "$1" == "rc" || "$1" == "companion" ]]; then
+          rc=1
+        fi
+        for a in "$@"; do
+          case "$a" in
+            --rc|--remote-control) rc=1 ;;
+          esac
+        done
+        if (( rc )); then
+          export KOUEN_RC_OPENED=1
+          /usr/bin/open -a "Google Chrome" "http://localhost:7777" >/dev/null 2>&1 &
+        fi
+        __kouen_next "$@"
+      }
+    fi
     """
 
     // ponytail: bash has no native preexec hook (only the DEBUG trap, which fires per
@@ -445,6 +482,43 @@ public enum ShellIntegration {
           esac
         done
         __kouen_hermes_next --remote "$@"
+      }
+    fi
+    # Kouen CLI wrapper: `kouen` command that supports `rc`/`--rc` to auto-open Chrome
+    # and delegates any other commands to `kouen-cli`.
+    if [ -n "$KOUEN" ] && [ -z "$__kouen_cli_wrapped" ]; then
+      __kouen_cli_wrapped=1
+      if declare -F kouen >/dev/null 2>&1; then
+        eval "$(declare -f kouen | sed '1s/^kouen /__kouen_next /')"
+      else
+        __kouen_next() {
+          if command -v kouen-cli >/dev/null 2>&1; then
+            command kouen-cli "$@"
+          elif [ -n "$KOUEN_CLI" ] && [ -x "$KOUEN_CLI" ]; then
+            "$KOUEN_CLI" "$@"
+          elif [ -x "$HOME/Library/Application Support/Kouen/bin/kouen-cli" ]; then
+            "$HOME/Library/Application Support/Kouen/bin/kouen-cli" "$@"
+          else
+            echo "kouen-cli: command not found" >&2
+            return 1
+          fi
+        }
+      fi
+      kouen() {
+        local a rc=0
+        if [ "$1" = "rc" ] || [ "$1" = "companion" ]; then
+          rc=1
+        fi
+        for a in "$@"; do
+          case "$a" in
+            --rc|--remote-control) rc=1 ;;
+          esac
+        done
+        if [ $rc -eq 1 ]; then
+          export KOUEN_RC_OPENED=1
+          /usr/bin/open -a "Google Chrome" "http://localhost:7777" >/dev/null 2>&1 &
+        fi
+        __kouen_next "$@"
       }
     fi
     """
@@ -655,6 +729,44 @@ public enum ShellIntegration {
                 end
             end
             __kouen_hermes_next --remote $argv
+        end
+    end
+    # Kouen CLI wrapper: `kouen` command that supports `rc`/`--rc` to auto-open Chrome
+    # and delegates any other commands to `kouen-cli`.
+    if set -q KOUEN; and not set -q __kouen_cli_wrapped
+        set -g __kouen_cli_wrapped 1
+        if functions -q kouen
+            functions -c kouen __kouen_next
+        else
+            function __kouen_next
+                if type -q kouen-cli
+                    command kouen-cli $argv
+                else if test -n "$KOUEN_CLI"; and test -x "$KOUEN_CLI"
+                    $KOUEN_CLI $argv
+                else if test -x "$HOME/Library/Application Support/Kouen/bin/kouen-cli"
+                    "$HOME/Library/Application Support/Kouen/bin/kouen-cli" $argv
+                else
+                    echo "kouen-cli: command not found" >&2
+                    return 1
+                end
+            end
+        end
+        function kouen
+            set -l rc 0
+            if test "$argv[1]" = "rc"; or test "$argv[1]" = "companion"
+                set rc 1
+            end
+            for a in $argv
+                switch $a
+                    case --remote-control --rc
+                        set rc 1
+                end
+            end
+            if test $rc -eq 1
+                set -x KOUEN_RC_OPENED 1
+                /usr/bin/open -a "Google Chrome" "http://localhost:7777" >/dev/null 2>&1 &
+            end
+            __kouen_next $argv
         end
     end
     """

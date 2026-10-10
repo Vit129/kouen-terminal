@@ -88,6 +88,7 @@ public enum CLICommandCatalog {
         .init("control-mode", "tmux control protocol over stdio", aliases: ["-CC"]),
         .init("kill-server", "Stop the daemon gracefully (launchd restarts it)"),
         .init("start-server", "Ensure the daemon is running"),
+        .init("rc", "Open the Kouen Companion in Google Chrome", aliases: ["remote-control", "companion"], json: true),
         .init("show-messages", "Recent display-message log"),
         // Buffers
         .init("set-buffer", "Set a paste buffer"),

@@ -41,6 +41,8 @@ struct KouenCLI {
                 exit(handleGrep(args))
             case "remote":
                 exit(try handleRemote(args))
+            case "rc", "--rc", "companion", "remote-control":
+                exit(handleRC(args))
             case "socket-path":
                 print(KouenPaths.socketURL.path)
                 return
