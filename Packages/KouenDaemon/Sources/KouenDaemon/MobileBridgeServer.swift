@@ -2211,14 +2211,79 @@ public final class MobileBridgeServer: @unchecked Sendable {
         func snapshot() -> Data { lock.lock(); defer { lock.unlock() }; return data }
     }
 
+    struct ProcessRunResult: Equatable, Sendable {
+        var status: Int32
+        var stdout: String
+        var stderr: String
+        var timedOut: Bool
+    }
+
+    /// Unified process runner with concurrent pipe draining and hard timeout.
+    /// Drains both stdout and stderr concurrently via PipeBuffer to prevent pipe buffer deadlocks.
+    static func runProcess(
+        executableURL: URL,
+        arguments: [String],
+        cwd: String? = nil,
+        timeoutSeconds: TimeInterval
+    ) -> ProcessRunResult {
+        let process = Process()
+        process.executableURL = executableURL
+        process.arguments = arguments
+        if let cwd = cwd, !cwd.isEmpty {
+            process.currentDirectoryURL = URL(fileURLWithPath: cwd)
+        }
+        let outPipe = Pipe()
+        let errPipe = Pipe()
+        process.standardOutput = outPipe
+        process.standardError = errPipe
+
+        let outBuffer = PipeBuffer()
+        let errBuffer = PipeBuffer()
+        outPipe.fileHandleForReading.readabilityHandler = { handle in
+            let chunk = handle.availableData
+            if !chunk.isEmpty { outBuffer.append(chunk) }
+        }
+        errPipe.fileHandleForReading.readabilityHandler = { handle in
+            let chunk = handle.availableData
+            if !chunk.isEmpty { errBuffer.append(chunk) }
+        }
+        defer {
+            outPipe.fileHandleForReading.readabilityHandler = nil
+            errPipe.fileHandleForReading.readabilityHandler = nil
+        }
+
+        do {
+            try process.run()
+        } catch {
+            return ProcessRunResult(status: -1, stdout: "", stderr: error.localizedDescription, timedOut: false)
+        }
+
+        let deadline = Date().addingTimeInterval(timeoutSeconds)
+        while process.isRunning && Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+        var timedOut = false
+        if process.isRunning {
+            timedOut = true
+            process.terminate()
+        }
+        process.waitUntilExit()
+
+        let outStr = String(data: outBuffer.snapshot(), encoding: .utf8) ?? ""
+        let errStr = String(data: errBuffer.snapshot(), encoding: .utf8) ?? ""
+
+        return ProcessRunResult(
+            status: process.terminationStatus,
+            stdout: outStr,
+            stderr: errStr,
+            timedOut: timedOut
+        )
+    }
+
     /// Cached `claude` CLI path resolution — mirrors `GitHubCLIClient.cachedGhPath`'s shape
     /// (`Packages/KouenCore/Sources/KouenCore/GitHub/GitHubCLIClient.swift`): common install
     /// locations first, `which` fallback for non-standard installs.
     private static let cachedClaudePath: String? = {
-        // Found via live-testing on this machine: unlike `gh` (which installs via Homebrew),
-        // the `claude` CLI commonly installs to `~/.local/bin` (curl-installer default) — the
-        // launchd-spawned daemon's PATH doesn't include that, so the `which` fallback below
-        // wouldn't have found it either. Check it explicitly rather than assuming Homebrew-only.
         let paths = [
             NSHomeDirectory() + "/.local/bin/claude",
             "/opt/homebrew/bin/claude",
@@ -2227,24 +2292,15 @@ public final class MobileBridgeServer: @unchecked Sendable {
         if let found = paths.first(where: { FileManager.default.fileExists(atPath: $0) }) {
             return found
         }
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/which")
-        process.arguments = ["claude"]
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-        do {
-            try process.run()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            process.waitUntilExit()
-            guard process.terminationStatus == 0,
-                  let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-                  !path.isEmpty, FileManager.default.fileExists(atPath: path)
-            else { return nil }
-            return path
-        } catch {
-            return nil
-        }
+        let res = runProcess(
+            executableURL: URL(fileURLWithPath: "/usr/bin/which"),
+            arguments: ["claude"],
+            timeoutSeconds: 5
+        )
+        guard res.status == 0 else { return nil }
+        let path = res.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !path.isEmpty, FileManager.default.fileExists(atPath: path) else { return nil }
+        return path
     }()
 
     /// Pure — no I/O, directly testable without spawning a process. Wraps `commandBuffer` in a
@@ -2275,66 +2331,20 @@ public final class MobileBridgeServer: @unchecked Sendable {
             return .failure("claude CLI not found")
         }
         let prompt = buildSuggestPrompt(commandBuffer: commandBuffer, cwd: cwd)
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: claudePath)
-        process.arguments = ["-p", prompt]
-        process.currentDirectoryURL = URL(fileURLWithPath: cwd)
-        let outPipe = Pipe()
-        let errPipe = Pipe()
-        process.standardOutput = outPipe
-        process.standardError = errPipe
-
-        // Drain both pipes concurrently as data arrives, rather than reading after the process
-        // exits — `claude -p` output isn't bounded like `gh pr merge`'s (the pattern this
-        // mirrors), so a reply larger than the pipe's OS buffer would block the child on
-        // write() forever, surfacing as a spurious 20s timeout instead of the real answer.
-        // Found via code review, not hit live. `readabilityHandler` fires on a background
-        // dispatch queue Foundation owns, hence the lock-protected `@unchecked Sendable` box
-        // rather than a captured `var` — same reasoning as this file's other lock-guarded state
-        // (e.g. `ConnectionState`).
-        let outputBuffer = PipeBuffer()
-        let errorBuffer = PipeBuffer()
-        outPipe.fileHandleForReading.readabilityHandler = { handle in
-            let chunk = handle.availableData
-            if !chunk.isEmpty { outputBuffer.append(chunk) }
-        }
-        errPipe.fileHandleForReading.readabilityHandler = { handle in
-            let chunk = handle.availableData
-            if !chunk.isEmpty { errorBuffer.append(chunk) }
-        }
-        defer {
-            outPipe.fileHandleForReading.readabilityHandler = nil
-            errPipe.fileHandleForReading.readabilityHandler = nil
-        }
-
-        do {
-            try process.run()
-        } catch {
-            return .failure(StringError(error.localizedDescription))
-        }
-
-        let deadline = Date().addingTimeInterval(timeoutSeconds)
-        while process.isRunning && Date() < deadline {
-            Thread.sleep(forTimeInterval: 0.1)
-        }
-        if process.isRunning {
-            process.terminate()
+        let res = runProcess(
+            executableURL: URL(fileURLWithPath: claudePath),
+            arguments: ["-p", prompt],
+            cwd: cwd,
+            timeoutSeconds: timeoutSeconds
+        )
+        if res.timedOut {
             return .failure("claude CLI timed out")
         }
-        process.waitUntilExit()
-
-        let outText = String(data: outputBuffer.snapshot(), encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let errText = String(data: errorBuffer.snapshot(), encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-
-        if process.terminationStatus == 0 {
-            // Only the first line: the prompt asks for a single command, but nothing enforces
-            // that server-side, and this text gets sent to the client as literal terminal
-            // input — an embedded newline would auto-submit an unreviewed command the instant
-            // the user taps it (LF triggers accept-line in bash/zsh, same as CR). Found via
-            // code review, not hit live.
-            let firstLine = Self.firstLine(of: outText)
+        if res.status == 0 {
+            let firstLine = Self.firstLine(of: res.stdout.trimmingCharacters(in: .whitespacesAndNewlines))
             return firstLine.isEmpty ? .failure("claude CLI returned no suggestion") : .success(firstLine)
         }
+        let errText = res.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
         return .failure(StringError(errText.isEmpty ? "claude CLI failed" : errText))
     }
 
@@ -2390,6 +2400,10 @@ public final class MobileBridgeServer: @unchecked Sendable {
                     let bPart = parts[3]
                     currentFile = bPart.hasPrefix("b/") ? String(bPart.dropFirst(2)) : bPart
                 }
+            } else if line.hasPrefix("+++ b/") {
+                currentFile = String(line.dropFirst(6))
+            } else if line.hasPrefix("--- a/") && currentFile == nil {
+                currentFile = String(line.dropFirst(6))
             } else if line.hasPrefix("@@") {
                 currentHunkLines.append(line)
             } else if currentFile != nil {
@@ -2409,37 +2423,22 @@ public final class MobileBridgeServer: @unchecked Sendable {
     }
 
     public static func parseGitDiff(in cwd: String) -> [GitDiffFile] {
-        let pipe = Pipe()
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-        process.currentDirectoryURL = URL(fileURLWithPath: cwd)
-        process.arguments = ["diff", "HEAD"]
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-
-        var diffOutput = ""
-        do {
-            try process.run()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            process.waitUntilExit()
-            diffOutput = String(data: data, encoding: .utf8) ?? ""
-            if diffOutput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                let fallbackPipe = Pipe()
-                let fallbackProc = Process()
-                fallbackProc.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-                fallbackProc.currentDirectoryURL = URL(fileURLWithPath: cwd)
-                fallbackProc.arguments = ["diff"]
-                fallbackProc.standardOutput = fallbackPipe
-                fallbackProc.standardError = FileHandle.nullDevice
-                try? fallbackProc.run()
-                let fbData = fallbackPipe.fileHandleForReading.readDataToEndOfFile()
-                fallbackProc.waitUntilExit()
-                diffOutput = String(data: fbData, encoding: .utf8) ?? ""
-            }
-        } catch {
-            return []
+        let res = runProcess(
+            executableURL: URL(fileURLWithPath: "/usr/bin/git"),
+            arguments: ["diff", "HEAD", "--", "."],
+            cwd: cwd,
+            timeoutSeconds: 10
+        )
+        var diffOutput = res.stdout
+        if diffOutput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !res.timedOut {
+            let fallbackRes = runProcess(
+                executableURL: URL(fileURLWithPath: "/usr/bin/git"),
+                arguments: ["diff"],
+                cwd: cwd,
+                timeoutSeconds: 10
+            )
+            diffOutput = fallbackRes.stdout
         }
-
         return parseGitDiffOutput(diffOutput)
     }
 
@@ -2520,34 +2519,28 @@ public final class MobileBridgeServer: @unchecked Sendable {
         }
 
         let prTitle = (title?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false) ? title! : "Draft PR"
-        let pipe = Pipe()
-        let errPipe = Pipe()
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.currentDirectoryURL = URL(fileURLWithPath: cwd)
-        process.arguments = ["gh", "pr", "create", "--draft", "--title", prTitle, "--fill"]
-        process.standardOutput = pipe
-        process.standardError = errPipe
+        let res = Self.runProcess(
+            executableURL: URL(fileURLWithPath: "/usr/bin/env"),
+            arguments: ["gh", "pr", "create", "--draft", "--title", prTitle, "--fill"],
+            cwd: cwd,
+            timeoutSeconds: 30
+        )
 
-        do {
-            try process.run()
-            let outData = pipe.fileHandleForReading.readDataToEndOfFile()
-            let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
-            process.waitUntilExit()
+        if res.timedOut {
+            sendJSON(ErrorAck(error: "gh command timed out after 30s"), on: connection)
+            return
+        }
 
-            let output = (String(data: outData, encoding: .utf8) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-            let errOutput = (String(data: errData, encoding: .utf8) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let output = res.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        let errOutput = res.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
 
-            if process.terminationStatus == 0 && output.contains("github.com") {
-                let prUrl = output.components(separatedBy: .whitespacesAndNewlines).last { $0.hasPrefix("http") } ?? output
-                let prNum = Int(prUrl.components(separatedBy: "/").last ?? "")
-                sendJSON(DraftPRAck(url: prUrl, number: prNum), on: connection)
-            } else {
-                let errMsg = !errOutput.isEmpty ? errOutput : (!output.isEmpty ? output : "gh command failed")
-                sendJSON(ErrorAck(error: errMsg), on: connection)
-            }
-        } catch {
-            sendJSON(ErrorAck(error: "failed to execute gh: \(error.localizedDescription)"), on: connection)
+        if res.status == 0 && output.contains("github.com") {
+            let prUrl = output.components(separatedBy: .whitespacesAndNewlines).last { $0.hasPrefix("http") } ?? output
+            let prNum = Int(prUrl.components(separatedBy: "/").last ?? "")
+            sendJSON(DraftPRAck(url: prUrl, number: prNum), on: connection)
+        } else {
+            let errMsg = !errOutput.isEmpty ? errOutput : (!output.isEmpty ? output : "gh command failed")
+            sendJSON(ErrorAck(error: errMsg), on: connection)
         }
     }
 
