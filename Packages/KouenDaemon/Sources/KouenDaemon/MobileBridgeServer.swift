@@ -331,7 +331,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
     /// session list, switcher sheet). Resize now round-trips: `FitAddon` measures the
     /// container, the client sends `{"resize":{cols,rows}}`, `handleControlMessage` forwards
     /// it to `DaemonClient.resize`.
-    private static let embeddedPageHTML = #"""
+    static let embeddedPageHTML = #"""
     <!doctype html>
     <html lang="en">
     <head>
@@ -580,7 +580,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
     const credKey = 'kouenDeviceCreds:' + location.hostname;
     function storedCreds() { try { return JSON.parse(localStorage.getItem(credKey)); } catch { return null; } }
 
-    function esc(t) { return (t || '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
+    function esc(t) { return (t || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
     function stripANSI(str) {
       return (str || '')
         .replace(/\x1b\][^\x07\x1b]*(\x07|\x1b\\)/g, '')
@@ -664,11 +664,18 @@ public final class MobileBridgeServer: @unchecked Sendable {
         if (k === "tool") return `<div class="tool${t.startsWith("Edit") ? " edit-link" : ""}">${esc(t)}</div>`;
         if (k === "diff") {
           const a = cur.files.reduce((x, f) => x + f[1], 0), d = cur.files.reduce((x, f) => x + f[2], 0);
-          return `<button class="card" data-c="diff"><span class="ic">±</span><span class="tx"><b>${cur.files.length} files changed</b><span>+${a} −${d} · ${cur.files.map(f => f[0].split("/").pop()).join(", ")}</span></span><span class="go">Diff</span></button>`;
+          return `<button class="card" data-c="diff"><span class="ic">±</span><span class="tx"><b>${cur.files.length} files changed</b><span>+${a} −${d} · ${esc(cur.files.map(f => f[0].split("/").pop()).join(", "))}</span></span><span class="go">Diff</span></button>`;
         }
         if (k === "preview") return `<button class="card" data-c="pv"><span class="ic">◳</span><span class="tx"><b>Dev server running</b><span>${esc(t)}</span></span><span class="go">Open</span></button>`;
         if (k === "pr") return `<button class="card" data-c="pr"><span class="ic">⇡</span><span class="tx"><b>Ready for review</b><span>${esc(cur.branch)} → main</span></span><span class="go">Create draft PR</span></button>`;
-        if (k === "prdone") return `<a class="card" href="${cur.pr.url}" target="_blank" rel="noopener"><span class="ic">⇡</span><span class="tx"><b>Draft PR #${cur.pr.n} opened</b><span>${esc(cur.pr.url.replace('https://',''))}</span></span><span class="go">GitHub ↗</span></a>`;
+        if (k === "prdone") {
+          const rawUrl = (cur.pr && cur.pr.url) ? String(cur.pr.url) : '';
+          const isSafe = rawUrl.startsWith("https://github.com/");
+          const safeUrl = isSafe ? esc(rawUrl) : '#';
+          const displayUrl = isSafe ? esc(rawUrl.replace('https://','')) : 'invalid URL';
+          const prNum = esc(String(cur.pr ? cur.pr.n : ''));
+          return `<a class="card" href="${safeUrl}" target="_blank" rel="noopener noreferrer"><span class="ic">⇡</span><span class="tx"><b>Draft PR #${prNum} opened</b><span>${displayUrl}</span></span><span class="go">GitHub ↗</span></a>`;
+        }
         if (k === "ask") return `<div class="ask"><div><strong>Approval needed</strong></div><div class="tool">${esc(t)}</div><div class="row"><button class="btn primary" data-a="y">Allow</button><button class="btn ghost" data-a="n">Deny</button></div></div>`;
         return `<div class="msg">${esc(t)}</div>`;
       }).join("") + '</div>';
@@ -795,7 +802,12 @@ public final class MobileBridgeServer: @unchecked Sendable {
 
     function openPR() {
       if (!cur) return;
-      if (cur.pr) { window.open(cur.pr.url, '_blank'); return; }
+      if (cur.pr) {
+        if (cur.pr.url && String(cur.pr.url).startsWith("https://github.com/")) {
+          window.open(cur.pr.url, '_blank');
+        }
+        return;
+      }
       $("pr-title").value = cur.name || "Draft PR";
       $("pr-branch").textContent = cur.branch || "feat";
       const add = cur.files ? cur.files.reduce((x, f) => x + f[1], 0) : 0;
@@ -2431,19 +2443,60 @@ public final class MobileBridgeServer: @unchecked Sendable {
         return parseGitDiffOutput(diffOutput)
     }
 
-    private func handleGitDiff(path: String?, connection: NWConnection, state: ConnectionState) {
-        var targetCwd = path
-        if targetCwd == nil || targetCwd?.isEmpty == true {
-            if let surfaceID = state.surfaceID {
-                let client = DaemonClient()
-                if let response = try? client.request(.listSurfaces), case let .surfaces(surfaces) = response {
-                    targetCwd = surfaces.first { $0.surfaceID == surfaceID }?.cwd
-                }
+    static func surfaceCwd(surfaceID: String?, client: DaemonClient = DaemonClient()) -> String? {
+        guard let surfaceID = surfaceID, !surfaceID.isEmpty else { return nil }
+        guard let response = try? client.request(.listSurfaces),
+              case let .surfaces(surfaces) = response else { return nil }
+        return surfaces.first { $0.surfaceID == surfaceID }?.cwd
+    }
+
+    enum CwdAuthorizationError: Error, Equatable {
+        case missingSessionOrCwd
+        case foreignPathRejected
+        case other(String)
+
+        var message: String {
+            switch self {
+            case .missingSessionOrCwd:
+                return "missing active session surface or cwd"
+            case .foreignPathRejected:
+                return "foreign or unauthorized path rejected"
+            case .other(let msg):
+                return msg
             }
         }
-        guard let cwd = targetCwd, !cwd.isEmpty else {
-            sendText(#"{"error":"missing worktree or session cwd for gitDiff"}"#, on: connection)
+    }
+
+    /// Validates that cwd resolves from the active surface session.
+    /// If the client passes a requested path, it must match or be a descendant within the surface cwd.
+    /// Foreign paths are strictly rejected.
+    static func resolveAuthorizedCwd(
+        requestedPath: String?,
+        surfaceID: String?,
+        surfaceLookup: (String) -> String? = { surfaceCwd(surfaceID: $0) }
+    ) -> Result<String, CwdAuthorizationError> {
+        guard let surfaceID = surfaceID, let cwd = surfaceLookup(surfaceID), !cwd.isEmpty else {
+            return .failure(.missingSessionOrCwd)
+        }
+        if let requested = requestedPath?.trimmingCharacters(in: .whitespacesAndNewlines), !requested.isEmpty {
+            let reqURL = URL(fileURLWithPath: requested).standardizedFileURL.path
+            let cwdURL = URL(fileURLWithPath: cwd).standardizedFileURL.path
+            if reqURL != cwdURL && !reqURL.hasPrefix(cwdURL + "/") {
+                return .failure(.foreignPathRejected)
+            }
+            return .success(reqURL)
+        }
+        return .success(cwd)
+    }
+
+    private func handleGitDiff(path: String?, connection: NWConnection, state: ConnectionState) {
+        let cwd: String
+        switch Self.resolveAuthorizedCwd(requestedPath: path, surfaceID: state.surfaceID) {
+        case .failure(let error):
+            sendText(#"{"error":"\#(error.message)"}"#, on: connection)
             return
+        case .success(let resolved):
+            cwd = resolved
         }
 
         let files = Self.parseGitDiff(in: cwd)
@@ -2457,18 +2510,13 @@ public final class MobileBridgeServer: @unchecked Sendable {
     }
 
     private func handleCreateDraftPR(title: String?, path: String?, connection: NWConnection, state: ConnectionState) {
-        var targetCwd = path
-        if targetCwd == nil || targetCwd?.isEmpty == true {
-            if let surfaceID = state.surfaceID {
-                let client = DaemonClient()
-                if let response = try? client.request(.listSurfaces), case let .surfaces(surfaces) = response {
-                    targetCwd = surfaces.first { $0.surfaceID == surfaceID }?.cwd
-                }
-            }
-        }
-        guard let cwd = targetCwd, !cwd.isEmpty else {
-            sendText(#"{"error":"missing cwd for PR creation"}"#, on: connection)
+        let cwd: String
+        switch Self.resolveAuthorizedCwd(requestedPath: path, surfaceID: state.surfaceID) {
+        case .failure(let error):
+            sendText(#"{"error":"\#(error.message)"}"#, on: connection)
             return
+        case .success(let resolved):
+            cwd = resolved
         }
 
         let prTitle = (title?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false) ? title! : "Draft PR"
