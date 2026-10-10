@@ -90,7 +90,7 @@ no breakpoints, no Run button.
 | `KouenCopyMode` | `Packages/KouenCopyMode/` | UI-agnostic keyboard copy-mode reducer. | All |
 | `KouenTheme` | `Packages/KouenTheme/` | Theme catalog (`.kouentheme`), base64 embedded in `BundledThemesData.swift`. | All |
 | `CKouenSys` | `Packages/CKouenSys/` | C shim for variadic `ioctl` and POSIX PTY helpers. | Darwin / Glibc |
-| `KouenDaemonCore` | `Packages/KouenDaemon/` | Daemon library: socket server, PTY registry, checkpoints/verify, automations, agent adapters, headless workers. Also hosts the legacy `MobileBridgeServer` (see Communication Protocols). | All |
+| `KouenDaemonCore` | `Packages/KouenDaemon/` | Daemon library: socket server, PTY registry, checkpoints/verify, automations, agent adapters, headless workers. Also hosts `MobileBridgeServer` (Kouen Companion PWA; see Communication Protocols). | All |
 | `KouenCLI` | `Tools/kouen/Sources/KouenCLI/` | Command-line client (`attach`, `send-keys`, `capture-pane`, `undo`, `verify`, `cc`, `history`, `task`). | All |
 | `KouenMCP` | `Tools/kouen-mcp/Sources/KouenMCP/` | MCP server (`kouen-mcp`): stdio and remote HTTP/SSE transports; browser, task, worktree, host, automation, feature, swarm and worker tools. | All |
 | `KouenLSP` | `Packages/KouenLSP/` | LSP client, server registry, transport (21 languages). | All |
@@ -111,8 +111,8 @@ no breakpoints, no Run button.
    - Managed via `SSHTunnelManager` (`ssh -N -L <local>:<remote>`) exposing a local loopback Unix endpoint with transparent IPC.
 3. **kouen-mcp remote transport (HTTP/SSE):**
    - Added v4.16.0 alongside stdio, with secure-by-default settings and the same tool registry as stdio. Bearer-token comparison was hardened against timing side-channels in P49.
-4. **Mobile bridge (deprecated, opt-in):**
-   - `MobileBridgeServer` (QR + Tailscale web/PWA client, paired-device store) still ships in `KouenDaemonCore`, gated by `mobileBridgeEnabled` (default `false`) and the `setMobileBridgeEnabled`/`mobile*` IPC messages. **No longer developed** — superseded by the 2026-09-23 decision below (use each vendor's own remote-control app); P37 and P25 are closed. Kept, not deleted, pending a dedicated removal task.
+4. **Mobile bridge (Kouen Companion PWA, opt-in):**
+   - `MobileBridgeServer` (P51) ships in `KouenDaemonCore`, gated by `mobileBridgeEnabled` (default `false`) and the `setMobileBridgeEnabled`/`mobile*` IPC messages. Un-deprecated and redesigned in 2026-10-09 (P51) as a zero-install Mobile PWA (Tailscale/LAN + QR pairing). Terminal emulation (xterm.js) was completely replaced with a native mobile-first chat feed (ANSI stripped to readable text), inline interactive diff/preview/draft-PR cards, slide-up review panels, and one-tap approvals.
 
 ## Dev & QA Verification Invariants
 
@@ -297,6 +297,18 @@ both routes when Happy is installed *and* logged in (`~/.happy/access.key`), wit
   the launch table are unchanged.
 - Release cycle: `Scripts/full-cycle.sh` compares `kouen-cli version --json` CLI/daemon builds after install and,
   on mismatch, offers to run `kouen-cli install` (reloads the daemon; running tasks stay alive until then).
+
+**2026-10-09 — P51 Kouen Companion: Mobile-First PWA, un-deprecating MobileBridgeServer.**
+Revises the 2026-09-23 decision to solely rely on individual vendor remote-control apps. Vendor apps fail to offer
+a unified multi-agent Fleet view and lack developer-centric review workflows (reading file diffs, verifying live dev
+server ports, one-tap command approvals, and opening draft PRs directly from phone).
+- **Un-deprecate MobileBridgeServer**: Restored as an opt-in zero-install PWA (`/manifest.json`, `/sw.js`, `/icon.svg`).
+  Zero App Store or cloud relay overhead; pairs locally or via Tailscale.
+- **Ditch terminal emulation**: Removed all xterm.js vendored code (saving ~397 KB in binary payload). Terminal screens
+  on mobile suffer from poor readability, zoom fighting, and complex keyboard clashes.
+- **Mobile-first Chat & Review UI**: Clean plain-text chat feed (ANSI stripped), inline cards (`± N files`, `◳ Dev server`,
+  `⇡ Ready for review`), ~88% slide-up review panels for hunk diffs and live iframe dev server previews, one-tap approval
+  prompts (`y`/`n`), and direct `gh pr create --draft` action deep-linking to GitHub Mobile.
 
 ### Shipped capability summary, P44–P49 (2026-08-31 → 2026-09-23)
 
