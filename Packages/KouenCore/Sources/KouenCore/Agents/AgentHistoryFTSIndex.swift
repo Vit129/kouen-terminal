@@ -1,5 +1,6 @@
 import Foundation
 import KouenIPC
+import os
 #if canImport(SQLite3)
 import SQLite3
 #endif
@@ -49,82 +50,11 @@ public struct CachedSessionEntry: Sendable {
     public let fileSize: Int
     public let transcriptPath: String
 
-    public init(record: AgentSessionRecord, mtime: Date, fileSize: Int, transcriptPath: String) {
+    public init(record: AgentSessionRecord, mtime: Date, fileSize: Int, transcriptPath: String? = nil) {
         self.record = record
         self.mtime = mtime
         self.fileSize = fileSize
-        self.transcriptPath = transcriptPath
-    }
-}
-
-/// In-memory cache for graphify symbols and god nodes per project repository.
-/// Reads `.graphify_labels.json` and `GRAPH_SUMMARY.md` at index-time to enrich FTS search terms
-/// without any runtime overhead during search queries.
-public final class GraphifyIndexCache: @unchecked Sendable {
-    public static let shared = GraphifyIndexCache()
-    private var cache: [String: Set<String>] = [:]
-    private let lock = NSLock()
-
-    public func symbols(for projectPath: String) -> Set<String> {
-        lock.lock()
-        defer { lock.unlock() }
-        if let cached = cache[projectPath] { return cached }
-
-        var result = Set<String>()
-        let labelsURL = URL(fileURLWithPath: projectPath).appendingPathComponent("graphify-out/.graphify_labels.json")
-        if let data = try? Data(contentsOf: labelsURL),
-           let dict = try? JSONSerialization.jsonObject(with: data) as? [String: String] {
-            for label in dict.values {
-                let clean = label.trimmingCharacters(in: .whitespacesAndNewlines)
-                if clean.count >= 4 && !clean.hasPrefix("code:") && !clean.hasPrefix(".") {
-                    result.insert(clean)
-                }
-            }
-        }
-
-        let summaryURL = URL(fileURLWithPath: projectPath).appendingPathComponent("graphify-out/GRAPH_SUMMARY.md")
-        if let content = try? String(contentsOf: summaryURL, encoding: .utf8) {
-            for line in content.components(separatedBy: .newlines) {
-                if line.range(of: #"^\d+\.\s+`([^`]+)`"#, options: .regularExpression) != nil {
-                    let sym = line.replacingOccurrences(of: #"^\d+\.\s+`"#, with: "", options: .regularExpression)
-                                  .replacingOccurrences(of: #"`.*$"#, with: "", options: .regularExpression)
-                    if sym.count >= 4 {
-                        result.insert(sym)
-                    }
-                }
-            }
-        }
-
-        cache[projectPath] = result
-        return result
-    }
-
-    /// Enriches touched file paths with relevant symbol and god node names from graphify.
-    public func enrich<S: Sequence>(files: S, projectPath: String) -> [String] where S.Element == String {
-        let allSymbols = symbols(for: projectPath)
-        guard !allSymbols.isEmpty else { return [] }
-
-        var enriched = Set<String>()
-        for file in files {
-            let base = URL(fileURLWithPath: file).deletingPathExtension().lastPathComponent
-            guard base.count >= 4 else { continue }
-            if allSymbols.contains(base) {
-                enriched.insert(base)
-            }
-            for s in allSymbols {
-                if s.count >= 5 && (s.contains(base) || (base.count >= 8 && base.contains(s))) {
-                    enriched.insert(s)
-                    if enriched.count >= 20 { break }
-                }
-            }
-        }
-        return Array(enriched)
-    }
-
-    public func clear() {
-        lock.lock()
-        defer { lock.unlock() }
-        cache.removeAll()
+        self.transcriptPath = transcriptPath ?? record.transcriptPath
     }
 }
 
@@ -132,6 +62,7 @@ public final class GraphifyIndexCache: @unchecked Sendable {
 /// Manages indexing session metadata, transcripts, edited files, and tool names.
 public final class AgentHistoryFTSIndex: @unchecked Sendable {
     public static let shared = AgentHistoryFTSIndex()
+    private static let logger = Logger(subsystem: "com.vit129.kouen", category: "history")
 
     public static let schemaVersion: Int32 = 2
 
@@ -161,7 +92,7 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
     #if canImport(SQLite3)
     private func logStepFailure(_ stepResult: Int32, context: String) {
         let errMsg = db.flatMap { sqlite3_errmsg($0) }.map { String(cString: $0) } ?? "unknown error"
-        print("[AgentHistoryFTSIndex] \(context) failed with code \(stepResult): \(errMsg)")
+        Self.logger.error("[AgentHistoryFTSIndex] \(context) failed with code \(stepResult): \(errMsg)")
     }
 
     /// Runs a statement, logging (not ignoring) any failure. Returns false on failure.
@@ -336,60 +267,65 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
 
         let encoder = JSONEncoder()
         inTransaction("saveRecordsBatch") {
-        for entry in entries {
-            let record = entry.record
-            let turnsData = try? encoder.encode(record.latestTurns)
-            let turnsJSON = turnsData.flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+            for entry in entries {
+                let record = entry.record
+                let turnsData = try? encoder.encode(record.latestTurns)
+                let turnsJSON = turnsData.flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
 
-            sqlite3_reset(stmt)
-            sqlite3_clear_bindings(stmt)
+                sqlite3_reset(stmt)
+                sqlite3_clear_bindings(stmt)
 
-            sqlite3_bind_text(stmt, 1, record.id, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-            sqlite3_bind_text(stmt, 2, record.agentKind.rawValue, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-            sqlite3_bind_text(stmt, 3, record.title, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-            sqlite3_bind_text(stmt, 4, record.projectPath, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-            sqlite3_bind_text(stmt, 5, record.projectName, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-            if let gitBranch = record.gitBranch {
-                sqlite3_bind_text(stmt, 6, gitBranch, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-            } else {
-                sqlite3_bind_null(stmt, 6)
-            }
-            if let modelName = record.modelName {
-                sqlite3_bind_text(stmt, 7, modelName, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-            } else {
-                sqlite3_bind_null(stmt, 7)
-            }
-            sqlite3_bind_int64(stmt, 8, Int64(record.messageCount))
-            sqlite3_bind_double(stmt, 9, record.updatedAt.timeIntervalSince1970)
-            sqlite3_bind_text(stmt, 10, record.firstPrompt, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-            sqlite3_bind_text(stmt, 11, turnsJSON, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-            sqlite3_bind_text(stmt, 12, record.transcriptPath, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-            sqlite3_bind_int(stmt, 13, record.worktreeAvailable ? 1 : 0)
-            sqlite3_bind_text(stmt, 14, record.placement.rawValue, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-            if let liveStatus = record.liveStatus {
-                sqlite3_bind_text(stmt, 15, liveStatus, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-            } else {
-                sqlite3_bind_null(stmt, 15)
-            }
-            if let resumeOverride = record.resumeCommandOverride {
-                sqlite3_bind_text(stmt, 16, resumeOverride, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-            } else {
-                sqlite3_bind_null(stmt, 16)
-            }
-            if let surfaceTag = record.surfaceTag {
-                sqlite3_bind_text(stmt, 17, surfaceTag, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-            } else {
-                sqlite3_bind_null(stmt, 17)
-            }
-            sqlite3_bind_double(stmt, 18, entry.mtime.timeIntervalSince1970)
-            sqlite3_bind_int64(stmt, 19, Int64(entry.fileSize))
+                sqlite3_bind_text(stmt, 1, record.id, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+                sqlite3_bind_text(stmt, 2, record.agentKind.rawValue, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+                sqlite3_bind_text(stmt, 3, record.title, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+                sqlite3_bind_text(stmt, 4, record.projectPath, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+                sqlite3_bind_text(stmt, 5, record.projectName, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+                if let gitBranch = record.gitBranch {
+                    sqlite3_bind_text(stmt, 6, gitBranch, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+                } else {
+                    sqlite3_bind_null(stmt, 6)
+                }
+                if let modelName = record.modelName {
+                    sqlite3_bind_text(stmt, 7, modelName, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+                } else {
+                    sqlite3_bind_null(stmt, 7)
+                }
+                sqlite3_bind_int64(stmt, 8, Int64(record.messageCount))
+                sqlite3_bind_double(stmt, 9, record.updatedAt.timeIntervalSince1970)
+                sqlite3_bind_text(stmt, 10, record.firstPrompt, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+                sqlite3_bind_text(stmt, 11, turnsJSON, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+                sqlite3_bind_text(stmt, 12, record.transcriptPath, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+                sqlite3_bind_int(stmt, 13, record.worktreeAvailable ? 1 : 0)
+                sqlite3_bind_text(stmt, 14, record.placement.rawValue, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+                if let liveStatus = record.liveStatus {
+                    sqlite3_bind_text(stmt, 15, liveStatus, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+                } else {
+                    sqlite3_bind_null(stmt, 15)
+                }
+                if let resumeOverride = record.resumeCommandOverride {
+                    sqlite3_bind_text(stmt, 16, resumeOverride, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+                } else {
+                    sqlite3_bind_null(stmt, 16)
+                }
+                if let surfaceTag = record.surfaceTag {
+                    sqlite3_bind_text(stmt, 17, surfaceTag, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+                } else {
+                    sqlite3_bind_null(stmt, 17)
+                }
+                sqlite3_bind_double(stmt, 18, entry.mtime.timeIntervalSince1970)
+                sqlite3_bind_int64(stmt, 19, Int64(entry.fileSize))
 
-            let stepRes = sqlite3_step(stmt)
-            if stepRes != SQLITE_DONE {
-                logStepFailure(stepRes, context: "step saveRecordsBatch for session \(record.id)")
+                let stepRes = sqlite3_step(stmt)
+                if stepRes != SQLITE_DONE {
+                    logStepFailure(stepRes, context: "step saveRecordsBatch for session \(record.id)")
+                }
             }
         }
-        }
+    }
+
+    /// Persists multiple cached session entries in a single transaction.
+    public func saveRecordsBatch(_ entries: [CachedSessionEntry]) {
+        saveRecordsBatch(entries.map { (record: $0.record, mtime: $0.mtime, fileSize: $0.fileSize) })
     }
 
     /// Persists an agent session record and its file metadata to SQLite.
@@ -705,6 +641,7 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
         topicSegments: [String]? = nil
     ) {}
     public func saveRecordsBatch(_ entries: [(record: AgentSessionRecord, mtime: Date, fileSize: Int)]) {}
+    public func saveRecordsBatch(_ entries: [CachedSessionEntry]) {}
     public func saveRecord(_ record: AgentSessionRecord, mtime: Date, fileSize: Int) {}
     public func loadCachedEntries() -> [CachedSessionEntry] { [] }
     public func pruneMissingSessions(validTranscriptPaths: Set<String>) {}

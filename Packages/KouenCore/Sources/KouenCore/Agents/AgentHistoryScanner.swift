@@ -394,6 +394,30 @@ public actor AgentHistoryScanner {
         return results
     }
 
+    /// Reads non-empty line data slices from a file URL using memory-mapped Data,
+    /// avoiding full-file String allocation and redundant UTF-8 re-encoding.
+    static func readJSONLLines(from fileURL: URL) -> (lines: [Data], fileSize: Int)? {
+        guard let data = try? Data(contentsOf: fileURL, options: .mappedIfSafe), !data.isEmpty else { return nil }
+        let rawSlices = data.split(separator: UInt8(ascii: "\n"))
+        var lines: [Data] = []
+        lines.reserveCapacity(rawSlices.count)
+        for slice in rawSlices {
+            var start = slice.startIndex
+            var end = slice.endIndex
+            while start < end && (slice[start] == 0x20 || slice[start] == 0x09 || slice[start] == 0x0D) {
+                start += 1
+            }
+            while end > start && (slice[end - 1] == 0x20 || slice[end - 1] == 0x09 || slice[end - 1] == 0x0D) {
+                end -= 1
+            }
+            if start < end {
+                lines.append(Data(slice[start..<end]))
+            }
+        }
+        guard !lines.isEmpty else { return nil }
+        return (lines, data.count)
+    }
+
     private var cachedRecords: [AgentSessionRecord] = []
     private let cloudSessionStore: ClaudeCloudSessionStore
     private var fileCache: [String: FileCacheEntry] = [:]
@@ -554,7 +578,7 @@ public actor AgentHistoryScanner {
         guard FileManager.default.fileExists(atPath: claudeProjectsDir.path) else { return [] }
 
         var records: [AgentSessionRecord] = []
-        var toSave: [(record: AgentSessionRecord, mtime: Date, fileSize: Int)] = []
+        var toSave: [CachedSessionEntry] = []
         guard let projectFolders = try? FileManager.default.contentsOfDirectory(atPath: claudeProjectsDir.path) else {
             return []
         }
@@ -584,7 +608,7 @@ public actor AgentHistoryScanner {
                        let mtime = rv.contentModificationDate,
                        let size = rv.fileSize {
                         fileCache[path] = FileCacheEntry(mtime: mtime, size: size, record: record)
-                        toSave.append((record: record, mtime: mtime, fileSize: size))
+                        toSave.append(CachedSessionEntry(record: record, mtime: mtime, fileSize: size))
                     }
                     records.append(record)
                 }
@@ -597,13 +621,9 @@ public actor AgentHistoryScanner {
     }
 
     private func parseClaudeTranscript(fileURL: URL) -> AgentSessionRecord? {
-        guard let data = try? Data(contentsOf: fileURL, options: .mappedIfSafe),
-              let string = String(data: data, encoding: .utf8) else { return nil }
+        guard let (lines, dataSize) = Self.readJSONLLines(from: fileURL) else { return nil }
 
         let sessionID = fileURL.deletingPathExtension().lastPathComponent
-        let lines = string.components(separatedBy: .newlines).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
-        guard !lines.isEmpty else { return nil }
-
         var cwd: String?
         var gitBranch: String?
         var modelName: String?
@@ -619,8 +639,7 @@ public actor AgentHistoryScanner {
 
         // 1. Scan prefix for metadata, model name, and first prompt
         for line in lines.prefix(40) {
-            guard let objData = line.data(using: .utf8),
-                  let json = try? JSONSerialization.jsonObject(with: objData) as? [String: Any] else {
+            guard let json = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else {
                 continue
             }
 
@@ -658,8 +677,7 @@ public actor AgentHistoryScanner {
 
         // 2. Scan suffix for latest turns
         for line in lines.suffix(Self.turnScanWindow) {
-            guard let objData = line.data(using: .utf8),
-                  let json = try? JSONSerialization.jsonObject(with: objData) as? [String: Any],
+            guard let json = try? JSONSerialization.jsonObject(with: line) as? [String: Any],
                   let msg = json["message"] as? [String: Any] else {
                 continue
             }
@@ -690,8 +708,7 @@ public actor AgentHistoryScanner {
 
         // Extract full conversation text, tools, and edited files across all lines
         for line in lines {
-            guard let objData = line.data(using: .utf8),
-                  let json = try? JSONSerialization.jsonObject(with: objData) as? [String: Any],
+            guard let json = try? JSONSerialization.jsonObject(with: line) as? [String: Any],
                   let msg = json["message"] as? [String: Any] else {
                 continue
             }
@@ -725,7 +742,7 @@ public actor AgentHistoryScanner {
         let projectName = (finalCwd as NSString).lastPathComponent
         let title = firstPrompt?.components(separatedBy: .newlines).first(where: { !$0.isEmpty }) ?? "Claude Session \(sessionID.prefix(8))"
         let modDate = (try? fileURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? timestamp ?? Date()
-        let fileSize = (try? fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? string.utf8.count
+        let fileSize = (try? fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? dataSize
 
         let topicSegments = AgentSessionRecord.detectTopicSegments(title: title, firstPrompt: firstPrompt ?? "", turns: turns)
         let graphifySymbols = GraphifyIndexCache.shared.enrich(files: filesEdited, projectPath: finalCwd)
@@ -998,7 +1015,7 @@ public actor AgentHistoryScanner {
         defer { sqlite3_finalize(stmt) }
 
         var records: [AgentSessionRecord] = []
-        var toSave: [(record: AgentSessionRecord, mtime: Date, fileSize: Int)] = []
+        var toSave: [CachedSessionEntry] = []
 
         while sqlite3_step(stmt) == SQLITE_ROW {
             guard let convIDCStr = sqlite3_column_text(stmt, 0) else { continue }
@@ -1110,7 +1127,7 @@ public actor AgentHistoryScanner {
                 surfaceTag: tag
             )
             records.append(record)
-            toSave.append((record: record, mtime: modDate, fileSize: fileSize))
+            toSave.append(CachedSessionEntry(record: record, mtime: modDate, fileSize: fileSize))
         }
 
         if !toSave.isEmpty {
@@ -1143,7 +1160,7 @@ public actor AgentHistoryScanner {
         guard FileManager.default.fileExists(atPath: brainDir.path) else { return [] }
 
         var records: [AgentSessionRecord] = []
-        var toSave: [(record: AgentSessionRecord, mtime: Date, fileSize: Int)] = []
+        var toSave: [CachedSessionEntry] = []
         guard let sessionFolders = try? FileManager.default.contentsOfDirectory(atPath: brainDir.path) else {
             return []
         }
@@ -1171,7 +1188,7 @@ public actor AgentHistoryScanner {
                    let mtime = rv.contentModificationDate,
                    let size = rv.fileSize {
                     fileCache[path] = FileCacheEntry(mtime: mtime, size: size, record: record)
-                    toSave.append((record: record, mtime: mtime, fileSize: size))
+                    toSave.append(CachedSessionEntry(record: record, mtime: mtime, fileSize: size))
                 }
                 records.append(record)
             }
@@ -1183,11 +1200,7 @@ public actor AgentHistoryScanner {
     }
 
     func parseAntigravityTranscript(sessionID: String, fileURL: URL) -> AgentSessionRecord? {
-        guard let data = try? Data(contentsOf: fileURL, options: .mappedIfSafe),
-              let string = String(data: data, encoding: .utf8) else { return nil }
-
-        let lines = string.components(separatedBy: .newlines).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
-        guard !lines.isEmpty else { return nil }
+        guard let (lines, dataSize) = Self.readJSONLLines(from: fileURL) else { return nil }
 
         var firstPrompt: String?
         var modelName: String?
@@ -1198,8 +1211,7 @@ public actor AgentHistoryScanner {
 
         // 1. Scan prefix for first prompt, model, and project path
         for line in lines.prefix(40) {
-            guard let objData = line.data(using: .utf8),
-                  let json = try? JSONSerialization.jsonObject(with: objData) as? [String: Any] else {
+            guard let json = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else {
                 continue
             }
 
@@ -1244,8 +1256,7 @@ public actor AgentHistoryScanner {
 
         // 2. Scan suffix for latest turns
         for line in lines.suffix(Self.turnScanWindow) {
-            guard let objData = line.data(using: .utf8),
-                  let json = try? JSONSerialization.jsonObject(with: objData) as? [String: Any] else {
+            guard let json = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else {
                 continue
             }
 
@@ -1274,8 +1285,7 @@ public actor AgentHistoryScanner {
         var toolsCalled: Set<String> = []
 
         for line in lines {
-            guard let objData = line.data(using: .utf8),
-                  let json = try? JSONSerialization.jsonObject(with: objData) as? [String: Any] else {
+            guard let json = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else {
                 continue
             }
             let type = json["type"] as? String ?? ""
@@ -1310,7 +1320,7 @@ public actor AgentHistoryScanner {
         let projectName = (finalPath as NSString).lastPathComponent
         let title = firstPrompt?.components(separatedBy: .newlines).first(where: { !$0.isEmpty }) ?? "\(AgentKind.antigravity.displayName) Session \(sessionID.prefix(8))"
         let modDate = (try? fileURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? Date()
-        let fileSize = (try? fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? string.utf8.count
+        let fileSize = (try? fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? dataSize
 
         let topicSegments = AgentSessionRecord.detectTopicSegments(title: title, firstPrompt: firstPrompt ?? "", turns: turns)
         let graphifySymbols = GraphifyIndexCache.shared.enrich(files: filesEdited, projectPath: finalPath)
@@ -1389,7 +1399,7 @@ public actor AgentHistoryScanner {
         }
 
         var records: [AgentSessionRecord] = []
-        var toSave: [(record: AgentSessionRecord, mtime: Date, fileSize: Int)] = []
+        var toSave: [CachedSessionEntry] = []
 
         for fileURL in rolloutFiles {
             let path = fileURL.path
@@ -1399,7 +1409,7 @@ public actor AgentHistoryScanner {
                 let mtime = rv?.contentModificationDate ?? Date()
                 let size = rv?.fileSize ?? 0
                 records.append(record)
-                toSave.append((record: record, mtime: mtime, fileSize: size))
+                toSave.append(CachedSessionEntry(record: record, mtime: mtime, fileSize: size))
             }
         }
 
@@ -1436,11 +1446,7 @@ public actor AgentHistoryScanner {
         surfaceTag: String = "CLI",
         ftsIndex: AgentHistoryFTSIndex? = nil
     ) -> AgentSessionRecord? {
-        guard let data = try? Data(contentsOf: fileURL, options: .mappedIfSafe),
-              let string = String(data: data, encoding: .utf8) else { return nil }
-
-        let lines = string.components(separatedBy: .newlines).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
-        guard !lines.isEmpty else { return nil }
+        guard let (lines, dataSize) = readJSONLLines(from: fileURL) else { return nil }
 
         var sessionID: String?
         var cwd: String?
@@ -1464,8 +1470,7 @@ public actor AgentHistoryScanner {
         var toolsCalled: Set<String> = []
 
         for line in lines {
-            guard let objData = line.data(using: .utf8),
-                  let json = try? JSONSerialization.jsonObject(with: objData) as? [String: Any] else { continue }
+            guard let json = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else { continue }
 
             if sessionID == nil {
                 sessionID = json["id"] as? String ?? json["session_id"] as? String
@@ -1535,7 +1540,7 @@ public actor AgentHistoryScanner {
         let title = firstPrompt?.components(separatedBy: .newlines).first(where: { !$0.isEmpty })
             ?? "Codex Session \(resolvedID.prefix(8))"
         let modDate = (try? fileURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? Date()
-        let fileSize = (try? fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? string.utf8.count
+        let fileSize = (try? fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? dataSize
 
         let topicSegments = AgentSessionRecord.detectTopicSegments(title: title, firstPrompt: firstPrompt ?? "", turns: turns)
         let graphifySymbols = GraphifyIndexCache.shared.enrich(files: filesEdited, projectPath: finalCwd)
@@ -1608,7 +1613,7 @@ public actor AgentHistoryScanner {
     ) -> [AgentSessionRecord] {
         let fm = FileManager.default
         var records: [AgentSessionRecord] = []
-        var toSave: [(record: AgentSessionRecord, mtime: Date, fileSize: Int)] = []
+        var toSave: [CachedSessionEntry] = []
 
         for storageDir in storageDirs {
             guard let workspaces = try? fm.contentsOfDirectory(atPath: storageDir.path) else { continue }
@@ -1628,7 +1633,7 @@ public actor AgentHistoryScanner {
                           let record = vscodeRecord(session, projectPath: projectPath, transcriptPath: url.path, fallbackDate: mtime, fileSize: size, ftsIndex: ftsIndex, surfaceTag: surfaceTag)
                     else { continue }
                     records.append(record)
-                    toSave.append((record: record, mtime: mtime, fileSize: size))
+                    toSave.append(CachedSessionEntry(record: record, mtime: mtime, fileSize: size))
                 }
             }
         }
@@ -1769,7 +1774,7 @@ public actor AgentHistoryScanner {
         }
 
         var records: [AgentSessionRecord] = []
-        var toSave: [(record: AgentSessionRecord, mtime: Date, fileSize: Int)] = []
+        var toSave: [CachedSessionEntry] = []
         var sessionStmt: OpaquePointer?
         var hasHostType = true
         let sessionSQL = "SELECT id, cwd, repository, branch, summary, updated_at, host_type FROM sessions ORDER BY updated_at DESC"
@@ -1850,7 +1855,7 @@ public actor AgentHistoryScanner {
                 worktreeAvailable: FileManager.default.fileExists(atPath: finalPath),
                 surfaceTag: surfaceTag
             )
-            toSave.append((record: record, mtime: modDate, fileSize: 0))
+            toSave.append(CachedSessionEntry(record: record, mtime: modDate, fileSize: 0))
             records.append(record)
         }
         if !toSave.isEmpty {
