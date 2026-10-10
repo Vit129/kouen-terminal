@@ -909,16 +909,21 @@ public final class MobileBridgeServer: @unchecked Sendable {
           renderPane();
         }
       }
-      if (msg.draftPRCreated) {
+      if (msg.ok === "draftPRCreated" || msg.draftPRCreated) {
         if (cur) {
-          cur.pr = { n: msg.draftPRCreated.number || 1, url: msg.draftPRCreated.url };
+          const prUrl = msg.url || (msg.draftPRCreated && msg.draftPRCreated.url);
+          const prNum = msg.number || (msg.draftPRCreated && msg.draftPRCreated.number) || 1;
+          cur.pr = { n: prNum, url: prUrl };
           renderPane();
           toast(`Draft PR #${cur.pr.n} opened`, 'launching GitHub…');
-          window.open(cur.pr.url, '_blank');
+          if (prUrl && prUrl.startsWith('https://github.com/')) {
+            window.open(prUrl, '_blank');
+          }
         }
       }
-      if (msg.fileAttached) {
-        toast('File attached', msg.fileAttached.path.split('/').pop());
+      if (msg.ok === "fileAttached" || msg.fileAttached) {
+        const filePath = msg.path || (msg.fileAttached && msg.fileAttached.path) || '';
+        toast('File attached', filePath.split('/').pop());
       }
       if (msg.error) {
         toast('Error', msg.error);
@@ -1427,7 +1432,9 @@ public final class MobileBridgeServer: @unchecked Sendable {
     }
     /// P37 Phase D2. `path` is the temp path the file was written to, mainly for the client to
     /// display — the actual delivery already happened via the shell-quoted paste into the PTY.
-    private struct FileAttachedAck: Encodable { var ok = "fileAttached"; var path: String }
+    struct FileAttachedAck: Codable, Equatable, Sendable { var ok = "fileAttached"; var path: String }
+    /// P51 Phase 1. Draft PR created ack sent to mobile client.
+    struct DraftPRAck: Codable, Equatable, Sendable { var ok = "draftPRCreated"; var url: String; var number: Int? }
 
     // P37 Phase D3 (browser mirror)
     private struct BrowserOkAck: Encodable { var ok: String }
@@ -2486,11 +2493,6 @@ public final class MobileBridgeServer: @unchecked Sendable {
             if process.terminationStatus == 0 && output.contains("github.com") {
                 let prUrl = output.components(separatedBy: .whitespacesAndNewlines).last { $0.hasPrefix("http") } ?? output
                 let prNum = Int(prUrl.components(separatedBy: "/").last ?? "")
-                struct DraftPRAck: Encodable {
-                    var ok = "draftPRCreated"
-                    var url: String
-                    var number: Int?
-                }
                 sendJSON(DraftPRAck(url: prUrl, number: prNum), on: connection)
             } else {
                 let errMsg = !errOutput.isEmpty ? errOutput : (!output.isEmpty ? output : "gh command failed")
