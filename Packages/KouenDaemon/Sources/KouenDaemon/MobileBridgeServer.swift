@@ -478,14 +478,8 @@ public final class MobileBridgeServer: @unchecked Sendable {
       .menu button:hover{background:var(--accent-soft)}
       .menu button:disabled{opacity:.4}
 
-      .sheet-bg{position:absolute;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:flex-end;z-index:6}
-      .sheet{background:var(--surface);width:100%;border-radius:20px 20px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:12px}
-      .sheet h3{margin:0;font-size:17px}
-      .field{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
-      .field input{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:9px 10px}
       .toast{position:absolute;left:16px;right:16px;bottom:96px;background:var(--ink);color:var(--surface);border-radius:12px;padding:10px 14px;font-size:14px;display:flex;justify-content:space-between;gap:10px;z-index:10}
       .toast span:last-child{font-family:var(--f-mono);font-size:12px;opacity:.8;white-space:nowrap}
-      @media (prefers-reduced-motion:no-preference){.sheet{animation:up .18s ease-out}@keyframes up{from{transform:translateY(30px);opacity:.6}}}
       </style>
     </head>
     <body>
@@ -552,19 +546,6 @@ public final class MobileBridgeServer: @unchecked Sendable {
           </div>
         </div>
 
-        <!-- PR Sheet -->
-        <div class="sheet-bg" id="sheet" hidden>
-          <div class="sheet" role="dialog" aria-labelledby="pr-h">
-            <h3 id="pr-h">Open draft pull request</h3>
-            <div class="field"><label for="pr-title">Title</label><input id="pr-title"></div>
-            <div class="field"><span>Branch</span><span class="sub" id="pr-branch" style="color:var(--ink)"></span></div>
-            <div class="sub" id="pr-stat"></div>
-            <div style="display:flex;gap:8px">
-              <button class="btn ghost" id="pr-cancel" style="flex:1">Cancel</button>
-              <button class="btn primary" id="pr-go" style="flex:2">Create draft &amp; open in GitHub</button>
-            </div>
-          </div>
-        </div>
 
         <!-- Toast -->
         <div class="toast" id="toast" hidden><span id="toast-t"></span><span id="toast-s"></span></div>
@@ -818,22 +799,11 @@ public final class MobileBridgeServer: @unchecked Sendable {
         }
         return;
       }
-      $("pr-title").value = cur.name || "Draft PR";
-      $("pr-branch").textContent = cur.branch || "feat";
-      const add = cur.files ? cur.files.reduce((x, f) => x + f[1], 0) : 0;
-      const del = cur.files ? cur.files.reduce((x, f) => x + f[2], 0) : 0;
-      $("pr-stat").textContent = `${cur.files ? cur.files.length : 0} files changed (+${add} −${del})`;
-      $("sheet").hidden = false;
-    }
-    $("pr-cancel").onclick = () => { $("sheet").hidden = true; };
-    $("pr-go").onclick = () => {
-      const title = $("pr-title").value.trim() || cur.name || "Draft PR";
-      $("sheet").hidden = true;
       toast("Creating draft PR…", "gh pr create --draft");
       if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ createDraftPR: { title, path: cur.cwd } }));
+        ws.send(JSON.stringify({ createDraftPR: { title: cur.name || "Draft PR", path: cur.cwd } }));
       }
-    };
+    }
 
     $("msg").addEventListener("input", syncSend);
     $("send").onclick = () => send($("msg").value);
