@@ -18,7 +18,7 @@ In **Settings → Terminal**, configure ordered fallback font families and OpenT
 
 The output receiver processes bounded batches and yields between them. Output order, replay boundaries, and consumption acknowledgements remain ordered. System scroller-style changes preserve scrollbar visibility and its existing hide deadline. Packed retained history and damage-driven row snapshots reduce repeated copying and rendering; hidden panes stop requesting frames.
 
-Windows resolve the saved sidebar state, tab-row placement, and final geometry before presentation. The initial window waits for a real daemon snapshot before mounting terminal panes, avoiding a temporary attachment and reconnecting chip. Loading a window does not rewrite the saved sidebar setting.
+Windows resolve the saved sidebar state, tab-row placement, and final geometry before presentation. The initial window waits for a real daemon snapshot before mounting terminal panes, avoiding a temporary attachment and reconnecting chip. Loading a window does not rewrite the saved sidebar setting. In 2.3.1, a window awaiting its first snapshot shows connecting, update, or retry controls. An older service remains running until an explicit restart decision; the restart cleans only that stopped owner's unchanged control socket.
 
 ## Update behavior
 

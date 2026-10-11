@@ -130,24 +130,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
 
     @objc private func restartSessionService() {
-        let snapshot = SessionCoordinator.shared.snapshot
-        let leaves = snapshot.workspaces.flatMap(\.sessions).flatMap(\.tabs).flatMap { $0.rootPane.allSurfaceIDs() }
-        let alert = NSAlert()
-        alert.messageText = "Restart the session service?"
-        alert.informativeText = "This stops every shell and program owned by the service, including background jobs. The current layout contains \(leaves.count) panes. Saved layouts will reopen with fresh shells."
-        alert.addButton(withTitle: "Cancel")
-        alert.addButton(withTitle: "Restart Only If Empty")
-        alert.addButton(withTitle: "Stop Shells and Restart")
-        let result = alert.runModal()
-        guard result != .alertFirstButtonReturn else { return }
-        DaemonLauncher.shared.restart(force: result == .alertThirdButtonReturn) { failure in
-            if let failure {
-                let error = NSAlert()
-                error.messageText = "Session service could not restart"
-                error.informativeText = failure
-                error.runModal()
-            } else { SessionCoordinator.shared.refreshSnapshot() }
-        }
+        SessionCoordinator.shared.presentSessionServiceRestart()
     }
 
     private func addHeader(_ text: String, to menu: NSMenu) {

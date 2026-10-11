@@ -5,6 +5,26 @@ import HarnessCore
 
 @MainActor
 final class WindowAppearanceTests: XCTestCase {
+    func testStartupNoticeProvidesRecoveryWithoutRestartingUnknownOwners() {
+        let view = SessionStartupView()
+        XCTAssertEqual(view.heading.stringValue, "Connecting to your sessions…")
+        XCTAssertTrue(view.retry.isHidden)
+        XCTAssertTrue(view.restart.isHidden)
+        view.configure(.blocked(DaemonUpgrade(stats: nil)))
+        XCTAssertFalse(view.retry.isHidden)
+        XCTAssertTrue(view.restart.isHidden, "An unverified owner cannot offer a destructive restart")
+        let stats = DaemonStats(pid: 123, uptimeSeconds: 0, surfaceCount: 3, totalScrollbackBytes: 0,
+            clientCount: 0, subscriberCount: 0, snapshotRevision: 0, version: "2.1.0", build: 132)
+        view.configure(.blocked(DaemonUpgrade(stats: stats)))
+        XCTAssertEqual(view.heading.stringValue, "Finish updating Harness")
+        XCTAssertFalse(view.restart.isHidden)
+        XCTAssertTrue(view.detail.stringValue.contains("Save your work"))
+        view.configure(.unavailable)
+        XCTAssertEqual(view.heading.stringValue, "Couldn’t load your sessions")
+        XCTAssertFalse(view.retry.isHidden)
+        XCTAssertTrue(view.restart.isHidden)
+    }
+
     override class func setUp() {
         super.setUp()
         setenv("HARNESS_HOME", "/tmp/hwa-\(UUID().uuidString.prefix(6))", 1)
@@ -37,6 +57,9 @@ final class WindowAppearanceTests: XCTestCase {
             XCTAssertEqual(content.frame.maxX, split.bounds.maxX, accuracy: 1)
             let tabBar = try XCTUnwrap(content.subviews.first { $0 is TerminalTabBarView })
             XCTAssertEqual(tabBar.isHidden, visible)
+            let terminalHost = try XCTUnwrap(content.subviews.first { $0.subviews.contains { $0 is SessionStartupView } })
+            let startup = try XCTUnwrap(terminalHost.subviews.first { $0 is SessionStartupView } as? SessionStartupView)
+            XCTAssertFalse(startup.isHidden, "An unhydrated window must have a visible startup state")
             XCTAssertEqual(SessionCoordinator.shared.settings.sidebarVisible, visible)
             window.setContentSize(NSSize(width: 1120, height: 660))
             root.view.layoutSubtreeIfNeeded()

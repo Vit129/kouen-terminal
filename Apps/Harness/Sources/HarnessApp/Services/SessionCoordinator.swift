@@ -679,12 +679,61 @@ final class SessionCoordinator: NSObject {
     private var appliedSnapshots = 0
     var isAwaitingInitialSnapshot: Bool { appliedSnapshots == 0 }
 
+    private(set) var localStartupState = SessionStartupState.connecting
+
+    private func updateLocalStartupState(_ state: SessionStartupState) {
+        localStartupState = state
+        NotificationCenter.default.post(name: .harnessLocalStartupChanged, object: self)
+    }
+
+    func connectLocalService(completion: @escaping @MainActor @Sendable (Bool) -> Void = { _ in }) {
+        updateLocalStartupState(.connecting)
+        DaemonLauncher.shared.ensureRunning { [weak self] ready in
+            guard let self else { completion(false); return }
+            guard ready else {
+                self.updateLocalStartupState(DaemonLauncher.shared.pendingUpgrade.map(SessionStartupState.blocked) ?? .unavailable)
+                completion(false)
+                return
+            }
+            StartupMetrics.shared.mark(.daemonConnected)
+            self.syncFromDaemon { synced in
+                if !synced { self.updateLocalStartupState(.unavailable) }
+                completion(synced)
+            }
+        }
+    }
+
+    func presentSessionServiceRestart() {
+        let count = DaemonLauncher.shared.pendingUpgrade?.shellCount
+            ?? snapshot.workspaces.flatMap(\.sessions).flatMap(\.tabs).flatMap { $0.rootPane.allSurfaceIDs() }.count
+        let alert = NSAlert()
+        alert.messageText = "Restart the session service?"
+        let panes = count == 1 ? "1 pane" : "\(count) panes"
+        alert.informativeText = "This stops every shell and program owned by the service, including background jobs. The service reports \(panes). Saved layouts will reopen with fresh shells."
+        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: "Restart Only If Empty")
+        alert.addButton(withTitle: "Stop Shells and Restart")
+        let result = alert.runModal()
+        guard result != .alertFirstButtonReturn else { return }
+        updateLocalStartupState(.connecting)
+        DaemonLauncher.shared.restart(force: result == .alertThirdButtonReturn) { failure in
+            if let failure {
+                self.updateLocalStartupState(DaemonLauncher.shared.pendingUpgrade.map(SessionStartupState.blocked) ?? .unavailable)
+                let error = NSAlert()
+                error.messageText = "Session service could not restart"
+                error.informativeText = failure
+                error.runModal()
+            } else { self.connectLocalService() }
+        }
+    }
+
     private func applySnapshot(_ remote: SessionSnapshot, metadataOnly: Bool) {
         StartupMetrics.shared.mark(.firstSnapshot) // idempotent: records the first hydration only
+        let firstSnapshot = appliedSnapshots == 0
         appliedSnapshots += 1
         // Nothing moved (the safety poll, a sync after an action that changed nothing): no
         // window needs to hear about it.
-        if metadataOnly, remote == snapshot, lastRevision == remote.revision { return }
+        if !firstSnapshot, metadataOnly, remote == snapshot, lastRevision == remote.revision { return }
         let structureChanged = structureFingerprint(remote) != structureFingerprint(snapshot)
         // A CLI-driven theme change arrives by push (metadata-only), so it must force the
         // chrome path itself — recurring syncs otherwise never rebuild renderers.
@@ -729,6 +778,7 @@ final class SessionCoordinator: NSObject {
                 "metadataOnly": metadataOnly,
             ]
         )
+        if firstSnapshot { (NSApp.delegate as? AppDelegate)?.sessionServiceDidConnect() }
     }
 
     /// Clean-quit reap of ephemeral (Plain-mode, unpinned) sessions. Best-effort but *reliable*: the
@@ -3005,6 +3055,7 @@ private enum HarnessPathDisplay {
 }
 
 extension Notification.Name {
+    static let harnessLocalStartupChanged = Notification.Name("HarnessLocalStartupChanged")
     /// The focused pane changed (pane headers re-dim on this).
     static let harnessActiveSurfaceDidChange = Notification.Name("HarnessActiveSurfaceDidChange")
     /// Some pane's size owner changed (its header shows or hides "Viewing at …").

@@ -10,16 +10,16 @@ It runs on the `macos-26` runner with Xcode 26.6, the same runner and pinned
 `XCODE_VERSION` as CI, so a release is built by the toolchain CI tested. Bump
 `XCODE_VERSION` in `release.yml` and `ci.yml` together.
 
-## Harness 2.3.0 (134)
+## Harness 2.3.1 (135)
 
 This release improves terminal parsing, packed history, rendering and output transport;
 adds stable text anchors, precise command actions, Unicode grapheme handling and font
-controls; and fixes startup layout. See [terminal quality](TERMINAL-QUALITY.md). See the [changelog](../CHANGELOG.md),
+controls; and fixes startup layout. The 2.3.1 patch adds explicit startup recovery for an older service and fenced cleanup of its control socket after an authorized restart. See [terminal quality](TERMINAL-QUALITY.md). See the [changelog](../CHANGELOG.md),
 [implementation evidence](DEVELOPMENT-IMPLEMENTATION.md), and
 [native acceptance](NATIVE-ACCEPTANCE.md). The private iOS companion remains separately distributed.
 
 Version declarations and generated update notes move together. Run CI on the shipping commit,
-then the release workflow with `tag=v2.3.0` and `deploy_appcast=true`. Signing, notarization,
+then the release workflow with `tag=v2.3.1` and `deploy_appcast=true`. Signing, notarization,
 DMG smoke testing, and live appcast verification must pass before publication. The GitHub
 release and workflow retain the publication evidence and asset checksum.
 

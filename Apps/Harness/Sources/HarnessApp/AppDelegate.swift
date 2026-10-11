@@ -13,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Observes the macOS system appearance so auto light/dark theme switching can follow it.
     private var appearanceObservation: NSKeyValueObservation?
     private var externalOpenReady = false
+    private var restoredInitialWindows = false
     private var contextClickMonitor: Any?
     /// Each window's notification observers, removed when it closes.
     private var windowObservers: [ObjectIdentifier: [NSObjectProtocol]] = [:]
@@ -74,28 +75,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DesktopNotifier.configurePresentation()
 
         // Locate/spawn the daemon off the main thread, then sync from real state.
-        DaemonLauncher.shared.ensureRunning { ok in
-            if ok { StartupMetrics.shared.mark(.daemonConnected) }
-            SessionCoordinator.shared.syncFromDaemon { synced in
-                if !ok || !synced {
-                    SessionCoordinator.shared.noteDaemonError(DaemonClientError.timeout)
-                }
-                // Refresh the window chrome after the daemon is hydrated so it matches the effective theme.
-                self.windowControllers.forEach { $0.effectiveAppearanceDidChange() }
-                if synced { self.restoreWindows() }
-                Self.reconcileSessionPersistenceWithMode()
-                OnboardingController.presentIfNeeded()
-                self.externalOpenReady = true
-                if synced {
-                    self.drainQueuedExternalOpenURLs()
-                } else if !self.queuedExternalOpens.isEmpty {
-                    // Daemon wasn't hydrated yet: opening a queued URL/.command now would create its tab
-                    // against a not-ready daemon and be dropped. Retry the drain on a bounded backoff
-                    // until a sync succeeds, instead of losing the open.
-                    self.retryQueuedExternalOpenDrain(attempt: 0)
-                }
+        SessionCoordinator.shared.connectLocalService { synced in
+            // Refresh the window chrome after the daemon is hydrated so it matches the effective theme.
+            self.windowControllers.forEach { $0.effectiveAppearanceDidChange() }
+            OnboardingController.presentIfNeeded()
+            self.externalOpenReady = true
+            if synced {
+                self.drainQueuedExternalOpenURLs()
+            } else if !self.queuedExternalOpens.isEmpty {
+                // Daemon wasn't hydrated yet: opening a queued URL/.command now would create its tab
+                // against a not-ready daemon and be dropped. Retry the drain on a bounded backoff
+                // until a sync succeeds, instead of losing the open.
+                self.retryQueuedExternalOpenDrain(attempt: 0)
             }
         }
+    }
+
+    func sessionServiceDidConnect() {
+        guard !restoredInitialWindows else { return }
+        restoredInitialWindows = true
+        restoreWindows()
+        Self.reconcileSessionPersistenceWithMode()
+        if externalOpenReady { drainQueuedExternalOpenURLs() }
     }
 
     private static var modePersistenceLastAppliedKey: String { UIStateDefaults.key("HarnessModePersistenceLastAppliedMode") }

@@ -12,5 +12,6 @@ xcodebuild -version
 swift build
 swift build -c release
 HARNESS_LIVE_DAEMON_TESTS=1 swift test --enable-code-coverage
+python3 Scripts/test-macos-upgrade.py
 xcodebuild -project Harness.xcodeproj -scheme Harness -configuration Debug \
   -derivedDataPath .build/xcode CODE_SIGNING_ALLOWED=NO build

@@ -2,6 +2,81 @@ import AppKit
 import HarnessCore
 import HarnessTerminalKit
 
+enum SessionStartupState: Equatable {
+    case connecting
+    case blocked(DaemonUpgrade)
+    case unavailable
+}
+
+@MainActor
+final class SessionStartupView: NSStackView {
+    let heading = NSTextField(wrappingLabelWithString: "")
+    let detail = NSTextField(wrappingLabelWithString: "")
+    let retry = NSButton(title: "Retry Connection", target: nil, action: nil)
+    let restart = NSButton(title: "Restart Session Service…", target: nil, action: nil)
+    private let progress = NSProgressIndicator()
+
+    init() {
+        super.init(frame: .zero)
+        orientation = .vertical
+        alignment = .centerX
+        spacing = 14
+        edgeInsets = NSEdgeInsets(top: 24, left: 24, bottom: 24, right: 24)
+        wantsLayer = true
+        layer?.cornerRadius = 14
+        heading.font = .systemFont(ofSize: 20, weight: .semibold)
+        heading.alignment = .center
+        detail.font = .systemFont(ofSize: 13)
+        detail.textColor = .secondaryLabelColor
+        detail.alignment = .center
+        progress.style = .spinning
+        progress.controlSize = .small
+        let buttons = NSStackView(views: [retry, restart])
+        buttons.orientation = .vertical
+        buttons.spacing = 10
+        [progress, heading, detail, buttons].forEach(addArrangedSubview)
+        configure(.connecting)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError() }
+
+    func applyChrome() {
+        let chrome = HarnessChrome.current
+        appearance = NSAppearance(named: chrome.isDark ? .darkAqua : .aqua)
+        layer?.backgroundColor = chrome.terminalBackground.withAlphaComponent(1).cgColor
+        heading.textColor = chrome.textPrimary
+        detail.textColor = chrome.textSecondary
+    }
+
+    func configure(_ state: SessionStartupState) {
+        applyChrome()
+        progress.isHidden = state != .connecting
+        if state == .connecting { progress.startAnimation(nil) } else { progress.stopAnimation(nil) }
+        retry.isHidden = state == .connecting
+        restart.isHidden = true
+        switch state {
+        case .connecting:
+            heading.stringValue = "Connecting to your sessions…"
+            detail.stringValue = "Your saved workspace will appear when the local service is ready."
+        case let .blocked(upgrade):
+            heading.stringValue = "Session service needs attention"
+            if upgrade.shutdownPending == true {
+                detail.stringValue = "The session service is still shutting down. Retry after its programs have exited."
+            } else if upgrade.shellCount != nil {
+                heading.stringValue = "Finish updating Harness"
+                detail.stringValue = "The installed app cannot connect to the older session service. Your existing programs have been preserved. Save your work before restarting the service; saved layouts will reopen with fresh shells."
+                restart.isHidden = false
+            } else {
+                detail.stringValue = "The local session service could not be verified. Existing programs have been preserved. Retry to check its connection again."
+            }
+        case .unavailable:
+            heading.stringValue = "Couldn’t load your sessions"
+            detail.stringValue = "The local session service is unavailable. Retry to reconnect. Existing programs have been preserved."
+        }
+    }
+}
+
 @MainActor
 final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate {
     /// The session this window shows; set by `MainSplitViewController`.
@@ -33,6 +108,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
     private let connectionNotice = NSStackView()
     private let connectionLabel = NSTextField(labelWithString: "")
     private let retryButton = NSButton(title: "Retry", target: nil, action: nil)
+    private let startupNotice = SessionStartupView()
     private var lastStructureKey = ""
     private var pendingReload: Bool?
     /// Pasteboard change counter captured at left-mouse-down. On mouse-up, if it
@@ -57,6 +133,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         view.layer?.backgroundColor = NSColor.clear.cgColor
         refreshTerminalHostFill()
         tabBar.applyChrome()
+        startupNotice.applyChrome()
         paneContainer?.applyChrome()
         // Density lives in the structure key, so a Comfortable/Compact change rebuilds
         // the islands instead of leaving the previous insets in place.
@@ -152,6 +229,24 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         ])
         refreshConnectionNotice()
 
+        startupNotice.translatesAutoresizingMaskIntoConstraints = false
+        terminalHost.addSubview(startupNotice)
+        let startupWidth = startupNotice.widthAnchor.constraint(lessThanOrEqualTo: terminalHost.widthAnchor, constant: -48)
+        startupWidth.priority = .defaultHigh
+        NSLayoutConstraint.activate([
+            startupNotice.centerXAnchor.constraint(equalTo: terminalHost.centerXAnchor),
+            startupNotice.centerYAnchor.constraint(equalTo: terminalHost.centerYAnchor),
+            startupNotice.widthAnchor.constraint(lessThanOrEqualToConstant: 460),
+            startupWidth,
+        ])
+        startupNotice.retry.target = self
+        startupNotice.retry.action = #selector(retryLocalStartup)
+        startupNotice.restart.target = self
+        startupNotice.restart.action = #selector(restartLocalService)
+        NotificationCenter.default.addObserver(self, selector: #selector(refreshStartupNotice),
+            name: .harnessLocalStartupChanged, object: nil)
+        refreshStartupNotice()
+
         installCopySelectionToast()
         reloadTabBar()
     }
@@ -197,6 +292,15 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
     /// so a change in another window or on another machine leaves them alone.
     @objc private func retryRemote() { SessionCoordinator.shared.retryConnection(context.owner) }
 
+    @objc private func retryLocalStartup() { SessionCoordinator.shared.connectLocalService() }
+    @objc private func restartLocalService() { SessionCoordinator.shared.presentSessionServiceRestart() }
+
+    @objc private func refreshStartupNotice() {
+        let coordinator = SessionCoordinator.shared
+        startupNotice.isHidden = context.owner != DaemonSidebar.localID || !coordinator.isAwaitingInitialSnapshot
+        if !startupNotice.isHidden { startupNotice.configure(coordinator.localStartupState) }
+    }
+
     private func refreshConnectionNotice() {
         tabBar.updateMachine(owner: context.owner)
         let state = SessionCoordinator.shared.connectionDescription(for: context.owner)
@@ -209,6 +313,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
     }
 
     func snapshotChanged(structureChanged: Bool, metadataOnly: Bool) {
+        refreshStartupNotice()
         refreshConnectionNotice()
         if metadataOnly && !structureChanged {
             refreshTabBarMetadata()

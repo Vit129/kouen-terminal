@@ -8,6 +8,8 @@ Run `Scripts/ci-macos.sh` from a checkout. It reports the installed Swift/Xcode 
 
 The [Local macOS CI workflow](../.github/workflows/local-macos.yml) runs the same script on a runner labeled `harness-macos`. It is manually dispatched and restricted to `main`, with read-only repository permission and no persisted checkout credential. Pull-request jobs continue using GitHub-hosted runners. The existing protected release workflow retains signing and notarization secrets; they are not placed in the VM template.
 
+Both macOS CI paths also run `Scripts/test-macos-upgrade.py` against the published 2.1.0 service binary, downloaded with a pinned SHA-256. In a disposable home, it verifies that restart without explicit force preserves the old service, then that an authorized restart brings up the current service with a restored terminal. This covers the running-service upgrade boundary that fresh, same-version tests missed in 2.3.0; startup recovery controls and socket-owner preservation also have focused unit coverage.
+
 ## VM template
 
 The preparation uses the upstream image `ghcr.io/cirruslabs/macos-tahoe-xcode:27` from [Cirrus Labs](https://github.com/cirruslabs/macos-image-templates/releases/tag/27), named `harness-ci-base`. The image has the Tart guest agent for `tart exec`. The downloaded template boots macOS 26.6.2 with Xcode 27.0; `tart exec` and Remote Login were verified. Local Xcode 27 checks supplement the shipping CI/release toolchain, which remains Xcode 26.6. A VM run is not evidence of physical GPU performance; guest Metal support and skipped cases must be reported as observed.

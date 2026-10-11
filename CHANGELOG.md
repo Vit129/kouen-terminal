@@ -8,6 +8,13 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 
 ## [Unreleased]
 
+## [2.3.1] - 2026-10-11
+
+### Fixed
+
+- Launching against an older or unavailable session service shows a clear recovery state instead of an empty window. Saved windows restore after the first successful connection, including a later retry.
+- An explicit service restart removes only the stopped owner's unchanged control socket under the startup lock. Inherited listener descriptors no longer prevent the replacement from starting; live owners and newer endpoints are preserved.
+
 ## [2.3.0] - 2026-10-11
 
 Harness 2.3 improves terminal throughput, retained history, command interaction, Unicode handling, and startup layout.
