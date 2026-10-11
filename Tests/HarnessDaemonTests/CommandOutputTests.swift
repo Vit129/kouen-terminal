@@ -21,6 +21,13 @@ final class CommandOutputSpanTests: XCTestCase {
             }
             sequence += UInt64(data.count)
         }
+        // Injection is serialized asynchronously with live PTY reads. Wait for
+        // the final injected chunk before asking the replay ring for its span.
+        let injected = Date().addingTimeInterval(2)
+        while !pty.replay(fromSequence: nil).contains("next prompt"), Date() < injected {
+            Thread.sleep(forTimeInterval: 0.01)
+        }
+        XCTAssertTrue(pty.replay(fromSequence: nil).contains("next prompt"))
         let completed = try XCTUnwrap(span)
         let output = try pty.commandOutput(span: completed, maximumBytes: 1024)
         XCTAssertEqual(output.text, "line 🙂\n"); XCTAssertEqual(output.span.exitCode, 7)

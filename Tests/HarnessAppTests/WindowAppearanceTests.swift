@@ -50,6 +50,19 @@ final class WindowAppearanceTests: XCTestCase {
         return QuickTerminalPanel(contentRect: NSRect(x: 0, y: 0, width: 100, height: 100))
     }
 
+    func testNotificationsAreUnavailableOutsideAnAppBundle() async throws {
+        guard Bundle.main.bundleURL.pathExtension != "app" else { throw XCTSkip("Requires an unpackaged test host") }
+        DesktopNotifier.configurePresentation()
+        DesktopNotifier.show(title: "Fixture", body: "Must not deliver", withSound: false)
+        DesktopNotifier.requestOrOpenSettings()
+        var result: String?
+        DesktopNotifier.sendTest { result = $0 }
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: .seconds(2))
+        while result == nil, clock.now < deadline { try await Task.sleep(for: .milliseconds(10)) }
+        XCTAssertEqual(result, "Notifications require a packaged macOS application.")
+    }
+
     func testQuickTerminalCanTransitionBetweenOpaqueAndTranslucent() {
         let panel = makePanel()
         defer { panel.close() }

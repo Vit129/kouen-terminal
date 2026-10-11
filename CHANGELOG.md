@@ -31,7 +31,7 @@ Harness 2.3 improves terminal throughput, retained history, command interaction,
 - Windows apply their saved sidebar state and final geometry before presentation, eliminating the initial half-width sidebar jump. Restored secondary windows receive their saved frame before being shown.
 - Agent activity records kernel process exits even before the parent reaps the process, retaining the final hook status.
 - Startup no longer invents a temporary terminal or attempts to attach it before the daemon's real snapshot arrives.
-- Sidebar collapse, tab creation, and hidden connection notices avoid conflicting layout constraints during installation and resizing.
+- Sidebar collapse, tab creation, and hidden connection notices avoid conflicting layout constraints during installation and resizing. System scroller-style changes preserve scrollbar visibility and its existing hide deadline.
 - Malformed output sequence spans are rejected before arithmetic can overflow. Valid sequence limits remain supported.
 - Render completion ordering, replay consumption fences, history restoration, and selection invalidation retain their current operation identity through resize, reconnect, and remount.
 

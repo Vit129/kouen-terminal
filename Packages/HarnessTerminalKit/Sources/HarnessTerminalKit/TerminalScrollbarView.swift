@@ -83,7 +83,7 @@ final class TerminalScrollbarView: NSScroller {
 
     @objc private func styleChanged() {
         scrollerStyle = NSScroller.preferredScrollerStyle
-        show(topLine: topLine, totalLines: totalLines, visibleRows: visibleRows)
+        // A preference change is not scrolling: preserve visibility and its hide deadline.
     }
 
     deinit { NotificationCenter.default.removeObserver(self) }

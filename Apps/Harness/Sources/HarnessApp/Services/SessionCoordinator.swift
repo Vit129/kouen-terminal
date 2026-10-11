@@ -2821,9 +2821,15 @@ extension SessionCoordinator: TerminalHostDelegate {
 }
 
 enum DesktopNotifier {
+    private static var notificationCenter: UNUserNotificationCenter? {
+        // UserNotifications traps when invoked by an unpackaged executable or XCTest host.
+        guard Bundle.main.bundleURL.pathExtension == "app", Bundle.main.bundleIdentifier != nil else { return nil }
+        return UNUserNotificationCenter.current()
+    }
+
     /// Register foreground delivery without asking for permission before the user chooses setup.
     static func configurePresentation() {
-        let center = UNUserNotificationCenter.current()
+        guard let center = notificationCenter else { return }
         // Without a delegate that opts in, macOS suppresses banners while Harness is
         // the *frontmost* app — so an agent notification fired while you're looking at
         // another tab would silently no-op. The presenter forces banner + sound + list
@@ -2832,7 +2838,7 @@ enum DesktopNotifier {
     }
 
     static func show(title: String, body: String, withSound: Bool = true, owner: String? = nil, surfaceID: String? = nil) {
-        let center = UNUserNotificationCenter.current()
+        guard let center = notificationCenter else { return }
         // The delegate is set once in `configurePresentation` (called at app launch
         // before any notification can fire) and in `requestOrOpenSettings` / `sendTest`.
         // Re-setting it here on every banner delivery was redundant and slightly wasteful
@@ -2863,7 +2869,8 @@ enum DesktopNotifier {
             content: content,
             trigger: nil
         )
-        UNUserNotificationCenter.current().add(request) { error in
+        guard let center = notificationCenter else { return }
+        center.add(request) { error in
             if let error {
                 fputs("Harness notification delivery failed: \(error)\n", harnessStderr)
             }
@@ -2873,9 +2880,8 @@ enum DesktopNotifier {
     /// The current system authorization status, on the main actor — drives the Settings
     /// permission indicator so the user can tell whether macOS is allowing alerts at all.
     static func authorizationStatus(_ completion: @escaping @MainActor (UNAuthorizationStatus) -> Void) {
-        // UNUserNotificationCenter throws outside an app bundle (a unit test host, `swift run`).
-        guard Bundle.main.bundleURL.pathExtension == "app" else { return }
-        UNUserNotificationCenter.current().getNotificationSettings { settings in
+        guard let center = notificationCenter else { return }
+        center.getNotificationSettings { settings in
             let status = settings.authorizationStatus
             DispatchQueue.main.async { MainActor.assumeIsolated { completion(status) } }
         }
@@ -2885,8 +2891,9 @@ enum DesktopNotifier {
     /// Settings ▸ Notifications when macOS has already denied us (the system never re-prompts
     /// after a denial, so the only path back is the settings pane).
     static func requestOrOpenSettings() {
-        UNUserNotificationCenter.current().delegate = ForegroundPresenter.shared
-        UNUserNotificationCenter.current().getNotificationSettings { settings in
+        guard let center = notificationCenter else { return }
+        center.delegate = ForegroundPresenter.shared
+        center.getNotificationSettings { settings in
             switch settings.authorizationStatus {
             case .denied:
                 DispatchQueue.main.async { openSystemNotificationSettings() }
@@ -2909,7 +2916,10 @@ enum DesktopNotifier {
     /// agent-activity gates; still honors the system permission). If permission isn't granted
     /// yet, request/route it first so the test isn't a silent no-op.
     static func sendTest(_ completion: @escaping @MainActor @Sendable (String) -> Void) {
-        let center = UNUserNotificationCenter.current()
+        guard let center = notificationCenter else {
+            DispatchQueue.main.async { completion("Notifications require a packaged macOS application.") }
+            return
+        }
         center.delegate = ForegroundPresenter.shared
         let report: @Sendable (String) -> Void = { message in
             DispatchQueue.main.async { completion(message) }

@@ -6,7 +6,7 @@
 extension ReleaseNotes {
     public static let current = ReleaseNotes(
         version: "2.3.0",
-        changelogDigest: "cb91a3d92b7548ef",
+        changelogDigest: "9d3a1ab5893e0dcf",
         sections: [
             Section(title: "Added", items: [
                 "Stable text anchors keep selections, reading positions, and search results attached to their text through resizing and history movement",

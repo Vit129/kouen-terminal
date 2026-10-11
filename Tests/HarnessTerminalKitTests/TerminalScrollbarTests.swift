@@ -12,9 +12,25 @@ final class TerminalScrollbarTests: XCTestCase {
             XCTAssertFalse(scrollbar.isHidden)
             XCTAssertEqual(scrollbar.doubleValue, 0.5, accuracy: 0.001)
             XCTAssertEqual(scrollbar.knobProportion, 1.0 / 3, accuracy: 0.001)
-            try await Task.sleep(for: .milliseconds(100))
-            XCTAssertTrue(scrollbar.isHidden)
+            try await waitUntilHidden(scrollbar)
         }
+    }
+
+    func testStyleChangeDoesNotRevealAnIdleScrollbar() async throws {
+        let scrollbar = TerminalScrollbarView(frame: .zero)
+        scrollbar.show(topLine: 40, totalLines: 120, visibleRows: 40, fadeOutAfter: 0.01)
+        try await waitUntilHidden(scrollbar)
+        NotificationCenter.default.post(name: NSScroller.preferredScrollerStyleDidChangeNotification, object: nil)
+        XCTAssertTrue(scrollbar.isHidden)
+    }
+
+    private func waitUntilHidden(_ scrollbar: TerminalScrollbarView) async throws {
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: .seconds(2))
+        while !scrollbar.isHidden, clock.now < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertTrue(scrollbar.isHidden)
     }
 
     func testContinuedScrollingResetsTheHideDeadline() async throws {
