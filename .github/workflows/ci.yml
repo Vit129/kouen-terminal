@@ -97,6 +97,19 @@ jobs:
           path: .build/*/debug/codecov/*.json
           if-no-files-found: warn
 
+      - name: Wait for test crash diagnostics
+        if: ${{ failure() }}
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import time
+          reports = Path.home() / "Library/Logs/DiagnosticReports"
+          for _ in range(10):
+              if any(any(reports.glob(pattern)) for pattern in ("xctest*.ips", "Harness*.ips", "xctest*.crash", "Harness*.crash")):
+                  break
+              time.sleep(1)
+          PY
+
       - name: Upload test crash reports
         if: ${{ failure() }}
         uses: actions/upload-artifact@v7
@@ -105,6 +118,8 @@ jobs:
           path: |
             ~/Library/Logs/DiagnosticReports/xctest*.ips
             ~/Library/Logs/DiagnosticReports/Harness*.ips
+            ~/Library/Logs/DiagnosticReports/xctest*.crash
+            ~/Library/Logs/DiagnosticReports/Harness*.crash
           if-no-files-found: warn
 
   linux-build-test:
