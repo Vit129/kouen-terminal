@@ -73,6 +73,9 @@ final class AgentActivityTests: XCTestCase {
         let service = AgentActivityService(store: store, hostID: hostID)
         defer { try? service.suspend() }
         XCTAssertTrue(waitUntil { (try? store.run(run.id)?.process) == .exited })
+        // The durable commit becomes visible before the serial service queue
+        // updates its in-memory projection. Wait for that same operation to finish.
+        service.drain()
         XCTAssertNil(service.currentRun(surfaceID: run.surfaceID))
         XCTAssertEqual(ProcessScan.generation(pid), current, "reconciliation must never signal the reused process")
     }
