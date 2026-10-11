@@ -3,6 +3,34 @@ import HarnessCore
 @testable import HarnessDaemonCore
 
 final class NotificationServiceTests: XCTestCase {
+    func testAdmittedNoticeFinishesAfterItsOwnerIsReleased() throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("hnotifications-lifetime-" + UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: home) }
+        #if os(macOS)
+        let protection = try HistoryProtection(keyMaterial: Data(repeating: 97, count: 32))
+        #else
+        let protection = HistoryProtection.system()
+        #endif
+        let store = ActivityStore(url: home.appendingPathComponent("activity.sqlite"), protection: protection)
+        let queue = DispatchQueue(label: "harness.notification-lifetime-test")
+        var settings = HarnessSettings()
+        var policy = NotificationPolicySettings(); policy.burstSeconds = 10
+        settings.notificationPolicy = policy
+        var service: NotificationService? = NotificationService(store: store, settings: settings,
+            settingsURL: home.appendingPathComponent("settings.json"), queue: queue)
+        try service?.activate()
+        weak var admittedService = service
+        queue.suspend()
+        service?.submit(NotificationNotice(surfaceID: UUID().uuidString, event: .agentWaiting, title: "admitted notice"))
+        service = nil
+        let retainedUntilCompletion = admittedService != nil
+        queue.resume()
+        queue.sync {}
+        XCTAssertTrue(retainedUntilCompletion, "Admitted work must retain its owner until the queue slot is returned")
+        XCTAssertNil(admittedService, "Completed work must release its owner")
+        XCTAssertEqual(try store.objectPage(PendingProjection.self, kind: "notification-pending", limit: 129).count, 1)
+    }
+
     func testUnavailableStorageBacksOffAndDeliveryRecovers() throws {
         let home = FileManager.default.temporaryDirectory.appendingPathComponent("hnotifications-retry-" + UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: home) }

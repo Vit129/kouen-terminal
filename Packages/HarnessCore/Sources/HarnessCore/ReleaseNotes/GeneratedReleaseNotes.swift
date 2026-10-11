@@ -6,7 +6,7 @@
 extension ReleaseNotes {
     public static let current = ReleaseNotes(
         version: "2.3.0",
-        changelogDigest: "9d3a1ab5893e0dcf",
+        changelogDigest: "610eb663ba7827be",
         sections: [
             Section(title: "Added", items: [
                 "Stable text anchors keep selections, reading positions, and search results attached to their text through resizing and history movement",
@@ -21,6 +21,7 @@ extension ReleaseNotes {
                 "Internal session-host protocol is now 10 and terminal checkpoints use schema 2",
             ]),
             Section(title: "Fixed", items: [
+                "Admitted notification work retains its service until its queue slot is returned, preventing shutdown from deallocating an in-use semaphore",
                 "Windows apply their saved sidebar state and final geometry before presentation, eliminating the initial half-width sidebar jump",
                 "Agent activity records kernel process exits even before the parent reaps the process, retaining the final hook status",
                 "Startup no longer invents a temporary terminal or attempts to attach it before the daemon's real snapshot arrives",

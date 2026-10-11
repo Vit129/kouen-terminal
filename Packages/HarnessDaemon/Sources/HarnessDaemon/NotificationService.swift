@@ -11,7 +11,7 @@ final class NotificationService: @unchecked Sendable {
         var attempts = 0
         var coalesced = 1
     }
-    private let queue = DispatchQueue(label: "com.harness.notifications")
+    private let queue: DispatchQueue
     private let inputSlots = DispatchSemaphore(value: 128)
     private let settingsCache: DaemonSettingsCache
     private var settingsObservation: UUID?
@@ -34,7 +34,9 @@ final class NotificationService: @unchecked Sendable {
     private var failure: String?
     private var deliveryRetryAt: Date?
     var onDesktop: (@Sendable (DesktopNotificationDelivery) -> Void)?
-    init(store: ActivityStore, settings: HarnessSettings, settingsURL: URL = HarnessPaths.settingsURL) {
+    init(store: ActivityStore, settings: HarnessSettings, settingsURL: URL = HarnessPaths.settingsURL,
+         queue: DispatchQueue = DispatchQueue(label: "com.harness.notifications")) {
+        self.queue = queue
         commandThreshold = Double(max(0, settings.commandFinishedThresholdSeconds))
         self.settingsURL = settingsURL
         settingsCache = settingsURL == HarnessPaths.settingsURL ? .shared : DaemonSettingsCache(url: settingsURL)
@@ -146,16 +148,16 @@ final class NotificationService: @unchecked Sendable {
     }
     func submit(_ notice: NotificationNotice, commandDuration: TimeInterval? = nil) {
         guard inputSlots.wait(timeout: .now()) == .success else { reportOverflow(); return }
-        queue.async { [weak self] in
-            guard let self else { return }; defer { inputSlots.signal() }
+        queue.async { [self] in
+            defer { inputSlots.signal() }
             if let commandDuration, commandDuration < commandThreshold { return }
             do { try enqueue(notice) } catch { failure = error.localizedDescription }
         }
     }
     func observe(_ run: AgentRun) {
         guard inputSlots.wait(timeout: .now()) == .success else { reportOverflow(); return }
-        queue.async { [weak self] in
-            guard let self else { return }; defer { inputSlots.signal() }
+        queue.async { [self] in
+            defer { inputSlots.signal() }
             guard accepting, run.parentRunID == nil else { return }
             let previous = observed[run.id]
             if run.process == .exited { observed.removeValue(forKey: run.id) } else { observed[run.id] = run }
