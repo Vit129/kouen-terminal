@@ -16,8 +16,9 @@ Tartelet clones the base for each runner and discards the job VM after use. Star
 
 ## Repository registration
 
-The private App `Harness Local macOS CI` (App ID `5270413`) is installed only on `robzilla1738/harness-terminal`. Tartelet's key is imported into the host Keychain, the base image and guest SSH login are configured, and `Harness Local macOS 1` has been verified online with `harness-macos`. A cancelled validation job was discarded and replaced by a new runner registration, confirming the ephemeral lifecycle. Job results remain separately visible in Actions.
+The private App `Harness Local macOS CI` (App ID `5270413`) is installed only on `robzilla1738/harness-terminal`. Tartelet's key is imported into the host Keychain, the base image and guest SSH login are configured, and `Harness Local macOS 1` has been verified online with `harness-macos`.
 
+The [2.3.0 validation run](https://github.com/robzilla1738/harness-terminal/actions/runs/38116314695) passed at source `6ba5115a610d5b2f192ee1d18ef44f4852eb0c2f`: debug and release builds, 2,513 XCTest cases with zero failures and 65 skips, and the Xcode app build. Skips include optional benchmark/fixture and font cases; this does not establish physical GPU performance. After the job, Tartelet replaced the used registration with a fresh online, idle runner. Automatic startup remains disabled; start the fleet in Tartelet when local CI is needed.
 
 Configure Tartelet's GitHub scope as **Repository**, owner `robzilla1738`, repository `harness-terminal`. It needs a private GitHub App installed only for this repository, its App ID, and its private key. Prepare it at [GitHub App registration](https://github.com/settings/apps/new):
 
